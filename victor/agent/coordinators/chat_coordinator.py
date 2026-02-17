@@ -46,8 +46,12 @@ from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
-from victor.providers.base import CompletionResponse, StreamChunk
-from victor.core.errors import ProviderRateLimitError
+from victor.providers.base import CompletionResponse, Message, StreamChunk
+from victor.core.errors import (
+    ProviderAuthError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+)
 
 if TYPE_CHECKING:
     # Type-only imports
@@ -1279,29 +1283,125 @@ class ChatCoordinator:
         total_iterations: int,
         last_quality_score: float,
     ) -> tuple[bool, Optional[StreamChunk]]:
-        """Handle context length and iteration limit checks.
-
-        Delegates to orchestrator's comprehensive implementation which handles
-        context overflow with smart compaction and forced completion.
-
-        Args:
-            user_message: The user's message
-            max_total_iterations: Maximum total iterations
-            max_context: Maximum context length
-            total_iterations: Current iteration count
-            last_quality_score: Last quality score
+        """Handle context overflow and hard iteration limits.
 
         Returns:
-            Tuple of (handled, chunk) where handled is True if limits were hit
+            handled (bool): True if the caller should stop processing
+            chunk (Optional[StreamChunk]): Chunk to yield if produced
         """
         orch = self._orchestrator
-        return await orch._handle_context_and_iteration_limits(
-            user_message,
-            max_total_iterations,
-            max_context,
-            total_iterations,
-            last_quality_score,
-        )
+
+        # Context overflow handling
+        if orch._check_context_overflow(max_context):
+            logger.warning("Context overflow detected. Attempting smart compaction...")
+            removed = orch._conversation_controller.smart_compact_history(
+                current_query=user_message
+            )
+            if removed > 0:
+                logger.info(f"Smart compaction removed {removed} messages")
+                chunk = StreamChunk(
+                    content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
+                )
+                orch._conversation_controller.inject_compaction_context()
+                return False, chunk
+
+            # If still overflowing, force completion
+            if orch._check_context_overflow(max_context):
+                logger.warning("Still overflowing after compaction. Forcing completion.")
+                chunk = StreamChunk(
+                    content=f"\n[tool] {orch._presentation.icon('warning', with_color=False)} Context size limit reached. Providing summary.\n"
+                )
+                completion_prompt = orch._get_thinking_disabled_prompt(
+                    "Context limit reached. Summarize in 2-3 sentences."
+                )
+                recent_messages = orch.messages[-8:] if len(orch.messages) > 8 else orch.messages[:]
+                completion_messages = recent_messages + [
+                    Message(role="user", content=completion_prompt)
+                ]
+
+                try:
+                    response = await orch.provider.chat(
+                        messages=completion_messages,
+                        model=orch.model,
+                        temperature=orch.temperature,
+                        max_tokens=min(orch.max_tokens, 1024),
+                        tools=None,
+                    )
+                    if response and response.content:
+                        sanitized = orch.sanitizer.sanitize(response.content)
+                        if sanitized:
+                            orch.add_message("assistant", sanitized)
+                            chunk = StreamChunk(content=sanitized, is_final=True)
+                            orch._record_intelligent_outcome(
+                                success=True,
+                                quality_score=last_quality_score,
+                                user_satisfied=True,
+                                completed=True,
+                            )
+                            return True, chunk
+                except Exception as e:
+                    logger.warning(f"Final response after context overflow failed: {e}")
+                orch._record_intelligent_outcome(
+                    success=True,
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
+                return True, StreamChunk(content="", is_final=True)
+
+        # Iteration limit handling
+        if total_iterations > max_total_iterations:
+            logger.warning(
+                f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
+            )
+            iteration_prompt = orch._get_thinking_disabled_prompt(
+                "Max iterations reached. Summarize key findings in 3-4 sentences. "
+                "Do NOT attempt any more tool calls."
+            )
+            recent_messages = orch.messages[-10:] if len(orch.messages) > 10 else orch.messages[:]
+            completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
+
+            chunk = StreamChunk(
+                content=f"\n[tool] {orch._presentation.icon('warning', with_color=False)} Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+            )
+
+            try:
+                response = await orch.provider.chat(
+                    messages=completion_messages,
+                    model=orch.model,
+                    temperature=orch.temperature,
+                    max_tokens=min(orch.max_tokens, 1024),
+                    tools=None,
+                )
+                if response and response.content:
+                    sanitized = orch.sanitizer.sanitize(response.content)
+                    if sanitized:
+                        orch.add_message("assistant", sanitized)
+                        chunk = StreamChunk(content=sanitized)
+            except (ProviderRateLimitError, ProviderTimeoutError) as e:
+                logger.error(f"Rate limit/timeout during final response: {e}")
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
+            except ProviderAuthError as e:
+                logger.error(f"Auth error during final response: {e}")
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
+            except (ConnectionError, TimeoutError) as e:
+                logger.error(f"Network error during final response: {e}")
+                chunk = StreamChunk(content="Network error. Check connection.\n")
+            except Exception:
+                logger.exception("Unexpected error during final response generation")
+                chunk = StreamChunk(
+                    content="Unable to generate final summary due to iteration limit.\n"
+                )
+
+            orch._record_intelligent_outcome(
+                success=True,
+                quality_score=last_quality_score,
+                user_satisfied=True,
+                completed=True,
+            )
+            return True, StreamChunk(content="", is_final=True)
+
+        return False, None
 
     # =====================================================================
     # Provider Response Streaming
@@ -1505,8 +1605,7 @@ class ChatCoordinator:
     def _parse_and_validate_tool_calls(self, tool_calls: Any, full_content: str) -> tuple[Any, str]:
         """Parse, validate, and normalize tool calls.
 
-        Delegates to orchestrator's comprehensive implementation which handles
-        fallback parsing, normalization, filtering, and argument coercion.
+        Delegates to ToolCoordinator which consolidates all tool-call processing.
 
         Args:
             tool_calls: Raw tool calls from the provider
@@ -1516,7 +1615,9 @@ class ChatCoordinator:
             Tuple of (validated_tool_calls, full_content)
         """
         orch = self._orchestrator
-        return orch._parse_and_validate_tool_calls(tool_calls, full_content)
+        return orch._tool_coordinator.parse_and_validate_tool_calls(
+            tool_calls, full_content, orch.tool_adapter
+        )
 
     # =====================================================================
     # Recovery Integration

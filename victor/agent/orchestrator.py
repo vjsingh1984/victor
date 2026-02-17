@@ -1056,91 +1056,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._observability.on_tool_start(tool_name, arguments, tool_id)
 
     def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
-        """Callback when tool execution completes (from ToolPipeline)."""
-        self._metrics_collector.on_tool_complete(result)
+        """Callback when tool execution completes (from ToolPipeline).
 
-        # Emit tool complete event
-        from victor.core.events import get_observability_bus
+        Delegates to ToolCoordinator.on_tool_complete with orchestrator state.
+        """
+        # Use a mutable list as a flag so ToolCoordinator can update it
+        nudge_flag = [getattr(self, "_all_files_read_nudge_sent", False)]
 
-        bus = get_observability_bus()
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                bus.emit(
-                    topic="tool.complete",
-                    data={
-                        "tool_name": result.tool_name,
-                        "success": result.success,
-                        "result_length": len(str(result.result or "")) if result.result else 0,
-                        "error": str(result.error) if result.error else None,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            pass
-        except Exception:
-            # Ignore errors during event emission
-            pass
+        self._tool_coordinator.on_tool_complete(
+            result=result,
+            metrics_collector=self._metrics_collector,
+            read_files_session=self._read_files_session,
+            required_files=self._required_files,
+            required_outputs=self._required_outputs,
+            nudge_sent_flag=nudge_flag,
+            add_message=self.add_message,
+            observability=getattr(self, "_observability", None),
+            pipeline_calls_used=(
+                self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
+            ),
+        )
 
-        # Track read files for task completion detection
-        if result.success and result.tool_name in ("read", "Read", "read_file"):
-            # Extract file path from arguments
-            if result.arguments:
-                file_path = result.arguments.get("path") or result.arguments.get("file_path")
-                if file_path:
-                    self._read_files_session.add(file_path)
-                    logger.debug(f"Tracked read file: {file_path}")
-
-                    # Check if all required files have been read - nudge to produce output
-                    if (
-                        self._required_files
-                        and self._read_files_session.issuperset(set(self._required_files))
-                        and not getattr(self, "_all_files_read_nudge_sent", False)
-                    ):
-                        self._all_files_read_nudge_sent = True
-                        logger.info(
-                            f"All {len(self._required_files)} required files have been read. "
-                            "Agent should now produce the required output."
-                        )
-
-                        # Emit nudge event
-                        from victor.core.events import get_observability_bus
-
-                        event_bus = get_observability_bus()
-                        event_bus.emit(
-                            topic="state.task.all_files_read_nudge",
-                            data={
-                                "required_files": list(self._required_files),
-                                "read_files": list(self._read_files_session),
-                                "required_outputs": self._required_outputs,
-                                "action": "nudge_output_production",
-                                "category": "state",
-                            },
-                        )
-
-                        # Inject nudge message to encourage output production
-                        if self._required_outputs:
-                            outputs_str = ", ".join(self._required_outputs)
-                            self.add_message(
-                                "system",
-                                f"[REMINDER] All required files have been read. "
-                                f"Please now produce the required output: {outputs_str}. "
-                                f"Avoid further exploration - focus on synthesizing findings.",
-                            )
-
-        # Emit observability event for tool completion
-        if hasattr(self, "_observability") and self._observability:
-            iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-            tool_id = f"tool-{iteration}"
-            self._observability.on_tool_end(
-                tool_name=result.tool_name,
-                result=result.result,
-                success=result.success,
-                tool_id=tool_id,
-                error=result.error,
-            )
+        # Sync the nudge flag back
+        self._all_files_read_nudge_sent = nudge_flag[0]
 
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
         """Callback when streaming session completes (from StreamingController).
@@ -2681,101 +2619,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_optimization_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
 
-        Provides visibility into the health and statistics of all optimization
-        components for debugging, monitoring, and observability.
-
-        Returns:
-            Dictionary with component status and statistics:
-            - context_compactor: Compaction stats, utilization, threshold
-            - usage_analytics: Tool/provider metrics, session info
-            - sequence_tracker: Pattern learning stats, suggestions
-            - code_correction: Enabled status, correction stats
-            - safety_checker: Enabled status, pattern counts
-            - auto_committer: Enabled status, commit history
-            - search_router: Routing stats, pattern matches
+        Delegates to MetricsCoordinator which owns the reporting logic.
         """
-        status: Dict[str, Any] = {
-            "timestamp": time.time(),
-            "components": {},
-        }
-
-        # Context Compactor
-        if self._context_compactor:
-            status["components"]["context_compactor"] = self._context_compactor.get_statistics()
-
-        # Usage Analytics
-        if self._usage_analytics:
-            try:
-                status["components"]["usage_analytics"] = {
-                    "session_active": self._usage_analytics._current_session is not None,
-                    "tool_records_count": len(self._usage_analytics._tool_records),
-                    "provider_records_count": len(self._usage_analytics._provider_records),
-                }
-            except Exception:
-                status["components"]["usage_analytics"] = {"status": "error"}
-
-        # Sequence Tracker
-        if self._sequence_tracker:
-            try:
-                status["components"]["sequence_tracker"] = self._sequence_tracker.get_statistics()
-            except Exception:
-                status["components"]["sequence_tracker"] = {"status": "error"}
-
-        # Code Correction Middleware
-        status["components"]["code_correction"] = {
-            "enabled": self._code_correction_middleware is not None,
-        }
-        if self._code_correction_middleware:
-            # Support both old-style (with config) and new vertical middleware (without config)
-            if hasattr(self._code_correction_middleware, "config"):
-                status["components"]["code_correction"]["config"] = {
-                    "auto_fix": self._code_correction_middleware.config.auto_fix,
-                    "max_iterations": self._code_correction_middleware.config.max_iterations,
-                }
-            else:
-                # New vertical middleware - use get_config() if available or default values
-                status["components"]["code_correction"]["config"] = {
-                    "auto_fix": getattr(self._code_correction_middleware, "auto_fix", True),
-                    "max_iterations": getattr(
-                        self._code_correction_middleware, "max_iterations", 1
-                    ),
-                }
-
-        # Safety Checker
-        status["components"]["safety_checker"] = {
-            "enabled": self._safety_checker is not None,
-            "has_confirmation_callback": (
-                self._safety_checker.confirmation_callback is not None
-                if self._safety_checker
-                else False
-            ),
-        }
-
-        # Auto Committer
-        status["components"]["auto_committer"] = {
-            "enabled": self._auto_committer is not None,
-        }
-        if self._auto_committer:
-            status["components"]["auto_committer"]["auto_commit"] = self._auto_committer.auto_commit
-
-        # Search Router
-        status["components"]["search_router"] = {
-            "enabled": self.search_router is not None,
-        }
-
-        # Overall health
-        enabled_count = sum(
-            1
-            for c in status["components"].values()
-            if c.get("enabled", True) and c.get("status") != "error"
+        return self._metrics_coordinator.get_optimization_status(
+            context_compactor=self._context_compactor,
+            usage_analytics=self._usage_analytics,
+            sequence_tracker=self._sequence_tracker,
+            code_correction_middleware=self._code_correction_middleware,
+            safety_checker=self._safety_checker,
+            auto_committer=self._auto_committer,
+            search_router=self.search_router,
         )
-        status["health"] = {
-            "enabled_components": enabled_count,
-            "total_components": len(status["components"]),
-            "status": "healthy" if enabled_count >= 4 else "degraded",
-        }
-
-        return status
 
     def flush_analytics(self) -> Dict[str, bool]:
         """Flush all analytics and cached data to persistent storage.
@@ -3465,121 +3319,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[bool, Optional[StreamChunk]]:
         """Handle context overflow and hard iteration limits.
 
-        Returns:
-            handled (bool): True if the caller should stop processing
-            chunk (Optional[StreamChunk]): Chunk to yield if produced
+        Delegates to ChatCoordinator which owns the full implementation.
         """
-        # Context overflow handling
-        if self._check_context_overflow(max_context):
-            logger.warning("Context overflow detected. Attempting smart compaction...")
-            removed = self._conversation_controller.smart_compact_history(
-                current_query=user_message
-            )
-            if removed > 0:
-                logger.info(f"Smart compaction removed {removed} messages")
-                chunk = StreamChunk(
-                    content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
-                )
-                self._conversation_controller.inject_compaction_context()
-                return False, chunk
-
-            # If still overflowing, force completion
-            if self._check_context_overflow(max_context):
-                logger.warning("Still overflowing after compaction. Forcing completion.")
-                chunk = StreamChunk(
-                    content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Context size limit reached. Providing summary.\n"
-                )
-                completion_prompt = self._get_thinking_disabled_prompt(
-                    "Context limit reached. Summarize in 2-3 sentences."
-                )
-                recent_messages = self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
-                completion_messages = recent_messages + [
-                    Message(role="user", content=completion_prompt)
-                ]
-
-                try:
-                    response = await self.provider.chat(
-                        messages=completion_messages,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=min(self.max_tokens, 1024),
-                        tools=None,
-                    )
-                    if response and response.content:
-                        sanitized = self.sanitizer.sanitize(response.content)
-                        if sanitized:
-                            self.add_message("assistant", sanitized)
-                            chunk = StreamChunk(content=sanitized, is_final=True)
-                            self._record_intelligent_outcome(
-                                success=True,
-                                quality_score=last_quality_score,
-                                user_satisfied=True,
-                                completed=True,
-                            )
-                            return True, chunk
-                except Exception as e:
-                    logger.warning(f"Final response after context overflow failed: {e}")
-                self._record_intelligent_outcome(
-                    success=True,
-                    quality_score=last_quality_score,
-                    user_satisfied=True,
-                    completed=True,
-                )
-                return True, StreamChunk(content="", is_final=True)
-
-        # Iteration limit handling
-        if total_iterations > max_total_iterations:
-            logger.warning(
-                f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
-            )
-            iteration_prompt = self._get_thinking_disabled_prompt(
-                "Max iterations reached. Summarize key findings in 3-4 sentences. "
-                "Do NOT attempt any more tool calls."
-            )
-            recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
-            completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
-
-            chunk = StreamChunk(
-                content=f"\n[tool] {self._presentation.icon('warning', with_color=False)} Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
-            )
-
-            try:
-                response = await self.provider.chat(
-                    messages=completion_messages,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=min(self.max_tokens, 1024),
-                    tools=None,
-                )
-                if response and response.content:
-                    sanitized = self.sanitizer.sanitize(response.content)
-                    if sanitized:
-                        self.add_message("assistant", sanitized)
-                        chunk = StreamChunk(content=sanitized)
-            except (ProviderRateLimitError, ProviderTimeoutError) as e:
-                logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
-            except ProviderAuthError as e:
-                logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
-            except (ConnectionError, TimeoutError) as e:
-                logger.error(f"Network error during final response: {e}")
-                chunk = StreamChunk(content="Network error. Check connection.\n")
-            except Exception:
-                logger.exception("Unexpected error during final response generation")
-                chunk = StreamChunk(
-                    content="Unable to generate final summary due to iteration limit.\n"
-                )
-
-            self._record_intelligent_outcome(
-                success=True,
-                quality_score=last_quality_score,
-                user_satisfied=True,
-                completed=True,
-            )
-            return True, StreamChunk(content="", is_final=True)
-
-        return False, None
+        return await self._chat_coordinator._handle_context_and_iteration_limits(
+            user_message,
+            max_total_iterations,
+            max_context,
+            total_iterations,
+            last_quality_score,
+        )
 
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
@@ -3800,87 +3548,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[Optional[List[Dict[str, Any]]], str]:
         """Parse, validate, and normalize tool calls from provider response.
 
-        Handles:
-        1. Fallback parsing from content if no native tool calls
-        2. Normalization to ensure tool_calls are dicts
-        3. Filtering out disabled/invalid tool names
-        4. Coercing arguments to dicts (some providers send JSON strings)
-
-        Args:
-            tool_calls: Native tool calls from provider (may be None)
-            full_content: Full response content for fallback parsing
-
-        Returns:
-            Tuple of (validated_tool_calls, remaining_content)
-            - validated_tool_calls: List of valid tool call dicts, or None
-            - remaining_content: Content after extracting any embedded tool calls
+        Delegates to ToolCoordinator which consolidates all tool-call processing.
         """
-        # Use unified adapter-based tool call parsing with fallbacks
-        if not tool_calls and full_content:
-            logger.debug(
-                f"No native tool_calls, attempting fallback parsing on content len={len(full_content)}"
-            )
-            parse_result = self._parse_tool_calls_with_adapter(full_content, tool_calls)
-            if parse_result.tool_calls:
-                # Convert ToolCall objects to dicts for compatibility
-                tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
-                logger.debug(
-                    f"Fallback parser found {len(tool_calls)} tool calls: {[tc.get('name') for tc in tool_calls]}"
-                )
-                full_content = parse_result.remaining_content
-            else:
-                logger.debug("Fallback parser found no tool calls")
-
-        # Ensure tool_calls is a list of dicts to avoid type errors from malformed provider output
-        if tool_calls:
-            normalized_tool_calls = [tc for tc in tool_calls if isinstance(tc, dict)]
-            if len(normalized_tool_calls) != len(tool_calls):
-                logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
-            tool_calls = normalized_tool_calls or None
-            logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
-
-        # Filter out invalid/hallucinated tool names early (adapter already validates, but double-check for enabled)
-        if tool_calls:
-            valid_tool_calls = []
-            for tc in tool_calls:
-                name = tc.get("name", "")
-                # Resolve shell aliases to appropriate enabled variant (run → shell_readonly in INITIAL)
-                resolved_name = self._resolve_shell_variant(name)
-                if resolved_name != name:
-                    tc["name"] = resolved_name
-                    name = resolved_name
-                # Use ToolAccessController (with tiered config) instead of registry directly
-                is_enabled = self.is_tool_enabled(name)
-                logger.debug(f"Tool '{name}' enabled={is_enabled}")
-                if is_enabled:
-                    valid_tool_calls.append(tc)
-                else:
-                    logger.debug(f"Filtered out disabled tool: {name}")
-            if len(valid_tool_calls) != len(tool_calls):
-                logger.warning(
-                    f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
-                )
-            tool_calls = valid_tool_calls or None
-            logger.debug(
-                f"After filtering: {len(tool_calls) if tool_calls else 0} valid tool_calls"
-            )
-
-        # Coerce arguments to dicts early (providers may stream JSON strings)
-        if tool_calls:
-            for tc in tool_calls:
-                args = tc.get("arguments")
-                if isinstance(args, str):
-                    try:
-                        tc["arguments"] = json.loads(args)
-                    except Exception:
-                        try:
-                            tc["arguments"] = ast.literal_eval(args)
-                        except Exception:
-                            tc["arguments"] = {"value": args}
-                elif args is None:
-                    tc["arguments"] = {}
-
-        return tool_calls, full_content
+        return self._tool_coordinator.parse_and_validate_tool_calls(
+            tool_calls, full_content, self.tool_adapter
+        )
 
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
@@ -3901,6 +3573,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[Any, bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
+        Delegates to ToolCoordinator.execute_tool_with_retry with orchestrator-specific
+        execution backend and task completion detection callback.
+
         Args:
             tool_name: Name of the tool to execute
             tool_args: Arguments for the tool
@@ -3909,127 +3584,33 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Tuple of (result, success, error_message or None)
         """
-        # Try cache first for allowlisted tools
-        if self.tool_cache:
-            cached = self.tool_cache.get(tool_name, tool_args)
-            if cached is not None:
-                logger.debug(f"Cache hit for tool '{tool_name}'")
-                return cached, True, None
 
-        retry_enabled = getattr(self.settings, "tool_retry_enabled", True)
-        max_attempts = getattr(self.settings, "tool_retry_max_attempts", 3) if retry_enabled else 1
-        base_delay = getattr(self.settings, "tool_retry_base_delay", 1.0)
-        max_delay = getattr(self.settings, "tool_retry_max_delay", 10.0)
+        async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
+            return await self.tools.execute(name, context=ctx, **args)
 
-        last_error = None
-        for attempt in range(max_attempts):
-            try:
-                result = await self.tools.execute(tool_name, context=context, **tool_args)
+        def _on_success(name: str, args: Dict[str, Any], result: Any) -> None:
+            if self._task_completion_detector:
+                tool_result = {"success": True}
+                if "path" in args:
+                    tool_result["path"] = args["path"]
+                elif "file_path" in args:
+                    tool_result["file_path"] = args["file_path"]
+                self._task_completion_detector.record_tool_result(name, tool_result)
 
-                if result.success:
-                    if self.tool_cache:
-                        self.tool_cache.set(tool_name, tool_args, result)
-                        invalidating_tools = {
-                            "write_file",
-                            "edit_files",
-                            "execute_bash",
-                            "git",
-                            "docker",
-                        }
-                        if tool_name in invalidating_tools:
-                            touched_paths = []
-                            if "path" in tool_args:
-                                touched_paths.append(tool_args["path"])
-                            if "paths" in tool_args and isinstance(tool_args["paths"], list):
-                                touched_paths.extend(tool_args["paths"])
-                            if touched_paths:
-                                self.tool_cache.invalidate_paths(touched_paths)
-                            else:
-                                namespaces_to_clear = [
-                                    "code_search",
-                                    "semantic_code_search",
-                                    "list_directory",
-                                ]
-                                self.tool_cache.clear_namespaces(namespaces_to_clear)
-                    if attempt > 0:
-                        logger.info(
-                            f"Tool '{tool_name}' succeeded on retry attempt {attempt + 1}/{max_attempts}"
-                        )
-
-                    # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-                    # Record successful tool execution for completion detection
-                    if self._task_completion_detector:
-                        tool_result = {"success": True}
-                        # Include path if available
-                        if "path" in tool_args:
-                            tool_result["path"] = tool_args["path"]
-                        elif "file_path" in tool_args:
-                            tool_result["file_path"] = tool_args["file_path"]
-                        self._task_completion_detector.record_tool_result(tool_name, tool_result)
-
-                    return result, True, None
-                else:
-                    # Tool returned failure - check if retryable
-                    error_msg = result.error or "Unknown error"
-
-                    # Don't retry validation errors or permanent failures
-                    non_retryable_errors = ["Invalid", "Missing required", "Not found", "disabled"]
-                    if any(err in error_msg for err in non_retryable_errors):
-                        logger.debug(
-                            f"Tool '{tool_name}' failed with non-retryable error: {error_msg}"
-                        )
-                        return result, False, error_msg
-
-                    last_error = error_msg
-                    if attempt < max_attempts - 1:
-                        # Calculate exponential backoff delay
-                        delay = min(base_delay * (2**attempt), max_delay)
-                        logger.warning(
-                            f"Tool '{tool_name}' failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. "
-                            f"Retrying in {delay:.1f}s..."
-                        )
-                        await asyncio.sleep(delay)
-                    else:
-                        logger.error(
-                            f"Tool '{tool_name}' failed after {max_attempts} attempts: {error_msg}"
-                        )
-                        return result, False, error_msg
-
-            except (ToolNotFoundError, ToolValidationError, PermissionError) as e:
-                # Non-retryable errors - fail immediately
-                logger.error(f"Tool '{tool_name}' permanent failure: {e}")
-                return None, False, str(e)
-            except (TimeoutError, ConnectionError, asyncio.TimeoutError) as e:
-                # Retryable transient errors
-                last_error = str(e)
-                if attempt < max_attempts - 1:
-                    delay = min(base_delay * (2**attempt), max_delay)
-                    logger.warning(
-                        f"Tool '{tool_name}' transient error (attempt {attempt + 1}/{max_attempts}): {e}. "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
-                    return None, False, last_error
-            except Exception as e:
-                # Unknown errors - log and retry with caution
-                last_error = str(e)
-                if attempt < max_attempts - 1:
-                    delay = min(base_delay * (2**attempt), max_delay)
-                    logger.warning(
-                        f"Tool '{tool_name}' unexpected error (attempt {attempt + 1}/{max_attempts}): {e}. "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(
-                        f"Tool '{tool_name}' raised exception after {max_attempts} attempts: {e}"
-                    )
-                    return None, False, last_error
-
-        # Should not reach here, but handle it anyway
-        return None, False, last_error or "Unknown error"
+        return await self._tool_coordinator.execute_tool_with_retry(
+            tool_name,
+            tool_args,
+            context,
+            tool_executor=_executor,
+            cache=self.tool_cache,
+            on_success=_on_success,
+            retry_config={
+                "retry_enabled": getattr(self.settings, "tool_retry_enabled", True),
+                "max_attempts": getattr(self.settings, "tool_retry_max_attempts", 3),
+                "base_delay": getattr(self.settings, "tool_retry_base_delay", 1.0),
+                "max_delay": getattr(self.settings, "tool_retry_max_delay", 10.0),
+            },
+        )
 
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.

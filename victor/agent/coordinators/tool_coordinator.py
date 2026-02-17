@@ -49,6 +49,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import logging
@@ -647,6 +648,10 @@ class ToolCoordinator:
         tool_name: str,
         tool_args: Dict[str, Any],
         context: Dict[str, Any],
+        tool_executor: Optional[Callable[..., Awaitable[Any]]] = None,
+        cache: Optional[Any] = None,
+        on_success: Optional[Callable[[str, Dict[str, Any], Any], None]] = None,
+        retry_config: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Optional[Any], bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
@@ -654,31 +659,56 @@ class ToolCoordinator:
             tool_name: Name of the tool to execute
             tool_args: Arguments for the tool
             context: Execution context
+            tool_executor: Optional custom executor callable. If provided, called as
+                ``await tool_executor(tool_name, tool_args, context)``.
+                Defaults to ``self._pipeline._execute_single_tool``.
+            cache: Optional cache override. Defaults to ``self._cache``.
+            on_success: Optional callback invoked on success as
+                ``on_success(tool_name, tool_args, result)``.
+            retry_config: Optional dict with keys ``retry_enabled``, ``max_attempts``,
+                ``base_delay``, ``max_delay`` to override coordinator config.
 
         Returns:
             Tuple of (result, success, error_message or None)
         """
+        effective_cache = cache if cache is not None else self._cache
+
         # Try cache first for allowlisted tools
-        if self._cache:
-            cached = self._cache.get(tool_name, tool_args)
+        if effective_cache:
+            cached = effective_cache.get(tool_name, tool_args)
             if cached is not None:
                 logger.debug(f"Cache hit for tool '{tool_name}'")
                 return cached, True, None
 
-        retry_enabled = self._config.retry_enabled
-        max_attempts = self._config.max_retry_attempts if retry_enabled else 1
-        base_delay = self._config.retry_base_delay
-        max_delay = self._config.retry_max_delay
+        if retry_config:
+            retry_enabled = retry_config.get("retry_enabled", self._config.retry_enabled)
+            max_attempts = (
+                retry_config.get("max_attempts", self._config.max_retry_attempts)
+                if retry_enabled
+                else 1
+            )
+            base_delay = retry_config.get("base_delay", self._config.retry_base_delay)
+            max_delay = retry_config.get("max_delay", self._config.retry_max_delay)
+        else:
+            retry_enabled = self._config.retry_enabled
+            max_attempts = self._config.max_retry_attempts if retry_enabled else 1
+            base_delay = self._config.retry_base_delay
+            max_delay = self._config.retry_max_delay
 
         last_error = None
         for attempt in range(max_attempts):
             try:
-                result = await self._pipeline._execute_single_tool(tool_name, tool_args, context)
+                if tool_executor:
+                    result = await tool_executor(tool_name, tool_args, context)
+                else:
+                    result = await self._pipeline._execute_single_tool(
+                        tool_name, tool_args, context
+                    )
 
                 if result.success:
                     # Cache successful result
-                    if self._cache:
-                        self._cache.set(tool_name, tool_args, result)
+                    if effective_cache:
+                        effective_cache.set(tool_name, tool_args, result)
                         # Invalidate related cache entries
                         invalidating_tools = {
                             "write_file",
@@ -694,19 +724,23 @@ class ToolCoordinator:
                             if "paths" in tool_args and isinstance(tool_args["paths"], list):
                                 touched_paths.extend(tool_args["paths"])
                             if touched_paths:
-                                self._cache.invalidate_paths(touched_paths)
+                                effective_cache.invalidate_paths(touched_paths)
                             else:
                                 namespaces_to_clear = [
                                     "code_search",
                                     "semantic_code_search",
                                     "list_directory",
                                 ]
-                                self._cache.clear_namespaces(namespaces_to_clear)
+                                effective_cache.clear_namespaces(namespaces_to_clear)
 
                     if attempt > 0:
                         logger.info(
                             f"Tool '{tool_name}' succeeded on retry attempt {attempt + 1}/{max_attempts}"
                         )
+
+                    # Invoke success callback if provided
+                    if on_success:
+                        on_success(tool_name, tool_args, result)
 
                     return result, True, None
                 else:
@@ -814,6 +848,98 @@ class ToolCoordinator:
 
         return result
 
+    def parse_and_validate_tool_calls(
+        self,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        full_content: str,
+        tool_adapter: Any,
+    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+        """Parse, validate, and normalize tool calls from provider response.
+
+        Handles:
+        1. Fallback parsing from content if no native tool calls
+        2. Normalization to ensure tool_calls are dicts
+        3. Filtering out disabled/invalid tool names
+        4. Coercing arguments to dicts (some providers send JSON strings)
+
+        Args:
+            tool_calls: Native tool calls from provider (may be None)
+            full_content: Full response content for fallback parsing
+            tool_adapter: ToolCallingAdapter for fallback parsing
+
+        Returns:
+            Tuple of (validated_tool_calls, remaining_content)
+        """
+        # Use unified adapter-based tool call parsing with fallbacks
+        if not tool_calls and full_content:
+            logger.debug(
+                f"No native tool_calls, attempting fallback parsing on content len={len(full_content)}"
+            )
+            parse_result = tool_adapter.parse_tool_calls(full_content, tool_calls)
+            # Log any warnings
+            for warning in parse_result.warnings:
+                logger.warning(f"Tool call parse warning: {warning}")
+            if parse_result.tool_calls:
+                # Convert ToolCall objects to dicts for compatibility
+                tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
+                logger.debug(
+                    f"Fallback parser found {len(tool_calls)} tool calls: "
+                    f"{[tc.get('name') for tc in tool_calls]}"
+                )
+                full_content = parse_result.remaining_content
+            else:
+                logger.debug("Fallback parser found no tool calls")
+
+        # Ensure tool_calls is a list of dicts to avoid type errors from malformed provider output
+        if tool_calls:
+            normalized_tool_calls = [tc for tc in tool_calls if isinstance(tc, dict)]
+            if len(normalized_tool_calls) != len(tool_calls):
+                logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
+            tool_calls = normalized_tool_calls or None
+            logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
+
+        # Filter out invalid/hallucinated tool names early
+        if tool_calls:
+            valid_tool_calls = []
+            for tc in tool_calls:
+                name = tc.get("name", "")
+                # Resolve shell aliases to appropriate enabled variant
+                resolved_name = self.resolve_tool_alias(name)
+                if resolved_name != name:
+                    tc["name"] = resolved_name
+                    name = resolved_name
+                is_enabled = self.is_tool_enabled(name)
+                logger.debug(f"Tool '{name}' enabled={is_enabled}")
+                if is_enabled:
+                    valid_tool_calls.append(tc)
+                else:
+                    logger.debug(f"Filtered out disabled tool: {name}")
+            if len(valid_tool_calls) != len(tool_calls):
+                logger.warning(
+                    f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
+                )
+            tool_calls = valid_tool_calls or None
+            logger.debug(
+                f"After filtering: {len(tool_calls) if tool_calls else 0} valid tool_calls"
+            )
+
+        # Coerce arguments to dicts early (providers may stream JSON strings)
+        if tool_calls:
+            for tc in tool_calls:
+                args = tc.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        tc["arguments"] = json.loads(args)
+                    except Exception:
+                        try:
+                            tc["arguments"] = ast.literal_eval(args)
+                        except Exception:
+                            tc["arguments"] = {"value": args}
+                elif args is None:
+                    tc["arguments"] = {}
+
+        return tool_calls, full_content
+
     def normalize_tool_arguments(
         self,
         tool_args: Dict[str, Any],
@@ -832,6 +958,121 @@ class ToolCoordinator:
             return tool_args, NormalizationStrategy.DIRECT
 
         return self._argument_normalizer.normalize_arguments(tool_args, tool_name)
+
+    # =====================================================================
+    # Tool Completion Tracking
+    # =====================================================================
+
+    def on_tool_complete(
+        self,
+        result: Any,
+        metrics_collector: Any,
+        read_files_session: Optional[Set[str]] = None,
+        required_files: Optional[List[str]] = None,
+        required_outputs: Optional[List[str]] = None,
+        nudge_sent_flag: Optional[List[bool]] = None,
+        add_message: Optional[Callable[[str, str], None]] = None,
+        observability: Optional[Any] = None,
+        pipeline_calls_used: int = 0,
+    ) -> None:
+        """Handle tool execution completion with event emission and file tracking.
+
+        Args:
+            result: ToolCallResult from execution
+            metrics_collector: MetricsCollector to record completion
+            read_files_session: Mutable set of read file paths for tracking
+            required_files: List of files required for the task
+            required_outputs: List of required output descriptions
+            nudge_sent_flag: Single-element list used as mutable bool flag for nudge tracking
+            add_message: Callback to inject messages into conversation
+            observability: Optional observability handler
+            pipeline_calls_used: Current pipeline call count for observability
+        """
+        metrics_collector.on_tool_complete(result)
+
+        # Emit tool complete event
+        from victor.core.events import get_observability_bus
+
+        bus = get_observability_bus()
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                bus.emit(
+                    topic="tool.complete",
+                    data={
+                        "tool_name": result.tool_name,
+                        "success": result.success,
+                        "result_length": len(str(result.result or "")) if result.result else 0,
+                        "error": str(result.error) if result.error else None,
+                        "category": "tool",
+                    },
+                )
+            )
+        except RuntimeError:
+            # No event loop running
+            pass
+        except Exception:
+            # Ignore errors during event emission
+            pass
+
+        # Track read files for task completion detection
+        if (
+            result.success
+            and result.tool_name in ("read", "Read", "read_file")
+            and read_files_session is not None
+        ):
+            if result.arguments:
+                file_path = result.arguments.get("path") or result.arguments.get("file_path")
+                if file_path:
+                    read_files_session.add(file_path)
+                    logger.debug(f"Tracked read file: {file_path}")
+
+                    # Check if all required files have been read - nudge to produce output
+                    if (
+                        required_files
+                        and read_files_session.issuperset(set(required_files))
+                        and nudge_sent_flag is not None
+                        and not nudge_sent_flag[0]
+                    ):
+                        nudge_sent_flag[0] = True
+                        logger.info(
+                            f"All {len(required_files)} required files have been read. "
+                            "Agent should now produce the required output."
+                        )
+
+                        # Emit nudge event
+                        event_bus = get_observability_bus()
+                        event_bus.emit(
+                            topic="state.task.all_files_read_nudge",
+                            data={
+                                "required_files": list(required_files),
+                                "read_files": list(read_files_session),
+                                "required_outputs": required_outputs,
+                                "action": "nudge_output_production",
+                                "category": "state",
+                            },
+                        )
+
+                        # Inject nudge message to encourage output production
+                        if required_outputs and add_message:
+                            outputs_str = ", ".join(required_outputs)
+                            add_message(
+                                "system",
+                                f"[REMINDER] All required files have been read. "
+                                f"Please now produce the required output: {outputs_str}. "
+                                f"Avoid further exploration - focus on synthesizing findings.",
+                            )
+
+        # Emit observability event for tool completion
+        if observability:
+            tool_id = f"tool-{pipeline_calls_used}"
+            observability.on_tool_end(
+                tool_name=result.tool_name,
+                result=result.result,
+                success=result.success,
+                tool_id=tool_id,
+                error=result.error,
+            )
 
     # =====================================================================
     # Statistics and Tracking

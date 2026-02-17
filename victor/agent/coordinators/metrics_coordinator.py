@@ -27,6 +27,7 @@ as part of the SOLID refactoring initiative.
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -333,6 +334,110 @@ class MetricsCoordinator:
             provider: New provider name
         """
         self._metrics_collector.update_model_info(model, provider)
+
+    def get_optimization_status(
+        self,
+        context_compactor: Optional[Any] = None,
+        usage_analytics: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        code_correction_middleware: Optional[Any] = None,
+        safety_checker: Optional[Any] = None,
+        auto_committer: Optional[Any] = None,
+        search_router: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Get comprehensive status of all integrated optimization components.
+
+        Provides visibility into the health and statistics of all optimization
+        components for debugging, monitoring, and observability.
+
+        Args:
+            context_compactor: Optional context compactor instance
+            usage_analytics: Optional usage analytics instance
+            sequence_tracker: Optional sequence tracker instance
+            code_correction_middleware: Optional code correction middleware
+            safety_checker: Optional safety checker instance
+            auto_committer: Optional auto committer instance
+            search_router: Optional search router instance
+
+        Returns:
+            Dictionary with component status and statistics
+        """
+        status: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "components": {},
+        }
+
+        # Context Compactor
+        if context_compactor:
+            status["components"]["context_compactor"] = context_compactor.get_statistics()
+
+        # Usage Analytics
+        if usage_analytics:
+            try:
+                status["components"]["usage_analytics"] = {
+                    "session_active": usage_analytics._current_session is not None,
+                    "tool_records_count": len(usage_analytics._tool_records),
+                    "provider_records_count": len(usage_analytics._provider_records),
+                }
+            except Exception:
+                status["components"]["usage_analytics"] = {"status": "error"}
+
+        # Sequence Tracker
+        if sequence_tracker:
+            try:
+                status["components"]["sequence_tracker"] = sequence_tracker.get_statistics()
+            except Exception:
+                status["components"]["sequence_tracker"] = {"status": "error"}
+
+        # Code Correction Middleware
+        status["components"]["code_correction"] = {
+            "enabled": code_correction_middleware is not None,
+        }
+        if code_correction_middleware:
+            if hasattr(code_correction_middleware, "config"):
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": code_correction_middleware.config.auto_fix,
+                    "max_iterations": code_correction_middleware.config.max_iterations,
+                }
+            else:
+                status["components"]["code_correction"]["config"] = {
+                    "auto_fix": getattr(code_correction_middleware, "auto_fix", True),
+                    "max_iterations": getattr(code_correction_middleware, "max_iterations", 1),
+                }
+
+        # Safety Checker
+        status["components"]["safety_checker"] = {
+            "enabled": safety_checker is not None,
+            "has_confirmation_callback": (
+                safety_checker.confirmation_callback is not None if safety_checker else False
+            ),
+        }
+
+        # Auto Committer
+        status["components"]["auto_committer"] = {
+            "enabled": auto_committer is not None,
+        }
+        if auto_committer:
+            status["components"]["auto_committer"]["auto_commit"] = auto_committer.auto_commit
+
+        # Search Router
+        status["components"]["search_router"] = {
+            "enabled": search_router is not None,
+        }
+
+        # Overall health
+        enabled_count = sum(
+            1
+            for c in status["components"].values()
+            if c.get("enabled", True) and c.get("status") != "error"
+        )
+        status["health"] = {
+            "enabled_components": enabled_count,
+            "total_components": len(status["components"]),
+            "status": "healthy" if enabled_count >= 4 else "degraded",
+        }
+
+        return status
 
     def reset_stats(self) -> None:
         """Reset all statistics (e.g., after conversation reset)."""
