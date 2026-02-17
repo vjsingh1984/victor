@@ -682,7 +682,8 @@ class Agent:
         directly importing observability types.
 
         Args:
-            category: Event category name ("TOOL", "STATE", "MODEL", "ERROR", "LIFECYCLE")
+            category: Event category, wildcard alias, or topic pattern.
+                Examples: "TOOL", "security_scan", "ALL", "tool.*"
             handler: Callback function receiving VictorEvent
 
         Returns:
@@ -699,20 +700,9 @@ class Agent:
         if not event_bus:
             return None
 
-        # Map category to topic pattern for canonical event system
-        topic_mapping = {
-            "TOOL": "tool.*",
-            "STATE": "state.*",
-            "MODEL": "model.*",
-            "ERROR": "error.*",
-            "LIFECYCLE": "lifecycle.*",
-        }
+        from victor.observability.event_registry import resolve_subscription_topic_pattern
 
-        topic_pattern = topic_mapping.get(category.upper())
-        if not topic_pattern:
-            raise ValueError(
-                f"Unknown event category: {category}. Valid categories: {list(topic_mapping.keys())}"
-            )
+        topic_pattern = resolve_subscription_topic_pattern(category)
 
         # Subscribe using canonical event system
         return event_bus.backend.subscribe(topic_pattern, handler)

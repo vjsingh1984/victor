@@ -308,3 +308,54 @@ class EventCategoryRegistry:
         """
         with self._instance_lock:
             return len(self._categories)
+
+
+def resolve_subscription_topic_pattern(
+    category_or_pattern: str,
+    *,
+    registry: Optional[EventCategoryRegistry] = None,
+) -> str:
+    """Resolve a category-or-pattern input to a canonical topic pattern.
+
+    Supports:
+    - Built-in category names (e.g., "TOOL" -> "tool.*")
+    - Registered custom categories (e.g., "security_scan" -> "security_scan.*")
+    - Wildcard aliases ("*", "ALL")
+    - Direct topic patterns (e.g., "tool.*", "security_scan.vuln.*")
+
+    Args:
+        category_or_pattern: Category name, wildcard alias, or topic pattern.
+        registry: Optional registry instance (primarily for testing).
+
+    Returns:
+        Topic pattern suitable for backend.subscribe(...).
+
+    Raises:
+        ValueError: If input is empty or cannot be resolved.
+    """
+    raw = category_or_pattern.strip() if isinstance(category_or_pattern, str) else ""
+    if not raw:
+        raise ValueError("Category or topic pattern cannot be empty")
+
+    if raw in {"*", "ALL", "all"}:
+        return "*"
+
+    # Treat explicit wildcard/pattern expressions as direct pass-through.
+    if "." in raw or "*" in raw:
+        return raw
+
+    resolved_registry = registry or EventCategoryRegistry.get_instance()
+    normalized = raw.lower()
+
+    if resolved_registry.has_category(normalized):
+        return f"{normalized}.*"
+
+    known = sorted(resolved_registry.list_all())
+    known_display = ", ".join(known[:12])
+    if len(known) > 12:
+        known_display += ", ..."
+    raise ValueError(
+        f"Unknown event category or topic pattern: {category_or_pattern}. "
+        f"Known categories include: {known_display}. "
+        "You can also pass a direct topic pattern like 'tool.*'."
+    )

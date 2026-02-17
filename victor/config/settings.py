@@ -890,6 +890,16 @@ class Settings(BaseSettings):
     event_max_batch_size: int = 100
     event_flush_interval_ms: float = 1000.0
 
+    # Sync emit metrics reporter configuration
+    # Emits periodic snapshots for emit_helper delivery counters.
+    # Topic defaults to "core.events.emit_sync.metrics".
+    # Reporter is disabled by default to avoid background thread overhead
+    # unless explicitly enabled.
+    event_emit_sync_metrics_enabled: bool = False
+    event_emit_sync_metrics_interval_seconds: float = 60.0
+    event_emit_sync_metrics_reset_after_emit: bool = False
+    event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
+
     # ==========================================================================
     # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
     # ==========================================================================

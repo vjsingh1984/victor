@@ -126,6 +126,8 @@ import hashlib
 import inspect
 import logging
 import json
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -145,15 +147,20 @@ from typing import (
 )
 
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.core.events.emit_helper import emit_event_sync
 
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
     from victor.core.verticals.base import VerticalBase
+    from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
 
 # Import protocols for runtime isinstance checks
 
 # Import capability registry protocol for type-safe capability access
 from victor.framework.protocols import CapabilityRegistryProtocol
+from victor.framework.vertical_cache_policy import (
+    InMemoryLRUVerticalIntegrationCachePolicy,
+)
 
 
 def _check_capability(
@@ -271,7 +278,7 @@ def _invoke_capability(
         )
 
     # Use centralized capability method mappings (single source of truth)
-    from victor.agent.capability_registry import get_method_for_capability
+    from victor.framework.capability_registry import get_method_for_capability
 
     method_name = get_method_for_capability(capability_name)
     method = getattr(obj, method_name, None)
@@ -915,6 +922,8 @@ class VerticalIntegrationPipeline:
         extension_registry: Optional[ExtensionHandlerRegistry] = None,
         enable_cache: bool = True,
         cache_ttl: int = 3600,
+        max_cache_entries: int = 256,
+        cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
         parallel_enabled: bool = False,
     ):
         """Initialize the pipeline.
@@ -928,6 +937,9 @@ class VerticalIntegrationPipeline:
             extension_registry: Custom extension handler registry (OCP compliance)
             enable_cache: If True, enable configuration caching (default: True)
             cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
+            max_cache_entries: Maximum number of cache entries to retain.
+                Set <= 0 for unbounded cache.
+            cache_policy: Optional custom cache policy implementation.
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
         """
         self._strict_mode = strict_mode
@@ -936,10 +948,14 @@ class VerticalIntegrationPipeline:
         self._use_step_handlers = use_step_handlers
         self._enable_cache = enable_cache
         self._cache_ttl = cache_ttl
+        self._max_cache_entries = max_cache_entries
         self._parallel_enabled = parallel_enabled
+        self._cache_policy = cache_policy or InMemoryLRUVerticalIntegrationCachePolicy()
 
         # Initialize cache (eagerly, to avoid attribute errors in tests)
-        self._cache: Dict[str, bytes] = {}
+        self._cache: Dict[str, str] = {}
+        self._cache_timestamps: Dict[str, float] = {}
+        self._cache_lock = threading.RLock()
 
         # Initialize extension handler registry (OCP compliance)
         self._extension_registry = extension_registry or get_extension_handler_registry()
@@ -1000,17 +1016,22 @@ class VerticalIntegrationPipeline:
 
         result.vertical_name = vertical_class.name
 
-        # Check cache for pre-computed integration (Phase 1: Caching)
+        cache_key: Optional[str] = None
+        cache_hit = False
+
+        # Check cache for pre-computed integration metadata (Phase 1: Caching)
+        # NOTE: cached IntegrationResult does not include VerticalContext; we must
+        # always replay step handlers to apply side effects on the target orchestrator.
         if self._enable_cache:
             cache_key = self._generate_cache_key(vertical_class)
             if cache_key:
                 cached_result = self._load_from_cache(cache_key)
                 if cached_result:
+                    cache_hit = True
                     logger.debug(
                         f"Cache HIT for vertical '{vertical_class.name}' "
-                        f"(key: {cache_key[:16]}...)"
+                        f"(key: {cache_key[:16]}...) - replaying integration"
                     )
-                    return cached_result
                 else:
                     logger.debug(
                         f"Cache MISS for vertical '{vertical_class.name}' "
@@ -1057,49 +1078,19 @@ class VerticalIntegrationPipeline:
         )
 
         # Emit vertical_applied event for observability
-        try:
-            from victor.core.events import get_observability_bus
-
-            bus = get_observability_bus()
-            if bus:
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(
-                        bus.emit(
-                            topic="vertical.applied",
-                            data={
-                                "vertical": result.vertical_name,
-                                "tools_count": len(result.tools_applied),
-                                "middleware_count": result.middleware_count,
-                                "safety_patterns_count": result.safety_patterns_count,
-                                "prompt_hints_count": result.prompt_hints_count,
-                                "workflows_count": result.workflows_count,
-                                "rl_learners_count": result.rl_learners_count,
-                                "team_specs_count": result.team_specs_count,
-                                "success": result.success,
-                                "error_count": len(result.errors),
-                                "warning_count": len(result.warnings),
-                                "category": "vertical",  # Preserve for observability
-                            },
-                            source="VerticalIntegrationPipeline",
-                        )
-                    )
-                except RuntimeError:
-                    # No event loop running
-                    logger.debug("No event loop, skipping vertical.applied event emission")
-                except Exception as emit_error:
-                    logger.debug(f"Failed to create emit task: {emit_error}")
-        except Exception as e:
-            logger.debug(f"Failed to emit vertical_applied event: {e}")
+        self._emit_vertical_applied_event(result, cache_hit=cache_hit)
 
         # Note: result.persist() available for opt-in audit logging
         # Not called automatically to avoid duplication with EventBus
 
         # Save to cache (Phase 1: Caching)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_class)
+            if cache_key is None:
+                cache_key = self._generate_cache_key(vertical_class)
             if cache_key:
                 self._save_to_cache(cache_key, result)
+                if cache_hit:
+                    result.add_info("Integration replayed from cache metadata")
 
         return result
 
@@ -1259,8 +1250,16 @@ class VerticalIntegrationPipeline:
         # Simple in-memory cache using JSON serialization
         # Note: Uses to_dict()/from_dict() to avoid pickle issues with
         # unpicklable middleware objects. The context is NOT cached.
-        cached_data = self._cache.get(cache_key)
-        if cached_data:
+        with self._cache_lock:
+            cached_data = self._cache_policy.load(
+                cache_key,
+                cache=self._cache,
+                timestamps=self._cache_timestamps,
+                cache_ttl=self._cache_ttl,
+            )
+            if cached_data is None:
+                return None
+
             try:
                 result = IntegrationResult.from_dict(json.loads(cached_data))
 
@@ -1271,9 +1270,9 @@ class VerticalIntegrationPipeline:
             except (json.JSONDecodeError, TypeError, KeyError) as e:
                 logger.warning(f"Failed to load from cache: {e}")
                 # Clear corrupted cache entry
-                del self._cache[cache_key]
-
-        return None
+                self._cache.pop(cache_key, None)
+                self._cache_timestamps.pop(cache_key, None)
+                return None
 
     def _save_to_cache(self, cache_key: str, result: "IntegrationResult") -> None:
         """Save integration result to in-memory cache.
@@ -1290,28 +1289,105 @@ class VerticalIntegrationPipeline:
             # Serialize result using JSON (avoids pickle issues)
             data = json.dumps(result.to_dict())
 
-            # Save to cache
-            if not hasattr(self, "_cache"):
-                self._cache: Dict[str, str] = {}
-
-            self._cache[cache_key] = data
-
-            # Enforce TTL by storing timestamp
-            if not hasattr(self, "_cache_timestamps"):
-                self._cache_timestamps: Dict[str, float] = {}
-            # Use event loop time if available, otherwise use wall clock time
-            try:
-                self._cache_timestamps[cache_key] = asyncio.get_event_loop().time()
-            except RuntimeError:
-                # No event loop running, fall back to wall clock time
-                import time
-
-                self._cache_timestamps[cache_key] = time.time()
+            with self._cache_lock:
+                self._cache_policy.save(
+                    cache_key,
+                    data,
+                    cache=self._cache,
+                    timestamps=self._cache_timestamps,
+                    max_entries=self._max_cache_entries,
+                )
 
             logger.debug(f"Cached integration result: {cache_key}")
 
         except (TypeError, ValueError) as e:
             logger.warning(f"Failed to save to cache: {e}")
+
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics for observability and diagnostics."""
+        with self._cache_lock:
+            return self._cache_policy.get_stats(
+                cache=self._cache,
+                max_entries=self._max_cache_entries,
+            )
+
+    def clear_cache(self) -> None:
+        """Clear integration cache and reset cache policy metrics."""
+        with self._cache_lock:
+            self._cache_policy.clear(
+                cache=self._cache,
+                timestamps=self._cache_timestamps,
+            )
+
+    def _build_vertical_applied_payload(
+        self,
+        result: IntegrationResult,
+        *,
+        cache_hit: bool,
+    ) -> Dict[str, Any]:
+        """Build observability payload for vertical.applied events."""
+        cache_stats = self.get_cache_stats() if self._enable_cache else {}
+        return {
+            "vertical": result.vertical_name,
+            "tools_count": len(result.tools_applied),
+            "middleware_count": result.middleware_count,
+            "safety_patterns_count": result.safety_patterns_count,
+            "prompt_hints_count": result.prompt_hints_count,
+            "workflows_count": result.workflows_count,
+            "rl_learners_count": result.rl_learners_count,
+            "team_specs_count": result.team_specs_count,
+            "success": result.success,
+            "error_count": len(result.errors),
+            "warning_count": len(result.warnings),
+            "cache_enabled": self._enable_cache,
+            "cache_hit": cache_hit,
+            "cache_stats": cache_stats,
+            "category": "vertical",  # Preserve for observability
+        }
+
+    def _emit_vertical_applied_event(
+        self,
+        result: IntegrationResult,
+        *,
+        cache_hit: bool,
+    ) -> None:
+        """Emit vertical.applied event from sync execution contexts."""
+        try:
+            from victor.core.events import get_observability_bus
+
+            bus = get_observability_bus()
+            if bus:
+                payload = self._build_vertical_applied_payload(result, cache_hit=cache_hit)
+                emit_event_sync(
+                    bus,
+                    "vertical.applied",
+                    payload,
+                    source="VerticalIntegrationPipeline",
+                    use_background_loop=True,
+                )
+        except Exception as e:
+            logger.debug(f"Failed to emit vertical_applied event: {e}")
+
+    async def _emit_vertical_applied_event_async(
+        self,
+        result: IntegrationResult,
+        *,
+        cache_hit: bool,
+    ) -> None:
+        """Emit vertical.applied event from async execution contexts."""
+        try:
+            from victor.core.events import get_observability_bus
+
+            bus = get_observability_bus()
+            if bus:
+                payload = self._build_vertical_applied_payload(result, cache_hit=cache_hit)
+                await bus.emit(
+                    topic="vertical.applied",
+                    data=payload,
+                    source="VerticalIntegrationPipeline",
+                )
+        except Exception as e:
+            logger.debug(f"Failed to emit vertical_applied event (async): {e}")
 
     async def apply_async(
         self,
@@ -1342,17 +1418,22 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
+        cache_key: Optional[str] = None
+        cache_hit = False
+
         # Check cache first (Phase 1)
+        # NOTE: like sync apply(), async apply must replay handlers to apply
+        # side effects on the target orchestrator.
         if self._enable_cache:
             cache_key = self._generate_cache_key(vertical_cls)
             if cache_key:
                 cached_result = self._load_from_cache(cache_key)
                 if cached_result:
+                    cache_hit = True
                     logger.debug(
                         f"Cache HIT for vertical '{vertical_cls.name}' "
-                        f"(key: {cache_key[:16]}...)"
+                        f"(key: {cache_key[:16]}...) - replaying integration"
                     )
-                    return cached_result
                 else:
                     logger.debug(
                         f"Cache MISS for vertical '{vertical_cls.name}' "
@@ -1409,11 +1490,17 @@ class VerticalIntegrationPipeline:
                         exc_info=True,
                     )
 
+        # Emit vertical_applied event for observability (async parity with sync apply)
+        await self._emit_vertical_applied_event_async(result, cache_hit=cache_hit)
+
         # Cache result (Phase 1)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_cls)
+            if cache_key is None:
+                cache_key = self._generate_cache_key(vertical_cls)
             if cache_key:
                 self._save_to_cache(cache_key, result)
+                if cache_hit:
+                    result.add_info("Async integration replayed from cache metadata")
 
         return result
 
@@ -1695,6 +1782,9 @@ def create_integration_pipeline(
     strict: bool = False,
     use_step_handlers: bool = True,
     enable_cache: bool = True,
+    cache_ttl: int = 3600,
+    max_cache_entries: int = 256,
+    cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
     enable_parallel: bool = False,
 ) -> VerticalIntegrationPipeline:
     """Create a vertical integration pipeline with feature flags (Phase 2).
@@ -1703,6 +1793,9 @@ def create_integration_pipeline(
         strict: Whether to use strict mode
         use_step_handlers: If True, use step handlers (Phase 3.1)
         enable_cache: Enable configuration caching (Phase 1, default: True)
+        cache_ttl: Cache time-to-live in seconds (default: 3600)
+        max_cache_entries: Maximum cache entries before LRU eviction (default: 256)
+        cache_policy: Optional custom cache policy implementation.
         enable_parallel: Enable parallel execution (Phase 2.2, default: False)
 
     Returns:
@@ -1721,6 +1814,9 @@ def create_integration_pipeline(
         strict_mode=strict,
         use_step_handlers=use_step_handlers,
         enable_cache=enable_cache,
+        cache_ttl=cache_ttl,
+        max_cache_entries=max_cache_entries,
+        cache_policy=cache_policy,
         parallel_enabled=enable_parallel,
     )
 
@@ -1728,6 +1824,10 @@ def create_integration_pipeline(
 def create_integration_pipeline_with_handlers(
     strict: bool = False,
     custom_handlers: Optional[List[Any]] = None,
+    enable_cache: bool = True,
+    cache_ttl: int = 3600,
+    max_cache_entries: int = 256,
+    cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
     enable_parallel: bool = False,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
@@ -1738,6 +1838,10 @@ def create_integration_pipeline_with_handlers(
     Args:
         strict: Whether to use strict mode
         custom_handlers: Optional list of additional step handlers
+        enable_cache: Enable configuration caching (default: True)
+        cache_ttl: Cache time-to-live in seconds (default: 3600)
+        max_cache_entries: Maximum cache entries before LRU eviction (default: 256)
+        cache_policy: Optional custom cache policy implementation.
         enable_parallel: Enable parallel execution (Phase 2.2, default: False)
 
     Returns:
@@ -1777,6 +1881,10 @@ def create_integration_pipeline_with_handlers(
             strict_mode=strict,
             step_registry=registry,
             use_step_handlers=True,
+            enable_cache=enable_cache,
+            cache_ttl=cache_ttl,
+            max_cache_entries=max_cache_entries,
+            cache_policy=cache_policy,
             parallel_enabled=enable_parallel,
         )
     except ImportError:
@@ -1784,6 +1892,10 @@ def create_integration_pipeline_with_handlers(
         return VerticalIntegrationPipeline(
             strict_mode=strict,
             use_step_handlers=False,
+            enable_cache=enable_cache,
+            cache_ttl=cache_ttl,
+            max_cache_entries=max_cache_entries,
+            cache_policy=cache_policy,
         )
 
 
@@ -1802,8 +1914,9 @@ def apply_vertical(
     Returns:
         IntegrationResult
     """
-    pipeline = VerticalIntegrationPipeline()
-    return pipeline.apply(orchestrator, vertical)
+    from victor.framework.vertical_service import apply_vertical_configuration
+
+    return apply_vertical_configuration(orchestrator, vertical, source="framework")
 
 
 __all__ = [

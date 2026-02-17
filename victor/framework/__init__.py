@@ -821,6 +821,10 @@ try:
         create_integration_pipeline,
         create_integration_pipeline_with_handlers,
     )
+    from victor.framework.vertical_cache_policy import (
+        InMemoryLRUVerticalIntegrationCachePolicy,
+        VerticalIntegrationCachePolicy,
+    )
     from victor.framework.step_handlers import (
         BaseStepHandler,
         ConfigStepHandler,
@@ -843,6 +847,8 @@ try:
         "apply_vertical",
         "create_integration_pipeline",
         "create_integration_pipeline_with_handlers",
+        "VerticalIntegrationCachePolicy",
+        "InMemoryLRUVerticalIntegrationCachePolicy",
         # Step handlers (Phase 3.1)
         "BaseStepHandler",
         "ConfigStepHandler",

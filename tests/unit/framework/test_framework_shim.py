@@ -399,6 +399,39 @@ class TestFrameworkShimVertical:
             # Check system_prompt contains expected text (may be prefixed by framework)
             assert "test assistant" in config.system_prompt.lower()
 
+    @pytest.mark.asyncio
+    async def test_vertical_application_delegates_to_framework_service(
+        self, mock_settings, mock_orchestrator
+    ):
+        """FrameworkShim should delegate vertical apply to central service."""
+        with patch(
+            "victor.agent.orchestrator.AgentOrchestrator.from_settings",
+            new_callable=AsyncMock,
+        ) as mock_from_settings:
+            mock_from_settings.return_value = mock_orchestrator
+
+            with patch("victor.framework.shim.apply_vertical_configuration") as mock_apply:
+                context = MagicMock()
+                context.config = MagicMock()
+                mock_result = MagicMock(
+                    success=True,
+                    vertical_name="test_vertical",
+                    tools_applied={"read", "write"},
+                    middleware_count=0,
+                    safety_patterns_count=0,
+                    prompt_hints_count=0,
+                    context=context,
+                    errors=[],
+                    warnings=[],
+                )
+                mock_apply.return_value = mock_result
+
+                shim = FrameworkShim(mock_settings, vertical=MockVertical)
+                await shim.create_orchestrator()
+
+                mock_apply.assert_called_once_with(mock_orchestrator, MockVertical, source="cli")
+                assert shim.vertical_config is context.config
+
 
 class TestFrameworkShimLifecycle:
     """Tests for lifecycle event emission."""

@@ -203,6 +203,53 @@ class TestVerticalBaseConfig:
 
         assert config1 is config2, "Cached configs should be same object"
 
+    def test_get_config_cache_key_uses_class_namespace(self):
+        """Same class names in different modules should not collide in config cache."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+        def _tools_one(cls):
+            return ["read"]
+
+        def _tools_two(cls):
+            return ["write"]
+
+        def _prompt_one(cls):
+            return "Prompt One"
+
+        def _prompt_two(cls):
+            return "Prompt Two"
+
+        vertical_one = type(
+            "DuplicateVertical",
+            (VerticalBase,),
+            {
+                "name": "dup_one",
+                "description": "Duplicate class name vertical one",
+                "get_tools": classmethod(_tools_one),
+                "get_system_prompt": classmethod(_prompt_one),
+            },
+        )
+        vertical_one.__module__ = "test.verticals.one"
+
+        vertical_two = type(
+            "DuplicateVertical",
+            (VerticalBase,),
+            {
+                "name": "dup_two",
+                "description": "Duplicate class name vertical two",
+                "get_tools": classmethod(_tools_two),
+                "get_system_prompt": classmethod(_prompt_two),
+            },
+        )
+        vertical_two.__module__ = "test.verticals.two"
+
+        config_one = vertical_one.get_config(use_cache=True)
+        config_two = vertical_two.get_config(use_cache=True)
+
+        assert config_one.system_prompt == "Prompt One"
+        assert config_two.system_prompt == "Prompt Two"
+        assert config_one is not config_two
+
 
 class TestGetCachedExtension:
     """Tests for VerticalBase._get_cached_extension() helper method."""
@@ -270,6 +317,52 @@ class TestGetCachedExtension:
         # Should call factory again
         result2 = ConcreteVertical._get_cached_extension("test_key", lambda: "new_value")
         assert result2 == "new_value"
+
+    def test_same_class_name_different_modules_do_not_share_extension_cache(self):
+        """Extension cache should be isolated by module + class, not class name only."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+        def _tools_one(cls):
+            return ["read"]
+
+        def _tools_two(cls):
+            return ["write"]
+
+        def _prompt_one(cls):
+            return "Prompt One"
+
+        def _prompt_two(cls):
+            return "Prompt Two"
+
+        vertical_one = type(
+            "DuplicateVertical",
+            (VerticalBase,),
+            {
+                "name": "dup_ext_one",
+                "description": "Duplicate class name extension vertical one",
+                "get_tools": classmethod(_tools_one),
+                "get_system_prompt": classmethod(_prompt_one),
+            },
+        )
+        vertical_one.__module__ = "test.verticals.extensions.one"
+
+        vertical_two = type(
+            "DuplicateVertical",
+            (VerticalBase,),
+            {
+                "name": "dup_ext_two",
+                "description": "Duplicate class name extension vertical two",
+                "get_tools": classmethod(_tools_two),
+                "get_system_prompt": classmethod(_prompt_two),
+            },
+        )
+        vertical_two.__module__ = "test.verticals.extensions.two"
+
+        first = vertical_one._get_cached_extension("shared_key", lambda: "one")
+        second = vertical_two._get_cached_extension("shared_key", lambda: "two")
+
+        assert first == "one"
+        assert second == "two"
 
 
 class TestDefaultStageDefinitions:

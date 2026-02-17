@@ -83,6 +83,7 @@ Related Modules:
 from __future__ import annotations
 
 import logging
+import threading
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
@@ -121,6 +122,12 @@ class VerticalExtensionLoader(ABC):
 
     # Extension cache (shared across all verticals)
     _extensions_cache: Dict[str, Any] = {}
+    _extensions_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+
+    @classmethod
+    def _cache_namespace(cls) -> str:
+        """Return namespaced cache prefix for this vertical class."""
+        return f"{cls.__name__}:{cls.__module__}:{cls.__qualname__}"
 
     # =========================================================================
     # Extension Caching Infrastructure
@@ -154,11 +161,12 @@ class VerticalExtensionLoader(ABC):
                     return [MyMiddleware()]
                 return cls._get_cached_extension("middleware", _create)
         """
-        # Use composite key to avoid collisions between different vertical classes
-        cache_key = f"{cls.__name__}:{key}"
-        if cache_key not in cls._extensions_cache:
-            cls._extensions_cache[cache_key] = factory()
-        return cls._extensions_cache[cache_key]
+        # Use namespaced composite key to avoid collisions across modules.
+        cache_key = f"{cls._cache_namespace()}:{key}"
+        with cls._extensions_cache_lock:
+            if cache_key not in cls._extensions_cache:
+                cls._extensions_cache[cache_key] = factory()
+            return cls._extensions_cache[cache_key]
 
     @classmethod
     def _get_extension_factory(
@@ -536,11 +544,14 @@ class VerticalExtensionLoader(ABC):
         from victor.core.errors import ExtensionLoadError
         from victor.core.verticals.protocols import VerticalExtensions
 
-        cache_key = cls.__name__
+        cache_key = cls._cache_namespace()
 
         # Return cached extensions if available and caching enabled
-        if use_cache and cache_key in cls._extensions_cache:
-            return cls._extensions_cache[cache_key]
+        if use_cache:
+            with cls._extensions_cache_lock:
+                cached = cls._extensions_cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         # Determine strict mode
         is_strict = strict if strict is not None else cls.strict_extension_loading
@@ -635,7 +646,8 @@ class VerticalExtensionLoader(ABC):
         )
 
         # Cache the extensions
-        cls._extensions_cache[cache_key] = extensions
+        with cls._extensions_cache_lock:
+            cls._extensions_cache[cache_key] = extensions
         return extensions
 
     @classmethod
@@ -658,13 +670,28 @@ class VerticalExtensionLoader(ABC):
                        If False (default), clear only for this class.
         """
         if clear_all:
-            cls._extensions_cache.clear()
+            with cls._extensions_cache_lock:
+                cls._extensions_cache.clear()
         else:
-            cache_key = cls.__name__
-            # Clear composite extensions cache entry
-            cls._extensions_cache.pop(cache_key, None)
-            # Also clear individual extension cache entries (format: "ClassName:key")
-            prefix = f"{cache_key}:"
-            keys_to_remove = [k for k in cls._extensions_cache if k.startswith(prefix)]
-            for key in keys_to_remove:
-                cls._extensions_cache.pop(key, None)
+            namespaced_key = cls._cache_namespace()
+            namespaced_prefix = f"{namespaced_key}:"
+            legacy_key = cls.__name__
+            legacy_prefix = f"{legacy_key}:"
+            with cls._extensions_cache_lock:
+                # Clear namespaced cache entries
+                cls._extensions_cache.pop(namespaced_key, None)
+                namespaced_keys = [
+                    k for k in cls._extensions_cache if k.startswith(namespaced_prefix)
+                ]
+                for key in namespaced_keys:
+                    cls._extensions_cache.pop(key, None)
+
+                # Backward compatibility: clear legacy class-name-only keys.
+                cls._extensions_cache.pop(legacy_key, None)
+                legacy_keys = [
+                    k
+                    for k in cls._extensions_cache
+                    if k.startswith(legacy_prefix) and k.count(":") == 1
+                ]
+                for key in legacy_keys:
+                    cls._extensions_cache.pop(key, None)

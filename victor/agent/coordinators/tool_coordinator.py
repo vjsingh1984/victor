@@ -911,6 +911,216 @@ class ToolCoordinator:
         """
         self._orchestrator = orchestrator
 
+    # =====================================================================
+    # Tool Call Validation & Normalization
+    # =====================================================================
+
+    def validate_tool_call(
+        self,
+        tool_call: Any,
+        sanitizer: Any,
+        is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
+    ) -> "ToolCallValidation":
+        """Validate a single tool call structure, name, and enabled status.
+
+        Encapsulates structure checks, name format validation, alias resolution,
+        and enabled-tool checking.
+
+        Args:
+            tool_call: Raw tool call dict from the model
+            sanitizer: ResponseSanitizer with is_valid_tool_name()
+            is_tool_enabled_fn: Optional callback to check if tool is enabled.
+                Defaults to self.is_tool_enabled.
+
+        Returns:
+            ToolCallValidation with validation result
+        """
+        _is_enabled = is_tool_enabled_fn or self.is_tool_enabled
+        # Structure check
+        if not isinstance(tool_call, dict):
+            return ToolCallValidation(
+                valid=False,
+                skip_reason=f"Skipping invalid tool call (not a dict): {tool_call}",
+            )
+
+        tool_name = tool_call.get("name")
+
+        # Missing name
+        if not tool_name:
+            return ToolCallValidation(
+                valid=False,
+                skip_reason="Skipping tool call without name",
+                error_result={
+                    "tool_name": "",
+                    "success": False,
+                    "result": None,
+                    "error": (
+                        "Tool call missing name. Each tool call must include a 'name' field. "
+                        "Please specify which tool you want to use."
+                    ),
+                },
+            )
+
+        # Format validation (reject hallucinated/malformed names)
+        if not sanitizer.is_valid_tool_name(tool_name):
+            return ToolCallValidation(
+                valid=False,
+                original_name=tool_name,
+                skip_reason=f"Skipping invalid/hallucinated tool name: {tool_name}",
+                error_result={
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": (
+                        f"Invalid tool name '{tool_name}'. This tool does not exist. "
+                        "Use only tools from the provided tool list. "
+                        "Check for typos or hallucinated tool names."
+                    ),
+                },
+            )
+
+        # Resolve legacy/alias names to canonical form
+        try:
+            from victor.tools.decorators import resolve_tool_name
+
+            canonical = resolve_tool_name(tool_name)
+        except Exception:
+            canonical = tool_name
+
+        # Check if enabled
+        if not _is_enabled(canonical):
+            return ToolCallValidation(
+                valid=False,
+                original_name=tool_name,
+                canonical_name=canonical,
+                skip_reason=(
+                    f"Skipping unknown or disabled tool: {tool_name} (resolved: {canonical})"
+                ),
+                error_result={
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": (
+                        f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
+                        "or not included in the current tool selection. "
+                        "Use only the tools listed in your available tools."
+                    ),
+                },
+            )
+
+        return ToolCallValidation(
+            valid=True,
+            original_name=tool_name,
+            canonical_name=canonical,
+        )
+
+    def normalize_arguments_full(
+        self,
+        tool_name: str,
+        original_name: str,
+        raw_args: Any,
+        argument_normalizer: Any,
+        tool_adapter: Any,
+        failed_signatures: Optional[Set[Tuple[str, str]]] = None,
+    ) -> "NormalizedArgs":
+        """Normalize tool arguments through all stages.
+
+        Encapsulates: JSON string parsing, ArgumentNormalizer, ToolCallingAdapter,
+        git operation inference, and dedup signature computation.
+
+        Args:
+            tool_name: Canonical tool name
+            original_name: Original (alias) tool name from the model
+            raw_args: Raw arguments from tool call
+            argument_normalizer: ArgumentNormalizer instance
+            tool_adapter: ToolCallingAdapter instance
+            failed_signatures: Set of previously failed (name, args_json) tuples.
+                Defaults to self._failed_tool_signatures.
+
+        Returns:
+            NormalizedArgs with normalized arguments and metadata
+        """
+        _failed = (
+            failed_signatures if failed_signatures is not None else self._failed_tool_signatures
+        )
+        import ast as _ast
+
+        from victor.agent.argument_normalizer import NormalizationStrategy
+        from victor.agent.orchestrator_utils import infer_git_operation
+
+        # Stage 1: Parse JSON strings to dicts
+        tool_args = raw_args
+        if isinstance(tool_args, str):
+            try:
+                tool_args = json.loads(tool_args)
+            except Exception:
+                try:
+                    tool_args = _ast.literal_eval(tool_args)
+                except Exception:
+                    tool_args = {"value": tool_args}
+        elif tool_args is None:
+            tool_args = {}
+
+        # Stage 2: ArgumentNormalizer (handles malformed JSON syntax)
+        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
+
+        # Stage 3: ToolCallingAdapter (handles missing required params)
+        normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
+
+        # Stage 4: Git operation inference from alias
+        normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
+
+        # Stage 5: Compute dedup signature
+        try:
+            signature = (tool_name, json.dumps(normalized_args, sort_keys=True, default=str))
+        except Exception:
+            signature = (tool_name, str(normalized_args))
+
+        is_repeated = signature in _failed
+
+        return NormalizedArgs(
+            args=normalized_args,
+            strategy=strategy,
+            signature=signature,
+            is_repeated_failure=is_repeated,
+        )
+
+
+@dataclass
+class ToolCallValidation:
+    """Result of validating a single tool call.
+
+    Attributes:
+        valid: Whether the tool call passed all validation checks
+        original_name: Original tool name from the model (if present)
+        canonical_name: Resolved canonical tool name (if valid)
+        skip_reason: Human-readable reason for skipping (for console output)
+        error_result: Error dict to feed back to the model (for learning)
+    """
+
+    valid: bool
+    original_name: Optional[str] = None
+    canonical_name: Optional[str] = None
+    skip_reason: Optional[str] = None
+    error_result: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class NormalizedArgs:
+    """Result of full argument normalization.
+
+    Attributes:
+        args: The normalized argument dict
+        strategy: The NormalizationStrategy used
+        signature: Dedup signature tuple (tool_name, args_json)
+        is_repeated_failure: Whether this signature already failed
+    """
+
+    args: Dict[str, Any]
+    strategy: Any  # NormalizationStrategy
+    signature: Tuple[str, str]
+    is_repeated_failure: bool = False
+
 
 def create_tool_coordinator(
     tool_pipeline: "ToolPipeline",
@@ -944,6 +1154,8 @@ __all__ = [
     "ToolCoordinator",
     "ToolCoordinatorConfig",
     "TaskContext",
+    "ToolCallValidation",
+    "NormalizedArgs",
     "ToolExecutionResult",
     "IToolCoordinator",
     "create_tool_coordinator",

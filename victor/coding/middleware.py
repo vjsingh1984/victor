@@ -29,6 +29,7 @@ from victor.core.verticals.protocols import (
     MiddlewareProtocol,
     MiddlewareResult,
 )
+from victor.framework.middleware import GitSafetyMiddleware as _FrameworkGitSafety
 
 logger = logging.getLogger(__name__)
 
@@ -402,90 +403,16 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         return set(CODE_TOOLS)
 
 
-class GitSafetyMiddleware(MiddlewareProtocol):
-    """Middleware for git operation safety checks.
+class GitSafetyMiddleware(_FrameworkGitSafety):
+    """Coding-specific defaults: block_dangerous=False.
 
-    Validates git operations before execution and can block
-    dangerous operations like force push or hard reset.
+    Thin subclass of the framework GitSafetyMiddleware that preserves
+    the coding vertical's default of block_dangerous=False (the framework
+    default is True).
     """
 
-    # Dangerous git operations
-    BLOCKED_OPERATIONS = frozenset(
-        {
-            "push --force",
-            "push -f",
-            "reset --hard HEAD~",
-            "clean -fd",
-        }
-    )
-
-    WARNED_OPERATIONS = frozenset(
-        {
-            "reset --hard",
-            "checkout --",
-            "stash drop",
-            "branch -D",
-        }
-    )
-
-    def __init__(
-        self,
-        block_dangerous: bool = False,
-        warn_on_risky: bool = True,
-    ):
-        """Initialize git safety middleware.
-
-        Args:
-            block_dangerous: Whether to block dangerous operations
-            warn_on_risky: Whether to add warnings for risky operations
-        """
-        self._block_dangerous = block_dangerous
-        self._warn_on_risky = warn_on_risky
-
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
-        """Check git operations for safety.
-
-        Args:
-            tool_name: Tool name
-            arguments: Tool arguments
-
-        Returns:
-            MiddlewareResult with safety check results
-        """
-        if tool_name not in {"git", "execute_bash"}:
-            return MiddlewareResult()
-
-        command = arguments.get("command", "") or arguments.get("args", "")
-        if not command:
-            return MiddlewareResult()
-
-        # Check for blocked operations
-        if self._block_dangerous:
-            for blocked in self.BLOCKED_OPERATIONS:
-                if blocked in command:
-                    return MiddlewareResult(
-                        proceed=False,
-                        error_message=f"Blocked dangerous git operation: {blocked}",
-                    )
-
-        # Add warnings for risky operations
-        if self._warn_on_risky:
-            for warned in self.WARNED_OPERATIONS:
-                if warned in command:
-                    return MiddlewareResult(
-                        proceed=True,
-                        metadata={"git_warning": f"Risky operation: {warned}"},
-                    )
-
-        return MiddlewareResult()
-
-    def get_priority(self) -> MiddlewarePriority:
-        """Get priority - CRITICAL for safety checks."""
-        return MiddlewarePriority.CRITICAL
-
-    def get_applicable_tools(self) -> Optional[Set[str]]:
-        """Get applicable tools."""
-        return {"git", "execute_bash"}
+    def __init__(self, block_dangerous: bool = False, warn_on_risky: bool = True, **kwargs):
+        super().__init__(block_dangerous=block_dangerous, warn_on_risky=warn_on_risky, **kwargs)
 
 
 __all__ = [

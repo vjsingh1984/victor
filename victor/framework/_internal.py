@@ -178,51 +178,36 @@ def apply_vertical_to_orchestrator(
         orchestrator: AgentOrchestrator instance
         vertical: Vertical class or name string
     """
-    from victor.framework.vertical_integration import (
-        VerticalIntegrationPipeline,
-        IntegrationResult,
-    )
-    import logging
+    from victor.framework.vertical_service import apply_vertical_configuration
 
-    logger = logging.getLogger(__name__)
-
-    # Create and apply pipeline
-    pipeline = VerticalIntegrationPipeline()
-    result = pipeline.apply(orchestrator, vertical)
-
-    if result.success:
-        logger.info(
-            f"Applied vertical '{result.vertical_name}' via SDK path: "
-            f"tools={len(result.tools_applied)}, "
-            f"middleware={result.middleware_count}, "
-            f"safety={result.safety_patterns_count}"
-        )
-    else:
-        for error in result.errors:
-            logger.error(f"Vertical integration error: {error}")
-        for warning in result.warnings:
-            logger.warning(f"Vertical integration warning: {warning}")
+    apply_vertical_configuration(orchestrator, vertical, source="sdk")
 
 
 def setup_observability_integration(
     orchestrator: Any,
     session_id: Optional[str] = None,
+    enable_cqrs_bridge: bool = False,
 ) -> Any:
     """Set up ObservabilityIntegration for the orchestrator.
 
     This wires the EventBus into the orchestrator for unified event handling.
+    Used by both the SDK path (Agent.create) and the CLI path (FrameworkShim).
 
     Args:
         orchestrator: AgentOrchestrator instance
         session_id: Optional session ID for event correlation
+        enable_cqrs_bridge: Whether to enable CQRS event bridging
 
     Returns:
         ObservabilityIntegration instance
     """
     from victor.observability.integration import ObservabilityIntegration
 
-    # Create integration with optional session ID
-    integration = ObservabilityIntegration(session_id=session_id)
+    # Create integration with optional session ID and CQRS bridge
+    integration = ObservabilityIntegration(
+        session_id=session_id,
+        enable_cqrs_bridge=enable_cqrs_bridge,
+    )
 
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)

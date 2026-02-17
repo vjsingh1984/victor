@@ -219,7 +219,7 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
 
     # Fallback: use centralized capability method mappings
     # Import from capability_registry (single source of truth)
-    from victor.agent.capability_registry import get_method_for_capability
+    from victor.framework.capability_registry import get_method_for_capability
 
     method_name = get_method_for_capability(capability_name)
     method = getattr(obj, method_name, None)

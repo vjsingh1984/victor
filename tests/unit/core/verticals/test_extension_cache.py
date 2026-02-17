@@ -17,6 +17,11 @@
 Tests that refresh_plugins() properly clears the extension cache.
 """
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
+import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
@@ -146,6 +151,457 @@ class TestRefreshPluginsClearsExtensionCache:
                     # Verify entry point cache invalidation
                     mock_cache.invalidate.assert_any_call("victor.verticals")
                     mock_cache.invalidate.assert_any_call("victor.tools")
+
+    def test_refresh_plugins_resets_loader_extension_state(self):
+        """refresh_plugins should clear loader-level extension/service state."""
+        loader = VerticalLoader()
+        loader._extensions = MagicMock()
+        loader._registered_services = True
+
+        with patch.object(loader, "_discovered_verticals", None):
+            with patch.object(loader, "_discovered_tools", None):
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
+                    mock_cache = MagicMock()
+                    mock_cache_get.return_value = mock_cache
+
+                    loader.refresh_plugins()
+
+                    assert loader._extensions is None
+                    assert loader._registered_services is False
+
+    def test_refresh_plugins_parallel_calls_are_safe(self):
+        """Concurrent refresh_plugins calls should complete without stale state."""
+        loader = VerticalLoader()
+        loader._extensions = MagicMock()
+        loader._registered_services = True
+
+        with patch(
+            "victor.core.verticals.vertical_loader.get_entry_point_cache"
+        ) as mock_cache_get:
+            mock_cache = MagicMock()
+            mock_cache_get.return_value = mock_cache
+
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                futures = [executor.submit(loader.refresh_plugins) for _ in range(30)]
+                for future in futures:
+                    future.result()
+
+            assert loader._extensions is None
+            assert loader._registered_services is False
+
+    def test_refresh_plugins_clears_framework_vertical_integration_cache(self):
+        """refresh_plugins should clear framework vertical integration cache."""
+        loader = VerticalLoader()
+
+        with patch.object(loader, "_discovered_verticals", None):
+            with patch.object(loader, "_discovered_tools", None):
+                with patch(
+                    "victor.core.verticals.vertical_loader.get_entry_point_cache"
+                ) as mock_cache_get:
+                    mock_cache = MagicMock()
+                    mock_cache_get.return_value = mock_cache
+
+                    with patch(
+                        "victor.framework.vertical_service.clear_vertical_integration_pipeline_cache"
+                    ) as mock_clear:
+                        loader.refresh_plugins()
+
+        mock_clear.assert_called_once_with()
+
+
+class TestVerticalLoaderThreadSafety:
+    """Thread-safety tests for VerticalLoader discovery and singleton behavior."""
+
+    def test_discover_verticals_concurrent_results_are_consistent(self):
+        """Concurrent discover_verticals should not return partially built caches."""
+        loader = VerticalLoader()
+        start_event = threading.Event()
+
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            mock_cache = MagicMock()
+            mock_cache_get.return_value = mock_cache
+
+            def _get_entry_points(group, force_refresh=False):
+                time.sleep(0.02)
+                return {"plugin_vertical": "pkg.plugin:PluginVertical"}
+
+            mock_cache.get_entry_points.side_effect = _get_entry_points
+
+            def _load_vertical_entries(entries):
+                for name in entries:
+                    loader._discovered_verticals[name] = MagicMock(name=name)
+
+            with patch.object(loader, "_load_vertical_entries", side_effect=_load_vertical_entries):
+
+                def _discover():
+                    start_event.wait()
+                    return loader.discover_verticals()
+
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = [executor.submit(_discover) for _ in range(8)]
+                    start_event.set()
+                    results = [future.result() for future in futures]
+
+        assert all("plugin_vertical" in result for result in results)
+        assert mock_cache.get_entry_points.call_count == 1
+
+    def test_discover_tools_concurrent_results_are_consistent(self):
+        """Concurrent discover_tools should return consistent plugin mappings."""
+        loader = VerticalLoader()
+        start_event = threading.Event()
+
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            mock_cache = MagicMock()
+            mock_cache_get.return_value = mock_cache
+
+            def _get_entry_points(group, force_refresh=False):
+                time.sleep(0.02)
+                return {"plugin_tool": "pkg.tools:PluginTool"}
+
+            mock_cache.get_entry_points.side_effect = _get_entry_points
+
+            def _load_tool_entries(entries):
+                for name in entries:
+                    loader._discovered_tools[name] = MagicMock(name=name)
+
+            with patch.object(loader, "_load_tool_entries", side_effect=_load_tool_entries):
+
+                def _discover():
+                    start_event.wait()
+                    return loader.discover_tools()
+
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = [executor.submit(_discover) for _ in range(8)]
+                    start_event.set()
+                    results = [future.result() for future in futures]
+
+        assert all("plugin_tool" in result for result in results)
+        assert mock_cache.get_entry_points.call_count == 1
+
+    def test_get_vertical_loader_thread_safe_singleton(self):
+        """get_vertical_loader should construct exactly one singleton under contention."""
+        import victor.core.verticals.vertical_loader as loader_module
+
+        start_event = threading.Event()
+        created_instances = []
+
+        def _build_loader():
+            time.sleep(0.02)
+            instance = MagicMock()
+            created_instances.append(instance)
+            return instance
+
+        with patch.object(loader_module, "_loader", None):
+            with patch.object(loader_module, "VerticalLoader", side_effect=_build_loader):
+
+                def _get_loader():
+                    start_event.wait()
+                    return loader_module.get_vertical_loader()
+
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = [executor.submit(_get_loader) for _ in range(10)]
+                    start_event.set()
+                    results = [future.result() for future in futures]
+
+        assert len({id(instance) for instance in results}) == 1
+        assert len(created_instances) == 1
+
+    def test_register_services_concurrent_calls_are_idempotent(self):
+        """Concurrent register_services calls should invoke provider once."""
+        loader = VerticalLoader()
+
+        class _SvcProvider:
+            def __init__(self):
+                self.count = 0
+                self.lock = threading.Lock()
+
+            def register_services(self, container, settings):
+                with self.lock:
+                    self.count += 1
+                time.sleep(0.01)
+
+        provider = _SvcProvider()
+        extensions = MagicMock()
+        extensions.service_provider = provider
+        loader._active_vertical = MagicMock()
+        loader._extensions = extensions
+        loader._registered_services = False
+
+        container = MagicMock()
+        settings = MagicMock()
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(loader.register_services, container, settings) for _ in range(20)]
+            for future in futures:
+                future.result()
+
+        assert provider.count == 1
+        assert loader._registered_services is True
+
+
+class TestVerticalLoaderDiscoveryTelemetry:
+    """Tests for discovery telemetry counters."""
+
+    def test_discovery_stats_track_vertical_calls_hits_and_scans(self):
+        """Vertical discovery should track calls, cache hits, and scans."""
+        loader = VerticalLoader()
+
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            mock_cache = MagicMock()
+            mock_cache_get.return_value = mock_cache
+            mock_cache.get_entry_points.return_value = {}
+
+            loader.discover_verticals()
+            loader.discover_verticals()
+
+        stats = loader.get_discovery_stats()
+        assert stats["vertical"]["calls"] == 2
+        assert stats["vertical"]["cache_hits"] == 1
+        assert stats["vertical"]["scans"] == 1
+        assert stats["vertical"]["last_discovery_ms"] >= 0.0
+
+    def test_discovery_stats_track_tool_calls_hits_and_scans(self):
+        """Tool discovery should track calls, cache hits, and scans."""
+        loader = VerticalLoader()
+
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            mock_cache = MagicMock()
+            mock_cache_get.return_value = mock_cache
+            mock_cache.get_entry_points.return_value = {}
+
+            loader.discover_tools()
+            loader.discover_tools()
+
+        stats = loader.get_discovery_stats()
+        assert stats["tools"]["calls"] == 2
+        assert stats["tools"]["cache_hits"] == 1
+        assert stats["tools"]["scans"] == 1
+        assert stats["tools"]["last_discovery_ms"] >= 0.0
+
+
+class TestVerticalLoaderObservabilityEvents:
+    """Tests for VerticalLoader observability event emission."""
+
+    def test_discover_verticals_emits_event_without_running_loop(self):
+        """discover_verticals should still emit without a running event loop."""
+        loader = VerticalLoader()
+        emitted = []
+        emitted_event = threading.Event()
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+                emitted_event.set()
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                mock_cache.get_entry_points.return_value = {}
+                loader.discover_verticals()
+
+        assert emitted_event.wait(timeout=1.0)
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.discovered"
+        assert source == "VerticalLoader"
+        assert data["kind"] == "vertical"
+
+    def test_refresh_plugins_emits_event_without_running_loop(self):
+        """refresh_plugins should still emit without a running event loop."""
+        loader = VerticalLoader()
+        emitted = []
+        emitted_event = threading.Event()
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+                emitted_event.set()
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                with patch(
+                    "victor.framework.vertical_service.clear_vertical_integration_pipeline_cache"
+                ):
+                    loader.refresh_plugins()
+
+        assert emitted_event.wait(timeout=1.0)
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.refreshed"
+        assert source == "VerticalLoader"
+        assert data["refresh_count"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_discover_verticals_emits_event(self):
+        """discover_verticals should emit vertical.plugins.discovered event."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                mock_cache.get_entry_points.return_value = {}
+
+                loader.discover_verticals()
+                await asyncio.sleep(0)
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.discovered"
+        assert source == "VerticalLoader"
+        assert data["kind"] == "vertical"
+        assert "count" in data
+        assert "duration_ms" in data
+        assert "stats" in data
+
+    @pytest.mark.asyncio
+    async def test_discover_tools_emits_event(self):
+        """discover_tools should emit vertical.plugins.discovered event."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                mock_cache.get_entry_points.return_value = {}
+
+                loader.discover_tools()
+                await asyncio.sleep(0)
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.discovered"
+        assert source == "VerticalLoader"
+        assert data["kind"] == "tools"
+        assert "count" in data
+        assert "duration_ms" in data
+        assert "stats" in data
+
+    @pytest.mark.asyncio
+    async def test_discover_verticals_async_emits_event(self):
+        """discover_verticals_async should emit vertical.plugins.discovered event."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                mock_cache.get_entry_points.return_value = {}
+
+                await loader.discover_verticals_async()
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.discovered"
+        assert source == "VerticalLoader"
+        assert data["kind"] == "vertical"
+        assert "count" in data
+        assert "duration_ms" in data
+        assert "stats" in data
+
+    @pytest.mark.asyncio
+    async def test_discover_tools_async_emits_event(self):
+        """discover_tools_async should emit vertical.plugins.discovered event."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                mock_cache.get_entry_points.return_value = {}
+
+                await loader.discover_tools_async()
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.discovered"
+        assert source == "VerticalLoader"
+        assert data["kind"] == "tools"
+        assert "count" in data
+        assert "duration_ms" in data
+        assert "stats" in data
+
+    @pytest.mark.asyncio
+    async def test_discover_verticals_async_concurrent_cache_hit_telemetry_is_correct(self):
+        """Concurrent async discovery should report one miss and one cache hit."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                if topic == "vertical.plugins.discovered" and data.get("kind") == "vertical":
+                    emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+
+                def _get_entry_points(group, force_refresh=False):
+                    time.sleep(0.03)
+                    return {}
+
+                mock_cache.get_entry_points.side_effect = _get_entry_points
+                await asyncio.gather(
+                    loader.discover_verticals_async(),
+                    loader.discover_verticals_async(),
+                )
+
+        # Exactly one call should be a cache miss and one should be a cache hit.
+        cache_hits = [data["cache_hit"] for _, data, _ in emitted[-2:]]
+        assert cache_hits.count(False) == 1
+        assert cache_hits.count(True) == 1
+
+    @pytest.mark.asyncio
+    async def test_refresh_plugins_emits_event(self):
+        """refresh_plugins should emit vertical.plugins.refreshed event."""
+        loader = VerticalLoader()
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+                mock_cache = MagicMock()
+                mock_cache_get.return_value = mock_cache
+                with patch(
+                    "victor.framework.vertical_service.clear_vertical_integration_pipeline_cache"
+                ):
+                    loader.refresh_plugins()
+                    await asyncio.sleep(0)
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.plugins.refreshed"
+        assert source == "VerticalLoader"
+        assert data["refresh_count"] >= 1
+        assert "duration_ms" in data
+        assert "stats" in data
 
 
 class TestExtensionCacheConsistency:

@@ -4034,6 +4034,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
+        Thin facade that delegates validation and normalization to
+        ToolCoordinator, keeping state mutations and message injection local.
+
         Args:
             tool_calls: List of tool call requests
         """
@@ -4041,176 +4044,66 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return []
 
         results: List[Dict[str, Any]] = []
+        warn_icon = self._presentation.icon("warning", with_color=False)
 
         for tool_call in tool_calls:
-            # Validate tool call structure
-            if not isinstance(tool_call, dict):
-                self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid tool call (not a dict): {tool_call}[/]"
-                )
+            # --- Validate via ToolCoordinator ---
+            validation = self._tool_coordinator.validate_tool_call(
+                tool_call, self.sanitizer, is_tool_enabled_fn=self.is_tool_enabled
+            )
+            if not validation.valid:
+                if validation.skip_reason:
+                    self.console.print(f"[yellow]{warn_icon} {validation.skip_reason}[/]")
+                if validation.error_result:
+                    results.append(validation.error_result)
                 continue
 
-            tool_name = tool_call.get("name")
-            if not tool_name:
-                self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping tool call without name: {tool_call}[/]"
-                )
-                # GAP-5 FIX: Add feedback so model learns from missing tool name
-                results.append(
-                    {
-                        "tool_name": "",
-                        "success": False,
-                        "result": None,
-                        "error": "Tool call missing name. Each tool call must include a 'name' field. "
-                        "Please specify which tool you want to use.",
-                    }
-                )
-                continue
-
-            # Validate tool name format (reject hallucinated/malformed names)
-            if not self.sanitizer.is_valid_tool_name(tool_name):
-                self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid/hallucinated tool name: {tool_name}[/]"
-                )
-                # GAP-5 FIX: Add feedback so model learns from invalid tool name
-                # Instead of silently dropping, return an error result the model can learn from
-                results.append(
-                    {
-                        "tool_name": tool_name,
-                        "success": False,
-                        "result": None,
-                        "error": f"Invalid tool name '{tool_name}'. This tool does not exist. "
-                        "Use only tools from the provided tool list. "
-                        "Check for typos or hallucinated tool names.",
-                    }
-                )
-                continue
-
-            # Resolve legacy/alias names to canonical form before checks
-            try:
-                from victor.tools.decorators import resolve_tool_name
-
-                canonical_tool_name = resolve_tool_name(tool_name)
-            except Exception:
-                canonical_tool_name = tool_name
-
-            # Skip unknown tools immediately (no retries, no budget cost)
-            # Use ToolAccessController (with tiered config) instead of registry directly
-            if not self.is_tool_enabled(canonical_tool_name):
-                # Log original and canonical names to aid debugging in tests
-                self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping unknown or disabled tool: {tool_name} (resolved: {canonical_tool_name})[/]"
-                )
-                # GAP-5 FIX: Add feedback so model learns from unknown/disabled tool
-                # Instead of silently dropping, return an error result the model can learn from
-                results.append(
-                    {
-                        "tool_name": tool_name,
-                        "success": False,
-                        "result": None,
-                        "error": f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
-                        "or not included in the current tool selection. "
-                        "Use only the tools listed in your available tools.",
-                    }
-                )
-                continue
-
+            # --- Budget check (reads orchestrator state) ---
             if self.tool_calls_used >= self.tool_budget:
                 self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
+                    f"[yellow]{warn_icon} Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
                 )
                 break
 
-            # Use the canonical name for execution and downstream bookkeeping
-            original_tool_name = tool_name  # Preserve for alias-based inference
-            tool_name = canonical_tool_name
+            original_tool_name = validation.original_name
+            tool_name = validation.canonical_name
 
-            tool_args = tool_call.get("arguments", {})
-
-            # Providers sometimes stream arguments as JSON strings; normalize to dict early
-            if isinstance(tool_args, str):
-                try:
-                    tool_args = json.loads(tool_args)
-                except Exception:
-                    try:
-                        tool_args = ast.literal_eval(tool_args)
-                    except Exception:
-                        tool_args = {"value": tool_args}
-            elif tool_args is None:
-                tool_args = {}
-
-            # Normalize arguments to handle malformed JSON (e.g., Python vs JSON syntax)
-            normalized_args, strategy = self.argument_normalizer.normalize_arguments(
-                tool_args, tool_name
+            # --- Normalize via ToolCoordinator ---
+            norm = self._tool_coordinator.normalize_arguments_full(
+                tool_name,
+                original_tool_name,
+                tool_call.get("arguments", {}),
+                self.argument_normalizer,
+                self.tool_adapter,
+                failed_signatures=self.failed_tool_signatures,
             )
+            normalized_args = norm.args
 
-            # DEBUG: Log normalized arguments with types
-            original_types = {k: type(v).__name__ for k, v in tool_args.items()}
-            normalized_types = {k: type(v).__name__ for k, v in normalized_args.items()}
-            logger.debug(
-                f"[NORMALIZE] {tool_name}: Original types={original_types}, "
-                f"Normalized types={normalized_types}"
-            )
-
-            # Apply adapter-based normalization for missing required parameters
-            # This handles provider-specific quirks like Gemini omitting 'path' for list_directory
-            before_adapter = normalized_args.copy()
-            normalized_args = self.tool_adapter.normalize_arguments(normalized_args, tool_name)
-
-            # DEBUG: Log if adapter changed the types
-            if before_adapter != normalized_args:
-                before_types = {k: type(v).__name__ for k, v in before_adapter.items()}
-                after_types = {k: type(v).__name__ for k, v in normalized_args.items()}
-                logger.debug(
-                    f"[ADAPTER] {tool_name}: Changed arguments - "
-                    f"Before={before_types}, After={after_types}"
-                )
-
-            # Infer operation from alias for git tool (e.g., git_log → git with operation=log)
-            normalized_args = infer_git_operation(
-                original_tool_name, canonical_tool_name, normalized_args
-            )
-
-            # Skip repeated failing calls with identical signature to avoid tight loops
-            try:
-                signature = (tool_name, json.dumps(normalized_args, sort_keys=True, default=str))
-            except Exception:
-                signature = (tool_name, str(normalized_args))
-            if signature in self.failed_tool_signatures:
+            # Skip repeated failing calls
+            if norm.is_repeated_failure:
                 self.console.print(
-                    f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
+                    f"[yellow]{warn_icon} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
                 )
                 continue
 
-            # Log normalization if applied (for debugging and monitoring)
-            if strategy != NormalizationStrategy.DIRECT:
+            # Log normalization if applied
+            if norm.strategy != NormalizationStrategy.DIRECT:
                 logger.warning(
-                    f"Applied {strategy.value} normalization to {tool_name} arguments. "
-                    f"Original: {tool_args} → Normalized: {normalized_args}"
+                    f"Applied {norm.strategy.value} normalization to {tool_name} arguments"
                 )
                 gear_icon = self._presentation.icon("gear", with_color=False)
                 self.console.print(
-                    f"[yellow]{gear_icon} Normalized arguments via {strategy.value}[/]"
+                    f"[yellow]{gear_icon} Normalized arguments via {norm.strategy.value}[/]"
                 )
-            else:
-                # Log type coercion even when strategy is DIRECT
-                args_changed = tool_args != normalized_args
-                if args_changed:
-                    logger.debug(
-                        f"Type coercion applied to {tool_name} arguments. "
-                        f"Original: {tool_args} → Normalized: {normalized_args}"
-                    )
 
+            # --- Execution (uses orchestrator context) ---
             self.usage_logger.log_event(
                 "tool_call", {"tool_name": tool_name, "tool_args": normalized_args}
             )
-
-            # Tool execution message handled by streaming - avoid duplicate
             logger.debug(f"Executing tool: {tool_name}")
 
             start = time.monotonic()
 
-            # Create context for the tool
             context = {
                 "code_manager": self.code_manager,
                 "provider": self.provider,
@@ -4220,10 +4113,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 "settings": self.settings,
             }
 
-            # Execute tool via centralized ToolExecutor (handles retry, caching, metrics)
-            # Note: skip_normalization=True since we already normalized above
-            final_types = {k: type(v).__name__ for k, v in normalized_args.items()}
-            logger.debug(f"[EXECUTE] {tool_name}: Final argument types={final_types}")
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
                 arguments=normalized_args,
@@ -4233,63 +4122,52 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             success = exec_result.success
             error_msg = exec_result.error
 
-            # Reset activity timer after tool execution to prevent idle timeout during active work
+            # Reset activity timer
             if hasattr(self, "_current_stream_context") and self._current_stream_context:
                 self._current_stream_context.reset_activity_timer()
 
-            # Update counters and tracking
+            # --- State updates (orchestrator-local) ---
             self.tool_calls_used += 1
             self.executed_tools.append(tool_name)
             if tool_name == "read" and "path" in normalized_args:
                 self.observed_files.add(str(normalized_args.get("path")))
 
-            # Reset continuation prompts counter on successful tool call
-            # This allows the model to get fresh continuation prompts if it pauses again
+            # Reset continuation/input prompts on successful tool call
             if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
                 logger.debug(
                     f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
                 )
                 self._continuation_prompts = 0
-                # Also reset the tool call tracking for stuck loop detection
                 if hasattr(self, "_tool_calls_at_continuation_start"):
                     self._tool_calls_at_continuation_start = self.tool_calls_used
-
-            # Reset asking input prompts counter on successful tool call
             if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
                 logger.debug(
                     f"Resetting asking input prompts counter (was {self._asking_input_prompts}) after successful tool call"
                 )
                 self._asking_input_prompts = 0
 
-            # Calculate execution time
-            elapsed_ms = (time.monotonic() - start) * 1000  # Convert to milliseconds
+            elapsed_ms = (time.monotonic() - start) * 1000
 
-            # Record tool execution analytics (including error type for UsageAnalytics)
             error_type = (
                 type(exec_result.error).__name__ if exec_result.error and not success else None
             )
             self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
-
-            # Update conversation state machine for stage detection
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
-            # Update unified tracker for milestone tracking (single source of truth)
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
             self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
-            # ToolExecutionResult stores actual output in .result field
+            # --- Result formatting + conversation injection ---
             output = exec_result.result if success else None
 
-            # Check for semantic failure in result dict (e.g., edit_files returning success=False)
+            # Check for semantic failure
             semantic_success = success
             if success and isinstance(output, dict) and output.get("success") is False:
                 semantic_success = False
-                # Extract error from result dict
                 error_msg = output.get("error", "Operation returned success=False")
 
-            # Only set error_display for failures; keep None for successes
             error_display = None if semantic_success else (error_msg or "Unknown error")
 
             self.usage_logger.log_event(
@@ -4303,44 +4181,28 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
             if semantic_success:
-                # Success message handled by streaming - log for debug only
                 logger.debug(f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)")
-
-                # Format tool output with clear boundaries to prevent hallucination
-                # Use structured format that models recognize as authoritative
                 formatted_output = self._format_tool_output(tool_name, normalized_args, output)
-
-                # Log actual tool output for debugging (truncated for readability)
                 output_preview = str(output)[:500] if output else "<empty>"
                 if len(str(output)) > 500:
                     output_preview += f"... [truncated, total {len(str(output))} chars]"
                 logger.debug(f"Tool '{tool_name}' actual output:\n{output_preview}")
 
-                # Add tool result to conversation with proper role
-                # Use "user" role but with clear TOOL_OUTPUT markers that models recognize
-                self.add_message(
-                    "user",
-                    formatted_output,
-                )
+                self.add_message("user", formatted_output)
                 results.append(
                     {
                         "name": tool_name,
                         "success": True,
                         "elapsed": time.monotonic() - start,
-                        "args": normalized_args,  # Include args for diff display
+                        "args": normalized_args,
                     }
                 )
             else:
-                self.failed_tool_signatures.add(signature)
-                # error_display was already set above from exec_result.error or semantic failure
+                self.failed_tool_signatures.add(norm.signature)
                 self.console.print(
                     f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                 )
 
-                # ALWAYS pass error details back to the model so it can understand and continue
-                # This handles both:
-                # 1. Execution failures (success=False): tool raised exception
-                # 2. Semantic failures (success=True, semantic_success=False): tool returned error
                 error_output = output if isinstance(output, dict) else {"error": error_display}
                 formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)
                 self.add_message("user", formatted_error)

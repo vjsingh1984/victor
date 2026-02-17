@@ -147,6 +147,15 @@ from victor.core.events.sync_wrapper import (
     SyncObservabilityBus,
     SyncEventHandler,
 )
+from victor.core.events.emit_helper import (
+    emit_event_sync,
+    get_emit_sync_stats,
+    reset_emit_sync_stats,
+    emit_sync_metrics_event,
+    EmitSyncMetricsReporter,
+    start_emit_sync_metrics_reporter,
+    stop_emit_sync_metrics_reporter,
+)
 
 __all__ = [
     # Taxonomy - Core enum
@@ -202,4 +211,12 @@ __all__ = [
     "SyncEventWrapper",
     "SyncObservabilityBus",
     "SyncEventHandler",
+    # Sync emit helper APIs
+    "emit_event_sync",
+    "get_emit_sync_stats",
+    "reset_emit_sync_stats",
+    "emit_sync_metrics_event",
+    "EmitSyncMetricsReporter",
+    "start_emit_sync_metrics_reporter",
+    "stop_emit_sync_metrics_reporter",
 ]

@@ -51,10 +51,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
-from victor.framework.vertical_integration import (
-    VerticalIntegrationPipeline,
-    IntegrationResult,
-)
+from victor.framework.vertical_service import apply_vertical_configuration
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -231,9 +228,8 @@ class FrameworkShim:
         """
         logger.debug(f"Applying vertical via pipeline: {vertical.name}")
 
-        # Use unified pipeline for vertical application
-        pipeline = VerticalIntegrationPipeline()
-        result = pipeline.apply(self._orchestrator, vertical)
+        # Use shared framework service for vertical application
+        result = apply_vertical_configuration(self._orchestrator, vertical, source="cli")
 
         # Store result for access
         self._vertical_config = result.context.config if result.context else None
@@ -256,22 +252,16 @@ class FrameworkShim:
     def _wire_observability(self) -> None:
         """Wire ObservabilityIntegration to orchestrator.
 
-        This enables:
-        - Tool execution events
-        - State transition events
-        - Model response events
-        - Session lifecycle events
+        Delegates to the shared setup_observability_integration() helper
+        used by both SDK and CLI paths.
         """
-        from victor.observability.integration import ObservabilityIntegration
+        from victor.framework._internal import setup_observability_integration
 
-        self._observability = ObservabilityIntegration(
+        self._observability = setup_observability_integration(
+            self._orchestrator,
             session_id=self._session_id,
             enable_cqrs_bridge=self._enable_cqrs_bridge,
         )
-        self._observability.wire_orchestrator(self._orchestrator)
-
-        # Store reference on orchestrator for access
-        self._orchestrator.observability = self._observability
 
         logger.debug(
             f"Wired observability: session_id={self._session_id}, "

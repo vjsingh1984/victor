@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework._internal import (
     apply_system_prompt,
+    apply_vertical_to_orchestrator,
     collect_tool_calls,
     configure_tools,
     format_context_message,
@@ -96,7 +97,9 @@ class TestSetupObservabilityIntegration:
 
             result = setup_observability_integration(mock_orchestrator)
 
-            MockIntegration.assert_called_once_with(session_id=None)
+            MockIntegration.assert_called_once_with(
+                session_id=None, enable_cqrs_bridge=False
+            )
             mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
             assert mock_orchestrator.observability == mock_integration
             assert result == mock_integration
@@ -111,7 +114,49 @@ class TestSetupObservabilityIntegration:
 
             setup_observability_integration(mock_orchestrator, session_id="test-session-123")
 
-            MockIntegration.assert_called_once_with(session_id="test-session-123")
+            MockIntegration.assert_called_once_with(
+                session_id="test-session-123", enable_cqrs_bridge=False
+            )
+
+    def test_setup_with_cqrs_bridge(self):
+        """Test setup with CQRS bridge enabled."""
+        mock_orchestrator = MagicMock()
+
+        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
+            mock_integration = MagicMock()
+            MockIntegration.return_value = mock_integration
+
+            setup_observability_integration(
+                mock_orchestrator, session_id="s1", enable_cqrs_bridge=True
+            )
+
+            MockIntegration.assert_called_once_with(
+                session_id="s1", enable_cqrs_bridge=True
+            )
+
+
+class TestVerticalApplicationDelegation:
+    """Tests for shared vertical application service usage."""
+
+    def test_apply_vertical_delegates_to_framework_service(self):
+        """apply_vertical_to_orchestrator should use central framework service."""
+        mock_orchestrator = MagicMock()
+        mock_result = MagicMock(
+            success=True,
+            vertical_name="coding",
+            tools_applied=set(),
+            middleware_count=0,
+            safety_patterns_count=0,
+            errors=[],
+            warnings=[],
+        )
+
+        with patch("victor.framework.vertical_service.apply_vertical_configuration") as mock_apply:
+            mock_apply.return_value = mock_result
+
+            apply_vertical_to_orchestrator(mock_orchestrator, "coding")
+
+            mock_apply.assert_called_once_with(mock_orchestrator, "coding", source="sdk")
 
 
 class TestApplySystemPrompt:

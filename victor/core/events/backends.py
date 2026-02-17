@@ -932,7 +932,25 @@ def get_observability_bus() -> ObservabilityBus:
 
         container.register(ObservabilityBus, create_bus, ServiceLifetime.SINGLETON)
 
-    return container.get(ObservabilityBus)
+    bus = container.get(ObservabilityBus)
+
+    # Optional sync emit metrics reporter bootstrap.
+    # This is idempotent via start_emit_sync_metrics_reporter singleton semantics.
+    try:
+        settings = get_settings()
+        if getattr(settings, "event_emit_sync_metrics_enabled", False):
+            from victor.core.events.emit_helper import start_emit_sync_metrics_reporter
+
+            start_emit_sync_metrics_reporter(
+                interval_seconds=getattr(settings, "event_emit_sync_metrics_interval_seconds", 60.0),
+                topic=getattr(settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"),
+                reset_after_emit=getattr(settings, "event_emit_sync_metrics_reset_after_emit", False),
+                event_bus_provider=lambda bus=bus: bus,
+            )
+    except Exception as e:
+        logger.debug("Failed to initialize sync emit metrics reporter: %s", e)
+
+    return bus
 
 
 def get_agent_message_bus() -> AgentMessageBus:

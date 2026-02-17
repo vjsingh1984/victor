@@ -803,6 +803,83 @@ class TestAgentObservability:
         assert unsubscribe is mock_unsubscribe
         mock_backend.subscribe.assert_called_once_with("tool.*", handler)
 
+    def test_subscribe_to_events_custom_category(self, mock_orchestrator):
+        """subscribe_to_events should support registered custom categories."""
+        from victor.framework.agent import Agent
+        from victor.observability.event_registry import EventCategoryRegistry
+
+        EventCategoryRegistry.reset_instance()
+        EventCategoryRegistry.get_instance().register(
+            name="security_scan",
+            description="Security scan events",
+            registered_by="victor.security",
+        )
+
+        mock_backend = MagicMock()
+        mock_unsubscribe = MagicMock()
+        mock_backend.subscribe = MagicMock(return_value=mock_unsubscribe)
+
+        mock_event_bus = MagicMock()
+        mock_event_bus.backend = mock_backend
+
+        mock_observability = MagicMock()
+        mock_observability.event_bus = mock_event_bus
+        mock_orchestrator.observability = mock_observability
+
+        agent = Agent(mock_orchestrator)
+        handler = MagicMock()
+
+        unsubscribe = agent.subscribe_to_events("security_scan", handler)
+
+        assert unsubscribe is mock_unsubscribe
+        mock_backend.subscribe.assert_called_once_with("security_scan.*", handler)
+
+    def test_subscribe_to_events_all_wildcard(self, mock_orchestrator):
+        """subscribe_to_events should support wildcard category subscriptions."""
+        from victor.framework.agent import Agent
+
+        mock_backend = MagicMock()
+        mock_unsubscribe = MagicMock()
+        mock_backend.subscribe = MagicMock(return_value=mock_unsubscribe)
+
+        mock_event_bus = MagicMock()
+        mock_event_bus.backend = mock_backend
+
+        mock_observability = MagicMock()
+        mock_observability.event_bus = mock_event_bus
+        mock_orchestrator.observability = mock_observability
+
+        agent = Agent(mock_orchestrator)
+        handler = MagicMock()
+
+        unsubscribe = agent.subscribe_to_events("ALL", handler)
+
+        assert unsubscribe is mock_unsubscribe
+        mock_backend.subscribe.assert_called_once_with("*", handler)
+
+    def test_subscribe_to_events_topic_pattern_passthrough(self, mock_orchestrator):
+        """subscribe_to_events should accept direct topic patterns."""
+        from victor.framework.agent import Agent
+
+        mock_backend = MagicMock()
+        mock_unsubscribe = MagicMock()
+        mock_backend.subscribe = MagicMock(return_value=mock_unsubscribe)
+
+        mock_event_bus = MagicMock()
+        mock_event_bus.backend = mock_backend
+
+        mock_observability = MagicMock()
+        mock_observability.event_bus = mock_event_bus
+        mock_orchestrator.observability = mock_observability
+
+        agent = Agent(mock_orchestrator)
+        handler = MagicMock()
+
+        unsubscribe = agent.subscribe_to_events("security_scan.*", handler)
+
+        assert unsubscribe is mock_unsubscribe
+        mock_backend.subscribe.assert_called_once_with("security_scan.*", handler)
+
     def test_subscribe_to_events_no_event_bus(self, mock_orchestrator):
         """subscribe_to_events should return None when no event bus."""
         from victor.framework.agent import Agent
@@ -817,6 +894,23 @@ class TestAgentObservability:
         result = agent.subscribe_to_events("TOOL", handler)
 
         assert result is None
+
+    def test_subscribe_to_events_unknown_category_raises(self, mock_orchestrator):
+        """Unknown category names should raise ValueError."""
+        from victor.framework.agent import Agent
+
+        mock_backend = MagicMock()
+        mock_event_bus = MagicMock()
+        mock_event_bus.backend = mock_backend
+
+        mock_observability = MagicMock()
+        mock_observability.event_bus = mock_event_bus
+        mock_orchestrator.observability = mock_observability
+
+        agent = Agent(mock_orchestrator)
+
+        with pytest.raises(ValueError, match="Unknown event category or topic pattern"):
+            agent.subscribe_to_events("not_a_real_category", MagicMock())
 
 
 # =============================================================================

@@ -46,6 +46,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
@@ -216,8 +217,14 @@ class VerticalBase(
         that inherit from VerticalBase require no changes.
     """
 
-    # Config cache (keyed by class name, stores VerticalConfig)
+    # Config cache (keyed by namespaced class identity, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
+    _config_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+
+    @classmethod
+    def _config_cache_key(cls) -> str:
+        """Get namespaced cache key for this class."""
+        return f"{cls.__name__}:{cls.__module__}:{cls.__qualname__}"
 
     # =========================================================================
     # Required Abstract Methods
@@ -438,11 +445,14 @@ class VerticalBase(
         Returns:
             Complete VerticalConfig for agent creation.
         """
-        cache_key = cls.__name__
+        cache_key = cls._config_cache_key()
 
         # Return cached config if available and caching enabled
-        if use_cache and cache_key in cls._config_cache:
-            return cls._config_cache[cache_key]
+        if use_cache:
+            with cls._config_cache_lock:
+                cached = cls._config_cache.get(cache_key)
+                if cached is not None:
+                    return cached
 
         # Build tool set
         tool_names = cls.get_tools()
@@ -466,7 +476,8 @@ class VerticalBase(
         config = cls.customize_config(config)
 
         # Cache the config
-        cls._config_cache[cache_key] = config
+        with cls._config_cache_lock:
+            cls._config_cache[cache_key] = config
         return config
 
     @classmethod
@@ -481,11 +492,15 @@ class VerticalBase(
                        If False (default), clear only for this class.
         """
         if clear_all:
-            cls._config_cache.clear()
+            with cls._config_cache_lock:
+                cls._config_cache.clear()
             cls.clear_extension_cache(clear_all=True)
         else:
-            cache_key = cls.__name__
-            cls._config_cache.pop(cache_key, None)
+            cache_key = cls._config_cache_key()
+            with cls._config_cache_lock:
+                cls._config_cache.pop(cache_key, None)
+                # Backward compatibility for legacy class-name cache keys.
+                cls._config_cache.pop(cls.__name__, None)
             # Clear extensions cache for this class too
             cls.clear_extension_cache(clear_all=False)
 

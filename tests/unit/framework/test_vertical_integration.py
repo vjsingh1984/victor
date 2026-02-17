@@ -19,6 +19,9 @@ vertical configurations to orchestrators, achieving parity between CLI
 (FrameworkShim) and SDK (Agent.create()) paths.
 """
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import pytest
 from unittest.mock import MagicMock, patch
 from typing import Dict, List, Optional, Set
@@ -41,6 +44,7 @@ from victor.framework.vertical_integration import (
     create_integration_pipeline,
     apply_vertical,
 )
+from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
 from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
 
 # =============================================================================
@@ -1195,6 +1199,48 @@ class TestVerticalIntegrationCaching:
         # Results should have the same vertical name
         assert result1.vertical_name == result2.vertical_name
 
+    def test_cache_hit_still_reapplies_orchestrator_side_effects(self):
+        """Cache hit must still apply tools/context to the target orchestrator.
+
+        Regression guard: cached IntegrationResult omits VerticalContext and cannot
+        be returned directly without replaying integration steps.
+        """
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        # Warm cache
+        first = pipeline.apply(orchestrator, MockVertical)
+        assert first.success is True
+
+        # Reset orchestrator state to prove second call reapplies side effects
+        orchestrator._enabled_tools = set()
+        orchestrator._vertical_context = create_vertical_context()
+
+        second = pipeline.apply(orchestrator, MockVertical)
+
+        assert second.success is True
+        assert orchestrator._enabled_tools == {"read", "write", "shell", "grep"}
+        assert orchestrator._vertical_context.name == "mock_vertical"
+
+    def test_cache_entry_expires_after_ttl(self):
+        """Expired cache entries should not be returned."""
+        import time
+
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, cache_ttl=1)
+        key = "ttl_expired_key"
+        result = IntegrationResult(success=True, vertical_name="mock_vertical")
+
+        pipeline._save_to_cache(key, result)
+        assert key in pipeline._cache
+        assert key in pipeline._cache_timestamps
+
+        # Force entry to expire
+        pipeline._cache_timestamps[key] = time.monotonic() - 3600
+
+        loaded = pipeline._load_from_cache(key)
+        assert loaded is None
+        assert key not in pipeline._cache
+
     def test_cache_miss_after_disabling(self):
         """Test that cache is not used when disabled."""
         orchestrator = MockOrchestrator()
@@ -1217,6 +1263,258 @@ class TestVerticalIntegrationCaching:
         """Test that cache TTL can be configured."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True, cache_ttl=1800)
         assert pipeline._cache_ttl == 1800
+
+    def test_cache_size_is_bounded_and_evicts_oldest_entry(self):
+        """Cache should evict oldest entry when max size is exceeded."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=2)
+
+        class VerticalA:
+            name = "vertical_a"
+
+            @classmethod
+            def get_config(cls):
+                return MockVerticalConfig(cls.name)
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Prompt A"
+
+            @classmethod
+            def get_stages(cls):
+                return {}
+
+            @classmethod
+            def get_extensions(cls):
+                return None
+
+        class VerticalB:
+            name = "vertical_b"
+
+            @classmethod
+            def get_config(cls):
+                return MockVerticalConfig(cls.name)
+
+            @classmethod
+            def get_tools(cls):
+                return ["write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Prompt B"
+
+            @classmethod
+            def get_stages(cls):
+                return {}
+
+            @classmethod
+            def get_extensions(cls):
+                return None
+
+        class VerticalC:
+            name = "vertical_c"
+
+            @classmethod
+            def get_config(cls):
+                return MockVerticalConfig(cls.name)
+
+            @classmethod
+            def get_tools(cls):
+                return ["grep"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Prompt C"
+
+            @classmethod
+            def get_stages(cls):
+                return {}
+
+            @classmethod
+            def get_extensions(cls):
+                return None
+
+        pipeline.apply(orchestrator, VerticalA)
+        pipeline.apply(orchestrator, VerticalB)
+        pipeline.apply(orchestrator, VerticalC)
+
+        key_a = pipeline._generate_cache_key(VerticalA)
+        key_b = pipeline._generate_cache_key(VerticalB)
+        key_c = pipeline._generate_cache_key(VerticalC)
+
+        assert key_a not in pipeline._cache
+        assert key_b in pipeline._cache
+        assert key_c in pipeline._cache
+        assert len(pipeline._cache) == 2
+
+    def test_cache_metrics_track_hits_misses_and_evictions(self):
+        """Cache metrics should reflect cache behavior for observability."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=1)
+
+        class VerticalA:
+            name = "metric_a"
+
+            @classmethod
+            def get_config(cls):
+                return MockVerticalConfig(cls.name)
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Prompt A"
+
+            @classmethod
+            def get_stages(cls):
+                return {}
+
+            @classmethod
+            def get_extensions(cls):
+                return None
+
+        class VerticalB:
+            name = "metric_b"
+
+            @classmethod
+            def get_config(cls):
+                return MockVerticalConfig(cls.name)
+
+            @classmethod
+            def get_tools(cls):
+                return ["write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Prompt B"
+
+            @classmethod
+            def get_stages(cls):
+                return {}
+
+            @classmethod
+            def get_extensions(cls):
+                return None
+
+        pipeline.apply(orchestrator, VerticalA)  # miss + save
+        pipeline.apply(orchestrator, VerticalA)  # hit
+        pipeline.apply(orchestrator, VerticalB)  # miss + eviction
+
+        stats = pipeline.get_cache_stats()
+        assert stats["hits"] >= 1
+        assert stats["misses"] >= 2
+        assert stats["evictions"] >= 1
+        assert stats["size"] == 1
+
+    def test_custom_cache_policy_can_be_injected(self):
+        """Pipeline should delegate cache operations to injected policy."""
+
+        class RecordingPolicy(VerticalIntegrationCachePolicy):
+            def __init__(self) -> None:
+                self.storage: Dict[str, str] = {}
+                self.loads = 0
+                self.saves = 0
+
+            def load(
+                self,
+                cache_key: str,
+                *,
+                cache: Dict[str, str],
+                timestamps: Dict[str, float],
+                cache_ttl: int,
+            ) -> Optional[str]:
+                self.loads += 1
+                return self.storage.get(cache_key)
+
+            def save(
+                self,
+                cache_key: str,
+                payload: str,
+                *,
+                cache: Dict[str, str],
+                timestamps: Dict[str, float],
+                max_entries: int,
+            ) -> None:
+                self.saves += 1
+                self.storage[cache_key] = payload
+
+            def get_stats(
+                self,
+                *,
+                cache: Dict[str, str],
+                max_entries: int,
+            ) -> Dict[str, int]:
+                return {
+                    "loads": self.loads,
+                    "saves": self.saves,
+                    "size": len(self.storage),
+                    "max_entries": max_entries,
+                }
+
+            def clear(self, *, cache: Dict[str, str], timestamps: Dict[str, float]) -> None:
+                self.storage.clear()
+
+        policy = RecordingPolicy()
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, cache_policy=policy)
+
+        pipeline.apply(orchestrator, MockVertical)
+        pipeline.apply(orchestrator, MockVertical)
+
+        stats = pipeline.get_cache_stats()
+        assert stats["loads"] >= 2
+        assert stats["saves"] >= 1
+        assert stats["size"] >= 1
+
+    def test_concurrent_apply_is_thread_safe_with_bounded_cache(self):
+        """Concurrent apply calls should succeed and honor cache bounds."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=3)
+
+        def _make_vertical(index: int):
+            class _Vertical:
+                name = f"concurrent_vertical_{index}"
+
+                @classmethod
+                def get_config(cls):
+                    return MockVerticalConfig(cls.name)
+
+                @classmethod
+                def get_tools(cls):
+                    return ["read", "write"]
+
+                @classmethod
+                def get_system_prompt(cls):
+                    return f"Prompt {index}"
+
+                @classmethod
+                def get_stages(cls):
+                    return {}
+
+                @classmethod
+                def get_extensions(cls):
+                    return None
+
+            return _Vertical
+
+        verticals = [_make_vertical(i) for i in range(6)]
+
+        def _run(i: int) -> bool:
+            orchestrator = MockOrchestrator()
+            result = pipeline.apply(orchestrator, verticals[i % len(verticals)])
+            return result.success
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(_run, i) for i in range(80)]
+            outcomes = [f.result() for f in futures]
+
+        assert all(outcomes)
+        assert len(pipeline._cache) <= 3
 
     def test_cache_stores_integration_result(self):
         """Test that cache stores IntegrationResult objects."""
@@ -1526,6 +1824,24 @@ class TestCachingEdgeCases:
         # All keys should be identical
         assert len(set(keys)) == 1, "Cache keys should be stable"
 
+    def test_clear_cache_resets_entries_and_stats(self):
+        """clear_cache should remove entries and reset cache policy stats."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        pipeline.apply(orchestrator, MockVertical)
+        pipeline.apply(orchestrator, MockVertical)  # create at least one hit
+        assert len(pipeline._cache) >= 1
+        assert pipeline.get_cache_stats()["size"] >= 1
+
+        pipeline.clear_cache()
+
+        stats = pipeline.get_cache_stats()
+        assert len(pipeline._cache) == 0
+        assert stats["size"] == 0
+        assert stats["hits"] == 0
+        assert stats["misses"] == 0
+
 
 class TestCachingIntegration:
     """Integration tests for caching with real verticals."""
@@ -1568,6 +1884,79 @@ class TestCachingIntegration:
         # In production, if the CodingAssistant source file changed,
         # the key would be different due to file hash change
         # (This is conceptual - we don't actually modify files in tests)
+
+
+class TestVerticalIntegrationObservability:
+    """Tests for vertical integration observability payloads."""
+
+    def test_vertical_applied_event_emits_without_running_loop(self):
+        """Sync apply should emit vertical.applied without a running event loop."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=2)
+        emitted = []
+        emitted_event = threading.Event()
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+                emitted_event.set()
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            pipeline.apply(orchestrator, MockVertical)
+
+        assert emitted_event.wait(timeout=1.0)
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.applied"
+        assert source == "VerticalIntegrationPipeline"
+        assert "cache_hit" in data
+        assert "cache_stats" in data
+        assert "cache_enabled" in data
+
+    @pytest.mark.asyncio
+    async def test_vertical_applied_event_includes_cache_telemetry(self):
+        """vertical.applied event should include cache telemetry fields."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=2)
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            pipeline.apply(orchestrator, MockVertical)
+            await asyncio.sleep(0)  # allow create_task() to run
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.applied"
+        assert source == "VerticalIntegrationPipeline"
+        assert "cache_hit" in data
+        assert "cache_stats" in data
+        assert "cache_enabled" in data
+
+    @pytest.mark.asyncio
+    async def test_apply_async_emits_vertical_applied_event_with_cache_telemetry(self):
+        """apply_async should emit vertical.applied with cache telemetry parity."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True, max_cache_entries=2)
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
+            await pipeline.apply_async(orchestrator, MockVertical)
+            await pipeline.apply_async(orchestrator, MockVertical)
+
+        assert len(emitted) >= 2
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.applied"
+        assert source == "VerticalIntegrationPipeline"
+        assert data["cache_enabled"] is True
+        assert data["cache_hit"] is True
+        assert "cache_stats" in data
 
 
 # =============================================================================

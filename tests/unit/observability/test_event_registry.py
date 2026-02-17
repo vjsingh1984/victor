@@ -18,7 +18,7 @@ Updated to use canonical ObservabilityBus from victor.core.events instead of
 deprecated EventBus from victor.observability.event_bus.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import asyncio
 
 import pytest
@@ -29,9 +29,11 @@ from victor.core.events import (
     get_observability_bus,
 )
 from victor.core.container import reset_container
+from victor.core.events.emit_helper import stop_emit_sync_metrics_reporter
 from victor.observability.event_registry import (
     CustomEventCategory,
     EventCategoryRegistry,
+    resolve_subscription_topic_pattern,
 )
 
 
@@ -41,12 +43,14 @@ def reset_singletons():
     # Reset registry and container before tests
     EventCategoryRegistry.reset_instance()
     reset_container()
+    stop_emit_sync_metrics_reporter()
 
     yield
 
     # Reset registry and container after tests
     EventCategoryRegistry.reset_instance()
     reset_container()
+    stop_emit_sync_metrics_reporter()
 
 
 # =============================================================================
@@ -92,6 +96,48 @@ class TestGetObservabilityBusFactory:
 
         # Cleanup
         await bus.disconnect()
+
+    def test_get_observability_bus_starts_emit_sync_metrics_reporter_when_enabled(self):
+        """Factory should start sync emit metrics reporter when setting is enabled."""
+
+        class _Settings:
+            event_backend_type = "in_memory"
+            event_emit_sync_metrics_enabled = True
+            event_emit_sync_metrics_interval_seconds = 15.0
+            event_emit_sync_metrics_reset_after_emit = True
+            event_emit_sync_metrics_topic = "custom.emit.metrics"
+
+        with patch("victor.config.settings.get_settings", return_value=_Settings()):
+            with patch(
+                "victor.core.events.emit_helper.start_emit_sync_metrics_reporter"
+            ) as mock_start:
+                bus = get_observability_bus()
+
+        mock_start.assert_called_once()
+        kwargs = mock_start.call_args.kwargs
+        assert kwargs["interval_seconds"] == 15.0
+        assert kwargs["topic"] == "custom.emit.metrics"
+        assert kwargs["reset_after_emit"] is True
+        assert callable(kwargs["event_bus_provider"])
+        assert kwargs["event_bus_provider"]() is bus
+
+    def test_get_observability_bus_does_not_start_reporter_when_disabled(self):
+        """Factory should not start metrics reporter when disabled."""
+
+        class _Settings:
+            event_backend_type = "in_memory"
+            event_emit_sync_metrics_enabled = False
+            event_emit_sync_metrics_interval_seconds = 30.0
+            event_emit_sync_metrics_reset_after_emit = False
+            event_emit_sync_metrics_topic = "core.events.emit_sync.metrics"
+
+        with patch("victor.config.settings.get_settings", return_value=_Settings()):
+            with patch(
+                "victor.core.events.emit_helper.start_emit_sync_metrics_reporter"
+            ) as mock_start:
+                get_observability_bus()
+
+        mock_start.assert_not_called()
 
 
 # =============================================================================
@@ -399,6 +445,42 @@ class TestEventCategoryRegistry:
 
         # Same singleton instance but cleared
         assert registry.count() == 0
+
+
+class TestSubscriptionPatternResolution:
+    """Tests for category/pattern -> topic pattern resolution helper."""
+
+    def test_resolve_builtin_category(self):
+        """Built-in categories should resolve to '<category>.*'."""
+        assert resolve_subscription_topic_pattern("TOOL") == "tool.*"
+        assert resolve_subscription_topic_pattern("lifecycle") == "lifecycle.*"
+
+    def test_resolve_custom_registered_category(self):
+        """Registered custom categories should resolve to '<category>.*'."""
+        registry = EventCategoryRegistry.get_instance()
+        registry.register(
+            name="security_scan",
+            description="Security scanning events",
+            registered_by="victor.security",
+        )
+
+        assert resolve_subscription_topic_pattern("security_scan") == "security_scan.*"
+
+    def test_resolve_all_wildcard_aliases(self):
+        """'*' and 'ALL' aliases should resolve to wildcard subscription."""
+        assert resolve_subscription_topic_pattern("*") == "*"
+        assert resolve_subscription_topic_pattern("ALL") == "*"
+        assert resolve_subscription_topic_pattern("all") == "*"
+
+    def test_resolve_direct_pattern_passthrough(self):
+        """Direct topic patterns should be passed through unchanged."""
+        assert resolve_subscription_topic_pattern("tool.*") == "tool.*"
+        assert resolve_subscription_topic_pattern("security_scan.vuln.*") == "security_scan.vuln.*"
+
+    def test_resolve_unknown_category_raises(self):
+        """Unknown category names should raise ValueError."""
+        with pytest.raises(ValueError, match="Unknown event category or topic pattern"):
+            resolve_subscription_topic_pattern("does_not_exist")
 
 
 # =============================================================================
