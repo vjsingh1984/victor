@@ -53,9 +53,10 @@ class SwitchCommand(BaseSlashCommand):
             usage="/switch <model>|<provider:model> [--resume [session_id]]",
             category="model",
             requires_agent=True,
+            is_async=True,
         )
 
-    def execute(self, ctx: CommandContext) -> None:
+    async def execute(self, ctx: CommandContext) -> None:
         if not self._require_agent(ctx):
             return
 
@@ -111,10 +112,10 @@ class SwitchCommand(BaseSlashCommand):
         # Perform the switch
         if provider and model:
             # Switch both provider and model
-            self._switch_provider(ctx, provider, model)
+            await self._switch_provider(ctx, provider, model)
         elif model:
             # Switch just model
-            self._switch_model(ctx, model)
+            await self._switch_model(ctx, model)
 
     def _show_current(self, ctx: CommandContext) -> None:
         """Show current model/provider information.
@@ -251,7 +252,7 @@ class SwitchCommand(BaseSlashCommand):
             logger.exception("Error resuming session")
             return False
 
-    def _switch_model(self, ctx: CommandContext, model: str) -> None:
+    async def _switch_model(self, ctx: CommandContext, model: str) -> None:
         """Switch to a different model.
 
         Args:
@@ -259,7 +260,7 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_model(model):
+            if await ctx.agent.switch_model(model):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{model}[/]\n"
@@ -272,7 +273,7 @@ class SwitchCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error switching model:[/] {e}")
             logger.exception("Error switching model")
 
-    def _switch_provider(self, ctx: CommandContext, provider: str, model: str) -> None:
+    async def _switch_provider(self, ctx: CommandContext, provider: str, model: str) -> None:
         """Switch to a different provider and model.
 
         Args:
@@ -281,7 +282,7 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_provider(provider_name=provider, model=model):
+            if await ctx.agent.switch_provider(provider_name=provider, model=model):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{provider}:{model}[/]\n"

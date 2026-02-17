@@ -119,9 +119,10 @@ class ProfileCommand(BaseSlashCommand):
             usage="/profile [profile_name]",
             aliases=["profiles"],
             category="model",
+            is_async=True,
         )
 
-    def execute(self, ctx: CommandContext) -> None:
+    async def execute(self, ctx: CommandContext) -> None:
         profiles = ctx.settings.load_profiles()
 
         if ctx.args:
@@ -143,7 +144,7 @@ class ProfileCommand(BaseSlashCommand):
                 f"({profile_config.provider}:{profile_config.model})...[/]"
             )
 
-            if ctx.agent.switch_provider(
+            if await ctx.agent.switch_provider(
                 provider_name=profile_config.provider,
                 model=profile_config.model,
             ):
@@ -221,9 +222,10 @@ class ProviderCommand(BaseSlashCommand):
             aliases=["providers"],
             category="model",
             requires_agent=True,
+            is_async=True,
         )
 
-    def execute(self, ctx: CommandContext) -> None:
+    async def execute(self, ctx: CommandContext) -> None:
         if not self._require_agent(ctx):
             return
 
@@ -289,7 +291,7 @@ class ProviderCommand(BaseSlashCommand):
 
         ctx.console.print(f"[dim]Switching to {provider_name}...[/]")
 
-        if ctx.agent.switch_provider(provider_name=provider_name, model=model):
+        if await ctx.agent.switch_provider(provider_name=provider_name, model=model):
             info = ctx.agent.get_current_provider_info()
             ctx.console.print(f"[green]Switched to:[/] {info['provider']}:{info['model']}")
             ctx.console.print(
