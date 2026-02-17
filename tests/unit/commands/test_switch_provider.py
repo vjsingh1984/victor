@@ -23,7 +23,7 @@ import inspect
 import io
 from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rich.console import Console
@@ -106,12 +106,13 @@ class TestProfileCommandSwitchProvider:
             args=args or [],
         )
 
-    def test_profile_switch_calls_switch_provider_with_provider_name(self):
+    @pytest.mark.asyncio
+    async def test_profile_switch_calls_switch_provider_with_provider_name(self):
         """ProfileCommand must call switch_provider(provider_name=..., model=...)."""
         from victor.ui.slash.commands.model import ProfileCommand
 
         agent = MagicMock()
-        agent.switch_provider.return_value = True
+        agent.switch_provider = AsyncMock(return_value=True)
         agent.get_current_provider_info.return_value = {
             "provider": "ollama",
             "model": "qwen3-coder-tools:30b-64K",
@@ -121,7 +122,7 @@ class TestProfileCommandSwitchProvider:
 
         ctx = self._make_ctx(args=["default"], agent=agent)
         cmd = ProfileCommand()
-        cmd.execute(ctx)
+        await cmd.execute(ctx)
 
         agent.switch_provider.assert_called_once_with(
             provider_name="ollama",
@@ -135,7 +136,10 @@ class TestProfileCommandSwitchProvider:
         agent = MagicMock()
         ctx = self._make_ctx(args=["nonexistent"], agent=agent)
         cmd = ProfileCommand()
-        cmd.execute(ctx)
+        # execute is async but returns early (before await) for unknown profile
+        import asyncio
+
+        asyncio.get_event_loop().run_until_complete(cmd.execute(ctx))
 
         agent.switch_provider.assert_not_called()
 
@@ -145,7 +149,9 @@ class TestProfileCommandSwitchProvider:
 
         ctx = self._make_ctx(args=["default"], agent=None)
         cmd = ProfileCommand()
-        cmd.execute(ctx)
+        import asyncio
+
+        asyncio.get_event_loop().run_until_complete(cmd.execute(ctx))
         # Should not raise — just print a message
 
 
@@ -162,15 +168,16 @@ class TestProviderCommandSwitchProvider:
             args=args or [],
         )
 
+    @pytest.mark.asyncio
     @patch("victor.providers.registry.ProviderRegistry.list_providers")
-    def test_provider_switch_calls_with_provider_name(self, mock_list):
+    async def test_provider_switch_calls_with_provider_name(self, mock_list):
         """ProviderCommand must call switch_provider(provider_name=..., model=...)."""
         from victor.ui.slash.commands.model import ProviderCommand
 
         mock_list.return_value = ["ollama", "anthropic", "openai"]
 
         agent = MagicMock()
-        agent.switch_provider.return_value = True
+        agent.switch_provider = AsyncMock(return_value=True)
         agent.get_current_provider_info.return_value = {
             "provider": "anthropic",
             "model": "claude-sonnet-4-5",
@@ -180,22 +187,23 @@ class TestProviderCommandSwitchProvider:
 
         ctx = self._make_ctx(args=["anthropic", "claude-sonnet-4-5"], agent=agent)
         cmd = ProviderCommand()
-        cmd.execute(ctx)
+        await cmd.execute(ctx)
 
         agent.switch_provider.assert_called_once_with(
             provider_name="anthropic",
             model="claude-sonnet-4-5",
         )
 
+    @pytest.mark.asyncio
     @patch("victor.providers.registry.ProviderRegistry.list_providers")
-    def test_provider_switch_with_colon_syntax(self, mock_list):
+    async def test_provider_switch_with_colon_syntax(self, mock_list):
         """ProviderCommand should parse provider:model syntax correctly."""
         from victor.ui.slash.commands.model import ProviderCommand
 
         mock_list.return_value = ["anthropic"]
 
         agent = MagicMock()
-        agent.switch_provider.return_value = True
+        agent.switch_provider = AsyncMock(return_value=True)
         agent.get_current_provider_info.return_value = {
             "provider": "anthropic",
             "model": "claude-sonnet-4-5",
@@ -205,7 +213,7 @@ class TestProviderCommandSwitchProvider:
 
         ctx = self._make_ctx(args=["anthropic:claude-sonnet-4-5"], agent=agent)
         cmd = ProviderCommand()
-        cmd.execute(ctx)
+        await cmd.execute(ctx)
 
         agent.switch_provider.assert_called_once_with(
             provider_name="anthropic",
@@ -226,12 +234,13 @@ class TestSwitchCommandSwitchProvider:
             args=args or [],
         )
 
-    def test_switch_command_calls_with_provider_name(self):
+    @pytest.mark.asyncio
+    async def test_switch_command_calls_with_provider_name(self):
         """SwitchCommand._switch_provider must use provider_name= kwarg."""
         from victor.ui.slash.commands.switch import SwitchCommand
 
         agent = MagicMock()
-        agent.switch_provider.return_value = True
+        agent.switch_provider = AsyncMock(return_value=True)
         agent.get_current_provider_info.return_value = {
             "provider": "openai",
             "model": "gpt-4o",
@@ -241,7 +250,7 @@ class TestSwitchCommandSwitchProvider:
 
         ctx = self._make_ctx(agent=agent)
         cmd = SwitchCommand()
-        cmd._switch_provider(ctx, "openai", "gpt-4o")
+        await cmd._switch_provider(ctx, "openai", "gpt-4o")
 
         agent.switch_provider.assert_called_once_with(
             provider_name="openai",
