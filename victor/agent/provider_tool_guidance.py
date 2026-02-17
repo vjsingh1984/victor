@@ -134,6 +134,8 @@ class GrokToolGuidance(ToolGuidanceStrategy):
         "edit_file",
         "list_directory",
         "shell",
+        "shell_readonly",
+        "git",
     }
 
     def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
@@ -180,6 +182,8 @@ class DeepSeekToolGuidance(ToolGuidanceStrategy):
         "plan_implementation",
         "security_scan",
         "code_metrics",
+        "shell_readonly",
+        "git",
     }
 
     def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
@@ -189,6 +193,16 @@ IMPORTANT - Tool Usage Guidelines:
 2. Check if you already have the information before making a tool call
 3. Prefer broad queries over multiple narrow ones
 4. Consolidate findings and synthesize before continuing exploration
+
+For git operations (status, diff, log, branch):
+- Use shell_readonly(cmd="git status") to check repository status
+- Use shell_readonly(cmd="git diff") to see uncommitted changes
+- Use shell_readonly(cmd="git log --oneline -10") to view commit history
+- The shell_readonly tool can run these git commands safely
+
+For executing shell commands:
+- Use shell_readonly for safe, readonly commands (ls, cat, grep, git status, etc.)
+- Use shell only when you need to modify files or run write operations
 """
 
         if task_type == "simple":
@@ -278,6 +292,8 @@ class OllamaToolGuidance(ToolGuidanceStrategy):
         "list_directory",
         "grep",
         "shell",
+        "shell_readonly",
+        "git",
         "code_search",
     }
     AVOIDED_TOOLS = {"web_search", "web_fetch"}  # Air-gapped environments
@@ -386,6 +402,8 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
         "edit_file",
         "plan_implementation",
         "shell",
+        "shell_readonly",
+        "git",
         "read_file",
         "grep",
         "list_directory",

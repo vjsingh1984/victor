@@ -38,6 +38,11 @@ from victor.coding.codebase.ignore_patterns import (
     should_ignore_path,
 )
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
+from victor.core.utils.ast_helpers import (
+    extract_base_classes,
+    extract_imports,
+    is_stdlib_module,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -439,13 +444,8 @@ class CodebaseAnalyzer:
 
     def _extract_class_info(self, node: ast.ClassDef, file_path: str) -> ClassInfo:
         """Extract information from a class AST node."""
-        # Get base class names
-        base_classes = []
-        for base in node.bases:
-            if isinstance(base, ast.Name):
-                base_classes.append(base.id)
-            elif isinstance(base, ast.Attribute):
-                base_classes.append(base.attr)
+        # Get base class names (short names for categorization compatibility)
+        base_classes = [b.rsplit(".", 1)[-1] for b in extract_base_classes(node)]
 
         # Get docstring
         docstring = None
@@ -766,58 +766,15 @@ class CodebaseAnalyzer:
                 try:
                     content = source_file.read_text(encoding="utf-8", errors="ignore")
                     tree = ast.parse(content)
-
-                    for node in ast.walk(tree):
-                        if isinstance(node, ast.Import):
-                            for alias in node.names:
-                                # Get top-level module
-                                module = alias.name.split(".")[0]
-                                import_counts[module] += 1
-                        elif isinstance(node, ast.ImportFrom):
-                            if node.module:
-                                module = node.module.split(".")[0]
-                                import_counts[module] += 1
-
+                    for module in extract_imports(tree, top_level_only=True):
+                        import_counts[module] += 1
                 except Exception:
                     pass
 
-        # Filter out standard library and sort by count
-        # Common stdlib modules to exclude from "top imports" (not exhaustive)
-        stdlib = {
-            "os",
-            "sys",
-            "re",
-            "json",
-            "typing",
-            "dataclasses",
-            "pathlib",
-            "collections",
-            "functools",
-            "itertools",
-            "logging",
-            "abc",
-            "datetime",
-            "time",
-            "asyncio",
-            "contextlib",
-            "copy",
-            "enum",
-            "hashlib",
-            "io",
-            "math",
-            "random",
-            "shutil",
-            "subprocess",
-            "tempfile",
-            "threading",
-            "traceback",
-            "unittest",
-            "uuid",
-            "warnings",
-        }
-
-        # Filter and sort
-        filtered = [(mod, count) for mod, count in import_counts.items() if mod not in stdlib]
+        # Filter and sort (exclude stdlib/common third-party)
+        filtered = [
+            (mod, count) for mod, count in import_counts.items() if not is_stdlib_module(mod)
+        ]
         filtered.sort(key=lambda x: -x[1])
 
         self.analysis.top_imports = filtered[:10]
