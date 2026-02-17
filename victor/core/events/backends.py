@@ -352,6 +352,103 @@ class InMemoryEventBackend:
 
 
 # =============================================================================
+# Lazy Backend Proxy
+# =============================================================================
+
+
+def _is_backend_connected(backend: IEventBackend) -> bool:
+    """Check connection state using protocol property with compatibility fallback."""
+    try:
+        return bool(backend.is_connected)
+    except Exception:
+        return bool(getattr(backend, "_is_connected", False))
+
+
+class LazyInitEventBackend:
+    """Proxy backend that defers backend construction until first use.
+
+    Useful for optional/heavy distributed backends (Kafka/Redis/SQS/RabbitMQ),
+    where importing clients or constructing backend objects can add startup cost
+    even if no events are emitted in a process.
+    """
+
+    def __init__(
+        self,
+        *,
+        config: BackendConfig,
+        backend_type: BackendType,
+        factory: Callable[[BackendConfig], IEventBackend],
+    ) -> None:
+        self._config = config
+        self._selected_type = backend_type
+        self._factory = factory
+        self._backend: Optional[IEventBackend] = None
+        self._lock = threading.Lock()
+
+    @property
+    def backend_type(self) -> BackendType:
+        """Requested backend type (available before concrete construction)."""
+        return self._selected_type
+
+    @property
+    def is_connected(self) -> bool:
+        """Connection status for the underlying backend (False if not initialized)."""
+        backend = self._backend
+        if backend is None:
+            return False
+        return _is_backend_connected(backend)
+
+    def _get_or_create_backend(self) -> IEventBackend:
+        """Create the underlying backend once, thread-safely."""
+        backend = self._backend
+        if backend is not None:
+            return backend
+
+        with self._lock:
+            backend = self._backend
+            if backend is None:
+                backend = self._factory(self._config)
+                self._backend = backend
+        return backend
+
+    async def connect(self) -> None:
+        backend = self._get_or_create_backend()
+        await backend.connect()
+
+    async def disconnect(self) -> None:
+        backend = self._backend
+        if backend is None:
+            return
+        await backend.disconnect()
+
+    async def health_check(self) -> bool:
+        backend = self._get_or_create_backend()
+        return await backend.health_check()
+
+    async def publish(self, event: MessagingEvent) -> bool:
+        backend = self._get_or_create_backend()
+        return await backend.publish(event)
+
+    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+        backend = self._get_or_create_backend()
+        return await backend.publish_batch(events)
+
+    async def subscribe(
+        self,
+        pattern: str,
+        handler: EventHandler,
+    ) -> SubscriptionHandle:
+        backend = self._get_or_create_backend()
+        return await backend.subscribe(pattern, handler)
+
+    async def unsubscribe(self, handle: SubscriptionHandle) -> bool:
+        backend = self._backend
+        if backend is None:
+            return False
+        return await backend.unsubscribe(handle)
+
+
+# =============================================================================
 # Backend Factory
 # =============================================================================
 
@@ -383,6 +480,7 @@ def create_event_backend(
     config: Optional[BackendConfig] = None,
     *,
     backend_type: Optional[BackendType] = None,
+    lazy_init: bool = False,
 ) -> IEventBackend:
     """Factory function to create event backends.
 
@@ -392,6 +490,8 @@ def create_event_backend(
     Args:
         config: Optional backend configuration
         backend_type: Override backend type (uses config.backend_type if not set)
+        lazy_init: If True, defer backend object construction until first operation.
+            Recommended for heavyweight distributed backends.
 
     Returns:
         IEventBackend implementation
@@ -413,18 +513,30 @@ def create_event_backend(
     config = config or BackendConfig()
     selected_type = backend_type or config.backend_type
 
-    # Check for registered factory
+    # Resolve factory, falling back to in-memory if unregistered.
     factory = _backend_factories.get(selected_type)
-    if factory:
-        return factory(config)
-
-    # Default to InMemory for unregistered types
-    if selected_type != BackendType.IN_MEMORY:
+    if factory is None and selected_type != BackendType.IN_MEMORY:
         logger.warning(
             f"Backend type '{selected_type.value}' not registered, " f"falling back to IN_MEMORY"
         )
+        selected_type = BackendType.IN_MEMORY
+        factory = _backend_factories.get(BackendType.IN_MEMORY)
 
-    return InMemoryEventBackend(config)
+    # Guaranteed by built-in registration below, but keep defensive fallback.
+    if factory is None:
+
+        def factory(cfg: BackendConfig) -> InMemoryEventBackend:
+            return InMemoryEventBackend(cfg)
+
+    # In-memory backend is lightweight; instantiate directly.
+    if selected_type == BackendType.IN_MEMORY or not lazy_init:
+        return factory(config)
+
+    return LazyInitEventBackend(
+        config=config,
+        backend_type=selected_type,
+        factory=factory,
+    )
 
 
 # Register built-in backend
@@ -609,7 +721,7 @@ class ObservabilityBus:
 
         try:
             # Auto-connect backend if not connected (lazy initialization)
-            if not self._backend._is_connected:
+            if not _is_backend_connected(self._backend):
                 await self._backend.connect()
 
             return await self._backend.publish(event)
@@ -790,7 +902,7 @@ class AgentMessageBus:
         )
 
         # Auto-connect backend if not connected (lazy initialization)
-        if not self._backend._is_connected:
+        if not _is_backend_connected(self._backend):
             await self._backend.connect()
 
         return await self._backend.publish(event)
@@ -827,7 +939,7 @@ class AgentMessageBus:
         )
 
         # Auto-connect backend if not connected (lazy initialization)
-        if not self._backend._is_connected:
+        if not _is_backend_connected(self._backend):
             await self._backend.connect()
 
         return await self._backend.publish(event)
@@ -908,6 +1020,7 @@ def get_observability_bus() -> ObservabilityBus:
             # Read settings to determine backend
             settings = get_settings()
             backend_type_str = settings.event_backend_type.lower()
+            lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
 
             # Map string to BackendType enum
             from victor.core.events.protocols import BackendType
@@ -924,7 +1037,7 @@ def get_observability_bus() -> ObservabilityBus:
             backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
 
             # Create backend from settings
-            backend = create_event_backend(backend_type=backend_type)
+            backend = create_event_backend(backend_type=backend_type, lazy_init=lazy_init)
 
             return ObservabilityBus(backend=backend)
 
@@ -942,9 +1055,15 @@ def get_observability_bus() -> ObservabilityBus:
             from victor.core.events.emit_helper import start_emit_sync_metrics_reporter
 
             start_emit_sync_metrics_reporter(
-                interval_seconds=getattr(settings, "event_emit_sync_metrics_interval_seconds", 60.0),
-                topic=getattr(settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"),
-                reset_after_emit=getattr(settings, "event_emit_sync_metrics_reset_after_emit", False),
+                interval_seconds=getattr(
+                    settings, "event_emit_sync_metrics_interval_seconds", 60.0
+                ),
+                topic=getattr(
+                    settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"
+                ),
+                reset_after_emit=getattr(
+                    settings, "event_emit_sync_metrics_reset_after_emit", False
+                ),
                 event_bus_provider=lambda bus=bus: bus,
             )
     except Exception as e:
@@ -984,6 +1103,7 @@ def get_agent_message_bus() -> AgentMessageBus:
             # Read settings to determine backend
             settings = get_settings()
             backend_type_str = settings.event_backend_type.lower()
+            lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
 
             # Map string to BackendType enum
             from victor.core.events.protocols import BackendType
@@ -1000,7 +1120,7 @@ def get_agent_message_bus() -> AgentMessageBus:
             backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
 
             # Create backend from settings
-            backend = create_event_backend(backend_type=backend_type)
+            backend = create_event_backend(backend_type=backend_type, lazy_init=lazy_init)
 
             return AgentMessageBus(backend=backend)
 
@@ -1039,6 +1159,7 @@ def get_event_backend() -> IEventBackend:
 __all__ = [
     # Backends
     "InMemoryEventBackend",
+    "LazyInitEventBackend",
     # Specialized buses
     "ObservabilityBus",
     "AgentMessageBus",
