@@ -129,29 +129,26 @@ class TestProfileCommandSwitchProvider:
             model="qwen3-coder-tools:30b-64K",
         )
 
-    def test_profile_switch_unknown_profile(self):
+    @pytest.mark.asyncio
+    async def test_profile_switch_unknown_profile(self):
         """ProfileCommand should report error for unknown profile."""
         from victor.ui.slash.commands.model import ProfileCommand
 
         agent = MagicMock()
         ctx = self._make_ctx(args=["nonexistent"], agent=agent)
         cmd = ProfileCommand()
-        # execute is async but returns early (before await) for unknown profile
-        import asyncio
-
-        asyncio.get_event_loop().run_until_complete(cmd.execute(ctx))
+        await cmd.execute(ctx)
 
         agent.switch_provider.assert_not_called()
 
-    def test_profile_switch_no_agent(self):
+    @pytest.mark.asyncio
+    async def test_profile_switch_no_agent(self):
         """ProfileCommand should handle missing agent gracefully."""
         from victor.ui.slash.commands.model import ProfileCommand
 
         ctx = self._make_ctx(args=["default"], agent=None)
         cmd = ProfileCommand()
-        import asyncio
-
-        asyncio.get_event_loop().run_until_complete(cmd.execute(ctx))
+        await cmd.execute(ctx)
         # Should not raise — just print a message
 
 
