@@ -637,5 +637,5 @@ def create_continuation_handler(
         unified_tracker=orchestrator.unified_tracker,
         finalize_metrics=orchestrator._finalize_stream_metrics,
         record_outcome=orchestrator._record_intelligent_outcome,
-        execute_extracted_tool=orchestrator._execute_extracted_tool_call,
+        execute_extracted_tool=getattr(orchestrator, "_execute_extracted_tool_call", None),
     )

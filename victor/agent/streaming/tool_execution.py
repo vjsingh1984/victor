@@ -450,6 +450,22 @@ class ToolExecutionHandler:
 # =============================================================================
 
 
+def _noop_check_progress(stream_ctx: StreamingChatContext) -> None:
+    """No-op fallback for progress checking."""
+    pass
+
+
+def _noop_force_completion(stream_ctx: StreamingChatContext) -> Optional[StreamChunk]:
+    """No-op fallback for force completion (returns None = no force)."""
+    return None
+
+
+async def _noop_async_generator(stream_ctx: StreamingChatContext):
+    """No-op async generator fallback that yields nothing."""
+    return
+    yield  # Make it an async generator
+
+
 def create_tool_execution_handler(
     orchestrator: "AgentOrchestrator",
 ) -> ToolExecutionHandler:
@@ -471,10 +487,18 @@ def create_tool_execution_handler(
         unified_tracker=orchestrator.unified_tracker,
         settings=orchestrator.settings,
         create_recovery_context=orchestrator._create_recovery_context,
-        check_progress_with_handler=orchestrator._check_progress_with_handler,
-        handle_force_completion_with_handler=orchestrator._handle_force_completion_with_handler,
-        handle_budget_exhausted=orchestrator._handle_budget_exhausted,
-        handle_force_final_response=orchestrator._handle_force_final_response,
+        check_progress_with_handler=getattr(
+            orchestrator, "_check_progress_with_handler", _noop_check_progress
+        ),
+        handle_force_completion_with_handler=getattr(
+            orchestrator, "_handle_force_completion_with_handler", _noop_force_completion
+        ),
+        handle_budget_exhausted=getattr(
+            orchestrator, "_handle_budget_exhausted", _noop_async_generator
+        ),
+        handle_force_final_response=getattr(
+            orchestrator, "_handle_force_final_response", _noop_async_generator
+        ),
         handle_tool_calls=orchestrator._handle_tool_calls,
         get_tool_status_message=get_tool_status_message,
         observed_files=set(orchestrator.observed_files) if orchestrator.observed_files else set(),

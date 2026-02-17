@@ -56,7 +56,6 @@ if TYPE_CHECKING:
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
-    from victor.agent.streaming import apply_tracking_state_updates, create_tracking_state
 
 logger = logging.getLogger(__name__)
 
@@ -499,12 +498,13 @@ class ChatCoordinator:
             mentioned_tools_detected: List[str] = []
 
             # Check for mentioned tools early for recovery integration
-            from victor.agent.streaming.continuation import ContinuationStrategy
-            from victor.tools.tool_names import _ALL_TOOL_NAMES, TOOL_ALIASES
+            from victor.agent.continuation_strategy import ContinuationStrategy
+            from victor.tools.tool_names import get_all_canonical_names, TOOL_ALIASES
 
             if full_content and not tool_calls:
+                all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
                 mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                    full_content, list(_ALL_TOOL_NAMES), TOOL_ALIASES
+                    full_content, list(all_tool_names), TOOL_ALIASES
                 )
 
             # Use recovery integration to detect and handle failures
@@ -678,6 +678,8 @@ class ChatCoordinator:
                     if not hasattr(orch, "_cumulative_prompt_interventions"):
                         orch._cumulative_prompt_interventions = 0
 
+                    from victor.agent.streaming import create_tracking_state
+
                     tracking_state = create_tracking_state(orch)
 
                     intent_result = (
@@ -699,6 +701,8 @@ class ChatCoordinator:
                     force_finalize_used = (
                         tracking_state.force_finalize and intent_result.action == "finish"
                     )
+                    from victor.agent.streaming import apply_tracking_state_updates
+
                     apply_tracking_state_updates(
                         orch, intent_result.state_updates, force_finalize_used
                     )
@@ -1010,6 +1014,9 @@ class ChatCoordinator:
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task based on keywords in the user message.
 
+        Delegates to TaskAnalyzer.classify_task_keywords() for consistency
+        with orchestrator behavior.
+
         Args:
             user_message: The user's message
 
@@ -1017,68 +1024,8 @@ class ChatCoordinator:
             Dictionary with classification results including is_analysis_task,
             is_action_task, needs_execution, and coarse_task_type
         """
-        # Check for analysis keywords
-        analysis_keywords = [
-            "analyze",
-            "analysis",
-            "investigate",
-            "explore",
-            "examine",
-            "review",
-            "audit",
-            "inspect",
-            "study",
-            "understand",
-            "explain",
-            "find",
-            "search",
-            "look for",
-            "identify",
-            "locate",
-            "trace",
-            "debug",
-            "troubleshoot",
-            "diagnose",
-        ]
-        is_analysis_task = any(keyword in user_message.lower() for keyword in analysis_keywords)
-
-        # Check for action keywords
-        action_keywords = [
-            "create",
-            "write",
-            "build",
-            "implement",
-            "add",
-            "generate",
-            "make",
-            "construct",
-            "develop",
-            "produce",
-            "form",
-            "compose",
-        ]
-        is_action_task = any(keyword in user_message.lower() for keyword in action_keywords)
-
-        # Check for execution keywords
-        execution_keywords = ["run", "execute", "test", "deploy", "launch"]
-        needs_execution = any(keyword in user_message.lower() for keyword in execution_keywords)
-
-        # Determine coarse task type
-        if is_analysis_task:
-            coarse_task_type = "analysis"
-        elif is_action_task:
-            coarse_task_type = "action"
-        elif needs_execution:
-            coarse_task_type = "execution"
-        else:
-            coarse_task_type = "default"
-
-        return {
-            "is_analysis_task": is_analysis_task,
-            "is_action_task": is_action_task,
-            "needs_execution": needs_execution,
-            "coarse_task_type": coarse_task_type,
-        }
+        orch = self._orchestrator
+        return orch._task_analyzer.classify_task_keywords(user_message)
 
     def _apply_intent_guard(self, user_message: str) -> None:
         """Detect intent and inject prompt guards for read-only tasks.
@@ -1188,10 +1135,12 @@ class ChatCoordinator:
         Returns:
             List of required file paths mentioned in the message
         """
-        from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
+        import re
 
-        requirements = extract_prompt_requirements(user_message)
-        return requirements.required_files if requirements else []
+        # Extract file paths from the message (e.g., /path/to/file.py, ./relative/path)
+        pattern = r'(?:^|[\s"\'`])(/[\w./\-]+\.\w+|\.{1,2}/[\w./\-]+\.\w+)'
+        matches = re.findall(pattern, user_message)
+        return list(set(matches))
 
     def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
         """Extract required outputs from the user message.
@@ -1202,20 +1151,19 @@ class ChatCoordinator:
         Returns:
             List of required outputs mentioned in the message
         """
-        from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
-
-        requirements = extract_prompt_requirements(user_message)
-        return requirements.required_outputs if requirements else []
+        # Required outputs are not easily extractable from raw text;
+        # return empty list as these are advisory hints for the streaming loop
+        return []
 
     def _get_max_context_chars(self) -> int:
         """Get the maximum context length in characters.
 
+        Delegates to orchestrator's _get_max_context_chars which uses ContextManager.
+
         Returns:
             Maximum context length for the current provider/model
         """
-        orch = self._orchestrator
-        limits = orch._provider_coordinator.get_provider_limits()
-        return limits.get("max_context_chars", 128000)
+        return self._orchestrator._get_max_context_chars()
 
     # =====================================================================
     # Iteration Pre-Checks
@@ -1333,6 +1281,9 @@ class ChatCoordinator:
     ) -> tuple[bool, Optional[StreamChunk]]:
         """Handle context length and iteration limit checks.
 
+        Delegates to orchestrator's comprehensive implementation which handles
+        context overflow with smart compaction and forced completion.
+
         Args:
             user_message: The user's message
             max_total_iterations: Maximum total iterations
@@ -1344,34 +1295,13 @@ class ChatCoordinator:
             Tuple of (handled, chunk) where handled is True if limits were hit
         """
         orch = self._orchestrator
-
-        # Check context length
-        context_length = sum(len(msg.content) for msg in orch.messages)
-        if context_length > max_context * 0.9:  # 90% threshold
-            logger.warning(f"Context length approaching limit: {context_length}/{max_context}")
-            # Trigger compaction
-            if orch._context_compactor:
-                compaction_action = orch._context_compactor.check_and_compact(
-                    current_query=user_message,
-                    force=True,
-                    tool_call_count=orch.tool_calls_used,
-                    task_complexity=TaskComplexity.COMPLEX.value,
-                )
-                if compaction_action.action_taken:
-                    logger.info(
-                        f"Emergency compaction: {compaction_action.messages_removed} messages removed"
-                    )
-
-        # Check iteration limit
-        if total_iterations >= max_total_iterations:
-            logger.warning(f"Iteration limit reached: {total_iterations}/{max_total_iterations}")
-            chunk = StreamChunk(
-                content=f"\n\n[Reached maximum iterations ({max_total_iterations}) - providing final response]\n",
-                is_final=False,
-            )
-            return True, chunk
-
-        return False, None
+        return await orch._handle_context_and_iteration_limits(
+            user_message,
+            max_total_iterations,
+            max_context,
+            total_iterations,
+            last_quality_score,
+        )
 
     # =====================================================================
     # Provider Response Streaming
@@ -1575,6 +1505,9 @@ class ChatCoordinator:
     def _parse_and_validate_tool_calls(self, tool_calls: Any, full_content: str) -> tuple[Any, str]:
         """Parse, validate, and normalize tool calls.
 
+        Delegates to orchestrator's comprehensive implementation which handles
+        fallback parsing, normalization, filtering, and argument coercion.
+
         Args:
             tool_calls: Raw tool calls from the provider
             full_content: The full content from the response
@@ -1582,15 +1515,8 @@ class ChatCoordinator:
         Returns:
             Tuple of (validated_tool_calls, full_content)
         """
-        if tool_calls:
-            for tc in tool_calls:
-                if tc.get("name"):
-                    logger.debug(f"Tool call: {tc.get('name')}")
-                # Normalize arguments if needed
-                if tc.get("arguments") is None:
-                    tc["arguments"] = {}
-
-        return tool_calls, full_content
+        orch = self._orchestrator
+        return orch._parse_and_validate_tool_calls(tool_calls, full_content)
 
     # =====================================================================
     # Recovery Integration
@@ -1602,36 +1528,17 @@ class ChatCoordinator:
     ) -> Any:
         """Create RecoveryContext from current orchestrator state.
 
+        Delegates to orchestrator for consistency (includes model, temperature,
+        unified_task_type, is_analysis_task, is_action_task fields).
+
         Args:
             stream_ctx: The streaming context
 
         Returns:
             StreamingRecoveryContext with all necessary state
         """
-        import time
-        from victor.agent.recovery_coordinator import StreamingRecoveryContext
-
         orch = self._orchestrator
-
-        elapsed_time = 0.0
-        if orch._streaming_controller.current_session:
-            elapsed_time = time.time() - orch._streaming_controller.current_session.start_time
-
-        return StreamingRecoveryContext(
-            iteration=stream_ctx.total_iterations,
-            elapsed_time=elapsed_time,
-            tool_calls_used=orch.tool_calls_used,
-            tool_budget=orch.tool_budget,
-            max_iterations=stream_ctx.max_total_iterations,
-            session_start_time=(
-                orch._streaming_controller.current_session.start_time
-                if orch._streaming_controller.current_session
-                else time.time()
-            ),
-            last_quality_score=stream_ctx.last_quality_score,
-            streaming_context=stream_ctx,
-            provider_name=orch.provider_name,
-        )
+        return orch._create_recovery_context(stream_ctx)
 
     async def _handle_recovery_with_integration(
         self,
@@ -1641,6 +1548,9 @@ class ChatCoordinator:
         mentioned_tools: Optional[List[str]] = None,
     ) -> Any:
         """Handle recovery using the recovery integration system.
+
+        Delegates to orchestrator which uses _recovery_coordinator for
+        consistent recovery handling.
 
         Args:
             stream_ctx: The streaming context
@@ -1652,9 +1562,8 @@ class ChatCoordinator:
             RecoveryAction with the action to take
         """
         orch = self._orchestrator
-        recovery_ctx = self._create_recovery_context(stream_ctx)
-        return await orch._recovery_integration.detect_and_handle(
-            recovery_ctx,
+        return await orch._handle_recovery_with_integration(
+            stream_ctx=stream_ctx,
             full_content=full_content,
             tool_calls=tool_calls,
             mentioned_tools=mentioned_tools,
@@ -1665,6 +1574,9 @@ class ChatCoordinator:
     ) -> Optional[StreamChunk]:
         """Apply a recovery action and return any chunk to yield.
 
+        Delegates to orchestrator which uses _recovery_coordinator for
+        consistent recovery action application.
+
         Args:
             recovery_action: The recovery action to apply
             stream_ctx: The streaming context
@@ -1673,27 +1585,19 @@ class ChatCoordinator:
             StreamChunk to yield, or None
         """
         orch = self._orchestrator
-
-        if recovery_action.action == "force_summary":
-            stream_ctx.force_completion = True
-            return orch._chunk_generator.generate_summary_chunk(
-                "Providing summary based on information gathered so far."
-            )
-        elif recovery_action.action == "retry":
-            orch.add_message("system", recovery_action.get("message", "Please try again."))
-            return None
-        elif recovery_action.action == "finalize":
-            return orch._chunk_generator.generate_content_chunk(
-                recovery_action.get("message", ""), is_final=True
-            )
-        return None
+        return orch._apply_recovery_action(recovery_action, stream_ctx)
 
     async def _handle_empty_response_recovery(
         self,
         stream_ctx: "StreamingChatContext",
         tools: Any,
     ) -> tuple[bool, Any, Optional[StreamChunk]]:
-        """Handle empty response recovery.
+        """Handle empty response recovery with multi-strategy retry.
+
+        Attempts to recover from an empty provider response by retrying
+        with increasing temperature and a nudge prompt. If recovery
+        produces content or tool calls, returns them for the main loop
+        to consume.
 
         Args:
             stream_ctx: The streaming context
@@ -1704,21 +1608,60 @@ class ChatCoordinator:
         """
         orch = self._orchestrator
 
-        # Try to recover with a simple prompt
-        try:
-            orch.add_message("system", "Please provide a response.")
-            response = await orch.provider.chat(
-                messages=orch.messages,
-                model=orch.model,
-                temperature=orch.temperature,
-                max_tokens=orch.max_tokens,
-                tools=None,
-            )
-            if response and response.content:
-                return True, None, StreamChunk(content=response.content, is_final=True)
-        except Exception as e:
-            logger.warning(f"Empty response recovery failed: {e}")
+        # Try recovery with increasing temperature
+        recovery_temps = [0.7, 0.9]
+        for temp in recovery_temps:
+            try:
+                # Add a nudge to prompt the model for a response
+                orch.add_message(
+                    "system",
+                    "Please provide a response to the user's question. "
+                    "If you need to use tools, go ahead. Otherwise, provide a text answer.",
+                )
 
+                provider_kwargs: Dict[str, Any] = {}
+                if orch.thinking:
+                    provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
+
+                full_content = ""
+                recovered_tool_calls = None
+
+                async for chunk in orch.provider.stream(
+                    messages=orch.messages,
+                    model=orch.model,
+                    temperature=temp,
+                    max_tokens=orch.max_tokens,
+                    tools=tools,
+                    **provider_kwargs,
+                ):
+                    if chunk.content:
+                        full_content += chunk.content
+                    if chunk.tool_calls:
+                        recovered_tool_calls = chunk.tool_calls
+                        break
+
+                if recovered_tool_calls:
+                    logger.info(f"Recovery at temperature {temp} produced tool calls")
+                    return True, recovered_tool_calls, None
+
+                if full_content.strip():
+                    logger.info(
+                        f"Recovery at temperature {temp} produced content "
+                        f"({len(full_content)} chars)"
+                    )
+                    sanitized = orch.sanitizer.sanitize(full_content)
+                    if sanitized:
+                        orch.add_message("assistant", sanitized)
+                    final_chunk = orch._chunk_generator.generate_content_chunk(
+                        sanitized or full_content, is_final=True
+                    )
+                    return True, None, final_chunk
+
+            except Exception as e:
+                logger.warning(f"Recovery attempt at temperature {temp} failed: {e}")
+                continue
+
+        # All recovery attempts failed
         return False, None, None
 
     # =====================================================================
@@ -1734,6 +1677,9 @@ class ChatCoordinator:
     ) -> Optional[Dict[str, Any]]:
         """Validate response quality using the intelligent pipeline.
 
+        Delegates to orchestrator's implementation which uses the correct
+        intelligent_integration property.
+
         Args:
             response: The response to validate
             query: The original query
@@ -1744,17 +1690,9 @@ class ChatCoordinator:
             Validation result dict or None
         """
         orch = self._orchestrator
-
-        if not orch._intelligent_pipeline:
-            return None
-
-        try:
-            return await orch._intelligent_pipeline.validate_response(
-                response=response,
-                query=query,
-                tool_calls=tool_calls,
-                task_type=task_type,
-            )
-        except Exception as e:
-            logger.warning(f"Intelligent validation failed: {e}")
-            return None
+        return await orch._validate_intelligent_response(
+            response=response,
+            query=query,
+            tool_calls=tool_calls,
+            task_type=task_type,
+        )

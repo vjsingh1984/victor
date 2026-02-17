@@ -530,9 +530,7 @@ class ToolCoordinator:
 
         return ToolAccessContext(
             session_enabled_tools=self._enabled_tools,
-            current_mode=(
-                self._mode_controller.config.mode_name if self._mode_controller else None
-            ),
+            current_mode=(self._mode_controller.config.name if self._mode_controller else None),
         )
 
     # =====================================================================
