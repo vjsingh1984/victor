@@ -43,52 +43,76 @@ class ReindexCommand(BaseSlashCommand):
         )
 
     async def execute(self, ctx: CommandContext) -> None:
+        import time
+        from pathlib import Path
+
         force = self._has_flag(ctx, "--force", "-f")
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-            from victor.coding.codebase.embeddings.manager import get_embedding_manager
+            from victor.coding.codebase.indexer import CodebaseIndex
+            from victor.config.settings import get_project_paths, load_settings
 
-            manager = get_embedding_manager()
+            root = Path.cwd()
+            settings = load_settings()
+            paths = get_project_paths(root)
+
+            embedding_config = {
+                "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
+                "embedding_model_type": getattr(
+                    settings, "codebase_embedding_provider", "sentence-transformers"
+                ),
+                "embedding_model_name": getattr(
+                    settings, "codebase_embedding_model", "BAAI/bge-small-en-v1.5"
+                ),
+                "persist_directory": str(paths.embeddings_dir),
+            }
+
+            index = CodebaseIndex(
+                root_path=str(root),
+                use_embeddings=True,
+                embedding_config=embedding_config,
+            )
 
             if show_stats:
-                stats = manager.get_index_stats()
+                stats = index.get_stats()
                 content = (
                     f"[bold]Index Statistics[/]\n\n"
-                    f"[bold]Total Documents:[/] {stats.get('total_documents', 0)}\n"
-                    f"[bold]Total Chunks:[/] {stats.get('total_chunks', 0)}\n"
-                    f"[bold]Last Updated:[/] {stats.get('last_updated', 'Never')}\n"
-                    f"[bold]Index Size:[/] {stats.get('size_mb', 0):.1f} MB\n"
+                    f"[bold]Total Files:[/] {stats.get('total_files', 0)}\n"
+                    f"[bold]Total Symbols:[/] {stats.get('total_symbols', 0)}\n"
+                    f"[bold]Total Lines:[/] {stats.get('total_lines', 0)}\n"
+                    f"[bold]Embeddings:[/] {'enabled' if stats.get('embeddings_enabled') else 'disabled'}\n"
+                    f"[bold]Indexed:[/] {stats.get('is_indexed', False)}\n"
                 )
-                ctx.console.print(Panel(content, title="Embedding Index", border_style="cyan"))
+                ctx.console.print(Panel(content, title="Codebase Index", border_style="cyan"))
                 return
 
-            ctx.console.print("[dim]Indexing codebase for semantic search...[/]")
+            ctx.console.print("[dim]Indexing codebase...[/]")
+            start = time.time()
 
             if force:
                 ctx.console.print("[dim]Force reindex: rebuilding from scratch[/]")
-                manager.clear_index()
+                await index.index_codebase()
+            else:
+                await index.ensure_indexed(auto_reindex=True)
 
-            # Run indexing
-            result = await manager.index_directory(
-                directory=".",
-                incremental=not force,
-            )
+            duration = time.time() - start
+            stats = index.get_stats()
 
             ctx.console.print(
                 Panel(
                     f"[green]Indexing complete![/]\n\n"
-                    f"[bold]Files Indexed:[/] {result.get('files_indexed', 0)}\n"
-                    f"[bold]Chunks Created:[/] {result.get('chunks_created', 0)}\n"
-                    f"[bold]Time:[/] {result.get('duration_seconds', 0):.1f}s",
+                    f"[bold]Files Indexed:[/] {stats.get('total_files', 0)}\n"
+                    f"[bold]Symbols Found:[/] {stats.get('total_symbols', 0)}\n"
+                    f"[bold]Time:[/] {duration:.1f}s",
                     title="Reindex Complete",
                     border_style="green",
                 )
             )
 
-        except ImportError:
-            ctx.console.print("[yellow]Embedding manager not available[/]")
-            ctx.console.print("[dim]Make sure sentence-transformers is installed[/]")
+        except ImportError as e:
+            ctx.console.print(f"[yellow]Indexing not available:[/] {e}")
+            ctx.console.print("[dim]Install with: pip install sentence-transformers lancedb[/]")
         except Exception as e:
             ctx.console.print(f"[red]Indexing failed:[/] {e}")
             logger.exception("Reindex error")
