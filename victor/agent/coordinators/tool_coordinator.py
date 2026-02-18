@@ -68,6 +68,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.tools.tool_names import ToolNames
+
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline, PipelineExecutionResult
     from victor.agent.tool_selection import ToolSelector
@@ -78,7 +80,6 @@ if TYPE_CHECKING:
     from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
     from victor.agent.tool_calling import ToolCallingAdapter, ToolCallParseResult
     from victor.agent.protocols import ToolAccessContext
-    from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
 

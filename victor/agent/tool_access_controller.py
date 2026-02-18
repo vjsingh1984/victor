@@ -383,7 +383,7 @@ class StageLayer(AccessLayer, ModeAwareMixin):
 
     # Core tools never filtered (basic operation)
     CORE_TOOLS: Set[str] = frozenset(
-        {"read", "read_file", "ls", "list_directory", "search", "code_search"}
+        {"read", "read_file", "ls", "list_directory", "search", "code_search", "shell_readonly"}
     )
 
     def __init__(self, preserved_tools: Optional[Set[str]] = None):

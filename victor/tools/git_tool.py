@@ -86,7 +86,15 @@ async def _run_git_async(
     access_mode=AccessMode.MIXED,  # Reads repo state and writes commits
     danger_level=DangerLevel.MEDIUM,  # Repository modifications
     # Registry-driven metadata for tool selection and cache management
-    stages=["execution", "verification", "completion"],  # Conversation stages where relevant
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+        "execution",
+        "verification",
+        "completion",
+    ],
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
     progress_params=["operation", "files", "branch"],  # Params indicating different operations
@@ -103,6 +111,11 @@ async def _run_git_async(
         "author",
         "changes",
         "history",
+        "uncommitted",
+        "committed",
+        "review changes",
+        "check changes",
+        "commit analysis",
     ],
     use_cases=[
         "checking repository status",
@@ -111,10 +124,12 @@ async def _run_git_async(
         "committing changes with custom authorship",
         "viewing commit history",
         "creating and switching branches",
+        "reviewing uncommitted changes",
     ],
     examples=[
         "show git status",
         "what files have changed",
+        "review uncommitted changes",
         "stage all changes",
         "commit with message 'fix bug'",
         "commit as John Doe john@example.com",
@@ -125,13 +140,19 @@ async def _run_git_async(
         "Use for all git version control operations",
         "Supports custom author name and email for commits",
         "Can stage individual files or all changes",
+        "Use operation='status' or 'diff' to review changes before committing",
     ],
     mandatory_keywords=[
         "commit",
         "git commit",
         "git status",
         "git diff",
-    ],  # From MANDATORY_TOOL_KEYWORDS
+        "git log",
+        "git branch",
+        "review changes",
+        "uncommitted changes",
+        "committed changes",
+    ],
 )
 async def git(
     operation: str,

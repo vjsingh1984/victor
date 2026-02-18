@@ -466,9 +466,27 @@ async def shell(
     access_mode=AccessMode.READONLY,  # Only read operations
     danger_level=DangerLevel.SAFE,  # Readonly commands are safe
     # Registry-driven metadata for tool selection
-    stages=["initial", "exploring", "analyzing"],  # Available in exploration stages
+    stages=[
+        "initial",
+        "exploring",
+        "analyzing",
+        "planning",
+        "reading",
+    ],  # Available in exploration stages
     task_types=["exploration", "analysis", "understanding"],
     execution_category=ExecutionCategory.READ_ONLY,  # No state changes
+    mandatory_keywords=[
+        "git status",
+        "git log",
+        "git diff",
+        "git branch",
+        "run git",
+        "execute git",
+        "check git",
+        "review git",
+        "uncommitted changes",
+        "committed changes",
+    ],
     keywords=[
         "pwd",
         "cd",
@@ -484,9 +502,15 @@ async def shell(
         "directory",
         "navigate",
         "explore",
+        "git",
         "git status",
         "git log",
         "git diff",
+        "git branch",
+        "git show",
+        "shell readonly",
+        "safe shell",
+        "readonly command",
     ],
     use_cases=[
         "navigating directories",
@@ -495,6 +519,8 @@ async def shell(
         "checking git status",
         "viewing git history",
         "finding files",
+        "reviewing uncommitted changes",
+        "viewing git diff",
     ],
     examples=[
         "pwd - show current directory",
@@ -502,6 +528,8 @@ async def shell(
         "cat file.txt - view file contents",
         "git status - check git status",
         "git log --oneline -10 - view recent commits",
+        "git diff - show uncommitted changes",
+        "git branch -a - list all branches",
         "find . -name '*.py' - find Python files",
     ],
 )

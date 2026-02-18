@@ -187,8 +187,7 @@ def get_category_to_tools_map(
 
     if not category_map:
         logger.warning(
-            "No tools with categories found in registry. "
-            "Add category metadata to @tool decorators."
+            "No tools with categories found in registry. Add category metadata to @tool decorators."
         )
 
     return category_map
@@ -313,8 +312,7 @@ def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     """
     if registry is None:
         logger.warning(
-            "get_web_tools called without registry. "
-            "Pass a ToolRegistry for proper tool discovery."
+            "get_web_tools called without registry. Pass a ToolRegistry for proper tool discovery."
         )
         return set()
 
@@ -1029,6 +1027,12 @@ class ToolSelector(ModeAwareMixin):
                 )
                 return tools
 
+        STAGE_PRESERVED_TOOLS: Set[str] = {
+            "shell_readonly",
+            "git",
+        }
+        preserved_tools.update(STAGE_PRESERVED_TOOLS)
+
         # Filter to readonly tools, but always keep vertical core tools
         filtered = [t for t in tools if self._is_readonly_tool(t.name) or t.name in preserved_tools]
 
@@ -1633,8 +1637,7 @@ class ToolSelector(ModeAwareMixin):
         tools = self._filter_tools_for_stage(tools, stage)
 
         logger.debug(
-            f"Semantic+keyword tools selected ({len(tools)}): "
-            f"{', '.join(t.name for t in tools)}"
+            f"Semantic+keyword tools selected ({len(tools)}): {', '.join(t.name for t in tools)}"
         )
 
         # Smart fallback if 0 tools
@@ -1806,7 +1809,7 @@ class ToolSelector(ModeAwareMixin):
         current_stage = self.conversation_state.get_stage()
         stage_tools = self.conversation_state.get_stage_tools()
 
-        logger.debug(f"Stage detection: {current_stage.name}, " f"recommended tools: {stage_tools}")
+        logger.debug(f"Stage detection: {current_stage.name}, recommended tools: {stage_tools}")
 
         # Core tools always included (stage-aware, read-only for explore/analysis)
         core = self._get_stage_core_tools(current_stage)
@@ -1904,7 +1907,7 @@ class ToolSelector(ModeAwareMixin):
         # Combine stage tools with required tools
         tools = set(stage_tools) | required
 
-        logger.debug(f"Task-aware tools for {task_type}/{stage}: " f"{sorted(tools)}")
+        logger.debug(f"Task-aware tools for {task_type}/{stage}: {sorted(tools)}")
 
         return tools
 
@@ -2012,7 +2015,7 @@ class ToolSelector(ModeAwareMixin):
             tools = tools[: self.fallback_max_tools]
 
         logger.info(
-            f"Smart fallback selected {len(tools)} tools: " f"{', '.join(t.name for t in tools)}"
+            f"Smart fallback selected {len(tools)} tools: {', '.join(t.name for t in tools)}"
         )
 
         return tools
