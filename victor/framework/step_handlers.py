@@ -1144,6 +1144,20 @@ class FrameworkStepHandler(BaseStepHandler):
         # Store in context
         context.apply_rl_config(rl_config)
 
+        # Wire active_learners restriction to RLCoordinator
+        if hasattr(rl_config, "active_learners") and rl_config.active_learners:
+            try:
+                from victor.framework.rl.coordinator import get_rl_coordinator
+
+                coordinator = get_rl_coordinator()
+                learner_names = [
+                    learner.value if hasattr(learner, "value") else str(learner)
+                    for learner in rl_config.active_learners
+                ]
+                coordinator.set_active_learners(learner_names)
+            except Exception as e:
+                logger.debug(f"Could not set active learners: {e}")
+
         # Apply to RL hooks if vertical provides them
         if hasattr(vertical, "get_rl_hooks"):
             rl_hooks = vertical.get_rl_hooks()

@@ -284,3 +284,45 @@ class TestEventLoopNonBlocking:
         )
 
         assert counter == 3
+
+
+class TestActiveLearners:
+    """Tests for active learners enforcement."""
+
+    def test_no_restriction_by_default(self, coordinator: RLCoordinator) -> None:
+        """Test that get_active_learner_names() returns None by default."""
+        assert coordinator.get_active_learner_names() is None
+
+    def test_set_active_learners_restricts_creation(self, coordinator: RLCoordinator) -> None:
+        """Test that unlisted learner returns None after set_active_learners."""
+        coordinator.set_active_learners(["continuation_patience"])
+
+        # Listed learner should be creatable
+        learner = coordinator.get_learner("continuation_patience")
+        assert learner is not None
+
+        # Unlisted learner should return None (not created)
+        learner = coordinator.get_learner("model_selector")
+        assert learner is None
+
+    def test_already_created_learners_still_accessible(self, coordinator: RLCoordinator) -> None:
+        """Test that pre-existing learners survive restriction."""
+        # Create learner before setting restriction
+        learner = coordinator.get_learner("continuation_patience")
+        assert learner is not None
+
+        # Now restrict to a different set
+        coordinator.set_active_learners(["model_selector"])
+
+        # Pre-existing learner should still be accessible
+        same_learner = coordinator.get_learner("continuation_patience")
+        assert same_learner is learner
+
+    def test_record_outcome_skips_inactive(
+        self, coordinator: RLCoordinator, sample_outcome: RLOutcome
+    ) -> None:
+        """Test that recording for inactive learner doesn't error."""
+        coordinator.set_active_learners(["continuation_patience"])
+
+        # Recording for inactive learner should not raise
+        coordinator.record_outcome("model_selector", sample_outcome, "coding")

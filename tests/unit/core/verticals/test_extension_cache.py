@@ -177,9 +177,7 @@ class TestRefreshPluginsClearsExtensionCache:
         loader._extensions = MagicMock()
         loader._registered_services = True
 
-        with patch(
-            "victor.core.verticals.vertical_loader.get_entry_point_cache"
-        ) as mock_cache_get:
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
             mock_cache = MagicMock()
             mock_cache_get.return_value = mock_cache
 
@@ -333,7 +331,9 @@ class TestVerticalLoaderThreadSafety:
         settings = MagicMock()
 
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(loader.register_services, container, settings) for _ in range(20)]
+            futures = [
+                executor.submit(loader.register_services, container, settings) for _ in range(20)
+            ]
             for future in futures:
                 future.result()
 
@@ -396,7 +396,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted_event.set()
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -420,7 +422,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted_event.set()
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 with patch(
@@ -445,7 +449,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -473,7 +479,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -501,7 +509,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -528,7 +538,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -556,7 +568,9 @@ class TestVerticalLoaderObservabilityEvents:
                     emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
 
@@ -586,7 +600,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 with patch(

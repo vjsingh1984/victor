@@ -42,25 +42,42 @@ install:
 
 install-dev:
 	pip install -e ".[dev,docs,build]"
+	pip install pre-commit pytest-xdist pytest-split
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short
+	pytest tests/unit -v --tb=short -n auto --dist loadscope
 
 test-all:
-	pytest -v --tb=short
+	pytest -v --tb=short -n auto --dist loadscope
 
 test-cov:
-	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
+	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing -n auto --dist loadscope
+
+test-quick:
+	pytest tests/unit -v --tb=short -m "not slow" -n auto --dist loadscope
+
+test-split:
+	pytest tests/unit --splits=4 --group=1 -v --tb=short
 
 lint:
-	ruff check victor
-	black --check victor
+	ruff check victor tests
+	black --check victor tests
 	mypy victor --ignore-missing-imports || true
 
 format:
 	black victor tests
 	ruff check --fix victor tests
+
+format-check:
+	black --check victor tests
+	ruff check victor tests
+
+pre-commit:
+	pre-commit run --all-files
+
+pre-commit-install:
+	pre-commit install
 
 clean:
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/ .ruff_cache/

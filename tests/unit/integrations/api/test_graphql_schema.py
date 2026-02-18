@@ -32,9 +32,7 @@ def mock_server():
     mock_orchestrator.provider.name = "anthropic"
     mock_orchestrator.provider.model = "claude-3-sonnet"
     mock_orchestrator.adaptive_controller = None
-    mock_orchestrator.chat = AsyncMock(
-        return_value=MagicMock(content="Hello!", tool_calls=[])
-    )
+    mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="Hello!", tool_calls=[]))
     mock_orchestrator.reset_conversation = MagicMock()
     server._get_orchestrator = AsyncMock(return_value=mock_orchestrator)
 
@@ -65,8 +63,7 @@ class TestSchemaCreation:
 
     def test_schema_introspection(self, schema):
         """Introspection query should succeed."""
-        result = schema.execute_sync(
-            """
+        result = schema.execute_sync("""
             {
                 __schema {
                     queryType { name }
@@ -74,8 +71,7 @@ class TestSchemaCreation:
                     subscriptionType { name }
                 }
             }
-            """
-        )
+            """)
         assert result.errors is None
         data = result.data["__schema"]
         assert data["queryType"]["name"] == "Query"
@@ -101,9 +97,7 @@ class TestStatusQuery:
     @pytest.mark.asyncio
     async def test_status_query(self, schema):
         """Status query should return server status."""
-        result = await schema.execute(
-            "{ status { connected mode provider model workspace } }"
-        )
+        result = await schema.execute("{ status { connected mode provider model workspace } }")
         assert result.errors is None
         data = result.data["status"]
         assert data["connected"] is True
@@ -124,9 +118,7 @@ class TestToolsQuery:
 
         with patch("victor.tools.base.ToolRegistry") as MockRegistry:
             MockRegistry.return_value.list_tools.return_value = [mock_tool]
-            result = await schema.execute(
-                "{ tools { name description category } }"
-            )
+            result = await schema.execute("{ tools { name description category } }")
 
         assert result.errors is None
         tools = result.data["tools"]
@@ -141,8 +133,7 @@ class TestChatMutation:
     @pytest.mark.asyncio
     async def test_chat_mutation(self, schema):
         """Chat mutation should return ChatResponseType."""
-        result = await schema.execute(
-            """
+        result = await schema.execute("""
             mutation {
                 chat(messages: [{role: "user", content: "Hello"}]) {
                     role
@@ -150,8 +141,7 @@ class TestChatMutation:
                     toolCalls
                 }
             }
-            """
-        )
+            """)
         assert result.errors is None
         data = result.data["chat"]
         assert data["role"] == "assistant"
@@ -160,16 +150,14 @@ class TestChatMutation:
     @pytest.mark.asyncio
     async def test_chat_empty_messages(self, schema):
         """Chat with empty messages should return empty response."""
-        result = await schema.execute(
-            """
+        result = await schema.execute("""
             mutation {
                 chat(messages: []) {
                     role
                     content
                 }
             }
-            """
-        )
+            """)
         assert result.errors is None
         assert result.data["chat"]["content"] == ""
 
@@ -184,13 +172,11 @@ class TestSwitchModelMutation:
             mock_switcher = MagicMock()
             mock_get.return_value = mock_switcher
 
-            result = await schema.execute(
-                """
+            result = await schema.execute("""
                 mutation {
                     switchModel(provider: "anthropic", model: "claude-3-opus")
                 }
-                """
-            )
+                """)
 
         assert result.errors is None
         assert result.data["switchModel"] is True
@@ -203,13 +189,11 @@ class TestResetConversationMutation:
     async def test_reset_conversation(self, schema, mock_server):
         """Reset conversation should return success."""
         mock_server._orchestrator = MagicMock()
-        result = await schema.execute(
-            """
+        result = await schema.execute("""
             mutation {
                 resetConversation
             }
-            """
-        )
+            """)
         assert result.errors is None
         assert result.data["resetConversation"] is True
 

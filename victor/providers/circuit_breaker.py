@@ -128,6 +128,8 @@ class CircuitBreaker:
         excluded_exceptions: Optional[tuple] = None,
         name: str = "default",
         config: Optional[CircuitBreakerConfig] = None,
+        on_state_change: Optional[Callable] = None,
+        on_call_rejected: Optional[Callable] = None,
     ):
         """Initialize circuit breaker.
 
@@ -139,6 +141,8 @@ class CircuitBreaker:
             excluded_exceptions: Exceptions that don't count as failures
             name: Name for logging/identification
             config: Optional config object (overrides individual parameters)
+            on_state_change: Callback(old_state, new_state, name) on state transitions
+            on_call_rejected: Callback(name, retry_after) when calls are rejected
         """
         # If config provided, use its values
         if config is not None:
@@ -153,6 +157,10 @@ class CircuitBreaker:
         self.success_threshold = success_threshold
         self.excluded_exceptions = excluded_exceptions or ()
         self.name = name
+
+        # Observability callbacks
+        self._on_state_change = on_state_change
+        self._on_call_rejected = on_call_rejected
 
         # State tracking
         self._state = CircuitState.CLOSED
@@ -244,6 +252,13 @@ class CircuitBreaker:
                 f"{old_state.value} -> {new_state.value}"
             )
 
+            # Invoke observability callback
+            if self._on_state_change is not None:
+                try:
+                    self._on_state_change(old_state, new_state, self.name)
+                except Exception:
+                    pass  # Callback errors must not break the breaker
+
             # Reset counters on state change
             if new_state == CircuitState.CLOSED:
                 self._failure_count = 0
@@ -286,6 +301,14 @@ class CircuitBreaker:
                 retry_after = max(0, self.recovery_timeout - elapsed)
 
             self._total_rejected += 1
+
+            # Invoke observability callback
+            if self._on_call_rejected is not None:
+                try:
+                    self._on_call_rejected(self.name, retry_after)
+                except Exception:
+                    pass  # Callback errors must not break the breaker
+
             raise CircuitBreakerError(
                 f"Circuit breaker '{self.name}' is OPEN. " f"Retry after {retry_after:.1f}s",
                 state=state,
@@ -416,6 +439,7 @@ class CircuitBreakerRegistry:
     """Registry for managing multiple circuit breakers."""
 
     _breakers: dict[str, CircuitBreaker] = {}
+    _observability_bus: Optional[Any] = None
 
     @classmethod
     def get_or_create(
@@ -433,7 +457,11 @@ class CircuitBreakerRegistry:
             CircuitBreaker instance
         """
         if name not in cls._breakers:
-            cls._breakers[name] = CircuitBreaker(name=name, **kwargs)
+            breaker = CircuitBreaker(name=name, **kwargs)
+            cls._breakers[name] = breaker
+            # Auto-wire observability if bus is set
+            if cls._observability_bus is not None:
+                cls._wire_breaker(breaker)
         return cls._breakers[name]
 
     @classmethod
@@ -451,3 +479,43 @@ class CircuitBreakerRegistry:
     def get_all_stats(cls) -> dict[str, dict[str, Any]]:
         """Get statistics for all circuit breakers."""
         return {name: breaker.get_stats() for name, breaker in cls._breakers.items()}
+
+    @classmethod
+    def wire_observability(cls, bus: Any) -> None:
+        """Wire an ObservabilityBus to all circuit breakers.
+
+        Sets callbacks on all existing breakers and ensures new breakers
+        created via get_or_create() are also wired automatically.
+
+        Args:
+            bus: ObservabilityBus instance with emit_metric(name, value, tags) method
+        """
+        cls._observability_bus = bus
+
+        # Wire all existing breakers
+        for breaker in cls._breakers.values():
+            cls._wire_breaker(breaker)
+
+    @classmethod
+    def _wire_breaker(cls, breaker: CircuitBreaker) -> None:
+        """Wire observability callbacks to a single breaker."""
+        bus = cls._observability_bus
+        if bus is None:
+            return
+
+        def on_state_change(old_state: CircuitState, new_state: CircuitState, name: str) -> None:
+            bus.emit_metric(
+                "circuit_breaker.state_change",
+                1.0,
+                {"breaker": name, "from": old_state.value, "to": new_state.value},
+            )
+
+        def on_call_rejected(name: str, retry_after: float) -> None:
+            bus.emit_metric(
+                "circuit_breaker.rejected",
+                1.0,
+                {"breaker": name, "retry_after": retry_after},
+            )
+
+        breaker._on_state_change = on_state_change
+        breaker._on_call_rejected = on_call_rejected

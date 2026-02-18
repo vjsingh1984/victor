@@ -39,6 +39,12 @@ from victor.agent.coordinators.tool_coordinator import (
     create_tool_coordinator,
 )
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.coordinators.chat_protocols import (
+    ChatContextProtocol,
+    ChatOrchestratorProtocol,
+    ProviderContextProtocol,
+    ToolContextProtocol,
+)
 from victor.agent.coordinators.session_coordinator import (
     SessionCoordinator,
     SessionInfo,
@@ -47,6 +53,10 @@ from victor.agent.coordinators.session_coordinator import (
 
 __all__ = [
     "ChatCoordinator",
+    "ChatContextProtocol",
+    "ChatOrchestratorProtocol",
+    "ProviderContextProtocol",
+    "ToolContextProtocol",
     "SessionCoordinator",
     "SessionInfo",
     "create_session_coordinator",

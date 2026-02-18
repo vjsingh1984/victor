@@ -133,9 +133,7 @@ class TestSelfBenchmarkRunner:
     @pytest.mark.asyncio
     async def test_run_produces_comparison_report(self):
         """Run should produce a ComparisonReport."""
-        config = SelfBenchmarkConfig(
-            max_tasks=3, output_dir=Path("/tmp/test_benchmark")
-        )
+        config = SelfBenchmarkConfig(max_tasks=3, output_dir=Path("/tmp/test_benchmark"))
         runner = SelfBenchmarkRunner(config)
 
         mock_correlation = CorrelationReport(
@@ -148,9 +146,7 @@ class TestSelfBenchmarkRunner:
             ],
         )
 
-        with patch(
-            "victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator"
-        ) as MockOrch:
+        with patch("victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator") as MockOrch:
             mock_instance = MagicMock()
             mock_instance.run_evaluation = AsyncMock(return_value=mock_correlation)
             MockOrch.return_value = mock_instance
@@ -163,9 +159,7 @@ class TestSelfBenchmarkRunner:
         assert len(report.results) >= 1  # At least Victor's result
 
         # Victor should be in the results
-        victor_results = [
-            r for r in report.results if r.framework == Framework.VICTOR
-        ]
+        victor_results = [r for r in report.results if r.framework == Framework.VICTOR]
         assert len(victor_results) == 1
 
     @pytest.mark.asyncio
@@ -177,15 +171,10 @@ class TestSelfBenchmarkRunner:
         mock_correlation = CorrelationReport(
             total_instances=5,
             resolved_count=2,
-            scores=[
-                SWEBenchScore(instance_id=f"t-{i}", resolved=(i < 2))
-                for i in range(5)
-            ],
+            scores=[SWEBenchScore(instance_id=f"t-{i}", resolved=(i < 2)) for i in range(5)],
         )
 
-        with patch(
-            "victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator"
-        ) as MockOrch:
+        with patch("victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator") as MockOrch:
             mock_instance = MagicMock()
             mock_instance.run_evaluation = AsyncMock(return_value=mock_correlation)
             MockOrch.return_value = mock_instance
@@ -212,9 +201,7 @@ class TestSelfBenchmarkRunner:
             scores=[SWEBenchScore(instance_id="t-1", resolved=True)],
         )
 
-        with patch(
-            "victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator"
-        ) as MockOrch:
+        with patch("victor.evaluation.evaluation_orchestrator.EvaluationOrchestrator") as MockOrch:
             mock_instance = MagicMock()
             mock_instance.run_evaluation = AsyncMock(return_value=mock_correlation)
             MockOrch.return_value = mock_instance
@@ -272,9 +259,7 @@ class TestCreateQuickComparison:
     def test_quick_comparison_victor_pass_rate(self):
         """Victor pass rate should be reflected in the report."""
         report = create_quick_comparison(victor_pass_rate=0.42)
-        victor_result = [
-            r for r in report.results if r.framework == Framework.VICTOR
-        ][0]
+        victor_result = [r for r in report.results if r.framework == Framework.VICTOR][0]
         assert victor_result.metrics.pass_rate == 0.42
 
     def test_quick_comparison_without_published(self):

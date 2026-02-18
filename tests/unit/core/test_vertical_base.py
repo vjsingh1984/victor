@@ -14,6 +14,8 @@
 
 """Tests for VerticalBase class - LSP compliance and core functionality."""
 
+import time
+
 import pytest
 from typing import List
 from unittest.mock import patch, MagicMock
@@ -897,3 +899,59 @@ class TestIntegrationResultExtensionErrors:
         required = result.get_required_extension_failures()
         assert len(required) == 1
         assert required[0].extension_type == "safety"
+
+
+class TestConfigCacheTTL:
+    """Tests for config cache TTL expiry behavior."""
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+    def test_cache_returns_within_ttl(self):
+        """Verify same object reference is returned within TTL window."""
+        config1 = ConcreteVertical.get_config(use_cache=True)
+        config2 = ConcreteVertical.get_config(use_cache=True)
+
+        assert config1 is config2, "Should return same cached object within TTL"
+
+    def test_cache_expires_after_ttl(self):
+        """Verify cache rebuilds after TTL expires."""
+        # Set a very short TTL
+        original_ttl = ConcreteVertical._config_cache_ttl
+        ConcreteVertical._config_cache_ttl = 0.01  # 10ms
+
+        try:
+            config1 = ConcreteVertical.get_config(use_cache=True)
+            time.sleep(0.02)  # Wait for TTL to expire
+            config2 = ConcreteVertical.get_config(use_cache=True)
+
+            assert config1 is not config2, "Should rebuild config after TTL expires"
+        finally:
+            ConcreteVertical._config_cache_ttl = original_ttl
+
+    def test_custom_ttl_per_vertical(self):
+        """Verify subclass can override _config_cache_ttl."""
+
+        class ShortTTLVertical(VerticalBase):
+            name = "short_ttl"
+            description = "Short TTL vertical"
+            _config_cache_ttl = 60.0  # Custom TTL
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Short TTL prompt"
+
+        assert ShortTTLVertical._config_cache_ttl == 60.0
+        assert ConcreteVertical._config_cache_ttl == 300.0
+
+    def test_use_cache_false_bypasses_ttl(self):
+        """Verify use_cache=False always rebuilds regardless of TTL."""
+        config1 = ConcreteVertical.get_config(use_cache=True)
+        config2 = ConcreteVertical.get_config(use_cache=False)
+
+        assert config1 is not config2, "use_cache=False should always rebuild"

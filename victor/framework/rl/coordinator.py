@@ -30,7 +30,7 @@ import asyncio
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.database import get_database
@@ -478,6 +478,9 @@ class RLCoordinator:
         # Registry of learners
         self._learners: Dict[str, BaseLearner] = {}
 
+        # Active learners allowlist (None = no restriction)
+        self._active_learners: Optional[Set[str]] = None
+
         # Async writer queue for non-blocking outcome recording
         self._writer_queue: Optional[AsyncWriterQueue] = None
         self._writer_queue_enabled = False
@@ -555,6 +558,26 @@ class RLCoordinator:
         self._learners[name] = learner
         logger.info(f"RL: Registered learner '{name}'")
 
+    def set_active_learners(self, learners: List[str]) -> None:
+        """Set the active learners allowlist.
+
+        Only learners in this list will be lazily created. Already-created
+        learners remain accessible regardless of this setting.
+
+        Args:
+            learners: List of learner names to allow
+        """
+        self._active_learners = set(learners)
+        logger.info(f"RL: Active learners set to: {sorted(self._active_learners)}")
+
+    def get_active_learner_names(self) -> Optional[Set[str]]:
+        """Get the current active learners allowlist.
+
+        Returns:
+            Set of active learner names, or None if no restriction
+        """
+        return self._active_learners
+
     def get_learner(self, name: str) -> Optional[BaseLearner]:
         """Get a learner by name, creating it lazily if needed.
 
@@ -562,10 +585,15 @@ class RLCoordinator:
             name: Learner name
 
         Returns:
-            Learner instance or None if unknown
+            Learner instance or None if unknown or not in active_learners
         """
         if name in self._learners:
             return self._learners[name]
+
+        # Guard: skip creation if not in active_learners allowlist
+        if self._active_learners is not None and name not in self._active_learners:
+            logger.debug(f"RL: Learner '{name}' not in active_learners, skipping")
+            return None
 
         # Lazy initialization of learners
         learner = self._create_learner(name)

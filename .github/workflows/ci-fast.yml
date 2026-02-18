@@ -1,0 +1,168 @@
+# Fast CI Checks - Run quick validation first (fail-fast strategy)
+# This workflow runs in ~1-2 minutes and catches common issues early
+# All checks run in parallel for maximum speed
+
+name: CI - Fast Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # All these jobs run in parallel for maximum speed
+  format:
+    name: Format Check (Black)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Black
+        run: pip install black==26.1.0
+
+      - name: Check formatting
+        run: black --check victor tests
+
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Lint with Ruff
+        run: ruff check victor
+
+  typecheck:
+    name: Type Check (MyPy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install MyPy
+        run: pip install mypy types-pyyaml types-aiofiles
+
+      - name: Type check with MyPy
+        run: mypy victor
+        continue-on-error: true
+
+  imports:
+    name: Import Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e .
+
+      - name: Check imports
+        run: |
+          python -c "import victor; print('✓ victor imports successfully')"
+          python -c "from victor.framework import Agent; print('✓ Agent imports')"
+          python -c "from victor.workflows import StateGraph; print('✓ StateGraph imports')"
+
+  guards:
+    name: CI Guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Check archive/victor-legacy guard
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE_BRANCH="${{ github.base_ref }}"
+          ADDED_OR_MODIFIED=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^archive/victor-legacy/' || true)
+          if [ -n "$ADDED_OR_MODIFIED" ]; then
+            echo "❌ Additions/modifications under archive/victor-legacy/ are not allowed."
+            echo "Found: $ADDED_OR_MODIFIED"
+            exit 1
+          fi
+          echo "✓ Archive guard passed"
+
+      - name: Check fallback_max_tools bound
+        run: |
+          val=$(python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path("victor/config/settings.py").read_text()
+          m = re.search(r"fallback_max_tools:\s*int\s*=\s*(\d+)", text)
+          print(m.group(1) if m else "")
+          PY
+          )
+          if [ -z "$val" ]; then
+            echo "❌ fallback_max_tools not found"
+            exit 1
+          fi
+          if [ "$val" -le 0 ] || [ "$val" -gt 20 ]; then
+            echo "❌ fallback_max_tools must be between 1 and 20 (found $val)"
+            exit 1
+          fi
+          echo "✓ fallback_max_tools = $val (valid)"
+
+  security-quick:
+    name: Security Quick Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy FS scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true

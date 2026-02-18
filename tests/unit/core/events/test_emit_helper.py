@@ -123,6 +123,7 @@ async def test_emit_event_sync_emits_on_running_loop():
 
 def test_emit_event_sync_metrics_track_dropped_without_loop():
     """Metrics should record dropped emits when no loop/fallback is available."""
+
     class _Bus:
         async def emit(self, topic, data, source):
             return None
@@ -166,6 +167,7 @@ async def test_emit_event_sync_metrics_track_emit_failures():
 
 def test_emit_sync_metrics_event_emits_snapshot_without_running_loop():
     """Metrics snapshot emitter should publish stats from sync no-loop contexts."""
+
     # Create at least one metric value.
     class _NoopBus:
         async def emit(self, topic, data, source):
@@ -198,6 +200,7 @@ def test_emit_sync_metrics_event_emits_snapshot_without_running_loop():
 
 def test_emit_sync_metrics_event_can_reset_after_emit():
     """Metrics snapshot emitter should support reset-after-emit semantics."""
+
     class _NoopBus:
         async def emit(self, topic, data, source):
             return None

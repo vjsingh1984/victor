@@ -97,9 +97,7 @@ class TestSetupObservabilityIntegration:
 
             result = setup_observability_integration(mock_orchestrator)
 
-            MockIntegration.assert_called_once_with(
-                session_id=None, enable_cqrs_bridge=False
-            )
+            MockIntegration.assert_called_once_with(session_id=None, enable_cqrs_bridge=False)
             mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
             assert mock_orchestrator.observability == mock_integration
             assert result == mock_integration
@@ -130,9 +128,7 @@ class TestSetupObservabilityIntegration:
                 mock_orchestrator, session_id="s1", enable_cqrs_bridge=True
             )
 
-            MockIntegration.assert_called_once_with(
-                session_id="s1", enable_cqrs_bridge=True
-            )
+            MockIntegration.assert_called_once_with(session_id="s1", enable_cqrs_bridge=True)
 
 
 class TestVerticalApplicationDelegation:

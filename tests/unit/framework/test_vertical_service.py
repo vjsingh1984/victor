@@ -55,7 +55,9 @@ class TestVerticalService:
         orchestrator = MagicMock()
         expected = IntegrationResult(success=True, vertical_name="dummy")
 
-        with patch("victor.framework.vertical_service.get_vertical_integration_pipeline") as mock_get:
+        with patch(
+            "victor.framework.vertical_service.get_vertical_integration_pipeline"
+        ) as mock_get:
             pipeline = MagicMock()
             pipeline.apply.return_value = expected
             mock_get.return_value = pipeline
@@ -67,7 +69,9 @@ class TestVerticalService:
 
     def test_clear_vertical_integration_pipeline_cache_delegates_to_pipeline(self):
         """Cache clear helper should delegate to shared pipeline clear_cache()."""
-        with patch("victor.framework.vertical_service.get_vertical_integration_pipeline") as mock_get:
+        with patch(
+            "victor.framework.vertical_service.get_vertical_integration_pipeline"
+        ) as mock_get:
             pipeline = MagicMock()
             mock_get.return_value = pipeline
 

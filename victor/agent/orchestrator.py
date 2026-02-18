@@ -1032,6 +1032,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
         self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
 
+        # Debug-mode conformance assertion for ChatOrchestratorProtocol
+        # Placed at end of __init__ so all attributes are initialized
+        if __debug__:
+            from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+            from victor.framework.protocols import verify_protocol_conformance
+
+            _conforms, _missing = verify_protocol_conformance(self, ChatOrchestratorProtocol)
+            assert (
+                _conforms
+            ), f"AgentOrchestrator missing ChatOrchestratorProtocol members: {_missing}"
+
         logger.info(
             "Orchestrator initialized with decomposed components: "
             "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "

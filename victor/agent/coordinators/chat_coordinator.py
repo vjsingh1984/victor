@@ -56,7 +56,7 @@ from victor.core.errors import (
 if TYPE_CHECKING:
     # Type-only imports
     from victor.agent.streaming.context import StreamingChatContext
-    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
@@ -70,18 +70,19 @@ class ChatCoordinator:
     This class extracts chat-related logic from the orchestrator,
     providing a clean interface for managing conversations.
 
-    The coordinator maintains a reference to the orchestrator for
-    accessing shared state and delegated operations.
+    The coordinator depends on ``ChatOrchestratorProtocol`` (defined in
+    ``chat_protocols.py``) rather than the concrete ``AgentOrchestrator``.
+    This enables unit testing with lightweight mocks.
 
     Args:
-        orchestrator: The AgentOrchestrator instance for accessing shared state
+        orchestrator: Any object satisfying ChatOrchestratorProtocol
     """
 
-    def __init__(self, orchestrator: "AgentOrchestrator") -> None:
+    def __init__(self, orchestrator: "ChatOrchestratorProtocol") -> None:
         """Initialize the ChatCoordinator.
 
         Args:
-            orchestrator: The parent orchestrator instance
+            orchestrator: Object satisfying ChatOrchestratorProtocol
         """
         self._orchestrator = orchestrator
 

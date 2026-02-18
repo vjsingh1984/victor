@@ -348,3 +348,123 @@ class TestCircuitBreakerEdgeCases:
         breaker._failure_count = 3
         breaker._record_success()
         assert breaker._failure_count == 0
+
+
+class TestCircuitBreakerObservability:
+    """Tests for circuit breaker observability callbacks."""
+
+    def test_on_state_change_callback(self) -> None:
+        """Test callback fires on state transition."""
+        changes = []
+
+        def on_change(old, new, name):
+            changes.append((old, new, name))
+
+        breaker = CircuitBreaker(
+            failure_threshold=2,
+            name="test_cb",
+            on_state_change=on_change,
+        )
+
+        # Trigger CLOSED -> OPEN
+        breaker._failure_count = 1
+        breaker._record_failure()
+
+        assert len(changes) == 1
+        assert changes[0] == (CircuitState.CLOSED, CircuitState.OPEN, "test_cb")
+
+    @pytest.mark.asyncio
+    async def test_on_call_rejected_callback(self) -> None:
+        """Test callback fires on call rejection."""
+        rejections = []
+
+        def on_rejected(name, retry_after):
+            rejections.append((name, retry_after))
+
+        breaker = CircuitBreaker(
+            failure_threshold=1,
+            recovery_timeout=60.0,
+            name="test_rej",
+            on_call_rejected=on_rejected,
+        )
+
+        # Open the circuit
+        async def fail():
+            raise ValueError("fail")
+
+        with pytest.raises(ValueError):
+            await breaker.execute(fail)
+
+        # Now trigger rejection
+        with pytest.raises(CircuitBreakerError):
+            await breaker.execute(fail)
+
+        assert len(rejections) == 1
+        assert rejections[0][0] == "test_rej"
+        assert rejections[0][1] > 0
+
+    def test_callback_exception_does_not_propagate(self) -> None:
+        """Test bad callback doesn't break breaker."""
+
+        def bad_callback(*args):
+            raise RuntimeError("callback error")
+
+        breaker = CircuitBreaker(
+            failure_threshold=2,
+            name="test_bad_cb",
+            on_state_change=bad_callback,
+        )
+
+        # Should not raise despite bad callback
+        breaker._failure_count = 1
+        breaker._record_failure()
+        assert breaker.state == CircuitState.OPEN
+
+
+class TestCircuitBreakerRegistryObservability:
+    """Tests for CircuitBreakerRegistry observability wiring."""
+
+    def setup_method(self) -> None:
+        """Clear registry before each test."""
+        CircuitBreakerRegistry._breakers.clear()
+        CircuitBreakerRegistry._observability_bus = None
+
+    def test_wire_observability(self) -> None:
+        """Test wire_observability sets callbacks on existing breakers."""
+        breaker = CircuitBreakerRegistry.get_or_create("obs_test", failure_threshold=2)
+
+        metrics = []
+
+        class MockBus:
+            def emit_metric(self, name, value, tags):
+                metrics.append((name, value, tags))
+
+        CircuitBreakerRegistry.wire_observability(MockBus())
+
+        # Trigger state change
+        breaker._failure_count = 1
+        breaker._record_failure()
+
+        assert len(metrics) == 1
+        assert metrics[0][0] == "circuit_breaker.state_change"
+        assert metrics[0][2]["breaker"] == "obs_test"
+
+    def test_new_breakers_auto_wired(self) -> None:
+        """Test breakers created after wiring also get callbacks."""
+        metrics = []
+
+        class MockBus:
+            def emit_metric(self, name, value, tags):
+                metrics.append((name, value, tags))
+
+        CircuitBreakerRegistry.wire_observability(MockBus())
+
+        # Create breaker AFTER wiring
+        breaker = CircuitBreakerRegistry.get_or_create("auto_wired", failure_threshold=1)
+
+        # Trigger state change
+        breaker._record_failure()
+
+        assert len(metrics) == 1
+        assert metrics[0][0] == "circuit_breaker.state_change"
+        assert metrics[0][2]["breaker"] == "auto_wired"

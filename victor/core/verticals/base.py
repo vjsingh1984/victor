@@ -46,6 +46,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import time
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -220,6 +221,8 @@ class VerticalBase(
     # Config cache (keyed by namespaced class identity, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _config_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+    _config_cache_timestamps: Dict[str, float] = {}
+    _config_cache_ttl: ClassVar[float] = 300.0  # 5 min default, verticals can override
 
     @classmethod
     def _config_cache_key(cls) -> str:
@@ -452,7 +455,12 @@ class VerticalBase(
             with cls._config_cache_lock:
                 cached = cls._config_cache.get(cache_key)
                 if cached is not None:
-                    return cached
+                    ts = cls._config_cache_timestamps.get(cache_key, 0.0)
+                    if time.time() - ts < cls._config_cache_ttl:
+                        return cached
+                    # Expired — remove stale entry and fall through to rebuild
+                    cls._config_cache.pop(cache_key, None)
+                    cls._config_cache_timestamps.pop(cache_key, None)
 
         # Build tool set
         tool_names = cls.get_tools()
@@ -478,6 +486,7 @@ class VerticalBase(
         # Cache the config
         with cls._config_cache_lock:
             cls._config_cache[cache_key] = config
+            cls._config_cache_timestamps[cache_key] = time.time()
         return config
 
     @classmethod
@@ -494,11 +503,13 @@ class VerticalBase(
         if clear_all:
             with cls._config_cache_lock:
                 cls._config_cache.clear()
+                cls._config_cache_timestamps.clear()
             cls.clear_extension_cache(clear_all=True)
         else:
             cache_key = cls._config_cache_key()
             with cls._config_cache_lock:
                 cls._config_cache.pop(cache_key, None)
+                cls._config_cache_timestamps.pop(cache_key, None)
                 # Backward compatibility for legacy class-name cache keys.
                 cls._config_cache.pop(cls.__name__, None)
             # Clear extensions cache for this class too
