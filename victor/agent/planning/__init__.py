@@ -66,6 +66,11 @@ from victor.agent.planning.readable_schema import (
     plan_to_session_context,
     plan_to_workflow_yaml,
 )
+from victor.agent.planning.tool_selection import (
+    COMPLEXITY_TOOL_LIMITS,
+    STEP_TOOL_MAPPING,
+    StepAwareToolSelector,
+)
 
 # Export TaskPlan as primary alias for ReadableTaskPlan
 TaskPlan = ReadableTaskPlan
@@ -86,6 +91,10 @@ __all__ = [
     "generate_task_plan",
     "plan_to_session_context",
     "plan_to_workflow_yaml",
+    # Context-aware tool selection
+    "StepAwareToolSelector",
+    "STEP_TOOL_MAPPING",
+    "COMPLEXITY_TOOL_LIMITS",
     # Planner
     "AutonomousPlanner",
     "PLANNING_SYSTEM_PROMPT",
