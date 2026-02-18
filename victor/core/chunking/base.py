@@ -37,8 +37,8 @@ class ChunkingConfig:
         respect_boundaries: Try to break at natural boundaries (default: True)
     """
 
-    chunk_size: int = 512
-    chunk_overlap: int = 50
+    chunk_size: int = 1024
+    chunk_overlap: int = 128
     min_chunk_size: int = 100
     max_chunk_size: int = 2000
     respect_boundaries: bool = True

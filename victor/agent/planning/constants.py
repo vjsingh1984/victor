@@ -167,6 +167,10 @@ COMPLEXITY_KEYWORDS: list[str] = [
     "scalability",
     "performance",
     "security audit",
+    "plan mode",  # Explicit user request for planning
+    "planning",
+    "step by step",
+    "step-by-step",
 ]
 
 

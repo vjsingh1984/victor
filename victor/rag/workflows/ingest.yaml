@@ -21,8 +21,8 @@
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ DEFAULT VALUES                                                               │
 # ├─────────────────────────────────────────────────────────────────────────────┤
-# │ chunk_size: 512 tokens                                                       │
-# │ chunk_overlap: 50 tokens (10% overlap)                                       │
+# │ chunk_size: 1024 tokens                                                      │
+# │ chunk_overlap: 128 tokens (12.5% overlap)                                    │
 # │ embedding_model: "text-embedding-3-small" (OpenAI) or "all-MiniLM-L6-v2"    │
 # │ embedding_dimensions: 384 (MiniLM) or 1536 (OpenAI)                         │
 # │ batch_size: 100 chunks per embedding API call                               │
@@ -363,8 +363,8 @@ workflows:
         tools: []  # No tools needed - operates on in-memory documents
         inputs:
           documents: $ctx.all_documents
-          chunk_size: $ctx.chunk_size        # Default: 512 tokens
-          chunk_overlap: $ctx.chunk_overlap  # Default: 50 tokens
+          chunk_size: $ctx.chunk_size        # Default: 1024 tokens
+          chunk_overlap: $ctx.chunk_overlap  # Default: 128 tokens
           strategies:
             technical_docs: section_based     # Split on markdown headers
             code_files: ast_boundaries        # Split on function/class boundaries

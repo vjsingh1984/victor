@@ -108,7 +108,7 @@ class FileInfo:
 class SymbolStore:
     """SQLite-based storage for code symbols with multi-language support."""
 
-    # Language extensions
+    # Language extensions (source code files that can be parsed for symbols)
     LANGUAGE_EXTENSIONS = {
         ".py": "python",
         ".pyw": "python",
@@ -136,6 +136,23 @@ class SymbolStore:
         ".exs": "elixir",
         ".vue": "vue",
         ".svelte": "svelte",
+    }
+
+    # Config extensions (configuration and documentation files)
+    # These are indexed for file counting and LOC but not parsed for symbols
+    CONFIG_EXTENSIONS = {
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".toml": "toml",
+        ".ini": "ini",
+        ".hocon": "hocon",
+        ".xml": "xml",
+        ".md": "markdown",
+        ".txt": "text",
+        ".cfg": "config",
+        ".conf": "config",
+        ".props": "properties",
     }
 
     # Use shared default skip directories from ignore_patterns module
@@ -189,7 +206,8 @@ class SymbolStore:
                     indexed_at REAL,
                     content_hash TEXT,
                     symbol_count INTEGER DEFAULT 0,
-                    import_count INTEGER DEFAULT 0
+                    import_count INTEGER DEFAULT 0,
+                    file_type TEXT DEFAULT 'source'
                 );
 
                 -- Symbols table
@@ -238,6 +256,7 @@ class SymbolStore:
                 CREATE INDEX IF NOT EXISTS idx_symbols_parent ON symbols(parent_symbol);
                 CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_path);
                 CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
+                CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type);
 
                 -- Metadata table
                 CREATE TABLE IF NOT EXISTS metadata (
@@ -467,17 +486,21 @@ class SymbolStore:
         symbol_count: int,
         import_count: int,
     ) -> None:
-        """Store file metadata."""
+        """Store file metadata including file type classification."""
         stat = file_path.stat()
         content = file_path.read_bytes()
         content_hash = hashlib.sha256(content).hexdigest()[:16]
         lines = content.count(b"\n") + 1
         rel_path = str(file_path.relative_to(self.root))
 
+        # Determine file type: config if extension in CONFIG_EXTENSIONS, else source
+        file_ext = file_path.suffix.lower()
+        file_type = "config" if file_ext in self.CONFIG_EXTENSIONS else "source"
+
         conn.execute(
             """INSERT OR REPLACE INTO files
-               (path, language, size, lines, last_modified, indexed_at, content_hash, symbol_count, import_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (path, language, size, lines, last_modified, indexed_at, content_hash, symbol_count, import_count, file_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 rel_path,
                 language,
@@ -488,6 +511,7 @@ class SymbolStore:
                 content_hash,
                 symbol_count,
                 import_count,
+                file_type,
             ),
         )
 
@@ -1302,7 +1326,15 @@ class SymbolStore:
             ]
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get statistics about the symbol store."""
+        """Get statistics about the symbol store.
+
+        Returns comprehensive stats including:
+        - total_files: All indexed files
+        - total_symbols: Code symbols (classes, functions, methods)
+        - graph_nodes: Total graph nodes (files + symbols + imports + etc.)
+        - symbols_by_type: Breakdown by symbol type (class, function, etc.)
+        - files_by_language: Breakdown by programming language
+        """
         with sqlite3.connect(str(self._db_path)) as conn:
             stats = {}
 
@@ -1312,7 +1344,26 @@ class SymbolStore:
 
             # Symbol count by type
             cursor = conn.execute("SELECT symbol_type, COUNT(*) FROM symbols GROUP BY symbol_type")
-            stats["symbols_by_type"] = dict(cursor.fetchall())
+            symbols_by_type = dict(cursor.fetchall())
+
+            # Total files
+            cursor = conn.execute("SELECT COUNT(*) FROM files")
+            stats["total_files"] = cursor.fetchone()[0]
+
+            # Total code symbols (classes, functions, methods - what developers write)
+            cursor = conn.execute("SELECT COUNT(*) FROM symbols")
+            stats["total_symbols"] = cursor.fetchone()[0]
+
+            # Total graph nodes (files + symbols + imports as approximation)
+            cursor = conn.execute("SELECT COUNT(*) FROM imports")
+            import_count = cursor.fetchone()[0]
+            stats["graph_nodes"] = stats["total_files"] + stats["total_symbols"] + import_count
+
+            # Symbol breakdown by type with clear naming
+            stats["classes"] = symbols_by_type.get("class", 0)
+            stats["functions"] = symbols_by_type.get("function", 0)
+            stats["methods"] = symbols_by_type.get("method", 0)
+            stats["symbols_by_type"] = symbols_by_type
 
             # Symbol count by category
             cursor = conn.execute(
@@ -1320,13 +1371,7 @@ class SymbolStore:
             )
             stats["symbols_by_category"] = dict(cursor.fetchall())
 
-            # Total counts
-            cursor = conn.execute("SELECT COUNT(*) FROM files")
-            stats["total_files"] = cursor.fetchone()[0]
-
-            cursor = conn.execute("SELECT COUNT(*) FROM symbols")
-            stats["total_symbols"] = cursor.fetchone()[0]
-
+            # Patterns
             cursor = conn.execute("SELECT COUNT(*) FROM patterns")
             stats["total_patterns"] = cursor.fetchone()[0]
 

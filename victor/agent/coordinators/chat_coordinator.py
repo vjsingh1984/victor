@@ -469,7 +469,7 @@ class ChatCoordinator:
             from victor.core.events import get_observability_bus
 
             event_bus = get_observability_bus()
-            event_bus.emit(
+            await event_bus.emit(
                 topic="state.task.requirements_extracted",
                 data={
                     "required_files": orch._required_files,

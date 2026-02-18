@@ -39,7 +39,7 @@ OLD Pattern (avoid - creates tight coupling):
 
 NEW Pattern (preferred - decoupled via context):
     # In vertical integration code
-    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.set_capability_config("rag_config", {"chunk_size": 1024})
     context.set_capability_config("source_verification_config", {"strict": True})
     context.set_capability_config("code_style", {"max_line_length": 100})
 
@@ -74,7 +74,7 @@ Usage:
     context.apply_safety_patterns(patterns)
 
     # Store capability configs
-    context.set_capability_config("rag_config", {"chunk_size": 512})
+    context.set_capability_config("rag_config", {"chunk_size": 1024})
     context.apply_capability_configs({
         "code_style": {"max_line_length": 100},
         "test_framework": "pytest",
