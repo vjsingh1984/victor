@@ -17,6 +17,18 @@
 This package contains shared utilities used across the codebase.
 """
 
+from victor.core.utils.ast_helpers import (
+    STDLIB_MODULES,
+    SymbolSummary,
+    build_signature,
+    extract_base_classes,
+    extract_imports,
+    extract_parameters,
+    extract_symbols,
+    get_annotation_str,
+    get_decorator_name,
+    is_stdlib_module,
+)
 from victor.core.utils.content_hasher import ContentHasher, HasherPresets
 from victor.core.utils.text_normalizer import (
     TextNormalizationPresets,
@@ -30,6 +42,16 @@ from victor.core.utils.text_normalizer import (
 __all__ = [
     "ContentHasher",
     "HasherPresets",
+    "STDLIB_MODULES",
+    "SymbolSummary",
+    "build_signature",
+    "extract_base_classes",
+    "extract_imports",
+    "extract_parameters",
+    "extract_symbols",
+    "get_annotation_str",
+    "get_decorator_name",
+    "is_stdlib_module",
     "normalize_for_git_branch",
     "normalize_for_filename",
     "slugify",

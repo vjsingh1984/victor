@@ -36,6 +36,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 
+from victor.core.utils.ast_helpers import (
+    extract_base_classes as _extract_base_classes,
+    extract_imports as _extract_imports,
+    get_decorator_name as _get_decorator_name,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -240,18 +246,9 @@ def find_imports(tree: ast.AST) -> List[str]:
         tree: AST to search.
 
     Returns:
-        List of imported module names.
+        List of imported module names (fully qualified).
     """
-    imports = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                imports.append(alias.name)
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            for alias in node.names:
-                imports.append(f"{module}.{alias.name}" if module else alias.name)
-    return imports
+    return _extract_imports(tree, top_level_only=False)
 
 
 # =============================================================================
@@ -461,17 +458,7 @@ def get_function_info(node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Fun
         args.append(f"**{node.args.kwarg.arg}")
 
     # Get decorators
-    decorators = []
-    for decorator in node.decorator_list:
-        if isinstance(decorator, ast.Name):
-            decorators.append(decorator.id)
-        elif isinstance(decorator, ast.Attribute):
-            decorators.append(f"{_get_attribute_name(decorator)}")
-        elif isinstance(decorator, ast.Call):
-            if isinstance(decorator.func, ast.Name):
-                decorators.append(decorator.func.id)
-            elif isinstance(decorator.func, ast.Attribute):
-                decorators.append(_get_attribute_name(decorator.func))
+    decorators = [_get_decorator_name(d) for d in node.decorator_list]
 
     # Check for docstring
     docstring = ast.get_docstring(node)
@@ -507,20 +494,10 @@ def get_class_info(node: ast.ClassDef) -> ClassInfo:
         ClassInfo with extracted details.
     """
     # Get base classes
-    bases = []
-    for base in node.bases:
-        if isinstance(base, ast.Name):
-            bases.append(base.id)
-        elif isinstance(base, ast.Attribute):
-            bases.append(_get_attribute_name(base))
+    bases = _extract_base_classes(node)
 
     # Get decorators
-    decorators = []
-    for decorator in node.decorator_list:
-        if isinstance(decorator, ast.Name):
-            decorators.append(decorator.id)
-        elif isinstance(decorator, ast.Attribute):
-            decorators.append(_get_attribute_name(decorator))
+    decorators = [_get_decorator_name(d) for d in node.decorator_list]
 
     # Check for docstring
     docstring = ast.get_docstring(node)

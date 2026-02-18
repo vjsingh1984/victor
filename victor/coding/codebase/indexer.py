@@ -50,104 +50,22 @@ from victor.coding.languages.tiers import get_tier, LanguageTier
 from victor.coding.codebase.graph.registry import create_graph_store
 from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.coding.codebase.symbol_resolver import SymbolResolver
+from victor.core.utils.ast_helpers import (
+    STDLIB_MODULES,
+    build_signature,
+    extract_base_classes,
+    extract_imports,
+    is_stdlib_module as _is_stdlib_module,
+)
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.base import BaseEmbeddingProvider
     from victor.coding.codebase.graph.protocol import GraphStoreProtocol
 
-# Import Rust accelerator for stdlib detection via unified facade (5-10x faster)
-try:
-    from victor.processing.native import (
-        is_native_available,
-        is_stdlib_module as native_is_stdlib_module,
-    )
-
-    _NATIVE_AVAILABLE = is_native_available()
-except ImportError:
-    _NATIVE_AVAILABLE = False
-
-    def native_is_stdlib_module(name: str) -> bool:
-        """Fallback stub when native not available."""
-        return False
-
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# STANDARD LIBRARY MODULES (exclude from graph to avoid inflating PageRank)
-# =============================================================================
-# These are Python standard library modules that shouldn't be indexed as nodes
-# because they inflate PageRank scores with external dependencies.
-STDLIB_MODULES = frozenset(
-    {
-        # Core builtins
-        "abc",
-        "asyncio",
-        "builtins",
-        "collections",
-        "contextlib",
-        "copy",
-        "dataclasses",
-        "datetime",
-        "decimal",
-        "enum",
-        "functools",
-        "gc",
-        "hashlib",
-        "heapq",
-        "importlib",
-        "inspect",
-        "io",
-        "itertools",
-        "json",
-        "logging",
-        "math",
-        "operator",
-        "os",
-        "pathlib",
-        "pickle",
-        "platform",
-        "pprint",
-        "queue",
-        "random",
-        "re",
-        "secrets",
-        "shutil",
-        "signal",
-        "socket",
-        "sqlite3",
-        "ssl",
-        "string",
-        "struct",
-        "subprocess",
-        "sys",
-        "tempfile",
-        "threading",
-        "time",
-        "traceback",
-        "typing",
-        "unittest",
-        "urllib",
-        "uuid",
-        "warnings",
-        "weakref",
-        "xml",
-        "zipfile",
-        "zlib",
-        # Typing extensions
-        "typing_extensions",
-        # Common third-party (can be expanded)
-        "numpy",
-        "pandas",
-        "requests",
-        "aiohttp",
-        "httpx",
-        "pydantic",
-        "pytest",
-        "mock",
-        "unittest.mock",
-    }
-)
+# STDLIB_MODULES imported from victor.core.utils.ast_helpers
 
 
 # =============================================================================
@@ -230,22 +148,7 @@ _PRIMITIVE_TYPES = frozenset(
 )
 
 
-def _is_stdlib_module(module_name: str) -> bool:
-    """Check if a module name is a standard library or common third-party module.
-
-    Uses Rust accelerator via unified facade when available for 5-10x speedup.
-    """
-    # Use Rust accelerator when available (HashSet lookup is O(1))
-    if _NATIVE_AVAILABLE:
-        return native_is_stdlib_module(module_name)
-
-    # Python fallback
-    # Check exact match
-    if module_name in STDLIB_MODULES:
-        return True
-    # Check top-level package (e.g., "os.path" -> "os")
-    top_level = module_name.split(".")[0]
-    return top_level in STDLIB_MODULES
+# _is_stdlib_module imported from victor.core.utils.ast_helpers
 
 
 # =============================================================================
@@ -547,6 +450,10 @@ def _process_file_parallel(
     # Python-specific: extract imports via ast (more reliable than tree-sitter)
     if language == "python":
         try:
+            from victor.core.utils.ast_helpers import (
+                extract_base_classes as _extract_bases,
+            )
+
             tree = py_ast.parse(content, filename=file_path_str)
             for node in py_ast.walk(tree):
                 if isinstance(node, py_ast.Import):
@@ -559,19 +466,8 @@ def _process_file_parallel(
             # Extract inheritance from AST (more complete than tree-sitter)
             for node in py_ast.walk(tree):
                 if isinstance(node, py_ast.ClassDef):
-                    for base in node.bases:
-                        try:
-                            base_name = (
-                                py_ast.unparse(base)
-                                if hasattr(py_ast, "unparse")
-                                else getattr(base, "id", None)
-                            )
-                            if base_name:
-                                inherit_edges.append((node.name, base_name))
-                        except Exception:
-                            base_name = getattr(base, "id", None)
-                            if base_name:
-                                inherit_edges.append((node.name, base_name))
+                    for base_name in _extract_bases(node):
+                        inherit_edges.append((node.name, base_name))
         except Exception:
             pass
 
@@ -992,39 +888,26 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
         rel_path = str(file_path.relative_to(root_path))
 
-        # Extract symbols and imports using a simple visitor
-        symbols = []
-        imports = []
+        # Extract symbols using shared helpers
+        from victor.core.utils.ast_helpers import extract_symbols as _extract_syms
 
+        raw_symbols = _extract_syms(tree)
+        symbols = [
+            {
+                "name": s.name,
+                "type": s.type,
+                "file_path": rel_path,
+                "line_number": s.line_number,
+                "docstring": s.docstring,
+                "signature": s.signature,
+            }
+            for s in raw_symbols
+        ]
+
+        # Extract imports (module names for dependency edges)
+        imports: list = []
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                symbols.append(
-                    {
-                        "name": node.name,
-                        "type": "class",
-                        "file_path": rel_path,
-                        "line_number": node.lineno,
-                        "docstring": ast.get_docstring(node),
-                        "signature": None,
-                    }
-                )
-            elif isinstance(node, ast.FunctionDef):
-                # Check if it's a method (inside a class)
-                name = node.name
-                # Build signature
-                args = [arg.arg for arg in node.args.args]
-                signature = f"{node.name}({', '.join(args)})"
-                symbols.append(
-                    {
-                        "name": name,
-                        "type": "function",
-                        "file_path": rel_path,
-                        "line_number": node.lineno,
-                        "docstring": ast.get_docstring(node),
-                        "signature": signature,
-                    }
-                )
-            elif isinstance(node, ast.Import):
+            if isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(alias.name)
             elif isinstance(node, ast.ImportFrom):
@@ -2146,17 +2029,8 @@ class CodebaseIndex:
                 tree = py_ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
                 for node in py_ast.walk(tree):
                     if isinstance(node, py_ast.ClassDef):
-                        for base in node.bases:
-                            try:
-                                base_name = (
-                                    py_ast.unparse(base)
-                                    if hasattr(py_ast, "unparse")
-                                    else getattr(base, "id", None)
-                                )
-                            except Exception:
-                                base_name = getattr(base, "id", None)
-                            if base_name:
-                                edges.append((node.name, base_name))
+                        for base_name in extract_base_classes(node):
+                            edges.append((node.name, base_name))
             except Exception:
                 pass
             if edges:
@@ -3262,14 +3136,7 @@ class SymbolVisitor(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
-        bases: List[str] = []
-        for base in node.bases:
-            if isinstance(base, ast.Name):
-                bases.append(base.id)
-            elif isinstance(base, ast.Attribute):
-                bases.append(base.attr)
-            elif isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
-                bases.append(base.value.id)
+        bases = extract_base_classes(node)
         symbol = Symbol(
             name=node.name,
             type="class",
@@ -3292,9 +3159,7 @@ class SymbolVisitor(ast.NodeVisitor):
         if self.current_class:
             name = f"{self.current_class}.{name}"
 
-        # Build signature
-        args = [arg.arg for arg in node.args.args]
-        signature = f"{node.name}({', '.join(args)})"
+        signature = build_signature(node)
 
         symbol = Symbol(
             name=name,

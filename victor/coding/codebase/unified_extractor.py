@@ -54,6 +54,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.coding.languages.tiers import LanguageTier, get_tier
+from victor.core.utils.ast_helpers import (
+    extract_parameters,
+    extract_symbols,
+    get_annotation_str,
+    get_decorator_name,
+)
 
 if TYPE_CHECKING:
     from victor.coding.codebase.tree_sitter_extractor import (
@@ -299,98 +305,24 @@ class UnifiedSymbolExtractor:
 
         try:
             tree = ast.parse(content)
-            ast_info = self._extract_python_ast_info(tree)
+            ast_syms = extract_symbols(tree, enrich=True)
+            lookup = {(s.name, s.line_number): s for s in ast_syms}
 
             for sym in symbols:
                 key = (sym.name, sym.line_number)
-                if key in ast_info:
-                    info = ast_info[key]
-                    sym.return_type = info.get("return_type")
-                    sym.parameters = info.get("parameters", [])
-                    sym.is_async = info.get("is_async", False)
-                    sym.decorators = info.get("decorators", [])
-                    sym.docstring = info.get("docstring")
+                if key in lookup:
+                    info = lookup[key]
+                    sym.return_type = info.return_type
+                    sym.parameters = info.parameters
+                    sym.is_async = info.is_async
+                    sym.decorators = info.decorators
+                    sym.docstring = info.docstring
         except SyntaxError as e:
             logger.debug(f"Python AST parse failed: {e}")
         except Exception as e:
             logger.warning(f"Python AST enrichment failed: {e}")
 
         return symbols
-
-    def _extract_python_ast_info(self, tree: ast.AST) -> Dict[tuple, Dict[str, Any]]:
-        """Extract detailed info from Python AST.
-
-        Returns:
-            Dict mapping (name, line) to info dict containing:
-            - is_async: bool
-            - parameters: List[str]
-            - return_type: Optional[str]
-            - decorators: List[str]
-            - docstring: Optional[str]
-        """
-        info: Dict[tuple, Dict[str, Any]] = {}
-
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                key = (node.name, node.lineno)
-                docstring = ast.get_docstring(node)
-                info[key] = {
-                    "is_async": isinstance(node, ast.AsyncFunctionDef),
-                    "parameters": self._extract_parameters(node),
-                    "return_type": self._get_annotation_str(node.returns),
-                    "decorators": [self._get_decorator_name(d) for d in node.decorator_list],
-                    "docstring": docstring,
-                }
-            elif isinstance(node, ast.ClassDef):
-                key = (node.name, node.lineno)
-                docstring = ast.get_docstring(node)
-                info[key] = {
-                    "is_async": False,
-                    "decorators": [self._get_decorator_name(d) for d in node.decorator_list],
-                    "docstring": docstring,
-                    "parameters": [],
-                }
-
-        return info
-
-    def _extract_parameters(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> List[str]:
-        """Extract parameter names with optional type annotations."""
-        params = []
-        for arg in node.args.args:
-            if arg.annotation:
-                params.append(f"{arg.arg}: {self._get_annotation_str(arg.annotation)}")
-            else:
-                params.append(arg.arg)
-        return params
-
-    def _get_annotation_str(self, node: Optional[ast.expr]) -> Optional[str]:
-        """Convert AST annotation to string."""
-        if node is None:
-            return None
-        try:
-            return ast.unparse(node)
-        except Exception:
-            return None
-
-    def _get_decorator_name(self, node: ast.expr) -> str:
-        """Get decorator name from AST node."""
-        if isinstance(node, ast.Name):
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            parts = []
-            current = node
-            while isinstance(current, ast.Attribute):
-                parts.append(current.attr)
-                current = current.value
-            if isinstance(current, ast.Name):
-                parts.append(current.id)
-            return ".".join(reversed(parts))
-        elif isinstance(node, ast.Call):
-            return self._get_decorator_name(node.func)
-        try:
-            return ast.unparse(node)
-        except Exception:
-            return "<decorator>"
 
     async def _enrich_with_lsp(
         self,
