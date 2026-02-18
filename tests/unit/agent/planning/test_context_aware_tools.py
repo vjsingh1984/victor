@@ -187,9 +187,7 @@ class TestReadableTaskPlanIntegration:
         assert step_0[1] == "research"  # type
         assert step_0[2] == "Analyze patterns"  # description
 
-    def test_get_contextual_tools_requires_tool_selector(
-        self, sample_plan
-    ):
+    def test_get_contextual_tools_requires_tool_selector(self, sample_plan):
         """Test that get_contextual_tools requires tool_selector parameter."""
         # This test verifies the method exists and requires the parameter
         import inspect
@@ -238,12 +236,22 @@ class TestStepToolMappingCompleteness:
 
         # All step types should have tool mappings
         expected_step_types = [
-            "research", "planning", "feature", "bugfix", "refactor",
-            "test", "review", "deploy", "analyze", "doc",
+            "research",
+            "planning",
+            "feature",
+            "bugfix",
+            "refactor",
+            "test",
+            "review",
+            "deploy",
+            "analyze",
+            "doc",
         ]
 
         for step_type in expected_step_types:
-            assert step_type in STEP_TOOL_MAPPING, f"Step type '{step_type}' not in STEP_TOOL_MAPPING"
+            assert (
+                step_type in STEP_TOOL_MAPPING
+            ), f"Step type '{step_type}' not in STEP_TOOL_MAPPING"
 
     def test_tool_mapping_non_empty(self):
         """Test that all step type mappings have at least one tool."""
@@ -262,5 +270,6 @@ class TestStepToolMappingCompleteness:
         for step_type, tools in STEP_TOOL_MAPPING.items():
             # At least one common tool should be present
             # (Some steps like 'test' might not have 'read')
-            assert len(tools & common_tools) >= 1 or len(tools) >= 2, \
-                f"Step type '{step_type}' has no common tools"
+            assert (
+                len(tools & common_tools) >= 1 or len(tools) >= 2
+            ), f"Step type '{step_type}' has no common tools"
