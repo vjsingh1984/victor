@@ -775,3 +775,73 @@ def get_research_stages() -> Dict[str, StageDefinition]:
             order=4,
         ),
     }
+
+
+def get_default_stages() -> Dict[str, StageDefinition]:
+    """Get generic default stage definitions for any vertical.
+
+    Provides a domain-neutral 7-stage pattern that any vertical can inherit
+    and customize. Uses generic tool names (no domain-specific tools like
+    ``execute_code`` or ``bash``).
+
+    Returns:
+        Dictionary of stage definitions suitable for any vertical
+    """
+    return {
+        "initial": StageDefinition(
+            name="initial",
+            display_name="Initial",
+            description="Understanding the request",
+            keywords=["what", "how", "where", "explain", "help"],
+            tools={"read", "ls", "search"},
+            order=0,
+        ),
+        "planning": StageDefinition(
+            name="planning",
+            display_name="Planning",
+            description="Planning the approach",
+            keywords=["plan", "approach", "strategy", "design"],
+            tools={"search", "read", "ls"},
+            order=1,
+        ),
+        "reading": StageDefinition(
+            name="reading",
+            display_name="Reading",
+            description="Gathering context",
+            keywords=["show", "read", "look", "check", "find"],
+            tools={"read", "search", "ls", "grep"},
+            order=2,
+        ),
+        "analysis": StageDefinition(
+            name="analysis",
+            display_name="Analysis",
+            description="Analyzing information",
+            keywords=["analyze", "review", "examine", "understand"],
+            tools={"read", "search", "grep"},
+            order=3,
+        ),
+        "execution": StageDefinition(
+            name="execution",
+            display_name="Execution",
+            description="Making changes",
+            keywords=["change", "modify", "create", "fix", "implement"],
+            tools={"write", "edit", "shell"},
+            order=4,
+        ),
+        "verification": StageDefinition(
+            name="verification",
+            display_name="Verification",
+            description="Validating results",
+            keywords=["test", "verify", "check", "validate", "run"],
+            tools={"shell", "read"},
+            order=5,
+        ),
+        "completion": StageDefinition(
+            name="completion",
+            display_name="Completion",
+            description="Wrapping up",
+            keywords=["done", "finish", "complete", "summarize"],
+            tools={"write"},
+            order=6,
+        ),
+    }

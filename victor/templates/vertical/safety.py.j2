@@ -20,9 +20,10 @@ This module defines dangerous operation patterns specific to
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import List
 
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.core.verticals.protocols import SafetyPattern
+from victor.framework.defaults import DefaultSafetyExtension
 
 
 # {{ name_title }}-specific dangerous patterns
@@ -30,46 +31,30 @@ from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPatte
 {{ name_upper }}_PATTERNS: List[SafetyPattern] = [
     # Example patterns - customize for your vertical
     # SafetyPattern(
-    #     pattern=r"rm\s+-rf\s+/",
-    #     description="Dangerous recursive delete from root",
+    #     pattern=r"dangerous_{{ name }}_command",
+    #     description="Dangerous {{ name }} operation",
     #     risk_level="HIGH",
+    #     category="{{ name }}",
     # ),
 ]
 
 
-class {{ name_class }}SafetyExtension(SafetyExtensionProtocol):
+class {{ name_class }}SafetyExtension(DefaultSafetyExtension):
     """Safety extension for {{ name }} vertical.
 
-    Provides {{ name }}-specific dangerous operation patterns.
+    Inherits common safety patterns (git, filesystem, credentials)
+    and adds {{ name }}-specific patterns.
     """
 
-    def __init__(self) -> None:
-        """Initialize the safety extension."""
-        self._patterns = {{ name_upper }}_PATTERNS.copy()
-
     def get_bash_patterns(self) -> List[SafetyPattern]:
-        """Get {{ name }}-specific bash command patterns.
+        """Get bash command patterns including base and {{ name }}-specific.
 
         Returns:
             List of safety patterns for dangerous bash commands
         """
-        return self._patterns
-
-    def get_file_patterns(self) -> List[SafetyPattern]:
-        """Get {{ name }}-specific file operation patterns.
-
-        Returns:
-            List of safety patterns for file operations
-        """
-        return []
-
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
-        """Get tool-specific argument restrictions.
-
-        Returns:
-            Dict mapping tool names to restricted argument patterns
-        """
-        return {}
+        patterns = super().get_bash_patterns()
+        patterns.extend({{ name_upper }}_PATTERNS)
+        return patterns
 
     def get_category(self) -> str:
         """Get the category name for these patterns.
@@ -78,23 +63,6 @@ class {{ name_class }}SafetyExtension(SafetyExtensionProtocol):
             Category identifier
         """
         return "{{ name }}"
-
-    def scan_command(self, command: str) -> List[SafetyPattern]:
-        """Scan a command for dangerous patterns.
-
-        Args:
-            command: The command to scan
-
-        Returns:
-            List of matched safety patterns
-        """
-        import re
-
-        matches = []
-        for pattern in self._patterns:
-            if re.search(pattern.pattern, command, re.IGNORECASE):
-                matches.append(pattern)
-        return matches
 
 
 __all__ = [
