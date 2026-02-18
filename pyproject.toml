@@ -149,6 +149,7 @@ build = [
 api = [
     "fastapi>=0.109",
     "uvicorn>=0.27",
+    "strawberry-graphql[fastapi]>=0.243",
 ]
 
 # Checkpoint persistence with SQLite backend

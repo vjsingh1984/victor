@@ -337,6 +337,7 @@ class VictorFastAPIServer:
         enable_hitl: bool = False,
         hitl_auth_token: Optional[str] = None,
         hitl_persistent: bool = True,
+        enable_graphql: bool = True,
     ):
         """Initialize the FastAPI server.
 
@@ -350,6 +351,7 @@ class VictorFastAPIServer:
             enable_hitl: Enable HITL (Human-in-the-Loop) endpoints (default: False)
             hitl_auth_token: Optional auth token for HITL endpoints
             hitl_persistent: Use SQLite for persistent HITL storage (default: True)
+            enable_graphql: Enable GraphQL endpoint at /graphql (default: True)
         """
         self.host = host
         self.port = port
@@ -360,6 +362,7 @@ class VictorFastAPIServer:
         self.enable_hitl = enable_hitl
         self.hitl_auth_token = hitl_auth_token
         self.hitl_persistent = hitl_persistent
+        self._enable_graphql = enable_graphql
 
         self._orchestrator = None
         self._ws_clients: List[WebSocket] = []
@@ -400,6 +403,19 @@ class VictorFastAPIServer:
 
         # Setup routes
         self._setup_routes()
+
+        # Setup GraphQL endpoint if enabled
+        if self._enable_graphql:
+            try:
+                from victor.integrations.api.graphql_schema import create_graphql_schema
+                from strawberry.fastapi import GraphQLRouter
+
+                schema = create_graphql_schema(self)
+                graphql_router = GraphQLRouter(schema)
+                self.app.include_router(graphql_router, prefix="/graphql")
+                logger.info("GraphQL endpoint enabled at /graphql")
+            except ImportError:
+                logger.debug("strawberry-graphql not installed, GraphQL disabled")
 
         # Setup HITL routes if enabled
         if self.enable_hitl:
