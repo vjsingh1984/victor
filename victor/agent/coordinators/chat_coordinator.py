@@ -177,8 +177,9 @@ class ChatCoordinator:
 
         task_classification = orch.task_classifier.classify(user_message)
         return task_classification.complexity in (
-            FrameworkTaskComplexity.MODERATE,
+            FrameworkTaskComplexity.MEDIUM,
             FrameworkTaskComplexity.COMPLEX,
+            FrameworkTaskComplexity.ANALYSIS,
         )
 
     async def _chat_with_planning(self, user_message: str) -> CompletionResponse:

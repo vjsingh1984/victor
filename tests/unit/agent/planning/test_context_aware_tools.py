@@ -99,9 +99,9 @@ class TestComplexityToolLimits:
 
     def test_limit_values(self):
         """Test that limit values are reasonable."""
-        assert COMPLEXITY_TOOL_LIMITS["simple"] <= 10
-        assert COMPLEXITY_TOOL_LIMITS["moderate"] <= 15
-        assert COMPLEXITY_TOOL_LIMITS["complex"] <= 20
+        assert COMPLEXITY_TOOL_LIMITS["simple"] <= 20
+        assert COMPLEXITY_TOOL_LIMITS["moderate"] <= 40
+        assert COMPLEXITY_TOOL_LIMITS["complex"] <= 50
 
 
 class TestStepAwareToolSelector:
@@ -136,9 +136,9 @@ class TestStepAwareToolSelector:
         )
 
         limits = get_complexity_limits()
-        assert limits["simple"] == 5
-        assert limits["moderate"] == 10
-        assert limits["complex"] == 15
+        assert limits["simple"] == 15
+        assert limits["moderate"] == 30
+        assert limits["complex"] == 45
 
     def test_step_tool_sets_content(self):
         """Test that step tool sets have expected tools."""

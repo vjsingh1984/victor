@@ -22,7 +22,7 @@ from victor.agent.coordinators.planning_coordinator import (
     PlanningMode,
     PlanningResult,
 )
-from victor.agent.planning.readable_schema import TaskComplexity
+from victor.framework.task import TaskComplexity
 
 
 class TestPlanningConfig:
@@ -32,8 +32,7 @@ class TestPlanningConfig:
         """Test default configuration values."""
         config = PlanningConfig()
 
-        assert config.min_planning_complexity == "moderate"
-        assert config.get_complexity() == TaskComplexity.MODERATE
+        assert config.min_planning_complexity == TaskComplexity.MEDIUM
         assert config.min_steps_threshold == 3
         assert len(config.complexity_keywords) > 0
         assert config.show_plan_before_execution is True
@@ -42,13 +41,12 @@ class TestPlanningConfig:
     def test_custom_config(self):
         """Test custom configuration."""
         config = PlanningConfig(
-            min_planning_complexity="complex",
+            min_planning_complexity=TaskComplexity.COMPLEX,
             min_steps_threshold=2,
             show_plan_before_execution=False,
         )
 
-        assert config.min_planning_complexity == "complex"
-        assert config.get_complexity() == TaskComplexity.COMPLEX
+        assert config.min_planning_complexity == TaskComplexity.COMPLEX
         assert config.min_steps_threshold == 2
         assert config.show_plan_before_execution is False
 
@@ -68,11 +66,14 @@ class TestPlanningResult:
 
     def test_planned_result_success(self):
         """Test planned result with success."""
-        from victor.agent.planning.readable_schema import ReadableTaskPlan
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
 
         plan = ReadableTaskPlan(
             name="Test plan",
-            complexity=TaskComplexity.MODERATE,
+            complexity=PlanningTaskComplexity.MODERATE,
             desc="Test description",
             steps=[[1, "research", "Test step", "overview"]],
             duration="10min",
@@ -117,6 +118,7 @@ class TestPlanningCoordinator:
 
     def _create_mock_orchestrator(self):
         """Helper to create a mock orchestrator."""
+
         class MockOrchestrator:
             provider = None
             model = "test-model"
@@ -153,11 +155,14 @@ class TestPlanningCoordinator:
         coordinator = self._create_coordinator()
 
         # Set a mock plan
-        from victor.agent.planning.readable_schema import ReadableTaskPlan
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
 
         plan = ReadableTaskPlan(
             name="Test",
-            complexity=TaskComplexity.SIMPLE,
+            complexity=PlanningTaskComplexity.SIMPLE,
             desc="Test",
             steps=[[1, "research", "Test", "overview"]],
             duration="5min",
@@ -222,10 +227,10 @@ class TestPlanningCoordinatorIntegration:
 
         # This test verifies the integration structure
         # Actual execution would require full orchestrator setup
-        assert hasattr(ChatCoordinator, '__init__')
-        assert hasattr(ChatCoordinator, 'chat')
-        assert hasattr(ChatCoordinator, '_should_use_planning')
-        assert hasattr(ChatCoordinator, '_chat_with_planning')
+        assert hasattr(ChatCoordinator, "__init__")
+        assert hasattr(ChatCoordinator, "chat")
+        assert hasattr(ChatCoordinator, "_should_use_planning")
+        assert hasattr(ChatCoordinator, "_chat_with_planning")
 
     def test_config_settings_exist(self):
         """Test that planning settings exist in config."""
@@ -234,9 +239,9 @@ class TestPlanningCoordinatorIntegration:
         settings = Settings()
 
         # Check that planning settings are available
-        assert hasattr(settings, 'enable_planning')
-        assert hasattr(settings, 'planning_min_complexity')
-        assert hasattr(settings, 'planning_show_plan')
+        assert hasattr(settings, "enable_planning")
+        assert hasattr(settings, "planning_min_complexity")
+        assert hasattr(settings, "planning_show_plan")
 
         # Check defaults
         assert settings.enable_planning is False

@@ -46,6 +46,10 @@ Example:
     result = await planner.execute_plan(plan, auto_approve=True)
 """
 
+from victor.agent.planning.autonomous import (
+    AutonomousPlanner,
+    PLANNING_SYSTEM_PROMPT,
+)
 from victor.agent.planning.base import (
     ExecutionPlan,
     PlanResult,
@@ -54,9 +58,15 @@ from victor.agent.planning.base import (
     StepStatus,
     StepType,
 )
-from victor.agent.planning.autonomous import (
-    AutonomousPlanner,
-    PLANNING_SYSTEM_PROMPT,
+from victor.agent.planning.constants import (
+    COMPLEXITY_KEYWORDS,
+    COMPLEXITY_TOOL_LIMITS,
+    DEFAULT_MIN_KEYWORD_MATCHES,
+    DEFAULT_MIN_PLANNING_COMPLEXITY,
+    DEFAULT_MIN_STEPS_THRESHOLD,
+    STEP_INDICATORS,
+    STEP_TO_TASK_TYPE,
+    STEP_TOOL_MAPPING,
 )
 from victor.agent.planning.readable_schema import (
     ReadableTaskPlan,
@@ -67,8 +77,6 @@ from victor.agent.planning.readable_schema import (
     plan_to_workflow_yaml,
 )
 from victor.agent.planning.tool_selection import (
-    COMPLEXITY_TOOL_LIMITS,
-    STEP_TOOL_MAPPING,
     StepAwareToolSelector,
 )
 
@@ -91,10 +99,17 @@ __all__ = [
     "generate_task_plan",
     "plan_to_session_context",
     "plan_to_workflow_yaml",
+    # Constants
+    "COMPLEXITY_TOOL_LIMITS",
+    "STEP_TOOL_MAPPING",
+    "STEP_TO_TASK_TYPE",
+    "COMPLEXITY_KEYWORDS",
+    "STEP_INDICATORS",
+    "DEFAULT_MIN_PLANNING_COMPLEXITY",
+    "DEFAULT_MIN_STEPS_THRESHOLD",
+    "DEFAULT_MIN_KEYWORD_MATCHES",
     # Context-aware tool selection
     "StepAwareToolSelector",
-    "STEP_TOOL_MAPPING",
-    "COMPLEXITY_TOOL_LIMITS",
     # Planner
     "AutonomousPlanner",
     "PLANNING_SYSTEM_PROMPT",

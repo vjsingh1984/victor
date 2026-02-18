@@ -54,13 +54,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
+from victor.agent.planning.constants import (
+    COMPLEXITY_KEYWORDS,
+    DEFAULT_MIN_PLANNING_COMPLEXITY,
+    DEFAULT_MIN_STEPS_THRESHOLD,
+    DEFAULT_MIN_KEYWORD_MATCHES,
+    STEP_INDICATORS,
+)
 from victor.agent.planning.readable_schema import (
     ReadableTaskPlan,
-    TaskComplexity,
+    TaskComplexity as PlanningTaskComplexity,
     generate_task_plan,
 )
 from victor.agent.task_analyzer import TaskAnalysis
-from victor.framework.task import TaskComplexity as FrameworkTaskComplexity
+from victor.framework.task import TaskComplexity
 from victor.providers.base import CompletionResponse
 
 if TYPE_CHECKING:
@@ -83,28 +90,14 @@ class PlanningConfig:
     """Configuration for planning behavior."""
 
     # Minimum complexity level to trigger planning
-    # Use string to avoid enum evaluation issues at import time
-    min_planning_complexity: str = "moderate"
+    # Use framework TaskComplexity (simple/medium/complex)
+    min_planning_complexity: TaskComplexity = TaskComplexity.MEDIUM
 
     # Thresholds for detecting multi-step tasks
-    min_steps_threshold: int = 3  # Minimum "steps" mentioned to trigger planning
-    complexity_keywords: List[str] = field(
-        default_factory=lambda: [
-            "analyze",
-            "architecture",
-            "design",
-            "evaluate",
-            "compare",
-            "roadmap",
-            "implementation",
-            "refactor",
-            "migration",
-            "solid",
-            "scalability",
-            "performance",
-            "security audit",
-        ]
-    )
+    min_steps_threshold: int = DEFAULT_MIN_STEPS_THRESHOLD
+    min_keyword_matches: int = DEFAULT_MIN_KEYWORD_MATCHES
+    complexity_keywords: List[str] = field(default_factory=lambda: list(COMPLEXITY_KEYWORDS))
+    step_indicators: List[str] = field(default_factory=lambda: list(STEP_INDICATORS))
 
     # Planning behavior
     show_plan_before_execution: bool = True  # Require user to see plan first
@@ -114,10 +107,6 @@ class PlanningConfig:
     # Fallback behavior
     fallback_on_planning_failure: bool = True  # Fall back to direct chat if planning fails
     max_planning_retries: int = 1  # Number of retries for plan generation
-
-    def get_complexity(self) -> TaskComplexity:
-        """Get the TaskComplexity enum from the string value."""
-        return TaskComplexity(self.min_planning_complexity)
 
 
 @dataclass
@@ -170,7 +159,7 @@ class PlanningCoordinator:
 
         logger.info(
             f"PlanningCoordinator initialized with "
-            f"min_complexity={self.config.get_complexity().value}"
+            f"min_complexity={self.config.min_planning_complexity.value}"
         )
 
     async def chat_with_planning(
@@ -226,7 +215,7 @@ class PlanningCoordinator:
 
         return response
 
-    def _map_complexity(self, framework_complexity: FrameworkTaskComplexity) -> TaskComplexity:
+    def _map_complexity(self, framework_complexity: TaskComplexity) -> PlanningTaskComplexity:
         """Map framework TaskComplexity to planning TaskComplexity.
 
         Args:
@@ -235,15 +224,18 @@ class PlanningCoordinator:
         Returns:
             Planning TaskComplexity
         """
-        # Use string mapping to avoid enum evaluation at import time
+        # Map framework complexity to planning complexity
+        # Framework: simple/medium/complex/generation/action/analysis
+        # Planning: simple/moderate/complex
         complexity_map = {
-            FrameworkTaskComplexity.SIMPLE: "simple",
-            FrameworkTaskComplexity.MODERATE: "moderate",
-            FrameworkTaskComplexity.COMPLEX: "complex",
-            FrameworkTaskComplexity.GENERATION: "complex",
+            TaskComplexity.SIMPLE: PlanningTaskComplexity.SIMPLE,
+            TaskComplexity.MEDIUM: PlanningTaskComplexity.MODERATE,
+            TaskComplexity.COMPLEX: PlanningTaskComplexity.COMPLEX,
+            TaskComplexity.GENERATION: PlanningTaskComplexity.COMPLEX,
+            TaskComplexity.ACTION: PlanningTaskComplexity.MODERATE,
+            TaskComplexity.ANALYSIS: PlanningTaskComplexity.COMPLEX,
         }
-        complexity_str = complexity_map.get(framework_complexity, "moderate")
-        return TaskComplexity(complexity_str)
+        return complexity_map.get(framework_complexity, PlanningTaskComplexity.MODERATE)
 
     def _should_use_planning(
         self,
@@ -272,34 +264,23 @@ class PlanningCoordinator:
 
         # Check task complexity if available
         if task_analysis:
+            # Map framework complexity to planning complexity for threshold comparison
             planning_complexity = self._map_complexity(task_analysis.complexity)
+            min_planning_complexity = self._map_complexity(self.config.min_planning_complexity)
 
-            if planning_complexity.value >= self.config.get_complexity().value:
+            if planning_complexity.value >= min_planning_complexity.value:
                 logger.info(f"Planning triggered by complexity: {planning_complexity.value}")
                 return True
 
         # Check for multi-step keywords
         message_lower = user_message.lower()
         keyword_matches = sum(1 for kw in self.config.complexity_keywords if kw in message_lower)
-        if keyword_matches >= 2:  # At least 2 keywords
+        if keyword_matches >= self.config.min_keyword_matches:
             logger.info(f"Planning triggered by keywords: {keyword_matches} matches")
             return True
 
         # Check for explicit "step" language
-        step_indicators = [
-            "step",
-            "phase",
-            "stage",
-            "deliverable",
-            "roadmap",
-            "first",
-            "then",
-            "finally",
-            "analyze",
-            "evaluate",
-            "design",
-        ]
-        step_count = sum(1 for indicator in step_indicators if indicator in message_lower)
+        step_count = sum(1 for indicator in self.config.step_indicators if indicator in message_lower)
         if step_count >= self.config.min_steps_threshold:
             logger.info(f"Planning triggered by step indicators: {step_count} matches")
             return True
@@ -324,7 +305,7 @@ class PlanningCoordinator:
         if task_analysis:
             complexity = self._map_complexity(task_analysis.complexity)
         else:
-            complexity = TaskComplexity("moderate")
+            complexity = PlanningTaskComplexity.MODERATE
 
         # Generate plan using readable schema
         provider = self.orchestrator.provider

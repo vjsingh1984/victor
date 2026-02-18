@@ -31,6 +31,11 @@ from enum import Enum
 from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
 from victor.agent.conversation_state import ConversationStage
+from victor.agent.planning.constants import (
+    COMPLEXITY_TOOL_LIMITS,
+    STEP_TO_TASK_TYPE,
+    STEP_TOOL_MAPPING,
+)
 from victor.agent.planning.readable_schema import TaskComplexity
 from victor.agent.tool_selection import ToolSelector, get_critical_tools
 from victor.agent.task_tool_config_loader import TaskToolConfigLoader
@@ -42,123 +47,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Step type to tool set mapping
-# These are the canonical tool sets for each step type
-STEP_TOOL_MAPPING: Dict[str, Set[str]] = {
-    # Research steps need read-only exploration tools
-    "research": {
-        "read",  # Read file contents
-        "grep",  # Search for patterns
-        "code_search",  # Semantic code search
-        "overview",  # Get project overview
-        "ls",  # List directories
-        "git_readonly",  # Read git history
-    },
-    # Planning needs exploration + analysis tools
-    "planning": {
-        "read",
-        "grep",
-        "code_search",
-        "overview",
-        "ls",
-        "analyze",  # Code analysis
-    },
-    # Feature implementation needs full toolset
-    "feature": {
-        "read",
-        "write",  # Write files
-        "edit",  # Edit files
-        "grep",
-        "test",  # Run tests
-        "code_search",
-        "git",  # Git operations
-        "shell",  # Execute commands
-    },
-    # Bugfix needs debugging tools
-    "bugfix": {
-        "read",
-        "grep",
-        "edit",
-        "test",
-        "debugger",  # Debugging tools
-        "code_search",
-        "shell",
-    },
-    # Refactor needs code analysis + modification
-    "refactor": {
-        "read",
-        "edit",
-        "grep",
-        "test",
-        "analyze",
-        "code_search",
-    },
-    # Testing needs test execution tools
-    "test": {
-        "test",
-        "read",
-        "grep",
-        "shell_readonly",  # Read-only shell for test commands
-    },
-    # Review needs read-only + analysis
-    "review": {
-        "read",
-        "grep",
-        "analyze",
-        "lint",  # Linting tools
-        "code_search",
-    },
-    # Deploy needs deployment + verification tools
-    "deploy": {
-        "shell",
-        "git",
-        "docker",  # Docker operations
-        "kubectl",  # Kubernetes operations
-        "read",
-        "test",
-    },
-    # Analyze needs exploration tools
-    "analyze": {
-        "read",
-        "grep",
-        "code_search",
-        "overview",
-        "analyze",
-        "shell_readonly",
-    },
-    # Doc needs reading + minimal writing
-    "doc": {
-        "read",
-        "grep",
-        "write",
-        "code_search",
-    },
-}
-
-
-# Complexity-based tool limits
-# Simple tasks get minimal tools, complex tasks get comprehensive sets
-COMPLEXITY_TOOL_LIMITS: Dict[str, int] = {
-    "simple": 5,  # Auto mode, minimal tools for quick execution
-    "moderate": 10,  # Plan-mode, balanced tools
-    "complex": 15,  # Plan-mode, comprehensive tools for complex tasks
-}
-
-
-# Step type to task type mapping
-# Maps planning step types to task_tool_config task types
-STEP_TO_TASK_TYPE: Dict[str, str] = {
-    "research": "search",
-    "planning": "design",
-    "feature": "create",
-    "bugfix": "edit",
-    "refactor": "edit",
-    "test": "create",
-    "review": "analyze",
-    "deploy": "create",
-    "analyze": "analyze",
-    "doc": "create",
-}
+# Re-export constants for backward compatibility
+__all__ = [
+    "STEP_TOOL_MAPPING",
+    "COMPLEXITY_TOOL_LIMITS",
+    "STEP_TO_TASK_TYPE",
+    "StepAwareToolSelector",
+    "get_step_tool_sets",
+    "get_complexity_limits",
+]
 
 
 class StepAwareToolSelector:
