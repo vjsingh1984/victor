@@ -133,9 +133,9 @@ class TestToolSetContainsCache:
         cached_avg = cached_total / 1000
 
         # Each call should be very fast (< 1 microsecond typically)
-        assert cached_avg < 0.0001, (
-            f"Average time ({cached_avg:.8f}s) should be fast for O(1) lookup"
-        )
+        assert (
+            cached_avg < 0.0001
+        ), f"Average time ({cached_avg:.8f}s) should be fast for O(1) lookup"
 
     def test_invalidate_cache(self):
         """invalidate_cache() clears the cache."""
@@ -181,9 +181,7 @@ class TestToolSetContainsCache:
         avg_time = (time.perf_counter() - start) / 1000
 
         # Should be very fast for O(1) set lookup
-        assert avg_time < 0.0001, (
-            f"Average time ({avg_time:.8f}s) indicates O(1) lookup"
-        )
+        assert avg_time < 0.0001, f"Average time ({avg_time:.8f}s) indicates O(1) lookup"
 
 
 class TestToolSetExclusions:

@@ -502,7 +502,9 @@ async def run_oneshot(
     # If planning is enabled, disable thinking mode to avoid context bloat
     # Planning mode generates structured plans which don't need extended reasoning
     if enable_planning and thinking:
-        console.print("[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]")
+        console.print(
+            "[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]"
+        )
         thinking = False
 
     agent = None
@@ -576,13 +578,19 @@ async def run_oneshot(
                     model=model_name,
                 )
             else:
-                from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
+                from victor.ui.rendering import (
+                    FormatterRenderer,
+                    LiveDisplayRenderer,
+                    stream_response,
+                )
 
                 use_live = renderer_choice in {"rich", "auto"}
                 if renderer_choice in {"rich-text", "text"}:
                     use_live = False
                 renderer = (
-                    LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+                    LiveDisplayRenderer(console)
+                    if use_live
+                    else FormatterRenderer(formatter, console)
                 )
                 content_buffer = await stream_response(agent, message, renderer)
         else:

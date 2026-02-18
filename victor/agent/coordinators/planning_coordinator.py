@@ -284,7 +284,9 @@ class PlanningCoordinator:
             return True
 
         # Check for explicit "step" language
-        step_count = sum(1 for indicator in self.config.step_indicators if indicator in message_lower)
+        step_count = sum(
+            1 for indicator in self.config.step_indicators if indicator in message_lower
+        )
         if step_count >= self.config.min_steps_threshold:
             logger.info(f"Planning triggered by step indicators: {step_count} matches")
             return True
@@ -493,7 +495,11 @@ class PlanningCoordinator:
         if hasattr(orch, "_context_compactor") and orch._context_compactor:
             try:
                 # Get current query (user message)
-                current_query = orch._conversation_history.get_latest_user_message() if hasattr(orch, "_conversation_history") else ""
+                current_query = (
+                    orch._conversation_history.get_latest_user_message()
+                    if hasattr(orch, "_conversation_history")
+                    else ""
+                )
 
                 # Check and compact
                 compaction_result = orch._context_compactor.check_and_compact(

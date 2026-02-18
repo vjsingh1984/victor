@@ -615,7 +615,7 @@ class TaskPlannerContext:
 # Helper functions for workflow integration
 
 
-def generate_task_plan(
+async def generate_task_plan(
     provider,
     user_request: str,
     complexity: Optional[TaskComplexity] = None,
@@ -630,42 +630,42 @@ def generate_task_plan(
     Returns:
         Validated ReadableTaskPlan
     """
-    import asyncio
+    # Classify complexity if not provided
+    task_complexity = complexity
+    if not task_complexity:
+        complexity_prompt = ReadableTaskPlan.get_complexity_prompt()
+        complexity_prompt = complexity_prompt.replace("{user_request}", user_request)
 
-    async def _generate():
-        # Classify complexity if not provided
-        task_complexity = complexity
-        if not task_complexity:
-            complexity_prompt = ReadableTaskPlan.get_complexity_prompt()
-            complexity_prompt = complexity_prompt.replace("{user_request}", user_request)
-
-            complexity_response = await provider.generate(
-                complexity_prompt,
-                response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=200,
-            )
-
-            import json
-
-            complexity_data = json.loads(complexity_response)
-            task_complexity = TaskComplexity(complexity_data["complexity"])
-
-        # Generate task plan
-        plan_prompt = ReadableTaskPlan.get_llm_prompt()
-        plan_prompt = plan_prompt.replace("{user_request}", user_request)
-
-        json_response = await provider.generate(
-            plan_prompt,
-            response_format={"type": "json_object"},
-            temperature=0.2,  # Lower temp for consistent structure
-            max_tokens=1500,
+        complexity_response = await provider.chat(
+            messages=[{"role": "user", "content": complexity_prompt}],
+            model=provider.model,
+            temperature=0.1,
+            max_tokens=200,
         )
 
-        # Validate and return
-        return ReadableTaskPlan.model_validate_json(json_response)
+        import json
 
-    return asyncio.run(_generate())
+        complexity_data = json.loads(complexity_response.content)
+        task_complexity = TaskComplexity(complexity_data["complexity"])
+
+    # Generate task plan
+    plan_prompt = ReadableTaskPlan.get_llm_prompt()
+    plan_prompt = plan_prompt.replace("{user_request}", user_request)
+
+    plan_response = await provider.chat(
+        messages=[{"role": "user", "content": plan_prompt}],
+        model=provider.model,
+        temperature=0.2,  # Lower temp for consistent structure
+        max_tokens=1500,
+    )
+
+    # Parse JSON response
+    import json
+
+    json_response = json.loads(plan_response.content)
+
+    # Validate and return
+    return ReadableTaskPlan.model_validate_json(json_response)
 
 
 def plan_to_workflow_yaml(plan: ReadableTaskPlan) -> str:

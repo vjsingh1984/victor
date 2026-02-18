@@ -468,7 +468,7 @@ class TestTokenEfficiency:
         savings_percent = (1 - readable_size / verbose_size) * 100
         assert savings_percent > 30, f"Expected >30% savings, got {savings_percent}%"
 
-        print(f"\nToken efficiency:")
+        print("\nToken efficiency:")
         print(f"Verbose JSON: {verbose_size} chars")
         print(f"Readable JSON: {readable_size} chars")
         print(f"Savings: {savings_percent:.1f}%")

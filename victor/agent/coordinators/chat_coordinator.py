@@ -46,6 +46,7 @@ from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
+from victor.agent.task_analyzer import TaskAnalysis
 from victor.providers.base import CompletionResponse, Message, StreamChunk
 from victor.core.errors import (
     ProviderAuthError,
@@ -1973,7 +1974,6 @@ class ChatCoordinator:
                 use_planning=True
             )
         """
-        orch = self._orchestrator
 
         # If planning is explicitly disabled, use regular chat
         if use_planning is False:

@@ -218,14 +218,16 @@ profiles:
 providers:
   ollama:
     base_url:
-      - http://192.168.1.20:11434  # Primary (LAN server)
-      - http://localhost:11434      # Fallback (localhost)
+      - http://192.168.1.227:11434  # Primary (LAN server)
+      - http://192.168.1.20:11434    # Secondary (LAN server)
+      - http://localhost:11434        # Fallback (localhost)
     timeout: 300
 
   lmstudio:
     base_url:
-      - http://192.168.1.20:1234   # Primary (LAN server)
-      - http://127.0.0.1:1234      # Fallback (localhost)
+      - http://192.168.1.227:1234   # Primary (LAN server)
+      - http://192.168.1.20:1234     # Secondary (LAN server)
+      - http://127.0.0.1:1234        # Fallback (localhost)
     timeout: 300
 
   anthropic:

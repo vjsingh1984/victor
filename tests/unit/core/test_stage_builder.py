@@ -129,22 +129,12 @@ class TestStageBuilder:
     def test_workflow_resets_state(self):
         """Test that workflow() resets internal state."""
         builder = StageBuilder()
-        
+
         # Build first workflow
-        (
-            builder.workflow("First")
-            .initial()
-            .completion()
-            .build_workflow()
-        )
-        
+        (builder.workflow("First").initial().completion().build_workflow())
+
         # Start second workflow
-        stages = (
-            builder.workflow("Second")
-            .initial()
-            .completion()
-            .build_workflow()
-        )
+        stages = builder.workflow("Second").initial().completion().build_workflow()
 
         # Should only have stages from second workflow
         assert len(stages) == 2
@@ -167,11 +157,7 @@ class TestStageBuilder:
     def test_build_workflow_returns_copy(self):
         """Test that build_workflow() returns a copy, not internal dict."""
         builder = StageBuilder()
-        stages = (
-            builder.workflow("Test")
-            .initial()
-            .build_workflow()
-        )
+        stages = builder.workflow("Test").initial().build_workflow()
 
         # Modify returned dict
         stages["MODIFIED"] = StageDefinition(

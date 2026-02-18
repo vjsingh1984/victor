@@ -165,13 +165,7 @@ class TestMiddlewareComposer:
 
     def test_fluent_chaining(self) -> None:
         """Test that all methods return self for chaining."""
-        composer = (
-            MiddlewareComposer()
-            .git_safety()
-            .secret_masking()
-            .logging()
-            .metrics()
-        )
+        composer = MiddlewareComposer().git_safety().secret_masking().logging().metrics()
         middleware = composer.build()
         assert len(middleware) == 4
 
@@ -188,24 +182,14 @@ class TestMiddlewareComposer:
 
     def test_clear(self) -> None:
         """Test clear() method removes all middleware."""
-        composer = (
-            MiddlewareComposer()
-            .git_safety()
-            .secret_masking()
-            .logging()
-        )
+        composer = MiddlewareComposer().git_safety().secret_masking().logging()
         assert len(composer.build()) == 3
         composer.clear()
         assert composer.build() == []
 
     def test_clear_returns_self(self) -> None:
         """Test that clear() returns self for chaining."""
-        composer = (
-            MiddlewareComposer()
-            .git_safety()
-            .clear()
-            .secret_masking()
-        )
+        composer = MiddlewareComposer().git_safety().clear().secret_masking()
         middleware = composer.build()
         assert len(middleware) == 1
         assert isinstance(middleware[0], SecretMaskingMiddleware)
@@ -236,11 +220,7 @@ class TestMiddlewareComposer:
     def test_custom_after_preset(self) -> None:
         """Test adding custom middleware after a preset."""
         custom = MetricsMiddleware()
-        composer = (
-            MiddlewareComposer()
-            .standard_devops()
-            .add(custom)
-        )
+        composer = MiddlewareComposer().standard_devops().add(custom)
         middleware = composer.build()
         assert len(middleware) == 4  # 3 from preset + 1 custom
         assert middleware[-1] is custom
@@ -248,11 +228,7 @@ class TestMiddlewareComposer:
     def test_preset_after_custom(self) -> None:
         """Test adding a preset after custom middleware."""
         custom = SecretMaskingMiddleware(replacement="[CUSTOM]")
-        composer = (
-            MiddlewareComposer()
-            .add(custom)
-            .standard_coding()
-        )
+        composer = MiddlewareComposer().add(custom).standard_coding()
         middleware = composer.build()
         # Custom middleware should be first, then preset middleware
         assert len(middleware) == 3
@@ -262,11 +238,7 @@ class TestMiddlewareComposer:
 
     def test_multiple_presets(self) -> None:
         """Test combining multiple presets."""
-        composer = (
-            MiddlewareComposer()
-            .standard_coding()
-            .standard_production()
-        )
+        composer = MiddlewareComposer().standard_coding().standard_production()
         middleware = composer.build()
         # Should have middleware from both presets
         assert len(middleware) == 5  # 2 from coding + 3 from production

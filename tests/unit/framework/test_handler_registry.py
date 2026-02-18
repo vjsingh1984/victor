@@ -66,10 +66,7 @@ class TestHandlerRegistration:
         handler.__class__.__name__ = "MockHandler"
 
         registry.register_vertical(
-            "test",
-            {"handler1": handler},
-            category="test_category",
-            description="Test handlers"
+            "test", {"handler1": handler}, category="test_category", description="Test handlers"
         )
 
         # Check handler is registered
@@ -118,10 +115,13 @@ class TestHandlerRetrieval:
         self.handler1 = MagicMock()
         self.handler2 = MagicMock()
 
-        self.registry.register_vertical("test", {
-            "h1": self.handler1,
-            "h2": self.handler2,
-        })
+        self.registry.register_vertical(
+            "test",
+            {
+                "h1": self.handler1,
+                "h2": self.handler2,
+            },
+        )
 
         self.global_handler = MagicMock()
         self.registry.register_global("gh", self.global_handler)
@@ -162,13 +162,19 @@ class TestHandlerListing:
         HandlerRegistry._instance = None
         self.registry = HandlerRegistry()
 
-        self.registry.register_vertical("coding", {
-            "code_validation": MagicMock(),
-            "test_runner": MagicMock(),
-        })
-        self.registry.register_vertical("research", {
-            "web_scraper": MagicMock(),
-        })
+        self.registry.register_vertical(
+            "coding",
+            {
+                "code_validation": MagicMock(),
+                "test_runner": MagicMock(),
+            },
+        )
+        self.registry.register_vertical(
+            "research",
+            {
+                "web_scraper": MagicMock(),
+            },
+        )
 
     def teardown_method(self):
         """Reset registry after each test."""

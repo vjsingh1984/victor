@@ -3058,9 +3058,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 use_planning=False
             )
         """
-        return await self._chat_coordinator.chat_with_planning(
-            user_message, use_planning
-        )
+        return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
 
     async def _handle_context_and_iteration_limits(
         self,
