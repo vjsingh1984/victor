@@ -194,6 +194,11 @@ def chat(
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
     ),
+    enable_planning: bool = typer.Option(
+        False,
+        "--planning/--no-planning",
+        help="Enable structured planning for complex multi-step tasks. Auto-detects when to use planning vs direct chat.",
+    ),
     # Session management options
     list_sessions: bool = typer.Option(
         False,
@@ -559,7 +564,11 @@ async def run_oneshot(
             )
             content_buffer = await stream_response(agent, message, renderer)
         else:
-            response = await agent.chat(message)
+            # Use planning mode if enabled and available
+            if enable_planning and hasattr(agent, "chat_with_planning"):
+                response = await agent.chat_with_planning(message)
+            else:
+                response = await agent.chat(message)
             content_buffer = response.content
             usage_stats = response.usage
             model_name = response.model
@@ -846,7 +855,11 @@ async def _run_cli_repl(
                 content_buffer = await stream_response(agent, user_input, renderer)
                 content_buffer = sanitize_response(content_buffer)
             else:
-                response = await agent.chat(user_input)
+                # Use planning mode if enabled and available
+                if enable_planning and hasattr(agent, "chat_with_planning"):
+                    response = await agent.chat_with_planning(user_input)
+                else:
+                    response = await agent.chat(user_input)
                 console.print(Markdown(response.content))
 
         except KeyboardInterrupt:
