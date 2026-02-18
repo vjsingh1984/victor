@@ -534,6 +534,34 @@ class VerticalExtensionLoader(ABC):
                 return None
 
     @classmethod
+    def get_capability_provider(cls) -> Optional[Any]:
+        """Get capability provider for this vertical.
+
+        Default implementation tries direct import pattern first, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~20 LOC of duplicated wrapper code across verticals.
+
+        Returns:
+            Capability provider (BaseCapabilityProvider) or None
+        """
+        try:
+            # Try direct import pattern (e.g., CodingCapabilityProvider)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}CapabilityProvider"
+            module = __import__(f"victor.{cls.name}.capabilities", fromlist=[class_name])
+            return getattr(module, class_name)()
+        except (ImportError, AttributeError):
+            try:
+                # Fall back to extension factory pattern
+                return cls._get_extension_factory(
+                    "capability_provider",
+                    f"victor.{cls.name}.capabilities",
+                )
+            except (ImportError, AttributeError):
+                return None
+
+    @classmethod
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 

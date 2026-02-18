@@ -384,23 +384,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return cls._get_extension_factory("rl_hooks", "victor.coding.rl")
 
     @classmethod
-    def get_capability_provider(cls) -> Any:
-        """Get capability provider for dynamic capability loading (cached).
-
-        Provides CodingCapabilityProvider for runtime configuration
-        of coding-specific capabilities like:
-        - git_safety: Git operation safety rules
-        - code_style: Code formatting preferences
-        - test_requirements: Test configuration
-        - language_server: LSP settings
-        - refactoring: Refactoring capabilities
-
-        Returns:
-            CodingCapabilityProvider instance
-        """
-        return cls._get_extension_factory("capability_provider", "victor.coding.capabilities")
-
-    @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
         """Get pre-built LCEL-composed tool chains (cached).
 

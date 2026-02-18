@@ -276,15 +276,6 @@ You: [Use rag_query tool with query="authentication"]
         return cls._get_extension_factory("team_spec_provider", "victor.rag.teams")
 
     @classmethod
-    def get_capability_provider(cls):
-        """Get the capability provider for RAG vertical.
-
-        Returns:
-            RAGCapabilityProvider instance
-        """
-        return cls._get_extension_factory("capability_provider", "victor.rag.capabilities")
-
-    @classmethod
     def get_handlers(cls) -> Dict[str, Any]:
         """Get compute handlers for RAG workflows.
 

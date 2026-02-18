@@ -224,24 +224,6 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         return ResearchRLHooks()
 
     @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Get Research-specific capability provider.
-
-        Provides capabilities for:
-        - source_verification: Source credibility validation
-        - citation_management: Bibliography formatting
-        - research_quality: Coverage assessment
-        - literature_analysis: Paper relevance scoring
-        - fact_checking: Evidence-based verdicts
-
-        Returns:
-            ResearchCapabilityProvider instance (implements BaseCapabilityProvider)
-        """
-        from victor.research.capabilities import ResearchCapabilityProvider
-
-        return ResearchCapabilityProvider()
-
-    @classmethod
     def get_handlers(cls) -> Dict[str, Any]:
         """Get compute handlers for research workflows.
 

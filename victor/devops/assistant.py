@@ -247,22 +247,6 @@ When creating configurations:
         return cls._get_extension_factory("rl_hooks", "victor.devops.rl")
 
     @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Get capability provider for DevOps vertical.
-
-        Provides capabilities for:
-        - deployment_safety: Safe deployment rules
-        - container_settings: Container configuration
-        - infrastructure_settings: IaC settings
-        - cicd_settings: CI/CD pipeline settings
-        - monitoring_settings: Observability configuration
-
-        Returns:
-            DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
-        """
-        return cls._get_extension_factory("capability_provider", "victor.devops.capabilities")
-
-    @classmethod
     def get_handlers(cls) -> Dict[str, Any]:
         """Get compute handlers for DevOps workflows.
 

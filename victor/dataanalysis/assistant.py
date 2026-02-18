@@ -228,24 +228,6 @@ When presenting analysis:
         return DataAnalysisRLHooks()
 
     @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Get capability provider for Data Analysis vertical.
-
-        Provides capabilities for:
-        - data_quality: Data quality rules and validation settings
-        - visualization_style: Visualization and plotting configuration
-        - statistical_analysis: Statistical analysis configuration
-        - ml_pipeline: Machine learning pipeline configuration
-        - data_privacy: Data privacy and anonymization settings
-
-        Returns:
-            DataAnalysisCapabilityProvider instance (implements BaseCapabilityProvider)
-        """
-        from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
-
-        return DataAnalysisCapabilityProvider()
-
-    @classmethod
     def get_handlers(cls) -> Dict[str, Any]:
         """Get compute handlers for DataAnalysis workflows.
 
