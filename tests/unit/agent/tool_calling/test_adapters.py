@@ -34,7 +34,6 @@ from victor.agent.tool_calling.base import (
 )
 from victor.providers.base import ToolDefinition
 
-
 # =============================================================================
 # _CapabilityLoaderHolder Tests
 # =============================================================================

@@ -37,7 +37,6 @@ from victor.evaluation.protocol import (
     TaskStatus,
 )
 
-
 # =============================================================================
 # BaseBenchmarkRunner._filter_tasks Tests
 # =============================================================================
@@ -152,9 +151,7 @@ class TestFilterTasks:
     def test_filter_by_max_tasks(self, sample_tasks):
         """Filter tasks by max_tasks limit."""
         runner = MockBenchmarkRunner()
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2
-        )
+        config = EvaluationConfig(benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2)
 
         filtered = runner._filter_tasks(sample_tasks, config)
 
@@ -430,7 +427,7 @@ class TestGenerateReports:
 
         assert "human_eval" in report
         assert "claude-3-sonnet" in report
-        assert ("1 passed" in report or "50.0%" in report)
+        assert "1 passed" in report or "50.0%" in report
 
     def test_generate_markdown_report(self, mock_result):
         """Generate markdown report from evaluation result."""

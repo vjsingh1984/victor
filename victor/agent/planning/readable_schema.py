@@ -64,9 +64,9 @@ logger = logging.getLogger(__name__)
 class TaskComplexity(str, Enum):
     """Task complexity levels for planning."""
 
-    SIMPLE = "simple"      # Auto mode, 2-3 steps, <30 min
+    SIMPLE = "simple"  # Auto mode, 2-3 steps, <30 min
     MODERATE = "moderate"  # Plan-mode, 3-5 steps, 30min-2hr
-    COMPLEX = "complex"    # Plan-mode, 5-8 steps, >2hr
+    COMPLEX = "complex"  # Plan-mode, 5-8 steps, >2hr
 
 
 class ReadableTaskPlan(BaseModel):
@@ -152,7 +152,7 @@ class ReadableTaskPlan(BaseModel):
                 "complexity": self.complexity.value,
                 "estimated_duration": self.duration,
                 "requires_approval": self.approval,
-            }
+            },
         )
 
     def _parse_step_data(self, step_data: List) -> PlanStep:
@@ -164,8 +164,8 @@ class ReadableTaskPlan(BaseModel):
         # Map readable step type to full StepType
         step_type = self._map_step_type(step_type_str)
 
-        # Parse tools and dependencies
-        tools = []
+        # Parse tools (for future use) and dependencies
+        _tools = []  # Parsed but not used in current implementation
         dependencies = []
 
         if len(step_data) > 3:
@@ -174,7 +174,7 @@ class ReadableTaskPlan(BaseModel):
             if isinstance(fourth, list):
                 dependencies = [str(d) for d in fourth]
             elif isinstance(fourth, str):
-                tools = fourth.split(",") if fourth else []
+                _tools = fourth.split(",") if fourth else []
 
         if len(step_data) > 4:
             # Fifth element is dependencies if fourth was tools
@@ -184,9 +184,7 @@ class ReadableTaskPlan(BaseModel):
 
         # Check if deployment or high-risk step
         requires_approval = (
-            step_type == StepType.DEPLOYMENT or
-            step_type == StepType.PLANNING or
-            self.approval
+            step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
         )
 
         return PlanStep(
@@ -206,7 +204,6 @@ class ReadableTaskPlan(BaseModel):
             "research": StepType.RESEARCH,
             "planning": StepType.PLANNING,
             "feature": StepType.IMPLEMENTATION,
-            "feature": StepType.IMPLEMENTATION,
             "implementation": StepType.IMPLEMENTATION,
             "bugfix": StepType.IMPLEMENTATION,
             "bug": StepType.IMPLEMENTATION,
@@ -222,8 +219,7 @@ class ReadableTaskPlan(BaseModel):
             "documentation": StepType.RESEARCH,
         }
         return type_map.get(
-            step_type_str.lower(),
-            StepType.IMPLEMENTATION  # Default to implementation
+            step_type_str.lower(), StepType.IMPLEMENTATION  # Default to implementation
         )
 
     def _get_sub_agent_role(self, step_type: StepType) -> Optional[str]:
@@ -254,7 +250,7 @@ class ReadableTaskPlan(BaseModel):
                         "estimated_duration": self.duration,
                         "requires_approval": self.approval,
                     },
-                    "nodes": []
+                    "nodes": [],
                 }
             }
         }
@@ -318,16 +314,16 @@ class ReadableTaskPlan(BaseModel):
             step_list = [int(step.id), type_str, step.description]
 
             # Add tools if available
-            if hasattr(step, 'allowed_tools') and step.allowed_tools:
+            if hasattr(step, "allowed_tools") and step.allowed_tools:
                 tools_str = ",".join(step.allowed_tools)
                 step_list.append(tools_str)
 
             # Add dependencies
             if step.depends_on:
-                if not hasattr(step, 'allowed_tools') or not step.allowed_tools:
+                if not hasattr(step, "allowed_tools") or not step.allowed_tools:
                     step_list.append([])  # Placeholder for tools
                 step_list.append([int(d) for d in step.depends_on])
-            elif hasattr(step, 'allowed_tools') and step.allowed_tools:
+            elif hasattr(step, "allowed_tools") and step.allowed_tools:
                 step_list.append([])  # Empty deps if no dependencies
 
             steps_data.append(step_list)
@@ -368,24 +364,27 @@ class ReadableTaskPlan(BaseModel):
         if verbose:
             # Expanded to verbose JSON
             plan = self.to_execution_plan()
-            return json.dumps({
-                "name": self.name,
-                "complexity": self.complexity.value,
-                "description": self.desc,
-                "steps": [
-                    {
-                        "id": step.id,
-                        "type": step.step_type.value,
-                        "description": step.description,
-                        "depends_on": step.depends_on,
-                        "estimated_tool_calls": step.estimated_tool_calls,
-                        "requires_approval": step.requires_approval,
-                    }
-                    for step in plan.steps
-                ],
-                "estimated_duration": self.duration,
-                "requires_approval": self.approval,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "name": self.name,
+                    "complexity": self.complexity.value,
+                    "description": self.desc,
+                    "steps": [
+                        {
+                            "id": step.id,
+                            "type": step.step_type.value,
+                            "description": step.description,
+                            "depends_on": step.depends_on,
+                            "estimated_tool_calls": step.estimated_tool_calls,
+                            "requires_approval": step.requires_approval,
+                        }
+                        for step in plan.steps
+                    ],
+                    "estimated_duration": self.duration,
+                    "requires_approval": self.approval,
+                },
+                indent=2,
+            )
         else:
             # Use compact schema (this is what LLM generates)
             return self.model_dump_json(exclude_none=True)
@@ -500,7 +499,7 @@ class TaskPlannerContext:
             "history": [
                 {"goal": plan.goal, "steps": len(plan.steps)}
                 for plan in self.plans_history[-5:]  # Last 5 plans
-            ]
+            ],
         }
 
     def to_context_dict(self) -> Dict[str, Any]:
@@ -558,6 +557,7 @@ class TaskPlannerContext:
 
 # Helper functions for workflow integration
 
+
 def generate_task_plan(
     provider,
     user_request: str,
@@ -577,7 +577,8 @@ def generate_task_plan(
 
     async def _generate():
         # Classify complexity if not provided
-        if not complexity:
+        task_complexity = complexity
+        if not task_complexity:
             complexity_prompt = ReadableTaskPlan.get_complexity_prompt()
             complexity_prompt = complexity_prompt.replace("{user_request}", user_request)
 
@@ -589,14 +590,13 @@ def generate_task_plan(
             )
 
             import json
+
             complexity_data = json.loads(complexity_response)
-            complexity = TaskComplexity(complexity_data["complexity"])
+            task_complexity = TaskComplexity(complexity_data["complexity"])
 
         # Generate task plan
         plan_prompt = ReadableTaskPlan.get_llm_prompt()
-        plan_prompt = plan_prompt.replace(
-            "{user_request}", user_request
-        )
+        plan_prompt = plan_prompt.replace("{user_request}", user_request)
 
         json_response = await provider.generate(
             plan_prompt,
@@ -629,7 +629,7 @@ def plan_to_workflow_yaml(plan: ReadableTaskPlan) -> str:
 def plan_to_session_context(
     plan: ReadableTaskPlan,
     session_id: str,
-    context_store = None,
+    context_store=None,
 ) -> Dict[str, Any]:
     """Add plan to session context for persistence.
 
@@ -659,9 +659,11 @@ def plan_to_session_context(
                     "description": step[2],
                 }
                 for step in plan.steps
-            ]
+            ],
         },
-        "created_at": plan.model_dump_json(include={'name', 'complexity', 'desc', 'duration', 'approval'}),
+        "created_at": plan.model_dump_json(
+            include={"name", "complexity", "desc", "duration", "approval"}
+        ),
     }
 
     # Store in context backend if provided

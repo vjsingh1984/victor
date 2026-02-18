@@ -49,9 +49,9 @@ class TestReadableTaskPlan:
 
     def test_moderate_plan_validation(self):
         """Test validation of moderate plan with dependencies."""
-        json_str = '''{"name":"Add auth","complexity":"moderate","desc":"OAuth2 login",
+        json_str = """{"name":"Add auth","complexity":"moderate","desc":"OAuth2 login",
         "steps":[[1,"research","Research patterns","overview"],[2,"feature","Create module","write,test"],
-        [3,"test","Verify","pytest",[2]]]}'''
+        [3,"test","Verify","pytest",[2]]]}"""
 
         plan = ReadableTaskPlan.model_validate_json(json_str)
 
@@ -65,9 +65,9 @@ class TestReadableTaskPlan:
 
     def test_complex_plan_with_approval(self):
         """Test complex plan requiring approval."""
-        json_str = '''{"name":"Deploy API","complexity":"complex","desc":"Deploy to production",
+        json_str = """{"name":"Deploy API","complexity":"complex","desc":"Deploy to production",
         "steps":[[1,"test","Run tests","pytest"],[2,"deploy","Deploy","kubectl",[1]]],
-        "approval":true}'''
+        "approval":true}"""
 
         plan = ReadableTaskPlan.model_validate_json(json_str)
 
@@ -205,9 +205,9 @@ class TestReadableTaskPlan:
                     "type": "feature",
                     "description": "Create auth module",
                     "tools": ["write", "test"],
-                    "dependencies": []
+                    "dependencies": [],
                 }
-            ]
+            ],
         }
 
         # Readable JSON (what TO use)
@@ -215,7 +215,7 @@ class TestReadableTaskPlan:
             "name": "Add auth",
             "complexity": "moderate",
             "desc": "OAuth2 login",
-            "steps": [[1, "feature", "Create module", "write,test"]]
+            "steps": [[1, "feature", "Create module", "write,test"]],
         }
 
         verbose_tokens = len(json.dumps(verbose))
@@ -409,18 +409,18 @@ class TestTokenEfficiency:
 
     def test_moderate_plan_token_count(self):
         """Test token count for moderate plan."""
-        moderate_json = '''{"name":"Add auth","complexity":"moderate","desc":"OAuth2 login",
+        moderate_json = """{"name":"Add auth","complexity":"moderate","desc":"OAuth2 login",
         "steps":[[1,"research","Research","overview"],[2,"feature","Create module","write,test"],
-        [3,"test","Verify","pytest",[2]]]}'''
+        [3,"test","Verify","pytest",[2]]]}"""
 
         char_count = len(moderate_json)
         assert char_count < 220  # Still very compact
 
     def test_complex_plan_token_count(self):
         """Test token count for complex plan."""
-        complex_json = '''{"name":"Deploy API","complexity":"complex","desc":"Production deployment",
+        complex_json = """{"name":"Deploy API","complexity":"complex","desc":"Production deployment",
         "steps":[[1,"test","Test","pytest"],[2,"analyze","Plan","overview"],[3,"feature","Create config","write"],
-        [4,"doc","Document","write"],[5,"test","Integration test","pytest",[4]],[6,"deploy","Deploy","kubectl",[5]]]}'''
+        [4,"doc","Document","write"],[5,"test","Integration test","pytest",[4]],[6,"deploy","Deploy","kubectl",[5]]]}"""
 
         char_count = len(complex_json)
         assert char_count < 350  # Complex but still compact
@@ -438,16 +438,16 @@ class TestTokenEfficiency:
                     "type": "feature",
                     "description": "Create auth module structure",
                     "tools": ["write", "test"],
-                    "depends_on": []
+                    "depends_on": [],
                 },
                 {
                     "step_id": 2,
                     "type": "feature",
                     "description": "Implement JWT validation",
                     "tools": ["write", "test"],
-                    "depends_on": [1]
-                }
-            ]
+                    "depends_on": [1],
+                },
+            ],
         }
 
         # Readable version
@@ -457,8 +457,8 @@ class TestTokenEfficiency:
             "desc": "OAuth2 login with JWT",
             "steps": [
                 [1, "feature", "Create auth structure", "write,test"],
-                [2, "feature", "Implement JWT", "write,test", [1]]
-            ]
+                [2, "feature", "Implement JWT", "write,test", [1]],
+            ],
         }
 
         verbose_size = len(json.dumps(verbose))

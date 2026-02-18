@@ -32,7 +32,6 @@ from victor.agent.conversation_memory import (
     ConversationMessage,
 )
 
-
 # =============================================================================
 # MessageRole Tests
 # =============================================================================
@@ -330,17 +329,13 @@ class TestParseModelMetadataKnownOverrides:
 
     def test_known_context_override(self):
         """Known context window overrides parsed value."""
-        metadata = parse_model_metadata(
-            "llama-3.3-70b-versatile", known_context=999999
-        )
+        metadata = parse_model_metadata("llama-3.3-70b-versatile", known_context=999999)
 
         assert metadata.context_tokens == 999999
 
     def test_known_params_override(self):
         """Known parameter count overrides parsed value."""
-        metadata = parse_model_metadata(
-            "llama-3.3-70b-versatile", known_params_b=99.9
-        )
+        metadata = parse_model_metadata("llama-3.3-70b-versatile", known_params_b=99.9)
 
         assert metadata.model_params_b == 99.9
 

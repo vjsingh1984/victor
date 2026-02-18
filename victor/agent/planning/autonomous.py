@@ -59,6 +59,7 @@ from victor.agent.planning.base import (
 )
 from victor.agent.planning.readable_schema import (
     ReadableTaskPlan,
+    TaskComplexity,
     generate_task_plan as generate_readable_plan,
 )
 
