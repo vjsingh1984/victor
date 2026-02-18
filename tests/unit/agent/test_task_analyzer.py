@@ -14,6 +14,7 @@
 
 """Tests for the unified TaskAnalyzer."""
 
+from unittest.mock import MagicMock
 from victor.agent.task_analyzer import (
     TaskAnalyzer,
     TaskAnalysis,
@@ -68,6 +69,101 @@ class TestTaskAnalysis:
         assert not analysis.should_force_completion(2)
         assert analysis.should_force_completion(3)
         assert analysis.should_force_completion(5)
+
+    def test_has_team_suggestion_no_coordination(self):
+        """Test has_team_suggestion when no coordination suggestion."""
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.SIMPLE,
+            tool_budget=3,
+            complexity_confidence=0.9,
+        )
+        assert not analysis.has_team_suggestion
+
+    def test_has_team_suggestion_with_empty_team_rec(self):
+        """Test has_team_suggestion with empty team recommendations."""
+        mock_coordination = MagicMock()
+        mock_coordination.team_recommendations = []
+
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.SIMPLE,
+            tool_budget=3,
+            complexity_confidence=0.9,
+            coordination_suggestion=mock_coordination,
+        )
+        assert not analysis.has_team_suggestion
+
+    def test_has_team_suggestion_with_team_rec(self):
+        """Test has_team_suggestion with team recommendations."""
+        mock_coordination = MagicMock()
+        mock_coordination.team_recommendations = [MagicMock()]
+
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.COMPLEX,
+            tool_budget=10,
+            complexity_confidence=0.9,
+            coordination_suggestion=mock_coordination,
+        )
+        assert analysis.has_team_suggestion
+
+    def test_should_spawn_team_no_coordination(self):
+        """Test should_spawn_team when no coordination suggestion."""
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.SIMPLE,
+            tool_budget=3,
+            complexity_confidence=0.9,
+        )
+        assert not analysis.should_spawn_team
+
+    def test_should_spawn_team_with_suggestion(self):
+        """Test should_spawn_team with coordination suggestion."""
+        mock_coordination = MagicMock()
+        mock_coordination.should_spawn_team = True
+
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.COMPLEX,
+            tool_budget=10,
+            complexity_confidence=0.9,
+            coordination_suggestion=mock_coordination,
+        )
+        assert analysis.should_spawn_team
+
+    def test_primary_team_no_coordination(self):
+        """Test primary_team when no coordination suggestion."""
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.SIMPLE,
+            tool_budget=3,
+            complexity_confidence=0.9,
+        )
+        assert analysis.primary_team is None
+
+    def test_primary_team_with_suggestion(self):
+        """Test primary_team with coordination suggestion."""
+        mock_team_rec = MagicMock()
+        mock_team_rec.team_name = "coding_team"
+
+        mock_coordination = MagicMock()
+        mock_coordination.primary_team = mock_team_rec
+
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.COMPLEX,
+            tool_budget=10,
+            complexity_confidence=0.9,
+            coordination_suggestion=mock_coordination,
+        )
+        assert analysis.primary_team == "coding_team"
+
+    def test_primary_team_none_suggestion(self):
+        """Test primary_team when no primary team recommendation."""
+        mock_coordination = MagicMock()
+        mock_coordination.primary_team = None
+
+        analysis = TaskAnalysis(
+            complexity=TaskComplexity.SIMPLE,
+            tool_budget=3,
+            complexity_confidence=0.9,
+            coordination_suggestion=mock_coordination,
+        )
+        assert analysis.primary_team is None
 
 
 class TestTaskAnalyzer:
@@ -175,6 +271,74 @@ class TestTaskAnalyzer:
 
         _ = analyzer.action_authorizer
         assert analyzer._action_authorizer is not None
+
+    def test_set_coordinator(self):
+        """Test setting the coordinator."""
+        analyzer = TaskAnalyzer()
+        mock_coordinator = MagicMock()
+
+        analyzer.set_coordinator(mock_coordinator)
+
+        assert analyzer._coordinator is mock_coordinator
+
+    def test_classify_task_keywords(self):
+        """Test classify_task_keywords method."""
+        analyzer = TaskAnalyzer()
+
+        # Analysis task
+        result = analyzer.classify_task_keywords("What files are in this project?")
+        assert isinstance(result, dict)
+        assert "is_analysis_task" in result
+        assert "is_action_task" in result
+        assert "needs_execution" in result
+        assert "coarse_task_type" in result
+
+    def test_analyze_with_suggestions_no_coordinator(self):
+        """Test analyze_with_suggestions without coordinator."""
+        analyzer = TaskAnalyzer()
+
+        result = analyzer.analyze_with_suggestions("Refactor this code", mode="build")
+
+        assert isinstance(result, TaskAnalysis)
+        # No coordinator means no suggestions
+        assert not result.has_team_suggestion
+
+    def test_analyze_with_history_context(self):
+        """Test analyze with proper history context."""
+        analyzer = TaskAnalyzer()
+
+        # History should be list of message dicts
+        result = analyzer.analyze(
+            "Continue the task",
+            context={"history": [{"role": "user", "content": "Previous message"}]},
+        )
+
+        assert isinstance(result, TaskAnalysis)
+
+    def test_analyze_with_task_type_enabled(self):
+        """Test analyze with task type classification."""
+        analyzer = TaskAnalyzer()
+
+        result = analyzer.analyze(
+            "Refactor this code",
+            include_task_type=True,
+        )
+
+        assert isinstance(result, TaskAnalysis)
+        # Task type may or may not be set depending on if classifier is available
+        assert isinstance(result.task_type_confidence, float)
+
+    def test_analyze_with_intent_enabled(self):
+        """Test analyze with intent classification."""
+        analyzer = TaskAnalyzer()
+
+        result = analyzer.analyze(
+            "Show me the file",
+            include_intent=True,
+        )
+
+        assert isinstance(result, TaskAnalysis)
+        # Intent may or may not be set depending on if classifier is available
 
 
 class TestGlobalAnalyzer:
