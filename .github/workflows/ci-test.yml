@@ -60,7 +60,7 @@ jobs:
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install with dev dependencies for testing
-          pip install -e ".[dev]"
+          pip install -e ".[dev,api]"
           # Install pytest-xdist for parallel execution
           pip install pytest-xdist pytest-split
 

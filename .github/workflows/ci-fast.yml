@@ -94,7 +94,7 @@ jobs:
         run: |
           python -c "import victor; print('✓ victor imports successfully')"
           python -c "from victor.framework import Agent; print('✓ Agent imports')"
-          python -c "from victor.workflows import StateGraph; print('✓ StateGraph imports')"
+          python -c "from victor.framework.graph import StateGraph; print('✓ StateGraph imports')"
 
   guards:
     name: CI Guards

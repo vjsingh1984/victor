@@ -24,7 +24,6 @@ from typing import Any
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.core.errors import ProviderRateLimitError
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -175,9 +174,7 @@ class TestExtractRequiredFilesFromPrompt:
 
     def test_no_paths_returns_empty(self, chat_coordinator):
         """Return empty list when no paths found."""
-        result = chat_coordinator._extract_required_files_from_prompt(
-            "Hello, how are you today?"
-        )
+        result = chat_coordinator._extract_required_files_from_prompt("Hello, how are you today?")
         assert result == []
 
 
@@ -229,7 +226,9 @@ class TestApplyIntentGuard:
         """Apply intent guard through task coordinator."""
         chat_coordinator._apply_intent_guard("What files exist?")
         mock_orchestrator.task_coordinator.apply_intent_guard.assert_called_once()
-        assert mock_orchestrator._current_intent == mock_orchestrator.task_coordinator.current_intent
+        assert (
+            mock_orchestrator._current_intent == mock_orchestrator.task_coordinator.current_intent
+        )
 
 
 class TestApplyTaskGuidance:
@@ -261,9 +260,7 @@ class TestPrepareTask:
         """Prepare task through task coordinator."""
         from victor.agent.unified_task_tracker import TrackerTaskType
 
-        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(
-            task_type="edit"
-        )
+        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(task_type="edit")
         result = chat_coordinator._prepare_task(
             "Write a function",
             TrackerTaskType.EDIT,
@@ -305,9 +302,7 @@ class TestSelectToolsForTurn:
     """Tests for _select_tools_for_turn."""
 
     @pytest.mark.asyncio
-    async def test_select_tools_with_intent_filtering(
-        self, chat_coordinator, mock_orchestrator
-    ):
+    async def test_select_tools_with_intent_filtering(self, chat_coordinator, mock_orchestrator):
         """Select tools with intent-based filtering."""
         mock_orchestrator._tool_planner.filter_tools_by_intent.return_value = [
             MagicMock(name="read_file"),
@@ -319,3 +314,109 @@ class TestSelectToolsForTurn:
         )
 
         mock_orchestrator._tool_planner.filter_tools_by_intent.assert_called()
+
+
+class TestParseAndValidateToolCalls:
+    """Tests for _parse_and_validate_tool_calls."""
+
+    def test_delegates_to_tool_coordinator(self, chat_coordinator, mock_orchestrator):
+        """Delegate parsing to tool coordinator."""
+        mock_orchestrator._tool_coordinator.parse_and_validate_tool_calls.return_value = (
+            [{"id": "1"}],
+            "content",
+        )
+
+        result = chat_coordinator._parse_and_validate_tool_calls([], "test")
+
+        mock_orchestrator._tool_coordinator.parse_and_validate_tool_calls.assert_called_once()
+
+
+class TestCreateRecoveryContext:
+    """Tests for _create_recovery_context."""
+
+    def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
+        """Delegate recovery context creation to orchestrator."""
+        mock_ctx = MagicMock()
+        mock_orchestrator._create_recovery_context.return_value = MagicMock()
+
+        result = chat_coordinator._create_recovery_context(mock_ctx)
+
+        mock_orchestrator._create_recovery_context.assert_called_once_with(mock_ctx)
+
+
+class TestHandleRecoveryWithIntegration:
+    """Tests for _handle_recovery_with_integration."""
+
+    @pytest.mark.asyncio
+    async def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
+        """Delegate recovery handling to orchestrator."""
+        mock_ctx = MagicMock()
+        mock_orchestrator._handle_recovery_with_integration = AsyncMock(return_value=MagicMock())
+
+        result = await chat_coordinator._handle_recovery_with_integration(
+            mock_ctx, "content", [], None
+        )
+
+        mock_orchestrator._handle_recovery_with_integration.assert_called_once()
+
+
+class TestApplyRecoveryAction:
+    """Tests for _apply_recovery_action."""
+
+    def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
+        """Delegate recovery action to orchestrator."""
+        mock_ctx = MagicMock()
+        mock_action = MagicMock()
+        mock_orchestrator._apply_recovery_action = MagicMock(return_value=None)
+
+        result = chat_coordinator._apply_recovery_action(mock_action, mock_ctx)
+
+        mock_orchestrator._apply_recovery_action.assert_called_once()
+
+
+class TestHandleEmptyResponseRecovery:
+    """Tests for _handle_empty_response_recovery."""
+
+    @pytest.mark.asyncio
+    async def test_empty_response_recovery_logic(self, chat_coordinator, mock_orchestrator):
+        """Test empty response recovery handles provider stream."""
+        from victor.providers.base import StreamChunk
+
+        # Mock streaming provider
+        async def mock_stream(*args, **kwargs):
+            yield StreamChunk(content="recovered content", role="assistant")
+
+        mock_orchestrator.provider.stream = mock_stream
+        mock_orchestrator.add_message = MagicMock()
+        mock_orchestrator.sanitizer.sanitize = MagicMock(return_value="sanitized content")
+        mock_orchestrator._chunk_generator.generate_content_chunk = MagicMock(
+            return_value=MagicMock()
+        )
+
+        success, tool_calls, chunk = await chat_coordinator._handle_empty_response_recovery(
+            MagicMock(), []
+        )
+
+        # Should recover content
+        assert success is True
+        assert tool_calls is None
+        assert chunk is not None
+
+
+class TestValidateIntelligentResponse:
+    """Tests for _validate_intelligent_response."""
+
+    @pytest.mark.asyncio
+    async def test_delegates_to_orchestrator_with_correct_args(
+        self, chat_coordinator, mock_orchestrator
+    ):
+        """Delegate validation to orchestrator with correct arguments."""
+        mock_orchestrator._validate_intelligent_response = AsyncMock(return_value=None)
+
+        result = await chat_coordinator._validate_intelligent_response(
+            "response", "query", 0, "edit"
+        )
+
+        mock_orchestrator._validate_intelligent_response.assert_called_once_with(
+            response="response", query="query", tool_calls=0, task_type="edit"
+        )
