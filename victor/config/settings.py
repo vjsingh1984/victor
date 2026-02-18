@@ -322,6 +322,29 @@ class ProfileConfig(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Planning Configuration (P3-1)
+    # -------------------------------------------------------------------------
+    # Optional override for planning-specific model selection
+    # Allows using a different (often more capable or cost-effective) model for
+    # structured planning vs regular chat execution
+    #
+    # Example: Use local model for chat (fast, cheap) but cloud model for planning
+    # (better at structured output, more reliable JSON generation)
+    #
+    # Set planning_provider and planning_model to override defaults for planning
+    # If not set, uses the default provider/model from the profile
+    # -------------------------------------------------------------------------
+
+    planning_provider: Optional[str] = Field(
+        None,
+        description="Override provider for planning (e.g., 'deepseek', 'anthropic')"
+    )
+    planning_model: Optional[str] = Field(
+        None,
+        description="Override model for planning tasks (e.g., 'deepseek-chat', 'claude-sonnet-4-5')"
+    )
+
+    # -------------------------------------------------------------------------
     # Provider Tuning Options (P3-1)
     # -------------------------------------------------------------------------
     # These settings allow fine-tuning agent behavior per provider/model.

@@ -51,9 +51,9 @@ from __future__ import annotations
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ValidationError
 
 from victor.agent.planning.base import (
     ExecutionPlan,
@@ -63,6 +63,51 @@ from victor.agent.planning.base import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Import unified response parser from framework
+try:
+    from victor.processing.response_parser import (
+        extract_content_from_response,
+        extract_json_from_response,
+    )
+
+    # Create aliases for backward compatibility
+    extract_llm_response_content = extract_content_from_response
+    extract_json_from_llm_response = extract_json_from_response
+    _UNIFIED_PARSER_AVAILABLE = True
+except ImportError:
+    logger.warning("Unified response parser not available, using local fallback")
+    _UNIFIED_PARSER_AVAILABLE = False
+
+    # Fallback implementations if unified parser not available
+    def extract_llm_response_content(
+        response: Union[str, Dict[str, Any], "CompletionResponse", Any],
+    ) -> Optional[str]:
+        """Fallback content extraction."""
+        if response is None:
+            return None
+        if isinstance(response, str):
+            return response
+        if isinstance(response, dict) and "content" in response:
+            content = response["content"]
+            return content if isinstance(content, str) else None
+        if hasattr(response, "content"):
+            content = response.content
+            return content if isinstance(content, str) else None
+        return None
+
+    def extract_json_from_llm_response(
+        response: Union[str, Dict[str, Any], "CompletionResponse", Any],
+    ) -> Optional[str]:
+        """Fallback JSON extraction."""
+        content = extract_llm_response_content(response)
+        if not content:
+            return None
+        try:
+            json.loads(content.strip())
+            return content.strip()
+        except json.JSONDecodeError:
+            return None
 
 
 class TaskComplexity(str, Enum):
@@ -453,7 +498,7 @@ class ReadableTaskPlan(BaseModel):
         Uses readable keywords for LLM reliability while maintaining
         token efficiency through list-based format.
         """
-        return """Create a task plan in JSON format:
+        return """You are a task planning assistant. Create a task plan in JSON format for the following task.
 
 {
   "name": "short task name",
@@ -495,7 +540,7 @@ Examples:
   "duration": "30min"
 }
 
-Return ONLY valid JSON. No markdown, no explanation."""
+Please generate the task plan as valid JSON above. Do not include markdown code blocks."""
 
     @classmethod
     def get_complexity_prompt(cls) -> str:
@@ -619,53 +664,145 @@ async def generate_task_plan(
     provider,
     user_request: str,
     complexity: Optional[TaskComplexity] = None,
+    model: Optional[str] = None,
+    max_retries: int = 2,
 ) -> ReadableTaskPlan:
     """Generate a readable task plan using LLM.
+
+    This function uses the framework's response parsing utilities for robust
+    JSON extraction and validation. Includes retry logic for reliability.
 
     Args:
         provider: LLM provider instance
         user_request: Natural language task description
         complexity: Optional pre-classified complexity level
+        model: Optional model identifier (if None, will try to get from provider)
+        max_retries: Maximum number of retries for plan generation (default: 2)
 
     Returns:
         Validated ReadableTaskPlan
+
+    Raises:
+        ValueError: If model identifier cannot be determined
+        ValidationError: If LLM response cannot be validated as ReadableTaskPlan
     """
+    from victor.providers.base import Message
+
+    # Get model identifier
+    if not model:
+        # Try to get from orchestrator if available
+        if hasattr(provider, 'model') and provider.model:
+            model = provider.model
+        elif hasattr(provider, '_provider') and hasattr(provider._provider, 'model'):
+            model = provider._provider.model
+        else:
+            raise ValueError(
+                "Model identifier must be provided or available from provider"
+            )
+
     # Classify complexity if not provided
     task_complexity = complexity
     if not task_complexity:
         complexity_prompt = ReadableTaskPlan.get_complexity_prompt()
         complexity_prompt = complexity_prompt.replace("{user_request}", user_request)
 
+        logger.debug("Classifying task complexity...")
         complexity_response = await provider.chat(
-            messages=[{"role": "user", "content": complexity_prompt}],
-            model=provider.model,
+            messages=[Message(role="user", content=complexity_prompt)],
+            model=model,
             temperature=0.1,
             max_tokens=200,
         )
 
-        import json
+        # Extract JSON using framework utilities
+        complexity_json = extract_json_from_llm_response(complexity_response)
+        if not complexity_json:
+            raise ValueError(
+                "Failed to extract JSON from complexity classification response. "
+                f"Response: {extract_llm_response_content(complexity_response)[:200]}"
+            )
 
-        complexity_data = json.loads(complexity_response.content)
+        complexity_data = json.loads(complexity_json)
         task_complexity = TaskComplexity(complexity_data["complexity"])
+        logger.debug(f"Classified complexity as: {task_complexity.value}")
 
-    # Generate task plan
+    # Generate task plan with retries
     plan_prompt = ReadableTaskPlan.get_llm_prompt()
-    plan_prompt = plan_prompt.replace("{user_request}", user_request)
+    plan_prompt = f"{plan_prompt}\n\nTask: {user_request}"
 
-    plan_response = await provider.chat(
-        messages=[{"role": "user", "content": plan_prompt}],
-        model=provider.model,
-        temperature=0.2,  # Lower temp for consistent structure
-        max_tokens=1500,
-    )
+    logger.debug(f"Planning prompt length: {len(plan_prompt)} chars")
+    logger.debug(f"Planning prompt preview: {plan_prompt[:500]}...")
 
-    # Parse JSON response
-    import json
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            if attempt > 0:
+                logger.info(f"Retry {attempt}/{max_retries} for plan generation")
 
-    json_response = json.loads(plan_response.content)
+            # Increase max_tokens for complex models
+            # Some models (like qwen2.5-coder) need more tokens to generate structured JSON
+            plan_max_tokens = 3000  # Increased from 1500
 
-    # Validate and return
-    return ReadableTaskPlan.model_validate_json(json_response)
+            plan_response = await provider.chat(
+                messages=[Message(role="user", content=plan_prompt)],
+                model=model,
+                temperature=0.2,  # Lower temp for consistent structure
+                max_tokens=plan_max_tokens,
+            )
+
+            # Log raw response for debugging
+            logger.debug(f"Raw plan response type: {type(plan_response)}")
+
+            # Log response details before extraction
+            if isinstance(plan_response, dict):
+                logger.debug(f"Response dict keys: {list(plan_response.keys())}")
+                for key in plan_response.keys():
+                    value = plan_response[key]
+                    if isinstance(value, str):
+                        logger.debug(f"Response dict[{key}] length: {len(value)}")
+                        logger.debug(f"Response dict[{key}] preview: {value[:200]}")
+                    else:
+                        logger.debug(f"Response dict[{key}] type: {type(value)}")
+            elif hasattr(plan_response, "__dict__"):
+                logger.debug(f"Response object attributes: {list(plan_response.__dict__.keys())}")
+
+            response_content = extract_llm_response_content(plan_response)
+            logger.info(
+                f"Plan attempt {attempt + 1}: response length={len(response_content) if response_content else 0}, "
+                f"response_preview={response_content[:200] if response_content else 'empty'}..."
+            )
+
+            # Extract JSON using framework utilities
+            plan_json = extract_json_from_llm_response(plan_response)
+            if not plan_json:
+                raise ValueError(
+                    f"No valid JSON found in plan response. "
+                    f"Response: {response_content[:500] if response_content else 'empty'}"
+                )
+
+            logger.debug(f"Extracted JSON: {plan_json[:200]}...")
+
+            # Validate and return
+            plan = ReadableTaskPlan.model_validate_json(plan_json)
+            logger.info(
+                f"Generated plan: {plan.name} with {len(plan.steps)} steps, "
+                f"complexity={plan.complexity.value}"
+            )
+            return plan
+
+        except (ValidationError, ValueError, json.JSONDecodeError) as e:
+            last_error = e
+            logger.warning(
+                f"Plan generation attempt {attempt + 1} failed: {e}. "
+                f"Response was: {response_content[:200] if response_content else 'empty'}"
+            )
+            # Continue to retry
+
+    # All retries exhausted
+    raise ValueError(
+        f"Failed to generate valid task plan after {max_retries + 1} attempts. "
+        f"Last error: {last_error}"
+    ) from last_error
 
 
 def plan_to_workflow_yaml(plan: ReadableTaskPlan) -> str:

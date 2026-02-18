@@ -385,6 +385,7 @@ class PlanResult:
     Attributes:
         plan_id: ID of the plan that was executed
         success: Whether all steps completed successfully
+        total_steps: Total number of steps in the plan
         steps_completed: Number of steps completed
         steps_failed: Number of steps failed
         total_tool_calls: Total tool calls across all steps
@@ -395,6 +396,7 @@ class PlanResult:
 
     plan_id: str
     success: bool
+    total_steps: int = 0
     steps_completed: int = 0
     steps_failed: int = 0
     total_tool_calls: int = 0
@@ -407,6 +409,7 @@ class PlanResult:
         return {
             "plan_id": self.plan_id,
             "success": self.success,
+            "total_steps": self.total_steps,
             "steps_completed": self.steps_completed,
             "steps_failed": self.steps_failed,
             "total_tool_calls": self.total_tool_calls,

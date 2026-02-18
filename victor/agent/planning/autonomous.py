@@ -389,6 +389,7 @@ class AutonomousPlanner:
         result = PlanResult(
             plan_id=plan.id,
             success=True,
+            total_steps=len(plan.steps),
         )
 
         try:

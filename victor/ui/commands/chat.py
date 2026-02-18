@@ -199,6 +199,12 @@ def chat(
         "--planning/--no-planning",
         help="Enable structured planning for complex multi-step tasks. Auto-detects when to use planning vs direct chat.",
     ),
+    planning_model: Optional[str] = typer.Option(
+        None,
+        "--planning-model",
+        help="Override model for planning tasks (e.g., 'qwen3-coder-tools:30b-128K', 'deepseek-chat'). "
+        "Takes precedence over profile planning_model setting.",
+    ),
     # Session management options
     list_sessions: bool = typer.Option(
         False,
@@ -416,6 +422,7 @@ def chat(
                     vertical=vertical,
                     enable_observability=enable_observability,
                     enable_planning=enable_planning,
+                    planning_model=planning_model,
                     legacy_mode=legacy_mode,
                 )
             )
@@ -437,6 +444,7 @@ def chat(
                     vertical=vertical,
                     enable_observability=enable_observability,
                     enable_planning=enable_planning,
+                    planning_model=planning_model,
                     legacy_mode=legacy_mode,
                     use_tui=use_tui,
                     resume_session_id=session_id,
@@ -470,6 +478,7 @@ async def run_oneshot(
     vertical: Optional[str] = None,
     enable_observability: bool = True,
     enable_planning: bool = False,
+    planning_model: Optional[str] = None,
     legacy_mode: bool = False,
 ) -> None:
     """Run a single message and exit.
@@ -529,6 +538,10 @@ async def run_oneshot(
                 session_id=session_id,
             )
             agent = await shim.create_orchestrator()
+
+            # Set planning model override if provided (for planning coordinator)
+            if planning_model:
+                agent._planning_model_override = planning_model
 
             # Emit session start event if observability is enabled
             shim.emit_session_start(
@@ -641,6 +654,7 @@ async def run_interactive(
     vertical: Optional[str] = None,
     enable_observability: bool = True,
     enable_planning: bool = False,
+    planning_model: Optional[str] = None,
     legacy_mode: bool = False,
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
@@ -688,6 +702,10 @@ async def run_interactive(
                 session_id=session_id,
             )
             agent = await shim.create_orchestrator()
+
+            # Set planning model override if provided (for planning coordinator)
+            if planning_model:
+                agent._planning_model_override = planning_model
 
             # Resume session if requested
             if resume_session_id:
@@ -787,6 +805,7 @@ async def run_interactive(
                 rl_suggestion,
                 renderer_choice=renderer_choice,
                 vertical_name=vertical,
+                enable_planning=enable_planning,
             )
 
         success = True
@@ -822,6 +841,7 @@ async def _run_cli_repl(
     rl_suggestion: Optional[tuple[str, str, float]] = None,
     renderer_choice: str = "auto",
     vertical_name: Optional[str] = None,
+    enable_planning: bool = False,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""

@@ -932,6 +932,9 @@ class LMStudioProvider(BaseProvider):
         - {"name": "tool_name", "parameters": {...}}
         - [TOOL_REQUEST]{"name": "...", "arguments": {...}}[END_TOOL_REQUEST]
 
+        Note: Must distinguish from task plan JSON which also has "name" but different structure.
+        Tool calls have "arguments" or "parameters" which are dict objects, not strings.
+
         Args:
             content: Message content that might contain JSON tool call
 
@@ -953,8 +956,12 @@ class LMStudioProvider(BaseProvider):
                     data = json.loads(match.strip())
                     name = data.get("name", "")
                     arguments = data.get("arguments") or data.get("parameters", {})
-                    if name:
-                        tool_calls.append({"name": name, "arguments": arguments})
+                    # Only treat as tool call if arguments is a dict
+                    if name and isinstance(arguments, dict):
+                        # Additional validation: exclude planning JSON
+                        planning_keywords = {"complexity", "steps", "desc", "duration"}
+                        if not any(key in arguments for key in planning_keywords):
+                            tool_calls.append({"name": name, "arguments": arguments})
                 except json.JSONDecodeError:
                     continue
             if tool_calls:
@@ -965,9 +972,21 @@ class LMStudioProvider(BaseProvider):
             data = json.loads(content.strip())
 
             # Check if it looks like a tool call
+            # Must have "name" AND ("arguments" OR "parameters")
+            # AND the arguments/parameters must be a dict (not a string)
             if isinstance(data, dict) and "name" in data:
-                arguments = data.get("arguments") or data.get("parameters", {})
-                return [{"name": data.get("name"), "arguments": arguments}]
+                arguments = data.get("arguments") or data.get("parameters")
+
+                # Only treat as tool call if arguments is a dict (actual tool call)
+                # This distinguishes from planning JSON where "name" is a task name string
+                if isinstance(arguments, dict):
+                    # Additional validation: tool calls typically have specific structure
+                    # Arguments usually contain things like "query", "path", "code", etc.
+                    # NOT "complexity", "steps", "desc" which are planning fields
+                    planning_keywords = {"complexity", "steps", "desc", "duration"}
+                    if not any(key in arguments for key in planning_keywords):
+                        # Convert to normalized format
+                        return [{"name": data.get("name"), "arguments": arguments}]
         except (json.JSONDecodeError, ValueError):
             pass
 
