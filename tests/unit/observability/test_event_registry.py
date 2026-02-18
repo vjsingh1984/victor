@@ -26,6 +26,7 @@ import pytest
 from victor.core.events import (
     MessagingEvent,
     ObservabilityBus,
+    InMemoryEventBackend,
     get_observability_bus,
 )
 from victor.core.container import reset_container
@@ -138,6 +139,31 @@ class TestGetObservabilityBusFactory:
                 get_observability_bus()
 
         mock_start.assert_not_called()
+
+    def test_get_observability_bus_passes_backend_lazy_init_setting(self):
+        """Factory should pass event_backend_lazy_init through backend creation."""
+
+        class _Settings:
+            event_backend_type = "redis"
+            event_backend_lazy_init = True
+            event_emit_sync_metrics_enabled = False
+            event_emit_sync_metrics_interval_seconds = 30.0
+            event_emit_sync_metrics_reset_after_emit = False
+            event_emit_sync_metrics_topic = "core.events.emit_sync.metrics"
+
+        reset_container()
+        try:
+            with patch("victor.config.settings.get_settings", return_value=_Settings()):
+                with patch(
+                    "victor.core.events.backends.create_event_backend",
+                    return_value=InMemoryEventBackend(),
+                ) as mock_create:
+                    get_observability_bus()
+        finally:
+            reset_container()
+
+        mock_create.assert_called_once()
+        assert mock_create.call_args.kwargs["lazy_init"] is True
 
 
 # =============================================================================

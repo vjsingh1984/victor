@@ -40,6 +40,7 @@ from victor.core.events import (
     IEventBackend,
     # Backends
     InMemoryEventBackend,
+    LazyInitEventBackend,
     # Specialized buses
     ObservabilityBus,
     AgentMessageBus,
@@ -394,6 +395,56 @@ class TestObservabilityBus:
             "continuation_strategy.py and native/observability.py depend on it"
         )
 
+    @pytest.mark.asyncio
+    async def test_emit_auto_connects_using_protocol_property(self):
+        """emit should use protocol is_connected, not private backend attributes."""
+
+        class PropertyOnlyBackend:
+            def __init__(self):
+                self._connected = False
+                self.connect_calls = 0
+                self.publish_calls = 0
+
+            @property
+            def backend_type(self):
+                return BackendType.KAFKA
+
+            @property
+            def is_connected(self):
+                return self._connected
+
+            async def connect(self):
+                self.connect_calls += 1
+                self._connected = True
+
+            async def disconnect(self):
+                self._connected = False
+
+            async def health_check(self):
+                return self._connected
+
+            async def publish(self, event: MessagingEvent):
+                self.publish_calls += 1
+                return True
+
+            async def publish_batch(self, events):
+                return len(events)
+
+            async def subscribe(self, pattern, handler):
+                return SubscriptionHandle(subscription_id="sub1", pattern=pattern)
+
+            async def unsubscribe(self, handle):
+                return True
+
+        backend = PropertyOnlyBackend()
+        bus = ObservabilityBus(backend=backend)
+
+        result = await bus.emit("metric.latency", {"value": 1.23})
+
+        assert result is True
+        assert backend.connect_calls == 1
+        assert backend.publish_calls == 1
+
 
 # =============================================================================
 # AgentMessageBus Tests
@@ -471,6 +522,56 @@ class TestAgentMessageBus:
         assert len(agent2_msgs) == 1
         assert agent1_msgs[0].data["phase"] == "planning"
 
+    @pytest.mark.asyncio
+    async def test_send_auto_connects_using_protocol_property(self):
+        """send should use protocol is_connected, not private backend attributes."""
+
+        class PropertyOnlyBackend:
+            def __init__(self):
+                self._connected = False
+                self.connect_calls = 0
+                self.publish_calls = 0
+
+            @property
+            def backend_type(self):
+                return BackendType.REDIS
+
+            @property
+            def is_connected(self):
+                return self._connected
+
+            async def connect(self):
+                self.connect_calls += 1
+                self._connected = True
+
+            async def disconnect(self):
+                self._connected = False
+
+            async def health_check(self):
+                return self._connected
+
+            async def publish(self, event: MessagingEvent):
+                self.publish_calls += 1
+                return True
+
+            async def publish_batch(self, events):
+                return len(events)
+
+            async def subscribe(self, pattern, handler):
+                return SubscriptionHandle(subscription_id="sub1", pattern=pattern)
+
+            async def unsubscribe(self, handle):
+                return True
+
+        backend = PropertyOnlyBackend()
+        bus = AgentMessageBus(backend=backend)
+
+        result = await bus.send("task", {"action": "analyze"}, to_agent="researcher")
+
+        assert result is True
+        assert backend.connect_calls == 1
+        assert backend.publish_calls == 1
+
 
 # =============================================================================
 # Factory Tests
@@ -527,6 +628,61 @@ class TestBackendFactory:
         # Create
         backend = create_event_backend(backend_type=BackendType.KAFKA)
         assert backend.backend_type == BackendType.KAFKA
+
+    @pytest.mark.asyncio
+    async def test_lazy_init_defers_backend_construction(self, monkeypatch):
+        """Lazy init should not construct backend until first operation."""
+        import victor.core.events.backends as backends_module
+
+        constructed = 0
+
+        class MockRedisBackend:
+            def __init__(self):
+                self._connected = False
+
+            @property
+            def backend_type(self):
+                return BackendType.REDIS
+
+            @property
+            def is_connected(self):
+                return self._connected
+
+            async def connect(self):
+                self._connected = True
+
+            async def disconnect(self):
+                self._connected = False
+
+            async def health_check(self):
+                return True
+
+            async def publish(self, event: MessagingEvent):
+                return True
+
+            async def publish_batch(self, events):
+                return len(events)
+
+            async def subscribe(self, pattern, handler):
+                return SubscriptionHandle(subscription_id="sub1", pattern=pattern)
+
+            async def unsubscribe(self, handle):
+                return True
+
+        def factory(config):
+            nonlocal constructed
+            constructed += 1
+            return MockRedisBackend()
+
+        monkeypatch.setitem(backends_module._backend_factories, BackendType.REDIS, factory)
+
+        backend = create_event_backend(backend_type=BackendType.REDIS, lazy_init=True)
+        assert isinstance(backend, LazyInitEventBackend)
+        assert backend.backend_type == BackendType.REDIS
+        assert constructed == 0
+
+        await backend.connect()
+        assert constructed == 1
 
 
 # =============================================================================

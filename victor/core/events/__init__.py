@@ -104,6 +104,7 @@ from victor.core.events.protocols import (
 from victor.core.events.backends import (
     # Backends
     InMemoryEventBackend,
+    LazyInitEventBackend,
     # Specialized buses
     ObservabilityBus,
     AgentMessageBus,
@@ -188,6 +189,7 @@ __all__ = [
     "EventSubscriptionError",
     # Protocol-based - Backends
     "InMemoryEventBackend",
+    "LazyInitEventBackend",
     # Protocol-based - Specialized buses
     "ObservabilityBus",
     "AgentMessageBus",

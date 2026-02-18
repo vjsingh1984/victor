@@ -272,6 +272,7 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
     # Create event backend configuration from settings
     # Check for new setting, fall back to legacy setting
     backend_type_str = getattr(settings, "event_backend_type", "in_memory")
+    lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
     if isinstance(backend_type_str, str):
         backend_type = BackendType(backend_type_str.lower())
     else:
@@ -288,7 +289,7 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
     # Register IEventBackend as singleton
     container.register(
         IEventBackend,
-        lambda c: create_event_backend(backend_config),
+        lambda c: create_event_backend(backend_config, lazy_init=lazy_init),
         ServiceLifetime.SINGLETON,
     )
 

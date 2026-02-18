@@ -17,6 +17,7 @@
 import pytest
 from typing import List
 from unittest.mock import patch, MagicMock
+import threading
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 
@@ -180,6 +181,101 @@ class TestGetExtensionsLSPCompliance:
         ), "LSP violation: different subclasses return different types"
         assert isinstance(extensions1, VerticalExtensions)
         assert isinstance(extensions2, VerticalExtensions)
+
+
+class TestGetExtensionsAsync:
+    """Tests for async extension loading API."""
+
+    def setup_method(self):
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_never_returns_none(self):
+        """Async API should return VerticalExtensions, never None."""
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        extensions = await ConcreteVertical.get_extensions_async(use_cache=False)
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_caching_works(self):
+        """Async API should reuse cache when enabled."""
+        first = await ConcreteVertical.get_extensions_async(use_cache=True)
+        second = await ConcreteVertical.get_extensions_async(use_cache=True)
+        assert first is second
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_sync_and_async_share_cache(self):
+        """Sync and async extension loaders should share the same cache entry."""
+        sync_extensions = ConcreteVertical.get_extensions(use_cache=True)
+        async_extensions = await ConcreteVertical.get_extensions_async(use_cache=True)
+        assert sync_extensions is async_extensions
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_honors_strict_mode(self):
+        """Strict async mode should raise ExtensionLoadError on extension failure."""
+        from victor.core.errors import ExtensionLoadError
+
+        class StrictFailingVertical(VerticalBase):
+            name = "strict_failing_vertical_async"
+            description = "Strict failing async vertical"
+            strict_extension_loading = True
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Strict failing prompt"
+
+            @classmethod
+            def get_safety_extension(cls):
+                raise RuntimeError("simulated async strict failure")
+
+        with pytest.raises(ExtensionLoadError) as exc_info:
+            await StrictFailingVertical.get_extensions_async(use_cache=False)
+
+        assert exc_info.value.extension_type == "safety"
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_parallel_loading(self):
+        """Async loader should support parallel extension loading."""
+
+        class BarrierVertical(VerticalBase):
+            name = "barrier_vertical_async"
+            description = "Uses barrier to verify parallel extension loading"
+            strict_extension_loading = True
+            _barrier = threading.Barrier(3)
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Barrier vertical prompt"
+
+            @classmethod
+            def get_middleware(cls):
+                cls._barrier.wait(timeout=1.0)
+                return []
+
+            @classmethod
+            def get_safety_extension(cls):
+                cls._barrier.wait(timeout=1.0)
+                return object()
+
+            @classmethod
+            def get_prompt_contributor(cls):
+                cls._barrier.wait(timeout=1.0)
+                return object()
+
+        extensions = await BarrierVertical.get_extensions_async(use_cache=False, strict=True)
+        assert extensions is not None
+        assert len(extensions.safety_extensions) == 1
+        assert len(extensions.prompt_contributors) == 1
 
 
 class TestVerticalBaseConfig:

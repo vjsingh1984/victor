@@ -880,6 +880,12 @@ class Settings(BaseSettings):
     # External backends (kafka, sqs, rabbitmq, redis) require additional dependencies.
     event_backend_type: str = "in_memory"
 
+    # Event backend lazy initialization
+    # When True, backend objects for non-in-memory types are created only on first
+    # publish/subscribe/connect call instead of at service construction time.
+    # This reduces startup overhead for optional distributed backends.
+    event_backend_lazy_init: bool = True
+
     # Event delivery guarantee: at_most_once | at_least_once | exactly_once
     # - at_most_once: Best effort (may lose events, high performance)
     # - at_least_once: Guaranteed delivery (may duplicate, requires deduplication)

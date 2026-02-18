@@ -82,6 +82,8 @@ Related Modules:
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
 import threading
 from abc import ABC, abstractmethod
@@ -646,6 +648,160 @@ class VerticalExtensionLoader(ABC):
         )
 
         # Cache the extensions
+        with cls._extensions_cache_lock:
+            cls._extensions_cache[cache_key] = extensions
+        return extensions
+
+    @classmethod
+    async def get_extensions_async(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Async version of get_extensions that loads extensions in parallel.
+
+        Uses a thread pool executor to load all extensions concurrently,
+        providing faster initialization when extensions involve I/O.
+
+        Shares the same cache as the synchronous get_extensions() method.
+
+        Args:
+            use_cache: If True (default), return cached extensions if available.
+            strict: Override the class-level strict_extension_loading setting.
+
+        Returns:
+            VerticalExtensions containing all vertical extensions (never None)
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
+        """
+        from victor.core.errors import ExtensionLoadError
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        cache_key = cls._cache_namespace()
+
+        # Return cached extensions if available (shared with sync get_extensions)
+        if use_cache:
+            with cls._extensions_cache_lock:
+                cached = cls._extensions_cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        # Determine strict mode
+        is_strict = strict if strict is not None else cls.strict_extension_loading
+
+        # Collect errors for reporting
+        errors: List[ExtensionLoadError] = []
+        errors_lock = threading.Lock()
+
+        def _load_extension(
+            extension_type: str,
+            loader: callable,
+            is_list: bool = False,
+        ) -> Any:
+            """Load an extension with error handling (runs in thread pool)."""
+            try:
+                return loader()
+            except Exception as e:
+                is_required = extension_type in cls.required_extensions
+                error = ExtensionLoadError(
+                    message=(
+                        f"Failed to load '{extension_type}' extension "
+                        f"for vertical '{cls.name}': {e}"
+                    ),
+                    extension_type=extension_type,
+                    vertical_name=cls.name,
+                    original_error=e,
+                    is_required=is_required,
+                )
+                with errors_lock:
+                    errors.append(error)
+
+                if is_strict or is_required:
+                    logger.error(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}",
+                        exc_info=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}"
+                    )
+                return [] if is_list else None
+
+        # Load all extensions in parallel using a thread pool
+        loop = asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            futures = {
+                "middleware": loop.run_in_executor(
+                    pool, lambda: _load_extension("middleware", cls.get_middleware, True)
+                ),
+                "safety": loop.run_in_executor(
+                    pool, lambda: _load_extension("safety", cls.get_safety_extension)
+                ),
+                "prompt": loop.run_in_executor(
+                    pool, lambda: _load_extension("prompt", cls.get_prompt_contributor)
+                ),
+                "mode_config": loop.run_in_executor(
+                    pool, lambda: _load_extension("mode_config", cls.get_mode_config_provider)
+                ),
+                "tool_deps": loop.run_in_executor(
+                    pool,
+                    lambda: _load_extension("tool_deps", cls.get_tool_dependency_provider),
+                ),
+                "workflow": loop.run_in_executor(
+                    pool, lambda: _load_extension("workflow", cls.get_workflow_provider)
+                ),
+                "service": loop.run_in_executor(
+                    pool, lambda: _load_extension("service", cls.get_service_provider)
+                ),
+                "rl_config": loop.run_in_executor(
+                    pool, lambda: _load_extension("rl_config", cls.get_rl_config_provider)
+                ),
+                "team_spec": loop.run_in_executor(
+                    pool, lambda: _load_extension("team_spec", cls.get_team_spec_provider)
+                ),
+                "enrichment": loop.run_in_executor(
+                    pool, lambda: _load_extension("enrichment", cls.get_enrichment_strategy)
+                ),
+                "tiered_tools": loop.run_in_executor(
+                    pool, lambda: _load_extension("tiered_tools", cls.get_tiered_tool_config)
+                ),
+            }
+
+            # Await all futures
+            results = {}
+            for key, future in futures.items():
+                results[key] = await future
+
+        # Check for critical failures
+        critical_errors = [e for e in errors if is_strict or e.is_required]
+        if critical_errors:
+            raise critical_errors[0]
+
+        if errors:
+            logger.warning(
+                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
+                f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
+            )
+
+        extensions = VerticalExtensions(
+            middleware=results["middleware"] if results["middleware"] else [],
+            safety_extensions=[results["safety"]] if results["safety"] else [],
+            prompt_contributors=[results["prompt"]] if results["prompt"] else [],
+            mode_config_provider=results["mode_config"],
+            tool_dependency_provider=results["tool_deps"],
+            workflow_provider=results["workflow"],
+            service_provider=results["service"],
+            rl_config_provider=results["rl_config"],
+            team_spec_provider=results["team_spec"],
+            enrichment_strategy=results["enrichment"],
+            tiered_tool_config=results["tiered_tools"],
+        )
+
+        # Cache the extensions (shared with sync get_extensions)
         with cls._extensions_cache_lock:
             cls._extensions_cache[cache_key] = extensions
         return extensions
