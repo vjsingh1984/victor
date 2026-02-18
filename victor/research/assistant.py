@@ -181,25 +181,8 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 """
 
     @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory("prompt_contributor", "victor.research.prompts")
-
-    @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         return cls._get_extension_factory("mode_config_provider", "victor.research.mode_config")
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory("safety_extension", "victor.research.safety")
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("research")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
@@ -230,17 +213,6 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         return ResearchWorkflowProvider()
 
     @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for Research vertical.
-
-        Returns:
-            ResearchRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        from victor.research.rl import ResearchRLConfig
-
-        return ResearchRLConfig()
-
-    @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for Research vertical.
 
@@ -250,24 +222,6 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         from victor.research.rl import ResearchRLHooks
 
         return ResearchRLHooks()
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for Research tasks.
-
-        Provides pre-configured team specifications for:
-        - deep_research_team: Comprehensive multi-source research
-        - fact_check_team: Claim verification
-        - literature_team: Academic literature review
-        - competitive_team: Market research
-        - synthesis_team: Report synthesis
-
-        Returns:
-            ResearchTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        from victor.research.teams import ResearchTeamSpecProvider
-
-        return ResearchTeamSpecProvider()
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:

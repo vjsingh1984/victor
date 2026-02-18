@@ -194,6 +194,8 @@ class PlanningCoordinator:
         # Step 2: Generate plan
         logger.info(f"Using planning mode for: {user_message[:100]}...")
         try:
+            # Compact context before plan generation to avoid overflow
+            self._compact_context_if_needed()
             plan = await self._generate_plan(user_message, task_analysis)
             self.active_plan = plan
         except Exception as e:
@@ -211,6 +213,8 @@ class PlanningCoordinator:
         result = await self._execute_plan(plan)
 
         # Step 5: Generate final response
+        # Compact context before generating final summary to avoid overflow
+        self._compact_context_if_needed()
         response = await self._generate_final_response(plan, result)
 
         return response
@@ -479,3 +483,30 @@ class PlanningCoordinator:
         """Clear the active plan."""
         self.active_plan = None
         logger.info("Active plan cleared")
+
+    def _compact_context_if_needed(self) -> None:
+        """Compact conversation context if it's getting too large.
+
+        This helps prevent context overflow during long planning sessions.
+        """
+        orch = self.orchestrator
+        if hasattr(orch, "_context_compactor") and orch._context_compactor:
+            try:
+                # Get current query (user message)
+                current_query = orch._conversation_history.get_latest_user_message() if hasattr(orch, "_conversation_history") else ""
+
+                # Check and compact
+                compaction_result = orch._context_compactor.check_and_compact(
+                    current_query=current_query,
+                    force=False,
+                    tool_call_count=orch.tool_calls_used,
+                    task_complexity="complex",  # Planning tasks are complex
+                )
+
+                if compaction_result.action_taken:
+                    logger.info(
+                        f"Context compacted: {compaction_result.messages_removed} messages removed, "
+                        f"{compaction_result.tokens_freed} tokens freed"
+                    )
+            except Exception as e:
+                logger.warning(f"Context compaction failed: {e}")

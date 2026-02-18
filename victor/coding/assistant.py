@@ -330,24 +330,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return cls._get_cached_extension("middleware", _create_middleware)
 
     @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        """Get coding-specific safety extension (cached).
-
-        Returns:
-            Safety extension for git/refactoring patterns
-        """
-        return cls._get_extension_factory("safety_extension", "victor.coding.safety")
-
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        """Get coding-specific prompt contributor (cached).
-
-        Returns:
-            Prompt contributor with task type hints
-        """
-        return cls._get_extension_factory("prompt_contributor", "victor.coding.prompts")
-
-    @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         """Get coding-specific mode configuration provider (cached).
 
@@ -355,21 +337,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             Mode configuration provider
         """
         return cls._get_extension_factory("mode_config_provider", "victor.coding.mode_config")
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        """Get coding-specific tool dependency provider (cached).
-
-        Returns:
-            Tool dependency provider
-        """
-
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("coding")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
@@ -406,20 +373,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return TieredToolTemplate.for_vertical(cls.name)
 
     @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for Coding vertical (cached).
-
-        Provides configuration for reinforcement learning integration,
-        including active learners, task type mappings, and quality thresholds.
-
-        Returns:
-            CodingRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        return cls._get_extension_factory(
-            "rl_config_provider", "victor.coding.rl", "CodingRLConfig"
-        )
-
-    @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for coding vertical (cached).
 
@@ -429,23 +382,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             CodingRLHooks instance
         """
         return cls._get_extension_factory("rl_hooks", "victor.coding.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for Coding tasks (cached).
-
-        Provides pre-configured team specifications for:
-        - feature_team: Feature implementation
-        - bug_fix_team: Bug investigation and fix
-        - refactoring_team: Safe refactoring
-        - review_team: Comprehensive code review
-        - testing_team: Test coverage improvement
-        - documentation_team: Documentation generation
-
-        Returns:
-            CodingTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor.coding.teams")
 
     @classmethod
     def get_capability_provider(cls) -> Any:

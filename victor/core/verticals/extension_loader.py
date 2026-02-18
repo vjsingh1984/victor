@@ -251,23 +251,41 @@ class VerticalExtensionLoader(ABC):
     def get_safety_extension(cls) -> Optional[Any]:
         """Get safety extension for this vertical.
 
-        Override to provide vertical-specific dangerous operation patterns.
+        Default implementation uses the extension factory pattern with the vertical's
+        safety module. Override only if custom behavior needed.
+
+        This eliminates ~20 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Safety extension (SafetyExtensionProtocol) or None
         """
-        return None
+        try:
+            return cls._get_extension_factory(
+                "safety_extension",
+                f"victor.{cls.name}.safety",
+            )
+        except (ImportError, AttributeError):
+            return None
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[Any]:
         """Get prompt contributor for this vertical.
 
-        Override to provide vertical-specific task hints and prompt sections.
+        Default implementation uses the extension factory pattern with the vertical's
+        prompts module. Override only if custom behavior needed.
+
+        This eliminates ~25 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Prompt contributor (PromptContributorProtocol) or None
         """
-        return None
+        try:
+            return cls._get_extension_factory(
+                "prompt_contributor",
+                f"victor.{cls.name}.prompts",
+            )
+        except (ImportError, AttributeError):
+            return None
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
@@ -367,12 +385,24 @@ class VerticalExtensionLoader(ABC):
     def get_tool_dependency_provider(cls) -> Optional[Any]:
         """Get tool dependency provider for this vertical.
 
-        Override to provide vertical-specific tool execution patterns.
+        Default implementation uses the framework's create_vertical_tool_dependency_provider()
+        factory function with the vertical's name. Override only if custom behavior needed.
+
+        This eliminates ~25 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Tool dependency provider (ToolDependencyProviderProtocol) or None
         """
-        return None
+        try:
+            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+            return cls._get_cached_extension(
+                "tool_dependency_provider",
+                lambda: create_vertical_tool_dependency_provider(cls.name),
+            )
+        except (ImportError, ValueError):
+            # If factory not available or vertical not recognized, return None
+            return None
 
     @classmethod
     def get_tool_graph(cls) -> Optional[Any]:
@@ -438,13 +468,30 @@ class VerticalExtensionLoader(ABC):
     def get_rl_config_provider(cls) -> Optional[Any]:
         """Get RL configuration provider for this vertical.
 
-        Override to provide vertical-specific RL learner configurations,
-        task type mappings, and quality thresholds.
+        Default implementation tries direct import pattern first, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~25 LOC of duplicated wrapper code across verticals.
 
         Returns:
             RL config provider (RLConfigProviderProtocol) or None
         """
-        return None
+        try:
+            # Try direct import pattern (e.g., CodingRLConfig)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}RLConfig"
+            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
+            return getattr(module, class_name)()
+        except (ImportError, AttributeError):
+            try:
+                # Fall back to extension factory pattern
+                return cls._get_extension_factory(
+                    "rl_config_provider",
+                    f"victor.{cls.name}.rl",
+                    class_name,
+                )
+            except (ImportError, AttributeError):
+                return None
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
@@ -462,13 +509,29 @@ class VerticalExtensionLoader(ABC):
     def get_team_spec_provider(cls) -> Optional[Any]:
         """Get team specification provider for this vertical.
 
-        Override to provide vertical-specific multi-agent team
-        configurations for complex task execution.
+        Default implementation tries direct import pattern first, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~30 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Team spec provider (TeamSpecProviderProtocol) or None
         """
-        return None
+        try:
+            # Try direct import pattern (e.g., CodingTeamSpecProvider)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}TeamSpecProvider"
+            module = __import__(f"victor.{cls.name}.teams", fromlist=[class_name])
+            return getattr(module, class_name)()
+        except (ImportError, AttributeError):
+            try:
+                # Fall back to extension factory pattern
+                return cls._get_extension_factory(
+                    "team_spec_provider",
+                    f"victor.{cls.name}.teams",
+                )
+            except (ImportError, AttributeError):
+                return None
 
     @classmethod
     def get_service_provider(cls) -> Optional[Any]:

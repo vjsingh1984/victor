@@ -185,31 +185,8 @@ When presenting analysis:
 """
 
     @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory("prompt_contributor", "victor.dataanalysis.prompts")
-
-    @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         return cls._get_extension_factory("mode_config_provider", "victor.dataanalysis.mode_config")
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory("safety_extension", "victor.dataanalysis.safety")
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        """Get tool dependency provider using centralized factory.
-
-        Phase 4: Migrated from deprecated DataAnalysisToolDependencyProvider
-        wrapper to centralized create_vertical_tool_dependency_provider().
-        """
-
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("dataanalysis")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
@@ -240,17 +217,6 @@ When presenting analysis:
         return DataAnalysisWorkflowProvider()
 
     @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for Data Analysis vertical.
-
-        Returns:
-            DataAnalysisRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        from victor.dataanalysis.rl import DataAnalysisRLConfig
-
-        return DataAnalysisRLConfig()
-
-    @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for Data Analysis vertical.
 
@@ -260,24 +226,6 @@ When presenting analysis:
         from victor.dataanalysis.rl import DataAnalysisRLHooks
 
         return DataAnalysisRLHooks()
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for Data Analysis tasks.
-
-        Provides pre-configured team specifications for:
-        - eda_team: Exploratory data analysis
-        - cleaning_team: Data quality and preparation
-        - statistics_team: Hypothesis testing
-        - ml_team: Machine learning pipeline
-        - visualization_team: Charts and dashboards
-
-        Returns:
-            DataAnalysisTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        from victor.dataanalysis.teams import DataAnalysisTeamSpecProvider
-
-        return DataAnalysisTeamSpecProvider()
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:

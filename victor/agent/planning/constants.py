@@ -25,11 +25,11 @@ from typing import Dict, Set
 # =============================================================================
 
 # Maximum number of tools to expose for each complexity level
-# Increased 3x to handle complex architecture analysis tasks
+# Set high for complex tasks - context compaction will manage overflow
 COMPLEXITY_TOOL_LIMITS: Dict[str, int] = {
-    "simple": 15,  # Auto mode, minimal tools for quick execution
-    "moderate": 30,  # Plan-mode, balanced tools
-    "complex": 45,  # Plan-mode, comprehensive tools for complex tasks
+    "simple": 10,
+    "moderate": 30,
+    "complex": 100,  # High limit for complex architecture analysis
 }
 
 

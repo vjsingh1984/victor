@@ -499,6 +499,12 @@ async def run_oneshot(
     except Exception:
         pass
 
+    # If planning is enabled, disable thinking mode to avoid context bloat
+    # Planning mode generates structured plans which don't need extended reasoning
+    if enable_planning and thinking:
+        console.print("[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]")
+        thinking = False
+
     agent = None
     shim: Optional[FrameworkShim] = None
     try:

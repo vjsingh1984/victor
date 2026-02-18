@@ -175,16 +175,8 @@ When creating configurations:
 """
 
     @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory("prompt_contributor", "victor.devops.prompts")
-
-    @classmethod
     def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
         return cls._get_extension_factory("mode_config_provider", "victor.devops.mode_config")
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory("safety_extension", "victor.devops.safety")
 
     @classmethod
     def get_middleware(cls) -> List[MiddlewareProtocol]:
@@ -226,15 +218,6 @@ When creating configurations:
         ]
 
     @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("devops")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
-
-    @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
         """Get tiered tool configuration for DevOps."""
         from victor.core.vertical_types import TieredToolTemplate
@@ -260,17 +243,6 @@ When creating configurations:
         return cls._get_extension_factory("workflow_provider", "victor.devops.workflows")
 
     @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for DevOps vertical.
-
-        Returns:
-            DevOpsRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        return cls._get_extension_factory(
-            "rl_config_provider", "victor.devops.rl", "DevOpsRLConfig"
-        )
-
-    @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for DevOps vertical.
 
@@ -278,20 +250,6 @@ When creating configurations:
             DevOpsRLHooks instance
         """
         return cls._get_extension_factory("rl_hooks", "victor.devops.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for DevOps tasks.
-
-        Provides pre-configured team specifications for:
-        - deployment_team: Infrastructure deployment
-        - container_team: Container management
-        - monitoring_team: Observability setup
-
-        Returns:
-            DevOpsTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor.devops.teams")
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:

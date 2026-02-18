@@ -249,17 +249,6 @@ You: [Use rag_query tool with query="authentication"]
         return cls._get_extension_factory("mode_config_provider", "victor.rag.mode_config")
 
     @classmethod
-    def get_tool_dependency_provider(cls):
-        """Get RAG tool dependency provider.
-
-        Returns:
-            RAGToolDependencyProvider instance
-        """
-        return cls._get_extension_factory(
-            "tool_dependency_provider", "victor.rag.tool_dependencies"
-        )
-
-    @classmethod
     def get_workflow_provider(cls):
         """Get the workflow provider for RAG vertical.
 
