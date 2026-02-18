@@ -860,14 +860,9 @@ class RegistryBasedModeConfigProvider:
         Returns:
             Recommended mode name
         """
-        mapping = {
-            "trivial": "quick",
-            "simple": "quick",
-            "moderate": "standard",
-            "complex": "comprehensive",
-            "highly_complex": "extended",
-        }
-        return mapping.get(complexity, "standard")
+        from victor.framework.defaults.mode_configs import DEFAULT_COMPLEXITY_MAP
+
+        return DEFAULT_COMPLEXITY_MAP.get(complexity, "standard")
 
 
 __all__ = [

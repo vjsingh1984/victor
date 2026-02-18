@@ -14,13 +14,18 @@
 
 """Framework defaults — one-stop import for external verticals.
 
-Collects generic stage definitions, safety patterns, RL config, and mode
-config so that external verticals can bootstrap with::
+Collects generic stage definitions, safety patterns, RL config, mode
+config, persona helpers, and task hints so that external verticals can
+bootstrap with::
 
     from victor.framework.defaults import (
         get_default_stages,
         DefaultSafetyExtension,
         BaseRLConfig,
+        DEFAULT_COMPLEXITY_MAP,
+        PersonaHelpers,
+        MODIFICATION_STAGE_TOOLS,
+        scale_budget,
     )
 """
 
@@ -51,6 +56,25 @@ from victor.core.mode_config import (
 # Stage definition type (re-export from existing)
 from victor.framework.stage_manager import StageDefinition
 
+# Mode configs (defaults)
+from victor.framework.defaults.mode_configs import (
+    DEFAULT_COMPLEXITY_MAP,
+    create_complexity_map,
+)
+
+# Personas
+from victor.framework.defaults.personas import PersonaHelpers
+
+# Task hints
+from victor.framework.defaults.task_hints import (
+    ANALYSIS_STAGE_TOOLS,
+    DEFAULT_BUDGET_SCALING,
+    EXECUTION_STAGE_TOOLS,
+    MODIFICATION_STAGE_TOOLS,
+    get_stage_tools_for_category,
+    scale_budget,
+)
+
 __all__ = [
     # Stages
     "get_default_stages",
@@ -67,4 +91,16 @@ __all__ = [
     "RegistryBasedModeConfigProvider",
     "DEFAULT_MODES",
     "DEFAULT_TASK_BUDGETS",
+    # Mode configs (defaults)
+    "DEFAULT_COMPLEXITY_MAP",
+    "create_complexity_map",
+    # Personas
+    "PersonaHelpers",
+    # Task hints
+    "MODIFICATION_STAGE_TOOLS",
+    "ANALYSIS_STAGE_TOOLS",
+    "EXECUTION_STAGE_TOOLS",
+    "get_stage_tools_for_category",
+    "DEFAULT_BUDGET_SCALING",
+    "scale_budget",
 ]
