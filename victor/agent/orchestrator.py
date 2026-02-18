@@ -3017,6 +3017,51 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return await self._chat_coordinator.chat(user_message)
 
+    async def chat_with_planning(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = None,
+    ) -> CompletionResponse:
+        """Chat with automatic planning for complex multi-step tasks.
+
+        This method extends regular chat by automatically detecting when a task
+        is complex enough to benefit from structured planning. It then:
+
+        1. Generates a structured plan using ReadableTaskPlan (token-efficient)
+        2. Executes the plan step-by-step with context-aware tools
+        3. Provides a comprehensive summary of results
+
+        For simple tasks, it falls back to regular direct chat.
+
+        Args:
+            user_message: User's message
+            use_planning: Force planning on/off. None = auto-detect
+
+        Returns:
+            CompletionResponse from the model
+
+        Example:
+            # Auto-detect if planning is needed (recommended)
+            response = await agent.chat_with_planning(
+                "Analyze the codebase architecture and provide SOLID evaluation"
+            )
+
+            # Force planning mode
+            response = await agent.chat_with_planning(
+                "Implement user auth",
+                use_planning=True
+            )
+
+            # Disable planning (use direct chat)
+            response = await agent.chat_with_planning(
+                "Quick question",
+                use_planning=False
+            )
+        """
+        return await self._chat_coordinator.chat_with_planning(
+            user_message, use_planning
+        )
+
     async def _handle_context_and_iteration_limits(
         self,
         user_message: str,

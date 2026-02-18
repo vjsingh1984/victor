@@ -50,6 +50,12 @@ from victor.agent.coordinators.session_coordinator import (
     SessionInfo,
     create_session_coordinator,
 )
+from victor.agent.coordinators.planning_coordinator import (
+    PlanningCoordinator,
+    PlanningConfig,
+    PlanningMode,
+    PlanningResult,
+)
 
 __all__ = [
     "ChatCoordinator",
@@ -65,4 +71,8 @@ __all__ = [
     "TaskContext",
     "IToolCoordinator",
     "create_tool_coordinator",
+    "PlanningCoordinator",
+    "PlanningConfig",
+    "PlanningMode",
+    "PlanningResult",
 ]

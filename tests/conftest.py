@@ -391,6 +391,58 @@ def mock_team_coordinator():
     return coordinator
 
 
+@pytest.fixture
+def mock_orchestrator():
+    """Mock AgentOrchestrator for testing without full initialization.
+
+    Creates a mock orchestrator with stubbed methods for testing
+    coordinator functionality in isolation.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from victor.framework.task import TaskComplexity as FrameworkTaskComplexity
+
+    # Create mock orchestrator
+    orchestrator = MagicMock()
+
+    # Stub common attributes
+    orchestrator.provider = MagicMock()
+    orchestrator.provider.supports_tools.return_value = True
+    orchestrator.model = "test-model"
+    orchestrator.temperature = 0.7
+    orchestrator.max_tokens = 4096
+    orchestrator.tool_budget = 10
+    orchestrator.thinking = False
+
+    # Stub chat method
+    orchestrator.chat = AsyncMock(
+        return_value=MagicMock(
+            content="Test response",
+            role="assistant",
+            tool_calls=None,
+        )
+    )
+
+    # Stub task_classifier
+    orchestrator.task_classifier = MagicMock()
+    mock_classification = MagicMock()
+    mock_classification.complexity = FrameworkTaskComplexity.MODERATE
+    mock_classification.tool_budget = 10
+    orchestrator.task_classifier.classify.return_value = mock_classification
+
+    # Stub other attributes
+    orchestrator.conversation = MagicMock()
+    orchestrator.conversation.ensure_system_prompt = MagicMock()
+    orchestrator.conversation.message_count.return_value = 1
+
+    orchestrator.tool_selector = MagicMock()
+    orchestrator.tool_selector.select_tools = AsyncMock(return_value=[])
+    orchestrator.tool_selector.prioritize_by_stage = MagicMock(return_value=[])
+
+    orchestrator.messages = []
+
+    return orchestrator
+
+
 # ============ HITL Fixtures ============
 
 

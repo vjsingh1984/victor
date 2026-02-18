@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
+    from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -90,12 +91,133 @@ class ChatCoordinator:
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
+        self._planning_coordinator: Optional["PlanningCoordinator"] = None
 
     # =====================================================================
     # Public API
     # =====================================================================
 
-    async def chat(self, user_message: str) -> CompletionResponse:
+    async def chat(
+        self,
+        user_message: str,
+        use_planning: bool = False,
+    ) -> CompletionResponse:
+        """Send a chat message and get response with full agentic loop.
+
+        This method implements a proper agentic loop that:
+        1. Optionally uses structured planning for complex tasks
+        2. Gets model response
+        3. Executes any tool calls
+        4. Continues until model provides a final response (no tool calls)
+        5. Ensures non-empty response on tool failures
+
+        Args:
+            user_message: User's message
+            use_planning: Whether to use structured planning for complex tasks
+
+        Returns:
+            CompletionResponse from the model with complete response
+        """
+        # Check if we should use planning for this task
+        if use_planning and self._should_use_planning(user_message):
+            return await self._chat_with_planning(user_message)
+
+        # Use standard agentic loop
+        return await self._chat_with_agentic_loop(user_message)
+
+    def _should_use_planning(self, user_message: str) -> bool:
+        """Determine if planning should be used for this task.
+
+        Checks for:
+        1. Planning coordinator is available
+        2. Task complexity threshold
+        3. Multi-step indicators
+
+        Args:
+            user_message: User's message
+
+        Returns:
+            True if planning should be used
+        """
+        # Planning coordinator must be initialized
+        if self._planning_coordinator is None:
+            return False
+
+        # Check orchestrator settings
+        orch = self._orchestrator
+        planning_enabled = getattr(orch.settings, "enable_planning", False)
+        if not planning_enabled:
+            return False
+
+        # Simple heuristic: multi-step keywords
+        multi_step_indicators = [
+            "analyze",
+            "architecture",
+            "design",
+            "evaluate",
+            "compare",
+            "roadmap",
+            "implementation",
+            "refactor",
+            "migration",
+            "step",
+            "phase",
+            "stage",
+            "deliverable",
+        ]
+        message_lower = user_message.lower()
+        keyword_count = sum(1 for kw in multi_step_indicators if kw in message_lower)
+
+        # Use planning if 2+ keywords or task is complex
+        if keyword_count >= 2:
+            return True
+
+        # Check task complexity
+        from victor.framework.task import TaskComplexity as FrameworkTaskComplexity
+
+        task_classification = orch.task_classifier.classify(user_message)
+        return task_classification.complexity in (
+            FrameworkTaskComplexity.MODERATE,
+            FrameworkTaskComplexity.COMPLEX,
+        )
+
+    async def _chat_with_planning(self, user_message: str) -> CompletionResponse:
+        """Chat using structured planning for complex tasks.
+
+        Args:
+            user_message: User's message
+
+        Returns:
+            CompletionResponse from planning-based execution
+        """
+        from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
+
+        if self._planning_coordinator is None:
+            # Lazy initialization
+            self._planning_coordinator = PlanningCoordinator(self._orchestrator)
+
+        # Get task analysis for planning
+        orch = self._orchestrator
+        task_analysis = orch.task_analyzer.analyze(user_message)
+
+        # Use planning coordinator
+        response = await self._planning_coordinator.chat_with_planning(
+            user_message,
+            task_analysis=task_analysis,
+        )
+
+        # Add messages to conversation history
+        if not orch._system_added:
+            orch.conversation.ensure_system_prompt()
+            orch._system_added = True
+
+        orch.add_message("user", user_message)
+        if response.content:
+            orch.add_message("assistant", response.content)
+
+        return response
+
+    async def _chat_with_agentic_loop(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
         This method implements a proper agentic loop that:
@@ -1798,3 +1920,118 @@ class ChatCoordinator:
             tool_calls=tool_calls,
             task_type=task_type,
         )
+
+    # =====================================================================
+    # Planning Integration
+    # =====================================================================
+
+    def _get_planning_coordinator(self) -> "PlanningCoordinator":
+        """Get or create the planning coordinator.
+
+        Returns:
+            PlanningCoordinator instance
+        """
+        if self._planning_coordinator is None:
+            from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
+
+            self._planning_coordinator = PlanningCoordinator(self._orchestrator)
+
+        return self._planning_coordinator
+
+    async def chat_with_planning(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = None,
+    ) -> CompletionResponse:
+        """Chat with automatic planning for complex multi-step tasks.
+
+        This method extends the regular chat flow by:
+        1. Analyzing if the task is complex enough to benefit from planning
+        2. If complex, generating a structured plan using ReadableTaskPlan
+        3. Executing the plan step-by-step with context-aware tools
+        4. Providing a summary of results
+
+        For simple tasks, it falls back to regular direct chat.
+
+        Args:
+            user_message: User's message
+            use_planning: Force planning on/off. None = auto-detect
+
+        Returns:
+            CompletionResponse from the model
+
+        Example:
+            # Auto-detect if planning is needed
+            response = await coordinator.chat_with_planning(
+                "Analyze the codebase architecture and provide SOLID evaluation"
+            )
+
+            # Force planning mode
+            response = await coordinator.chat_with_planning(
+                "Implement user auth",
+                use_planning=True
+            )
+        """
+        orch = self._orchestrator
+
+        # If planning is explicitly disabled, use regular chat
+        if use_planning is False:
+            return await self.chat(user_message)
+
+        # If planning is explicitly enabled, use planning coordinator
+        if use_planning is True:
+            planning_coordinator = self._get_planning_coordinator()
+            return await planning_coordinator.chat_with_planning(user_message)
+
+        # Auto-detect: analyze if planning would be beneficial
+        task_analysis = self._analyze_task_for_planning(user_message)
+
+        # Get planning coordinator and let it decide
+        planning_coordinator = self._get_planning_coordinator()
+
+        # Check if planning should be used
+        should_plan = planning_coordinator._should_use_planning(user_message, task_analysis)
+
+        if should_plan:
+            logger.info("Using planning-based chat execution")
+            return await planning_coordinator.chat_with_planning(user_message, task_analysis)
+        else:
+            logger.info("Using direct chat (no planning needed)")
+            return await self.chat(user_message)
+
+    def _analyze_task_for_planning(self, user_message: str) -> Optional["TaskAnalysis"]:
+        """Analyze task to determine if planning would be beneficial.
+
+        Args:
+            user_message: User's message
+
+        Returns:
+            TaskAnalysis if available, None otherwise
+        """
+        orch = self._orchestrator
+
+        # Try to get task analysis from task_analyzer if available
+        if hasattr(orch, "task_analyzer"):
+            try:
+                return orch.task_analyzer.analyze(user_message)
+            except Exception as e:
+                logger.warning(f"Task analysis failed: {e}")
+
+        # Fall back to task_classifier
+        if hasattr(orch, "task_classifier"):
+            try:
+                classification = orch.task_classifier.classify(user_message)
+                # Convert TaskClassification to TaskAnalysis-like structure
+                from victor.agent.task_analyzer import TaskAnalysis
+                from victor.agent.unified_classifier import UnifiedTaskType
+
+                return TaskAnalysis(
+                    complexity=classification.complexity,
+                    tool_budget=classification.tool_budget,
+                    complexity_confidence=0.8,  # Default confidence
+                    unified_task_type=UnifiedTaskType.DEFAULT,
+                )
+            except Exception as e:
+                logger.warning(f"Task classification failed: {e}")
+
+        return None
