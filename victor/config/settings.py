@@ -607,6 +607,21 @@ class Settings(BaseSettings):
     # Tool selection fallback
     fallback_max_tools: int = 8  # Cap tool list when stage pruning removes everything
 
+    # Autonomous Planning Settings
+    # When enabled, complex multi-step tasks use structured planning instead of direct chat
+    enable_planning: bool = Field(
+        default=False,
+        description="Auto-detect and use planning for complex tasks (default: off)"
+    )
+    planning_min_complexity: str = Field(
+        default="moderate",
+        description="Minimum complexity to trigger planning: simple, moderate, complex"
+    )
+    planning_show_plan: bool = Field(
+        default=True,
+        description="Show plan before execution (for transparency)"
+    )
+
     # Tool result caching (opt-in per tool)
     tool_cache_enabled: bool = True
     tool_cache_ttl: int = 600  # seconds
