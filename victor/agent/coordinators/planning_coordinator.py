@@ -83,7 +83,7 @@ class PlanningConfig:
     """Configuration for planning behavior."""
 
     # Minimum complexity level to trigger planning
-    min_planning_complexity: TaskComplexity = TaskComplexity.MODERATE
+    min_planning_complexity: TaskComplexity
 
     # Thresholds for detecting multi-step tasks
     min_steps_threshold: int = 3  # Minimum "steps" mentioned to trigger planning

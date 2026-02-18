@@ -30,7 +30,7 @@ class TestPlanningConfig:
 
     def test_default_config(self):
         """Test default configuration values."""
-        config = PlanningConfig()
+        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
 
         assert config.min_planning_complexity == TaskComplexity.MODERATE
         assert config.min_steps_threshold == 3
@@ -113,16 +113,28 @@ class TestPlanningResult:
 class TestPlanningCoordinator:
     """Tests for PlanningCoordinator (without orchestrator)."""
 
-    def test_planning_coordinator_init(self):
-        """Test coordinator initialization."""
-        # Create a mock orchestrator for testing
+    def _create_mock_orchestrator(self):
+        """Helper to create a mock orchestrator."""
         class MockOrchestrator:
             provider = None
             model = "test-model"
             max_tokens = 4096
 
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        return MockOrchestrator()
+
+    def _create_coordinator(self):
+        """Helper to create a coordinator with default config."""
+        from victor.agent.coordinators.planning_coordinator import PlanningConfig
+
+        mock_orch = self._create_mock_orchestrator()
+        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
+        return PlanningCoordinator(mock_orch, config)
+
+    def test_planning_coordinator_init(self):
+        """Test coordinator initialization."""
+        mock_orch = self._create_mock_orchestrator()
+        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
+        coordinator = PlanningCoordinator(mock_orch, config)
 
         assert coordinator.orchestrator == mock_orch
         assert coordinator.active_plan is None
@@ -130,13 +142,7 @@ class TestPlanningCoordinator:
 
     def test_planning_mode_setter(self):
         """Test setting planning mode."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
 
         coordinator.set_planning_mode(PlanningMode.ALWAYS)
         assert coordinator._planning_mode == PlanningMode.ALWAYS
@@ -146,13 +152,7 @@ class TestPlanningCoordinator:
 
     def test_clear_active_plan(self):
         """Test clearing active plan."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
 
         # Set a mock plan
         from victor.agent.planning.readable_schema import ReadableTaskPlan
@@ -174,13 +174,7 @@ class TestPlanningCoordinator:
 
     def test_should_use_planning_keywords(self):
         """Test planning detection via keywords."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
 
         # Test with multi-step keywords
         message = "Analyze the architecture and evaluate scalability"
@@ -190,13 +184,7 @@ class TestPlanningCoordinator:
 
     def test_should_not_use_planning_simple(self):
         """Test that simple messages don't trigger planning."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
 
         # Test simple message
         message = "What is the weather today?"
@@ -206,13 +194,7 @@ class TestPlanningCoordinator:
 
     def test_should_use_planning_mode_never(self):
         """Test NEVER planning mode."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
         coordinator.set_planning_mode(PlanningMode.NEVER)
 
         # Even with keywords, should not plan
@@ -223,13 +205,7 @@ class TestPlanningCoordinator:
 
     def test_should_use_planning_mode_always(self):
         """Test ALWAYS planning mode."""
-        class MockOrchestrator:
-            provider = None
-            model = "test-model"
-            max_tokens = 4096
-
-        mock_orch = MockOrchestrator()
-        coordinator = PlanningCoordinator(mock_orch)
+        coordinator = self._create_coordinator()
         coordinator.set_planning_mode(PlanningMode.ALWAYS)
 
         # Even simple message should plan

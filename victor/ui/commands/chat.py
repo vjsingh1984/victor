@@ -415,6 +415,7 @@ def chat(
                     max_iterations=max_iterations,
                     vertical=vertical,
                     enable_observability=enable_observability,
+                    enable_planning=enable_planning,
                     legacy_mode=legacy_mode,
                 )
             )
@@ -435,6 +436,7 @@ def chat(
                     max_iterations=max_iterations,
                     vertical=vertical,
                     enable_observability=enable_observability,
+                    enable_planning=enable_planning,
                     legacy_mode=legacy_mode,
                     use_tui=use_tui,
                     resume_session_id=session_id,
@@ -467,6 +469,7 @@ async def run_oneshot(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
+    enable_planning: bool = False,
     legacy_mode: bool = False,
 ) -> None:
     """Run a single message and exit.
@@ -554,15 +557,28 @@ async def run_oneshot(
         model_name = None
 
         if stream and agent.provider.supports_streaming():
-            from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
+            # Planning mode requires non-streaming execution (plan generation → step execution → summary)
+            # Fall back to non-streaming when planning is enabled
+            if enable_planning and hasattr(agent, "chat_with_planning"):
+                response = await agent.chat_with_planning(message)
+                content_buffer = response.content
+                usage_stats = response.usage
+                model_name = response.model
+                formatter.response(
+                    content=content_buffer,
+                    usage=usage_stats,
+                    model=model_name,
+                )
+            else:
+                from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
 
-            use_live = renderer_choice in {"rich", "auto"}
-            if renderer_choice in {"rich-text", "text"}:
-                use_live = False
-            renderer = (
-                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
-            )
-            content_buffer = await stream_response(agent, message, renderer)
+                use_live = renderer_choice in {"rich", "auto"}
+                if renderer_choice in {"rich-text", "text"}:
+                    use_live = False
+                renderer = (
+                    LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+                )
+                content_buffer = await stream_response(agent, message, renderer)
         else:
             # Use planning mode if enabled and available
             if enable_planning and hasattr(agent, "chat_with_planning"):
@@ -610,6 +626,7 @@ async def run_interactive(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
+    enable_planning: bool = False,
     legacy_mode: bool = False,
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
@@ -839,21 +856,26 @@ async def _run_cli_repl(
             console.print("[blue]Assistant:[/]")
 
             if stream:
-                from victor.agent.response_sanitizer import sanitize_response
-                from victor.ui.rendering import (
-                    LiveDisplayRenderer,
-                    FormatterRenderer,
-                    stream_response,
-                )
+                # Planning mode requires non-streaming execution
+                if enable_planning and hasattr(agent, "chat_with_planning"):
+                    response = await agent.chat_with_planning(user_input)
+                    console.print(Markdown(response.content))
+                else:
+                    from victor.agent.response_sanitizer import sanitize_response
+                    from victor.ui.rendering import (
+                        LiveDisplayRenderer,
+                        FormatterRenderer,
+                        stream_response,
+                    )
 
-                use_live = renderer_choice in {"rich", "auto"}
-                renderer = (
-                    LiveDisplayRenderer(console)
-                    if use_live
-                    else FormatterRenderer(create_formatter(), console)
-                )
-                content_buffer = await stream_response(agent, user_input, renderer)
-                content_buffer = sanitize_response(content_buffer)
+                    use_live = renderer_choice in {"rich", "auto"}
+                    renderer = (
+                        LiveDisplayRenderer(console)
+                        if use_live
+                        else FormatterRenderer(create_formatter(), console)
+                    )
+                    content_buffer = await stream_response(agent, user_input, renderer)
+                    content_buffer = sanitize_response(content_buffer)
             else:
                 # Use planning mode if enabled and available
                 if enable_planning and hasattr(agent, "chat_with_planning"):
