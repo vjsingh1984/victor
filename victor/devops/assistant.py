@@ -182,8 +182,8 @@ When creating configurations:
     def get_middleware(cls) -> List[MiddlewareProtocol]:
         """Get DevOps-specific middleware.
 
-        Uses framework-level middleware for common functionality:
-        - GitSafetyMiddleware: Block dangerous git operations (force push, hard reset)
+        Uses MiddlewareComposer for consistent middleware composition:
+        - GitSafetyMiddleware: Block dangerous git operations (strict for infrastructure)
         - SecretMaskingMiddleware: Mask secrets in tool results
         - LoggingMiddleware: Audit logging for tool calls
 
@@ -192,30 +192,25 @@ When creating configurations:
         Returns:
             List of middleware implementations
         """
-        from victor.framework.middleware import (
-            GitSafetyMiddleware,
-            LoggingMiddleware,
-            SecretMaskingMiddleware,
-        )
+        from victor.framework.middleware import MiddlewareComposer
 
-        return [
-            # Git safety is critical for DevOps - block dangerous operations
-            GitSafetyMiddleware(
+        return (
+            MiddlewareComposer()
+            .git_safety(
                 block_dangerous=True,  # Strict for infrastructure
                 warn_on_risky=True,
                 protected_branches={"production", "staging"},  # Additional protected branches
-            ),
-            # Always mask secrets in infrastructure output
-            SecretMaskingMiddleware(
+            )
+            .secret_masking(
                 replacement="[REDACTED]",
                 mask_in_arguments=True,  # Also mask secrets in inputs
-            ),
-            # Audit logging for compliance
-            LoggingMiddleware(
+            )
+            .logging(
                 include_arguments=True,
-                sanitize_arguments=True,
-            ),
-        ]
+                include_results=True,
+            )
+            .build()
+        )
 
     @classmethod
     def get_tiered_tools(cls) -> Optional[TieredToolConfig]:

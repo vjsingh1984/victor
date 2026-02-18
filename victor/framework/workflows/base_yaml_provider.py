@@ -67,6 +67,8 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
 
     Optionally override:
         - _get_workflows_directory(): Return Path to YAML workflow files
+        - AUTO_WORKFLOW_PATTERNS: Class attribute for auto-trigger patterns
+        - TASK_TYPE_MAPPINGS: Class attribute for task type mappings
         - get_auto_workflows(): Return automatic workflow triggers
         - get_workflow_for_task_type(): Map task types to workflow names
 
@@ -75,6 +77,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         - Automatic escape hatches registration from vertical-specific modules
         - Standard and streaming workflow execution
         - Error handling with graceful degradation
+        - Configurable auto-workflow triggers via class attributes
 
     Example:
         class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
@@ -83,6 +86,13 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             def _get_escape_hatches_module(self) -> str:
                 return "victor.devops.escape_hatches"
 
+            # Option 1: Use class attributes (new pattern)
+            AUTO_WORKFLOW_PATTERNS = [
+                (r"deploy\\s+infrastructure", "deploy_infrastructure"),
+                (r"container(ize)?", "container_setup"),
+            ]
+
+            # Option 2: Override method (old pattern, still supported)
             def get_auto_workflows(self) -> List[Tuple[str, str]]:
                 return [
                     (r"deploy\\s+infrastructure", "deploy_infrastructure"),
@@ -91,6 +101,28 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
 
         provider = DevOpsWorkflowProvider()
         workflows = provider.get_workflows()  # Lazy-loads YAML files
+    """
+
+    # Class attributes for auto-workflow configuration
+    # Subclasses can override these to provide auto-trigger patterns
+    AUTO_WORKFLOW_PATTERNS: List[Tuple[str, str]] = []
+    """List of (regex_pattern, workflow_name) tuples for auto-triggering workflows.
+
+    Example:
+        AUTO_WORKFLOW_PATTERNS = [
+            (r"deep\\s+research", "deep_research"),
+            (r"fact\\s*check", "fact_check"),
+        ]
+    """
+
+    TASK_TYPE_MAPPINGS: Dict[str, str] = {}
+    """Dict mapping task types to workflow names.
+
+    Example:
+        TASK_TYPE_MAPPINGS = {
+            "research": "deep_research",
+            "fact_check": "fact_check",
+        }
     """
 
     def __init__(self) -> None:
@@ -351,25 +383,38 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
     def get_auto_workflows(self) -> List[Tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 
-        Override this method in subclasses to define patterns that
-        automatically trigger specific workflows based on user input.
+        This default implementation reads from the AUTO_WORKFLOW_PATTERNS
+        class attribute. Subclasses can either:
+        1. Set AUTO_WORKFLOW_PATTERNS class attribute (recommended)
+        2. Override this method for dynamic behavior
 
         Returns:
             List of (regex_pattern, workflow_name) tuples
 
         Example:
-            def get_auto_workflows(self) -> List[Tuple[str, str]]:
-                return [
+            # Using class attribute (recommended)
+            class MyProvider(BaseYAMLWorkflowProvider):
+                AUTO_WORKFLOW_PATTERNS = [
                     (r"deep\\s+research", "deep_research"),
-                    (r"fact\\s*check", "fact_check"),
                 ]
+
+            # Or override method (for dynamic behavior)
+            def get_auto_workflows(self) -> List[Tuple[str, str]]:
+                patterns = super().get_auto_workflows()
+                if some_condition:
+                    patterns.append((r"custom", "custom_workflow"))
+                return patterns
         """
-        return []
+        # Return copy to prevent accidental modification of class attribute
+        return list(self.AUTO_WORKFLOW_PATTERNS)
 
     def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
         """Get recommended workflow for a task type.
 
-        Override this method in subclasses to map task types to workflow names.
+        This default implementation reads from the TASK_TYPE_MAPPINGS
+        class attribute. Subclasses can either:
+        1. Set TASK_TYPE_MAPPINGS class attribute (recommended)
+        2. Override this method for dynamic behavior
 
         Args:
             task_type: Type of task (e.g., "research", "deploy", "eda")
@@ -378,14 +423,22 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             Workflow name string or None if no mapping exists
 
         Example:
-            def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
-                mapping = {
+            # Using class attribute (recommended)
+            class MyProvider(BaseYAMLWorkflowProvider):
+                TASK_TYPE_MAPPINGS = {
                     "research": "deep_research",
                     "fact_check": "fact_check",
                 }
-                return mapping.get(task_type.lower())
+
+            # Or override method (for dynamic behavior)
+            def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
+                workflow = super().get_workflow_for_task_type(task_type)
+                if workflow:
+                    return workflow
+                # Custom logic
+                return "default_workflow"
         """
-        return None
+        return self.TASK_TYPE_MAPPINGS.get(task_type.lower())
 
     # =========================================================================
     # UnifiedWorkflowCompiler Integration (Recommended Pattern)

@@ -67,6 +67,7 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
     - YAML workflow loading with two-level caching
     - UnifiedWorkflowCompiler integration for consistent execution
     - Checkpointing support for resumable code reviews and TDD cycles
+    - Auto-workflow triggers via class attributes
 
     Example:
         provider = CodingWorkflowProvider()
@@ -82,6 +83,69 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
             print(f"Completed: {node_id}")
     """
 
+    # Auto-workflow triggers for coding tasks
+    AUTO_WORKFLOW_PATTERNS = [
+        # Feature patterns
+        (r"implement\s+.+feature", "feature_implementation"),
+        (r"add\s+.+feature", "feature_implementation"),
+        (r"create\s+.+feature", "feature_implementation"),
+        (r"build\s+new\s+", "feature_implementation"),
+        (r"quick(ly)?\s+implement", "quick_feature"),
+        (r"simple\s+feature", "quick_feature"),
+        # Bug fix patterns
+        (r"fix\s+.+bug", "bug_fix"),
+        (r"debug\s+", "bug_fix"),
+        (r"investigate\s+.+issue", "bug_fix"),
+        (r"quick(ly)?\s+fix", "quick_fix"),
+        (r"simple\s+fix", "quick_fix"),
+        # Review patterns
+        (r"review\s+.+code", "code_review"),
+        (r"code\s+review", "code_review"),
+        (r"comprehensive\s+review", "code_review"),
+        (r"quick(ly)?\s+review", "quick_review"),
+        (r"review\s+.+pr", "pr_review"),
+        (r"review\s+pull\s+request", "pr_review"),
+        (r"pr\s+review", "pr_review"),
+        # TDD patterns
+        (r"tdd\s+", "tdd_cycle"),
+        (r"test.?driven", "tdd_cycle"),
+        (r"write\s+tests?\s+first", "tdd_cycle"),
+        # Refactor patterns
+        (r"refactor\s+", "refactor"),
+        (r"clean\s+up\s+code", "refactor"),
+        (r"improve\s+code\s+quality", "refactor"),
+    ]
+
+    # Task type to workflow mappings
+    TASK_TYPE_MAPPINGS = {
+        # Feature workflows
+        "feature": "feature_implementation",
+        "implement": "feature_implementation",
+        "simple_feature": "quick_feature",
+        "quick_feature": "quick_feature",
+        # Bug fix workflows
+        "bug": "bug_fix",
+        "bugfix": "bug_fix",
+        "debug": "bug_fix",
+        "investigation": "bug_fix",
+        "simple_bug": "quick_fix",
+        "quick_fix": "quick_fix",
+        # Review workflows
+        "review": "code_review",
+        "code_review": "code_review",
+        "security_review": "code_review",
+        "quick_review": "quick_review",
+        "pr": "pr_review",
+        "pull_request": "pr_review",
+        "pr_review": "pr_review",
+        # TDD workflows
+        "tdd": "tdd_cycle",
+        "test_driven": "tdd_cycle",
+        # Refactor workflows
+        "refactor": "refactor",
+        "cleanup": "refactor",
+    }
+
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for coding escape hatches.
 
@@ -89,86 +153,6 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
             Module path string for CONDITIONS and TRANSFORMS dictionaries
         """
         return "victor.coding.escape_hatches"
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatic workflow triggers based on query patterns.
-
-        Returns patterns that can trigger workflows automatically
-        based on user input.
-
-        Returns:
-            List of (regex_pattern, workflow_name) tuples
-        """
-        return [
-            # Feature patterns
-            (r"implement\s+.+feature", "feature_implementation"),
-            (r"add\s+.+feature", "feature_implementation"),
-            (r"create\s+.+feature", "feature_implementation"),
-            (r"build\s+new\s+", "feature_implementation"),
-            (r"quick(ly)?\s+implement", "quick_feature"),
-            (r"simple\s+feature", "quick_feature"),
-            # Bug fix patterns
-            (r"fix\s+.+bug", "bug_fix"),
-            (r"debug\s+", "bug_fix"),
-            (r"investigate\s+.+issue", "bug_fix"),
-            (r"quick(ly)?\s+fix", "quick_fix"),
-            (r"simple\s+fix", "quick_fix"),
-            # Review patterns
-            (r"review\s+.+code", "code_review"),
-            (r"code\s+review", "code_review"),
-            (r"comprehensive\s+review", "code_review"),
-            (r"quick(ly)?\s+review", "quick_review"),
-            (r"review\s+.+pr", "pr_review"),
-            (r"review\s+pull\s+request", "pr_review"),
-            (r"pr\s+review", "pr_review"),
-            # TDD patterns
-            (r"tdd\s+", "tdd_cycle"),
-            (r"test.?driven", "tdd_cycle"),
-            (r"write\s+tests?\s+first", "tdd_cycle"),
-            # Refactor patterns
-            (r"refactor\s+", "refactor"),
-            (r"clean\s+up\s+code", "refactor"),
-            (r"improve\s+code\s+quality", "refactor"),
-        ]
-
-    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
-        """Get recommended workflow for a task type.
-
-        Args:
-            task_type: Type of task (feature, bugfix, review, etc.)
-
-        Returns:
-            Workflow name string or None if no mapping exists
-        """
-        task_mapping = {
-            # Feature workflows
-            "feature": "feature_implementation",
-            "implement": "feature_implementation",
-            "simple_feature": "quick_feature",
-            "quick_feature": "quick_feature",
-            # Bug fix workflows
-            "bug": "bug_fix",
-            "bugfix": "bug_fix",
-            "debug": "bug_fix",
-            "investigation": "bug_fix",
-            "simple_bug": "quick_fix",
-            "quick_fix": "quick_fix",
-            # Review workflows
-            "review": "code_review",
-            "code_review": "code_review",
-            "security_review": "code_review",
-            "quick_review": "quick_review",
-            "pr": "pr_review",
-            "pull_request": "pr_review",
-            "pr_review": "pr_review",
-            # TDD workflows
-            "tdd": "tdd_cycle",
-            "test_driven": "tdd_cycle",
-            # Refactor workflows
-            "refactor": "refactor",
-            "cleanup": "refactor",
-        }
-        return task_mapping.get(task_type.lower())
 
 
 __all__ = [

@@ -60,6 +60,7 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
     - YAML workflow loading with two-level caching
     - UnifiedWorkflowCompiler integration for consistent execution
     - Checkpointing support for resumable benchmark runs
+    - Auto-workflow triggers via class attributes
 
     Example:
         provider = BenchmarkWorkflowProvider()
@@ -75,6 +76,60 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
             print(f"Completed: {node_id}")
     """
 
+    # Auto-workflow triggers for benchmark tasks
+    AUTO_WORKFLOW_PATTERNS = [
+        # SWE-bench patterns
+        (r"swe.*bench", "swe_bench"),
+        (r"fix\s+issue", "swe_bench"),
+        (r"resolve\s+bug", "swe_bench"),
+        (r"patch\s+fix", "swe_bench"),
+        # Code generation patterns
+        (r"humaneval", "code_generation"),
+        (r"mbpp", "code_generation"),
+        (r"generate\s+function", "code_generation"),
+        (r"implement\s+function", "code_generation"),
+        (r"write\s+code\s+for", "code_generation"),
+        # Agentic benchmark patterns
+        (r"live.*code.*bench", "live_code_bench"),
+        (r"big.*code.*bench", "big_code_bench"),
+        (r"aider", "aider_polyglot"),
+        (r"polyglot", "aider_polyglot"),
+        # Pass@k patterns
+        (r"pass@\d+", "passk_generation"),
+        (r"pass\s*at\s*k", "passk_generation"),
+        (r"multi.*attempt", "passk_generation"),
+    ]
+
+    # Task type to workflow mappings
+    TASK_TYPE_MAPPINGS = {
+        # SWE-bench style
+        "swe_bench": "swe_bench",
+        "swe-bench": "swe_bench",
+        "swe_bench_lite": "swe_bench_lite",
+        "bug_fix": "swe_bench",
+        "issue": "swe_bench",
+        "patch": "swe_bench",
+        # Code generation style
+        "code_generation": "code_generation",
+        "humaneval": "code_generation",
+        "mbpp": "code_generation",
+        "function": "code_generation",
+        # Agentic benchmarks
+        "live_code_bench": "live_code_bench",
+        "livecodebench": "live_code_bench",
+        "big_code_bench": "big_code_bench",
+        "bigcodebench": "big_code_bench",
+        "aider": "aider_polyglot",
+        "aider_polyglot": "aider_polyglot",
+        "polyglot": "aider_polyglot",
+        # Pass@k evaluation
+        "passk": "passk_generation",
+        "pass_at_k": "passk_generation",
+        "passk_generation": "passk_generation",
+        "passk_high": "passk_high",
+        "passk_refined": "passk_refined",
+    }
+
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for benchmark escape hatches.
 
@@ -82,74 +137,6 @@ class BenchmarkWorkflowProvider(BaseYAMLWorkflowProvider):
             Module path string for CONDITIONS and TRANSFORMS dictionaries
         """
         return "victor.benchmark.escape_hatches"
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatic workflow triggers based on query patterns.
-
-        Returns:
-            List of (regex_pattern, workflow_name) tuples for auto-triggering
-        """
-        return [
-            # SWE-bench patterns
-            (r"swe.*bench", "swe_bench"),
-            (r"fix\s+issue", "swe_bench"),
-            (r"resolve\s+bug", "swe_bench"),
-            (r"patch\s+fix", "swe_bench"),
-            # Code generation patterns
-            (r"humaneval", "code_generation"),
-            (r"mbpp", "code_generation"),
-            (r"generate\s+function", "code_generation"),
-            (r"implement\s+function", "code_generation"),
-            (r"write\s+code\s+for", "code_generation"),
-            # Agentic benchmark patterns
-            (r"live.*code.*bench", "live_code_bench"),
-            (r"big.*code.*bench", "big_code_bench"),
-            (r"aider", "aider_polyglot"),
-            (r"polyglot", "aider_polyglot"),
-            # Pass@k patterns
-            (r"pass@\d+", "passk_generation"),
-            (r"pass\s*at\s*k", "passk_generation"),
-            (r"multi.*attempt", "passk_generation"),
-        ]
-
-    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
-        """Get appropriate workflow for task type.
-
-        Args:
-            task_type: Type of task (e.g., "swe_bench", "code_generation")
-
-        Returns:
-            Workflow name string or None if no mapping exists
-        """
-        mapping = {
-            # SWE-bench style
-            "swe_bench": "swe_bench",
-            "swe-bench": "swe_bench",
-            "swe_bench_lite": "swe_bench_lite",
-            "bug_fix": "swe_bench",
-            "issue": "swe_bench",
-            "patch": "swe_bench",
-            # Code generation style
-            "code_generation": "code_generation",
-            "humaneval": "code_generation",
-            "mbpp": "code_generation",
-            "function": "code_generation",
-            # Agentic benchmarks
-            "live_code_bench": "live_code_bench",
-            "livecodebench": "live_code_bench",
-            "big_code_bench": "big_code_bench",
-            "bigcodebench": "big_code_bench",
-            "aider": "aider_polyglot",
-            "aider_polyglot": "aider_polyglot",
-            "polyglot": "aider_polyglot",
-            # Pass@k evaluation
-            "passk": "passk_generation",
-            "pass_at_k": "passk_generation",
-            "passk_generation": "passk_generation",
-            "passk_high": "passk_high",
-            "passk_refined": "passk_refined",
-        }
-        return mapping.get(task_type.lower())
 
 
 # Note: Handlers are now registered via BenchmarkVertical.get_handlers()

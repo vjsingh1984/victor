@@ -58,6 +58,7 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
     - YAML workflow loading with two-level caching
     - UnifiedWorkflowCompiler integration for consistent execution
     - Checkpointing support for resumable analysis pipelines
+    - Auto-workflow triggers via class attributes
 
     Example:
         provider = DataAnalysisWorkflowProvider()
@@ -72,6 +73,37 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
         async for node_id, state in provider.stream_compiled_workflow("ml_pipeline", {}):
             print(f"Completed: {node_id}")
     """
+
+    # Auto-workflow triggers for data analysis tasks
+    AUTO_WORKFLOW_PATTERNS = [
+        (r"explor(e|atory)\s+data", "eda_workflow"),
+        (r"eda\b", "eda_workflow"),
+        (r"data\s+profil", "eda_workflow"),
+        (r"clean\s+(the\s+)?data", "data_cleaning"),
+        (r"data\s+clean", "data_cleaning"),
+        (r"handle\s+missing", "data_cleaning"),
+        (r"statistic(al)?\s+analysis", "statistical_analysis"),
+        (r"hypothesis\s+test", "statistical_analysis"),
+        (r"correlation\s+analysis", "statistical_analysis"),
+        (r"machine\s+learning", "ml_pipeline"),
+        (r"ml\s+model", "ml_pipeline"),
+        (r"train\s+(a\s+)?model", "ml_pipeline"),
+        (r"predict", "ml_pipeline"),
+    ]
+
+    # Task type to workflow mappings
+    TASK_TYPE_MAPPINGS = {
+        "eda": "eda_workflow",
+        "exploration": "eda_workflow",
+        "profiling": "eda_workflow",
+        "cleaning": "data_cleaning",
+        "preparation": "data_cleaning",
+        "statistics": "statistical_analysis",
+        "hypothesis": "statistical_analysis",
+        "ml": "ml_pipeline",
+        "training": "ml_pipeline",
+        "prediction": "ml_pipeline",
+    }
 
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for DataAnalysis escape hatches.
@@ -88,51 +120,6 @@ class DataAnalysisWorkflowProvider(BaseYAMLWorkflowProvider):
             Module path string for DataAnalysisCapabilityProvider
         """
         return "victor.dataanalysis.capabilities"
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatic workflow triggers based on query patterns.
-
-        Returns:
-            List of (regex_pattern, workflow_name) tuples for auto-triggering
-        """
-        return [
-            (r"explor(e|atory)\s+data", "eda_workflow"),
-            (r"eda\b", "eda_workflow"),
-            (r"data\s+profil", "eda_workflow"),
-            (r"clean\s+(the\s+)?data", "data_cleaning"),
-            (r"data\s+clean", "data_cleaning"),
-            (r"handle\s+missing", "data_cleaning"),
-            (r"statistic(al)?\s+analysis", "statistical_analysis"),
-            (r"hypothesis\s+test", "statistical_analysis"),
-            (r"correlation\s+analysis", "statistical_analysis"),
-            (r"machine\s+learning", "ml_pipeline"),
-            (r"ml\s+model", "ml_pipeline"),
-            (r"train\s+(a\s+)?model", "ml_pipeline"),
-            (r"predict", "ml_pipeline"),
-        ]
-
-    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
-        """Get appropriate workflow for task type.
-
-        Args:
-            task_type: Type of data analysis task
-
-        Returns:
-            Workflow name string or None if no mapping exists
-        """
-        mapping = {
-            "eda": "eda_workflow",
-            "exploration": "eda_workflow",
-            "profiling": "eda_workflow",
-            "cleaning": "data_cleaning",
-            "preparation": "data_cleaning",
-            "statistics": "statistical_analysis",
-            "hypothesis": "statistical_analysis",
-            "ml": "ml_pipeline",
-            "training": "ml_pipeline",
-            "prediction": "ml_pipeline",
-        }
-        return mapping.get(task_type.lower())
 
 
 __all__ = [

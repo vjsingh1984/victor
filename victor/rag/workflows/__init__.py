@@ -65,6 +65,7 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
     - YAML workflow loading with two-level caching
     - UnifiedWorkflowCompiler integration for consistent execution
     - Checkpointing support for resumable document ingestion
+    - Auto-workflow triggers via class attributes
 
     Available Workflows (all YAML-defined):
     - document_ingest: Document ingestion with parsing, chunking, and embedding
@@ -88,6 +89,61 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
             print(f"Completed: {node_id}")
     """
 
+    # Auto-workflow triggers for RAG tasks
+    AUTO_WORKFLOW_PATTERNS = [
+        # Ingest triggers
+        (r"ingest\s+document", "document_ingest"),
+        (r"add\s+(to\s+)?knowledge", "document_ingest"),
+        (r"index\s+(new\s+)?document", "document_ingest"),
+        (r"import\s+file", "document_ingest"),
+        # Incremental update triggers
+        (r"update\s+index", "incremental_update"),
+        (r"refresh\s+documents", "incremental_update"),
+        (r"sync\s+documents", "incremental_update"),
+        # Query triggers
+        (r"search\s+(for|the)\s+", "rag_query"),
+        (r"find\s+(information|answer)", "rag_query"),
+        (r"what\s+(does|is|are)", "rag_query"),
+        (r"how\s+(do|does|to)", "rag_query"),
+        # Conversation triggers
+        (r"chat\s+(about|with)", "conversation"),
+        (r"discuss\s+", "conversation"),
+        # Agentic RAG triggers
+        (r"deep\s+search", "agentic_rag"),
+        (r"research\s+", "agentic_rag"),
+        # Maintenance triggers
+        (r"clean(up)?\s+index", "maintenance"),
+        (r"optimize\s+(index|search)", "maintenance"),
+        (r"maintenance", "maintenance"),
+    ]
+
+    # Task type to workflow mappings
+    TASK_TYPE_MAPPINGS = {
+        # Ingestion
+        "ingest": "document_ingest",
+        "ingestion": "document_ingest",
+        "index": "document_ingest",
+        "update": "incremental_update",
+        "sync": "incremental_update",
+        # Query
+        "query": "rag_query",
+        "search": "rag_query",
+        "question": "rag_query",
+        "qa": "rag_query",
+        # Conversation
+        "conversation": "conversation",
+        "chat": "conversation",
+        "dialog": "conversation",
+        # Agentic
+        "research": "agentic_rag",
+        "deep_search": "agentic_rag",
+        "agentic": "agentic_rag",
+        # Maintenance
+        "maintenance": "maintenance",
+        "cleanup": "maintenance",
+        "optimize": "maintenance",
+    }
+
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for RAG escape hatches.
 
@@ -95,75 +151,6 @@ class RAGWorkflowProvider(BaseYAMLWorkflowProvider):
             Module path string for CONDITIONS and TRANSFORMS dictionaries
         """
         return "victor.rag.escape_hatches"
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatic workflow triggers based on query patterns.
-
-        Returns:
-            List of (regex_pattern, workflow_name) tuples for auto-triggering
-        """
-        return [
-            # Ingest triggers
-            (r"ingest\s+document", "document_ingest"),
-            (r"add\s+(to\s+)?knowledge", "document_ingest"),
-            (r"index\s+(new\s+)?document", "document_ingest"),
-            (r"import\s+file", "document_ingest"),
-            # Incremental update triggers
-            (r"update\s+index", "incremental_update"),
-            (r"refresh\s+documents", "incremental_update"),
-            (r"sync\s+documents", "incremental_update"),
-            # Query triggers
-            (r"search\s+(for|the)\s+", "rag_query"),
-            (r"find\s+(information|answer)", "rag_query"),
-            (r"what\s+(does|is|are)", "rag_query"),
-            (r"how\s+(do|does|to)", "rag_query"),
-            # Conversation triggers
-            (r"chat\s+(about|with)", "conversation"),
-            (r"discuss\s+", "conversation"),
-            # Agentic RAG triggers
-            (r"deep\s+search", "agentic_rag"),
-            (r"research\s+", "agentic_rag"),
-            # Maintenance triggers
-            (r"clean(up)?\s+index", "maintenance"),
-            (r"optimize\s+(index|search)", "maintenance"),
-            (r"maintenance", "maintenance"),
-        ]
-
-    def get_workflow_for_task_type(self, task_type: str) -> Optional[str]:
-        """Get appropriate workflow for task type.
-
-        Args:
-            task_type: Type of task (e.g., "ingest", "query")
-
-        Returns:
-            Workflow name string or None if no mapping exists
-        """
-        mapping = {
-            # Ingestion
-            "ingest": "document_ingest",
-            "ingestion": "document_ingest",
-            "index": "document_ingest",
-            "update": "incremental_update",
-            "sync": "incremental_update",
-            # Query
-            "query": "rag_query",
-            "search": "rag_query",
-            "question": "rag_query",
-            "qa": "rag_query",
-            # Conversation
-            "conversation": "conversation",
-            "chat": "conversation",
-            "dialog": "conversation",
-            # Agentic
-            "research": "agentic_rag",
-            "deep_search": "agentic_rag",
-            "agentic": "agentic_rag",
-            # Maintenance
-            "maintenance": "maintenance",
-            "cleanup": "maintenance",
-            "optimize": "maintenance",
-        }
-        return mapping.get(task_type.lower())
 
 
 __all__ = [
