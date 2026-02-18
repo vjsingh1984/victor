@@ -30,9 +30,10 @@ class TestPlanningConfig:
 
     def test_default_config(self):
         """Test default configuration values."""
-        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
+        config = PlanningConfig()
 
-        assert config.min_planning_complexity == TaskComplexity.MODERATE
+        assert config.min_planning_complexity == "moderate"
+        assert config.get_complexity() == TaskComplexity.MODERATE
         assert config.min_steps_threshold == 3
         assert len(config.complexity_keywords) > 0
         assert config.show_plan_before_execution is True
@@ -41,12 +42,13 @@ class TestPlanningConfig:
     def test_custom_config(self):
         """Test custom configuration."""
         config = PlanningConfig(
-            min_planning_complexity=TaskComplexity.COMPLEX,
+            min_planning_complexity="complex",
             min_steps_threshold=2,
             show_plan_before_execution=False,
         )
 
-        assert config.min_planning_complexity == TaskComplexity.COMPLEX
+        assert config.min_planning_complexity == "complex"
+        assert config.get_complexity() == TaskComplexity.COMPLEX
         assert config.min_steps_threshold == 2
         assert config.show_plan_before_execution is False
 
@@ -124,17 +126,13 @@ class TestPlanningCoordinator:
 
     def _create_coordinator(self):
         """Helper to create a coordinator with default config."""
-        from victor.agent.coordinators.planning_coordinator import PlanningConfig
-
         mock_orch = self._create_mock_orchestrator()
-        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
-        return PlanningCoordinator(mock_orch, config)
+        return PlanningCoordinator(mock_orch)
 
     def test_planning_coordinator_init(self):
         """Test coordinator initialization."""
         mock_orch = self._create_mock_orchestrator()
-        config = PlanningConfig(min_planning_complexity=TaskComplexity.MODERATE)
-        coordinator = PlanningCoordinator(mock_orch, config)
+        coordinator = PlanningCoordinator(mock_orch)
 
         assert coordinator.orchestrator == mock_orch
         assert coordinator.active_plan is None

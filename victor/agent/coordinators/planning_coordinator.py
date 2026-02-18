@@ -83,7 +83,8 @@ class PlanningConfig:
     """Configuration for planning behavior."""
 
     # Minimum complexity level to trigger planning
-    min_planning_complexity: TaskComplexity
+    # Use string to avoid enum evaluation issues at import time
+    min_planning_complexity: str = "moderate"
 
     # Thresholds for detecting multi-step tasks
     min_steps_threshold: int = 3  # Minimum "steps" mentioned to trigger planning
@@ -113,6 +114,10 @@ class PlanningConfig:
     # Fallback behavior
     fallback_on_planning_failure: bool = True  # Fall back to direct chat if planning fails
     max_planning_retries: int = 1  # Number of retries for plan generation
+
+    def get_complexity(self) -> TaskComplexity:
+        """Get the TaskComplexity enum from the string value."""
+        return TaskComplexity(self.min_planning_complexity)
 
 
 @dataclass
@@ -165,7 +170,7 @@ class PlanningCoordinator:
 
         logger.info(
             f"PlanningCoordinator initialized with "
-            f"min_complexity={self.config.min_planning_complexity.value}"
+            f"min_complexity={self.config.get_complexity().value}"
         )
 
     async def chat_with_planning(
@@ -258,7 +263,7 @@ class PlanningCoordinator:
             }
             planning_complexity = complexity_map.get(framework_complexity, TaskComplexity.MODERATE)
 
-            if planning_complexity.value >= self.config.min_planning_complexity.value:
+            if planning_complexity.value >= self.config.get_complexity().value:
                 logger.info(f"Planning triggered by complexity: {planning_complexity.value}")
                 return True
 
