@@ -184,7 +184,7 @@ class StepAwareToolSelector:
         # Get tools for a research step
         tools = selector.get_tools_for_step(
             step_type="research",
-            complexity=TaskComplexity.MODERATE,
+            complexity=TaskComplexity("moderate"),
             step_description="Analyze authentication patterns",
             conversation_stage=ConversationStage.READING,
         )

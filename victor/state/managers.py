@@ -40,6 +40,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import logging
 from typing import Any, Dict, List
@@ -86,27 +87,40 @@ class WorkflowStateManager:
         """
         return self._state.get(key, default)
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(self, key: str, value: Any, notify: bool = True) -> None:
         """Set a value by key.
 
         Args:
             key: The key to set
             value: The value to store
+            notify: Whether to notify observers (default: True)
+
+        Performance: Only notifies observers if value actually changed.
+        Notifications run in parallel for multiple observers.
         """
         old_value = self._state.get(key)
+
+        # Skip notification if value hasn't changed (key exists and same value)
+        if old_value == value and key in self._state:
+            # Value unchanged, skip notification (but still update state)
+            return
+
         self._state[key] = value
 
-        # Notify observers
-        for observer in self._observers:
-            try:
-                await observer.on_state_changed(
-                    scope=self.scope,
-                    key=key,
-                    old_value=old_value,
-                    new_value=value,
-                )
-            except Exception as e:
-                logger.warning(f"Observer notification failed: {e}")
+        # Notify observers in parallel if requested
+        if notify and self._observers:
+            await asyncio.gather(
+                *[
+                    observer.on_state_changed(
+                        scope=self.scope,
+                        key=key,
+                        old_value=old_value,
+                        new_value=value,
+                    )
+                    for observer in self._observers
+                ],
+                return_exceptions=True,  # Don't fail on observer errors
+            )
 
         logger.debug(f"Workflow state set: {key} = {str(value)[:50]}")
 
@@ -252,27 +266,39 @@ class ConversationStateManager:
         """
         return self._state.get(key, default)
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(self, key: str, value: Any, notify: bool = True) -> None:
         """Set a value by key.
 
         Args:
             key: The key to set
             value: The value to store
+            notify: Whether to notify observers (default: True)
+
+        Performance: Only notifies observers if value actually changed.
+        Notifications run in parallel for multiple observers.
         """
         old_value = self._state.get(key)
+
+        # Skip notification if value hasn't changed (key exists and same value)
+        if old_value == value and key in self._state:
+            return
+
         self._state[key] = value
 
-        # Notify observers
-        for observer in self._observers:
-            try:
-                await observer.on_state_changed(
-                    scope=self.scope,
-                    key=key,
-                    old_value=old_value,
-                    new_value=value,
-                )
-            except Exception as e:
-                logger.warning(f"Observer notification failed: {e}")
+        # Notify observers in parallel if requested
+        if notify and self._observers:
+            await asyncio.gather(
+                *[
+                    observer.on_state_changed(
+                        scope=self.scope,
+                        key=key,
+                        old_value=old_value,
+                        new_value=value,
+                    )
+                    for observer in self._observers
+                ],
+                return_exceptions=True,
+            )
 
         logger.debug(f"Conversation state set: {key} = {str(value)[:50]}")
 
@@ -418,27 +444,39 @@ class TeamStateManager:
         """
         return self._state.get(key, default)
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(self, key: str, value: Any, notify: bool = True) -> None:
         """Set a value by key.
 
         Args:
             key: The key to set
             value: The value to store
+            notify: Whether to notify observers (default: True)
+
+        Performance: Only notifies observers if value actually changed.
+        Notifications run in parallel for multiple observers.
         """
         old_value = self._state.get(key)
+
+        # Skip notification if value hasn't changed (key exists and same value)
+        if old_value == value and key in self._state:
+            return
+
         self._state[key] = value
 
-        # Notify observers
-        for observer in self._observers:
-            try:
-                await observer.on_state_changed(
-                    scope=self.scope,
-                    key=key,
-                    old_value=old_value,
-                    new_value=value,
-                )
-            except Exception as e:
-                logger.warning(f"Observer notification failed: {e}")
+        # Notify observers in parallel if requested
+        if notify and self._observers:
+            await asyncio.gather(
+                *[
+                    observer.on_state_changed(
+                        scope=self.scope,
+                        key=key,
+                        old_value=old_value,
+                        new_value=value,
+                    )
+                    for observer in self._observers
+                ],
+                return_exceptions=True,
+            )
 
         logger.debug(f"Team state set: {key} = {str(value)[:50]}")
 
@@ -584,27 +622,39 @@ class GlobalStateManagerImpl:
         """
         return self._state.get(key, default)
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(self, key: str, value: Any, notify: bool = True) -> None:
         """Set a value by key.
 
         Args:
             key: The key to set
             value: The value to store
+            notify: Whether to notify observers (default: True)
+
+        Performance: Only notifies observers if value actually changed.
+        Notifications run in parallel for multiple observers.
         """
         old_value = self._state.get(key)
+
+        # Skip notification if value hasn't changed (key exists and same value)
+        if old_value == value and key in self._state:
+            return
+
         self._state[key] = value
 
-        # Notify observers
-        for observer in self._observers:
-            try:
-                await observer.on_state_changed(
-                    scope=self.scope,
-                    key=key,
-                    old_value=old_value,
-                    new_value=value,
-                )
-            except Exception as e:
-                logger.warning(f"Observer notification failed: {e}")
+        # Notify observers in parallel if requested
+        if notify and self._observers:
+            await asyncio.gather(
+                *[
+                    observer.on_state_changed(
+                        scope=self.scope,
+                        key=key,
+                        old_value=old_value,
+                        new_value=value,
+                    )
+                    for observer in self._observers
+                ],
+                return_exceptions=True,
+            )
 
         logger.debug(f"Global state set: {key} = {str(value)[:50]}")
 

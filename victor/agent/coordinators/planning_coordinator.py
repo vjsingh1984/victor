@@ -226,6 +226,25 @@ class PlanningCoordinator:
 
         return response
 
+    def _map_complexity(self, framework_complexity: FrameworkTaskComplexity) -> TaskComplexity:
+        """Map framework TaskComplexity to planning TaskComplexity.
+
+        Args:
+            framework_complexity: Framework complexity level
+
+        Returns:
+            Planning TaskComplexity
+        """
+        # Use string mapping to avoid enum evaluation at import time
+        complexity_map = {
+            FrameworkTaskComplexity.SIMPLE: "simple",
+            FrameworkTaskComplexity.MODERATE: "moderate",
+            FrameworkTaskComplexity.COMPLEX: "complex",
+            FrameworkTaskComplexity.GENERATION: "complex",
+        }
+        complexity_str = complexity_map.get(framework_complexity, "moderate")
+        return TaskComplexity(complexity_str)
+
     def _should_use_planning(
         self,
         user_message: str,
@@ -253,15 +272,7 @@ class PlanningCoordinator:
 
         # Check task complexity if available
         if task_analysis:
-            framework_complexity = task_analysis.complexity
-            # Map framework complexity to planning complexity
-            complexity_map = {
-                FrameworkTaskComplexity.SIMPLE: TaskComplexity.SIMPLE,
-                FrameworkTaskComplexity.MODERATE: TaskComplexity.MODERATE,
-                FrameworkTaskComplexity.COMPLEX: TaskComplexity.COMPLEX,
-                FrameworkTaskComplexity.GENERATION: TaskComplexity.COMPLEX,
-            }
-            planning_complexity = complexity_map.get(framework_complexity, TaskComplexity.MODERATE)
+            planning_complexity = self._map_complexity(task_analysis.complexity)
 
             if planning_complexity.value >= self.config.get_complexity().value:
                 logger.info(f"Planning triggered by complexity: {planning_complexity.value}")
@@ -311,15 +322,9 @@ class PlanningCoordinator:
         """
         # Determine complexity
         if task_analysis:
-            complexity_map = {
-                FrameworkTaskComplexity.SIMPLE: TaskComplexity.SIMPLE,
-                FrameworkTaskComplexity.MODERATE: TaskComplexity.MODERATE,
-                FrameworkTaskComplexity.COMPLEX: TaskComplexity.COMPLEX,
-                FrameworkTaskComplexity.GENERATION: TaskComplexity.COMPLEX,
-            }
-            complexity = complexity_map.get(task_analysis.complexity, TaskComplexity.MODERATE)
+            complexity = self._map_complexity(task_analysis.complexity)
         else:
-            complexity = TaskComplexity.MODERATE
+            complexity = TaskComplexity("moderate")
 
         # Generate plan using readable schema
         provider = self.orchestrator.provider

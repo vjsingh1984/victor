@@ -889,30 +889,38 @@ class EventDispatcher:
         """
         self._all_handlers.append(handler)
 
+    async def _safe_execute_handler(self, handler, event: DomainEvent) -> None:
+        """Safely execute a single event handler.
+
+        Args:
+            handler: Handler function (sync or async)
+            event: Event to handle
+        """
+        try:
+            result = handler(event)
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            logger.error(f"Event handler error: {e}")
+
     async def dispatch(self, event: DomainEvent) -> None:
-        """Dispatch event to handlers.
+        """Dispatch event to handlers in parallel.
+
+        Performance: Handlers execute in parallel using asyncio.gather().
+        Errors in one handler don't prevent other handlers from running.
 
         Args:
             event: Event to dispatch.
         """
-        # Type-specific handlers
-        handlers = self._handlers.get(event.event_type, [])
-        for handler in handlers:
-            try:
-                result = handler(event)
-                if asyncio.iscoroutine(result):
-                    await result
-            except Exception as e:
-                logger.error(f"Event handler error: {e}")
+        # Combine type-specific and all-event handlers
+        handlers = self._handlers.get(event.event_type, []) + self._all_handlers
 
-        # All-event handlers
-        for handler in self._all_handlers:
-            try:
-                result = handler(event)
-                if asyncio.iscoroutine(result):
-                    await result
-            except Exception as e:
-                logger.error(f"Event handler error: {e}")
+        # Execute all handlers in parallel
+        if handlers:
+            await asyncio.gather(
+                *[self._safe_execute_handler(handler, event) for handler in handlers],
+                return_exceptions=True,  # Don't fail on handler errors
+            )
 
 
 class Projection(ABC):
