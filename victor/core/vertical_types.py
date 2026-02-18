@@ -672,9 +672,247 @@ class TieredToolTemplate:
         return list(cls.VERTICAL_CORES.keys())
 
 
+# =============================================================================
+# Stage Builder (Factory for Reducing Duplication)
+# =============================================================================
+
+
+class StageBuilder:
+    """Builder class for creating StageDefinition instances with fluent API.
+
+    Reduces boilerplate code when defining stages across verticals. Instead of
+    directly instantiating StageDefinition dataclass, use this builder for a
+    cleaner, more readable syntax.
+
+    Also provides factory methods for standard/common stages that are shared
+    across verticals (INITIAL, COMPLETION, etc.).
+
+    Example:
+        builder = StageBuilder()
+        stages = {
+            "INITIAL": builder.standard_initial(),
+            "PLANNING": builder.stage("PLANNING")
+                .description("Planning the implementation")
+                .tools({ToolNames.READ, ToolNames.GREP})
+                .keywords(["plan", "design"])
+                .next_stages({"READING", "EXECUTION"})
+                .build(),
+            "COMPLETION": builder.standard_completion(),
+        }
+
+    Or for complete workflow definition:
+        builder = StageBuilder()
+        stages = (
+            builder.workflow("MyVertical")
+            .initial()
+            .stage("PLANNING")
+                .description("Planning")
+                .tools({ToolNames.READ})
+                .keywords(["plan"])
+            .stage("EXECUTION")
+                .description("Executing")
+                .tools({ToolNames.WRITE})
+                .keywords(["execute"])
+            .completion()
+            .build()
+        )
+    """
+
+    # Track workflow stages being built
+    _stages: Dict[str, StageDefinition]
+    _last_stage_name: Optional[str]
+
+    def __init__(self) -> None:
+        """Initialize the stage builder."""
+        self._stages = {}
+        self._last_stage_name = None
+        self._current_name = ""
+        self._current_description = ""
+        self._current_tools: Set[str] = set()
+        self._current_keywords: List[str] = []
+        self._current_next_stages: Set[str] = set()
+
+    # =========================================================================
+    # Fluent API Methods (for stage() chaining)
+    # =========================================================================
+
+    def stage(self, name: str) -> "StageBuilder":
+        """Start building a new stage definition.
+
+        Args:
+            name: Stage name (e.g., "PLANNING", "EXECUTION")
+
+        Returns:
+            Self for method chaining
+        """
+        self._current_name = name
+        self._current_description = ""
+        self._current_tools = set()
+        self._current_keywords = []
+        self._current_next_stages = set()
+        return self
+
+    def description(self, description: str) -> "StageBuilder":
+        """Set stage description.
+
+        Args:
+            description: Human-readable description
+
+        Returns:
+            Self for method chaining
+        """
+        self._current_description = description
+        return self
+
+    def tools(self, tools: Set[str]) -> "StageBuilder":
+        """Set tools available at this stage.
+
+        Args:
+            tools: Set of tool names (canonical names from ToolNames)
+
+        Returns:
+            Self for method chaining
+        """
+        self._current_tools = tools
+        return self
+
+    def keywords(self, keywords: List[str]) -> "StageBuilder":
+        """Set keywords that suggest this stage.
+
+        Args:
+            keywords: List of keywords for stage detection
+
+        Returns:
+            Self for method chaining
+        """
+        self._current_keywords = keywords
+        return self
+
+    def next_stages(self, next_stages: Set[str]) -> "StageBuilder":
+        """Set valid next stages for transitions.
+
+        Args:
+            next_stages: Set of stage names that can follow this stage
+
+        Returns:
+            Self for method chaining
+        """
+        self._current_next_stages = next_stages
+        return self
+
+    def build(self) -> StageDefinition:
+        """Build the current stage definition.
+
+        Returns:
+            StageDefinition instance with configured properties
+        """
+        return StageDefinition(
+            name=self._current_name,
+            description=self._current_description,
+            tools=self._current_tools,
+            keywords=self._current_keywords,
+            next_stages=self._current_next_stages,
+        )
+
+    def add(self, name: str, stage_def: StageDefinition) -> "StageBuilder":
+        """Add a pre-built StageDefinition to the collection.
+
+        Args:
+            name: Stage name key
+            stage_def: StageDefinition instance
+
+        Returns:
+            Self for method chaining
+        """
+        self._stages[name] = stage_def
+        self._last_stage_name = name
+        return self
+
+    # =========================================================================
+    # Standard Stage Factories
+    # =========================================================================
+
+    def standard_initial(self) -> StageDefinition:
+        """Create a standard INITIAL stage definition.
+
+        Returns:
+            StageDefinition for INITIAL stage
+        """
+        return StageDefinition(
+            name="INITIAL",
+            description="Understanding the request",
+            tools=set(),  # Empty - verticals should customize
+            keywords=["what", "how", "explain", "understand"],
+            next_stages=set(),  # Verticals should customize
+        )
+
+    def standard_completion(self) -> StageDefinition:
+        """Create a standard COMPLETION stage definition.
+
+        Returns:
+            StageDefinition for COMPLETION stage
+        """
+        return StageDefinition(
+            name="COMPLETION",
+            description="Task complete",
+            tools=set(),
+            keywords=["done", "complete", "finish"],
+            next_stages=set(),  # No stages after completion
+        )
+
+    # =========================================================================
+    # Workflow Builder API
+    # =========================================================================
+
+    def workflow(self, name: str) -> "StageBuilder":
+        """Start building a complete workflow.
+
+        Resets internal state and prepares for building a series of stages.
+
+        Args:
+            name: Workflow name (for documentation/debugging)
+
+        Returns:
+            Self for method chaining
+        """
+        self._stages = {}
+        self._last_stage_name = None
+        return self
+
+    def initial(self) -> "StageBuilder":
+        """Add standard INITIAL stage and set it as last stage.
+
+        Returns:
+            Self for method chaining
+        """
+        initial_stage = self.standard_initial()
+        self._stages["INITIAL"] = initial_stage
+        self._last_stage_name = "INITIAL"
+        return self
+
+    def completion(self) -> "StageBuilder":
+        """Add standard COMPLETION stage.
+
+        Returns:
+            Self for method chaining
+        """
+        completion_stage = self.standard_completion()
+        self._stages["COMPLETION"] = completion_stage
+        return self
+
+    def build_workflow(self) -> Dict[str, StageDefinition]:
+        """Build and return the complete workflow stages dictionary.
+
+        Returns:
+            Dict mapping stage names to StageDefinition instances
+        """
+        return self._stages.copy()
+
+
 __all__ = [
     # Stage Types
     "StageDefinition",
+    "StageBuilder",
     # Task Types
     "TaskTypeHint",
     "StandardTaskHints",

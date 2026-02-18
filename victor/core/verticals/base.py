@@ -64,7 +64,10 @@ if TYPE_CHECKING:
 
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
-from victor.core.vertical_types import StageDefinition
+from victor.core.vertical_types import (
+    StageDefinition,
+    StageBuilder,
+)
 
 logger = logging.getLogger(__name__)
 

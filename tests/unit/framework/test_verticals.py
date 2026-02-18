@@ -478,8 +478,8 @@ class TestVerticalLoaderSwitch:
         loader.load("coding")
         assert loader.active_vertical_name == "coding"
 
-        loader.load("data_analysis")
-        assert loader.active_vertical_name == "data_analysis"
+        loader.load("dataanalysis")
+        assert loader.active_vertical_name == "dataanalysis"
 
     def test_loader_get_tools_per_vertical(self):
         """Each vertical should have distinct tool sets."""
@@ -833,7 +833,7 @@ class TestDataAnalysisDirectImport:
         """Test DataAnalysisAssistant class."""
         from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
-        assert DirectDataAnalysis.name == "data_analysis"
+        assert DirectDataAnalysis.name == "dataanalysis"
 
     def test_data_analysis_get_tools(self):
         """Test get_tools method."""

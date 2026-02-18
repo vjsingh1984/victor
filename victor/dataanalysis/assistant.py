@@ -24,7 +24,7 @@ class DataAnalysisAssistant(VerticalBase):
     Competitive with: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
     """
 
-    name = "data_analysis"
+    name = "dataanalysis"
     description = "Data exploration, statistical analysis, visualization, and ML insights"
     version = "1.0.0"
 
