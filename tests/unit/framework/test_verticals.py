@@ -256,6 +256,7 @@ class TestVerticalRegistry:
         # Import and register coding vertical FIRST before storing state
         try:
             from victor.coding import CodingAssistant
+
             VerticalRegistry.register(CodingAssistant)
         except ImportError:
             pass  # coding vertical may not be available in all environments
@@ -425,6 +426,7 @@ class TestVerticalLoaderSwitch:
         """Ensure coding vertical is registered for these tests."""
         try:
             from victor.coding import CodingAssistant
+
             VerticalRegistry.register(CodingAssistant)
         except ImportError:
             pass  # coding vertical may not be available in all environments
@@ -869,6 +871,7 @@ class TestVerticalHelperFunctions:
         """Ensure coding vertical is registered for these tests."""
         try:
             from victor.coding import CodingAssistant
+
             VerticalRegistry.register(CodingAssistant)
         except ImportError:
             pass  # coding vertical may not be available in all environments
