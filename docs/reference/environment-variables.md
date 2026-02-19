@@ -103,6 +103,16 @@ Complete reference for all environment variables recognized by Victor.
 | `LMSTUDIO_BASE_URLS` | `http://127.0.0.1:1234` | LMStudio URLs (comma-separated) |
 | `VLLM_BASE_URL` | `http://localhost:8000` | vLLM server URL |
 
+### Provider Loading Controls
+
+Victor lazily materializes provider implementations at first use (`ProviderRegistry.get/create`).
+This keeps startup/import overhead lower, especially when optional local runtimes are not installed.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VICTOR_ENABLE_MLX_PROVIDER` | `unset` | Set to `0`/`false` to disable MLX provider aliases (`mlx`, `mlx-lm`, `applesilicon`) entirely |
+| `VICTOR_MLX_SKIP_PREFLIGHT` | `unset` | Set to `1`/`true` to bypass MLX subprocess preflight (only for known-good MPS/Metal environments) |
+
 **Example for LAN LMStudio server:**
 
 ```bash
