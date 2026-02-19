@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for tiered tool configuration fallback chain.
+"""Tests for tiered tool configuration canonical contract.
 
 These tests verify that the TieredConfigStepHandler correctly handles
-the API mismatch between get_tiered_tool_config() and get_tiered_tools().
+the canonical get_tiered_tool_config() API and optional legacy adapter.
 
 Workstream D: OpenAI Codex feedback fixes.
 """
@@ -116,7 +116,7 @@ class MockVerticalWithNoneReturn:
 
 
 class TestTieredToolConfigFallbackChain:
-    """Test get_tiered_config fallback chain."""
+    """Test get_tiered_config canonical behavior and optional fallback."""
 
     def test_fallback_chain_prefers_get_tiered_tool_config(self):
         """get_tiered_config should prefer get_tiered_tool_config when available."""
@@ -127,8 +127,16 @@ class TestTieredToolConfigFallbackChain:
         assert "ls" in config.mandatory
         assert "write" in config.vertical_core
 
-    def test_fallback_chain_uses_get_tiered_tools_when_config_missing(self):
-        """get_tiered_config should fall back to get_tiered_tools."""
+    def test_no_legacy_fallback_by_default(self):
+        """get_tiered_config should not use deprecated fallback by default."""
+        config = get_tiered_config(MockVerticalWithTieredTools)
+
+        assert config is None
+
+    def test_legacy_fallback_uses_get_tiered_tools_when_enabled(self, monkeypatch):
+        """Deprecated fallback should be opt-in via env flag."""
+        monkeypatch.setenv("VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK", "1")
+
         config = get_tiered_config(MockVerticalWithTieredTools)
 
         assert config is not None
@@ -154,7 +162,15 @@ class TestTieredToolConfigFallbackChain:
         assert config is None
 
     def test_fallback_chain_with_none_return(self):
-        """get_tiered_config should fall back when get_tiered_tool_config returns None."""
+        """get_tiered_config should return None if canonical method returns None."""
+        config = get_tiered_config(MockVerticalWithNoneReturn)
+
+        assert config is None
+
+    def test_legacy_fallback_with_none_return_when_enabled(self, monkeypatch):
+        """Legacy fallback should apply when canonical method returns None."""
+        monkeypatch.setenv("VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK", "true")
+
         config = get_tiered_config(MockVerticalWithNoneReturn)
 
         assert config is not None
@@ -195,8 +211,26 @@ class TestTieredConfigStepHandler:
         config_arg = context.apply_tiered_config.call_args[0][0]
         assert "read" in config_arg.mandatory
 
-    def test_handler_falls_back_to_get_tiered_tools(self):
-        """Handler should fall back to get_tiered_tools."""
+    def test_handler_does_not_use_legacy_fallback_by_default(self):
+        """Handler should skip deprecated fallback unless explicitly enabled."""
+        handler = TieredConfigStepHandler()
+        context = MagicMock()
+        result = MagicMock()
+        orchestrator = MagicMock()
+
+        handler._do_apply(
+            orchestrator,
+            MockVerticalWithTieredTools,
+            context,
+            result,
+        )
+
+        context.apply_tiered_config.assert_not_called()
+
+    def test_handler_falls_back_to_get_tiered_tools_when_enabled(self, monkeypatch):
+        """Handler should use fallback only when legacy adapter is enabled."""
+        monkeypatch.setenv("VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK", "1")
+
         handler = TieredConfigStepHandler()
         context = MagicMock()
         result = MagicMock()

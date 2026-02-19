@@ -36,6 +36,7 @@ from victor.framework.events import (
     tool_result_event,
 )
 from victor.framework.tools import ToolSet
+from victor.framework.protocols import ObservabilityPortProtocol
 
 # Import capability helpers for protocol-based access
 from victor.framework.vertical_integration import _check_capability, _invoke_capability
@@ -212,8 +213,15 @@ def setup_observability_integration(
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)
 
-    # Store reference on orchestrator for access
-    orchestrator.observability = integration
+    # Ensure reference is stored through public observability ports.
+    if isinstance(orchestrator, ObservabilityPortProtocol):
+        orchestrator.set_observability(integration)
+    elif hasattr(orchestrator, "set_observability") and callable(
+        getattr(orchestrator, "set_observability")
+    ):
+        orchestrator.set_observability(integration)
+    elif hasattr(orchestrator, "observability"):
+        orchestrator.observability = integration
 
     return integration
 

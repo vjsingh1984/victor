@@ -122,12 +122,14 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import inspect
 import logging
 import json
 import threading
 import time
+import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -294,6 +296,9 @@ def _invoke_capability(
 
 
 logger = logging.getLogger(__name__)
+
+_INTEGRATION_PLAN_VERSION = 1
+_INTEGRATION_PLAN_SKIP_REASON = "integration_plan_noop"
 
 
 # =============================================================================
@@ -484,8 +489,10 @@ def register_extension_handler(
 ) -> None:
     """Register a new extension handler (OCP extension point).
 
-    This allows adding new extension types without modifying the
-    _apply_extensions method.
+    This is a compatibility adapter only. The active integration path uses
+    `victor.framework.step_handlers.ExtensionsStepHandler` and its registry.
+    Handlers registered here affect only legacy/custom pipelines that explicitly
+    consume this module-level registry.
 
     Args:
         name: Name of the extension type
@@ -934,7 +941,8 @@ class VerticalIntegrationPipeline:
             post_hooks: Callables to run after integration
             step_registry: Custom step handler registry (uses default if None)
             use_step_handlers: If True, use step handlers; if False, use legacy methods
-            extension_registry: Custom extension handler registry (OCP compliance)
+            extension_registry: Legacy extension registry adapter. Ignored in active
+                step-handler path; retained for backward-compatible signatures.
             enable_cache: If True, enable configuration caching (default: True)
             cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
             max_cache_entries: Maximum number of cache entries to retain.
@@ -957,8 +965,29 @@ class VerticalIntegrationPipeline:
         self._cache_timestamps: Dict[str, float] = {}
         self._cache_lock = threading.RLock()
 
-        # Initialize extension handler registry (OCP compliance)
-        self._extension_registry = extension_registry or get_extension_handler_registry()
+        # Integration plan cache (P3): handler-level fingerprints used for
+        # no-op/delta application on cache hits.
+        self._integration_plan_cache: Dict[str, Dict[str, Any]] = {}
+        self._integration_plan_timestamps: Dict[str, float] = {}
+        self._integration_plan_lock = threading.RLock()
+        self._applied_plan_by_orchestrator: "weakref.WeakKeyDictionary[Any, Dict[str, Any]]" = (
+            weakref.WeakKeyDictionary()
+        )
+        self._integration_plan_metrics: Dict[str, int] = {
+            "compiled": 0,
+            "reused": 0,
+            "skip_decisions": 0,
+            "skipped_handlers": 0,
+            "full_replays": 0,
+        }
+
+        # Legacy pipeline-level extension registry is intentionally inactive.
+        # Active extension integration lives in step_handlers.ExtensionsStepHandler.
+        if extension_registry is not None:
+            logger.debug(
+                "Ignoring legacy extension_registry argument for VerticalIntegrationPipeline; "
+                "use StepHandlerRegistry/ExtensionsStepHandler extension points instead."
+            )
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -1060,8 +1089,28 @@ class VerticalIntegrationPipeline:
                 "Use create_integration_pipeline() factory for proper setup."
             )
 
+        cached_plan: Optional[Dict[str, Any]] = None
+        skip_handlers: Set[str] = set()
+        if cache_hit and cache_key:
+            cached_plan = self._load_plan_from_cache(cache_key)
+            skip_handlers = self._compute_skip_handlers(
+                orchestrator,
+                cache_key=cache_key,
+                cached_plan=cached_plan,
+            )
+            if skip_handlers:
+                result.add_info(
+                    f"Skipped {len(skip_handlers)} side-effect handler(s) via integration-plan delta"
+                )
+
         # Use step handlers (Phase 3.1 - SOLID compliant single responsibility)
-        self._apply_with_step_handlers(orchestrator, vertical_class, context, result)
+        self._apply_with_step_handlers(
+            orchestrator,
+            vertical_class,
+            context,
+            result,
+            skip_handlers=skip_handlers,
+        )
 
         # Run post-hooks
         for hook in self._post_hooks:
@@ -1089,6 +1138,17 @@ class VerticalIntegrationPipeline:
                 cache_key = self._generate_cache_key(vertical_class)
             if cache_key:
                 self._save_to_cache(cache_key, result)
+                plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
+                self._save_plan_to_cache(cache_key, plan)
+                self._set_applied_plan_for_orchestrator(orchestrator, plan)
+                if result.context is not None:
+                    try:
+                        result.context.set_capability_config(
+                            "framework.internal.integration_plan",
+                            plan,
+                        )
+                    except Exception:
+                        pass
                 if cache_hit:
                     result.add_info("Integration replayed from cache metadata")
 
@@ -1318,6 +1378,263 @@ class VerticalIntegrationPipeline:
                 cache=self._cache,
                 timestamps=self._cache_timestamps,
             )
+        with self._integration_plan_lock:
+            self._integration_plan_cache.clear()
+            self._integration_plan_timestamps.clear()
+            for key in list(self._integration_plan_metrics.keys()):
+                self._integration_plan_metrics[key] = 0
+        self._applied_plan_by_orchestrator = weakref.WeakKeyDictionary()
+
+    def _hash_plan_payload(self, payload: Any) -> str:
+        """Create a deterministic fingerprint for plan payloads."""
+        try:
+            raw = json.dumps(payload, sort_keys=True, default=str)
+        except TypeError:
+            raw = repr(payload)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    def _build_integration_plan(
+        self,
+        cache_key: str,
+        result: IntegrationResult,
+        *,
+        base_plan: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Build handler-level integration plan from step execution status."""
+        base_fingerprints: Dict[str, str] = {}
+        if base_plan:
+            base_fingerprints = dict(base_plan.get("handler_fingerprints", {}))
+
+        fingerprints: Dict[str, str] = {}
+        for handler_name, status in result.step_status.items():
+            if (
+                status.get("status") == "skipped"
+                and status.get("details", {}).get("reason") == _INTEGRATION_PLAN_SKIP_REASON
+                and handler_name in base_fingerprints
+            ):
+                fingerprints[handler_name] = base_fingerprints[handler_name]
+                continue
+            fingerprints[handler_name] = self._hash_plan_payload(status)
+
+        signature = self._hash_plan_payload(
+            {
+                "cache_key": cache_key,
+                "handler_fingerprints": fingerprints,
+            }
+        )
+        state_snapshot: Dict[str, Any] = {}
+        if result.context is not None:
+            state_snapshot["vertical_name"] = result.context.name
+            state_snapshot["enabled_tools_hash"] = self._hash_plan_payload(
+                sorted(result.context.enabled_tools)
+            )
+
+        return {
+            "version": _INTEGRATION_PLAN_VERSION,
+            "cache_key": cache_key,
+            "vertical_name": result.vertical_name,
+            "signature": signature,
+            "handler_fingerprints": fingerprints,
+            "state_snapshot": state_snapshot,
+            "created_at": time.time(),
+        }
+
+    def _save_plan_to_cache(self, cache_key: str, plan: Dict[str, Any]) -> None:
+        """Save integration plan with TTL and bounded size semantics."""
+        with self._integration_plan_lock:
+            self._integration_plan_cache[cache_key] = copy.deepcopy(plan)
+            self._integration_plan_timestamps[cache_key] = time.monotonic()
+            self._integration_plan_metrics["compiled"] += 1
+
+            if self._max_cache_entries > 0:
+                while len(self._integration_plan_cache) > self._max_cache_entries:
+                    oldest_key = next(iter(self._integration_plan_cache))
+                    self._integration_plan_cache.pop(oldest_key, None)
+                    self._integration_plan_timestamps.pop(oldest_key, None)
+
+    def _load_plan_from_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """Load integration plan from in-memory cache."""
+        with self._integration_plan_lock:
+            plan = self._integration_plan_cache.get(cache_key)
+            if plan is None:
+                return None
+
+            ts = self._integration_plan_timestamps.get(cache_key)
+            if ts is not None and self._cache_ttl > 0:
+                age_seconds = time.monotonic() - ts
+                if age_seconds > self._cache_ttl:
+                    self._integration_plan_cache.pop(cache_key, None)
+                    self._integration_plan_timestamps.pop(cache_key, None)
+                    return None
+
+            # LRU touch
+            touched = self._integration_plan_cache.pop(cache_key)
+            self._integration_plan_cache[cache_key] = touched
+            self._integration_plan_metrics["reused"] += 1
+            return copy.deepcopy(touched)
+
+    def get_integration_plan_stats(self) -> Dict[str, int]:
+        """Get integration-plan cache and skip metrics."""
+        with self._integration_plan_lock:
+            stats = dict(self._integration_plan_metrics)
+            stats["size"] = len(self._integration_plan_cache)
+            stats["max_entries"] = self._max_cache_entries
+        return stats
+
+    def _get_applied_plan_for_orchestrator(self, orchestrator: Any) -> Optional[Dict[str, Any]]:
+        """Get previously applied plan metadata for this orchestrator."""
+        try:
+            cached = self._applied_plan_by_orchestrator.get(orchestrator)
+        except TypeError:
+            cached = None
+        if cached is not None:
+            return copy.deepcopy(cached)
+
+        context = getattr(orchestrator, "vertical_context", None)
+        if context is None:
+            getter = getattr(orchestrator, "get_vertical_context", None)
+            if callable(getter):
+                try:
+                    context = getter()
+                except Exception:
+                    context = None
+
+        if context is None:
+            return None
+
+        get_config = getattr(context, "get_capability_config", None)
+        if not callable(get_config):
+            return None
+        try:
+            plan = get_config("framework.internal.integration_plan", None)
+        except Exception:
+            return None
+
+        if isinstance(plan, dict):
+            return copy.deepcopy(plan)
+        return None
+
+    def _set_applied_plan_for_orchestrator(self, orchestrator: Any, plan: Dict[str, Any]) -> None:
+        """Store applied plan metadata for orchestrator delta/no-op checks."""
+        try:
+            self._applied_plan_by_orchestrator[orchestrator] = copy.deepcopy(plan)
+        except TypeError:
+            # Non-weakref-able orchestrator; skip side cache.
+            pass
+
+    def _orchestrator_state_snapshot(self, orchestrator: Any) -> Dict[str, Any]:
+        """Collect lightweight orchestrator state used for no-op safety checks."""
+        snapshot: Dict[str, Any] = {}
+
+        context = getattr(orchestrator, "vertical_context", None)
+        if context is None:
+            getter = getattr(orchestrator, "get_vertical_context", None)
+            if callable(getter):
+                try:
+                    context = getter()
+                except Exception:
+                    context = None
+        if context is None:
+            # Compatibility fallback for legacy/test orchestrators.
+            context = getattr(orchestrator, "_vertical_context", None)
+
+        if context is not None:
+            snapshot["vertical_name"] = getattr(context, "name", None)
+
+        enabled_tools: Optional[Set[str]] = None
+        get_enabled_tools = getattr(orchestrator, "get_enabled_tools", None)
+        if callable(get_enabled_tools):
+            try:
+                value = get_enabled_tools()
+                if value is not None:
+                    enabled_tools = set(value)
+            except Exception:
+                enabled_tools = None
+        if enabled_tools is None:
+            # Compatibility fallback for legacy/test orchestrators.
+            raw = getattr(orchestrator, "_enabled_tools", None)
+            if raw is not None:
+                try:
+                    enabled_tools = set(raw)
+                except Exception:
+                    enabled_tools = None
+        if enabled_tools is not None:
+            snapshot["enabled_tools_hash"] = self._hash_plan_payload(sorted(enabled_tools))
+
+        return snapshot
+
+    def _plan_state_matches(self, orchestrator: Any, plan: Dict[str, Any]) -> bool:
+        """Return True when orchestrator state is compatible with applied-plan snapshot."""
+        expected = plan.get("state_snapshot", {})
+        if not expected:
+            return True
+
+        actual = self._orchestrator_state_snapshot(orchestrator)
+
+        for key in ("vertical_name", "enabled_tools_hash"):
+            expected_value = expected.get(key)
+            if expected_value is None:
+                continue
+            actual_value = actual.get(key)
+            if actual_value != expected_value:
+                return False
+        return True
+
+    def _compute_skip_handlers(
+        self,
+        orchestrator: Any,
+        *,
+        cache_key: Optional[str],
+        cached_plan: Optional[Dict[str, Any]],
+    ) -> Set[str]:
+        """Compute side-effect handlers that can be skipped as no-op delta."""
+        if cache_key is None or cached_plan is None or self._step_registry is None:
+            with self._integration_plan_lock:
+                self._integration_plan_metrics["full_replays"] += 1
+            return set()
+
+        applied_plan = self._get_applied_plan_for_orchestrator(orchestrator)
+        if not applied_plan:
+            with self._integration_plan_lock:
+                self._integration_plan_metrics["full_replays"] += 1
+            return set()
+
+        if applied_plan.get("cache_key") != cache_key:
+            with self._integration_plan_lock:
+                self._integration_plan_metrics["full_replays"] += 1
+            return set()
+
+        if not self._plan_state_matches(orchestrator, applied_plan):
+            with self._integration_plan_lock:
+                self._integration_plan_metrics["full_replays"] += 1
+            return set()
+
+        cached_fingerprints = cached_plan.get("handler_fingerprints", {})
+        applied_fingerprints = applied_plan.get("handler_fingerprints", {})
+
+        skip: Set[str] = set()
+        for handler in self._step_registry.get_ordered_handlers():
+            name = str(getattr(handler, "name", handler.__class__.__name__))
+            has_side_effects = bool(getattr(handler, "side_effects", True))
+            if not has_side_effects:
+                continue
+            expected = cached_fingerprints.get(name)
+            current = applied_fingerprints.get(name)
+            if expected and current and expected == current:
+                skip.add(name)
+
+        with self._integration_plan_lock:
+            self._integration_plan_metrics["skip_decisions"] += 1
+            self._integration_plan_metrics["skipped_handlers"] += len(skip)
+        return skip
+
+    def _record_skipped_handler(self, result: IntegrationResult, handler_name: str) -> None:
+        """Record skipped handler status for integration-plan no-op delta."""
+        result.record_step_status(
+            handler_name,
+            "skipped",
+            details={"reason": _INTEGRATION_PLAN_SKIP_REASON},
+        )
 
     def _build_vertical_applied_payload(
         self,
@@ -1327,6 +1644,25 @@ class VerticalIntegrationPipeline:
     ) -> Dict[str, Any]:
         """Build observability payload for vertical.applied events."""
         cache_stats = self.get_cache_stats() if self._enable_cache else {}
+        integration_plan_stats = self.get_integration_plan_stats() if self._enable_cache else {}
+        extension_loader_metrics: Dict[str, Any] = {}
+        observability_delivery_stats: Dict[str, Any] = {}
+        try:
+            from victor.core.verticals.extension_loader import VerticalExtensionLoader
+
+            extension_loader_metrics = VerticalExtensionLoader.get_extension_loader_metrics()
+        except Exception:
+            extension_loader_metrics = {}
+        try:
+            from victor.core.events import get_observability_bus
+
+            bus = get_observability_bus()
+            getter = getattr(bus, "get_delivery_pressure_stats", None) if bus else None
+            if callable(getter):
+                observability_delivery_stats = getter() or {}
+        except Exception:
+            observability_delivery_stats = {}
+
         return {
             "vertical": result.vertical_name,
             "tools_count": len(result.tools_applied),
@@ -1342,6 +1678,9 @@ class VerticalIntegrationPipeline:
             "cache_enabled": self._enable_cache,
             "cache_hit": cache_hit,
             "cache_stats": cache_stats,
+            "integration_plan_stats": integration_plan_stats,
+            "extension_loader_metrics": extension_loader_metrics,
+            "observability_delivery_stats": observability_delivery_stats,
             "category": "vertical",  # Preserve for observability
         }
 
@@ -1446,21 +1785,44 @@ class VerticalIntegrationPipeline:
         if context is None:
             result.add_error("Failed to create vertical context")
             return result
+        result.context = context
 
         # Execute step handlers (Phase 2.1-2.2)
         if self._step_registry is None:
             result.add_error("StepHandlerRegistry required for vertical integration")
             return result
 
+        cached_plan: Optional[Dict[str, Any]] = None
+        skip_handlers: Set[str] = set()
+        if cache_hit and cache_key:
+            cached_plan = self._load_plan_from_cache(cache_key)
+            skip_handlers = self._compute_skip_handlers(
+                orchestrator,
+                cache_key=cache_key,
+                cached_plan=cached_plan,
+            )
+            if skip_handlers:
+                result.add_info(
+                    f"Skipped {len(skip_handlers)} side-effect handler(s) via integration-plan delta"
+                )
+
         # Choose execution strategy based on parallel_enabled flag
         if self._parallel_enabled:
             # Parallel execution (Phase 2.2)
             await self._apply_with_step_handlers_parallel(
-                orchestrator, vertical_cls, context, result
+                orchestrator,
+                vertical_cls,
+                context,
+                result,
+                skip_handlers=skip_handlers,
             )
         else:
             # Sequential execution (Phase 2.1)
             for handler in self._step_registry.get_ordered_handlers():
+                handler_name = str(getattr(handler, "name", handler.__class__.__name__))
+                if handler_name in skip_handlers:
+                    self._record_skipped_handler(result, handler_name)
+                    continue
                 try:
                     # Check if handler has async apply method
                     if hasattr(handler, "apply_async"):
@@ -1499,50 +1861,156 @@ class VerticalIntegrationPipeline:
                 cache_key = self._generate_cache_key(vertical_cls)
             if cache_key:
                 self._save_to_cache(cache_key, result)
+                plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
+                self._save_plan_to_cache(cache_key, plan)
+                self._set_applied_plan_for_orchestrator(orchestrator, plan)
+                if result.context is not None:
+                    try:
+                        result.context.set_capability_config(
+                            "framework.internal.integration_plan",
+                            plan,
+                        )
+                    except Exception:
+                        pass
                 if cache_hit:
                     result.add_info("Async integration replayed from cache metadata")
 
         return result
 
     def _classify_handlers(self, handlers: List[Any]) -> Tuple[List[Any], List[Any]]:
-        """Classify handlers into independent and dependent groups (Phase 2.2).
+        """Classify handlers into parallel-safe and sequential groups.
 
-        Independent handlers can run in parallel (no shared state):
-        - ToolStepHandler: Reads vertical only
-        - PromptStepHandler: Reads vertical only
-        - SafetyStepHandler: Reads vertical only
-
-        Dependent handlers must run sequentially:
-        - ConfigStepHandler: Depends on tools, prompts
-        - MiddlewareStepHandler: Depends on config
-        - ExtensionsStepHandler: Depends on all
-        - FrameworkStepHandler: Depends on all
-        - ContextStepHandler: Must run last
+        Classification is metadata-driven to avoid class-name coupling.
+        A handler is eligible for parallel execution only when:
+        - `parallel_safe` metadata is True, and
+        - `side_effects` metadata is False, and
+        - it has no declared dependencies on handlers present in this run.
 
         Args:
-            handlers: List of step handlers
+            handlers: Ordered list of step handlers.
 
         Returns:
-            Tuple of (independent_handlers, dependent_handlers)
+            Tuple of (parallel_safe_handlers, sequential_handlers)
         """
-        independent = []
-        dependent = []
+        independent: List[Any] = []
+        dependent: List[Any] = []
+        ordered_handlers = sorted(handlers, key=self._handler_sort_key)
+        known_handler_names = {
+            getattr(handler, "name", None)
+            for handler in ordered_handlers
+            if getattr(handler, "name", None) is not None
+        }
 
-        for handler in handlers:
-            handler_type = type(handler).__name__
+        for handler in ordered_handlers:
+            parallel_safe = self._is_parallel_eligible(handler)
+            declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
+            active_dependencies = [d for d in declared_dependencies if d in known_handler_names]
 
-            # Independent handlers (read-only, no side effects)
-            if handler_type in [
-                "ToolStepHandler",
-                "PromptStepHandler",
-                "SafetyStepHandler",
-            ]:
+            if parallel_safe and not active_dependencies:
                 independent.append(handler)
             else:
-                # Dependent handlers (have side effects or dependencies)
                 dependent.append(handler)
 
         return independent, dependent
+
+    def _handler_sort_key(self, handler: Any) -> Tuple[int, str]:
+        """Return deterministic sort key for handlers.
+
+        Sorting is stable across runs even with mixed handler implementations.
+        """
+        order = getattr(handler, "order", 1000)
+        try:
+            order_value = int(order)
+        except (TypeError, ValueError):
+            order_value = 1000
+        name = str(getattr(handler, "name", handler.__class__.__name__))
+        return (order_value, name)
+
+    def _is_parallel_eligible(self, handler: Any) -> bool:
+        """Return True if handler is safe for concurrent execution.
+
+        Safety invariant:
+        - Handler must explicitly opt in (`parallel_safe=True`)
+        - Handler must be side-effect free (`side_effects=False`)
+        """
+        parallel_safe = bool(getattr(handler, "parallel_safe", False))
+        has_side_effects = bool(getattr(handler, "side_effects", True))
+        return parallel_safe and not has_side_effects
+
+    def _build_execution_levels(self, handlers: List[Any]) -> List[List[Any]]:
+        """Build deterministic execution levels from metadata dependencies.
+
+        Uses Kahn topological layering over `depends_on`. Each returned level
+        contains handlers whose active dependencies are satisfied and can be
+        considered for concurrent execution by metadata policy.
+
+        If a cycle is detected, the method falls back to deterministic
+        order-based sequential levels.
+        """
+        if not handlers:
+            return []
+
+        ordered_handlers = sorted(handlers, key=self._handler_sort_key)
+        name_to_handler: Dict[str, Any] = {}
+        duplicate_counts: Dict[str, int] = {}
+        ordered_names: List[str] = []
+
+        for index, handler in enumerate(ordered_handlers):
+            raw_name = str(getattr(handler, "name", f"handler_{index}"))
+            if raw_name in name_to_handler:
+                duplicate_counts[raw_name] = duplicate_counts.get(raw_name, 0) + 1
+                unique_name = f"{raw_name}#{duplicate_counts[raw_name]}"
+                logger.warning(
+                    "Duplicate step-handler name '%s' detected; using '%s' for dependency graph",
+                    raw_name,
+                    unique_name,
+                )
+            else:
+                duplicate_counts[raw_name] = 0
+                unique_name = raw_name
+
+            name_to_handler[unique_name] = handler
+            ordered_names.append(unique_name)
+
+        indegree: Dict[str, int] = {name: 0 for name in ordered_names}
+        dependents: Dict[str, Set[str]] = {name: set() for name in ordered_names}
+
+        for name in ordered_names:
+            handler = name_to_handler[name]
+            declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
+            active_dependencies = [dep for dep in declared_dependencies if dep in name_to_handler]
+
+            for dependency in active_dependencies:
+                indegree[name] += 1
+                dependents[dependency].add(name)
+
+        completed: Set[str] = set()
+        levels: List[List[Any]] = []
+        ready = [name for name in ordered_names if indegree[name] == 0]
+
+        while ready:
+            ready_sorted = sorted(ready, key=lambda item: self._handler_sort_key(name_to_handler[item]))
+            levels.append([name_to_handler[name] for name in ready_sorted])
+            completed.update(ready_sorted)
+
+            for done in ready_sorted:
+                for dependent in dependents.get(done, ()):
+                    indegree[dependent] -= 1
+
+            ready = [
+                name for name in ordered_names if name not in completed and indegree[name] == 0
+            ]
+
+        if len(completed) != len(ordered_names):
+            unresolved = [name for name in ordered_names if name not in completed]
+            logger.warning(
+                "Detected cyclical step-handler dependencies (%s); "
+                "falling back to deterministic sequential order",
+                unresolved,
+            )
+            return [[handler] for handler in ordered_handlers]
+
+        return levels
 
     async def _apply_with_step_handlers_parallel(
         self,
@@ -1550,11 +2018,14 @@ class VerticalIntegrationPipeline:
         vertical: Type["VerticalBase"],
         context: VerticalContext,
         result: IntegrationResult,
+        *,
+        skip_handlers: Optional[Set[str]] = None,
     ) -> None:
         """Apply step handlers with parallel execution (Phase 2.2).
 
-        Executes independent handlers concurrently using asyncio.gather,
-        then executes dependent handlers sequentially.
+        Builds metadata-driven dependency levels and executes each level with:
+        - sequential run for handlers that are not parallel-eligible
+        - concurrent run for handlers that are parallel-eligible
 
         Args:
             orchestrator: Orchestrator instance
@@ -1568,39 +2039,54 @@ class VerticalIntegrationPipeline:
             return
 
         handlers = self._step_registry.get_ordered_handlers()
-        independent, dependent = self._classify_handlers(handlers)
+        levels = self._build_execution_levels(handlers)
+        skip_names = skip_handlers or set()
 
-        # Execute independent handlers in parallel
-        if independent:
-            logger.debug(f"Executing {len(independent)} independent handlers in parallel")
+        for level_index, level_handlers in enumerate(levels):
+            sequential_handlers: List[Any] = []
+            parallel_handlers: List[Any] = []
 
-            tasks = [
-                self._run_handler_async(h, orchestrator, vertical, context, result)
-                for h in independent
-            ]
+            for handler in level_handlers:
+                handler_name = str(getattr(handler, "name", handler.__class__.__name__))
+                if handler_name in skip_names:
+                    self._record_skipped_handler(result, handler_name)
+                    continue
+                if self._is_parallel_eligible(handler):
+                    parallel_handlers.append(handler)
+                else:
+                    sequential_handlers.append(handler)
 
-            # Gather results with exception handling
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            if sequential_handlers:
+                logger.debug(
+                    "Executing level %s sequential handlers: %s",
+                    level_index,
+                    [getattr(h, "name", h.__class__.__name__) for h in sequential_handlers],
+                )
+                for handler in sequential_handlers:
+                    await self._run_handler_async(handler, orchestrator, vertical, context, result)
 
-            # Check for exceptions
-            for i, result_or_exc in enumerate(results):
-                if isinstance(result_or_exc, Exception):
-                    handler = independent[i]
-                    if self._strict_mode:
-                        result.add_error(
-                            f"Parallel handler '{handler.name}' failed: {result_or_exc}"
-                        )
-                    else:
-                        result.add_warning(
-                            f"Parallel handler '{handler.name}' error: {result_or_exc}"
-                        )
-
-        # Execute dependent handlers sequentially
-        if dependent:
-            logger.debug(f"Executing {len(dependent)} dependent handlers sequentially")
-
-            for handler in dependent:
-                await self._run_handler_async(handler, orchestrator, vertical, context, result)
+            if parallel_handlers:
+                logger.debug(
+                    "Executing level %s parallel handlers: %s",
+                    level_index,
+                    [getattr(h, "name", h.__class__.__name__) for h in parallel_handlers],
+                )
+                tasks = [
+                    self._run_handler_async(h, orchestrator, vertical, context, result)
+                    for h in parallel_handlers
+                ]
+                results_or_exc = await asyncio.gather(*tasks, return_exceptions=True)
+                for idx, maybe_exc in enumerate(results_or_exc):
+                    if isinstance(maybe_exc, Exception):
+                        failed_handler = parallel_handlers[idx]
+                        if self._strict_mode:
+                            result.add_error(
+                                f"Parallel handler '{failed_handler.name}' failed: {maybe_exc}"
+                            )
+                        else:
+                            result.add_warning(
+                                f"Parallel handler '{failed_handler.name}' error: {maybe_exc}"
+                            )
 
     async def _run_handler_async(
         self,
@@ -1662,6 +2148,8 @@ class VerticalIntegrationPipeline:
         vertical: Type["VerticalBase"],
         context: VerticalContext,
         result: IntegrationResult,
+        *,
+        skip_handlers: Optional[Set[str]] = None,
     ) -> None:
         """Apply vertical using step handlers.
 
@@ -1677,8 +2165,14 @@ class VerticalIntegrationPipeline:
         if self._step_registry is None:
             return
 
+        skip_names = skip_handlers or set()
+
         # Execute all step handlers in order
         for handler in self._step_registry.get_ordered_handlers():
+            handler_name = str(getattr(handler, "name", handler.__class__.__name__))
+            if handler_name in skip_names:
+                self._record_skipped_handler(result, handler_name)
+                continue
             try:
                 handler.apply(
                     orchestrator,

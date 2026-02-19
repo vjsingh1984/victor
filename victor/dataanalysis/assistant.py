@@ -189,11 +189,16 @@ When presenting analysis:
         return cls._get_extension_factory("mode_config_provider", "victor.dataanalysis.mode_config")
 
     @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
         """Get tiered tool configuration for Data Analysis."""
         from victor.core.vertical_types import TieredToolTemplate
 
         return TieredToolTemplate.for_vertical(cls.name)
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Compatibility wrapper for legacy tiered tool API."""
+        return cls.get_tiered_tool_config()
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)

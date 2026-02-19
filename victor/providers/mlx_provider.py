@@ -40,8 +40,6 @@ import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
-
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
@@ -54,19 +52,41 @@ from victor.providers.base import (
 
 logger = logging.getLogger(__name__)
 
-# Lazy import of MLX LM (only available on Apple Silicon or with MLX installed)
-try:
-    from mlx_lm import load, stream_generate
-    from mlx_lm.sample_utils import top_p_sampling
+# NOTE: Keep mlx_lm imports out of module top-level.
+# Importing mlx can crash process on some environments with broken Metal/MPS.
+_MLX_IMPORT_ATTEMPTED = False
+_MLX_AVAILABLE = False
+_MLX_IMPORT_ERROR: Optional[Exception] = None
+_mlx_load = None
+_mlx_stream_generate = None
 
-    MLX_AVAILABLE = True
-except ImportError:
-    MLX_AVAILABLE = False
-    load = None
-    stream_generate = None
-    logger.warning(
-        "mlx-lm not installed. Install with: pip install mlx-lm"
-    )
+
+def _ensure_mlx_imported() -> None:
+    """Import mlx_lm lazily and cache availability state."""
+    global _MLX_IMPORT_ATTEMPTED
+    global _MLX_AVAILABLE
+    global _MLX_IMPORT_ERROR
+    global _mlx_load
+    global _mlx_stream_generate
+
+    if _MLX_IMPORT_ATTEMPTED:
+        if not _MLX_AVAILABLE:
+            detail = f": {_MLX_IMPORT_ERROR}" if _MLX_IMPORT_ERROR else ""
+            raise ImportError(f"mlx-lm is not available{detail}")
+        return
+
+    _MLX_IMPORT_ATTEMPTED = True
+    try:
+        from mlx_lm import load as _load
+        from mlx_lm import stream_generate as _stream_generate
+
+        _mlx_load = _load
+        _mlx_stream_generate = _stream_generate
+        _MLX_AVAILABLE = True
+    except Exception as exc:
+        _MLX_IMPORT_ERROR = exc
+        _MLX_AVAILABLE = False
+        raise ImportError(f"mlx-lm is not available: {exc}") from exc
 
 
 # Models that support tool calling (instruction-tuned)
@@ -155,10 +175,13 @@ class MLXProvider(BaseProvider):
             model: Model path or HuggingFace ID (default: small fast model)
             **kwargs: Additional configuration (ignored for MLX)
         """
-        if not MLX_AVAILABLE:
+        try:
+            _ensure_mlx_imported()
+        except ImportError as exc:
             raise ImportError(
-                "mlx-lm is not installed. Install it with: pip install mlx-lm"
-            )
+                "mlx-lm is not available in this runtime. "
+                "Install and verify with: python -c 'import mlx_lm'"
+            ) from exc
 
         super().__init__(api_key="not-needed", base_url="in-process", **kwargs)
 
@@ -187,11 +210,13 @@ class MLXProvider(BaseProvider):
 
             try:
                 logger.info(f"Loading MLX model: {self.model_path}")
+                if _mlx_load is None:
+                    raise RuntimeError("mlx-lm loader unavailable")
                 # Load in thread pool to avoid blocking event loop
                 loop = asyncio.get_event_loop()
                 self._model, self._tokenizer = await loop.run_in_executor(
                     None,
-                    lambda: load(self.model_path, **self.model_kwargs),
+                    lambda: _mlx_load(self.model_path, **self.model_kwargs),
                 )
                 logger.info(f"MLX model loaded: {self.model_path}")
             except Exception as e:
@@ -281,12 +306,12 @@ class MLXProvider(BaseProvider):
         Returns:
             Generated text
         """
-        if stream_generate is None:
+        if _mlx_stream_generate is None:
             raise RuntimeError("mlx-lm not properly installed")
 
         # Use stream_generate and collect all chunks
         text_chunks = []
-        for response in stream_generate(
+        for response in _mlx_stream_generate(
             self._model,
             self._tokenizer,
             prompt,
@@ -362,7 +387,9 @@ class MLXProvider(BaseProvider):
         def generate_sync():
             """Synchronous generator for streaming."""
             try:
-                for response in stream_generate(
+                if _mlx_stream_generate is None:
+                    raise RuntimeError("mlx-lm stream generator unavailable")
+                for response in _mlx_stream_generate(
                     self._model,
                     self._tokenizer,
                     prompt,
@@ -408,7 +435,7 @@ class MLXProvider(BaseProvider):
         Returns:
             True if MLX is available
         """
-        if not MLX_AVAILABLE:
+        if not _MLX_AVAILABLE:
             return False
 
         try:

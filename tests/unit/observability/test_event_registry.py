@@ -27,6 +27,8 @@ from victor.core.events import (
     MessagingEvent,
     ObservabilityBus,
     InMemoryEventBackend,
+    BackendType,
+    DeliveryGuarantee,
     get_observability_bus,
 )
 from victor.core.container import reset_container
@@ -145,6 +147,12 @@ class TestGetObservabilityBusFactory:
 
         class _Settings:
             event_backend_type = "redis"
+            event_delivery_guarantee = "at_least_once"
+            event_max_batch_size = 25
+            event_flush_interval_ms = 400.0
+            event_queue_maxsize = 42
+            event_queue_overflow_policy = "drop_oldest"
+            event_queue_overflow_block_timeout_ms = 33.0
             event_backend_lazy_init = True
             event_emit_sync_metrics_enabled = False
             event_emit_sync_metrics_interval_seconds = 30.0
@@ -164,6 +172,14 @@ class TestGetObservabilityBusFactory:
 
         mock_create.assert_called_once()
         assert mock_create.call_args.kwargs["lazy_init"] is True
+        config = mock_create.call_args.kwargs["config"]
+        assert config.backend_type == BackendType.REDIS
+        assert config.delivery_guarantee == DeliveryGuarantee.AT_LEAST_ONCE
+        assert config.max_batch_size == 25
+        assert config.flush_interval_ms == 400.0
+        assert config.extra["queue_maxsize"] == 42
+        assert config.extra["queue_overflow_policy"] == "drop_oldest"
+        assert config.extra["queue_overflow_block_timeout_ms"] == 33.0
 
 
 # =============================================================================

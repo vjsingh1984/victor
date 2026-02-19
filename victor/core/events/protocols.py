@@ -266,6 +266,12 @@ class BackendConfig:
         extra: Backend-specific configuration options
 
     Backend-Specific Extra Options:
+        InMemory:
+            - queue_overflow_policy: "drop_newest" (default), "drop_oldest", or
+              "block_with_timeout"
+            - queue_overflow_block_timeout_ms: Timeout for block-with-timeout policy
+            - overflow_durable_sink: Optional callable/write/persist sink for dropped events
+
         Kafka:
             - bootstrap_servers: Kafka broker addresses
             - security_protocol: PLAINTEXT, SSL, SASL_SSL

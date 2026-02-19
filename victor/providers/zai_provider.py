@@ -48,9 +48,24 @@ from victor.providers.openai_compat import convert_tools_to_openai_format
 
 logger = logging.getLogger(__name__)
 
-# Available z.ai GLM models
-# Reference: https://docs.z.ai/ and https://z.ai/blog/glm-4.6
+# Available zhipuAI GLM models
+# Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
+    # Paid flagship models
+    "glm-5": {
+        "description": "GLM-5 - SOTA flagship model with agentic capabilities",
+        "context_window": 128000,
+        "max_output": 8192,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
+    "glm-5-code": {
+        "description": "GLM-5-Code - Specialized coding model (coming soon)",
+        "context_window": 128000,
+        "max_output": 8192,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-4.7": {
         "description": "GLM-4.7 - Latest flagship model",
         "context_window": 128000,
@@ -79,6 +94,50 @@ ZAI_MODELS = {
         "supports_tools": True,
         "supports_thinking": True,
     },
+    # FREE models (unlimited use, no API credits required)
+    "glm-4.7-flash": {
+        "description": "GLM-4.7-Flash - Free model with 200K context",
+        "context_window": 200000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
+    "glm-4.6v-flash": {
+        "description": "GLM-4.6V-Flash - Free multimodal model (vision + text)",
+        "context_window": 128000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
+    # Paid Flash/FlashX models (lower cost)
+    "glm-4.7-flashx": {
+        "description": "GLM-4.7-FlashX - Fast, low-cost model",
+        "context_window": 200000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
+    "glm-4.6v-flashx": {
+        "description": "GLM-4.6V-FlashX - Fast multimodal model",
+        "context_window": 128000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
+    "glm-4.6v": {
+        "description": "GLM-4.6V - Multimodal model (vision + text)",
+        "context_window": 128000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
+    "glm-4.5v": {
+        "description": "GLM-4.5V - Multimodal model (vision + text)",
+        "context_window": 128000,
+        "max_output": 4096,
+        "supports_tools": True,
+        "supports_thinking": False,
+    },
 }
 
 
@@ -96,12 +155,12 @@ class ZAIProvider(BaseProvider):
 
         provider = ZAIProvider(
             api_key="your-zai-api-key",
-            base_url="https://api.z.ai/api/paas/v4/"
+            base_url="https://open.bigmodel.cn/api/paas/v4/"
         )
 
         response = await provider.chat(
             messages=[Message(role="user", content="Hello!")],
-            model="glm-4.7"
+            model="glm-5"
         )
     """
 
@@ -111,16 +170,16 @@ class ZAIProvider(BaseProvider):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: str = "https://api.z.ai/api/paas/v4/",
+        base_url: str = "https://open.bigmodel.cn/api/paas/v4/",
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         **kwargs: Any,
     ):
-        """Initialize z.ai provider.
+        """Initialize ZhipuAI provider.
 
         Args:
-            api_key: z.ai API key (or set ZAI_API_KEY env var, or use keyring)
-            base_url: z.ai API base URL (default: https://api.z.ai/api/paas/v4/)
+            api_key: ZhipuAI API key (or set ZAI_API_KEY env var, or use keyring)
+            base_url: ZhipuAI API base URL (default: https://open.bigmodel.cn/api/paas/v4/)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             **kwargs: Additional configuration
@@ -143,6 +202,7 @@ class ZAIProvider(BaseProvider):
                 "ZhipuAI API key not provided. Set ZAI_API_KEY environment variable, "
                 "use 'victor keys --set zai --keyring', or pass api_key parameter."
             )
+        self._api_key = resolved_key
 
         super().__init__(
             api_key=resolved_key,
@@ -198,7 +258,7 @@ class ZAIProvider(BaseProvider):
         self,
         messages: List[Message],
         *,
-        model: str = "glm-4.7",
+        model: str = "glm-5",
         temperature: float = 0.7,
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
@@ -266,7 +326,7 @@ class ZAIProvider(BaseProvider):
         self,
         messages: List[Message],
         *,
-        model: str = "glm-4.7",
+        model: str = "glm-5",
         temperature: float = 0.7,
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,

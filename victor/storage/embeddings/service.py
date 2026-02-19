@@ -170,7 +170,20 @@ class EmbeddingService:
             with self._model_lock:
                 if self._model is None:
                     try:
+                        import warnings
+                        import logging
+                        import sys
+                        from contextlib import redirect_stderr
+                        from io import StringIO
                         from sentence_transformers import SentenceTransformer
+
+                        # Suppress all warnings from transformers/sentence_transformers during model loading
+                        # The BERT LOAD REPORT is printed directly by transformers library
+                        warnings.filterwarnings("ignore")
+
+                        # Also suppress transformers library logging
+                        logging.getLogger("transformers").setLevel(logging.ERROR)
+                        logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
                         load_start = time.perf_counter()
                         logger.info(
@@ -184,10 +197,13 @@ class EmbeddingService:
                             "all-MiniLM-L6-v2=80MB/384-dim/fastest"
                         )
 
-                        self._model = SentenceTransformer(
-                            self.model_name,
-                            device=self.device,
-                        )
+                        # Suppress stderr to hide BERT LOAD REPORT (printed directly by C++ library)
+                        stderr_capture = StringIO()
+                        with redirect_stderr(stderr_capture):
+                            self._model = SentenceTransformer(
+                                self.model_name,
+                                device=self.device,
+                            )
 
                         # Get embedding dimension from model
                         self._dimension = self._model.get_sentence_embedding_dimension()

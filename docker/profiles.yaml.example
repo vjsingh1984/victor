@@ -1,21 +1,219 @@
-# Victor Docker Profiles Configuration
-# Copy this file to profiles.yaml and configure your providers
+# =============================================================================
+# Victor Docker Configuration - Model Profiles with Detailed Documentation
+# =============================================================================
+# This is an example configuration file for Victor (Docker environment).
+# Copy to ~/.victor/profiles.yaml to activate.
+#
+# Based on comprehensive model research (Feb 2026):
+#   - 40-56B model analysis: /tmp/models_40_56b_complete.md
+#   - 30-35B dense models: /tmp/dense_models_30_35b.md
+#   - Model comparisons: /tmp/model_comparison_40_56b.md
+#   - Optimal sizing for 48GB VRAM: /tmp/optimal_models_m1_max.md
+# =============================================================================
 
-default_profile: local
+default_profile: default
 
 profiles:
+  # ===========================================================================
+  # PRIMARY DEFAULT PROFILE - Qwen2.5-Coder 32B (Recommended)
+  # ===========================================================================
+  # WHY THIS DEFAULT:
+  #   ✅ 32B dense parameters - perfect sweet spot for 48GB VRAM
+  #   ✅ 262K context - MASSIVE context window (4x larger than most)
+  #   ✅ Near-SOTA performance - competitive with 70B models
+  #   ✅ Tool calling - native function support
+  #   ✅ 19GB file - fits with 20GB+ VRAM headroom
+  #
+  # STRENGTHS:
+  #   - Best balance of size, context, and performance
+  #   - Excellent for 90% of tasks (chat, coding, reasoning, tools)
+  #   - Massive 262K context for large codebases/documents
+  #   - Near-SOTA benchmarks (HumanEval ~80%, GSM8K ~85%)
+  #
+  # WEAKNESSES:
+  #   - Dense model (32B active per token, not sparse like MoE)
+  #   - Slower than MoE models for simple tasks
+  #   - Not the absolute SOTA (cloud models like GLM-5 are better)
+  #
+  # USE FOR:
+  #   - Daily driver (general use)
+  #   - Long-context tasks (large codebases, documents)
+  #   - Coding (it's a coder variant)
+  #   - Tool workflows
+  # ===========================================================================
+  default:
+    provider: ollama
+    model: qwen2.5-coder-tools:32b-262K
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'DEFAULT: Qwen2.5-Coder 32B (262K context) - Best all-rounder for 48GB VRAM'
+
+  # ===========================================================================
+  # DENSE MODELS 30-35B (Predictable Performance)
+  # ===========================================================================
+  # Dense models activate ALL parameters per token (100% activation).
+  # More consistent than MoE, but slower and use more VRAM.
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Qwen2.5 32B - Best All-Rounder Dense
+  # ---------------------------------------------------------------------------
   local:
     provider: ollama
-    model: qwen2.5-coder:7b
+    model: qwen2.5-coder-tools:32b-262K
     endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Qwen2.5-Coder 32B (262K) - Best all-rounder dense model'
 
-  # Uncomment and configure for cloud providers
-  # anthropic:
-  #   provider: anthropic
-  #   model: claude-sonnet-4-20250514
-  #   # Set ANTHROPIC_API_KEY environment variable
+  # ---------------------------------------------------------------------------
+  # DeepSeek-Coder 33B - Coding Specialist
+  # ---------------------------------------------------------------------------
+  coding:
+    provider: ollama
+    model: deepseek-coder-tools:33b-262K
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'DeepSeek-Coder 33B (262K) - Best open-source coding model'
 
-  # openai:
-  #   provider: openai
-  #   model: gpt-4o
-  #   # Set OPENAI_API_KEY environment variable
+  # ===========================================================================
+  # Mixture of Experts (MoE) MODELS 40-56B (Efficient Scaling)
+  # ===========================================================================
+  # MoE models activate only a SUBSET of experts per token (sparse activation).
+  # More efficient than dense models, faster for same total parameters.
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Mixtral 8x7B - Best MoE for Tool-Based Agents (46.7B)
+  # ---------------------------------------------------------------------------
+  # WHY CHOOSE:
+  #   ✅ 46.7B total parameters (perfect for 40-56B target)
+  #   ✅ MoE efficiency - only 11.7B active per token (25%)
+  #   ✅ Native tool calling - excellent for agents
+  #   ✅ Multilingual - 5 languages supported
+  #   ✅ 32-65K context - decent context window
+  #   ✅ Apache 2.0 license - fully open
+  #
+  # STRENGTHS:
+  #   - Fast MoE inference (sparse activation)
+  #   - Best for tool-heavy agent workflows
+  #   - More capacity (46.7B total)
+  #
+  # WEAKNESSES:
+  #   - Shorter context (32-65K vs 262K on Qwen2.5)
+  #   - Older model (late 2023 vs 2024)
+  #
+  # USE FOR:
+  #   - Agent-heavy workflows (lots of tool calls)
+  #   - When you need faster responses
+  #   - European languages (French, German, Spanish, Italian)
+  # ---------------------------------------------------------------------------
+  moe:
+    provider: ollama
+    model: mixtral-tools:8x7b-65K
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Mixtral 8x7B (46.7B MoE, 65K) - Best MoE for tool-based agents'
+
+  # ===========================================================================
+  # REASONING SPECIALISTS (Chain-of-Thought)
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # DeepSeek R1 32B - Reasoning with CoT
+  # ---------------------------------------------------------------------------
+  reasoning:
+    provider: ollama
+    model: deepseek-r1-tools:32b-262K
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'DeepSeek-R1 32B (262K) - Chain-of-Thought reasoning'
+
+  # ---------------------------------------------------------------------------
+  # Qwen3 30B - Latest Gen with Thinking Mode
+  # ---------------------------------------------------------------------------
+  qwen3:
+    provider: ollama
+    model: qwen3-coder-tools:30b-262K
+    endpoint: http://localhost:11434
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Qwen3-Coder 30B (262K) - Latest gen, thinking mode, best Chinese'
+
+  # ===========================================================================
+  # CLOUD SOTA MODELS (API Required, Maximum Performance)
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # GLM-5 - NEW SOTA Model (Feb 2026)
+  # ---------------------------------------------------------------------------
+  # WHY CHOOSE:
+  #   ✅ 744B total, 40B active - EXACT match for 40-56B target!
+  #   ✅ SOTA benchmarks - 92.7% AIME, 77.8% SWE-bench
+  #   ✅ 198K context - massive context window
+  #   ✅ MIT license - commercial-friendly
+  #
+  # STRENGTHS:
+  #   - State-of-the-art performance
+  #   - Perfect 40B active parameters (your target!)
+  #   - MIT license (fully open)
+  #
+  # WEAKNESSES:
+  #   - Cloud-only (not downloadable)
+  #   - API costs
+  #
+  # USE FOR:
+  #   - Maximum performance needed
+  #   - Complex reasoning (92.7% AIME!)
+  #   - SOTA coding (77.8% SWE-bench!)
+  # ---------------------------------------------------------------------------
+  glm5:
+    provider: ollama
+    model: glm-5:cloud
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'GLM-5 (744B total, 40B active) - NEW SOTA, 198K context, MIT'
+
+  # ===========================================================================
+  # CLASSIC CLOUD MODELS (Claude, GPT, Gemini, etc.)
+  # ===========================================================================
+
+  claude:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    temperature: 1.0
+    max_tokens: 8192
+    description: 'Claude Sonnet 4.5 - Best for complex tasks'
+    # Set ANTHROPIC_API_KEY environment variable
+
+  gpt:
+    provider: openai
+    model: gpt-4.1
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'GPT-4.1 - Latest OpenAI flagship'
+    # Set OPENAI_API_KEY environment variable
+
+  gemini:
+    provider: google
+    model: gemini-2.5-pro
+    temperature: 1.0
+    max_tokens: 8192
+    description: 'Gemini 2.5 Pro - 1M context window'
+    # Set GOOGLE_API_KEY environment variable
+
+  # ===========================================================================
+  # FAST PROFILES (Ultra-Fast Inference)
+  # ===========================================================================
+
+  quick:
+    provider: ollama
+    model: mistral-tools:7b-instruct
+    endpoint: http://localhost:11434
+    temperature: 0.5
+    max_tokens: 2048
+    description: 'Mistral 7B - Fastest local model'

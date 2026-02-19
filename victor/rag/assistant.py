@@ -170,7 +170,7 @@ You: [Use rag_query tool with query="authentication"]
         }
 
     @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
         """Get tiered tool configuration for RAG.
 
         RAG has unique requirements:
@@ -206,6 +206,11 @@ You: [Use rag_query tool with query="authentication"]
             # Analysis tasks should not have write tools
             readonly_only_for_analysis=True,
         )
+
+    @classmethod
+    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
+        """Compatibility wrapper for legacy tiered tool API."""
+        return cls.get_tiered_tool_config()
 
     # Extension providers delegated to base class (OCP/caching compliance)
     # RAG previously overrode get_extensions() directly, bypassing base class caching.

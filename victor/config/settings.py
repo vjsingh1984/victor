@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -931,6 +931,9 @@ class Settings(BaseSettings):
     # Event batching configuration
     event_max_batch_size: int = 100
     event_flush_interval_ms: float = 1000.0
+    event_queue_maxsize: int = 10000
+    event_queue_overflow_policy: str = "drop_newest"
+    event_queue_overflow_block_timeout_ms: float = 50.0
 
     # Sync emit metrics reporter configuration
     # Emits periodic snapshots for emit_helper delivery counters.
@@ -941,6 +944,18 @@ class Settings(BaseSettings):
     event_emit_sync_metrics_interval_seconds: float = 60.0
     event_emit_sync_metrics_reset_after_emit: bool = False
     event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
+
+    # Extension-loader pressure/reporter defaults (P3 reliability)
+    extension_loader_warn_queue_threshold: int = 24
+    extension_loader_error_queue_threshold: int = 32
+    extension_loader_warn_in_flight_threshold: int = 6
+    extension_loader_error_in_flight_threshold: int = 8
+    extension_loader_pressure_cooldown_seconds: float = 5.0
+    extension_loader_emit_pressure_events: bool = False
+    extension_loader_metrics_reporter_enabled: bool = False
+    extension_loader_metrics_reporter_interval_seconds: float = 60.0
+    extension_loader_metrics_reporter_reset_after_emit: bool = False
+    extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
 
     # ==========================================================================
     # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
@@ -963,6 +978,48 @@ class Settings(BaseSettings):
     # Analytics
     analytics_enabled: bool = True
     # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
+
+    @field_validator("event_queue_overflow_policy")
+    @classmethod
+    def validate_event_queue_overflow_policy(cls, value: str) -> str:
+        """Validate configured in-memory queue overflow policy."""
+        normalized = str(value).strip().lower()
+        allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
+        if normalized not in allowed:
+            allowed_csv = ", ".join(sorted(allowed))
+            raise ValueError(
+                f"event_queue_overflow_policy must be one of: {allowed_csv}; got '{value}'"
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_extension_loader_thresholds(self) -> "Settings":
+        """Validate extension-loader pressure threshold relationships."""
+        if self.event_queue_maxsize < 1:
+            raise ValueError("event_queue_maxsize must be >= 1")
+        if self.event_queue_overflow_block_timeout_ms < 0:
+            raise ValueError("event_queue_overflow_block_timeout_ms must be >= 0")
+        if self.extension_loader_pressure_cooldown_seconds < 0:
+            raise ValueError("extension_loader_pressure_cooldown_seconds must be >= 0")
+        if self.extension_loader_metrics_reporter_interval_seconds <= 0:
+            raise ValueError("extension_loader_metrics_reporter_interval_seconds must be > 0")
+        if (
+            self.extension_loader_error_queue_threshold
+            < self.extension_loader_warn_queue_threshold
+        ):
+            raise ValueError(
+                "extension_loader_error_queue_threshold must be >= "
+                "extension_loader_warn_queue_threshold"
+            )
+        if (
+            self.extension_loader_error_in_flight_threshold
+            < self.extension_loader_warn_in_flight_threshold
+        ):
+            raise ValueError(
+                "extension_loader_error_in_flight_threshold must be >= "
+                "extension_loader_warn_in_flight_threshold"
+            )
+        return self
 
     @staticmethod
     def _estimate_model_vram_gb(model_id: str) -> Optional[float]:

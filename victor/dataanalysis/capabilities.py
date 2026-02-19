@@ -43,6 +43,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import load_capability_config, store_capability_config
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
@@ -50,6 +51,39 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+_DATA_QUALITY_DEFAULTS: Dict[str, Any] = {
+    "min_completeness": 0.9,
+    "max_outlier_ratio": 0.05,
+    "require_type_validation": True,
+    "handle_missing": "impute",
+}
+_VISUALIZATION_DEFAULTS: Dict[str, Any] = {
+    "backend": "matplotlib",
+    "theme": "seaborn-v0_8-whitegrid",
+    "figure_size": (10, 6),
+    "dpi": 100,
+    "save_format": "png",
+}
+_STATISTICS_DEFAULTS: Dict[str, Any] = {
+    "significance_level": 0.05,
+    "confidence_interval": 0.95,
+    "multiple_testing_correction": "bonferroni",
+    "effect_size_threshold": 0.2,
+}
+_ML_DEFAULTS: Dict[str, Any] = {
+    "framework": "sklearn",
+    "cv_folds": 5,
+    "test_size": 0.2,
+    "random_state": 42,
+    "hyperparameter_tuning": True,
+    "tuning_method": "grid",
+}
 
 # =============================================================================
 # Capability Handlers
@@ -76,13 +110,16 @@ def configure_data_quality(
         require_type_validation: Require data type validation
         handle_missing: Strategy for missing values: "impute", "drop", "flag"
     """
-    if hasattr(orchestrator, "data_quality_config"):
-        orchestrator.data_quality_config = {
+    store_capability_config(
+        orchestrator,
+        "data_quality_config",
+        {
             "min_completeness": min_completeness,
             "max_outlier_ratio": max_outlier_ratio,
             "require_type_validation": require_type_validation,
             "handle_missing": handle_missing,
-        }
+        },
+    )
 
     logger.info(
         f"Configured data quality: completeness>={min_completeness:.0%}, "
@@ -99,15 +136,11 @@ def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Data quality configuration dict
     """
-    return getattr(
+    return load_capability_config(
         orchestrator,
         "data_quality_config",
-        {
-            "min_completeness": 0.9,
-            "max_outlier_ratio": 0.05,
-            "require_type_validation": True,
-            "handle_missing": "impute",
-        },
+        _DATA_QUALITY_DEFAULTS,
+        legacy_service_names=["data_quality"],
     )
 
 
@@ -130,14 +163,17 @@ def configure_visualization_style(
         dpi: Resolution in dots per inch
         save_format: Default save format (png, svg, pdf)
     """
-    if hasattr(orchestrator, "visualization_config"):
-        orchestrator.visualization_config = {
+    store_capability_config(
+        orchestrator,
+        "visualization_config",
+        {
             "backend": default_backend,
             "theme": theme,
             "figure_size": figure_size,
             "dpi": dpi,
             "save_format": save_format,
-        }
+        },
+    )
 
     logger.info(f"Configured visualization: backend={default_backend}, theme={theme}")
 
@@ -151,16 +187,11 @@ def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Visualization configuration dict
     """
-    return getattr(
+    return load_capability_config(
         orchestrator,
         "visualization_config",
-        {
-            "backend": "matplotlib",
-            "theme": "seaborn-v0_8-whitegrid",
-            "figure_size": (10, 6),
-            "dpi": 100,
-            "save_format": "png",
-        },
+        _VISUALIZATION_DEFAULTS,
+        legacy_service_names=["visualization"],
     )
 
 
@@ -181,13 +212,16 @@ def configure_statistical_analysis(
         multiple_testing_correction: Correction method (bonferroni, holm, fdr_bh)
         effect_size_threshold: Minimum effect size for practical significance
     """
-    if hasattr(orchestrator, "statistics_config"):
-        orchestrator.statistics_config = {
+    store_capability_config(
+        orchestrator,
+        "statistics_config",
+        {
             "significance_level": significance_level,
             "confidence_interval": confidence_interval,
             "multiple_testing_correction": multiple_testing_correction,
             "effect_size_threshold": effect_size_threshold,
-        }
+        },
+    )
 
     logger.info(
         f"Configured statistics: alpha={significance_level}, " f"CI={confidence_interval:.0%}"
@@ -203,15 +237,11 @@ def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Statistical configuration dict
     """
-    return getattr(
+    return load_capability_config(
         orchestrator,
         "statistics_config",
-        {
-            "significance_level": 0.05,
-            "confidence_interval": 0.95,
-            "multiple_testing_correction": "bonferroni",
-            "effect_size_threshold": 0.2,
-        },
+        _STATISTICS_DEFAULTS,
+        legacy_service_names=["statistical_analysis"],
     )
 
 
@@ -236,15 +266,18 @@ def configure_ml_pipeline(
         enable_hyperparameter_tuning: Enable hyperparameter optimization
         tuning_method: Tuning method (grid, random, bayesian)
     """
-    if hasattr(orchestrator, "ml_config"):
-        orchestrator.ml_config = {
+    store_capability_config(
+        orchestrator,
+        "ml_config",
+        {
             "framework": default_framework,
             "cv_folds": cross_validation_folds,
             "test_size": test_size,
             "random_state": random_state,
             "hyperparameter_tuning": enable_hyperparameter_tuning,
             "tuning_method": tuning_method,
-        }
+        },
+    )
 
     logger.info(
         f"Configured ML pipeline: framework={default_framework}, "
@@ -261,17 +294,11 @@ def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         ML configuration dict
     """
-    return getattr(
+    return load_capability_config(
         orchestrator,
         "ml_config",
-        {
-            "framework": "sklearn",
-            "cv_folds": 5,
-            "test_size": 0.2,
-            "random_state": 42,
-            "hyperparameter_tuning": True,
-            "tuning_method": "grid",
-        },
+        _ML_DEFAULTS,
+        legacy_service_names=["ml_pipeline"],
     )
 
 
@@ -754,26 +781,26 @@ def get_capability_configs() -> Dict[str, Any]:
         Dict with default data analysis capability configurations
     """
     return {
-        "data_quality": {
+        "data_quality_config": {
             "min_completeness": 0.9,
             "max_outlier_ratio": 0.05,
             "require_type_validation": True,
             "handle_missing": "impute",
         },
-        "visualization": {
+        "visualization_config": {
             "backend": "matplotlib",
             "theme": "seaborn-v0_8-whitegrid",
             "figure_size": (10, 6),
             "dpi": 100,
             "save_format": "png",
         },
-        "statistical_analysis": {
+        "statistics_config": {
             "significance_level": 0.05,
             "confidence_interval": 0.95,
             "multiple_testing_correction": "bonferroni",
             "effect_size_threshold": 0.2,
         },
-        "ml_pipeline": {
+        "ml_config": {
             "framework": "sklearn",
             "cv_folds": 5,
             "test_size": 0.2,
@@ -781,7 +808,7 @@ def get_capability_configs() -> Dict[str, Any]:
             "hyperparameter_tuning": True,
             "tuning_method": "grid",
         },
-        "privacy": {
+        "privacy_config": {
             "anonymize_pii": True,
             "pii_columns": [],
             "hash_identifiers": True,

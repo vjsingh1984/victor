@@ -1886,6 +1886,90 @@ class TestCachingIntegration:
         # (This is conceptual - we don't actually modify files in tests)
 
 
+class TestIntegrationPlanCache:
+    """Tests for integration-plan cache no-op/delta behavior."""
+
+    class _CountingHandler:
+        def __init__(self, name: str, order: int, side_effects: bool) -> None:
+            self.name = name
+            self.order = order
+            self.side_effects = side_effects
+            self.parallel_safe = not side_effects
+            self.depends_on = ()
+            self.calls = 0
+
+        def apply(
+            self,
+            orchestrator,
+            vertical,
+            context,
+            result,
+            strict_mode=False,
+        ):
+            self.calls += 1
+            result.record_step_status(
+                self.name,
+                "success",
+                details={"calls": self.calls},
+            )
+
+    class _Registry:
+        def __init__(self, handlers):
+            self._handlers = handlers
+
+        def get_ordered_handlers(self):
+            return self._handlers
+
+    def test_cache_hit_skips_side_effect_handlers_when_plan_matches(self):
+        """Cache hit should skip side-effect handlers when plan is unchanged."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        stateful = self._CountingHandler("stateful", 10, side_effects=True)
+        pure = self._CountingHandler("pure", 20, side_effects=False)
+        pipeline._step_registry = self._Registry([stateful, pure])
+
+        first = pipeline.apply(orchestrator, MockVertical)
+        cached_plan = pipeline._get_applied_plan_for_orchestrator(orchestrator)
+        assert cached_plan is not None
+        cached_plan["state_snapshot"] = {}
+        pipeline._set_applied_plan_for_orchestrator(orchestrator, cached_plan)
+        second = pipeline.apply(orchestrator, MockVertical)
+
+        assert first.success is True
+        assert second.success is True
+        assert stateful.calls == 1
+        assert pure.calls == 2
+        assert second.get_step_status("stateful")["status"] == "skipped"
+        assert second.get_step_status("stateful")["details"]["reason"] == "integration_plan_noop"
+
+    def test_cache_hit_applies_delta_when_only_some_side_effect_fingerprints_change(self):
+        """Delta mode should skip unchanged side-effect handlers and re-run changed ones."""
+        orchestrator = MockOrchestrator()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        stateful_a = self._CountingHandler("stateful_a", 10, side_effects=True)
+        stateful_b = self._CountingHandler("stateful_b", 11, side_effects=True)
+        pipeline._step_registry = self._Registry([stateful_a, stateful_b])
+
+        first = pipeline.apply(orchestrator, MockVertical)
+        assert first.success is True
+        cached_plan = pipeline._get_applied_plan_for_orchestrator(orchestrator)
+        assert cached_plan is not None
+
+        # Simulate local state divergence for one handler only.
+        cached_plan["handler_fingerprints"]["stateful_b"] = "out_of_sync"
+        cached_plan["state_snapshot"] = {}
+        pipeline._set_applied_plan_for_orchestrator(orchestrator, cached_plan)
+
+        second = pipeline.apply(orchestrator, MockVertical)
+        assert second.success is True
+        assert stateful_a.calls == 1  # skipped as no-op
+        assert stateful_b.calls == 2  # re-run due fingerprint mismatch
+        assert second.get_step_status("stateful_a")["status"] == "skipped"
+        assert second.get_step_status("stateful_b")["status"] == "success"
+
+
 class TestVerticalIntegrationObservability:
     """Tests for vertical integration observability payloads."""
 
@@ -1911,6 +1995,9 @@ class TestVerticalIntegrationObservability:
         assert "cache_hit" in data
         assert "cache_stats" in data
         assert "cache_enabled" in data
+        assert "integration_plan_stats" in data
+        assert "extension_loader_metrics" in data
+        assert "observability_delivery_stats" in data
 
     @pytest.mark.asyncio
     async def test_vertical_applied_event_includes_cache_telemetry(self):
@@ -1934,6 +2021,9 @@ class TestVerticalIntegrationObservability:
         assert "cache_hit" in data
         assert "cache_stats" in data
         assert "cache_enabled" in data
+        assert "integration_plan_stats" in data
+        assert "extension_loader_metrics" in data
+        assert "observability_delivery_stats" in data
 
     @pytest.mark.asyncio
     async def test_apply_async_emits_vertical_applied_event_with_cache_telemetry(self):
@@ -1957,6 +2047,9 @@ class TestVerticalIntegrationObservability:
         assert data["cache_enabled"] is True
         assert data["cache_hit"] is True
         assert "cache_stats" in data
+        assert "integration_plan_stats" in data
+        assert "extension_loader_metrics" in data
+        assert "observability_delivery_stats" in data
 
 
 # =============================================================================
@@ -1969,15 +2062,21 @@ class TestParallelExecution:
 
     @pytest.mark.asyncio
     async def test_classify_handlers_separates_independent_dependent(self):
-        """Test that handlers are correctly classified."""
+        """Test that handlers are classified by metadata, not class name."""
         pipeline = VerticalIntegrationPipeline()
 
         # Mock handlers
         independent_handler = MagicMock()
-        independent_handler.__class__.__name__ = "ToolStepHandler"
+        independent_handler.name = "tools"
+        independent_handler.parallel_safe = True
+        independent_handler.depends_on = ()
+        independent_handler.side_effects = False
 
         dependent_handler = MagicMock()
-        dependent_handler.__class__.__name__ = "ConfigStepHandler"
+        dependent_handler.name = "config"
+        dependent_handler.parallel_safe = False
+        dependent_handler.depends_on = ("tools",)
+        dependent_handler.side_effects = True
 
         handlers = [independent_handler, dependent_handler]
         independent, dependent = pipeline._classify_handlers(handlers)
@@ -1986,6 +2085,166 @@ class TestParallelExecution:
         assert len(dependent) == 1
         assert independent[0] is independent_handler
         assert dependent[0] is dependent_handler
+
+    @pytest.mark.asyncio
+    async def test_classify_handlers_respects_declared_dependencies(self):
+        """Parallel-safe handlers with active dependencies stay sequential."""
+        pipeline = VerticalIntegrationPipeline()
+
+        tools_handler = MagicMock()
+        tools_handler.name = "tools"
+        tools_handler.parallel_safe = True
+        tools_handler.depends_on = ()
+        tools_handler.side_effects = False
+
+        tiered_handler = MagicMock()
+        tiered_handler.name = "tiered_config"
+        tiered_handler.parallel_safe = True
+        tiered_handler.depends_on = ("tools",)
+        tiered_handler.side_effects = False
+
+        independent, dependent = pipeline._classify_handlers([tools_handler, tiered_handler])
+
+        assert independent == [tools_handler]
+        assert dependent == [tiered_handler]
+
+    def test_build_execution_levels_respects_metadata_dependencies(self):
+        """Execution levels should follow metadata dependencies deterministically."""
+        pipeline = VerticalIntegrationPipeline()
+
+        capability = MagicMock()
+        capability.name = "capability_config"
+        capability.order = 5
+        capability.depends_on = ()
+
+        tools = MagicMock()
+        tools.name = "tools"
+        tools.order = 10
+        tools.depends_on = ()
+
+        prompt = MagicMock()
+        prompt.name = "prompt"
+        prompt.order = 20
+        prompt.depends_on = ()
+
+        config = MagicMock()
+        config.name = "config"
+        config.order = 40
+        config.depends_on = ("tools", "prompt")
+
+        framework = MagicMock()
+        framework.name = "framework"
+        framework.order = 60
+        framework.depends_on = ("config",)
+
+        context = MagicMock()
+        context.name = "context"
+        context.order = 100
+        context.depends_on = ("framework",)
+
+        levels = pipeline._build_execution_levels(
+            [context, framework, prompt, tools, capability, config]
+        )
+        level_names = [[handler.name for handler in level] for level in levels]
+
+        assert level_names == [
+            ["capability_config", "tools", "prompt"],
+            ["config"],
+            ["framework"],
+            ["context"],
+        ]
+
+    def test_build_execution_levels_cycle_falls_back_to_order(self):
+        """Cyclical dependencies should degrade to deterministic sequential order."""
+        pipeline = VerticalIntegrationPipeline()
+
+        first = MagicMock()
+        first.name = "first"
+        first.order = 20
+        first.depends_on = ("second",)
+
+        second = MagicMock()
+        second.name = "second"
+        second.order = 10
+        second.depends_on = ("first",)
+
+        levels = pipeline._build_execution_levels([first, second])
+        level_names = [[handler.name for handler in level] for level in levels]
+
+        assert level_names == [["second"], ["first"]]
+
+    @pytest.mark.asyncio
+    async def test_parallel_execution_enforces_side_effect_safety(self):
+        """Only side-effect-free handlers should run concurrently."""
+        pipeline = VerticalIntegrationPipeline(parallel_enabled=True)
+        orchestrator = MockOrchestrator()
+        context = create_vertical_context(name=MockVertical.name)
+        result = IntegrationResult(vertical_name=MockVertical.name)
+
+        events = []
+        active = 0
+        max_active = 0
+
+        class RecordingHandler:
+            def __init__(
+                self,
+                name: str,
+                order: int,
+                parallel_safe: bool,
+                side_effects: bool,
+                depends_on: tuple[str, ...] = (),
+                delay: float = 0.0,
+            ) -> None:
+                self.name = name
+                self.order = order
+                self.parallel_safe = parallel_safe
+                self.side_effects = side_effects
+                self.depends_on = depends_on
+                self.delay = delay
+
+            async def apply_async(
+                self,
+                orchestrator,
+                vertical,
+                context,
+                result,
+                strict_mode=False,
+            ):
+                nonlocal active, max_active
+                events.append(("start", self.name))
+                active += 1
+                max_active = max(max_active, active)
+                if self.delay > 0:
+                    await asyncio.sleep(self.delay)
+                active -= 1
+                events.append(("end", self.name))
+
+        class Registry:
+            def __init__(self, handlers):
+                self._handlers = handlers
+
+            def get_ordered_handlers(self):
+                return self._handlers
+
+        handlers = [
+            RecordingHandler("seq", 5, parallel_safe=False, side_effects=True),
+            RecordingHandler("unsafe_parallel", 6, parallel_safe=True, side_effects=True),
+            RecordingHandler("par1", 10, parallel_safe=True, side_effects=False, delay=0.03),
+            RecordingHandler("par2", 11, parallel_safe=True, side_effects=False, delay=0.03),
+        ]
+        pipeline._step_registry = Registry(handlers)
+
+        await pipeline._apply_with_step_handlers_parallel(
+            orchestrator,
+            MockVertical,
+            context,
+            result,
+        )
+
+        starts = [name for marker, name in events if marker == "start"]
+        assert starts[:2] == ["seq", "unsafe_parallel"]
+        assert set(starts[2:]) == {"par1", "par2"}
+        assert max_active == 2
 
     @pytest.mark.asyncio
     async def test_parallel_execution_with_independent_handlers(self):
@@ -2027,6 +2286,14 @@ class TestParallelExecution:
 
         pipeline_seq = VerticalIntegrationPipeline(parallel_enabled=False)
         assert pipeline_seq._parallel_enabled is False
+
+    def test_legacy_extension_registry_is_not_in_active_pipeline_path(self):
+        """Legacy extension registry should be ignored in step-handler mode."""
+        legacy_registry = MagicMock()
+        pipeline = VerticalIntegrationPipeline(extension_registry=legacy_registry)
+
+        assert pipeline.step_registry is not None
+        assert not hasattr(pipeline, "_extension_registry")
 
 
 class TestFeatureFlags:

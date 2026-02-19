@@ -589,6 +589,46 @@ class OrchestratorProtocol(Protocol):
 
 
 # =============================================================================
+# Infrastructure Port Protocols (DIP Boundaries)
+# =============================================================================
+
+
+@runtime_checkable
+class ServiceContainerPortProtocol(Protocol):
+    """Protocol for orchestrators exposing their DI container safely."""
+
+    def get_service_container(self) -> Any:
+        """Get service container used by the orchestrator."""
+        ...
+
+
+@runtime_checkable
+class CapabilityLoaderPortProtocol(Protocol):
+    """Protocol for orchestrators exposing capability loader lifecycle."""
+
+    def get_capability_loader(self) -> Optional[Any]:
+        """Get configured capability loader if available."""
+        ...
+
+    def set_capability_loader(self, loader: Any) -> None:
+        """Set capability loader instance."""
+        ...
+
+    def get_or_create_capability_loader(self) -> Any:
+        """Get or lazily create capability loader instance."""
+        ...
+
+
+@runtime_checkable
+class ObservabilityPortProtocol(Protocol):
+    """Protocol for observability wiring without private attribute access."""
+
+    def set_observability(self, value: Optional[Any]) -> None:
+        """Set observability integration on orchestrator."""
+        ...
+
+
+# =============================================================================
 # Capability Discovery Protocol
 # =============================================================================
 

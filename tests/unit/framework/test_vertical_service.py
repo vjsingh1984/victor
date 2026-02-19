@@ -15,8 +15,10 @@
 """Tests for shared framework vertical integration service."""
 
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from victor.core.verticals.base import VerticalBase
 from victor.framework.vertical_integration import IntegrationResult
 from victor.framework.vertical_service import (
     apply_vertical_configuration,
@@ -29,6 +31,58 @@ class DummyVertical:
     """Minimal vertical type for service-level tests."""
 
     name = "dummy"
+
+
+class VerticalWithServiceProvider(VerticalBase):
+    """Test vertical exposing service-provider extensions."""
+
+    name = "service_vertical"
+    description = "Service provider test vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_tools(cls):
+        return ["read"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "Service vertical prompt"
+
+    @classmethod
+    def get_extensions(cls):
+        provider = MagicMock()
+        provider.get_required_services.return_value = ["svc_required"]
+        provider.get_optional_services.return_value = ["svc_optional"]
+        return SimpleNamespace(
+            service_provider=provider,
+            middleware=None,
+            safety_extensions=None,
+            prompt_contributors=None,
+            mode_config_provider=None,
+            tool_dependency_provider=None,
+            enrichment_strategy=None,
+            tool_selection_strategy=None,
+        )
+
+
+class StubOrchestrator:
+    """Minimal orchestrator with required public ports for integration."""
+
+    def __init__(self):
+        self.settings = MagicMock()
+        self._container = MagicMock()
+        self._enabled_tools = set()
+        self._vertical_context = None
+        self.prompt_builder = SimpleNamespace(set_custom_prompt=lambda _prompt: None)
+
+    def get_service_container(self):
+        return self._container
+
+    def set_enabled_tools(self, tools):
+        self._enabled_tools = set(tools)
+
+    def set_vertical_context(self, context):
+        self._vertical_context = context
 
 
 class TestVerticalService:
@@ -78,3 +132,35 @@ class TestVerticalService:
             clear_vertical_integration_pipeline_cache()
 
         pipeline.clear_cache.assert_called_once_with()
+
+    def test_cli_and_sdk_paths_share_activation_helper_idempotently(self):
+        """Both source paths should use same activation helper with idempotent behavior."""
+        orchestrator = StubOrchestrator()
+        get_vertical_integration_pipeline(reset=True)
+
+        with patch(
+            "victor.core.verticals.vertical_loader.activate_vertical_services",
+            side_effect=[
+                SimpleNamespace(services_registered=True),
+                SimpleNamespace(services_registered=False),
+            ],
+        ) as mock_activate:
+            cli_result = apply_vertical_configuration(
+                orchestrator,
+                VerticalWithServiceProvider,
+                source="cli",
+            )
+            sdk_result = apply_vertical_configuration(
+                orchestrator,
+                VerticalWithServiceProvider,
+                source="sdk",
+            )
+
+        expected_args = (orchestrator.get_service_container(), orchestrator.settings, "service_vertical")
+        assert mock_activate.call_count == 2
+        assert mock_activate.call_args_list[0].args == expected_args
+        assert mock_activate.call_args_list[1].args == expected_args
+        assert cli_result.success is True
+        assert sdk_result.success is True
+        assert any("Registered 2 vertical services" in msg for msg in cli_result.info)
+        assert any("already registered" in msg for msg in sdk_result.info)

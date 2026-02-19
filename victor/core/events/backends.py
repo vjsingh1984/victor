@@ -62,6 +62,128 @@ from victor.core.events.protocols import (
 
 logger = logging.getLogger(__name__)
 
+_QUEUE_POLICY_DROP_NEWEST = "drop_newest"
+_QUEUE_POLICY_DROP_OLDEST = "drop_oldest"
+_QUEUE_POLICY_BLOCK_WITH_TIMEOUT = "block_with_timeout"
+_VALID_QUEUE_POLICIES = {
+    _QUEUE_POLICY_DROP_NEWEST,
+    _QUEUE_POLICY_DROP_OLDEST,
+    _QUEUE_POLICY_BLOCK_WITH_TIMEOUT,
+}
+_DELIVERY_GUARANTEE_MAP: Dict[str, DeliveryGuarantee] = {
+    "at_most_once": DeliveryGuarantee.AT_MOST_ONCE,
+    "at_least_once": DeliveryGuarantee.AT_LEAST_ONCE,
+    "exactly_once": DeliveryGuarantee.EXACTLY_ONCE,
+}
+_BACKEND_TYPE_MAP: Dict[str, BackendType] = {
+    "in_memory": BackendType.IN_MEMORY,
+    "memory": BackendType.IN_MEMORY,
+    "sqlite": BackendType.DATABASE,
+    "database": BackendType.DATABASE,
+    "redis": BackendType.REDIS,
+    "kafka": BackendType.KAFKA,
+    "sqs": BackendType.SQS,
+    "rabbitmq": BackendType.RABBITMQ,
+}
+
+
+def _parse_backend_type(raw: Any) -> BackendType:
+    """Parse backend type from settings value with safe fallback."""
+    if isinstance(raw, BackendType):
+        return raw
+    normalized = str(raw).strip().lower()
+    backend_type = _BACKEND_TYPE_MAP.get(normalized)
+    if backend_type is None:
+        logger.warning("Unknown event_backend_type '%s'; defaulting to '%s'", raw, "in_memory")
+        return BackendType.IN_MEMORY
+    return backend_type
+
+
+def _parse_delivery_guarantee(raw: Any) -> DeliveryGuarantee:
+    """Parse delivery guarantee from settings value with safe fallback."""
+    if isinstance(raw, DeliveryGuarantee):
+        return raw
+    normalized = str(raw).strip().lower()
+    guarantee = _DELIVERY_GUARANTEE_MAP.get(normalized)
+    if guarantee is None:
+        logger.warning(
+            "Unknown event_delivery_guarantee '%s'; defaulting to '%s'",
+            raw,
+            DeliveryGuarantee.AT_MOST_ONCE.value,
+        )
+        return DeliveryGuarantee.AT_MOST_ONCE
+    return guarantee
+
+
+def _parse_int_setting(raw: Any, *, default: int, minimum: int) -> int:
+    """Parse int setting with fallback and lower-bound clamp."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, value)
+
+
+def _parse_float_setting(raw: Any, *, default: float, minimum: float) -> float:
+    """Parse float setting with fallback and lower-bound clamp."""
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, value)
+
+
+def build_backend_config_from_settings(settings: Any) -> BackendConfig:
+    """Build backend config from settings object with normalized defaults."""
+    backend_type = _parse_backend_type(getattr(settings, "event_backend_type", "in_memory"))
+    delivery_guarantee = _parse_delivery_guarantee(
+        getattr(settings, "event_delivery_guarantee", DeliveryGuarantee.AT_MOST_ONCE.value)
+    )
+    max_batch_size = _parse_int_setting(
+        getattr(settings, "event_max_batch_size", 100),
+        default=100,
+        minimum=1,
+    )
+    flush_interval_ms = _parse_float_setting(
+        getattr(settings, "event_flush_interval_ms", 1000.0),
+        default=1000.0,
+        minimum=0.0,
+    )
+
+    overflow_policy = str(
+        getattr(settings, "event_queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)
+    ).strip().lower()
+    if overflow_policy not in _VALID_QUEUE_POLICIES:
+        logger.warning(
+            "Unknown event_queue_overflow_policy '%s'; defaulting to '%s'",
+            overflow_policy,
+            _QUEUE_POLICY_DROP_NEWEST,
+        )
+        overflow_policy = _QUEUE_POLICY_DROP_NEWEST
+
+    queue_maxsize = _parse_int_setting(
+        getattr(settings, "event_queue_maxsize", 10000),
+        default=10000,
+        minimum=1,
+    )
+    block_timeout_ms = _parse_float_setting(
+        getattr(settings, "event_queue_overflow_block_timeout_ms", 50.0),
+        default=50.0,
+        minimum=0.0,
+    )
+
+    return BackendConfig(
+        backend_type=backend_type,
+        delivery_guarantee=delivery_guarantee,
+        max_batch_size=max_batch_size,
+        flush_interval_ms=flush_interval_ms,
+        extra={
+            "queue_maxsize": queue_maxsize,
+            "queue_overflow_policy": overflow_policy,
+            "queue_overflow_block_timeout_ms": block_timeout_ms,
+        },
+    )
+
 
 # =============================================================================
 # In-Memory Event Backend
@@ -123,13 +245,55 @@ class InMemoryEventBackend:
             queue_maxsize: Maximum queue size (0 for unbounded)
         """
         self._config = config or BackendConfig()
-        self._queue_maxsize = queue_maxsize
+        extra = self._config.extra if isinstance(self._config.extra, dict) else {}
+        configured_queue_maxsize = extra.get("queue_maxsize", queue_maxsize)
+        try:
+            resolved_queue_maxsize = int(configured_queue_maxsize)
+        except (TypeError, ValueError):
+            resolved_queue_maxsize = int(queue_maxsize)
+        if resolved_queue_maxsize < 0:
+            resolved_queue_maxsize = max(0, int(queue_maxsize))
+        self._queue_maxsize = resolved_queue_maxsize
+
+        overflow_policy = str(
+            extra.get("queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)
+        ).strip().lower()
+        if overflow_policy not in _VALID_QUEUE_POLICIES:
+            logger.warning(
+                "Unknown queue_overflow_policy '%s'; defaulting to '%s'",
+                overflow_policy,
+                _QUEUE_POLICY_DROP_NEWEST,
+            )
+            overflow_policy = _QUEUE_POLICY_DROP_NEWEST
+        self._queue_overflow_policy = overflow_policy
+
+        timeout_raw = extra.get("queue_overflow_block_timeout_ms", 50.0)
+        try:
+            timeout_ms = max(0.0, float(timeout_raw))
+        except (TypeError, ValueError):
+            timeout_ms = 50.0
+        self._queue_overflow_block_timeout_ms = timeout_ms
+        self._overflow_durable_sink = extra.get("overflow_durable_sink")
+
         self._subscriptions: Dict[str, _Subscription] = {}
-        self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(maxsize=queue_maxsize)
+        self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(
+            maxsize=self._queue_maxsize
+        )
         self._is_connected = False
         self._dispatcher_task: Optional[asyncio.Task] = None
         self._lock = threading.Lock()
         self._pending_tasks: Set[asyncio.Task] = set()
+        self._publish_stats_lock = threading.Lock()
+        self._publish_stats: Dict[str, int] = {
+            "queued": 0,
+            "dropped_newest": 0,
+            "dropped_oldest": 0,
+            "blocked_success": 0,
+            "blocked_timeout": 0,
+            "durable_sink_success": 0,
+            "durable_sink_failures": 0,
+            "max_queue_depth": 0,
+        }
 
     @property
     def backend_type(self) -> BackendType:
@@ -191,6 +355,38 @@ class InMemoryEventBackend:
             and not self._dispatcher_task.done()
         )
 
+    def _increment_publish_stat(self, key: str, delta: int = 1) -> None:
+        """Increment queue publish counter."""
+        with self._publish_stats_lock:
+            self._publish_stats[key] = self._publish_stats.get(key, 0) + delta
+
+    def _update_max_queue_depth(self) -> None:
+        """Update max queue depth watermark."""
+        depth = self.get_queue_depth()
+        with self._publish_stats_lock:
+            if depth > self._publish_stats.get("max_queue_depth", 0):
+                self._publish_stats["max_queue_depth"] = depth
+
+    def _write_to_durable_sink(self, event: MessagingEvent, reason: str) -> None:
+        """Write dropped events to optional durable sink."""
+        sink = self._overflow_durable_sink
+        if sink is None:
+            return
+
+        try:
+            if callable(sink):
+                sink(event=event, reason=reason)
+            elif hasattr(sink, "write") and callable(sink.write):
+                sink.write(event=event, reason=reason)
+            elif hasattr(sink, "persist") and callable(sink.persist):
+                sink.persist(event=event, reason=reason)
+            else:
+                raise TypeError("overflow_durable_sink must be callable/write/persist compatible")
+            self._increment_publish_stat("durable_sink_success")
+        except Exception as e:
+            self._increment_publish_stat("durable_sink_failures")
+            logger.debug("Durable sink write failed: %s", e)
+
     async def publish(self, event: MessagingEvent) -> bool:
         """Publish an event to all matching subscribers.
 
@@ -209,10 +405,54 @@ class InMemoryEventBackend:
         try:
             # Non-blocking put
             self._event_queue.put_nowait(event)
+            self._increment_publish_stat("queued")
+            self._update_max_queue_depth()
             return True
         except asyncio.QueueFull:
-            # Queue full - drop event (AT_MOST_ONCE semantics)
-            logger.warning(f"Event queue full, dropping event: {event.topic}")
+            if self._queue_overflow_policy == _QUEUE_POLICY_DROP_OLDEST:
+                try:
+                    oldest = self._event_queue.get_nowait()
+                    self._increment_publish_stat("dropped_oldest")
+                    self._write_to_durable_sink(oldest, "drop_oldest")
+                except asyncio.QueueEmpty:
+                    oldest = None
+
+                try:
+                    self._event_queue.put_nowait(event)
+                    self._increment_publish_stat("queued")
+                    self._update_max_queue_depth()
+                    return True
+                except asyncio.QueueFull:
+                    self._increment_publish_stat("dropped_newest")
+                    self._write_to_durable_sink(event, "drop_newest_after_drop_oldest")
+                    logger.warning(
+                        "Event queue remained full after drop_oldest policy, dropping event: %s",
+                        event.topic,
+                    )
+                    return False
+
+            if self._queue_overflow_policy == _QUEUE_POLICY_BLOCK_WITH_TIMEOUT:
+                timeout_s = self._queue_overflow_block_timeout_ms / 1000.0
+                try:
+                    await asyncio.wait_for(self._event_queue.put(event), timeout=timeout_s)
+                    self._increment_publish_stat("blocked_success")
+                    self._increment_publish_stat("queued")
+                    self._update_max_queue_depth()
+                    return True
+                except asyncio.TimeoutError:
+                    self._increment_publish_stat("blocked_timeout")
+                    self._write_to_durable_sink(event, "block_timeout")
+                    logger.warning(
+                        "Event queue full (block timeout %.1fms), dropping event: %s",
+                        self._queue_overflow_block_timeout_ms,
+                        event.topic,
+                    )
+                    return False
+
+            # Default: drop newest event (AT_MOST_ONCE semantics)
+            self._increment_publish_stat("dropped_newest")
+            self._write_to_durable_sink(event, "drop_newest")
+            logger.warning("Event queue full, dropping event: %s", event.topic)
             return False
 
     async def publish_batch(self, events: List[MessagingEvent]) -> int:
@@ -349,6 +589,18 @@ class InMemoryEventBackend:
     def get_queue_depth(self) -> int:
         """Get current event queue depth."""
         return self._event_queue.qsize()
+
+    def get_queue_pressure_stats(self) -> Dict[str, Any]:
+        """Get queue overflow policy and pressure/drop counters."""
+        with self._publish_stats_lock:
+            stats = dict(self._publish_stats)
+        return {
+            "queue_depth": self.get_queue_depth(),
+            "queue_maxsize": self._queue_maxsize,
+            "overflow_policy": self._queue_overflow_policy,
+            "block_timeout_ms": self._queue_overflow_block_timeout_ms,
+            "stats": stats,
+        }
 
 
 # =============================================================================
@@ -599,6 +851,16 @@ class ObservabilityBus:
     def backend(self) -> IEventBackend:
         """Get underlying backend."""
         return self._backend
+
+    def get_delivery_pressure_stats(self) -> Dict[str, Any]:
+        """Get backend queue/drop pressure stats when available."""
+        getter = getattr(self._backend, "get_queue_pressure_stats", None)
+        if callable(getter):
+            try:
+                return getter()
+            except Exception as e:
+                logger.debug("Failed to get backend pressure stats: %s", e)
+        return {}
 
     async def connect(self) -> None:
         """Connect the backend."""
@@ -1019,25 +1281,9 @@ def get_observability_bus() -> ObservabilityBus:
         def create_bus(container):
             # Read settings to determine backend
             settings = get_settings()
-            backend_type_str = settings.event_backend_type.lower()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
-
-            # Map string to BackendType enum
-            from victor.core.events.protocols import BackendType
-
-            backend_type_map = {
-                "in_memory": BackendType.IN_MEMORY,
-                "sqlite": BackendType.DATABASE,
-                "redis": BackendType.REDIS,
-                "kafka": BackendType.KAFKA,
-                "sqs": BackendType.SQS,
-                "rabbitmq": BackendType.RABBITMQ,
-            }
-
-            backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
-
-            # Create backend from settings
-            backend = create_event_backend(backend_type=backend_type, lazy_init=lazy_init)
+            backend_config = build_backend_config_from_settings(settings)
+            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
 
             return ObservabilityBus(backend=backend)
 
@@ -1102,25 +1348,9 @@ def get_agent_message_bus() -> AgentMessageBus:
         def create_bus(container):
             # Read settings to determine backend
             settings = get_settings()
-            backend_type_str = settings.event_backend_type.lower()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
-
-            # Map string to BackendType enum
-            from victor.core.events.protocols import BackendType
-
-            backend_type_map = {
-                "in_memory": BackendType.IN_MEMORY,
-                "sqlite": BackendType.DATABASE,
-                "redis": BackendType.REDIS,
-                "kafka": BackendType.KAFKA,
-                "sqs": BackendType.SQS,
-                "rabbitmq": BackendType.RABBITMQ,
-            }
-
-            backend_type = backend_type_map.get(backend_type_str, BackendType.IN_MEMORY)
-
-            # Create backend from settings
-            backend = create_event_backend(backend_type=backend_type, lazy_init=lazy_init)
+            backend_config = build_backend_config_from_settings(settings)
+            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
 
             return AgentMessageBus(backend=backend)
 

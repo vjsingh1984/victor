@@ -104,6 +104,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import (
@@ -138,7 +139,11 @@ from victor.core.verticals.protocols import (
 # Import PromptContributorAdapter for hint normalization
 from victor.core.verticals.prompt_adapter import PromptContributorAdapter
 
-from victor.framework.protocols import CapabilityRegistryProtocol
+from victor.framework.protocols import (
+    CapabilityLoaderPortProtocol,
+    CapabilityRegistryProtocol,
+    ServiceContainerPortProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -235,25 +240,33 @@ def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any
 
 
 # =============================================================================
-# Tiered Tool Config Helper (Workstream D: API Mismatch Fix)
+# Tiered Tool Config Helper (P2: Legacy Compatibility Cleanup)
 # =============================================================================
 
 
+_LEGACY_TIERED_TOOLS_FALLBACK_ENV = "VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK"
+
+
+def _legacy_tiered_tools_fallback_enabled() -> bool:
+    """Return True when legacy get_tiered_tools fallback is explicitly enabled."""
+    value = os.getenv(_LEGACY_TIERED_TOOLS_FALLBACK_ENV, "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def get_tiered_config(vertical: Any) -> Optional[Any]:
-    """Get tiered tool config with fallback chain.
+    """Get tiered tool config from canonical API.
 
-    Some verticals implement get_tiered_tool_config() while others
-    implement get_tiered_tools(). This helper provides a unified
-    interface with a fallback chain:
+    Canonical method:
+    1. `get_tiered_tool_config()` (required for active path)
 
-    1. Try get_tiered_tool_config() first (preferred)
-    2. Fall back to get_tiered_tools() if config method missing or returns None
-    3. Return None if vertical has neither method
+    Optional migration fallback:
+    - `get_tiered_tools()` is only consulted when
+      `VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK=1`.
 
     SOLID Compliance:
-    - Uses callable() check instead of just hasattr (ISP)
+    - Canonical contract first (ISP/OCP)
+    - Explicit adapter flag for deprecated path (OCP)
     - Validates return type is TieredToolConfig-like (LSP)
-    - Provides single unified interface (DIP)
 
     Args:
         vertical: Vertical class to get config from
@@ -287,15 +300,21 @@ def get_tiered_config(vertical: Any) -> Optional[Any]:
 
         return None
 
-    # Try get_tiered_tool_config() first (preferred method)
+    # Canonical method only (active path)
     config = _try_get_config(vertical, "get_tiered_tool_config")
     if config is not None:
         return config
 
-    # Fallback to get_tiered_tools()
-    config = _try_get_config(vertical, "get_tiered_tools")
-    if config is not None:
-        return config
+    # Optional migration fallback, disabled by default.
+    if _legacy_tiered_tools_fallback_enabled():
+        config = _try_get_config(vertical, "get_tiered_tools")
+        if config is not None:
+            logger.warning(
+                "Using deprecated get_tiered_tools() fallback for vertical '%s'; "
+                "implement get_tiered_tool_config() instead.",
+                getattr(vertical, "name", type(vertical).__name__),
+            )
+            return config
 
     return None
 
@@ -315,7 +334,14 @@ class StepHandlerProtocol(Protocol):
     Attributes:
         name: Unique identifier for this step
         order: Execution order (lower numbers run first)
+        parallel_safe: Whether this handler is safe to run in parallel
+        depends_on: Handler names that must complete before this one
+        side_effects: Whether this handler mutates orchestrator/context state
     """
+
+    parallel_safe: bool
+    depends_on: tuple[str, ...]
+    side_effects: bool
 
     @property
     def name(self) -> str:
@@ -366,6 +392,11 @@ class BaseStepHandler(ABC):
     Optionally override:
     - _get_step_details() to provide additional status details
     """
+
+    # Metadata for metadata-driven scheduling (P2).
+    parallel_safe: bool = False
+    depends_on: tuple[str, ...] = ()
+    side_effects: bool = True
 
     @property
     @abstractmethod
@@ -475,6 +506,10 @@ class ToolStepHandler(BaseStepHandler):
     tool names and enabling them on the orchestrator.
     """
 
+    parallel_safe = True
+    depends_on = ()
+    side_effects = False
+
     @property
     def name(self) -> str:
         return "tools"
@@ -548,6 +583,10 @@ class PromptStepHandler(BaseStepHandler):
     Applies the system prompt from the vertical and merges
     task hints from prompt contributors.
     """
+
+    parallel_safe = True
+    depends_on = ()
+    side_effects = False
 
     @property
     def name(self) -> str:
@@ -674,6 +713,10 @@ class SafetyStepHandler(BaseStepHandler):
     applies them to the orchestrator.
     """
 
+    parallel_safe = True
+    depends_on = ()
+    side_effects = False
+
     @property
     def name(self) -> str:
         return "safety"
@@ -750,6 +793,10 @@ class ConfigStepHandler(BaseStepHandler):
     Applies configuration-related settings from the vertical
     to the orchestrator.
     """
+
+    parallel_safe = False
+    depends_on = ("tools", "prompt", "safety")
+    side_effects = True
 
     @property
     def name(self) -> str:
@@ -864,6 +911,10 @@ class CapabilityConfigStepHandler(BaseStepHandler):
     in VerticalContext instead of scattered orchestrator attributes.
     """
 
+    parallel_safe = False
+    depends_on = ()
+    side_effects = True
+
     @property
     def name(self) -> str:
         return "capability_config"
@@ -886,6 +937,7 @@ class CapabilityConfigStepHandler(BaseStepHandler):
 
         # Store in VerticalContext
         context.apply_capability_configs(configs)
+        self._store_in_framework_service(orchestrator, configs)
         result.add_info(f"Applied {len(configs)} capability configs")
         logger.debug(f"Applied capability configs: {list(configs.keys())}")
 
@@ -914,6 +966,38 @@ class CapabilityConfigStepHandler(BaseStepHandler):
 
         return {}
 
+    def _store_in_framework_service(
+        self,
+        orchestrator: Any,
+        configs: Dict[str, Any],
+    ) -> None:
+        """Persist capability configs in framework service when available."""
+        try:
+            from victor.framework.capability_config_service import CapabilityConfigService
+        except ImportError:
+            return
+
+        container = None
+        if isinstance(orchestrator, ServiceContainerPortProtocol):
+            container = orchestrator.get_service_container()
+        else:
+            get_container = getattr(orchestrator, "get_service_container", None)
+            if callable(get_container):
+                container = get_container()
+            elif hasattr(orchestrator, "container"):
+                container = getattr(orchestrator, "container", None)
+
+        if container is None or not hasattr(container, "get_optional"):
+            return
+
+        service = container.get_optional(CapabilityConfigService)
+        if service is None and hasattr(container, "register_instance"):
+            service = CapabilityConfigService()
+            container.register_instance(CapabilityConfigService, service)
+
+        if service is not None:
+            service.apply_configs(configs)
+
 
 # =============================================================================
 # Middleware Step Handler
@@ -926,6 +1010,10 @@ class MiddlewareStepHandler(BaseStepHandler):
     Applies middleware from the vertical to the orchestrator's
     middleware chain.
     """
+
+    parallel_safe = False
+    depends_on = ("extensions",)
+    side_effects = True
 
     @property
     def name(self) -> str:
@@ -991,6 +1079,19 @@ class FrameworkStepHandler(BaseStepHandler):
     Applies framework-level integrations from the vertical
     including workflows, reinforcement learning, and multi-agent teams.
     """
+
+    parallel_safe = False
+    depends_on = (
+        "capability_config",
+        "tools",
+        "tiered_config",
+        "prompt",
+        "safety",
+        "config",
+        "extensions",
+        "middleware",
+    )
+    side_effects = True
 
     @property
     def name(self) -> str:
@@ -1410,19 +1511,23 @@ class FrameworkStepHandler(BaseStepHandler):
         elif hasattr(provider, "CAPABILITIES"):
             cap_count = len(provider.CAPABILITIES)
 
-        # Wire to CapabilityLoader if available
+        # Wire to CapabilityLoader via explicit orchestrator port first.
         try:
-            from victor.framework.capability_loader import CapabilityLoader
-
-            # Get or create loader
             loader = None
-            if hasattr(orchestrator, "_capability_loader"):
-                loader = orchestrator._capability_loader
+            if isinstance(orchestrator, CapabilityLoaderPortProtocol):
+                loader = orchestrator.get_or_create_capability_loader()
             else:
-                loader = CapabilityLoader()
-                # Store for reuse
-                if hasattr(orchestrator, "__dict__"):
-                    orchestrator._capability_loader = loader
+                # Compatibility path for orchestrators that expose the same public methods
+                # but do not explicitly satisfy the runtime protocol check.
+                get_or_create_loader = getattr(orchestrator, "get_or_create_capability_loader", None)
+                if callable(get_or_create_loader):
+                    loader = get_or_create_loader()
+
+            if loader is None:
+                result.add_warning(
+                    "Cannot wire capability provider: orchestrator lacks capability-loader port"
+                )
+                return
 
             # Load capabilities from provider
             if hasattr(provider, "get_capabilities"):
@@ -1530,13 +1635,28 @@ class FrameworkStepHandler(BaseStepHandler):
 
             registry = get_handler_registry()
 
-            for name, handler in handlers.items():
-                registry.register(name, handler, vertical=vertical.name, replace=True)
-                logger.debug(f"Registered handler: {vertical.name}:{name}")
+            if hasattr(registry, "register") and callable(getattr(registry, "register")):
+                # Newer registry API: register one handler at a time with vertical namespace.
+                for name, handler in handlers.items():
+                    registry.register(name, handler, vertical=vertical.name, replace=True)
+                    logger.debug(f"Registered handler: {vertical.name}:{name}")
+            elif hasattr(registry, "register_vertical") and callable(
+                getattr(registry, "register_vertical")
+            ):
+                # Compatibility path for HandlerRegistry API exposing register_vertical().
+                registry.register_vertical(vertical.name, handlers)
+                logger.debug(
+                    "Registered %s handlers via register_vertical for '%s'",
+                    handler_count,
+                    vertical.name,
+                )
+            else:
+                raise AttributeError("HandlerRegistry has no supported registration method")
 
             # Sync to executor for backward compatibility
             try:
-                registry.sync_with_executor(direction="to_executor", replace=True)
+                if hasattr(registry, "sync_with_executor"):
+                    registry.sync_with_executor(direction="to_executor", replace=True)
             except Exception:
                 pass  # Sync is optional
 
@@ -1577,6 +1697,10 @@ class TieredConfigStepHandler(BaseStepHandler):
     in verticals but never applied to the tool access system.
     """
 
+    parallel_safe = False
+    depends_on = ("tools",)
+    side_effects = True
+
     @property
     def name(self) -> str:
         return "tiered_config"
@@ -1594,12 +1718,13 @@ class TieredConfigStepHandler(BaseStepHandler):
     ) -> None:
         """Apply tiered tool config from vertical.
 
-        Uses get_tiered_config() helper with fallback chain:
-        1. Try get_tiered_tool_config() first
-        2. Fall back to get_tiered_tools() if config missing or None
-        3. Return early if neither method provides config
+        Uses get_tiered_config() helper with canonical contract:
+        1. Use get_tiered_tool_config() (active path)
+        2. Optional deprecated fallback to get_tiered_tools() only when
+           VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK=1
+        3. Return early if no valid config is available
         """
-        # Use fallback chain helper (Workstream D fix)
+        # Use canonical helper with optional legacy adapter.
         tiered_config = get_tiered_config(vertical)
 
         if tiered_config is None:
@@ -1664,6 +1789,20 @@ class ContextStepHandler(BaseStepHandler):
 
     This is typically the final step in the pipeline.
     """
+
+    parallel_safe = False
+    depends_on = (
+        "capability_config",
+        "tools",
+        "tiered_config",
+        "prompt",
+        "safety",
+        "config",
+        "extensions",
+        "middleware",
+        "framework",
+    )
+    side_effects = True
 
     @property
     def name(self) -> str:
@@ -1820,6 +1959,10 @@ class ExtensionsStepHandler(BaseStepHandler):
     modifying this class.
     """
 
+    parallel_safe = False
+    depends_on = ("config",)
+    side_effects = True
+
     def __init__(self):
         """Initialize with sub-handlers and registry."""
         self._middleware_handler = MiddlewareStepHandler()
@@ -1925,9 +2068,20 @@ class ExtensionsStepHandler(BaseStepHandler):
             result: "IntegrationResult",
         ) -> None:
             """Register vertical-specific services with the DI container."""
-            # Get container and settings from orchestrator
-            container = getattr(orchestrator, "_container", None)
+            # Get container via explicit orchestrator port first.
+            container = None
+            if isinstance(orchestrator, ServiceContainerPortProtocol):
+                container = orchestrator.get_service_container()
+            else:
+                # Compatibility path for orchestrators exposing the same public method/property
+                # without explicit runtime protocol conformance.
+                get_container = getattr(orchestrator, "get_service_container", None)
+                if callable(get_container):
+                    container = get_container()
+                elif hasattr(orchestrator, "container"):
+                    container = getattr(orchestrator, "container", None)
             settings = getattr(orchestrator, "settings", None)
+            vertical_name = context.vertical_name
 
             if container is None:
                 result.add_warning(
@@ -1935,24 +2089,44 @@ class ExtensionsStepHandler(BaseStepHandler):
                 )
                 return
 
+            if not vertical_name:
+                result.add_warning("Cannot register vertical services: missing vertical context name")
+                return
+
             try:
-                provider.register_services(container, settings)
-                # Count registered services if method available
-                required = (
-                    provider.get_required_services()
-                    if hasattr(provider, "get_required_services")
-                    else []
+                # Use the shared loader-based activation path for consistency with bootstrap.
+                from victor.core.verticals.vertical_loader import activate_vertical_services
+
+                activation = activate_vertical_services(container, settings, vertical_name)
+
+                if activation.services_registered:
+                    # Count registered services if method available
+                    required = (
+                        provider.get_required_services()
+                        if hasattr(provider, "get_required_services")
+                        else []
+                    )
+                    optional = (
+                        provider.get_optional_services()
+                        if hasattr(provider, "get_optional_services")
+                        else []
+                    )
+                    total = len(required) + len(optional)
+                    result.add_info(
+                        f"Registered {total} vertical services ({len(required)} required, {len(optional)} optional)"
+                    )
+                    logger.debug("Registered vertical services: %s total", total)
+                else:
+                    result.add_info(f"Vertical services already registered for '{vertical_name}'")
+                    logger.debug("Vertical services already registered for '%s'", vertical_name)
+            except ValueError as e:
+                result.add_warning(f"Failed to activate vertical '{vertical_name}': {e}")
+                logger.debug(
+                    "Vertical activation error for '%s': %s",
+                    vertical_name,
+                    e,
+                    exc_info=True,
                 )
-                optional = (
-                    provider.get_optional_services()
-                    if hasattr(provider, "get_optional_services")
-                    else []
-                )
-                total = len(required) + len(optional)
-                result.add_info(
-                    f"Registered {total} vertical services ({len(required)} required, {len(optional)} optional)"
-                )
-                logger.debug(f"Registered vertical services: {total} total")
             except Exception as e:
                 result.add_warning(f"Failed to register vertical services: {e}")
                 logger.debug(f"Service registration error: {e}", exc_info=True)

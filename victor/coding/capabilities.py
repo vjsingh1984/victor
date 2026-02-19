@@ -39,12 +39,11 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import load_capability_config, store_capability_config
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
@@ -52,6 +51,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+_CODE_STYLE_DEFAULTS: Dict[str, Any] = {
+    "formatter": "black",
+    "linter": "ruff",
+    "max_line_length": 100,
+    "enforce_type_hints": True,
+}
+_TEST_REQUIREMENTS_DEFAULTS: Dict[str, Any] = {
+    "min_coverage": 0.0,
+    "required_patterns": [],
+    "framework": "pytest",
+    "run_on_edit": False,
+}
+_LSP_DEFAULT_LANGUAGES: List[str] = ["python", "typescript", "javascript", "rust", "go"]
+_LSP_DEFAULTS: Dict[str, Any] = {
+    "languages": list(_LSP_DEFAULT_LANGUAGES),
+    "features": {"hover": True, "references": True, "symbols": True},
+}
+_REFACTOR_DEFAULTS: Dict[str, Any] = {
+    "operations": {"rename": True, "extract": True, "inline": True},
+    "require_tests": True,
+}
 
 # =============================================================================
 # Capability Handlers
@@ -90,8 +116,15 @@ def configure_git_safety(
     if block_main_push:
         safety.add_dangerous_pattern(r"git\s+push\s+.*\b(main|master)\b")
 
-    # Store config for commit hook
-    if hasattr(orchestrator, "safety_config"):
+    config = {
+        "require_tests_before_commit": require_tests_before_commit,
+        "allowed_branches": allowed_branches or [],
+    }
+
+    service_stored = store_capability_config(orchestrator, "git_safety_config", config)
+
+    # Legacy compatibility path while runtime consumers migrate.
+    if not service_stored and hasattr(orchestrator, "safety_config"):
         orchestrator.safety_config["git"] = {
             "require_tests_before_commit": require_tests_before_commit,
             "allowed_branches": allowed_branches or [],
@@ -117,13 +150,16 @@ def configure_code_style(
         max_line_length: Maximum line length
         enforce_type_hints: Whether to enforce type hints
     """
-    if hasattr(orchestrator, "code_style"):
-        orchestrator.code_style = {
+    store_capability_config(
+        orchestrator,
+        "code_style",
+        {
             "formatter": formatter,
             "linter": linter,
             "max_line_length": max_line_length,
             "enforce_type_hints": enforce_type_hints,
-        }
+        },
+    )
 
     logger.info(f"Configured code style: formatter={formatter}, linter={linter}")
 
@@ -137,16 +173,7 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Code style configuration dict
     """
-    return getattr(
-        orchestrator,
-        "code_style",
-        {
-            "formatter": "black",
-            "linter": "ruff",
-            "max_line_length": 100,
-            "enforce_type_hints": True,
-        },
-    )
+    return load_capability_config(orchestrator, "code_style", _CODE_STYLE_DEFAULTS)
 
 
 def configure_test_requirements(
@@ -166,13 +193,16 @@ def configure_test_requirements(
         test_framework: Test framework to use
         run_tests_on_edit: Automatically run tests after edits
     """
-    if hasattr(orchestrator, "test_config"):
-        orchestrator.test_config = {
+    store_capability_config(
+        orchestrator,
+        "test_config",
+        {
             "min_coverage": min_coverage,
             "required_patterns": required_test_patterns or [],
             "framework": test_framework,
             "run_on_edit": run_tests_on_edit,
-        }
+        },
+    )
 
     logger.info(f"Configured test requirements: framework={test_framework}")
 
@@ -194,19 +224,20 @@ def configure_language_server(
         enable_references: Enable find references
         enable_symbols: Enable document symbols
     """
-    default_languages = ["python", "typescript", "javascript", "rust", "go"]
-
-    if hasattr(orchestrator, "lsp_config"):
-        orchestrator.lsp_config = {
-            "languages": languages or default_languages,
+    store_capability_config(
+        orchestrator,
+        "lsp_config",
+        {
+            "languages": languages or list(_LSP_DEFAULT_LANGUAGES),
             "features": {
                 "hover": enable_hover,
                 "references": enable_references,
                 "symbols": enable_symbols,
             },
-        }
+        },
+    )
 
-    logger.info(f"Configured LSP for languages: {languages or default_languages}")
+    logger.info(f"Configured LSP for languages: {languages or _LSP_DEFAULT_LANGUAGES}")
 
 
 def configure_refactoring(
@@ -226,15 +257,18 @@ def configure_refactoring(
         enable_inline: Enable inline refactoring
         require_tests: Require tests before refactoring
     """
-    if hasattr(orchestrator, "refactor_config"):
-        orchestrator.refactor_config = {
+    store_capability_config(
+        orchestrator,
+        "refactor_config",
+        {
             "operations": {
                 "rename": enable_rename,
                 "extract": enable_extract,
                 "inline": enable_inline,
             },
             "require_tests": require_tests,
-        }
+        },
+    )
 
     logger.info("Configured refactoring capabilities")
 

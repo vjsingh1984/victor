@@ -315,6 +315,11 @@ lang-all = [
     "tree-sitter-xml>=0.6",
 ]
 
+# Apple Silicon optimizations (optional)
+apple-silicon = [
+    "mlx-lm>=0.21.0",  # Apple's ML framework for LLMs
+]
+
 # Native Rust extensions for performance (optional)
 # Build with: cd rust && maturin develop --release
 native = [
@@ -322,7 +327,7 @@ native = [
 ]
 
 all = [
-    "victor[dev,docs,build,lang-all]",
+    "victor[dev,docs,build,lang-all,apple-silicon]",
 ]
 
 [project.urls]

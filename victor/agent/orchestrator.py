@@ -449,6 +449,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return calculate_max_context_chars(settings, provider, model)
 
+    def _initialize_provider_runtime(self) -> None:
+        """Initialize provider runtime boundaries with lazy coordinator loading."""
+        from victor.agent.runtime.provider_runtime import create_provider_runtime_components
+
+        self._provider_runtime = create_provider_runtime_components(
+            factory=self._factory,
+            settings=self.settings,
+            provider_manager=self._provider_manager,
+        )
+        # Keep legacy attributes for compatibility while deferring heavy coordinator init.
+        self._provider_coordinator = self._provider_runtime.provider_coordinator
+        self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
+
     def __init__(
         self,
         settings: Settings,
@@ -521,26 +534,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.tool_calling_caps,
         ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
-        # ProviderCoordinator: Wraps ProviderManager with rate limiting and health monitoring (TD-002)
-        from victor.agent.provider_coordinator import (
-            ProviderCoordinator,
-            ProviderCoordinatorConfig,
-        )
-
-        self._provider_coordinator = ProviderCoordinator(
-            provider_manager=self._provider_manager,
-            config=ProviderCoordinatorConfig(
-                max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
-                enable_health_monitoring=getattr(settings, "provider_health_checks", True),
-            ),
-        )
-
-        # ProviderSwitchCoordinator: Coordinate provider/model switching workflow (via factory)
-        # Wraps ProviderSwitcher with validation, health checks, retry logic
-        self._provider_switch_coordinator = self._factory.create_provider_switch_coordinator(
-            provider_switcher=self._provider_manager._provider_switcher,
-            health_monitor=self._provider_manager._health_monitor,
-        )
+        # Provider runtime boundary: coordinator services are created lazily on first use.
+        self._initialize_provider_runtime()
 
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         self.sanitizer = self._factory.create_sanitizer()
@@ -1181,6 +1176,41 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             value: ObservabilityIntegration instance or None to disable
         """
         self._observability = value
+
+    def set_observability(self, value: Optional[ObservabilityIntegration]) -> None:
+        """Set observability integration via explicit port method.
+
+        Args:
+            value: ObservabilityIntegration instance or None.
+        """
+        self.observability = value
+
+    @property
+    def container(self) -> Any:
+        """Get the service container via a public property."""
+        return self._container
+
+    def get_service_container(self) -> Any:
+        """Get the DI service container via explicit port method."""
+        return self._container
+
+    def get_capability_loader(self) -> Optional[Any]:
+        """Get the cached framework CapabilityLoader if available."""
+        return getattr(self, "_capability_loader", None)
+
+    def set_capability_loader(self, loader: Any) -> None:
+        """Set the framework CapabilityLoader instance."""
+        self._capability_loader = loader
+
+    def get_or_create_capability_loader(self) -> Any:
+        """Get or lazily create the framework CapabilityLoader."""
+        loader = self.get_capability_loader()
+        if loader is None:
+            from victor.framework.capability_loader import CapabilityLoader
+
+            loader = CapabilityLoader()
+            self.set_capability_loader(loader)
+        return loader
 
     @property
     def provider_manager(self) -> "ProviderManager":
@@ -3911,7 +3941,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 )
 
     def _get_vertical_tiered_config(self) -> Any:
-        """Get TieredToolConfig from active vertical if available.
+        """Get TieredToolConfig from active vertical canonical API.
 
         Returns:
             TieredToolConfig or None
@@ -3921,7 +3951,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             loader = get_vertical_loader()
             if loader.active_vertical:
-                return loader.active_vertical.get_tiered_tools()
+                getter = getattr(loader.active_vertical, "get_tiered_tool_config", None)
+                if callable(getter):
+                    return getter()
         except Exception as e:
             logger.debug(f"Could not get tiered config from vertical: {e}")
         return None

@@ -14,6 +14,7 @@
 
 """Tests for VerticalBase class - LSP compliance and core functionality."""
 
+import asyncio
 import time
 
 import pytest
@@ -22,6 +23,11 @@ from unittest.mock import patch, MagicMock
 import threading
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
+from victor.core.verticals.extension_loader import (
+    VerticalExtensionLoader,
+    start_extension_loader_metrics_reporter,
+    stop_extension_loader_metrics_reporter,
+)
 
 
 class ConcreteVertical(VerticalBase):
@@ -190,6 +196,7 @@ class TestGetExtensionsAsync:
 
     def setup_method(self):
         ConcreteVertical.clear_config_cache(clear_all=True)
+        VerticalExtensionLoader.reset_extension_loader_metrics()
 
     @pytest.mark.asyncio
     async def test_get_extensions_async_never_returns_none(self):
@@ -278,6 +285,89 @@ class TestGetExtensionsAsync:
         assert extensions is not None
         assert len(extensions.safety_extensions) == 1
         assert len(extensions.prompt_contributors) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_reuses_shared_executor(self):
+        """Async extension loading should reuse the shared executor."""
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+        first_executor = VerticalExtensionLoader._extension_executor
+        assert first_executor is not None
+
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+        second_executor = VerticalExtensionLoader._extension_executor
+        assert first_executor is second_executor
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_updates_loader_metrics(self):
+        """Async loader should expose submission/in-flight completion metrics."""
+        VerticalExtensionLoader.reset_extension_loader_metrics()
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+
+        metrics = VerticalExtensionLoader.get_extension_loader_metrics()
+        assert metrics["submitted"] >= 11
+        assert metrics["completed"] == metrics["submitted"]
+        assert metrics["in_flight"] == 0
+        assert metrics["max_in_flight"] >= 1
+        assert metrics["queue_limit"] == VerticalExtensionLoader._extension_executor_queue_limit
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_records_pressure_threshold_events(self):
+        """Queue/in-flight saturation should increment pressure counters."""
+        old_settings = {
+            "warn_queue": VerticalExtensionLoader._extension_loader_warn_queue_threshold,
+            "error_queue": VerticalExtensionLoader._extension_loader_error_queue_threshold,
+            "warn_in_flight": VerticalExtensionLoader._extension_loader_warn_in_flight_threshold,
+            "error_in_flight": VerticalExtensionLoader._extension_loader_error_in_flight_threshold,
+            "cooldown": VerticalExtensionLoader._extension_loader_pressure_cooldown_seconds,
+            "emit_events": VerticalExtensionLoader._extension_loader_emit_pressure_events,
+        }
+        try:
+            VerticalExtensionLoader.configure_extension_loader_pressure(
+                warn_queue_threshold=1,
+                error_queue_threshold=2,
+                warn_in_flight_threshold=1,
+                error_in_flight_threshold=2,
+                cooldown_seconds=0.0,
+                emit_events=False,
+            )
+            VerticalExtensionLoader.reset_extension_loader_metrics()
+            await ConcreteVertical.get_extensions_async(use_cache=False)
+
+            metrics = VerticalExtensionLoader.get_extension_loader_metrics()
+            assert metrics["pressure_warnings"] + metrics["pressure_errors"] >= 1
+        finally:
+            VerticalExtensionLoader.configure_extension_loader_pressure(
+                warn_queue_threshold=old_settings["warn_queue"],
+                error_queue_threshold=old_settings["error_queue"],
+                warn_in_flight_threshold=old_settings["warn_in_flight"],
+                error_in_flight_threshold=old_settings["error_in_flight"],
+                cooldown_seconds=old_settings["cooldown"],
+                emit_events=old_settings["emit_events"],
+            )
+
+    @pytest.mark.asyncio
+    async def test_emit_extension_loader_metrics_event(self):
+        """Metrics event helper should emit a payload to observability bus."""
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        VerticalExtensionLoader.emit_extension_loader_metrics_event(event_bus=_Bus())
+        await asyncio.sleep(0.05)
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.extensions.loader.metrics"
+        assert source == "VerticalExtensionLoader"
+        assert "metrics" in data
+
+    def test_extension_loader_metrics_reporter_start_stop(self):
+        """Periodic reporter helper should start and stop cleanly."""
+        reporter = start_extension_loader_metrics_reporter(interval_seconds=0.05)
+        assert reporter.is_running is True
+        stop_extension_loader_metrics_reporter(timeout=1.0)
 
 
 class TestVerticalBaseConfig:

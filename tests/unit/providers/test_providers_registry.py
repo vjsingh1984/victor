@@ -14,6 +14,9 @@
 
 """Tests for providers registry and base provider module."""
 
+import subprocess
+import sys
+
 import pytest
 
 from victor.providers.base import (
@@ -37,6 +40,58 @@ class TestProviderRegistry:
         assert isinstance(providers, list)
         # Check for some common providers (may not all be registered)
         assert len(providers) >= 0
+
+    def test_mlx_aliases_are_listed(self):
+        """MLX aliases should be discoverable even when lazily loaded."""
+        providers = ProviderRegistry.list_providers()
+        assert "mlx" in providers
+        assert "mlx-lm" in providers
+        assert "applesilicon" in providers
+
+    def test_registry_import_does_not_eager_import_mlx_provider(self):
+        """Importing registry should not import mlx provider module."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys\n"
+                    "import victor.providers.registry\n"
+                    "print('victor.providers.mlx_provider' in sys.modules)"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "False"
+
+    def test_get_mlx_disabled_fails_gracefully(self):
+        """MLX lookup should fail with ProviderNotFoundError, not abort."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import os\n"
+                    "os.environ['VICTOR_ENABLE_MLX_PROVIDER']='0'\n"
+                    "from victor.providers.base import ProviderNotFoundError\n"
+                    "from victor.providers.registry import ProviderRegistry\n"
+                    "try:\n"
+                    "    ProviderRegistry.get('mlx')\n"
+                    "except ProviderNotFoundError:\n"
+                    "    print('notfound')\n"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert "notfound" in result.stdout
 
     def test_get_provider_ollama(self):
         """Test getting Ollama provider class."""
