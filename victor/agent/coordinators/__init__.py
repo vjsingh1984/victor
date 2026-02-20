@@ -29,6 +29,14 @@ Each coordinator follows the Single Responsibility Principle (SRP) and
 provides a focused, testable interface for its domain. Coordinators are
 designed to work with existing components and provide a clean API for
 the orchestrator to delegate to.
+
+Phase 2: DIP Compliance Protocols
+-------------------------------
+The protocols module provides protocol definitions for Dependency
+Inversion Principle (DIP) compliance:
+- CacheProvider: Protocol for caching operations
+- EventEmitter: Protocol for event emission
+- ConfigProvider: Protocol for configuration access
 """
 
 from victor.agent.coordinators.tool_coordinator import (
@@ -57,6 +65,17 @@ from victor.agent.coordinators.planning_coordinator import (
     PlanningResult,
 )
 
+# Phase 2: DIP Compliance Protocols
+from victor.agent.coordinators.protocols import (
+    CacheProvider,
+    CacheEventType,
+    EventEmitter,
+    ConfigProvider,
+    NoOpCacheProvider,
+    NoOpEventEmitter,
+    DictConfigProvider,
+)
+
 __all__ = [
     "ChatCoordinator",
     "ChatContextProtocol",
@@ -75,4 +94,12 @@ __all__ = [
     "PlanningConfig",
     "PlanningMode",
     "PlanningResult",
+    # Phase 2: DIP Compliance Protocols
+    "CacheProvider",
+    "CacheEventType",
+    "EventEmitter",
+    "ConfigProvider",
+    "NoOpCacheProvider",
+    "NoOpEventEmitter",
+    "DictConfigProvider",
 ]
