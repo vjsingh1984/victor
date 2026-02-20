@@ -104,7 +104,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import (
@@ -144,113 +143,24 @@ from victor.framework.protocols import (
     CapabilityRegistryProtocol,
     ServiceContainerPortProtocol,
 )
+from victor.framework.capability_runtime import (
+    check_capability as _check_capability,
+    invoke_capability as _invoke_capability,
+)
+from victor.framework.capability_config_helpers import resolve_capability_config_scope_key
+from victor.framework.framework_integration_registry_service import (
+    resolve_framework_integration_registry_service,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Capability Helpers (moved from vertical_integration.py for reuse)
-# =============================================================================
-
-
-def _check_capability(obj: Any, capability_name: str) -> bool:
-    """Check if object has capability via registry.
-
-    Uses protocol-based capability discovery. Orchestrators must implement
-    CapabilityRegistryProtocol for proper capability checking.
-
-    SOLID Compliance:
-    - Uses protocol, not hasattr (DIP - Dependency Inversion)
-    - No private attribute access (SRP - Single Responsibility)
-
-    Args:
-        obj: Object to check (should implement CapabilityRegistryProtocol)
-        capability_name: Name of capability
-
-    Returns:
-        True if capability is available via the registry
-    """
-    # Check capability registry (protocol-based only)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        return obj.has_capability(capability_name)
-
-    # For objects not implementing protocol, check for public method
-    # Note: No private attribute fallbacks (SOLID compliant)
-    public_methods = {
-        "enabled_tools": "set_enabled_tools",
-        "prompt_builder": "prompt_builder",
-        "vertical_middleware": "apply_vertical_middleware",
-        "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "vertical_context": "set_vertical_context",
-        "adaptive_mode_controller": "adaptive_mode_controller",
-    }
-
-    method_name = public_methods.get(capability_name, capability_name)
-    return hasattr(obj, method_name) and (
-        callable(getattr(obj, method_name, None))
-        or not callable(getattr(obj, method_name, None))  # Allow properties
-    )
-
-
-def _invoke_capability(obj: Any, capability_name: str, *args: Any, **kwargs: Any) -> Any:
-    """Invoke capability via registry or public method call.
-
-    Uses protocol-based capability invocation. Orchestrators must implement
-    CapabilityRegistryProtocol for proper capability invocation.
-
-    SOLID Compliance:
-    - Uses protocol, not private attribute assignment (DIP)
-    - No direct private attribute writes (SRP)
-
-    Args:
-        obj: Object to invoke capability on (should implement CapabilityRegistryProtocol)
-        capability_name: Name of capability
-        *args: Arguments for capability
-        **kwargs: Keyword arguments for capability
-
-    Returns:
-        Result of capability invocation
-
-    Raises:
-        AttributeError: If capability cannot be invoked
-    """
-    # Use capability registry if available (preferred)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        try:
-            return obj.invoke_capability(capability_name, *args, **kwargs)
-        except (KeyError, TypeError) as e:
-            logger.debug(f"Registry invoke failed for {capability_name}: {e}")
-            # Fall through to public method fallback
-
-    # Fallback: use centralized capability method mappings
-    # Import from capability_registry (single source of truth)
-    from victor.framework.capability_registry import get_method_for_capability
-
-    method_name = get_method_for_capability(capability_name)
-    method = getattr(obj, method_name, None)
-    if callable(method):
-        return method(*args, **kwargs)
-
-    # No private attribute fallback - raise clear error instead
-    raise AttributeError(
-        f"Cannot invoke capability '{capability_name}' on {type(obj).__name__}. "
-        f"Expected method '{method_name}' not found. "
-        f"Object should implement CapabilityRegistryProtocol."
-    )
+# Shared capability helpers are imported from victor.framework.capability_runtime.
 
 
 # =============================================================================
 # Tiered Tool Config Helper (P2: Legacy Compatibility Cleanup)
 # =============================================================================
-
-
-_LEGACY_TIERED_TOOLS_FALLBACK_ENV = "VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK"
-
-
-def _legacy_tiered_tools_fallback_enabled() -> bool:
-    """Return True when legacy get_tiered_tools fallback is explicitly enabled."""
-    value = os.getenv(_LEGACY_TIERED_TOOLS_FALLBACK_ENV, "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
 
 
 def get_tiered_config(vertical: Any) -> Optional[Any]:
@@ -259,14 +169,14 @@ def get_tiered_config(vertical: Any) -> Optional[Any]:
     Canonical method:
     1. `get_tiered_tool_config()` (required for active path)
 
-    Optional migration fallback:
-    - `get_tiered_tools()` is only consulted when
-      `VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK=1`.
-
     SOLID Compliance:
     - Canonical contract first (ISP/OCP)
-    - Explicit adapter flag for deprecated path (OCP)
     - Validates return type is TieredToolConfig-like (LSP)
+
+    Note:
+        Legacy `get_tiered_tools()` compatibility is intentionally excluded
+        from framework step handlers and is isolated to core compatibility
+        adapter paths.
 
     Args:
         vertical: Vertical class to get config from
@@ -300,21 +210,10 @@ def get_tiered_config(vertical: Any) -> Optional[Any]:
 
         return None
 
-    # Canonical method only (active path)
+    # Canonical method only.
     config = _try_get_config(vertical, "get_tiered_tool_config")
     if config is not None:
         return config
-
-    # Optional migration fallback, disabled by default.
-    if _legacy_tiered_tools_fallback_enabled():
-        config = _try_get_config(vertical, "get_tiered_tools")
-        if config is not None:
-            logger.warning(
-                "Using deprecated get_tiered_tools() fallback for vertical '%s'; "
-                "implement get_tiered_tool_config() instead.",
-                getattr(vertical, "name", type(vertical).__name__),
-            )
-            return config
 
     return None
 
@@ -996,7 +895,8 @@ class CapabilityConfigStepHandler(BaseStepHandler):
             container.register_instance(CapabilityConfigService, service)
 
         if service is not None:
-            service.apply_configs(configs)
+            scope_key = resolve_capability_config_scope_key(orchestrator)
+            service.apply_configs(configs, scope_key=scope_key)
 
 
 # =============================================================================
@@ -1057,11 +957,22 @@ class MiddlewareStepHandler(BaseStepHandler):
         if _check_capability(orchestrator, "vertical_middleware"):
             _invoke_capability(orchestrator, "vertical_middleware", middleware_list)
             logger.debug(f"Applied {len(middleware_list)} middleware via capability")
-        elif _check_capability(orchestrator, "middleware_chain"):
-            # Fallback: try middleware chain
-            chain = getattr(orchestrator, "middleware_chain", None) or getattr(
-                orchestrator, "_middleware_chain", None
-            )
+        else:
+            chain = None
+            if _check_capability(orchestrator, "middleware_chain"):
+                try:
+                    chain = _invoke_capability(orchestrator, "middleware_chain")
+                except Exception:
+                    chain = None
+            if chain is None:
+                getter = getattr(orchestrator, "get_middleware_chain", None)
+                if callable(getter):
+                    try:
+                        chain = getter()
+                    except Exception:
+                        chain = None
+            if chain is None:
+                chain = getattr(orchestrator, "middleware_chain", None)
             if chain is not None and hasattr(chain, "add"):
                 for mw in middleware_list:
                     chain.add(mw)
@@ -1109,18 +1020,86 @@ class FrameworkStepHandler(BaseStepHandler):
         result: "IntegrationResult",
     ) -> None:
         """Apply framework integrations (workflows, RL, teams, chains, personas, capabilities)."""
-        self.apply_workflows(orchestrator, vertical, context, result)
-        self.apply_rl_config(orchestrator, vertical, context, result)
-        self.apply_team_specs(orchestrator, vertical, context, result)
+        registration_version = self._resolve_registration_version(vertical, context)
+        self.apply_workflows(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
+        self.apply_rl_config(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
+        self.apply_team_specs(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
         # Phase 1: Gap fix - Register chains and personas
-        self.apply_chains(orchestrator, vertical, context, result)
-        self.apply_personas(orchestrator, vertical, context, result)
+        self.apply_chains(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
+        self.apply_personas(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
         # Phase 1: Gap fix - Wire capability provider to framework
         self.apply_capability_provider(orchestrator, vertical, context, result)
         # Phase 1: Gap fix - Register tool graphs with global registry
-        self.apply_tool_graphs(orchestrator, vertical, context, result)
+        self.apply_tool_graphs(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
         # Phase 2: Gap fix - Register handlers explicitly
-        self.apply_handlers(orchestrator, vertical, context, result)
+        self.apply_handlers(
+            orchestrator,
+            vertical,
+            context,
+            result,
+            registration_version=registration_version,
+        )
+
+    def _resolve_registration_version(
+        self,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+    ) -> Optional[str]:
+        """Resolve registration version token for registry idempotence boundaries."""
+        get_config = getattr(context, "get_capability_config", None)
+        if callable(get_config):
+            try:
+                value = get_config("framework.internal.registration_version", None)
+            except Exception:
+                value = None
+            if isinstance(value, (str, int, float)):
+                token = str(value).strip()
+                if token:
+                    return token
+
+        value = getattr(vertical, "version", None)
+        if value is not None:
+            token = str(value).strip()
+            if token:
+                return token
+
+        return None
 
     def apply_workflows(
         self,
@@ -1128,6 +1107,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Apply workflow definitions from vertical.
 
@@ -1160,45 +1141,37 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # Store in context
         context.apply_workflows(workflows)
+        registry_service = resolve_framework_integration_registry_service(orchestrator)
 
-        # Register with workflow registry if available
+        # Register through framework integration registry service.
         try:
-            from victor.workflows.registry import get_workflow_registry
-
-            registry = get_workflow_registry()
-            for name, workflow in workflows.items():
-                registry.register(
-                    f"{vertical.name}:{name}",
-                    workflow,
-                    replace=True,
-                )
+            registry_service.register_workflows(
+                vertical.name,
+                workflows,
+                replace=True,
+                registration_version=registration_version,
+            )
             result.add_info(
                 f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
             )
-        except ImportError:
-            result.add_warning("Workflow registry not available")
         except Exception as e:
             result.add_warning(f"Could not register workflows: {e}")
 
-        # NEW: Register workflow triggers with global WorkflowTriggerRegistry
+        # Register workflow triggers through framework integration registry service.
         try:
-            from victor.workflows.trigger_registry import get_trigger_registry
-
-            trigger_registry = get_trigger_registry()
-
-            # Get auto_workflows from provider if available
             if hasattr(workflow_provider, "get_auto_workflows"):
                 auto_workflows = workflow_provider.get_auto_workflows()
                 if auto_workflows:
-                    trigger_registry.register_from_vertical(vertical.name, auto_workflows)
+                    registry_service.register_workflow_triggers(
+                        vertical.name,
+                        auto_workflows,
+                        registration_version=registration_version,
+                    )
                     logger.debug(
                         f"Registered {len(auto_workflows)} workflow triggers "
                         f"for {vertical.name}"
                     )
                     result.add_info(f"Registered {len(auto_workflows)} workflow triggers")
-        except ImportError:
-            # Trigger registry not available (optional dependency)
-            pass
         except Exception as e:
             result.add_warning(f"Could not register workflow triggers: {e}")
 
@@ -1210,6 +1183,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Apply RL configuration from vertical.
 
@@ -1248,14 +1223,15 @@ class FrameworkStepHandler(BaseStepHandler):
         # Wire active_learners restriction to RLCoordinator
         if hasattr(rl_config, "active_learners") and rl_config.active_learners:
             try:
-                from victor.framework.rl.coordinator import get_rl_coordinator
-
-                coordinator = get_rl_coordinator()
+                registry_service = resolve_framework_integration_registry_service(orchestrator)
                 learner_names = [
                     learner.value if hasattr(learner, "value") else str(learner)
                     for learner in rl_config.active_learners
                 ]
-                coordinator.set_active_learners(learner_names)
+                registry_service.set_active_rl_learners(
+                    learner_names,
+                    registration_version=registration_version,
+                )
             except Exception as e:
                 logger.debug(f"Could not set active learners: {e}")
 
@@ -1265,16 +1241,13 @@ class FrameworkStepHandler(BaseStepHandler):
             if rl_hooks:
                 context.apply_rl_hooks(rl_hooks)
 
-                # Attach hooks via capability (SOLID compliant)
+                # Attach hooks via capability (protocol-only, no fallback)
                 if _check_capability(orchestrator, "rl_hooks"):
                     _invoke_capability(orchestrator, "rl_hooks", rl_hooks)
                     logger.debug("Applied RL hooks via capability")
-                elif hasattr(orchestrator, "set_rl_hooks"):
-                    orchestrator.set_rl_hooks(rl_hooks)
-                    logger.debug("Applied RL hooks via set_rl_hooks")
                 else:
                     result.add_warning(
-                        "Orchestrator lacks set_rl_hooks method; " "hooks stored in context only"
+                        "Orchestrator lacks rl_hooks capability; hooks stored in context only"
                     )
 
         result.add_info(f"Configured {learner_count} RL learners")
@@ -1286,6 +1259,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Apply team specifications from vertical.
 
@@ -1318,16 +1293,13 @@ class FrameworkStepHandler(BaseStepHandler):
         # Store in context
         context.apply_team_specs(team_specs)
 
-        # Attach via capability (SOLID compliant)
+        # Attach via capability (protocol-only, no fallback)
         if _check_capability(orchestrator, "team_specs"):
             _invoke_capability(orchestrator, "team_specs", team_specs)
             logger.debug("Applied team specs via capability")
-        elif hasattr(orchestrator, "set_team_specs"):
-            orchestrator.set_team_specs(team_specs)
-            logger.debug("Applied team specs via set_team_specs")
         else:
             result.add_warning(
-                "Orchestrator lacks set_team_specs method; " "specs stored in context only"
+                "Orchestrator lacks team_specs capability; specs stored in context only"
             )
 
         result.add_info(f"Registered {team_count} team specs: " f"{', '.join(team_specs.keys())}")
@@ -1335,16 +1307,16 @@ class FrameworkStepHandler(BaseStepHandler):
         for team_name in team_specs.keys():
             logger.debug(f"Registered team_spec: {team_name}")
 
-        # NEW: Register with global TeamSpecRegistry for cross-vertical discovery
+        # Register with TeamSpecRegistry through framework integration registry service.
         try:
-            from victor.framework.team_registry import get_team_registry
-
-            team_registry = get_team_registry()
-            team_registry.register_from_vertical(vertical.name, team_specs, replace=True)
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            registry_service.register_team_specs(
+                vertical.name,
+                team_specs,
+                replace=True,
+                registration_version=registration_version,
+            )
             logger.debug(f"Registered {team_count} teams with global registry for {vertical.name}")
-        except ImportError:
-            # Team registry not available (optional dependency)
-            pass
         except Exception as e:
             result.add_warning(f"Could not register with team registry: {e}")
 
@@ -1367,6 +1339,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Register composed chains from vertical with ChainRegistry.
 
@@ -1389,25 +1363,21 @@ class FrameworkStepHandler(BaseStepHandler):
 
         chain_count = len(chains)
 
-        # Register with ChainRegistry
+        # Register with ChainRegistry via framework integration registry service.
         try:
-            from victor.framework.chain_registry import get_chain_registry
-
-            registry = get_chain_registry()
-            for name, chain in chains.items():
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            registry_service.register_chains(
+                vertical.name,
+                chains,
+                replace=True,
+                registration_version=registration_version,
+            )
+            for name in chains.keys():
                 full_name = f"{vertical.name}:{name}"
-                registry.register(
-                    name,
-                    chain,
-                    vertical=vertical.name,
-                    replace=True,
-                )
                 logger.debug(f"Registered chain: {full_name}")
 
             result.add_info(f"Registered {chain_count} chains: {', '.join(chains.keys())}")
             logger.debug(f"Applied {chain_count} chains from vertical")
-        except ImportError:
-            result.add_warning("ChainRegistry not available")
         except Exception as e:
             result.add_warning(f"Could not register chains: {e}")
 
@@ -1417,6 +1387,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Register personas from vertical with PersonaRegistry.
 
@@ -1438,11 +1410,10 @@ class FrameworkStepHandler(BaseStepHandler):
 
         persona_count = len(personas)
 
-        # Register with PersonaRegistry
+        # Normalize and register personas through framework integration registry service.
         try:
-            from victor.framework.persona_registry import get_persona_registry
-
-            registry = get_persona_registry()
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            normalized_personas: Dict[str, Any] = {}
             for name, persona in personas.items():
                 # Convert to PersonaSpec if needed
                 if hasattr(persona, "to_persona_spec"):
@@ -1465,13 +1436,17 @@ class FrameworkStepHandler(BaseStepHandler):
                     spec = persona
 
                 full_name = f"{vertical.name}:{name}"
-                registry.register(name, spec, vertical=vertical.name, replace=True)
+                normalized_personas[name] = spec
                 logger.debug(f"Registered persona: {full_name}")
 
+            registry_service.register_personas(
+                vertical.name,
+                normalized_personas,
+                replace=True,
+                registration_version=registration_version,
+            )
             result.add_info(f"Registered {persona_count} personas: {', '.join(personas.keys())}")
             logger.debug(f"Applied {persona_count} personas from vertical")
-        except ImportError:
-            result.add_warning("PersonaRegistry not available")
         except Exception as e:
             result.add_warning(f"Could not register personas: {e}")
 
@@ -1560,6 +1535,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Register vertical tool graphs with global ToolGraphRegistry.
 
@@ -1572,13 +1549,6 @@ class FrameworkStepHandler(BaseStepHandler):
             context: Vertical context
             result: Result to update
         """
-        try:
-            from victor.tools.tool_graph import ToolGraphRegistry
-        except ImportError:
-            # ToolGraphRegistry not available (optional dependency)
-            return
-
-        graph_registry = ToolGraphRegistry.get_instance()
         graph = None
 
         # Check for direct tool graph method
@@ -1595,7 +1565,12 @@ class FrameworkStepHandler(BaseStepHandler):
             return
 
         try:
-            graph_registry.register_graph(vertical.name, graph)
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            registry_service.register_tool_graph(
+                vertical.name,
+                graph,
+                registration_version=registration_version,
+            )
             result.add_info(f"Registered tool graph for {vertical.name}")
             logger.debug(f"Registered tool graph for vertical={vertical.name}")
         except Exception as e:
@@ -1607,6 +1582,8 @@ class FrameworkStepHandler(BaseStepHandler):
         vertical: Type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
+        *,
+        registration_version: Optional[str] = None,
     ) -> None:
         """Explicitly register vertical compute handlers.
 
@@ -1631,52 +1608,18 @@ class FrameworkStepHandler(BaseStepHandler):
         handler_count = len(handlers)
 
         try:
-            from victor.framework.handler_registry import get_handler_registry
-
-            registry = get_handler_registry()
-
-            if hasattr(registry, "register") and callable(getattr(registry, "register")):
-                # Newer registry API: register one handler at a time with vertical namespace.
-                for name, handler in handlers.items():
-                    registry.register(name, handler, vertical=vertical.name, replace=True)
-                    logger.debug(f"Registered handler: {vertical.name}:{name}")
-            elif hasattr(registry, "register_vertical") and callable(
-                getattr(registry, "register_vertical")
-            ):
-                # Compatibility path for HandlerRegistry API exposing register_vertical().
-                registry.register_vertical(vertical.name, handlers)
-                logger.debug(
-                    "Registered %s handlers via register_vertical for '%s'",
-                    handler_count,
-                    vertical.name,
-                )
-            else:
-                raise AttributeError("HandlerRegistry has no supported registration method")
-
-            # Sync to executor for backward compatibility
-            try:
-                if hasattr(registry, "sync_with_executor"):
-                    registry.sync_with_executor(direction="to_executor", replace=True)
-            except Exception:
-                pass  # Sync is optional
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            registry_service.register_handlers(
+                vertical.name,
+                handlers,
+                replace=True,
+                registration_version=registration_version,
+            )
+            for name in handlers.keys():
+                logger.debug(f"Registered handler: {vertical.name}:{name}")
 
             result.add_info(f"Registered {handler_count} handlers: {', '.join(handlers.keys())}")
             logger.debug(f"Applied {handler_count} handlers from vertical")
-        except ImportError:
-            # Handler registry not available - fall back to executor registration
-            try:
-                from victor.workflows.executor import register_compute_handler
-
-                for name, handler in handlers.items():
-                    register_compute_handler(name, handler)
-                    logger.debug(f"Registered handler via executor: {name}")
-
-                result.add_info(
-                    f"Registered {handler_count} handlers (fallback): "
-                    f"{', '.join(handlers.keys())}"
-                )
-            except ImportError:
-                result.add_warning("Handler registration not available")
         except Exception as e:
             result.add_warning(f"Could not register handlers: {e}")
 
@@ -1718,13 +1661,10 @@ class TieredConfigStepHandler(BaseStepHandler):
     ) -> None:
         """Apply tiered tool config from vertical.
 
-        Uses get_tiered_config() helper with canonical contract:
-        1. Use get_tiered_tool_config() (active path)
-        2. Optional deprecated fallback to get_tiered_tools() only when
-           VICTOR_ENABLE_LEGACY_TIERED_TOOLS_FALLBACK=1
-        3. Return early if no valid config is available
+        Uses canonical `get_tiered_tool_config()` contract only.
+        Returns early if no valid config is available.
         """
-        # Use canonical helper with optional legacy adapter.
+        # Use canonical helper.
         tiered_config = get_tiered_config(vertical)
 
         if tiered_config is None:
@@ -1820,16 +1760,13 @@ class ContextStepHandler(BaseStepHandler):
         result: "IntegrationResult",
     ) -> None:
         """Attach the vertical context to orchestrator."""
-        # Use capability-based approach (SOLID compliant)
+        # Use capability-based approach (protocol-only, no fallback)
         if _check_capability(orchestrator, "vertical_context"):
             _invoke_capability(orchestrator, "vertical_context", context)
             logger.debug("Attached context via capability")
-        elif hasattr(orchestrator, "set_vertical_context"):
-            orchestrator.set_vertical_context(context)
-            logger.debug("Attached context via set_vertical_context")
         else:
             result.add_warning(
-                "Orchestrator lacks set_vertical_context method; " "context not attached"
+                "Orchestrator lacks vertical_context capability; context not attached"
             )
 
 
