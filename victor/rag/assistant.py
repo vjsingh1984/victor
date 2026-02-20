@@ -207,11 +207,6 @@ You: [Use rag_query tool with query="authentication"]
             readonly_only_for_analysis=True,
         )
 
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Compatibility wrapper for legacy tiered tool API."""
-        return cls.get_tiered_tool_config()
-
     # Extension providers delegated to base class (OCP/caching compliance)
     # RAG previously overrode get_extensions() directly, bypassing base class caching.
     # Now we implement the individual getter methods and let VerticalBase.get_extensions()
@@ -245,24 +240,6 @@ You: [Use rag_query tool with query="authentication"]
         return cls._get_extension_factory("prompt_contributor", "victor.rag.prompts")
 
     @classmethod
-    def get_mode_config_provider(cls):
-        """Get RAG mode configuration provider.
-
-        Returns:
-            RAGModeConfigProvider instance
-        """
-        return cls._get_extension_factory("mode_config_provider", "victor.rag.mode_config")
-
-    @classmethod
-    def get_workflow_provider(cls):
-        """Get the workflow provider for RAG vertical.
-
-        Returns:
-            RAGWorkflowProvider instance
-        """
-        return cls._get_extension_factory("workflow_provider", "victor.rag.workflows")
-
-    @classmethod
     def get_rl_config_provider(cls):
         """Get the RL configuration provider for RAG vertical.
 
@@ -279,20 +256,6 @@ You: [Use rag_query tool with query="authentication"]
             RAGTeamSpecProvider instance
         """
         return cls._get_extension_factory("team_spec_provider", "victor.rag.teams")
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for RAG workflows.
-
-        Returns handlers from victor.rag.handlers for workflow execution.
-        This replaces the previous import-side-effect registration pattern.
-
-        Returns:
-            Dict mapping handler names to handler instances
-        """
-        from victor.rag.handlers import HANDLERS
-
-        return HANDLERS
 
     @classmethod
     def get_capability_configs(cls) -> Dict[str, Any]:

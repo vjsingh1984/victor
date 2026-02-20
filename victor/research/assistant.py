@@ -180,68 +180,9 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 - Update findings when new information emerges
 """
 
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory("mode_config_provider", "victor.research.mode_config")
-
-    @classmethod
-    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for research."""
-        from victor.core.vertical_types import TieredToolTemplate
-
-        return TieredToolTemplate.for_vertical(cls.name)
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Compatibility wrapper for legacy tiered tool API."""
-        return cls.get_tiered_tool_config()
-
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
     # =========================================================================
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Get Research-specific workflow provider.
-
-        Provides workflows for:
-        - deep_research: Multi-source research with verification
-        - fact_check: Fact verification workflow
-        - literature_review: Academic literature review
-        - competitive_analysis: Market and competitive research
-
-        Returns:
-            ResearchWorkflowProvider instance
-        """
-        from victor.research.workflows import ResearchWorkflowProvider
-
-        return ResearchWorkflowProvider()
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for Research vertical.
-
-        Returns:
-            ResearchRLHooks instance
-        """
-        from victor.research.rl import ResearchRLHooks
-
-        return ResearchRLHooks()
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for research workflows.
-
-        Returns handlers from victor.research.handlers for workflow execution.
-        This replaces the previous import-side-effect registration pattern.
-
-        Returns:
-            Dict mapping handler names to handler instances
-        """
-        from victor.research.handlers import HANDLERS
-
-        return HANDLERS
-
     @classmethod
     def get_capability_configs(cls) -> Dict[str, Any]:
         """Get research capability configurations for centralized storage.

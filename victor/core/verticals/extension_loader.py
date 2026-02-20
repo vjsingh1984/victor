@@ -164,6 +164,7 @@ class VerticalExtensionLoader(ABC):
     _extension_loader_emit_pressure_events: ClassVar[bool] = False
     _extension_loader_last_pressure_level: ClassVar[str] = "ok"
     _extension_loader_last_pressure_emit_ts: ClassVar[float] = 0.0
+    _tiered_tools_deprecation_warned: ClassVar[Set[str]] = set()
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -579,12 +580,29 @@ class VerticalExtensionLoader(ABC):
     def get_mode_config_provider(cls) -> Optional[Any]:
         """Get mode configuration provider for this vertical.
 
-        Override to provide vertical-specific operational modes.
+        Default implementation tries direct import pattern, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~6 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Mode config provider (ModeConfigProviderProtocol) or None
         """
-        return None
+        try:
+            # Try direct import pattern (e.g., CodingModeConfigProvider)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}ModeConfigProvider"
+            module = __import__(f"victor.{cls.name}.mode_config", fromlist=[class_name])
+            return getattr(module, class_name)()
+        except (ImportError, AttributeError):
+            try:
+                # Fall back to extension factory pattern
+                return cls._get_extension_factory(
+                    "mode_config_provider",
+                    f"victor.{cls.name}.mode_config",
+                )
+            except (ImportError, AttributeError):
+                return None
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:
@@ -749,6 +767,17 @@ class VerticalExtensionLoader(ABC):
         Returns:
             TieredToolConfig or None (falls back to get_tools())
         """
+        # Keep compatibility at the core adapter boundary only.
+        qualified_name = f"{cls.__module__}.{cls.__qualname__}"
+        with VerticalExtensionLoader._extensions_cache_lock:
+            if qualified_name not in VerticalExtensionLoader._tiered_tools_deprecation_warned:
+                VerticalExtensionLoader._tiered_tools_deprecation_warned.add(qualified_name)
+                logger.warning(
+                    "%s.get_tiered_tools() is deprecated and will be removed after 2026-06-30; "
+                    "implement get_tiered_tool_config() instead.",
+                    qualified_name,
+                )
+
         # Delegate to the canonical method
         return cls.get_tiered_tool_config()
 
@@ -785,13 +814,29 @@ class VerticalExtensionLoader(ABC):
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for outcome recording.
 
-        Override to provide vertical-specific RL hooks for
-        recording task outcomes and updating learners.
+        Default implementation tries direct import pattern, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~6 LOC of duplicated wrapper code across verticals.
 
         Returns:
             RLHooks instance or None
         """
-        return None
+        try:
+            # Try direct import pattern (e.g., CodingRLHooks)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}RLHooks"
+            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
+            return getattr(module, class_name)()
+        except (ImportError, AttributeError):
+            try:
+                # Fall back to extension factory pattern
+                return cls._get_extension_factory(
+                    "rl_hooks",
+                    f"victor.{cls.name}.rl",
+                )
+            except (ImportError, AttributeError):
+                return None
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -1233,12 +1278,36 @@ class VerticalExtensionLoader(ABC):
     def get_workflow_provider(cls) -> Optional[Any]:
         """Get workflow provider for this vertical.
 
-        Override to provide vertical-specific workflows.
+        Default implementation tries direct import pattern, then falls back
+        to extension factory. Override only if custom behavior needed.
+
+        This eliminates ~6-8 LOC of duplicated wrapper code across verticals.
 
         Returns:
-            Workflow provider (WorkflowProviderProtocol) or None
+            Workflow provider instance (WorkflowProviderProtocol) or None
         """
-        return None
+        try:
+            # Try direct import pattern (e.g., CodingWorkflowProvider)
+            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+            class_name = f"{vertical_name}WorkflowProvider"
+            module = __import__(f"victor.{cls.name}.workflows", fromlist=[class_name])
+            provider_class = getattr(module, class_name)
+            return provider_class()
+        except (ImportError, AttributeError):
+            try:
+                # Try provider submodule
+                module = __import__(f"victor.{cls.name}.workflows.provider", fromlist=[class_name])
+                provider_class = getattr(module, class_name)
+                return provider_class()
+            except (ImportError, AttributeError):
+                try:
+                    # Fall back to extension factory pattern
+                    return cls._get_extension_factory(
+                        "workflow_provider",
+                        f"victor.{cls.name}.workflows",
+                    )
+                except (ImportError, AttributeError):
+                    return None
 
     @classmethod
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:

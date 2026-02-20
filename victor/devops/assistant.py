@@ -175,10 +175,6 @@ When creating configurations:
 """
 
     @classmethod
-    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory("mode_config_provider", "victor.devops.mode_config")
-
-    @classmethod
     def get_middleware(cls) -> List[MiddlewareProtocol]:
         """Get DevOps-specific middleware.
 
@@ -212,55 +208,6 @@ When creating configurations:
             .build()
         )
 
-    @classmethod
-    def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for DevOps."""
-        from victor.core.vertical_types import TieredToolTemplate
-
-        return TieredToolTemplate.for_vertical(cls.name)
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Compatibility wrapper for legacy tiered tool API."""
-        return cls.get_tiered_tool_config()
-
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
     # =========================================================================
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Get DevOps-specific workflow provider.
-
-        Provides workflows for:
-        - deploy_infrastructure: Infrastructure deployment
-        - container_setup: Docker container configuration
-        - cicd_pipeline: CI/CD pipeline setup
-
-        Returns:
-            DevOpsWorkflowProvider instance
-        """
-        return cls._get_extension_factory("workflow_provider", "victor.devops.workflows")
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for DevOps vertical.
-
-        Returns:
-            DevOpsRLHooks instance
-        """
-        return cls._get_extension_factory("rl_hooks", "victor.devops.rl")
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for DevOps workflows.
-
-        Returns handlers from victor.devops.handlers for workflow execution.
-        This replaces the previous import-side-effect registration pattern.
-
-        Returns:
-            Dict mapping handler names to handler instances
-        """
-        from victor.devops.handlers import HANDLERS
-
-        return HANDLERS
