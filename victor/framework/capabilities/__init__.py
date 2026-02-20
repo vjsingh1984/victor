@@ -17,7 +17,7 @@
 This module contains framework-level capability providers that can be reused
 across all verticals to promote code reuse and maintain SOLID principles.
 
-Phase 3: Generic Capabilities - Framework Layer
+Phase 1: Promote Generic Capabilities to Framework
 
 Capabilities:
 - BaseCapabilityProvider: Abstract base for vertical capability providers
@@ -25,6 +25,12 @@ Capabilities:
 - FileOperationsCapability: Common file operation tools (read, write, edit, grep)
 - PromptContributionCapability: Common prompt hints for task types
 - PrivacyCapabilityProvider: Framework-level privacy and PII management (cross-vertical)
+- StageBuilderCapability: Generic stage definitions for workflow templates
+- GroundingRulesCapability: Centralized grounding rules for vertical constraints
+- ValidationCapabilityProvider: Pluggable validation system
+- SafetyRulesCapabilityProvider: Reusable safety pattern definitions
+- TaskTypeHintCapabilityProvider: Centralized task type hints
+- SourceVerificationCapabilityProvider: Source verification for citations
 """
 
 # Base classes for capability providers
@@ -35,12 +41,89 @@ from .file_operations import FileOperationsCapability
 from .prompt_contributions import PromptContributionCapability
 from .privacy import PrivacyCapabilityProvider
 
+# Phase 1: Generic capabilities promoted to framework
+from .stages import (
+    StageBuilderCapability,
+    StageBuilderPresets,
+    StandardStage,
+    StagePromptHint,
+)
+from .grounding_rules import (
+    GroundingRulesCapability,
+    GroundingRulesPresets,
+    RuleCategory,
+    GroundingRule,
+)
+from .validation import (
+    ValidationCapabilityProvider,
+    Validator,
+    FilePathValidator,
+    CodeSyntaxValidator,
+    ConfigurationValidator,
+    OutputFormatValidator,
+    ValidationResult,
+    ValidationSeverity,
+)
+from .safety_rules import (
+    SafetyRulesCapabilityProvider,
+    SafetyRulesPresets,
+    SafetyCategory,
+    SafetyAction,
+    SafetyRule,
+)
+from .task_hints import (
+    TaskTypeHintCapabilityProvider,
+    TaskTypeHintPresets,
+    TaskCategory,
+    TaskTypeHint,
+)
+from .source_verification import (
+    SourceVerificationCapabilityProvider,
+    SourceVerificationPresets,
+    SourceType,
+    ReliabilityLevel,
+    Citation,
+    VerificationResult,
+)
+
 __all__ = [
     # Base classes
     "BaseCapabilityProvider",
     "CapabilityMetadata",
-    # Concrete implementations
+    # Original concrete implementations
     "FileOperationsCapability",
     "PromptContributionCapability",
     "PrivacyCapabilityProvider",
+    # Phase 1: Generic capabilities
+    "StageBuilderCapability",
+    "StageBuilderPresets",
+    "StandardStage",
+    "StagePromptHint",
+    "GroundingRulesCapability",
+    "GroundingRulesPresets",
+    "RuleCategory",
+    "GroundingRule",
+    "ValidationCapabilityProvider",
+    "Validator",
+    "FilePathValidator",
+    "CodeSyntaxValidator",
+    "ConfigurationValidator",
+    "OutputFormatValidator",
+    "ValidationResult",
+    "ValidationSeverity",
+    "SafetyRulesCapabilityProvider",
+    "SafetyRulesPresets",
+    "SafetyCategory",
+    "SafetyAction",
+    "SafetyRule",
+    "TaskTypeHintCapabilityProvider",
+    "TaskTypeHintPresets",
+    "TaskCategory",
+    "TaskTypeHint",
+    "SourceVerificationCapabilityProvider",
+    "SourceVerificationPresets",
+    "SourceType",
+    "ReliabilityLevel",
+    "Citation",
+    "VerificationResult",
 ]

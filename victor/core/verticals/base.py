@@ -59,9 +59,6 @@ from victor.core.verticals.metadata import VerticalMetadataProvider
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
 
-if TYPE_CHECKING:
-    from victor.core.verticals.protocols import VerticalExtensions
-
 # Import StageDefinition from core for centralized definition
 # Re-export for backward compatibility
 from victor.core.vertical_types import (
@@ -69,7 +66,20 @@ from victor.core.vertical_types import (
     StageBuilder,
 )
 
+# Import framework capabilities (Phase 1: Promote Generic Capabilities)
+from victor.framework.capabilities import (
+    StageBuilderCapability,
+    GroundingRulesCapability,
+)
+
+if TYPE_CHECKING:
+    from victor.core.verticals.protocols import VerticalExtensions
+
 logger = logging.getLogger(__name__)
+
+# Framework capability instances (class-level for sharing)
+_stage_capability: Optional[StageBuilderCapability] = None
+_grounding_capability: Optional[GroundingRulesCapability] = None
 
 
 @dataclass
@@ -251,10 +261,71 @@ class VerticalBase(
     def get_system_prompt(cls) -> str:
         """Get the system prompt for this vertical.
 
+        Verticals can optionally append framework grounding rules by calling
+        get_framework_grounding_rules() and appending to their prompt:
+
+            prompt = "You are an expert in X..."
+            prompt += "\\n\\n" + cls.get_framework_grounding_rules()
+            return prompt
+
         Returns:
             System prompt text with domain expertise.
         """
         pass
+
+    # =========================================================================
+    # Framework Capability Helpers (Phase 1)
+    # =========================================================================
+
+    @classmethod
+    def _get_stage_capability(cls) -> StageBuilderCapability:
+        """Get or create the stage builder capability.
+
+        Returns:
+            StageBuilderCapability instance
+        """
+        global _stage_capability
+        if _stage_capability is None:
+            _stage_capability = StageBuilderCapability()
+        return _stage_capability
+
+    @classmethod
+    def _get_grounding_capability(cls) -> GroundingRulesCapability:
+        """Get or create the grounding rules capability.
+
+        Returns:
+            GroundingRulesCapability instance
+        """
+        global _grounding_capability
+        if _grounding_capability is None:
+            _grounding_capability = GroundingRulesCapability()
+        return _grounding_capability
+
+    @classmethod
+    def get_framework_stages(cls) -> Dict[str, Any]:
+        """Get stage definitions from framework capability.
+
+        This provides a way for verticals to access the generic 7-stage
+        workflow template from the framework while allowing customization.
+
+        Returns:
+            Dictionary mapping stage names to stage definitions
+        """
+        capability = cls._get_stage_capability()
+        return capability.get_stages()
+
+    @classmethod
+    def get_framework_grounding_rules(cls) -> str:
+        """Get grounding rules text from framework capability.
+
+        This provides a way for verticals to access the generic grounding
+        rules from the framework while allowing extensions.
+
+        Returns:
+            Formatted grounding rules text
+        """
+        capability = cls._get_grounding_capability()
+        return capability.get_rules_text(vertical=cls.name, include_extensions=True)
 
     # =========================================================================
     # Configurable Override Points
