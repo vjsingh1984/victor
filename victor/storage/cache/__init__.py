@@ -25,6 +25,12 @@ Features:
 - Size limits
 - Thread-safe
 
+Phase 3: Extended Caching
+- GenericResultCache: Extended caching for non-tool results
+- Enhanced EmbeddingCache: Batch operations and preloading
+- HttpConnectionPool: Connection pooling for HTTP tools
+- PreloadManager: Warm cache initialization
+
 Usage:
     from victor.storage.cache import get_cache_manager
 
@@ -35,7 +41,7 @@ Usage:
 """
 
 from victor.storage.cache.config import CacheConfig
-from victor.storage.cache.tiered_cache import TieredCache
+from victor.storage.cache.tiered_cache import TieredCache, EmbeddingCache
 
 # New unified cache manager
 from victor.storage.cache.manager import (
@@ -51,11 +57,21 @@ from victor.storage.cache.manager import (
     get_code_search_cache,
 )
 
+# Phase 3: Extended caching
+from victor.storage.cache.generic_result_cache import (
+    GenericResultCache,
+    ResultType,
+    CacheDependency,
+    InvalidationStrategy,
+    CacheKeys,
+)
+
 __all__ = [
     # Configuration
     "CacheConfig",
     # Low-level cache
     "TieredCache",
+    "EmbeddingCache",
     # Unified cache manager
     "CacheManager",
     "CacheNamespace",
@@ -68,4 +84,10 @@ __all__ = [
     "get_embeddings_cache",
     "get_responses_cache",
     "get_code_search_cache",
+    # Phase 3: Extended caching
+    "GenericResultCache",
+    "ResultType",
+    "CacheDependency",
+    "InvalidationStrategy",
+    "CacheKeys",
 ]
