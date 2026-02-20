@@ -25,6 +25,7 @@ from victor.ui.commands.chat import chat_app, _run_default_interactive
 from victor.ui.commands.config import config_app
 from victor.ui.commands.dashboard import dashboard_app
 from victor.ui.commands.docs import docs_app
+from victor.ui.commands.observability import app as observability_app
 from victor.ui.commands.embeddings import embeddings_app
 from victor.ui.commands.examples import examples_app
 from victor.ui.commands.experiments import experiment_app
@@ -60,6 +61,7 @@ app.add_typer(chat_app)
 app.add_typer(config_app)
 app.add_typer(dashboard_app)
 app.add_typer(docs_app)
+app.add_typer(observability_app, name="observability")
 app.add_typer(embeddings_app)
 app.add_typer(examples_app)
 app.add_typer(experiment_app)
