@@ -633,6 +633,29 @@ class TieredCache:
             except Exception as e:
                 logger.warning("Error closing disk cache: %s", e)
 
+    def get_observability_data(self) -> Dict[str, Any]:
+        """Get observability data for dashboard integration.
+
+        Returns a dictionary formatted for the ObservabilityManager.
+        Includes cache statistics like hit rates, sizes, and eviction counts.
+
+        Returns:
+            Dictionary with observability data including:
+            - source_id: Unique identifier for this cache
+            - source_type: Type of metrics source ("cache")
+            - stats: Cache statistics dictionary
+
+        Example:
+            data = cache.get_observability_data()
+            print(f"Hit rate: {data['stats']['memory_hit_rate']:.2%}")
+        """
+        stats = self.get_stats()
+        return {
+            "source_id": f"cache:tiered:{id(self)}",
+            "source_type": "cache",
+            "stats": stats,
+        }
+
     def __enter__(self) -> "TieredCache":
         """Context manager entry."""
         return self
