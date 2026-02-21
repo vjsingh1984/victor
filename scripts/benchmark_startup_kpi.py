@@ -180,6 +180,65 @@ def _measure_agent_create(
     )
 
 
+def _measure_activation_probe(
+    *,
+    python_executable: str,
+    vertical: str,
+    provider: str,
+    model: str,
+    timeout_seconds: float,
+) -> Dict[str, Any]:
+    """Measure activation probe timing and metrics for a specific vertical."""
+    provider_literal = json.dumps(provider)
+    model_literal = json.dumps(vertical)
+    code = textwrap.dedent(
+        f"""
+        import asyncio
+        import json
+        import time
+
+        from victor.framework import Agent
+
+        vertical = {model_literal}
+        provider = {provider_literal}
+        model = {json.dumps(model)}
+
+        async def run():
+            t0 = time.perf_counter()
+            agent = await Agent.create(
+                provider=provider,
+                model=model,
+                vertical=vertical,
+                enable_observability=False,
+            )
+            cold_ms = (time.perf_counter() - t0) * 1000.0
+
+            # Get activation probe data from the orchestrator
+            orchestrator = agent._orchestrator
+            activation_probe = getattr(orchestrator, "_activation_probe", {{}})
+
+            await agent.close()
+
+            print(json.dumps({{
+                "vertical": vertical,
+                "cold_ms": cold_ms,
+                "warm_samples_ms": [],
+                "warm_mean_ms": 0.0,
+                "warm_p95_ms": 0.0,
+                **activation_probe,
+            }}))
+
+        asyncio.run(run())
+        """
+    )
+    payload = _run_snippet(
+        python_executable=python_executable,
+        code=code,
+        timeout_seconds=timeout_seconds,
+    )
+    return payload
+
+
 def _build_report(
     *,
     python_executable: str,
@@ -199,6 +258,124 @@ def _build_report(
         },
         "import_victor": import_timing.to_dict(),
     }
+
+
+def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
+    """Collect threshold values from CLI args."""
+    thresholds: Dict[str, float] = {}
+
+    if hasattr(args, 'max_import_cold_ms') and args.max_import_cold_ms is not None:
+        thresholds["import_victor.cold_ms"] = args.max_import_cold_ms
+    if hasattr(args, 'max_import_warm_mean_ms') and args.max_import_warm_mean_ms is not None:
+        thresholds["import_victor.warm_mean_ms"] = args.max_import_warm_mean_ms
+    if hasattr(args, 'max_agent_create_cold_ms') and args.max_agent_create_cold_ms is not None:
+        thresholds["agent_create.cold_ms"] = args.max_agent_create_cold_ms
+    if hasattr(args, 'max_agent_create_warm_mean_ms') and args.max_agent_create_warm_mean_ms is not None:
+        thresholds["agent_create.warm_mean_ms"] = args.max_agent_create_warm_mean_ms
+
+    return thresholds
+
+
+def _evaluate_threshold_failures(report: Dict[str, Any], thresholds: Dict[str, float]) -> List[str]:
+    """Evaluate report against thresholds and return list of failure messages."""
+    failures: List[str] = []
+
+    for key, threshold in thresholds.items():
+        parts = key.split(".")
+        if len(parts) != 2:
+            continue
+
+        section, metric = parts
+        if section not in report:
+            continue
+
+        value = report[section].get(metric)
+        if value is None:
+            continue
+
+        if value > threshold:
+            failures.append(f"{key}: {value:.2f} exceeds threshold {threshold:.2f}")
+
+    return failures
+
+
+def _collect_minimums(args: argparse.Namespace) -> Dict[str, float]:
+    """Collect minimum value requirements from CLI args."""
+    minimums: Dict[str, float] = {}
+
+    if hasattr(args, 'min_framework_registry_attempted_total') and args.min_framework_registry_attempted_total is not None:
+        minimums["activation_probe.framework_registry_attempted_total"] = args.min_framework_registry_attempted_total
+    if hasattr(args, 'min_framework_registry_applied_total') and args.min_framework_registry_applied_total is not None:
+        minimums["activation_probe.framework_registry_applied_total"] = args.min_framework_registry_applied_total
+
+    return minimums
+
+
+def _evaluate_minimum_failures(report: Dict[str, Any], minimums: Dict[str, float]) -> List[str]:
+    """Evaluate report against minimums and return list of failure messages."""
+    failures: List[str] = []
+
+    for key, minimum in minimums.items():
+        parts = key.split(".")
+        if len(parts) < 2:
+            continue
+
+        # Navigate nested structure
+        value = report
+        for part in parts:
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                value = None
+                break
+
+        if value is None:
+            continue
+
+        if value < minimum:
+            failures.append(f"{key}: {value:.2f} below minimum {minimum:.2f}")
+
+    return failures
+
+
+def _collect_flag_expectations(args: argparse.Namespace) -> Dict[str, bool]:
+    """Collect runtime flag expectations from CLI args."""
+    expectations: Dict[str, bool] = {}
+
+    if hasattr(args, 'require_generic_result_cache_enabled') and args.require_generic_result_cache_enabled:
+        expectations["activation_probe.runtime_flags.generic_result_cache_enabled"] = True
+    if hasattr(args, 'require_http_connection_pool_enabled') and args.require_http_connection_pool_enabled:
+        expectations["activation_probe.runtime_flags.http_connection_pool_enabled"] = True
+    if hasattr(args, 'require_framework_preload_enabled') and args.require_framework_preload_enabled:
+        expectations["activation_probe.runtime_flags.framework_preload_enabled"] = True
+
+    return expectations
+
+
+def _evaluate_flag_expectation_failures(report: Dict[str, Any], expectations: Dict[str, bool]) -> List[str]:
+    """Evaluate report against flag expectations and return list of failure messages."""
+    failures: List[str] = []
+
+    for key, expected_value in expectations.items():
+        parts = key.split(".")
+        if len(parts) < 2:
+            continue
+
+        # Navigate nested structure
+        value = report
+        for part in parts:
+            if isinstance(value, dict) and part in value:
+                value = value[part]
+            else:
+                value = None
+                break
+
+        if value is None:
+            failures.append(f"{key}: not found in report")
+        elif value != expected_value:
+            failures.append(f"{key}: {value} != {expected_value}")
+
+    return failures
 
 
 def main() -> int:
@@ -237,6 +414,72 @@ def main() -> int:
         action="store_true",
         help="Print JSON report only.",
     )
+
+    # Threshold arguments for CI/CD validation
+    parser.add_argument(
+        "--max-import-cold-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable import cold time in milliseconds.",
+    )
+    parser.add_argument(
+        "--max-import-warm-mean-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable import warm mean time in milliseconds.",
+    )
+    parser.add_argument(
+        "--max-agent-create-cold-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable agent_create cold time in milliseconds.",
+    )
+    parser.add_argument(
+        "--max-agent-create-warm-mean-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable agent_create warm mean time in milliseconds.",
+    )
+
+    # Minimum value arguments
+    parser.add_argument(
+        "--min-framework-registry-attempted-total",
+        type=float,
+        default=None,
+        help="Minimum acceptable framework registry attempted total.",
+    )
+    parser.add_argument(
+        "--min-framework-registry-applied-total",
+        type=float,
+        default=None,
+        help="Minimum acceptable framework registry applied total.",
+    )
+
+    # Flag expectation arguments
+    parser.add_argument(
+        "--require-generic-result-cache-enabled",
+        action="store_true",
+        help="Require generic_result_cache_enabled to be True.",
+    )
+    parser.add_argument(
+        "--require-http-connection-pool-enabled",
+        action="store_true",
+        help="Require http_connection_pool_enabled to be True.",
+    )
+    parser.add_argument(
+        "--require-framework-preload-enabled",
+        action="store_true",
+        help="Require framework_preload_enabled to be True.",
+    )
+
+    # Activation probe arguments
+    parser.add_argument(
+        "--activation-vertical",
+        type=str,
+        default=None,
+        help="Vertical to use for activation probe (e.g., coding, research).",
+    )
+
     args = parser.parse_args()
 
     if args.iterations < 1:
@@ -264,9 +507,42 @@ def main() -> int:
         create_timing=create_timing,
     )
 
+    # Add activation probe if vertical specified
+    if args.activation_vertical:
+        activation_probe = _measure_activation_probe(
+            python_executable=args.python,
+            vertical=args.activation_vertical,
+            provider=args.provider,
+            model=args.model,
+            timeout_seconds=args.timeout_seconds,
+        )
+        report["activation_probe"] = activation_probe
+
+    # Collect and evaluate thresholds
+    thresholds = _collect_thresholds(args)
+    threshold_failures = _evaluate_threshold_failures(report, thresholds) if thresholds else []
+
+    # Collect and evaluate minimums
+    minimums = _collect_minimums(args)
+    minimum_failures = _evaluate_minimum_failures(report, minimums) if minimums else []
+
+    # Collect and evaluate flag expectations
+    flag_expectations = _collect_flag_expectations(args)
+    flag_failures = _evaluate_flag_expectation_failures(report, flag_expectations) if flag_expectations else []
+
+    # Combine all failures
+    all_failures = threshold_failures + minimum_failures + flag_failures
+
+    # Add failures to report
+    if all_failures:
+        report["threshold_failures"] = all_failures
+
     if args.json:
+        report["thresholds"] = thresholds
+        report["minimums"] = minimums
+        report["flag_expectations"] = flag_expectations
         print(json.dumps(report, indent=2, sort_keys=True))
-        return 0
+        return 2 if all_failures else 0
 
     print("Startup KPI Benchmark")
     print(f"python: {report['python']}")
@@ -282,6 +558,14 @@ def main() -> int:
     print(f"  cold_ms: {report['agent_create']['cold_ms']:.2f}")
     print(f"  warm_mean_ms: {report['agent_create']['warm_mean_ms']:.2f}")
     print(f"  warm_p95_ms: {report['agent_create']['warm_p95_ms']:.2f}")
+
+    if all_failures:
+        print("")
+        print("FAILURES:")
+        for failure in all_failures:
+            print(f"  - {failure}")
+        return 2
+
     return 0
 
 
