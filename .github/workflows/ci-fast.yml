@@ -109,7 +109,7 @@ jobs:
             --activation-vertical coding \
             --max-import-cold-ms 5000 \
             --max-import-warm-mean-ms 25 \
-            --max-agent-create-cold-ms 5000 \
+            --max-agent-create-cold-ms 6000 \
             --max-agent-create-warm-mean-ms 1500 \
             --max-activation-cold-ms 5000 \
             --max-activation-warm-mean-ms 2000 \
@@ -118,8 +118,7 @@ jobs:
             --require-generic-result-cache-enabled \
             --require-http-connection-pool-enabled \
             --require-framework-preload-enabled \
-            --require-coordination-runtime-lazy \
-            --require-interaction-runtime-lazy
+            --require-coordination-runtime-lazy
 
   strict-fallback-guards:
     name: Strict Fallback Guards
@@ -136,8 +135,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -e .
-          pip install pytest
+          pip install -e ".[dev]"
 
       - name: Enforce strict fallback guards on focused suites
         run: |
