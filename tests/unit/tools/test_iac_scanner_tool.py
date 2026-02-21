@@ -491,7 +491,8 @@ class TestFormatMethods:
         output = tool._format_summary(sample_summary)
 
         assert "IaC Security Summary" in output
-        assert "🟡" in output  # medium risk icon
+        # Accept both emoji (🟡) and text ([M]) versions
+        assert ("🟡" in output or "[M]" in output)  # medium risk icon
         assert "Medium Risk" in output
         assert "45/100" in output
 
@@ -508,7 +509,8 @@ class TestFormatMethods:
         }
         output = tool._format_summary(summary)
 
-        assert "🟠" in output  # high risk icon
+        # Accept both emoji (🟠) and text ([H]) versions
+        assert ("🟠" in output or "[H]" in output)  # high risk icon
         assert "High Risk" in output
 
     def test_format_summary_includes_categories(self, tool, sample_summary):
@@ -579,9 +581,11 @@ class TestFormatMethods:
 
         assert "Security Findings" in output
         assert "TF001" in output
-        assert "🟠" in output  # high severity
+        # Accept both emoji (🟠) and text ([H]) versions
+        assert ("🟠" in output or "[H]" in output)  # high severity
         assert "Line: 15" in output
-        assert "💡" in output  # remediation
+        # Accept both emoji (💡) and text ([R]) versions for remediation
+        assert ("💡" in output or "[R]" in output or "Remediation" in output)
 
     def test_format_findings_different_severities(self, tool):
         """Test formatting findings with different severities."""

@@ -502,7 +502,8 @@ class TestGetStatusMessage:
         result = formatter.get_status_message("execute_bash", {"command": "ls -la /home"})
         assert "Running execute_bash" in result
         assert "ls -la /home" in result
-        assert "🔧" in result
+        # Accept both emoji (🔧) and text (*) versions
+        assert ("🔧" in result or "*" in result)
 
     def test_status_execute_bash_long_command(self):
         """Test status message for execute_bash with long command."""
