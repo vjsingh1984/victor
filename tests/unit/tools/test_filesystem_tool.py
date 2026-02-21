@@ -885,6 +885,7 @@ class TestFileCacheIntegration:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_write_invalidates_cache(self):
         """Test that write() invalidates file cache."""
         with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as f:

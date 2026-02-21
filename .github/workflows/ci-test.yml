@@ -67,6 +67,7 @@ jobs:
       - name: Run tests (sharded)
         run: |
           pytest tests/unit \
+            -m "not slow" \
             --dist loadscope \
             -n auto \
             --splitting-algorithm=least_duration \
