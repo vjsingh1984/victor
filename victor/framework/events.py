@@ -33,6 +33,7 @@ class EventType(str, Enum):
     - Lifecycle events: STREAM_START, STREAM_END
     - Error events: ERROR, RECOVERY
     - Progress events: PROGRESS, MILESTONE
+    - Custom events: CUSTOM
     """
 
     # Content events
@@ -76,6 +77,10 @@ class EventType(str, Enum):
 
     MILESTONE = "milestone"
     """Task milestone has been reached."""
+
+    # Custom events
+    CUSTOM = "custom"
+    """User-defined custom event. Use metadata['custom_type'] for sub-typing."""
 
 
 @dataclass
@@ -164,6 +169,11 @@ class AgentExecutionEvent:
     def is_lifecycle_event(self) -> bool:
         """Check if this is a lifecycle event."""
         return self.type in (EventType.STREAM_START, EventType.STREAM_END)
+
+    @property
+    def is_custom_event(self) -> bool:
+        """Check if this is a custom user-defined event."""
+        return self.type == EventType.CUSTOM
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -394,3 +404,28 @@ def milestone_event(milestone: str, **kwargs: Any) -> AgentExecutionEvent:
         AgentExecutionEvent with type=MILESTONE
     """
     return AgentExecutionEvent(type=EventType.MILESTONE, milestone=milestone, **kwargs)
+
+
+def custom_event(
+    custom_type: str,
+    content: str = "",
+    **kwargs: Any,
+) -> AgentExecutionEvent:
+    """Create a custom user-defined event.
+
+    Args:
+        custom_type: Sub-type identifier stored in metadata['custom_type']
+        content: Optional content payload
+        **kwargs: Additional event attributes
+
+    Returns:
+        AgentExecutionEvent with type=CUSTOM
+    """
+    metadata = kwargs.pop("metadata", {})
+    metadata["custom_type"] = custom_type
+    return AgentExecutionEvent(
+        type=EventType.CUSTOM,
+        content=content,
+        metadata=metadata,
+        **kwargs,
+    )

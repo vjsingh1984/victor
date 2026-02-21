@@ -292,16 +292,27 @@ class DebugLogger:
         )
 
     def log_context_size(self, char_count: int, estimated_tokens: int) -> None:
-        """Log context size warning if large."""
+        """Log context size warning if large.
+
+        Thresholds are conservative for older models:
+        - Warning at 150K chars (~37K tokens) - was 100K
+        - Info at 75K chars (~19K tokens) - was 50K
+
+        Modern models (DeepSeek, Claude 3.5+, GPT-4) support much larger contexts,
+        so these thresholds are informational rather than critical.
+        """
         if not self.enabled:
             return
 
-        if char_count > 100000:
+        # Adjusted thresholds for modern models with larger context windows
+        # DeepSeek-V3: 64K tokens, Claude 3.5: 200K tokens, GPT-4: 128K tokens
+        # 150K chars ≈ 37K tokens is still comfortable for most models
+        if char_count > 150000:
             warning_icon = self._presentation.icon("warning", with_color=False)
             self.logger.warning(
                 f"   {warning_icon} Large context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
             )
-        elif char_count > 50000:
+        elif char_count > 75000:
             chart_icon = self._presentation.icon("chart", with_color=False)
             self.logger.info(
                 f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"

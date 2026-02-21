@@ -17,6 +17,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from typing import Dict, Any, List, Optional
+from types import SimpleNamespace
 
 from victor.core.verticals.base import VerticalBase
 from victor.agent.vertical_context import VerticalContext
@@ -105,6 +106,83 @@ class MockVerticalWithTeams(VerticalBase):
         }
 
 
+class MockVerticalWithServiceProvider(VerticalBase):
+    """Mock vertical that exposes a service provider extension only."""
+
+    name = "test_service_vertical"
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        return ["read"]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        return "Test"
+
+    @classmethod
+    def get_extensions(cls) -> Any:
+        service_provider = MagicMock()
+        service_provider.get_required_services.return_value = ["svc1"]
+        service_provider.get_optional_services.return_value = ["svc2"]
+        return SimpleNamespace(
+            service_provider=service_provider,
+            middleware=None,
+            safety_extensions=None,
+            prompt_contributors=None,
+            mode_config_provider=None,
+            tool_dependency_provider=None,
+            enrichment_strategy=None,
+            tool_selection_strategy=None,
+        )
+
+
+class MockVerticalWithCapabilityProvider(VerticalBase):
+    """Mock vertical that provides dynamic capabilities."""
+
+    name = "test_cap_provider_vertical"
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        return ["read"]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        return "Test"
+
+    @classmethod
+    def get_capability_provider(cls) -> Any:
+        cap = SimpleNamespace(
+            name="custom_capability",
+            handler=lambda *_args, **_kwargs: None,
+            capability_type=None,
+            version="1.0",
+        )
+        provider = MagicMock()
+        provider.get_capabilities.return_value = [cap]
+        return provider
+
+
+class MockVerticalWithCapabilityConfigs(VerticalBase):
+    """Mock vertical that exposes centralized capability config defaults."""
+
+    name = "test_cap_config_vertical"
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        return ["read"]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        return "Test"
+
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        return {
+            "source_verification_config": {"min_credibility": 0.8},
+            "citation_config": {"default_style": "apa"},
+        }
+
+
 @pytest.fixture
 def mock_orchestrator():
     """Create a mock orchestrator."""
@@ -138,9 +216,15 @@ def reset_registries():
     """Reset all registries before and after test."""
     from victor.framework.handler_registry import HandlerRegistry
 
-    HandlerRegistry.reset_instance()
+    if hasattr(HandlerRegistry, "reset_instance"):
+        HandlerRegistry.reset_instance()
+    else:
+        HandlerRegistry._instance = None
     yield
-    HandlerRegistry.reset_instance()
+    if hasattr(HandlerRegistry, "reset_instance"):
+        HandlerRegistry.reset_instance()
+    else:
+        HandlerRegistry._instance = None
 
 
 class TestApplyHandlers:
@@ -162,9 +246,11 @@ class TestApplyHandlers:
         )
 
         registry = get_handler_registry()
-        assert registry.has("test_handler")
-        assert registry.has("another_handler")
-        assert registry.get_entry("test_handler").vertical == "test_vertical"
+        assert registry.get_handler("test_vertical", "test_handler") is not None
+        assert registry.get_handler("test_vertical", "another_handler") is not None
+        listed = registry.list_handlers("test_vertical")
+        assert "test_handler" in listed.get("test_vertical", [])
+        assert "another_handler" in listed.get("test_vertical", [])
 
     def test_apply_handlers_adds_info_to_result(
         self, mock_orchestrator, mock_context, mock_result, reset_registries
@@ -297,6 +383,68 @@ class TestApplyWorkflowsWithTriggers:
                 call_args = mock_trigger_registry.register_from_vertical.call_args
                 assert call_args[0][0] == "test_workflow_vertical"
 
+    def test_apply_workflows_uses_framework_registry_service(
+        self, mock_orchestrator, mock_context, mock_result
+    ):
+        """Workflow registration should route through framework registry service."""
+        from victor.framework.step_handlers import FrameworkStepHandler
+
+        handler = FrameworkStepHandler()
+        mock_service = MagicMock()
+
+        with patch(
+            "victor.framework.step_handlers.resolve_framework_integration_registry_service",
+            return_value=mock_service,
+        ):
+            handler.apply_workflows(
+                mock_orchestrator,
+                MockVerticalWithWorkflows,
+                mock_context,
+                mock_result,
+            )
+
+        mock_service.register_workflows.assert_called_once()
+        mock_service.register_workflow_triggers.assert_called_once()
+        wf_kwargs = mock_service.register_workflows.call_args.kwargs
+        trigger_kwargs = mock_service.register_workflow_triggers.call_args.kwargs
+        assert "registration_version" in wf_kwargs
+        assert wf_kwargs["registration_version"] is None
+        assert "registration_version" in trigger_kwargs
+        assert trigger_kwargs["registration_version"] is None
+
+    def test_apply_workflows_passes_vertical_version_to_registry_service(
+        self, mock_orchestrator, mock_context, mock_result
+    ):
+        """Workflow registration should include explicit vertical version token."""
+        from victor.framework.step_handlers import FrameworkStepHandler
+
+        class VersionedWorkflowVertical(MockVerticalWithWorkflows):
+            version = "2.4.0"
+
+        handler = FrameworkStepHandler()
+        mock_service = MagicMock()
+
+        with patch(
+            "victor.framework.step_handlers.resolve_framework_integration_registry_service",
+            return_value=mock_service,
+        ):
+            registration_version = handler._resolve_registration_version(
+                VersionedWorkflowVertical,
+                mock_context,
+            )
+            handler.apply_workflows(
+                mock_orchestrator,
+                VersionedWorkflowVertical,
+                mock_context,
+                mock_result,
+                registration_version=registration_version,
+            )
+
+        wf_kwargs = mock_service.register_workflows.call_args.kwargs
+        trigger_kwargs = mock_service.register_workflow_triggers.call_args.kwargs
+        assert wf_kwargs["registration_version"] == "2.4.0"
+        assert trigger_kwargs["registration_version"] == "2.4.0"
+
 
 class TestApplyTeamSpecsWithRegistry:
     """Tests for team spec registry registration in apply_team_specs."""
@@ -328,3 +476,253 @@ class TestApplyTeamSpecsWithRegistry:
             mock_team_registry.register_from_vertical.assert_called_once()
             call_args = mock_team_registry.register_from_vertical.call_args
             assert call_args[0][0] == "test_team_vertical"
+
+
+class TestServiceProviderRegistrationPorts:
+    """Tests for service-provider registration through public orchestrator ports."""
+
+    def test_extensions_step_handler_uses_activation_helper(self):
+        """Service provider registration should route through activate_vertical_services."""
+        from victor.framework.step_handlers import ExtensionsStepHandler
+
+        handler = ExtensionsStepHandler()
+        orchestrator = MagicMock()
+        container = MagicMock()
+        settings = MagicMock()
+        context = MagicMock(spec=VerticalContext)
+        context.vertical_name = "test_service_vertical"
+        result = MagicMock()
+        result.add_info = MagicMock()
+        result.add_warning = MagicMock()
+
+        orchestrator.get_service_container.return_value = container
+        orchestrator.settings = settings
+
+        activation = SimpleNamespace(services_registered=True)
+        with patch(
+            "victor.core.verticals.vertical_loader.activate_vertical_services",
+            return_value=activation,
+        ) as mock_activate:
+            handler._do_apply(orchestrator, MockVerticalWithServiceProvider, context, result)
+
+        mock_activate.assert_called_once_with(container, settings, "test_service_vertical")
+
+    def test_extensions_step_handler_warns_without_public_container_port(self):
+        """Service provider registration should fail fast without container access port."""
+        from victor.framework.step_handlers import ExtensionsStepHandler
+
+        handler = ExtensionsStepHandler()
+        context = MagicMock(spec=VerticalContext)
+        context.vertical_name = "test_service_vertical"
+        result = MagicMock()
+        result.add_info = MagicMock()
+        result.add_warning = MagicMock()
+
+        class NoContainerOrchestrator:
+            settings = MagicMock()
+
+        handler._do_apply(
+            NoContainerOrchestrator(), MockVerticalWithServiceProvider, context, result
+        )
+        assert result.add_warning.call_count >= 1
+
+
+class TestCapabilityProviderPorts:
+    """Tests for capability provider wiring through loader ports."""
+
+    def test_apply_capability_provider_uses_public_loader_port(self):
+        """FrameworkStepHandler should use get_or_create_capability_loader when available."""
+        from victor.framework.step_handlers import FrameworkStepHandler
+
+        handler = FrameworkStepHandler()
+        orchestrator = MagicMock()
+        loader = MagicMock()
+        context = MagicMock(spec=VerticalContext)
+        result = MagicMock()
+
+        orchestrator.get_or_create_capability_loader.return_value = loader
+
+        handler.apply_capability_provider(
+            orchestrator,
+            MockVerticalWithCapabilityProvider,
+            context,
+            result,
+        )
+
+        loader.register_capability.assert_called_once()
+        loader.apply_to.assert_called_once_with(orchestrator)
+
+    def test_apply_capability_provider_warns_without_loader_port(self):
+        """FrameworkStepHandler should warn if capability-loader port is missing."""
+        from victor.framework.step_handlers import FrameworkStepHandler
+
+        handler = FrameworkStepHandler()
+        context = MagicMock(spec=VerticalContext)
+        result = MagicMock()
+        result.add_warning = MagicMock()
+
+        class NoLoaderPortOrchestrator:
+            pass
+
+        handler.apply_capability_provider(
+            NoLoaderPortOrchestrator(),
+            MockVerticalWithCapabilityProvider,
+            context,
+            result,
+        )
+
+        result.add_warning.assert_any_call(
+            "Cannot wire capability provider: orchestrator lacks capability-loader port"
+        )
+
+
+class TestCapabilityConfigPersistence:
+    """Tests for capability-config persistence in framework service."""
+
+    def test_capability_config_step_persists_to_framework_service(self):
+        """CapabilityConfigStepHandler should persist defaults in CapabilityConfigService."""
+        from victor.framework.capability_config_service import CapabilityConfigService
+        from victor.framework.step_handlers import CapabilityConfigStepHandler
+
+        class StubContainer:
+            def __init__(self) -> None:
+                self._services = {}
+
+            def get_optional(self, service_type):
+                return self._services.get(service_type)
+
+            def register_instance(self, service_type, instance):
+                self._services[service_type] = instance
+
+        class StubOrchestrator:
+            def __init__(self):
+                self._container = StubContainer()
+
+            def get_service_container(self):
+                return self._container
+
+        handler = CapabilityConfigStepHandler()
+        orchestrator = StubOrchestrator()
+        context = MagicMock(spec=VerticalContext)
+        context.apply_capability_configs = MagicMock()
+        result = MagicMock()
+        result.add_info = MagicMock()
+
+        handler._do_apply(orchestrator, MockVerticalWithCapabilityConfigs, context, result)
+
+        service = orchestrator.get_service_container().get_optional(CapabilityConfigService)
+        assert service is not None
+        assert service.get_config("source_verification_config") == {"min_credibility": 0.8}
+        assert service.get_config("citation_config") == {"default_style": "apa"}
+
+    def test_end_to_end_defaults_flow_service_to_runtime_getter(self):
+        """Defaults should flow from step handler into runtime capability getter via service."""
+        from victor.framework.step_handlers import CapabilityConfigStepHandler
+        from victor.research.capabilities import get_source_verification
+
+        class StubContainer:
+            def __init__(self) -> None:
+                self._services = {}
+
+            def get_optional(self, service_type):
+                return self._services.get(service_type)
+
+            def register_instance(self, service_type, instance):
+                self._services[service_type] = instance
+
+        class StubOrchestrator:
+            def __init__(self):
+                self._container = StubContainer()
+
+            def get_service_container(self):
+                return self._container
+
+        handler = CapabilityConfigStepHandler()
+        orchestrator = StubOrchestrator()
+        context = MagicMock(spec=VerticalContext)
+        context.apply_capability_configs = MagicMock()
+        result = MagicMock()
+        result.add_info = MagicMock()
+
+        handler._do_apply(orchestrator, MockVerticalWithCapabilityConfigs, context, result)
+
+        source_verification = get_source_verification(orchestrator)
+        assert source_verification == {"min_credibility": 0.8}
+
+    def test_capability_config_step_persists_by_scope_key(self):
+        """Capability config persistence should isolate writes by orchestrator scope key."""
+        from victor.framework.capability_config_service import CapabilityConfigService
+        from victor.framework.step_handlers import CapabilityConfigStepHandler
+
+        class ScopeA(VerticalBase):
+            name = "scope_a_vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test"
+
+            @classmethod
+            def get_capability_configs(cls):
+                return {"source_verification_config": {"min_credibility": 0.9}}
+
+        class ScopeB(VerticalBase):
+            name = "scope_b_vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test"
+
+            @classmethod
+            def get_capability_configs(cls):
+                return {"source_verification_config": {"min_credibility": 0.6}}
+
+        class StubContainer:
+            def __init__(self, service):
+                self._services = {CapabilityConfigService: service}
+
+            def get_optional(self, service_type):
+                return self._services.get(service_type)
+
+            def register_instance(self, service_type, instance):
+                self._services[service_type] = instance
+
+        class ScopedOrchestrator:
+            def __init__(self, service, scope_key):
+                self._container = StubContainer(service)
+                self._scope_key = scope_key
+
+            def get_service_container(self):
+                return self._container
+
+            def get_capability_config_scope_key(self):
+                return self._scope_key
+
+        service = CapabilityConfigService()
+        handler = CapabilityConfigStepHandler()
+        context = MagicMock(spec=VerticalContext)
+        context.apply_capability_configs = MagicMock()
+        result = MagicMock()
+        result.add_info = MagicMock()
+
+        orchestrator_a = ScopedOrchestrator(service, "session-a")
+        orchestrator_b = ScopedOrchestrator(service, "session-b")
+
+        handler._do_apply(orchestrator_a, ScopeA, context, result)
+        handler._do_apply(orchestrator_b, ScopeB, context, result)
+
+        assert service.get_config(
+            "source_verification_config",
+            scope_key="session-a",
+        ) == {"min_credibility": 0.9}
+        assert service.get_config(
+            "source_verification_config",
+            scope_key="session-b",
+        ) == {"min_credibility": 0.6}

@@ -14,111 +14,123 @@
 
 """Agent module - orchestrator and supporting components."""
 
-from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+import os
 
-# OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
-# Configuration is now loaded via Settings objects and composed by OrchestratorFactory
-from victor.agent.config import UnifiedAgentConfig, AgentMode
-from victor.agent.tool_selection import get_critical_tools
-from victor.agent.message_history import MessageHistory
+_LIGHT_IMPORT = str(os.getenv("VICTOR_LIGHT_IMPORT", "")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
-# OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
-# Observability is now handled by victor.core.events (get_observability_bus)
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.stream_handler import StreamHandler, StreamResult, StreamMetrics, StreamBuffer
-from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
+if not _LIGHT_IMPORT:
+    from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 
-# New decomposed components
-from victor.agent.conversation_controller import (
-    ConversationController,
-    ConversationConfig,
-    ContextMetrics,
-)
-from victor.agent.tool_pipeline import (
-    ToolPipeline,
-    ToolPipelineConfig,
-    ToolCallResult,
-    PipelineExecutionResult,
-)
-from victor.agent.streaming_controller import (
-    StreamingController,
-    StreamingControllerConfig,
-    StreamingSession,
-)
-from victor.agent.task_analyzer import (
-    TaskAnalyzer,
-    TaskAnalysis,
-    get_task_analyzer,
-    reset_task_analyzer,
-)
+    # OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
+    # Configuration is now loaded via Settings objects and composed by OrchestratorFactory
+    from victor.agent.config import UnifiedAgentConfig, AgentMode
+    from victor.agent.tool_selection import get_critical_tools
+    from victor.agent.message_history import MessageHistory
 
-# Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
-from victor.agent.intelligent_pipeline import (
-    IntelligentAgentPipeline,
-    RequestContext,
-    ResponseResult,
-    PipelineStats,
-    get_pipeline,
-    clear_pipeline_cache,
-)
-from victor.agent.orchestrator_integration import (
-    OrchestratorIntegration,
-    IntegrationConfig,
-    IntegrationMetrics,
-    enhance_orchestrator,
-)
+    # OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
+    # Observability is now handled by victor.core.events (get_observability_bus)
+    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.agent.stream_handler import StreamHandler, StreamResult, StreamMetrics, StreamBuffer
+    from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
 
-__all__ = [
-    "AgentOrchestrator",
-    "ArgumentNormalizer",
-    "NormalizationStrategy",
-    # "ConfigLoader",  # OBSOLETE - moved to archive/obsolete/
-    "UnifiedAgentConfig",
-    "AgentMode",
-    "get_critical_tools",
-    # Conversation
-    "MessageHistory",
-    "ConversationController",
-    "ConversationConfig",
-    "ContextMetrics",
-    # Observability (OBSOLETE - use victor.core.events instead)
-    # "TracingProvider",
-    # "Span",
-    # "SpanKind",
-    # "SpanStatus",
-    # "get_observability",
-    # "set_observability",
-    # "traced",
-    # Streaming
-    "StreamHandler",
-    "StreamResult",
-    "StreamMetrics",
-    "StreamBuffer",
-    "StreamingController",
-    "StreamingControllerConfig",
-    "StreamingSession",
-    # Tool execution
-    "ToolExecutor",
-    "ToolExecutionResult",
-    "ToolPipeline",
-    "ToolPipelineConfig",
-    "ToolCallResult",
-    "PipelineExecutionResult",
-    # Task analysis
-    "TaskAnalyzer",
-    "TaskAnalysis",
-    "get_task_analyzer",
-    "reset_task_analyzer",
-    # Intelligent Pipeline
-    "IntelligentAgentPipeline",
-    "RequestContext",
-    "ResponseResult",
-    "PipelineStats",
-    "get_pipeline",
-    "clear_pipeline_cache",
-    # Orchestrator Integration
-    "OrchestratorIntegration",
-    "IntegrationConfig",
-    "IntegrationMetrics",
-    "enhance_orchestrator",
-]
+    # New decomposed components
+    from victor.agent.conversation_controller import (
+        ConversationController,
+        ConversationConfig,
+        ContextMetrics,
+    )
+    from victor.agent.tool_pipeline import (
+        ToolPipeline,
+        ToolPipelineConfig,
+        ToolCallResult,
+        PipelineExecutionResult,
+    )
+    from victor.agent.streaming_controller import (
+        StreamingController,
+        StreamingControllerConfig,
+        StreamingSession,
+    )
+    from victor.agent.task_analyzer import (
+        TaskAnalyzer,
+        TaskAnalysis,
+        get_task_analyzer,
+        reset_task_analyzer,
+    )
+
+    # Intelligent agent components (RL-based learning, quality scoring, prompt optimization)
+    from victor.agent.intelligent_pipeline import (
+        IntelligentAgentPipeline,
+        RequestContext,
+        ResponseResult,
+        PipelineStats,
+        get_pipeline,
+        clear_pipeline_cache,
+    )
+    from victor.agent.orchestrator_integration import (
+        OrchestratorIntegration,
+        IntegrationConfig,
+        IntegrationMetrics,
+        enhance_orchestrator,
+    )
+
+    __all__ = [
+        "AgentOrchestrator",
+        "ArgumentNormalizer",
+        "NormalizationStrategy",
+        # "ConfigLoader",  # OBSOLETE - moved to archive/obsolete/
+        "UnifiedAgentConfig",
+        "AgentMode",
+        "get_critical_tools",
+        # Conversation
+        "MessageHistory",
+        "ConversationController",
+        "ConversationConfig",
+        "ContextMetrics",
+        # Observability (OBSOLETE - use victor.core.events instead)
+        # "TracingProvider",
+        # "Span",
+        # "SpanKind",
+        # "SpanStatus",
+        # "get_observability",
+        # "set_observability",
+        # "traced",
+        # Streaming
+        "StreamHandler",
+        "StreamResult",
+        "StreamMetrics",
+        "StreamBuffer",
+        "StreamingController",
+        "StreamingControllerConfig",
+        "StreamingSession",
+        # Tool execution
+        "ToolExecutor",
+        "ToolExecutionResult",
+        "ToolPipeline",
+        "ToolPipelineConfig",
+        "ToolCallResult",
+        "PipelineExecutionResult",
+        # Task analysis
+        "TaskAnalyzer",
+        "TaskAnalysis",
+        "get_task_analyzer",
+        "reset_task_analyzer",
+        # Intelligent Pipeline
+        "IntelligentAgentPipeline",
+        "RequestContext",
+        "ResponseResult",
+        "PipelineStats",
+        "get_pipeline",
+        "clear_pipeline_cache",
+        # Orchestrator Integration
+        "OrchestratorIntegration",
+        "IntegrationConfig",
+        "IntegrationMetrics",
+        "enhance_orchestrator",
+    ]
+else:
+    __all__ = []

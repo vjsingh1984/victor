@@ -175,23 +175,11 @@ When creating configurations:
 """
 
     @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory("prompt_contributor", "victor.devops.prompts")
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory("mode_config_provider", "victor.devops.mode_config")
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory("safety_extension", "victor.devops.safety")
-
-    @classmethod
     def get_middleware(cls) -> List[MiddlewareProtocol]:
         """Get DevOps-specific middleware.
 
-        Uses framework-level middleware for common functionality:
-        - GitSafetyMiddleware: Block dangerous git operations (force push, hard reset)
+        Uses MiddlewareComposer for consistent middleware composition:
+        - GitSafetyMiddleware: Block dangerous git operations (strict for infrastructure)
         - SecretMaskingMiddleware: Mask secrets in tool results
         - LoggingMiddleware: Audit logging for tool calls
 
@@ -200,125 +188,26 @@ When creating configurations:
         Returns:
             List of middleware implementations
         """
-        from victor.framework.middleware import (
-            GitSafetyMiddleware,
-            LoggingMiddleware,
-            SecretMaskingMiddleware,
-        )
+        from victor.framework.middleware import MiddlewareComposer
 
-        return [
-            # Git safety is critical for DevOps - block dangerous operations
-            GitSafetyMiddleware(
+        return (
+            MiddlewareComposer()
+            .git_safety(
                 block_dangerous=True,  # Strict for infrastructure
                 warn_on_risky=True,
                 protected_branches={"production", "staging"},  # Additional protected branches
-            ),
-            # Always mask secrets in infrastructure output
-            SecretMaskingMiddleware(
+            )
+            .secret_masking(
                 replacement="[REDACTED]",
                 mask_in_arguments=True,  # Also mask secrets in inputs
-            ),
-            # Audit logging for compliance
-            LoggingMiddleware(
+            )
+            .logging(
                 include_arguments=True,
-                sanitize_arguments=True,
-            ),
-        ]
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("devops")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for DevOps."""
-        from victor.core.vertical_types import TieredToolTemplate
-
-        return TieredToolTemplate.for_vertical(cls.name)
+                include_results=True,
+            )
+            .build()
+        )
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
     # =========================================================================
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Get DevOps-specific workflow provider.
-
-        Provides workflows for:
-        - deploy_infrastructure: Infrastructure deployment
-        - container_setup: Docker container configuration
-        - cicd_pipeline: CI/CD pipeline setup
-
-        Returns:
-            DevOpsWorkflowProvider instance
-        """
-        return cls._get_extension_factory("workflow_provider", "victor.devops.workflows")
-
-    @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for DevOps vertical.
-
-        Returns:
-            DevOpsRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        return cls._get_extension_factory(
-            "rl_config_provider", "victor.devops.rl", "DevOpsRLConfig"
-        )
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for DevOps vertical.
-
-        Returns:
-            DevOpsRLHooks instance
-        """
-        return cls._get_extension_factory("rl_hooks", "victor.devops.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for DevOps tasks.
-
-        Provides pre-configured team specifications for:
-        - deployment_team: Infrastructure deployment
-        - container_team: Container management
-        - monitoring_team: Observability setup
-
-        Returns:
-            DevOpsTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor.devops.teams")
-
-    @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Get capability provider for DevOps vertical.
-
-        Provides capabilities for:
-        - deployment_safety: Safe deployment rules
-        - container_settings: Container configuration
-        - infrastructure_settings: IaC settings
-        - cicd_settings: CI/CD pipeline settings
-        - monitoring_settings: Observability configuration
-
-        Returns:
-            DevOpsCapabilityProvider instance (implements BaseCapabilityProvider)
-        """
-        return cls._get_extension_factory("capability_provider", "victor.devops.capabilities")
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for DevOps workflows.
-
-        Returns handlers from victor.devops.handlers for workflow execution.
-        This replaces the previous import-side-effect registration pattern.
-
-        Returns:
-            Dict mapping handler names to handler instances
-        """
-        from victor.devops.handlers import HANDLERS
-
-        return HANDLERS

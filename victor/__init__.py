@@ -40,6 +40,8 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
+import os
+
 try:
     from importlib.metadata import version as _get_version
 
@@ -50,59 +52,72 @@ __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
 
-# Core classes (existing API - for backward compatibility)
-from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
+_LIGHT_IMPORT = str(os.getenv("VICTOR_LIGHT_IMPORT", "")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
-# Framework API (simplified - new golden path)
-from victor.framework import (
-    Agent,
-    AgentConfig,
-    AgentError,
-    AgentExecutionEvent,
-    BudgetExhaustedError,
-    CancellationError,
-    ChatSession,
-    ConfigurationError,
-    EventType,
-    FrameworkTaskType,
-    ProviderError,
-    Stage,
-    State,
-    StateHooks,
-    Task,
-    TaskResult,
-    ToolCategory,
-    ToolError,
-    Tools,
-    ToolSet,
-)
+if not _LIGHT_IMPORT:
+    # Core classes (existing API - for backward compatibility)
+    from victor.agent.orchestrator import AgentOrchestrator
+    from victor.config.settings import Settings
 
-__all__ = [
-    # Framework API (5 core concepts + supporting classes)
-    "Agent",
-    "Task",
-    "Tools",
-    "State",
-    "AgentExecutionEvent",
-    # Supporting classes
-    "ChatSession",
-    "TaskResult",
-    "FrameworkTaskType",
-    "ToolSet",
-    "ToolCategory",
-    "Stage",
-    "StateHooks",
-    "EventType",
-    "AgentConfig",
-    # Errors
-    "AgentError",
-    "ProviderError",
-    "ToolError",
-    "ConfigurationError",
-    "BudgetExhaustedError",
-    "CancellationError",
-    # Core classes (existing API)
-    "AgentOrchestrator",
-    "Settings",
-]
+    # Framework API (simplified - new golden path)
+    from victor.framework import (
+        Agent,
+        AgentConfig,
+        AgentError,
+        AgentExecutionEvent,
+        BudgetExhaustedError,
+        CancellationError,
+        ChatSession,
+        ConfigurationError,
+        EventType,
+        FrameworkTaskType,
+        ProviderError,
+        Stage,
+        State,
+        StateHooks,
+        Task,
+        TaskResult,
+        ToolCategory,
+        ToolError,
+        Tools,
+        ToolSet,
+    )
+
+    __all__ = [
+        # Framework API (5 core concepts + supporting classes)
+        "Agent",
+        "Task",
+        "Tools",
+        "State",
+        "AgentExecutionEvent",
+        # Supporting classes
+        "ChatSession",
+        "TaskResult",
+        "FrameworkTaskType",
+        "ToolSet",
+        "ToolCategory",
+        "Stage",
+        "StateHooks",
+        "EventType",
+        "AgentConfig",
+        # Errors
+        "AgentError",
+        "ProviderError",
+        "ToolError",
+        "ConfigurationError",
+        "BudgetExhaustedError",
+        "CancellationError",
+        # Core classes (existing API)
+        "AgentOrchestrator",
+        "Settings",
+    ]
+else:
+    # Light mode intentionally avoids importing orchestrator/provider stacks.
+    from victor.config.settings import Settings
+
+    __all__ = ["Settings"]

@@ -38,6 +38,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+from victor.framework.capability_config_service import CapabilityConfigService
 from victor.coding.workflows import CodingWorkflowProvider
 from victor.devops.workflows import DevOpsWorkflowProvider
 from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -79,6 +80,29 @@ class MockOrchestrator:
         self.privacy_config: Optional[Dict] = None
 
         self.rag_config: Dict = {}
+
+
+class _StubContainer:
+    """Minimal container stub exposing get_optional for service lookup."""
+
+    def __init__(self, service: CapabilityConfigService):
+        self._service = service
+
+    def get_optional(self, service_type):
+        if isinstance(self._service, service_type):
+            return self._service
+        return None
+
+
+class ServiceBackedOrchestrator(MockOrchestrator):
+    """Mock orchestrator with framework CapabilityConfigService wiring."""
+
+    def __init__(self, service: CapabilityConfigService):
+        super().__init__()
+        self._container = _StubContainer(service)
+
+    def get_service_container(self):
+        return self._container
 
 
 class TestResearchVerticalCapabilities:
@@ -1029,3 +1053,59 @@ class TestCrossVerticalCapabilityIntegration:
         assert "indexing" in rag_meta["retrieval"].dependencies
         # synthesis depends on retrieval
         assert "retrieval" in rag_meta["synthesis"].dependencies
+
+
+class TestServiceBackedCapabilityConfigFlow:
+    """Integration tests for service-backed capability config runtime getters."""
+
+    def test_coding_service_backed_getter_flow(self):
+        from victor.coding.capabilities import configure_code_style, get_code_style
+
+        service = CapabilityConfigService()
+        orchestrator = ServiceBackedOrchestrator(service)
+
+        configure_code_style(orchestrator, formatter="ruff-format", max_line_length=120)
+
+        assert service.get_config("code_style")["formatter"] == "ruff-format"
+        assert get_code_style(orchestrator)["max_line_length"] == 120
+
+    def test_rag_service_backed_getter_flow(self):
+        from victor.rag.capabilities import configure_retrieval, get_retrieval_config
+
+        service = CapabilityConfigService()
+        orchestrator = ServiceBackedOrchestrator(service)
+
+        configure_retrieval(orchestrator, top_k=11, search_type="semantic")
+
+        rag_config = service.get_config("rag_config")
+        assert rag_config["retrieval"]["top_k"] == 11
+        assert get_retrieval_config(orchestrator)["search_type"] == "semantic"
+
+    def test_devops_service_backed_getter_flow(self):
+        from victor.devops.capabilities import configure_container_settings, get_container_settings
+
+        service = CapabilityConfigService()
+        orchestrator = ServiceBackedOrchestrator(service)
+
+        configure_container_settings(orchestrator, runtime="podman", max_image_size_mb=1024)
+
+        assert service.get_config("container_config")["runtime"] == "podman"
+        assert get_container_settings(orchestrator)["max_image_size_mb"] == 1024
+
+    def test_dataanalysis_service_backed_getter_flow(self):
+        from victor.dataanalysis.capabilities import (
+            configure_statistical_analysis,
+            get_statistical_config,
+        )
+
+        service = CapabilityConfigService()
+        orchestrator = ServiceBackedOrchestrator(service)
+
+        configure_statistical_analysis(
+            orchestrator,
+            significance_level=0.01,
+            confidence_interval=0.9,
+        )
+
+        assert service.get_config("statistics_config")["significance_level"] == 0.01
+        assert get_statistical_config(orchestrator)["confidence_interval"] == 0.9

@@ -12,77 +12,112 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handler Registry for explicit compute handler registration.
+"""Handler Registry for workflow compute handlers.
 
-This module provides a centralized registry for workflow compute handlers,
-replacing the previous import-side-effect registration pattern with an
-explicit, testable, and traceable registration mechanism.
+This module provides centralized management for compute handlers across verticals,
+eliminating duplication and providing consistent handler discovery and registration.
 
-Example:
+Design Pattern: Registry + Namespace Isolation
+====================================================
+- Handlers stored by vertical name for namespace isolation
+- Global handlers for cross-vertical functionality
+- Lazy loading of vertical handlers
+- Integration with workflow executor for handler resolution
+
+Phase 1 Gap #2: Handler Registry
+===================================
+This addresses the handler duplication gap identified in the architecture analysis.
+Verticals no longer need to manage HANDLERS dicts directly.
+
+Usage:
+    from victor.framework.handler_registry import get_handler_registry
+
+    # Register handlers from a vertical
     registry = get_handler_registry()
-    registry.register("code_validation", handler, vertical="coding")
+    registry.register_vertical("coding", {
+        "code_validation": CodeValidationHandler(),
+        "test_runner": TestRunnerHandler(),
+    })
 
-    # Get handler
-    handler = registry.get("code_validation")
+    # Get a handler
+    handler = registry.get_handler("coding", "code_validation")
 
-    # List handlers by vertical
-    coding_handlers = registry.list_by_vertical("coding")
-
-    # Sync with executor's global handlers
-    registry.sync_with_executor()
-
-    # Auto-discover handlers from a vertical
-    count = registry.discover_from_vertical("coding")
+    # List all handlers
+    all_handlers = registry.list_handlers()
 """
 
-import importlib
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Handler Metadata
+# =============================================================================
+
+
 @dataclass
-class HandlerEntry:
+class HandlerSpec:
     """Metadata for a registered handler.
 
     Attributes:
-        name: Handler name (e.g., "code_validation")
-        handler: The handler instance or callable
-        vertical: Optional vertical that owns this handler
-        description: Optional human-readable description
+        name: Handler name (unique within vertical)
+        description: What this handler does
+        category: Handler category (validation, execution, analysis, etc.)
+        handler_class: The handler class (for inspection)
+        version: Handler version string
     """
 
     name: str
-    handler: Any
-    vertical: Optional[str] = None
-    description: Optional[str] = None
+    description: str
+    category: str
+    handler_class: type
+    version: str = "1.0"
+
+    def __post_init__(self) -> None:
+        """Validate handler spec."""
+        if not self.name:
+            raise ValueError("Handler name cannot be empty")
+        if not self.category:
+            raise ValueError("Handler category cannot be empty")
+
+
+# =============================================================================
+# Handler Registry
+# =============================================================================
 
 
 class HandlerRegistry:
-    """Registry for compute handlers with explicit registration.
+    """Centralized registry for compute handlers from verticals.
 
-    Provides a centralized, singleton registry for workflow compute handlers.
-    Supports vertical namespacing, handler discovery, and replacement.
+    Provides namespace isolation between verticals while supporting
+    global handlers for cross-cutting concerns.
 
-    Thread Safety:
-        This implementation is NOT thread-safe. For concurrent access,
-        use external synchronization or a thread-safe variant.
+    Attributes:
+        _vertical_handlers: Handlers stored by vertical name
+        _global_handlers: Global handlers accessible to all verticals
+        _specs: Handler metadata by vertical:handler
     """
 
     _instance: Optional["HandlerRegistry"] = None
 
     def __init__(self) -> None:
-        """Initialize empty handler registry."""
-        self._handlers: Dict[str, HandlerEntry] = {}
+        """Initialize the handler registry."""
+        self._vertical_handlers: Dict[str, Dict[str, Any]] = {}
+        self._global_handlers: Dict[str, Any] = {}
+        self._specs: Dict[str, HandlerSpec] = {}
+        logger.debug("HandlerRegistry initialized")
 
     @classmethod
     def get_instance(cls) -> "HandlerRegistry":
         """Get singleton instance of the registry.
 
         Returns:
-            The global HandlerRegistry instance
+            HandlerRegistry singleton instance
         """
         if cls._instance is None:
             cls._instance = cls()
@@ -90,379 +125,232 @@ class HandlerRegistry:
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset singleton instance (for testing)."""
-        cls._instance = None
+        """Reset the singleton instance (primarily for testing).
 
-    def register(
+        This clears all registered handlers and creates a fresh instance
+        on the next call to get_instance().
+        """
+        cls._instance = None
+        logger.debug("HandlerRegistry instance reset")
+
+    def register_vertical(
         self,
-        name: str,
-        handler: Any,
-        vertical: Optional[str] = None,
-        description: Optional[str] = None,
-        replace: bool = False,
+        vertical_name: str,
+        handlers: Dict[str, Any],
+        category: str = "general",
+        description: str = "",
     ) -> None:
-        """Register a handler.
+        """Register all handlers from a vertical.
 
         Args:
-            name: Handler name (should be unique)
-            handler: Handler instance or callable
-            vertical: Optional vertical namespace
-            description: Optional description
-            replace: If True, replace existing handler
-
-        Raises:
-            ValueError: If handler already exists and replace is False
+            vertical_name: Name of the vertical (e.g., "coding", "research")
+            handlers: Dict mapping handler names to handler instances
+            category: Default category for these handlers
+            description: Optional description for the vertical's handlers
         """
-        if name in self._handlers and not replace:
-            raise ValueError(
-                f"Handler '{name}' already registered. " f"Use replace=True to override."
+        if not vertical_name:
+            raise ValueError("vertical_name cannot be empty")
+
+        for handler_name, handler_instance in handlers.items():
+            # Create spec
+            spec = HandlerSpec(
+                name=handler_name,
+                description=description or f"{vertical_name} handler",
+                category=category,
+                handler_class=type(handler_instance),
             )
 
-        self._handlers[name] = HandlerEntry(
-            name=name,
-            handler=handler,
-            vertical=vertical,
-            description=description,
-        )
-        logger.debug(f"Registered handler: {name} (vertical={vertical})")
+            # Store handler and spec
+            key = f"{vertical_name}.{handler_name}"
+            self._specs[key] = spec
 
-    def unregister(self, name: str) -> bool:
-        """Remove a handler from the registry.
+            # Store in vertical namespace
+            if vertical_name not in self._vertical_handlers:
+                self._vertical_handlers[vertical_name] = {}
+            self._vertical_handlers[vertical_name][handler_name] = handler_instance
+
+        logger.debug(f"Registered {len(handlers)} handlers from vertical '{vertical_name}'")
+
+    def register_global(self, name: str, handler: Any, category: str = "global") -> None:
+        """Register a global handler accessible to all verticals.
 
         Args:
-            name: Handler name to remove
-
-        Returns:
-            True if handler was removed, False if not found
+            name: Global handler name
+            handler: Handler instance
+            category: Handler category
         """
-        if name in self._handlers:
-            del self._handlers[name]
-            logger.debug(f"Unregistered handler: {name}")
-            return True
-        return False
+        if not name:
+            raise ValueError("Global handler name cannot be empty")
 
-    def get(self, name: str) -> Optional[Any]:
-        """Get handler by name.
+        spec = HandlerSpec(
+            name=name,
+            description=f"Global handler: {name}",
+            category=category,
+            handler_class=type(handler),
+        )
+
+        self._global_handlers[name] = handler
+        self._specs[f"global.{name}"] = spec
+        logger.debug(f"Registered global handler: {name}")
+
+    def get_handler(self, vertical_name: str, handler_name: str) -> Optional[Any]:
+        """Get a handler by vertical and name.
 
         Args:
-            name: Handler name
+            vertical_name: Name of the vertical
+            handler_name: Name of the handler within the vertical
 
         Returns:
             Handler instance or None if not found
         """
-        entry = self._handlers.get(name)
-        return entry.handler if entry else None
+        # Check vertical-specific handlers first
+        if vertical_name in self._vertical_handlers:
+            handler = self._vertical_handlers[vertical_name].get(handler_name)
+            if handler:
+                return handler
 
-    def get_entry(self, name: str) -> Optional[HandlerEntry]:
-        """Get full handler entry with metadata.
+        # Fall back to global handlers
+        return self._global_handlers.get(handler_name)
 
-        Args:
-            name: Handler name
-
-        Returns:
-            HandlerEntry or None if not found
-        """
-        return self._handlers.get(name)
-
-    def has(self, name: str) -> bool:
-        """Check if handler exists.
-
-        Args:
-            name: Handler name
-
-        Returns:
-            True if handler is registered
-        """
-        return name in self._handlers
-
-    def list_handlers(self) -> List[str]:
-        """List all registered handler names.
-
-        Returns:
-            List of handler names
-        """
-        return list(self._handlers.keys())
-
-    def list_entries(self) -> List[HandlerEntry]:
-        """List all handler entries with metadata.
-
-        Returns:
-            List of HandlerEntry objects
-        """
-        return list(self._handlers.values())
-
-    def list_by_vertical(self, vertical: str) -> List[str]:
-        """List handlers for a specific vertical.
-
-        Args:
-            vertical: Vertical name
-
-        Returns:
-            List of handler names for that vertical
-        """
-        return [name for name, entry in self._handlers.items() if entry.vertical == vertical]
-
-    def clear(self) -> None:
-        """Clear all handlers from the registry."""
-        self._handlers.clear()
-        logger.debug("Cleared handler registry")
-
-    def register_from_vertical(
-        self,
-        vertical_name: str,
-        handlers: Dict[str, Any],
-        replace: bool = False,
-    ) -> int:
-        """Bulk register handlers from a vertical.
+    def get_vertical_handlers(self, vertical_name: str) -> Dict[str, Any]:
+        """Get all handlers for a specific vertical.
 
         Args:
             vertical_name: Name of the vertical
-            handlers: Dict of name -> handler mappings
-            replace: If True, replace existing handlers
 
         Returns:
-            Number of handlers registered
+            Dict mapping handler names to handler instances
         """
-        count = 0
-        for name, handler in handlers.items():
-            self.register(
-                name=name,
-                handler=handler,
-                vertical=vertical_name,
-                replace=replace,
-            )
-            count += 1
-        return count
+        return self._vertical_handlers.get(vertical_name, {}).copy()
 
-    def sync_with_executor(
-        self,
-        *,
-        direction: str = "bidirectional",
-        replace: bool = False,
-    ) -> Tuple[int, int]:
-        """Bridge to workflows/executor.py global handler dict.
-
-        Synchronizes handlers between this registry and the executor's
-        global _compute_handlers dictionary. This enables handlers
-        registered via either mechanism to be available everywhere.
+    def list_handlers(self, vertical_name: Optional[str] = None) -> Dict[str, List[str]]:
+        """List available handlers.
 
         Args:
-            direction: Sync direction:
-                - "to_executor": Push registry handlers to executor
-                - "from_executor": Pull executor handlers to registry
-                - "bidirectional": Both directions (default)
-            replace: If True, replace existing handlers during sync
+            vertical_name: Optional vertical name to filter by
 
         Returns:
-            Tuple of (handlers_pushed, handlers_pulled)
-
-        Example:
-            registry = get_handler_registry()
-            registry.register("my_handler", handler, vertical="coding")
-
-            # Sync to make handler available in executor
-            pushed, pulled = registry.sync_with_executor()
+            Dict mapping vertical names to lists of handler names
         """
-        from victor.workflows.executor import (
-            _compute_handlers,
-            register_compute_handler,
-            get_compute_handler,
-        )
+        if vertical_name:
+            return {vertical_name: list(self._vertical_handlers.get(vertical_name, {}).keys())}
 
-        pushed = 0
-        pulled = 0
+        return {
+            vertical: list(handlers.keys())
+            for vertical, handlers in self._vertical_handlers.items()
+        }
 
-        # Push registry handlers to executor
-        if direction in ("to_executor", "bidirectional"):
-            for name, entry in self._handlers.items():
-                existing = get_compute_handler(name)
-                if existing is None or replace:
-                    register_compute_handler(name, entry.handler)
-                    pushed += 1
-                    logger.debug(f"Pushed handler to executor: {name}")
-
-        # Pull executor handlers to registry
-        if direction in ("from_executor", "bidirectional"):
-            for name, handler in _compute_handlers.items():
-                if not self.has(name) or replace:
-                    # We don't know the vertical for executor handlers
-                    self.register(name, handler, vertical=None, replace=replace)
-                    pulled += 1
-                    logger.debug(f"Pulled handler from executor: {name}")
-
-        logger.debug(f"Sync complete: pushed={pushed}, pulled={pulled}")
-        return (pushed, pulled)
-
-    def discover_from_vertical(
-        self,
-        vertical_name: str,
-        *,
-        replace: bool = False,
-        sync_to_executor: bool = True,
-    ) -> int:
-        """Auto-discover and register handlers from a vertical module.
-
-        Attempts to import victor.{vertical_name}.handlers and register
-        all handlers from its HANDLERS dictionary.
+    def list_specs(self, category: Optional[str] = None) -> List[HandlerSpec]:
+        """List handler specifications.
 
         Args:
-            vertical_name: Name of the vertical (e.g., "coding", "research")
-            replace: If True, replace existing handlers
-            sync_to_executor: If True, sync new handlers to executor
+            category: Optional category filter
 
         Returns:
-            Number of handlers registered
-
-        Raises:
-            ImportError: If the handlers module cannot be imported
-
-        Example:
-            registry = get_handler_registry()
-
-            # Discover and register handlers from coding vertical
-            count = registry.discover_from_vertical("coding")
-            print(f"Registered {count} handlers")
+            List of HandlerSpec objects
         """
-        module_path = f"victor.{vertical_name}.handlers"
+        specs = list(self._specs.values())
+        if category:
+            specs = [s for s in specs if s.category == category]
+        return specs
 
-        try:
-            module = importlib.import_module(module_path)
-        except ImportError as e:
-            logger.warning(f"Could not import handlers from {module_path}: {e}")
-            raise
+    def get_spec(self, vertical_name: str, handler_name: str) -> Optional[HandlerSpec]:
+        """Get handler specification.
 
-        handlers_dict = getattr(module, "HANDLERS", None)
-        if handlers_dict is None:
-            logger.warning(f"No HANDLERS dict found in {module_path}")
-            return 0
-
-        count = self.register_from_vertical(
-            vertical_name=vertical_name,
-            handlers=handlers_dict,
-            replace=replace,
-        )
-
-        # Optionally sync to executor
-        if sync_to_executor and count > 0:
-            self.sync_with_executor(direction="to_executor", replace=replace)
-
-        logger.info(f"Discovered {count} handlers from {module_path}")
-        return count
-
-    def list_verticals(self) -> List[str]:
-        """List all verticals with registered handlers.
+        Args:
+            vertical_name: Name of the vertical
+            handler_name: Name of the handler
 
         Returns:
-            List of unique vertical names
+            HandlerSpec or None if not found
         """
-        verticals = set()
-        for entry in self._handlers.values():
-            if entry.vertical:
-                verticals.add(entry.vertical)
-        return list(verticals)
+        key = f"{vertical_name}.{handler_name}"
+        return self._specs.get(key)
+
+    def clear_vertical(self, vertical_name: str) -> None:
+        """Clear all handlers for a vertical.
+
+        Args:
+            vertical_name: Name of the vertical to clear
+        """
+        if vertical_name in self._vertical_handlers:
+            # Remove specs
+            for handler_name in self._vertical_handlers[vertical_name]:
+                key = f"{vertical_name}.{handler_name}"
+                self._specs.pop(key, None)
+
+            # Remove handlers
+            del self._vertical_handlers[vertical_name]
+            logger.debug(f"Cleared handlers for vertical: {vertical_name}")
+
+    def clear_global(self, name: str) -> None:
+        """Clear a global handler.
+
+        Args:
+            name: Name of the global handler to clear
+        """
+        if name in self._global_handlers:
+            self._specs.pop(f"global.{name}", None)
+            del self._global_handlers[name]
+            logger.debug(f"Cleared global handler: {name}")
 
 
-# Module-level convenience functions
+# =============================================================================
+# Convenience Functions
+# =============================================================================
+
+
 def get_handler_registry() -> HandlerRegistry:
-    """Get the global handler registry singleton.
+    """Get the singleton HandlerRegistry instance.
 
     Returns:
-        HandlerRegistry instance
+        HandlerRegistry singleton
     """
     return HandlerRegistry.get_instance()
 
 
-def register_handler(
-    name: str,
-    handler: Any,
-    vertical: Optional[str] = None,
-    description: Optional[str] = None,
-    replace: bool = False,
-) -> None:
-    """Register a handler with the global registry.
-
-    Convenience function for `get_handler_registry().register(...)`.
-
-    Args:
-        name: Handler name
-        handler: Handler instance
-        vertical: Optional vertical namespace
-        description: Optional description
-        replace: If True, replace existing
-    """
-    get_handler_registry().register(
-        name=name,
-        handler=handler,
-        vertical=vertical,
-        description=description,
-        replace=replace,
-    )
-
-
-def get_handler(name: str) -> Optional[Any]:
-    """Get a handler from the global registry.
-
-    Convenience function for `get_handler_registry().get(...)`.
-
-    Args:
-        name: Handler name
-
-    Returns:
-        Handler instance or None
-    """
-    return get_handler_registry().get(name)
-
-
-def sync_handlers_with_executor(
-    *,
-    direction: str = "bidirectional",
-    replace: bool = False,
-) -> Tuple[int, int]:
-    """Sync global handler registry with executor.
-
-    Convenience function for `get_handler_registry().sync_with_executor(...)`.
-
-    Args:
-        direction: Sync direction ("to_executor", "from_executor", "bidirectional")
-        replace: If True, replace existing handlers
-
-    Returns:
-        Tuple of (handlers_pushed, handlers_pulled)
-    """
-    return get_handler_registry().sync_with_executor(direction=direction, replace=replace)
-
-
-def discover_handlers_from_vertical(
+def register_vertical_handlers(
     vertical_name: str,
-    *,
-    replace: bool = False,
-    sync_to_executor: bool = True,
-) -> int:
-    """Discover and register handlers from a vertical.
+    handlers: Dict[str, Any],
+    category: str = "general",
+    description: str = "",
+) -> None:
+    """Register handlers from a vertical with the registry.
 
-    Convenience function for `get_handler_registry().discover_from_vertical(...)`.
+    Convenience function for registering vertical handlers.
 
     Args:
         vertical_name: Name of the vertical
-        replace: If True, replace existing handlers
-        sync_to_executor: If True, sync to executor after discovery
-
-    Returns:
-        Number of handlers registered
+        handlers: Dict of handler name to handler instance
+        category: Default category for handlers
+        description: Optional description
     """
-    return get_handler_registry().discover_from_vertical(
-        vertical_name=vertical_name,
-        replace=replace,
-        sync_to_executor=sync_to_executor,
-    )
+    registry = get_handler_registry()
+    registry.register_vertical(vertical_name, handlers, category, description)
+
+
+def register_global_handler(
+    name: str,
+    handler: Any,
+    category: str = "global",
+) -> None:
+    """Register a global handler.
+
+    Convenience function for registering global handlers.
+
+    Args:
+        name: Global handler name
+        handler: Handler instance
+        category: Handler category
+    """
+    registry = get_handler_registry()
+    registry.register_global(name, handler, category)
 
 
 __all__ = [
-    "HandlerEntry",
+    "HandlerSpec",
     "HandlerRegistry",
     "get_handler_registry",
-    "register_handler",
-    "get_handler",
-    "sync_handlers_with_executor",
-    "discover_handlers_from_vertical",
+    "register_vertical_handlers",
+    "register_global_handler",
 ]

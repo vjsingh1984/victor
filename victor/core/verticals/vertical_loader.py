@@ -46,6 +46,7 @@ import asyncio
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from victor.core.events.emit_helper import emit_event_sync
@@ -58,6 +59,16 @@ if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class VerticalActivationResult:
+    """Result of activating a vertical and registering its services."""
+
+    vertical_name: str
+    previous_vertical: Optional[str]
+    activated: bool
+    services_registered: bool
 
 
 class VerticalLoader:
@@ -573,22 +584,26 @@ class VerticalLoader:
         self,
         container: "ServiceContainer",
         settings: "Settings",
-    ) -> None:
+    ) -> bool:
         """Register vertical-specific services with DI container.
 
         Args:
             container: DI container
             settings: Application settings
+
+        Returns:
+            True if services were newly registered, False if already registered
+            or unavailable for this vertical.
         """
         with self._lock:
             if self._registered_services:
                 logger.debug("Vertical services already registered")
-                return
+                return False
 
             extensions = self.get_extensions()
             if extensions is None or extensions.service_provider is None:
                 logger.debug("No service provider for active vertical")
-                return
+                return False
 
             try:
                 extensions.service_provider.register_services(container, settings)
@@ -597,8 +612,10 @@ class VerticalLoader:
                     "Registered services for vertical: %s",
                     self.active_vertical_name,
                 )
+                return True
             except Exception as e:
                 logger.error("Failed to register vertical services: %s", e)
+                return False
 
     def get_config(self):
         """Get configuration from active vertical.
@@ -712,6 +729,40 @@ def get_vertical_extensions() -> Optional["VerticalExtensions"]:
     return get_vertical_loader().get_extensions()
 
 
+def activate_vertical_services(
+    container: "ServiceContainer",
+    settings: "Settings",
+    vertical_name: str,
+) -> VerticalActivationResult:
+    """Activate a vertical and ensure its services are registered.
+
+    This is the canonical activation path used by bootstrap and framework
+    step handlers to avoid diverging registration behavior.
+
+    Args:
+        container: DI container.
+        settings: Application settings.
+        vertical_name: Vertical name to activate.
+
+    Returns:
+        Activation result with activation and service registration details.
+    """
+    loader = get_vertical_loader()
+    previous_vertical = loader.active_vertical_name
+    activated = previous_vertical != vertical_name or loader.active_vertical is None
+
+    if activated:
+        loader.load(vertical_name)
+
+    services_registered = loader.register_services(container, settings)
+    return VerticalActivationResult(
+        vertical_name=vertical_name,
+        previous_vertical=previous_vertical,
+        activated=activated,
+        services_registered=services_registered,
+    )
+
+
 def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
     """Discover vertical plugins from entry points (convenience function).
 
@@ -753,7 +804,9 @@ async def discover_tool_plugins_async() -> Dict[str, Type]:
 
 
 __all__ = [
+    "VerticalActivationResult",
     "VerticalLoader",
+    "activate_vertical_services",
     "get_vertical_loader",
     "load_vertical",
     "get_active_vertical",

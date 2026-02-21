@@ -103,50 +103,44 @@ class TestToolSetContainsCache:
         # Web tools should not be in default
         assert "web_search" not in ts
 
-    def test_cache_is_built_on_first_access(self):
-        """Cache is built on first __contains__ call."""
+    def test_cache_is_built_on_creation(self):
+        """Cache is built at creation time (eager resolution)."""
         ts = ToolSet.from_tools(["read", "write", "bash"])
-        # Cache should be None initially
-        assert ts._resolved_names_cache is None
-
-        # First access builds cache
-        _ = "read" in ts
+        # Cache should be pre-populated after __post_init__
         assert ts._resolved_names_cache is not None
         assert ts._resolved_names_cache == {"read", "write", "bash"}
 
-    def test_cached_contains_is_faster(self):
-        """Cached __contains__ is significantly faster than uncached."""
-        # Create a ToolSet with many categories to make uncached slower
+        # __contains__ uses the pre-built cache
+        assert "read" in ts
+        assert "write" in ts
+        assert "bash" in ts
+
+    def test_cached_contains_is_fast(self):
+        """__contains__ is fast (O(1) set lookup) with eager caching."""
+        # Create a ToolSet with many categories
         ts = ToolSet.full()
 
-        # First call builds cache
-        start = time.perf_counter()
-        _ = "read" in ts
-        first_call = time.perf_counter() - start
+        # Cache is pre-built at creation, so all calls are O(1)
+        # Just verify it works correctly
+        assert "read" in ts
+        assert "write" in ts
 
-        # Warm up the cache completely
-        for _ in range(10):
-            _ = "read" in ts
-
-        # Measure 1000 cached calls
+        # Measure 1000 calls to verify consistent O(1) performance
         start = time.perf_counter()
         for _ in range(1000):
             _ = "read" in ts
         cached_total = time.perf_counter() - start
         cached_avg = cached_total / 1000
 
-        # Cached should be significantly faster per call
-        # First call does category expansion, cached is O(1) set lookup
-        assert cached_avg < first_call, (
-            f"Cached avg ({cached_avg:.6f}s) should be faster than "
-            f"first call ({first_call:.6f}s)"
-        )
+        # Each call should be very fast (< 1 microsecond typically)
+        assert (
+            cached_avg < 0.0001
+        ), f"Average time ({cached_avg:.8f}s) should be fast for O(1) lookup"
 
     def test_invalidate_cache(self):
         """invalidate_cache() clears the cache."""
         ts = ToolSet.from_tools(["read", "write"])
-        # Build cache
-        _ = "read" in ts
+        # Cache is pre-built at creation
         assert ts._resolved_names_cache is not None
 
         # Invalidate
@@ -160,41 +154,34 @@ class TestToolSetContainsCache:
     def test_new_toolset_has_independent_cache(self):
         """New ToolSet from include/exclude has independent cache."""
         ts1 = ToolSet.from_tools(["read", "write"])
-        _ = "read" in ts1  # Build cache
+        # Cache is pre-built
+        assert ts1._resolved_names_cache is not None
 
         ts2 = ts1.include("custom")
-        # ts2 should have its own cache (starts as None since it's a new instance)
-        # Note: include() creates a new ToolSet, so cache doesn't carry over
-        assert ts2._resolved_names_cache is None
-
-        _ = "custom" in ts2
+        # ts2 should have its own pre-built cache (eager resolution)
+        assert ts2._resolved_names_cache is not None
         assert "custom" in ts2._resolved_names_cache
         assert "read" in ts2._resolved_names_cache
 
-    def test_toolset_contains_performance_benchmark(self):
-        """Verify __contains__ is O(1) after first access."""
+        # Caches are independent
+        assert ts1._resolved_names_cache is not ts2._resolved_names_cache
+
+    def test_toolset_contains_performance(self):
+        """Verify __contains__ is O(1) with eager caching."""
         tool_set = ToolSet(
             tools={"read", "write", "bash"},
             categories={ToolCategory.FILESYSTEM.value, ToolCategory.GIT.value},
         )
 
-        # First call (builds cache)
-        start = time.perf_counter()
-        _ = "read" in tool_set
-        first_call = time.perf_counter() - start
-
-        # Subsequent calls (cached)
+        # Cache is pre-built at creation, so all calls are O(1)
+        # Measure 1000 calls
         start = time.perf_counter()
         for _ in range(1000):
             _ = "read" in tool_set
-        cached_calls = (time.perf_counter() - start) / 1000
+        avg_time = (time.perf_counter() - start) / 1000
 
-        # Cached should be significantly faster (at least 10x)
-        # This verifies we're doing O(1) set lookup, not O(n) category expansion
-        assert cached_calls < first_call / 5, (
-            f"Cached ({cached_calls:.8f}s) should be at least 5x faster "
-            f"than first call ({first_call:.8f}s)"
-        )
+        # Should be very fast for O(1) set lookup
+        assert avg_time < 0.0001, f"Average time ({avg_time:.8f}s) indicates O(1) lookup"
 
 
 class TestToolSetExclusions:

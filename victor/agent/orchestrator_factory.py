@@ -1491,6 +1491,37 @@ class OrchestratorFactory(ModeAwareMixin):
             max_content_length=getattr(self.settings, "max_content_length", 5000),
             batch_concurrency=getattr(self.settings, "batch_concurrency", 5),
             batch_max_files=getattr(self.settings, "batch_max_files", 100),
+            generic_result_cache_enabled=getattr(
+                self.settings,
+                "generic_result_cache_enabled",
+                False,
+            ),
+            generic_result_cache_ttl=getattr(self.settings, "generic_result_cache_ttl", 300),
+            http_connection_pool_enabled=getattr(
+                self.settings,
+                "http_connection_pool_enabled",
+                False,
+            ),
+            http_connection_pool_max_connections=getattr(
+                self.settings,
+                "http_connection_pool_max_connections",
+                100,
+            ),
+            http_connection_pool_max_connections_per_host=getattr(
+                self.settings,
+                "http_connection_pool_max_connections_per_host",
+                10,
+            ),
+            http_connection_pool_connection_timeout=getattr(
+                self.settings,
+                "http_connection_pool_connection_timeout",
+                30,
+            ),
+            http_connection_pool_total_timeout=getattr(
+                self.settings,
+                "http_connection_pool_total_timeout",
+                60,
+            ),
         )
         executor.update_context(tool_config=tool_config)
 
@@ -2527,7 +2558,7 @@ class OrchestratorFactory(ModeAwareMixin):
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
-                from victor.framework.tools import configure_tools
+                from victor.framework._internal import configure_tools
 
                 configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
 

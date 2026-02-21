@@ -14,12 +14,167 @@
 
 """Provider registry for managing and discovering LLM providers."""
 
-from typing import Any, Dict, List, Optional, Type
+import importlib
+import os
+import platform
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from victor.core.registry import BaseRegistry
 from victor.providers.base import BaseProvider, ProviderNotFoundError
 
 __all__ = ["ProviderRegistry", "ProviderNotFoundError"]
+
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FALSE_VALUES = {"0", "false", "no", "off"}
+
+
+@dataclass(frozen=True)
+class _LazyProviderSpec:
+    """Deferred provider import specification."""
+
+    module_path: str
+    class_name: str
+    preflight: Optional[Callable[[str], Optional[str]]] = None
+
+
+_lazy_provider_specs: Dict[str, _LazyProviderSpec] = {}
+_mlx_preflight_result: Optional[Tuple[bool, str]] = None
+
+
+def _env_flag(name: str) -> Optional[bool]:
+    """Parse a boolean-like environment variable."""
+    value = os.getenv(name)
+    if value is None:
+        return None
+    lowered = value.strip().lower()
+    if lowered in _TRUE_VALUES:
+        return True
+    if lowered in _FALSE_VALUES:
+        return False
+    return None
+
+
+def _register_lazy_provider(
+    aliases: List[str],
+    *,
+    module_path: str,
+    class_name: str,
+    preflight: Optional[Callable[[str], Optional[str]]] = None,
+) -> None:
+    """Register aliases that should be materialized on first use."""
+    spec = _LazyProviderSpec(module_path=module_path, class_name=class_name, preflight=preflight)
+    for alias in aliases:
+        _lazy_provider_specs[alias] = spec
+
+
+def _run_mlx_preflight() -> Tuple[bool, str]:
+    """Verify MLX runtime readiness in a subprocess to avoid crashing main process."""
+    global _mlx_preflight_result
+    if _mlx_preflight_result is not None:
+        return _mlx_preflight_result
+
+    if _env_flag("VICTOR_ENABLE_MLX_PROVIDER") is False:
+        _mlx_preflight_result = (
+            False,
+            "disabled by VICTOR_ENABLE_MLX_PROVIDER=0.",
+        )
+        return _mlx_preflight_result
+
+    if sys.platform != "darwin":
+        _mlx_preflight_result = (
+            False,
+            "requires macOS/Metal runtime.",
+        )
+        return _mlx_preflight_result
+
+    if platform.machine().lower() != "arm64":
+        _mlx_preflight_result = (
+            False,
+            "requires Apple Silicon (arm64).",
+        )
+        return _mlx_preflight_result
+
+    if _env_flag("VICTOR_MLX_SKIP_PREFLIGHT") is True:
+        _mlx_preflight_result = (True, "")
+        return _mlx_preflight_result
+
+    check_cmd = [
+        sys.executable,
+        "-c",
+        "import mlx_lm\nimport mlx.core as mx\nprint(mx.default_device())",
+    ]
+    try:
+        result = subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except Exception as exc:
+        _mlx_preflight_result = (
+            False,
+            f"failed to run MLX runtime preflight ({exc}).",
+        )
+        return _mlx_preflight_result
+
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout or "").strip().splitlines()
+        tail = details[-1] if details else "unknown MLX runtime error"
+        _mlx_preflight_result = (
+            False,
+            f"MLX runtime preflight failed ({tail}).",
+        )
+        return _mlx_preflight_result
+
+    _mlx_preflight_result = (True, "")
+    return _mlx_preflight_result
+
+
+def _mlx_preflight(provider_name: str) -> Optional[str]:
+    """Preflight gate for MLX provider aliases."""
+    ok, reason = _run_mlx_preflight()
+    if ok:
+        return None
+    return (
+        f"Provider '{provider_name}' is unavailable: {reason} "
+        "Set VICTOR_MLX_SKIP_PREFLIGHT=1 to bypass this safety check."
+    )
+
+
+def _materialize_lazy_provider(name: str) -> Optional[Type[BaseProvider]]:
+    """Import and register a lazily-declared provider."""
+    spec = _lazy_provider_specs.get(name)
+    if spec is None:
+        return None
+
+    if spec.preflight:
+        preflight_error = spec.preflight(name)
+        if preflight_error:
+            raise ProviderNotFoundError(message=preflight_error, provider=name)
+
+    try:
+        module = importlib.import_module(spec.module_path)
+        provider_class = getattr(module, spec.class_name)
+    except Exception as exc:
+        raise ProviderNotFoundError(
+            message=(
+                f"Provider '{name}' failed to load from "
+                f"{spec.module_path}.{spec.class_name}: {exc}"
+            ),
+            provider=name,
+        ) from exc
+
+    for alias, alias_spec in list(_lazy_provider_specs.items()):
+        if alias_spec == spec:
+            _registry_instance.register(alias, provider_class)
+            del _lazy_provider_specs[alias]
+
+    return provider_class
 
 
 class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
@@ -44,8 +199,11 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
         """
         provider = self.get(name)
         if provider is None:
+            provider = _materialize_lazy_provider(name)
+        if provider is None:
+            available = sorted(set(self.list_all()) | set(_lazy_provider_specs.keys()))
             raise ProviderNotFoundError(
-                message=f"Provider '{name}' not found. Available: {', '.join(self.list_all())}",
+                message=f"Provider '{name}' not found. Available: {', '.join(available)}",
                 provider=name,
             )
         return provider
@@ -89,6 +247,7 @@ class ProviderRegistry:
             name: Provider name (e.g., "ollama", "anthropic")
             provider_class: Provider class
         """
+        _lazy_provider_specs.pop(name, None)
         _registry_instance.register(name, provider_class)
 
     @classmethod
@@ -116,7 +275,13 @@ class ProviderRegistry:
         Returns:
             Provider class or None if not found
         """
-        return _registry_instance.get(name)
+        provider = _registry_instance.get(name)
+        if provider is not None:
+            return provider
+        try:
+            return _materialize_lazy_provider(name)
+        except ProviderNotFoundError:
+            return None
 
     @classmethod
     def create(cls, name: str, **kwargs: Any) -> BaseProvider:
@@ -141,7 +306,9 @@ class ProviderRegistry:
         Returns:
             List of provider names
         """
-        return _registry_instance.list_all()
+        providers = set(_registry_instance.list_all())
+        providers.update(_lazy_provider_specs.keys())
+        return sorted(providers)
 
     @classmethod
     def is_registered(cls, name: str) -> bool:
@@ -153,7 +320,7 @@ class ProviderRegistry:
         Returns:
             True if registered, False otherwise
         """
-        return name in _registry_instance
+        return (name in _registry_instance) or (name in _lazy_provider_specs)
 
     @classmethod
     def unregister(cls, name: str) -> bool:
@@ -165,12 +332,17 @@ class ProviderRegistry:
         Returns:
             True if the provider was found and removed, False otherwise
         """
-        return _registry_instance.unregister(name)
+        removed_lazy = _lazy_provider_specs.pop(name, None) is not None
+        removed_registered = _registry_instance.unregister(name)
+        return removed_lazy or removed_registered
 
     @classmethod
     def clear(cls) -> None:
         """Clear all registered providers."""
         _registry_instance.clear()
+        _lazy_provider_specs.clear()
+        global _mlx_preflight_result
+        _mlx_preflight_result = None
 
 
 def get_provider_registry() -> _ProviderRegistryImpl:
@@ -188,86 +360,133 @@ def get_provider_registry() -> _ProviderRegistryImpl:
 # Auto-register all providers
 def _register_default_providers() -> None:
     """Register all default providers."""
-    from victor.providers.ollama_provider import OllamaProvider
-    from victor.providers.anthropic_provider import AnthropicProvider
-    from victor.providers.openai_provider import OpenAIProvider
-    from victor.providers.google_provider import GoogleProvider
-    from victor.providers.xai_provider import XAIProvider
-    from victor.providers.zai_provider import ZAIProvider
-    from victor.providers.lmstudio_provider import LMStudioProvider
-    from victor.providers.moonshot_provider import MoonshotProvider
-    from victor.providers.deepseek_provider import DeepSeekProvider
-    from victor.providers.groq_provider import GroqProvider
-    from victor.providers.mistral_provider import MistralProvider
-    from victor.providers.together_provider import TogetherProvider
-    from victor.providers.openrouter_provider import OpenRouterProvider
-    from victor.providers.fireworks_provider import FireworksProvider
-    from victor.providers.cerebras_provider import CerebrasProvider
+    # Core providers
+    _register_lazy_provider(
+        ["ollama"],
+        module_path="victor.providers.ollama_provider",
+        class_name="OllamaProvider",
+    )
+    _register_lazy_provider(
+        ["anthropic"],
+        module_path="victor.providers.anthropic_provider",
+        class_name="AnthropicProvider",
+    )
+    _register_lazy_provider(
+        ["openai"],
+        module_path="victor.providers.openai_provider",
+        class_name="OpenAIProvider",
+    )
+    _register_lazy_provider(
+        ["google"],
+        module_path="victor.providers.google_provider",
+        class_name="GoogleProvider",
+    )
+    _register_lazy_provider(
+        ["xai", "grok"],
+        module_path="victor.providers.xai_provider",
+        class_name="XAIProvider",
+    )
+    _register_lazy_provider(
+        ["zai", "zhipuai", "zhipu"],
+        module_path="victor.providers.zai_provider",
+        class_name="ZAIProvider",
+    )
+    _register_lazy_provider(
+        ["lmstudio"],
+        module_path="victor.providers.lmstudio_provider",
+        class_name="LMStudioProvider",
+    )
+    _register_lazy_provider(
+        ["moonshot", "kimi"],
+        module_path="victor.providers.moonshot_provider",
+        class_name="MoonshotProvider",
+    )
+    _register_lazy_provider(
+        ["deepseek"],
+        module_path="victor.providers.deepseek_provider",
+        class_name="DeepSeekProvider",
+    )
+    _register_lazy_provider(
+        ["groqcloud"],
+        module_path="victor.providers.groq_provider",
+        class_name="GroqProvider",
+    )
+    _register_lazy_provider(
+        ["mistral"],
+        module_path="victor.providers.mistral_provider",
+        class_name="MistralProvider",
+    )
+    _register_lazy_provider(
+        ["together"],
+        module_path="victor.providers.together_provider",
+        class_name="TogetherProvider",
+    )
+    _register_lazy_provider(
+        ["openrouter"],
+        module_path="victor.providers.openrouter_provider",
+        class_name="OpenRouterProvider",
+    )
+    _register_lazy_provider(
+        ["fireworks"],
+        module_path="victor.providers.fireworks_provider",
+        class_name="FireworksProvider",
+    )
+    _register_lazy_provider(
+        ["cerebras"],
+        module_path="victor.providers.cerebras_provider",
+        class_name="CerebrasProvider",
+    )
 
-    ProviderRegistry.register("ollama", OllamaProvider)
-    ProviderRegistry.register("anthropic", AnthropicProvider)
-    ProviderRegistry.register("openai", OpenAIProvider)
-    # LMStudio uses dedicated provider (similar to Ollama)
-    # with httpx, tiered URL selection, and 300s timeout
-    ProviderRegistry.register("lmstudio", LMStudioProvider)
-    # vLLM high-throughput inference server
-    from victor.providers.vllm_provider import VLLMProvider
-
-    ProviderRegistry.register("vllm", VLLMProvider)
-    # llama.cpp server (CPU-friendly local inference)
-    from victor.providers.llamacpp_provider import LlamaCppProvider
-
-    ProviderRegistry.register("llamacpp", LlamaCppProvider)
-    ProviderRegistry.register("llama-cpp", LlamaCppProvider)  # Alias
-    ProviderRegistry.register("llama.cpp", LlamaCppProvider)  # Alias
-    ProviderRegistry.register("google", GoogleProvider)
-    ProviderRegistry.register("xai", XAIProvider)
-    ProviderRegistry.register("grok", XAIProvider)  # Alias for xai
-    # z.ai (ZhipuAI/智谱AI) - GLM models with OpenAI-compatible API
-    ProviderRegistry.register("zai", ZAIProvider)
-    ProviderRegistry.register("zhipuai", ZAIProvider)  # Alias
-    ProviderRegistry.register("zhipu", ZAIProvider)  # Alias
-    # Moonshot AI for Kimi K2 models (OpenAI-compatible with reasoning traces)
-    ProviderRegistry.register("moonshot", MoonshotProvider)
-    ProviderRegistry.register("kimi", MoonshotProvider)  # Alias for moonshot
-    # DeepSeek for DeepSeek-V3 models (chat and reasoner)
-    ProviderRegistry.register("deepseek", DeepSeekProvider)
-    # Groq Cloud for ultra-fast LLM inference (free tier available)
-    ProviderRegistry.register("groqcloud", GroqProvider)
-
-    # New free-tier providers (2025)
-    # Mistral AI - 500K tokens/min free tier
-    ProviderRegistry.register("mistral", MistralProvider)
-    # Together AI - $25 free credits
-    ProviderRegistry.register("together", TogetherProvider)
-    # OpenRouter - unified gateway, free tier with daily limits
-    ProviderRegistry.register("openrouter", OpenRouterProvider)
-    # Fireworks AI - $1 free credits, fast inference
-    ProviderRegistry.register("fireworks", FireworksProvider)
-    # Cerebras - ultra-fast inference, free tier
-    ProviderRegistry.register("cerebras", CerebrasProvider)
+    # Local backends (hardware/runtime dependent: CUDA/ROCm/CPU/MPS).
+    # Keep these lazy-only without hardware preflight because they are
+    # OpenAI-compatible server adapters (local or remote endpoints), not
+    # in-process runtime initializers.
+    _register_lazy_provider(
+        ["vllm"],
+        module_path="victor.providers.vllm_provider",
+        class_name="VLLMProvider",
+    )
+    _register_lazy_provider(
+        ["llamacpp", "llama-cpp", "llama.cpp"],
+        module_path="victor.providers.llamacpp_provider",
+        class_name="LlamaCppProvider",
+    )
+    # MLX LM (Apple Silicon-optimized inference)
+    # NOTE: Must remain lazy. Importing mlx_lm can hard-abort on unsupported
+    # Metal runtime environments (e.g., missing visible MPS device).
+    _register_lazy_provider(
+        ["mlx", "mlx-lm", "applesilicon"],
+        module_path="victor.providers.mlx_provider",
+        class_name="MLXProvider",
+        preflight=_mlx_preflight,
+    )
 
     # Enterprise cloud providers
-    from victor.providers.vertex_provider import VertexAIProvider
-    from victor.providers.azure_openai_provider import AzureOpenAIProvider
-    from victor.providers.bedrock_provider import BedrockProvider
-    from victor.providers.huggingface_provider import HuggingFaceProvider
-    from victor.providers.replicate_provider import ReplicateProvider
-
-    # Google Cloud Vertex AI - Enterprise Gemini access
-    ProviderRegistry.register("vertex", VertexAIProvider)
-    ProviderRegistry.register("vertexai", VertexAIProvider)  # Alias
-    # Azure OpenAI - Enterprise OpenAI + Phi models
-    ProviderRegistry.register("azure", AzureOpenAIProvider)
-    ProviderRegistry.register("azure-openai", AzureOpenAIProvider)  # Alias
-    # AWS Bedrock - Claude, Llama, Mistral, Titan
-    ProviderRegistry.register("bedrock", BedrockProvider)
-    ProviderRegistry.register("aws", BedrockProvider)  # Alias
-    # Hugging Face Inference API - 1000s of open models
-    ProviderRegistry.register("huggingface", HuggingFaceProvider)
-    ProviderRegistry.register("hf", HuggingFaceProvider)  # Alias
-    # Replicate - Neocloud for open models
-    ProviderRegistry.register("replicate", ReplicateProvider)
+    _register_lazy_provider(
+        ["vertex", "vertexai"],
+        module_path="victor.providers.vertex_provider",
+        class_name="VertexAIProvider",
+    )
+    _register_lazy_provider(
+        ["azure", "azure-openai"],
+        module_path="victor.providers.azure_openai_provider",
+        class_name="AzureOpenAIProvider",
+    )
+    _register_lazy_provider(
+        ["bedrock", "aws"],
+        module_path="victor.providers.bedrock_provider",
+        class_name="BedrockProvider",
+    )
+    _register_lazy_provider(
+        ["huggingface", "hf"],
+        module_path="victor.providers.huggingface_provider",
+        class_name="HuggingFaceProvider",
+    )
+    _register_lazy_provider(
+        ["replicate"],
+        module_path="victor.providers.replicate_provider",
+        class_name="ReplicateProvider",
+    )
 
 
 # Register providers on module import

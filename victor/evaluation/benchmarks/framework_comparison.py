@@ -434,3 +434,49 @@ def create_comparison_report(
             report.results.append(result)
 
     return report
+
+
+def create_quick_comparison(
+    benchmark: BenchmarkType = BenchmarkType.SWE_BENCH,
+    victor_pass_rate: float = 0.0,
+    victor_model: str = "claude-3-sonnet",
+    include_published: bool = True,
+) -> ComparisonReport:
+    """Create a comparison report without running actual benchmarks.
+
+    Useful for testing the comparison pipeline or generating reports
+    from pre-computed pass rates.
+
+    Args:
+        benchmark: Benchmark type for the report
+        victor_pass_rate: Victor's pass rate to use
+        victor_model: Model name for Victor's entry
+        include_published: Include published competitor data
+
+    Returns:
+        ComparisonReport with Victor and (optionally) published results
+    """
+    report = ComparisonReport(benchmark=benchmark)
+
+    victor_metrics = ComparisonMetrics(pass_rate=victor_pass_rate)
+    victor_result = FrameworkResult(
+        framework=Framework.VICTOR,
+        benchmark=benchmark,
+        model=victor_model,
+        metrics=victor_metrics,
+    )
+    report.results.append(victor_result)
+
+    if include_published and benchmark in PUBLISHED_RESULTS:
+        for framework, data in PUBLISHED_RESULTS[benchmark].items():
+            metrics = ComparisonMetrics(pass_rate=data.get("pass_rate", 0.0))
+            result = FrameworkResult(
+                framework=framework,
+                benchmark=benchmark,
+                model=data.get("model", "unknown"),
+                metrics=metrics,
+                config={"source": data.get("source", "published")},
+            )
+            report.results.append(result)
+
+    return report

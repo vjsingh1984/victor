@@ -253,7 +253,15 @@ class TestVerticalRegistry:
     @pytest.fixture(autouse=True)
     def reset_registry(self):
         """Reset registry to known state."""
-        # Store current state
+        # Import and register coding vertical FIRST before storing state
+        try:
+            from victor.coding import CodingAssistant
+
+            VerticalRegistry.register(CodingAssistant)
+        except ImportError:
+            pass  # coding vertical may not be available in all environments
+
+        # Store current state (now with coding registered)
         original = dict(VerticalRegistry._registry)
         yield
         # Restore
@@ -413,6 +421,16 @@ class TestCustomVertical:
 class TestVerticalLoaderSwitch:
     """Tests for VerticalLoader vertical switching behavior (GAP-1, GAP-6 fixes)."""
 
+    @pytest.fixture(autouse=True)
+    def ensure_coding_registered(self):
+        """Ensure coding vertical is registered for these tests."""
+        try:
+            from victor.coding import CodingAssistant
+
+            VerticalRegistry.register(CodingAssistant)
+        except ImportError:
+            pass  # coding vertical may not be available in all environments
+
     def test_loader_switch_clears_extensions(self):
         """Switching verticals should clear cached extensions."""
         from victor.core.verticals.vertical_loader import VerticalLoader
@@ -460,8 +478,8 @@ class TestVerticalLoaderSwitch:
         loader.load("coding")
         assert loader.active_vertical_name == "coding"
 
-        loader.load("data_analysis")
-        assert loader.active_vertical_name == "data_analysis"
+        loader.load("dataanalysis")
+        assert loader.active_vertical_name == "dataanalysis"
 
     def test_loader_get_tools_per_vertical(self):
         """Each vertical should have distinct tool sets."""
@@ -815,7 +833,7 @@ class TestDataAnalysisDirectImport:
         """Test DataAnalysisAssistant class."""
         from victor.dataanalysis import DataAnalysisAssistant as DirectDataAnalysis
 
-        assert DirectDataAnalysis.name == "data_analysis"
+        assert DirectDataAnalysis.name == "dataanalysis"
 
     def test_data_analysis_get_tools(self):
         """Test get_tools method."""
@@ -847,6 +865,16 @@ class TestDataAnalysisDirectImport:
 
 class TestVerticalHelperFunctions:
     """Tests for helper functions in victor.verticals."""
+
+    @pytest.fixture(autouse=True)
+    def ensure_coding_registered(self):
+        """Ensure coding vertical is registered for these tests."""
+        try:
+            from victor.coding import CodingAssistant
+
+            VerticalRegistry.register(CodingAssistant)
+        except ImportError:
+            pass  # coding vertical may not be available in all environments
 
     def test_get_vertical_by_name(self):
         """Test get_vertical helper function."""

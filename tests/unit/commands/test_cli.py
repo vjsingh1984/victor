@@ -120,9 +120,11 @@ class TestConfigureLogging:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestFlushLogging:
     """Tests for _flush_logging function."""
 
+    @pytest.mark.slow
     def test_flush_logging_flushes_handlers(self):
         """Test that all handlers are flushed."""
         from victor.ui.commands.utils import flush_logging as _flush_logging
@@ -138,6 +140,7 @@ class TestFlushLogging:
         # Cleanup
         logging.root.removeHandler(mock_handler)
 
+    @pytest.mark.slow
     def test_flush_logging_multiple_handlers(self):
         """Test flushing multiple handlers."""
         from victor.ui.commands.utils import flush_logging as _flush_logging
@@ -161,10 +164,12 @@ class TestFlushLogging:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestGracefulShutdown:
     """Tests for _graceful_shutdown async function."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_none_agent(self):
         """Test shutdown with None agent."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown
@@ -173,6 +178,7 @@ class TestGracefulShutdown:
         await _graceful_shutdown(None)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_calls_agent_methods(self, mock_agent):
         """Test that shutdown calls agent methods."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown
@@ -183,6 +189,7 @@ class TestGracefulShutdown:
         mock_agent.shutdown.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_handles_exception(self, mock_agent):
         """Test that exceptions are handled gracefully."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown
@@ -195,6 +202,7 @@ class TestGracefulShutdown:
         mock_agent.provider.close.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_handles_close_exception(self, mock_agent):
         """Test that close exceptions are also handled."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown

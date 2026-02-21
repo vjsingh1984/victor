@@ -246,7 +246,7 @@ from victor.research.assistant import ResearchAssistant
 prompt = ResearchAssistant.get_system_prompt()
 
 # Get tiered tools
-tiered_tools = ResearchAssistant.get_tiered_tools()
+tiered_tools = ResearchAssistant.get_tiered_tool_config()
 
 # Access capability provider
 capabilities = ResearchAssistant.get_capability_provider()

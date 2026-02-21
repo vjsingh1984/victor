@@ -79,6 +79,10 @@ class TestFrameworkShimBasic:
         orch = MagicMock()
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
+        orch.observability = None
+        orch.set_observability = MagicMock(
+            side_effect=lambda obs: setattr(orch, "observability", obs)
+        )
         return orch
 
     @pytest.mark.asyncio
@@ -168,6 +172,10 @@ class TestFrameworkShimObservability:
         """Create mock orchestrator."""
         orch = MagicMock()
         orch.conversation_state = MagicMock()
+        orch.observability = None
+        orch.set_observability = MagicMock(
+            side_effect=lambda obs: setattr(orch, "observability", obs)
+        )
         return orch
 
     @pytest.mark.asyncio
@@ -240,6 +248,10 @@ class TestFrameworkShimVertical:
         orch = MagicMock(spec=CapabilityRegistryProtocol)
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
+        orch.observability = None
+        orch.set_observability = MagicMock(
+            side_effect=lambda obs: setattr(orch, "observability", obs)
+        )
 
         # Add protocol methods for tools
         orch._enabled_tools = set()

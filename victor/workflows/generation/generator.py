@@ -31,6 +31,7 @@ Key Features:
     - Retry with exponential backoff
     - Template fallback for simple patterns
     - Comprehensive error handling
+    - Unified response parsing for robustness
 
 Example:
     from victor.workflows.generation import WorkflowGenerator
@@ -56,6 +57,15 @@ from victor.workflows.generation.types import (
     WorkflowGenerationValidationResult,
     RefinementResult,
 )
+
+# Import unified response parser from framework
+try:
+    from victor.processing.response_parser import extract_json_from_response
+
+    _UNIFIED_PARSER_AVAILABLE = True
+except ImportError:
+    _UNIFIED_PARSER_AVAILABLE = False
+    logging.warning("Unified response parser not available, using local fallback")
 
 logger = logging.getLogger(__name__)
 
@@ -676,36 +686,57 @@ Fixed schema:
 """
         return prompt
 
-    def _parse_json_response(self, response: str) -> Dict[str, Any]:
-        """Parse JSON from LLM response.
+    def _parse_json_response(self, response: Union[str, Dict[str, Any], Any]) -> Dict[str, Any]:
+        """Parse JSON from LLM response using unified parser.
 
-        Handles markdown code blocks and malformed JSON.
+        This method uses the unified response parser from victor.processing.response_parser
+        which provides robust JSON extraction with:
+        - Markdown code block handling
+        - Malformed JSON repair
+        - Multiple response format support
 
         Args:
-            response: Raw LLM response string
+            response: LLM response (string, dict, or object)
 
         Returns:
             Parsed JSON dict
 
         Raises:
-            ValueError: If JSON is invalid
+            ValueError: If JSON is invalid or cannot be extracted
         """
-        # Clean response
-        response = response.strip()
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.startswith("```"):
-            response = response[3:]
-        if response.endswith("```"):
-            response = response[:-3]
-        response = response.strip()
+        # Use unified response parser if available
+        if _UNIFIED_PARSER_AVAILABLE:
+            json_str = extract_json_from_response(response)
+            if json_str:
+                try:
+                    return json.loads(json_str)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse extracted JSON: {e}")
+                    logger.debug(f"JSON string: {json_str[:500]}")
+                    raise ValueError(f"Invalid JSON in LLM response: {e}") from e
+            else:
+                raise ValueError("Invalid JSON in LLM response: No valid JSON found")
+
+        # Fallback: simple markdown stripping and JSON parsing
+        logger.warning("Unified parser unavailable, using simple fallback")
+        response_str = response if isinstance(response, str) else str(response)
+        response_str = response_str.strip()
+
+        # Remove markdown code blocks
+        if response_str.startswith("```json"):
+            response_str = response_str[7:]
+        if response_str.startswith("```"):
+            response_str = response_str[3:]
+        if response_str.endswith("```"):
+            response_str = response_str[:-3]
+        response_str = response_str.strip()
 
         # Parse JSON
         try:
-            return json.loads(response)
+            return json.loads(response_str)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Response content: {response[:500]}")
+            logger.debug(f"Response content: {response_str[:500]}")
             raise ValueError(f"Invalid JSON in LLM response: {e}") from e
 
     def _get_schema_template(self) -> Dict[str, Any]:

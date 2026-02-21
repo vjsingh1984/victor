@@ -87,8 +87,8 @@ class TestConfigureToolsWithToolConfigurator:
 class TestSetupObservabilityIntegration:
     """Test observability integration setup."""
 
-    def test_setup_creates_integration(self):
-        """Test that setup creates ObservabilityIntegration."""
+    def test_setup_creates_integration_uses_set_observability(self):
+        """Test setup wires and stores integration via public setter port."""
         mock_orchestrator = MagicMock()
 
         with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
@@ -97,11 +97,35 @@ class TestSetupObservabilityIntegration:
 
             result = setup_observability_integration(mock_orchestrator)
 
-            MockIntegration.assert_called_once_with(
-                session_id=None, enable_cqrs_bridge=False
-            )
+            MockIntegration.assert_called_once_with(session_id=None, enable_cqrs_bridge=False)
             mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
-            assert mock_orchestrator.observability == mock_integration
+            mock_orchestrator.set_observability.assert_called_once_with(mock_integration)
+            assert result == mock_integration
+
+    def test_setup_falls_back_to_observability_property(self):
+        """Test setup falls back to observability property when setter is unavailable."""
+
+        class PropertyOnlyOrchestrator:
+            def __init__(self):
+                self._observability = None
+
+            @property
+            def observability(self):
+                return self._observability
+
+            @observability.setter
+            def observability(self, value):
+                self._observability = value
+
+        orchestrator = PropertyOnlyOrchestrator()
+
+        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
+            mock_integration = MagicMock()
+            MockIntegration.return_value = mock_integration
+
+            result = setup_observability_integration(orchestrator)
+
+            assert orchestrator.observability == mock_integration
             assert result == mock_integration
 
     def test_setup_with_session_id(self):
@@ -130,9 +154,7 @@ class TestSetupObservabilityIntegration:
                 mock_orchestrator, session_id="s1", enable_cqrs_bridge=True
             )
 
-            MockIntegration.assert_called_once_with(
-                session_id="s1", enable_cqrs_bridge=True
-            )
+            MockIntegration.assert_called_once_with(session_id="s1", enable_cqrs_bridge=True)
 
 
 class TestVerticalApplicationDelegation:

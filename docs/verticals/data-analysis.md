@@ -252,7 +252,7 @@ from victor.dataanalysis.assistant import DataAnalysisAssistant
 prompt = DataAnalysisAssistant.get_system_prompt()
 
 # Get tiered tools
-tiered_tools = DataAnalysisAssistant.get_tiered_tools()
+tiered_tools = DataAnalysisAssistant.get_tiered_tool_config()
 
 # Access capability provider
 capabilities = DataAnalysisAssistant.get_capability_provider()

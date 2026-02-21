@@ -370,6 +370,12 @@ def get_vertical(name: Optional[str]) -> Optional[Type["VerticalBase"]]:
     if name is None:
         return None
 
+    # Import package root and re-run built-in registration once module init settles.
+    # This self-heals early-import circular ordering where a built-in (notably coding)
+    # can be skipped during the package's first import.
+    import victor.core.verticals as core_verticals
+
+    core_verticals._register_builtin_verticals()
     from victor.core.verticals.base import VerticalRegistry
 
     # Try exact match first
@@ -395,6 +401,10 @@ def list_verticals() -> list[str]:
     Example:
         print(f"Available verticals: {list_verticals()}")
     """
+    # Import package root and re-run built-in registration once module init settles.
+    import victor.core.verticals as core_verticals
+
+    core_verticals._register_builtin_verticals()
     from victor.core.verticals.base import VerticalRegistry
 
     return VerticalRegistry.list_names()

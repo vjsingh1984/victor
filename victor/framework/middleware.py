@@ -1254,6 +1254,8 @@ __all__ = [
     "MetricsMiddleware",
     "GitSafetyMiddleware",
     "OutputValidationMiddleware",
+    # Middleware Composer
+    "MiddlewareComposer",
     # Validation Types
     "ValidationSeverity",
     "ValidationIssue",
@@ -1263,3 +1265,263 @@ __all__ = [
     # Types
     "ToolMetrics",
 ]
+
+
+# =============================================================================
+# Middleware Composer
+# =============================================================================
+
+
+class MiddlewareComposer:
+    """Helper for composing middleware lists with common patterns.
+
+    This class provides a fluent API for building middleware lists with
+    pre-configured patterns for common use cases. It eliminates
+    duplication in vertical middleware configuration and ensures
+    consistent middleware ordering.
+
+    Example:
+        # Using preset patterns
+        middleware = (
+            MiddlewareComposer()
+            .git_safety(block_dangerous=False, warn_on_risky=True)
+            .secret_masking(replacement="[REDACTED]")
+            .logging(include_arguments=True)
+            .build()
+        )
+
+        # Using custom middleware
+        middleware = (
+            MiddlewareComposer()
+            .add(CustomMiddleware())
+            .git_safety()
+            .build()
+        )
+
+        # For DevOps (stricter git safety)
+        middleware = (
+            MiddlewareComposer()
+            .git_safety(
+                block_dangerous=True,
+                protected_branches={"production", "staging"},
+            )
+            .secret_masking()
+            .logging()
+            .build()
+        )
+    """
+
+    def __init__(self) -> None:
+        """Initialize an empty composer."""
+        self._middleware: List[MiddlewareProtocol] = []
+
+    def add(self, middleware: MiddlewareProtocol) -> "MiddlewareComposer":
+        """Add custom middleware to the composition.
+
+        Args:
+            middleware: Middleware instance to add
+
+        Returns:
+            Self for method chaining
+        """
+        self._middleware.append(middleware)
+        return self
+
+    def git_safety(
+        self,
+        block_dangerous: bool = False,
+        warn_on_risky: bool = True,
+        protected_branches: Optional[Set[str]] = None,
+        allowed_force_branches: Optional[Set[str]] = None,
+    ) -> "MiddlewareComposer":
+        """Add GitSafetyMiddleware with configuration.
+
+        Args:
+            block_dangerous: Block dangerous git operations (force push, hard reset)
+            warn_on_risky: Warn about risky operations
+            protected_branches: Branches to protect from force push
+            allowed_force_branches: Branch patterns where force is allowed
+
+        Returns:
+            Self for method chaining
+        """
+        from victor.core.vertical_types import MiddlewarePriority
+
+        # Import here to avoid circular import
+        git_middleware = GitSafetyMiddleware(
+            block_dangerous=block_dangerous,
+            warn_on_risky=warn_on_risky,
+            protected_branches=protected_branches,
+            allowed_force_branches=allowed_force_branches,
+        )
+        self._middleware.append(git_middleware)
+        return self
+
+    def secret_masking(
+        self,
+        replacement: str = "[REDACTED]",
+        mask_in_arguments: bool = False,
+    ) -> "MiddlewareComposer":
+        """Add SecretMaskingMiddleware with configuration.
+
+        Args:
+            replacement: Text to replace secrets with
+            mask_in_arguments: Also mask secrets in input arguments
+
+        Returns:
+            Self for method chaining
+        """
+        secret_middleware = SecretMaskingMiddleware(
+            replacement=replacement,
+            mask_in_arguments=mask_in_arguments,
+        )
+        self._middleware.append(secret_middleware)
+        return self
+
+    def logging(
+        self,
+        log_level: int = logging.DEBUG,
+        include_arguments: bool = True,
+        include_results: bool = False,
+        exclude_tools: Optional[Set[str]] = None,
+    ) -> "MiddlewareComposer":
+        """Add LoggingMiddleware with configuration.
+
+        Args:
+            log_level: Logging level (default: DEBUG)
+            include_arguments: Include arguments in logs
+            include_results: Include results in logs
+            exclude_tools: Tools to exclude from logging
+
+        Returns:
+            Self for method chaining
+        """
+        logging_middleware = LoggingMiddleware(
+            log_level=log_level,
+            include_arguments=include_arguments,
+            include_results=include_results,
+            exclude_tools=exclude_tools,
+        )
+        self._middleware.append(logging_middleware)
+        return self
+
+    def metrics(
+        self,
+        enable_timing: bool = True,
+    ) -> "MiddlewareComposer":
+        """Add MetricsMiddleware with configuration.
+
+        Args:
+            enable_timing: Track execution timing
+
+        Returns:
+            Self for method chaining
+        """
+        metrics_middleware = MetricsMiddleware(enable_timing=enable_timing)
+        self._middleware.append(metrics_middleware)
+        return self
+
+    def output_validation(
+        self,
+        validator: "ValidatorProtocol",
+        applicable_tools: Optional[Set[str]] = None,
+        argument_names: Optional[Set[str]] = None,
+        auto_fix: bool = True,
+        block_on_error: bool = False,
+    ) -> "MiddlewareComposer":
+        """Add OutputValidationMiddleware with configuration.
+
+        Args:
+            validator: Validator instance
+            applicable_tools: Tools this middleware applies to
+            argument_names: Argument names to validate
+            auto_fix: Automatically fix issues if possible
+            block_on_error: Block execution on validation errors
+
+        Returns:
+            Self for method chaining
+        """
+        validation_middleware = OutputValidationMiddleware(
+            validator=validator,
+            applicable_tools=applicable_tools,
+            argument_names=argument_names,
+            auto_fix=auto_fix,
+            block_on_error=block_on_error,
+        )
+        self._middleware.append(validation_middleware)
+        return self
+
+    def standard_coding(self) -> "MiddlewareComposer":
+        """Add standard coding middleware setup.
+
+        Includes:
+        - Code correction with auto-fix
+        - Git safety (warnings only, not blocking)
+
+        Returns:
+            Self for method chaining
+        """
+        from victor.coding.middleware import (
+            CodeCorrectionMiddleware,
+            GitSafetyMiddleware,
+        )
+
+        self._middleware.extend(
+            [
+                CodeCorrectionMiddleware(enabled=True, auto_fix=True),
+                GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
+            ]
+        )
+        return self
+
+    def standard_devops(self) -> "MiddlewareComposer":
+        """Add standard DevOps middleware setup.
+
+        Includes:
+        - Git safety (strict for infrastructure)
+        - Secret masking (with input masking)
+        - Audit logging
+
+        Returns:
+            Self for method chaining
+        """
+        self.git_safety(
+            block_dangerous=True,
+            protected_branches={"production", "staging"},
+        )
+        self.secret_masking(mask_in_arguments=True)
+        self.logging(include_arguments=True, include_results=True)
+        return self
+
+    def standard_production(self) -> "MiddlewareComposer":
+        """Add standard production middleware setup.
+
+        Includes:
+        - Secret masking
+        - Metrics tracking
+        - Audit logging
+
+        Returns:
+            Self for method chaining
+        """
+        self.secret_masking()
+        self.metrics()
+        self.logging(include_arguments=True, include_results=True)
+        return self
+
+    def build(self) -> List[MiddlewareProtocol]:
+        """Build and return the middleware list.
+
+        Returns:
+            List of middleware instances in execution order
+        """
+        return list(self._middleware)
+
+    def clear(self) -> "MiddlewareComposer":
+        """Clear all middleware from the composer.
+
+        Returns:
+            Self for method chaining
+        """
+        self._middleware.clear()
+        return self

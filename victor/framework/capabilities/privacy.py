@@ -50,11 +50,35 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+def _store_config(orchestrator: Any, name: str, config: Dict[str, Any]) -> None:
+    """Store config in framework service when available, else fallback to orchestrator attr."""
+    store_capability_config(
+        orchestrator,
+        name,
+        config,
+        require_existing_attr=False,
+    )
+
+
+def _load_config(orchestrator: Any, name: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Load config from framework service when available, else fallback to orchestrator attr."""
+    return load_capability_config(orchestrator, name, defaults)
 
 
 # =============================================================================
@@ -87,25 +111,18 @@ def configure_data_privacy(
         detect_secrets: Detect and mask secrets (API keys, tokens)
         secret_patterns: Regex patterns for secret detection
     """
-    if hasattr(orchestrator, "privacy_config"):
-        orchestrator.privacy_config = {
+    _store_config(
+        orchestrator,
+        "privacy_config",
+        {
             "anonymize_pii": anonymize_pii,
             "pii_columns": pii_columns or [],
             "hash_identifiers": hash_identifiers,
             "log_access": log_access,
             "detect_secrets": detect_secrets,
             "secret_patterns": secret_patterns or _get_default_secret_patterns(),
-        }
-    else:
-        # Fallback: set attribute if config dict doesn't exist
-        orchestrator.privacy_config = {
-            "anonymize_pii": anonymize_pii,
-            "pii_columns": pii_columns or [],
-            "hash_identifiers": hash_identifiers,
-            "log_access": log_access,
-            "detect_secrets": detect_secrets,
-            "secret_patterns": secret_patterns or _get_default_secret_patterns(),
-        }
+        },
+    )
 
     logger.info(
         f"Configured data privacy: anonymize={anonymize_pii}, "
@@ -122,7 +139,7 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Privacy configuration dict
     """
-    return getattr(
+    return _load_config(
         orchestrator,
         "privacy_config",
         {
@@ -171,22 +188,17 @@ def configure_secrets_masking(
         mask_in_output: Mask secrets in tool output/results
         custom_patterns: Additional regex patterns for secret detection
     """
-    if hasattr(orchestrator, "secrets_masking_config"):
-        orchestrator.secrets_masking_config = {
+    _store_config(
+        orchestrator,
+        "secrets_masking_config",
+        {
             "enabled": enabled,
             "replacement": replacement,
             "mask_in_arguments": mask_in_arguments,
             "mask_in_output": mask_in_output,
             "custom_patterns": custom_patterns or [],
-        }
-    else:
-        orchestrator.secrets_masking_config = {
-            "enabled": enabled,
-            "replacement": replacement,
-            "mask_in_arguments": mask_in_arguments,
-            "mask_in_output": mask_in_output,
-            "custom_patterns": custom_patterns or [],
-        }
+        },
+    )
 
     logger.info(f"Configured secrets masking: enabled={enabled}, replacement={replacement}")
 
@@ -200,7 +212,7 @@ def get_secrets_masking_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Secrets masking configuration dict
     """
-    return getattr(
+    return _load_config(
         orchestrator,
         "secrets_masking_config",
         {
@@ -232,22 +244,17 @@ def configure_audit_logging(
         log_secrets_access: Log secrets masking operations
         log_file_path: Optional file path for audit log
     """
-    if hasattr(orchestrator, "audit_logging_config"):
-        orchestrator.audit_logging_config = {
+    _store_config(
+        orchestrator,
+        "audit_logging_config",
+        {
             "enabled": enabled,
             "log_data_access": log_data_access,
             "log_pii_access": log_pii_access,
             "log_secrets_access": log_secrets_access,
             "log_file_path": log_file_path,
-        }
-    else:
-        orchestrator.audit_logging_config = {
-            "enabled": enabled,
-            "log_data_access": log_data_access,
-            "log_pii_access": log_pii_access,
-            "log_secrets_access": log_secrets_access,
-            "log_file_path": log_file_path,
-        }
+        },
+    )
 
     logger.info(f"Configured audit logging: enabled={enabled}, data_access={log_data_access}")
 
@@ -261,7 +268,7 @@ def get_audit_logging_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Audit logging configuration dict
     """
-    return getattr(
+    return _load_config(
         orchestrator,
         "audit_logging_config",
         {

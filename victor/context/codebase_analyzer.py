@@ -139,6 +139,22 @@ class CodebaseAnalyzer:
         ".svelte": "Svelte",
     }
 
+    # Config and documentation file extensions (counted for LOC but not parsed)
+    CONFIG_EXTENSIONS = {
+        ".json": "JSON",
+        ".yaml": "YAML",
+        ".yml": "YAML",
+        ".toml": "TOML",
+        ".ini": "INI",
+        ".hocon": "HOCON",
+        ".xml": "XML",
+        ".md": "Markdown",
+        ".txt": "Text",
+        ".cfg": "Config",
+        ".conf": "Config",
+        ".props": "Properties",
+    }
+
     # Use shared default skip directories from ignore_patterns module
     # Hidden directories (starting with '.') are excluded automatically
     # by the shared should_ignore_path() utility
@@ -706,27 +722,50 @@ class CodebaseAnalyzer:
                 logger.debug(f"Failed to parse package.json dependencies: {e}")
 
     def _calculate_loc_stats(self) -> None:
-        """Calculate lines of code statistics."""
+        """Calculate lines of code statistics for both source and config files."""
+        # Source code stats
+        source_lines = 0
+        source_files = 0
+        # Config/doc stats
+        config_lines = 0
+        config_files = 0
+
+        # Overall tracking
         total_lines = 0
         total_files = 0
         largest_file = ""
         largest_file_lines = 0
         file_sizes: List[Tuple[str, int]] = []
 
-        # Scan all source files
-        for ext in self.LANGUAGE_EXTENSIONS.keys():
-            search_dirs = (
-                [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
-            )
-            for search_dir in search_dirs:
-                if not search_dir.is_dir():
-                    continue
+        # Merge both extension types for unified scanning
+        all_extensions = {**self.LANGUAGE_EXTENSIONS, **self.CONFIG_EXTENSIONS}
+
+        # Scan all files
+        search_dirs = (
+            [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
+        )
+
+        for search_dir in search_dirs:
+            if not search_dir.is_dir():
+                continue
+            for ext in all_extensions.keys():
                 for source_file in search_dir.rglob(f"*{ext}"):
                     if should_ignore_path(source_file, skip_dirs=self.effective_skip_dirs):
                         continue
                     try:
                         content = source_file.read_text(encoding="utf-8", errors="ignore")
                         lines = len(content.splitlines())
+
+                        # Track separately
+                        is_config = ext in self.CONFIG_EXTENSIONS
+                        if is_config:
+                            config_lines += lines
+                            config_files += 1
+                        else:
+                            source_lines += lines
+                            source_files += 1
+
+                        # Overall totals
                         total_lines += lines
                         total_files += 1
                         rel_path = str(source_file.relative_to(self.root))
@@ -742,15 +781,25 @@ class CodebaseAnalyzer:
         top_files = file_sizes[:5]
 
         self.analysis.loc_stats = {
+            # Overall totals
             "total_lines": total_lines,
             "total_files": total_files,
             "largest_file": largest_file,
             "largest_file_lines": largest_file_lines,
             "top_files": top_files,
+            # Breakdown by type
+            "source_lines": source_lines,
+            "source_files": source_files,
+            "config_lines": config_lines,
+            "config_files": config_files,
         }
 
     def _extract_top_imports(self) -> None:
-        """Extract the most commonly imported modules (Python only)."""
+        """Extract the most commonly imported modules (Python only).
+
+        Uses AST parsing as primary method with regex fallback for notebooks
+        and files with syntax errors (e.g., Databricks notebooks with magic commands).
+        """
         import_counts: Dict[str, int] = defaultdict(int)
 
         # Only scan Python files
@@ -765,9 +814,16 @@ class CodebaseAnalyzer:
                     continue
                 try:
                     content = source_file.read_text(encoding="utf-8", errors="ignore")
-                    tree = ast.parse(content)
-                    for module in extract_imports(tree, top_level_only=True):
-                        import_counts[module] += 1
+
+                    # Try AST parsing first (fast, accurate)
+                    try:
+                        tree = ast.parse(content)
+                        for module in extract_imports(tree, top_level_only=True):
+                            import_counts[module] += 1
+                    except SyntaxError:
+                        # Fallback to regex for notebooks, Databricks files, etc.
+                        for module in self._extract_imports_regex(content):
+                            import_counts[module] += 1
                 except Exception:
                     pass
 
@@ -778,6 +834,52 @@ class CodebaseAnalyzer:
         filtered.sort(key=lambda x: -x[1])
 
         self.analysis.top_imports = filtered[:10]
+
+    def _extract_imports_regex(self, content: str) -> List[str]:
+        """Extract imports using regex as fallback for AST failures.
+
+        Handles:
+        - Regular Python imports
+        - Databricks %run magic commands
+        - Dynamic imports
+
+        Args:
+            content: File content to parse
+
+        Returns:
+            List of imported module names
+        """
+        imports = []
+
+        # Regular Python imports
+        # import module
+        imports.extend(re.findall(r"^import\s+(\S+)", content, re.MULTILINE))
+        # from module import ...
+        imports.extend(re.findall(r"^from\s+(\S+)\s+import", content, re.MULTILINE))
+
+        # Databricks-specific patterns
+        # %run /path/to/notebook or %run ../path/to/module
+        run_matches = re.findall(r"%run\s+(\S+)", content)
+        for match in run_matches:
+            # Extract module name from path
+            # e.g., "../include/library/a.utils/import" -> "include.library.a.utils.import"
+            parts = Path(match).parts
+            if parts and parts[-1].endswith(".py"):
+                # Remove .py extension
+                parts = parts[:-1]
+            if parts:
+                imports.append(".".join(parts))
+
+        # Dynamic imports
+        # importlib.import_module("module.name")
+        dynamic_imports = re.findall(r'importlib\.import_module\([\'"]([^\'"]+)[\'"]\)', content)
+        imports.extend(dynamic_imports)
+
+        # __import__("module.name")
+        dynamic_imports2 = re.findall(r'__import__\([\'"]([^\'"]+)[\'"]\)', content)
+        imports.extend(dynamic_imports2)
+
+        return imports
 
     def _extract_test_coverage(self) -> None:
         """Try to extract test coverage from coverage reports."""
@@ -2194,10 +2296,25 @@ async def generate_victor_md_from_index(
     if enhanced_info.loc_stats:
         sections.append("## Codebase Stats\n")
         loc = enhanced_info.loc_stats
-        stats_line = f"- **{loc.get('total_lines', 0):,}** lines of code across **{loc.get('total_files', 0)}** files"
+
+        # Overall totals
+        total_lines = loc.get("total_lines", 0)
+        total_files = loc.get("total_files", 0)
+        stats_line = f"- **{total_lines:,}** lines of code across **{total_files}** files"
+
         if enhanced_info.test_coverage is not None:
             stats_line += f" ({enhanced_info.test_coverage}% test coverage)"
         sections.append(stats_line)
+
+        # Breakdown by file type if available
+        if loc.get("source_files") and loc.get("config_files"):
+            source_lines = loc.get("source_lines", 0)
+            config_lines = loc.get("config_lines", 0)
+            source_files = loc.get("source_files", 0)
+            config_files = loc.get("config_files", 0)
+
+            sections.append(f"  - **Source**: {source_lines:,} LOC in {source_files} files")
+            sections.append(f"  - **Config**: {config_lines:,} LOC in {config_files} files")
 
         if loc.get("largest_file"):
             sections.append(
@@ -2348,9 +2465,21 @@ async def generate_victor_md_from_index(
 
     # Important Notes
     sections.append("## Important Notes\n")
-    sections.append(
-        f"- Indexed {stats.get('total_files', 0)} files, {stats.get('total_symbols', 0)} symbols"
-    )
+
+    # Show clear breakdown of what was indexed
+    total_files = stats.get("total_files", 0)
+    total_symbols = stats.get("total_symbols", 0)
+    graph_nodes = stats.get("graph_nodes", 0)
+    classes = stats.get("classes", 0)
+    functions = stats.get("functions", 0)
+
+    sections.append(f"- **Indexed {total_files} files**:")
+    sections.append(f"  - {classes} classes")
+    sections.append(f"  - {functions} functions")
+    sections.append(f"  - {total_symbols} total code symbols")
+    sections.append(f"  - {graph_nodes} total graph nodes (files + symbols + imports)")
+    sections.append("")
+
     sections.append("- Check component paths above for exact file:line references")
     sections.append("- Run `/init --update` to refresh after code changes")
     sections.append("")
@@ -2402,16 +2531,14 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["message_count"] = cursor.fetchone()[0]
 
         # Extract common user queries (deduplicated, excluding benchmarks)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content FROM messages
             WHERE role = 'user'
               AND content NOT LIKE '%<TOOL_OUTPUT%'
               AND content NOT LIKE '%Complete this Python function%'
               AND content NOT LIKE '%Complete the following Python%'
               AND length(content) BETWEEN 20 AND 500
-        """
-        )
+        """)
 
         queries = [row[0] for row in cursor.fetchall()]
         query_counter = Counter()
@@ -2449,13 +2576,11 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["common_topics"] = query_counter.most_common(10)
 
         # Extract frequently referenced files from assistant responses
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content FROM messages
             WHERE role = 'assistant'
               AND (content LIKE '%.py%' OR content LIKE '%.ts%' OR content LIKE '%.js%')
-        """
-        )
+        """)
 
         file_counter = Counter()
         file_pattern = re.compile(r"`([a-zA-Z_/]+\.(py|ts|js|go|rs))[:`]")
@@ -2471,21 +2596,18 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["hot_files"] = file_counter.most_common(15)
 
         # Get architectural patterns from patterns table
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT pattern_name, pattern_type, COUNT(*) as count
             FROM patterns
             GROUP BY pattern_type
             ORDER BY count DESC
-        """
-        )
+        """)
         insights["learned_patterns"] = [
             {"name": row[0], "type": row[1], "count": row[2]} for row in cursor.fetchall()
         ]
 
         # Extract FAQ-like questions (questions asked multiple times)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content, COUNT(*) as times
             FROM messages
             WHERE role = 'user'
@@ -2496,8 +2618,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
             HAVING times > 1
             ORDER BY times DESC
             LIMIT 5
-        """
-        )
+        """)
         insights["faq"] = [{"question": row[0], "times_asked": row[1]} for row in cursor.fetchall()]
 
         conn.close()
@@ -2604,8 +2725,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
 
             # Get high-connectivity nodes (hub classes) via SQL
-            cur = conn.execute(
-                f"""
+            cur = conn.execute(f"""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id) +
                        (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id) as degree
@@ -2613,8 +2733,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('class', 'struct', 'interface')
                 ORDER BY degree DESC
                 LIMIT 5
-            """
-            )
+            """)
             hub_results = cur.fetchall()
             insights["hub_classes"] = [
                 {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
@@ -2623,8 +2742,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             ][:3]
 
             # Get most-called symbols (important functions)
-            cur = conn.execute(
-                f"""
+            cur = conn.execute(f"""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
                        (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id AND type = 'CALLS') as out_calls
@@ -2632,8 +2750,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('function', 'method', 'class')
                 ORDER BY in_calls DESC
                 LIMIT 8
-            """
-            )
+            """)
             important_results = cur.fetchall()
             insights["important_symbols"] = [
                 {
@@ -2721,8 +2838,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Use REFERENCES edges (imports/dependencies) for richer module relationships
             # CALLS edges are sparse as they only track explicit function calls
             # Note: Hidden directories (.*) and archive/ are filtered at index time
-            cur = conn.execute(
-                f"""
+            cur = conn.execute(f"""
                 SELECT
                     src_n.file as src_module,
                     dst_n.file as dst_module,
@@ -2738,8 +2854,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                   AND dst_n.file NOT LIKE 'tests/%'
                 GROUP BY src_n.file, dst_n.file
                 HAVING ref_count >= 2
-                """
-            )
+                """)
             module_edges = cur.fetchall()
 
             if module_edges:

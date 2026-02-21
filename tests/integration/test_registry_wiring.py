@@ -141,14 +141,13 @@ class TestHandlerRegistryWiring:
         registry = get_handler_registry()
         handlers = MockVertical.get_handlers()
 
-        # Simulate what apply_handlers does
-        for name, handler in handlers.items():
-            registry.register(name, handler, vertical="mock_vertical", replace=True)
+        # Simulate what apply_handlers does - register handlers by vertical
+        registry.register_vertical("mock_vertical", handlers, category="test")
 
         # Verify registration
-        assert registry.has("mock_handler_1")
-        assert registry.has("mock_handler_2")
-        assert "mock_vertical" == registry.get_entry("mock_handler_1").vertical
+        retrieved_handlers = registry.get_vertical_handlers("mock_vertical")
+        assert "mock_handler_1" in retrieved_handlers
+        assert "mock_handler_2" in retrieved_handlers
 
     def test_handlers_listed_by_vertical(self, reset_handler_registry):
         """Test handlers can be listed by vertical."""
@@ -157,11 +156,21 @@ class TestHandlerRegistryWiring:
         registry = get_handler_registry()
 
         # Register handlers for multiple verticals
-        registry.register("coding_h1", MagicMock(), vertical="coding")
-        registry.register("coding_h2", MagicMock(), vertical="coding")
-        registry.register("devops_h1", MagicMock(), vertical="devops")
+        registry.register_vertical(
+            "coding",
+            {
+                "coding_h1": MagicMock(),
+                "coding_h2": MagicMock(),
+            },
+        )
+        registry.register_vertical(
+            "devops",
+            {
+                "devops_h1": MagicMock(),
+            },
+        )
 
-        coding_handlers = registry.list_by_vertical("coding")
+        coding_handlers = registry.get_vertical_handlers("coding")
         assert len(coding_handlers) == 2
         assert "coding_h1" in coding_handlers
         assert "coding_h2" in coding_handlers

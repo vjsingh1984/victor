@@ -39,18 +39,98 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+    update_capability_config_section,
+)
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+_PASSK_DEFAULTS: Dict[str, Any] = {
+    "k_value": 10,
+    "temperature_range": [0.2, 0.4, 0.6, 0.8],
+    "max_samples": 100,
+    "enable_early_stopping": True,
+    "stop_after_n_success": 5,
+}
+_BENCHMARK_DEFAULTS: Dict[str, Any] = {
+    "swe_bench": {
+        "enable_patch_generation": True,
+        "require_test_verification": True,
+        "max_iterations": 5,
+        "timeout_seconds": 300,
+        "enable_dry_run": False,
+    },
+    "passk": dict(_PASSK_DEFAULTS),
+}
+_METRICS_DEFAULTS: Dict[str, Any] = {
+    "track_token_usage": True,
+    "track_execution_time": True,
+    "track_tool_calls": True,
+    "track_test_results": True,
+    "enable_detailed_tracing": False,
+    "output_format": "json",
+}
+_TEST_GENERATION_DEFAULTS: Dict[str, Any] = {
+    "test_framework": "pytest",
+    "coverage_threshold": 0.8,
+    "generate_unit_tests": True,
+    "generate_integration_tests": False,
+    "use_property_based_testing": False,
+}
+_CODE_QUALITY_DEFAULTS: Dict[str, Any] = {
+    "enable_linting": True,
+    "linting_tool": "ruff",
+    "enable_formatting": True,
+    "formatting_tool": "black",
+    "enable_type_checking": False,
+    "type_checking_tool": "mypy",
+    "max_complexity": 10,
+}
+_PERFORMANCE_DEFAULTS: Dict[str, Any] = {
+    "measure_latency": True,
+    "measure_throughput": True,
+    "benchmark_iterations": 10,
+    "warmup_iterations": 2,
+    "enable_profiling": False,
+    "profile_memory": False,
+}
+
+
+def _load_config(orchestrator: Any, name: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Load config from framework service when available, else fallback to orchestrator attr."""
+    return load_capability_config(orchestrator, name, defaults)
+
+
+def _store_config(orchestrator: Any, name: str, config: Dict[str, Any]) -> None:
+    """Store config in framework service when available, else fallback to orchestrator attr."""
+    store_capability_config(orchestrator, name, config)
+
+
+def _store_benchmark_section(orchestrator: Any, section: str, config: Dict[str, Any]) -> None:
+    """Store/update benchmark_config section with service-first behavior."""
+    update_capability_config_section(
+        orchestrator,
+        root_name="benchmark_config",
+        section_name=section,
+        section_config=config,
+        root_defaults=_BENCHMARK_DEFAULTS,
+    )
 
 
 # =============================================================================
@@ -80,22 +160,31 @@ def configure_swe_bench_execution(
         timeout_seconds: Timeout per task in seconds
         enable_dry_run: Run in dry-run mode without making changes
     """
-    from victor.benchmark.safety import BenchmarkSafetyExtension
-
-    safety = BenchmarkSafetyExtension()
-
-    if hasattr(orchestrator, "benchmark_config"):
-        orchestrator.benchmark_config["swe_bench"] = {
+    _store_benchmark_section(
+        orchestrator,
+        "swe_bench",
+        {
             "enable_patch_generation": enable_patch_generation,
             "require_test_verification": require_test_verification,
             "max_iterations": max_iterations,
             "timeout_seconds": timeout_seconds,
             "enable_dry_run": enable_dry_run,
-        }
+        },
+    )
 
     # Configure safety patterns for dry-run mode
     if enable_dry_run:
-        safety.enable_dry_run_mode()
+        # BenchmarkSafetyExtension may not be present in all runtime/test builds.
+        try:
+            from victor.benchmark.safety import BenchmarkSafetyExtension
+
+            safety = BenchmarkSafetyExtension()
+            safety.enable_dry_run_mode()
+        except Exception:
+            logger.debug(
+                "BenchmarkSafetyExtension unavailable; dry-run mode limited to configuration flag",
+                exc_info=True,
+            )
 
     logger.info(
         f"Configured SWE-bench execution: patch_gen={enable_patch_generation}, "
@@ -107,7 +196,7 @@ def configure_passk_evaluation(
     orchestrator: Any,
     *,
     k_value: int = 10,
-    temperature_range: List[float] = field(default_factory=lambda: [0.2, 0.4, 0.6, 0.8]),
+    temperature_range: Optional[List[float]] = None,
     max_samples: int = 100,
     enable_early_stopping: bool = True,
     stop_after_n_success: int = 5,
@@ -125,14 +214,23 @@ def configure_passk_evaluation(
         enable_early_stopping: Stop early if all tests pass
         stop_after_n_success: Stop after N successful samples
     """
-    if hasattr(orchestrator, "benchmark_config"):
-        orchestrator.benchmark_config["passk"] = {
+    effective_temperature_range = (
+        list(temperature_range)
+        if temperature_range is not None
+        else list(_PASSK_DEFAULTS["temperature_range"])
+    )
+
+    _store_benchmark_section(
+        orchestrator,
+        "passk",
+        {
             "k_value": k_value,
-            "temperature_range": temperature_range,
+            "temperature_range": effective_temperature_range,
             "max_samples": max_samples,
             "enable_early_stopping": enable_early_stopping,
             "stop_after_n_success": stop_after_n_success,
-        }
+        },
+    )
 
     logger.info(f"Configured Pass@k evaluation: k={k_value}, max_samples={max_samples}")
 
@@ -146,19 +244,9 @@ def get_passk_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Pass@k configuration dict
     """
-    return getattr(
-        orchestrator,
-        "benchmark_config",
-        {},
-    ).get(
+    return _load_config(orchestrator, "benchmark_config", _BENCHMARK_DEFAULTS).get(
         "passk",
-        {
-            "k_value": 10,
-            "temperature_range": [0.2, 0.4, 0.6, 0.8],
-            "max_samples": 100,
-            "enable_early_stopping": True,
-            "stop_after_n_success": 5,
-        },
+        dict(_PASSK_DEFAULTS),
     )
 
 
@@ -183,15 +271,18 @@ def configure_metrics_collection(
         enable_detailed_tracing: Enable detailed execution traces
         output_format: Output format (json, csv, or both)
     """
-    if hasattr(orchestrator, "metrics_config"):
-        orchestrator.metrics_config = {
+    _store_config(
+        orchestrator,
+        "metrics_config",
+        {
             "track_token_usage": track_token_usage,
             "track_execution_time": track_execution_time,
             "track_tool_calls": track_tool_calls,
             "track_test_results": track_test_results,
             "enable_detailed_tracing": enable_detailed_tracing,
             "output_format": output_format,
-        }
+        },
+    )
 
     logger.info(f"Configured metrics collection: format={output_format}")
 
@@ -205,18 +296,7 @@ def get_metrics_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Metrics configuration dict
     """
-    return getattr(
-        orchestrator,
-        "metrics_config",
-        {
-            "track_token_usage": True,
-            "track_execution_time": True,
-            "track_tool_calls": True,
-            "track_test_results": True,
-            "enable_detailed_tracing": False,
-            "output_format": "json",
-        },
-    )
+    return _load_config(orchestrator, "metrics_config", _METRICS_DEFAULTS)
 
 
 def configure_test_generation(
@@ -238,14 +318,17 @@ def configure_test_generation(
         generate_integration_tests: Generate integration tests
         use_property_based_testing: Use property-based testing (hypothesis)
     """
-    if hasattr(orchestrator, "test_generation_config"):
-        orchestrator.test_generation_config = {
+    _store_config(
+        orchestrator,
+        "test_generation_config",
+        {
             "test_framework": test_framework,
             "coverage_threshold": coverage_threshold,
             "generate_unit_tests": generate_unit_tests,
             "generate_integration_tests": generate_integration_tests,
             "use_property_based_testing": use_property_based_testing,
-        }
+        },
+    )
 
     logger.info(
         f"Configured test generation: framework={test_framework}, "
@@ -276,8 +359,10 @@ def configure_code_quality_checks(
         type_checking_tool: Type checking tool to use
         max_complexity: Maximum cyclomatic complexity
     """
-    if hasattr(orchestrator, "code_quality_config"):
-        orchestrator.code_quality_config = {
+    _store_config(
+        orchestrator,
+        "code_quality_config",
+        {
             "enable_linting": enable_linting,
             "linting_tool": linting_tool,
             "enable_formatting": enable_formatting,
@@ -285,7 +370,8 @@ def configure_code_quality_checks(
             "enable_type_checking": enable_type_checking,
             "type_checking_tool": type_checking_tool,
             "max_complexity": max_complexity,
-        }
+        },
+    )
 
     logger.info(
         f"Configured code quality checks: linting={enable_linting}, "
@@ -314,15 +400,18 @@ def configure_performance_benchmarking(
         enable_profiling: Enable CPU profiling
         profile_memory: Enable memory profiling
     """
-    if hasattr(orchestrator, "performance_config"):
-        orchestrator.performance_config = {
+    _store_config(
+        orchestrator,
+        "performance_config",
+        {
             "measure_latency": measure_latency,
             "measure_throughput": measure_throughput,
             "benchmark_iterations": benchmark_iterations,
             "warmup_iterations": warmup_iterations,
             "enable_profiling": enable_profiling,
             "profile_memory": profile_memory,
-        }
+        },
+    )
 
     logger.info(f"Configured performance benchmarking: iterations={benchmark_iterations}")
 

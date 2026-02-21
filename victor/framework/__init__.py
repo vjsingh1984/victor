@@ -1199,6 +1199,55 @@ try:
 except ImportError:
     _WORKFLOW_ENGINE_EXPORTS = []
 
+# Observability (Phase 4 - Unified metrics and dashboard)
+try:
+    from victor.framework.observability import (
+        # Manager
+        ObservabilityManager,
+        ObservabilityConfig,
+        DashboardData,
+        # Metrics
+        Metric,
+        MetricType,
+        MetricLabel,
+        CounterMetric,
+        GaugeMetric,
+        HistogramBucket,
+        HistogramMetric,
+        SummaryMetric,
+        MetricsSnapshot,
+        MetricsCollection,
+        # Protocols
+        MetricSource,
+        # Constants
+        MetricNames,
+    )
+
+    _OBSERVABILITY_EXPORTS = [
+        # Manager
+        "ObservabilityManager",
+        "ObservabilityConfig",
+        "DashboardData",
+        # Metrics
+        "Metric",
+        "MetricType",
+        "MetricLabel",
+        "CounterMetric",
+        "GaugeMetric",
+        "HistogramBucket",
+        "HistogramMetric",
+        "SummaryMetric",
+        "MetricsSnapshot",
+        "MetricsCollection",
+        # Protocols
+        "MetricSource",
+        # Constants
+        "MetricNames",
+    ]
+    __all__ = list(__all__) + _OBSERVABILITY_EXPORTS
+except ImportError:
+    _OBSERVABILITY_EXPORTS = []
+
 # Version sourced from pyproject.toml via importlib.metadata
 try:
     from importlib.metadata import version as _get_version

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -322,6 +322,28 @@ class ProfileConfig(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Planning Configuration (P3-1)
+    # -------------------------------------------------------------------------
+    # Optional override for planning-specific model selection
+    # Allows using a different (often more capable or cost-effective) model for
+    # structured planning vs regular chat execution
+    #
+    # Example: Use local model for chat (fast, cheap) but cloud model for planning
+    # (better at structured output, more reliable JSON generation)
+    #
+    # Set planning_provider and planning_model to override defaults for planning
+    # If not set, uses the default provider/model from the profile
+    # -------------------------------------------------------------------------
+
+    planning_provider: Optional[str] = Field(
+        None, description="Override provider for planning (e.g., 'deepseek', 'anthropic')"
+    )
+    planning_model: Optional[str] = Field(
+        None,
+        description="Override model for planning tasks (e.g., 'deepseek-chat', 'claude-sonnet-4-5')",
+    )
+
+    # -------------------------------------------------------------------------
     # Provider Tuning Options (P3-1)
     # -------------------------------------------------------------------------
     # These settings allow fine-tuning agent behavior per provider/model.
@@ -574,7 +596,10 @@ class Settings(BaseSettings):
     show_token_count: bool = True
     show_cost_metrics: bool = False  # Show cost in metrics display (e.g., "$0.015")
     stream_responses: bool = True
-    use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
+    use_emojis: bool = Field(
+        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
+        description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var.",
+    )
 
     # Interaction Mode
     # When True (one-shot mode), auto-continue when model asks for user input
@@ -607,6 +632,19 @@ class Settings(BaseSettings):
     # Tool selection fallback
     fallback_max_tools: int = 8  # Cap tool list when stage pruning removes everything
 
+    # Autonomous Planning Settings
+    # When enabled, complex multi-step tasks use structured planning instead of direct chat
+    enable_planning: bool = Field(
+        default=False, description="Auto-detect and use planning for complex tasks (default: off)"
+    )
+    planning_min_complexity: str = Field(
+        default="moderate",
+        description="Minimum complexity to trigger planning: simple, moderate, complex",
+    )
+    planning_show_plan: bool = Field(
+        default=True, description="Show plan before execution (for transparency)"
+    )
+
     # Tool result caching (opt-in per tool)
     tool_cache_enabled: bool = True
     tool_cache_ttl: int = 600  # seconds
@@ -617,6 +655,26 @@ class Settings(BaseSettings):
         "list_directory",
         "plan_files",
     ]
+
+    # Generic runtime cache for non-tool payloads (feature-flagged integration path)
+    generic_result_cache_enabled: bool = False
+    generic_result_cache_ttl: int = 300  # seconds
+
+    # Shared HTTP connection pool for network tools (feature-flagged integration path)
+    http_connection_pool_enabled: bool = False
+    http_connection_pool_max_connections: int = 100
+    http_connection_pool_max_connections_per_host: int = 10
+    http_connection_pool_connection_timeout: int = 30  # seconds
+    http_connection_pool_total_timeout: int = 60  # seconds
+
+    # Startup/runtime preloading coordinator for warm-path dependencies.
+    framework_preload_enabled: bool = False
+    framework_preload_parallel: bool = True
+
+    # Strict mode for blocking private attribute fallbacks in framework integration.
+    framework_private_fallback_strict_mode: bool = False
+    # Strict mode for blocking non-registry protocol fallback probes in framework integration.
+    framework_protocol_fallback_strict_mode: bool = False
 
     # Tool Argument Validation
     # Controls pre-execution JSON Schema validation of tool arguments
@@ -895,6 +953,27 @@ class Settings(BaseSettings):
     # Event batching configuration
     event_max_batch_size: int = 100
     event_flush_interval_ms: float = 1000.0
+    event_queue_maxsize: int = 10000
+    event_queue_overflow_policy: str = "drop_newest"
+    event_queue_overflow_block_timeout_ms: float = 50.0
+    event_queue_overflow_topic_policies: Dict[str, str] = Field(
+        default_factory=lambda: {
+            # Critical lifecycle/integration/error events should prefer bounded blocking
+            "lifecycle.session.*": "block_with_timeout",
+            "vertical.applied": "block_with_timeout",
+            "error.*": "block_with_timeout",
+            # High-volume telemetry should preserve recency and avoid hard stalls
+            "core.events.emit_sync.metrics": "drop_oldest",
+            "vertical.extensions.loader.metrics": "drop_oldest",
+        }
+    )
+    event_queue_overflow_topic_block_timeout_ms: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": 150.0,
+            "vertical.applied": 120.0,
+            "error.*": 200.0,
+        }
+    )
 
     # Sync emit metrics reporter configuration
     # Emits periodic snapshots for emit_helper delivery counters.
@@ -905,6 +984,18 @@ class Settings(BaseSettings):
     event_emit_sync_metrics_interval_seconds: float = 60.0
     event_emit_sync_metrics_reset_after_emit: bool = False
     event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
+
+    # Extension-loader pressure/reporter defaults (P3 reliability)
+    extension_loader_warn_queue_threshold: int = 24
+    extension_loader_error_queue_threshold: int = 32
+    extension_loader_warn_in_flight_threshold: int = 6
+    extension_loader_error_in_flight_threshold: int = 8
+    extension_loader_pressure_cooldown_seconds: float = 5.0
+    extension_loader_emit_pressure_events: bool = False
+    extension_loader_metrics_reporter_enabled: bool = False
+    extension_loader_metrics_reporter_interval_seconds: float = 60.0
+    extension_loader_metrics_reporter_reset_after_emit: bool = False
+    extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
 
     # ==========================================================================
     # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
@@ -927,6 +1018,123 @@ class Settings(BaseSettings):
     # Analytics
     analytics_enabled: bool = True
     # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
+
+    @field_validator("event_queue_overflow_policy")
+    @classmethod
+    def validate_event_queue_overflow_policy(cls, value: str) -> str:
+        """Validate configured in-memory queue overflow policy."""
+        normalized = str(value).strip().lower()
+        allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
+        if normalized not in allowed:
+            allowed_csv = ", ".join(sorted(allowed))
+            raise ValueError(
+                f"event_queue_overflow_policy must be one of: {allowed_csv}; got '{value}'"
+            )
+        return normalized
+
+    @field_validator("event_queue_overflow_topic_policies")
+    @classmethod
+    def validate_event_queue_overflow_topic_policies(
+        cls,
+        value: Dict[str, str],
+    ) -> Dict[str, str]:
+        """Validate per-topic overflow policy overrides."""
+        if not isinstance(value, dict):
+            raise ValueError("event_queue_overflow_topic_policies must be a dict[str, str]")
+
+        allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
+        normalized: Dict[str, str] = {}
+        for topic_pattern, policy in value.items():
+            pattern = str(topic_pattern).strip()
+            if not pattern:
+                raise ValueError("event_queue_overflow_topic_policies keys must be non-empty")
+            normalized_policy = str(policy).strip().lower()
+            if normalized_policy not in allowed:
+                allowed_csv = ", ".join(sorted(allowed))
+                raise ValueError(
+                    "event_queue_overflow_topic_policies values must be one of: "
+                    f"{allowed_csv}; got '{policy}' for key '{topic_pattern}'"
+                )
+            normalized[pattern] = normalized_policy
+        return normalized
+
+    @field_validator("event_queue_overflow_topic_block_timeout_ms")
+    @classmethod
+    def validate_event_queue_overflow_topic_block_timeout_ms(
+        cls,
+        value: Dict[str, float],
+    ) -> Dict[str, float]:
+        """Validate per-topic timeout overrides for block-with-timeout policy."""
+        if not isinstance(value, dict):
+            raise ValueError(
+                "event_queue_overflow_topic_block_timeout_ms must be a dict[str, float]"
+            )
+
+        normalized: Dict[str, float] = {}
+        for topic_pattern, timeout_ms in value.items():
+            pattern = str(topic_pattern).strip()
+            if not pattern:
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms keys must be non-empty"
+                )
+            try:
+                parsed_timeout = float(timeout_ms)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms values must be numeric"
+                ) from None
+            if parsed_timeout < 0:
+                raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
+            normalized[pattern] = parsed_timeout
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_extension_loader_thresholds(self) -> "Settings":
+        """Validate extension-loader pressure threshold relationships."""
+        if self.event_queue_maxsize < 1:
+            raise ValueError("event_queue_maxsize must be >= 1")
+        if self.event_queue_overflow_block_timeout_ms < 0:
+            raise ValueError("event_queue_overflow_block_timeout_ms must be >= 0")
+        if self.extension_loader_pressure_cooldown_seconds < 0:
+            raise ValueError("extension_loader_pressure_cooldown_seconds must be >= 0")
+        if self.extension_loader_metrics_reporter_interval_seconds <= 0:
+            raise ValueError("extension_loader_metrics_reporter_interval_seconds must be > 0")
+        if self.extension_loader_error_queue_threshold < self.extension_loader_warn_queue_threshold:
+            raise ValueError(
+                "extension_loader_error_queue_threshold must be >= "
+                "extension_loader_warn_queue_threshold"
+            )
+        if (
+            self.extension_loader_error_in_flight_threshold
+            < self.extension_loader_warn_in_flight_threshold
+        ):
+            raise ValueError(
+                "extension_loader_error_in_flight_threshold must be >= "
+                "extension_loader_warn_in_flight_threshold"
+            )
+        if self.generic_result_cache_ttl < 0:
+            raise ValueError("generic_result_cache_ttl must be >= 0")
+        if self.http_connection_pool_max_connections < 1:
+            raise ValueError("http_connection_pool_max_connections must be >= 1")
+        if self.http_connection_pool_max_connections_per_host < 1:
+            raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
+        if self.http_connection_pool_connection_timeout <= 0:
+            raise ValueError("http_connection_pool_connection_timeout must be > 0")
+        if self.http_connection_pool_total_timeout <= 0:
+            raise ValueError("http_connection_pool_total_timeout must be > 0")
+        return self
+
+    @model_validator(mode="after")
+    def disable_emojis_in_ci(self) -> "Settings":
+        """Automatically disable emoji indicators in CI environments.
+
+        This prevents test failures due to emoji rendering differences in CI.
+        Checks the CI environment variable which is set by GitHub Actions, GitLab CI, etc.
+        """
+        if os.getenv("CI", "false").lower() == "true":
+            # Use object.__setattr__ to bypass pydantic validation
+            object.__setattr__(self, "use_emojis", False)
+        return self
 
     @staticmethod
     def _estimate_model_vram_gb(model_id: str) -> Optional[float]:

@@ -223,6 +223,9 @@ def bootstrap_container(
     # Register workflow compiler plugins (Plugin Architecture)
     _register_workflow_compiler_plugins(container, settings)
 
+    # Apply runtime pressure/reporter configuration for extension loading.
+    _configure_extension_loader_runtime(settings)
+
     # Register vertical services
     _register_vertical_services(container, settings, vertical)
 
@@ -244,11 +247,29 @@ def bootstrap_container(
 
 def _register_core_services(container: ServiceContainer, settings: Settings) -> None:
     """Register core infrastructure services."""
+    from victor.framework.capability_config_service import CapabilityConfigService
+    from victor.framework.framework_integration_registry_service import (
+        FrameworkIntegrationRegistryService,
+    )
 
     # Cache service
     container.register(
         CacheServiceProtocol,
         lambda c: InMemoryCacheService(max_size=1000),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Capability config service (DI-global store with per-session scope buckets)
+    container.register(
+        CapabilityConfigService,
+        lambda c: CapabilityConfigService(),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Framework integration registry facade service
+    container.register(
+        FrameworkIntegrationRegistryService,
+        lambda c: FrameworkIntegrationRegistryService(),
         ServiceLifetime.SINGLETON,
     )
 
@@ -263,33 +284,19 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
         IEventBackend,
         ObservabilityBus,
         AgentMessageBus,
-        BackendConfig,
-        BackendType,
-        DeliveryGuarantee,
         create_event_backend,
     )
+    from victor.core.events.backends import build_backend_config_from_settings
 
-    # Create event backend configuration from settings
-    # Check for new setting, fall back to legacy setting
-    backend_type_str = getattr(settings, "event_backend_type", "in_memory")
+    backend_config = build_backend_config_from_settings(settings)
     lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
-    if isinstance(backend_type_str, str):
-        backend_type = BackendType(backend_type_str.lower())
-    else:
-        backend_type = BackendType.IN_MEMORY
-
-    # Create backend config
-    backend_config = BackendConfig(
-        backend_type=backend_type,
-        delivery_guarantee=DeliveryGuarantee.AT_MOST_ONCE,
-        max_batch_size=100,
-        flush_interval_ms=1000.0,
-    )
 
     # Register IEventBackend as singleton
     container.register(
         IEventBackend,
-        lambda c: create_event_backend(backend_config, lazy_init=lazy_init),
+        lambda c, cfg=backend_config, lazy=lazy_init: create_event_backend(
+            config=cfg, lazy_init=lazy
+        ),
         ServiceLifetime.SINGLETON,
     )
 
@@ -307,7 +314,95 @@ def _register_event_services(container: ServiceContainer, settings: Settings) ->
         ServiceLifetime.SINGLETON,
     )
 
-    logger.info(f"Registered event services with backend: {backend_type.value}")
+    logger.info(
+        "Registered event services with backend: %s (overflow_policy=%s, queue_maxsize=%s)",
+        backend_config.backend_type.value,
+        backend_config.extra.get("queue_overflow_policy"),
+        backend_config.extra.get("queue_maxsize"),
+    )
+
+
+def _configure_extension_loader_runtime(settings: Settings) -> None:
+    """Apply settings-level extension-loader pressure/reporter configuration."""
+    try:
+        from victor.core.verticals.extension_loader import (
+            VerticalExtensionLoader,
+            start_extension_loader_metrics_reporter,
+            stop_extension_loader_metrics_reporter,
+        )
+    except Exception as e:
+        logger.debug("Failed to import extension loader runtime config hooks: %s", e)
+        return
+
+    def _setting_int(name: str, default: int) -> int:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                return default
+        return default
+
+    def _setting_float(name: str, default: float) -> float:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return float(value)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value.strip())
+            except ValueError:
+                return default
+        return default
+
+    def _setting_bool(name: str, default: bool) -> bool:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return default
+
+    def _setting_str(name: str, default: str) -> str:
+        value = getattr(settings, name, default)
+        return value if isinstance(value, str) and value.strip() else default
+
+    VerticalExtensionLoader.configure_extension_loader_pressure(
+        warn_queue_threshold=_setting_int("extension_loader_warn_queue_threshold", 24),
+        error_queue_threshold=_setting_int("extension_loader_error_queue_threshold", 32),
+        warn_in_flight_threshold=_setting_int("extension_loader_warn_in_flight_threshold", 6),
+        error_in_flight_threshold=_setting_int("extension_loader_error_in_flight_threshold", 8),
+        cooldown_seconds=_setting_float("extension_loader_pressure_cooldown_seconds", 5.0),
+        emit_events=_setting_bool("extension_loader_emit_pressure_events", False),
+    )
+
+    if _setting_bool("extension_loader_metrics_reporter_enabled", False):
+        start_extension_loader_metrics_reporter(
+            interval_seconds=_setting_float(
+                "extension_loader_metrics_reporter_interval_seconds", 60.0
+            ),
+            topic=_setting_str(
+                "extension_loader_metrics_reporter_topic",
+                "vertical.extensions.loader.metrics",
+            ),
+            source="BootstrapExtensionLoaderMetricsReporter",
+            reset_after_emit=_setting_bool(
+                "extension_loader_metrics_reporter_reset_after_emit", False
+            ),
+        )
+    else:
+        stop_extension_loader_metrics_reporter(timeout=2.0)
 
 
 def _register_analytics_services(container: ServiceContainer, settings: Settings) -> None:
@@ -528,25 +623,39 @@ def _register_vertical_services(
     # Determine which vertical to load
     # Priority: explicit parameter > settings.default_vertical > "coding"
     if vertical_name is None:
-        vertical_name = getattr(settings, "default_vertical", None) or "coding"
+        default_vertical = getattr(settings, "default_vertical", None)
+        if isinstance(default_vertical, str) and default_vertical.strip():
+            vertical_name = default_vertical
+        else:
+            vertical_name = "coding"
 
     try:
-        from victor.core.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import activate_vertical_services
         from victor.core.verticals.protocols import VerticalExtensions
 
-        # Load and activate the vertical
-        loader = get_vertical_loader()
-        loader.load(vertical_name)
-
-        # Register vertical services with DI container
-        loader.register_services(container, settings)
+        activation = activate_vertical_services(container, settings, vertical_name)
 
         # Register the extensions as a service for framework access
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
         extensions = loader.get_extensions()
         if extensions:
-            container.register_instance(VerticalExtensions, extensions)
+            if container.is_registered(VerticalExtensions):
+                container.register_or_replace(
+                    VerticalExtensions,
+                    lambda c, ext=extensions: ext,
+                    ServiceLifetime.SINGLETON,
+                )
+            else:
+                container.register_instance(VerticalExtensions, extensions)
 
-        logger.info(f"Registered vertical services: {vertical_name}")
+        logger.info(
+            "Registered vertical services: %s (activated=%s, services_registered=%s)",
+            vertical_name,
+            activation.activated,
+            activation.services_registered,
+        )
     except ImportError as e:
         logger.debug(f"Vertical loading not available: {e}")
     except ValueError as e:
@@ -629,7 +738,10 @@ def _ensure_vertical_activated(
         vertical_name: Vertical name to ensure is active
     """
     try:
-        from victor.core.verticals.vertical_loader import get_vertical_loader
+        from victor.core.verticals.vertical_loader import (
+            activate_vertical_services,
+            get_vertical_loader,
+        )
         from victor.core.verticals.protocols import VerticalExtensions
 
         loader = get_vertical_loader()
@@ -638,11 +750,7 @@ def _ensure_vertical_activated(
         # If no vertical active or different vertical requested, (re)activate
         if current_vertical is None or current_vertical != vertical_name:
             logger.info(f"Switching vertical: {current_vertical or 'none'} -> {vertical_name}")
-            # Load and activate the new vertical
-            loader.load(vertical_name)
-
-            # Re-register vertical services (loader tracks if already registered)
-            loader.register_services(container, settings)
+            activation = activate_vertical_services(container, settings, vertical_name)
 
             # Update the extensions in container
             extensions = loader.get_extensions()
@@ -653,7 +761,12 @@ def _ensure_vertical_activated(
                     ServiceLifetime.SINGLETON,
                 )
 
-            logger.info(f"Vertical switched to: {vertical_name}")
+            logger.info(
+                "Vertical switched to: %s (activated=%s, services_registered=%s)",
+                vertical_name,
+                activation.activated,
+                activation.services_registered,
+            )
     except ImportError as e:
         logger.debug(f"Vertical loading not available: {e}")
     except ValueError as e:

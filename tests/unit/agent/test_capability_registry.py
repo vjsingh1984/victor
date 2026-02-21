@@ -55,9 +55,17 @@ class MockOrchestrator(CapabilityRegistryMixin):
         """Set enabled tools."""
         self._enabled_tools = tools
 
+    def get_enabled_tools(self) -> Set[str]:
+        """Get enabled tools."""
+        return set(self._enabled_tools)
+
     def set_vertical_context(self, context: Any) -> None:
         """Set vertical context."""
         self._vertical_context = context
+
+    def get_vertical_context(self) -> Any:
+        """Get vertical context."""
+        return self._vertical_context
 
     def apply_vertical_middleware(self, middleware: list) -> None:
         """Apply vertical middleware."""
@@ -384,6 +392,22 @@ class TestCapabilityRegistryMixin:
         assert builder is not None
         assert builder._custom_prompt == "Test prompt"
 
+    def test_get_capability_value_returns_enabled_tools(self, orchestrator):
+        """enabled_tools capability should expose getter-backed value."""
+        orchestrator._enabled_tools = {"read", "write"}
+
+        value = orchestrator.get_capability_value("enabled_tools")
+
+        assert value == {"read", "write"}
+
+    def test_get_capability_value_returns_vertical_context(self, orchestrator):
+        """vertical_context capability should expose getter-backed value."""
+        orchestrator._vertical_context = {"name": "coding"}
+
+        value = orchestrator.get_capability_value("vertical_context")
+
+        assert value == {"name": "coding"}
+
     def test_get_capability_value_raises_for_unknown(self, orchestrator):
         """Test get_capability_value raises for unknown capability."""
         with pytest.raises(KeyError, match="not found"):
@@ -549,6 +573,19 @@ class TestVerticalIntegrationHelpers:
         assert _check_capability(obj, "enabled_tools")
         assert not _check_capability(obj, "unknown")
 
+    def test_check_capability_fallback_blocked_in_protocol_strict_mode(self, monkeypatch):
+        """Protocol strict mode should block duck-typed fallback checks."""
+        from victor.framework.vertical_integration import _check_capability
+
+        class PlainObject:
+            def set_enabled_tools(self, tools):
+                pass
+
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS", "1")
+
+        with pytest.raises(RuntimeError, match="Protocol fallback blocked"):
+            _check_capability(PlainObject(), "enabled_tools")
+
     def test_invoke_capability_with_protocol(self):
         """Test _invoke_capability uses protocol when available."""
         from victor.framework.vertical_integration import _invoke_capability
@@ -573,6 +610,22 @@ class TestVerticalIntegrationHelpers:
         tools = {"read", "write"}
         _invoke_capability(obj, "enabled_tools", tools)
         assert obj.tools == tools
+
+    def test_invoke_capability_fallback_blocked_in_protocol_strict_mode(self, monkeypatch):
+        """Protocol strict mode should block duck-typed fallback invocation."""
+        from victor.framework.vertical_integration import _invoke_capability
+
+        class PlainObject:
+            def __init__(self):
+                self.tools = set()
+
+            def set_enabled_tools(self, tools):
+                self.tools = tools
+
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS", "1")
+
+        with pytest.raises(RuntimeError, match="Protocol fallback blocked"):
+            _invoke_capability(PlainObject(), "enabled_tools", {"read"})
 
     def test_check_capability_with_version_requirement(self):
         """Test _check_capability with min_version requirement."""

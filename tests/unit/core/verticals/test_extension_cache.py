@@ -25,7 +25,10 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
-from victor.core.verticals.vertical_loader import VerticalLoader
+from victor.core.verticals.vertical_loader import (
+    VerticalLoader,
+    activate_vertical_services,
+)
 
 
 class TestClearExtensionCache:
@@ -177,9 +180,7 @@ class TestRefreshPluginsClearsExtensionCache:
         loader._extensions = MagicMock()
         loader._registered_services = True
 
-        with patch(
-            "victor.core.verticals.vertical_loader.get_entry_point_cache"
-        ) as mock_cache_get:
+        with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
             mock_cache = MagicMock()
             mock_cache_get.return_value = mock_cache
 
@@ -333,12 +334,69 @@ class TestVerticalLoaderThreadSafety:
         settings = MagicMock()
 
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(loader.register_services, container, settings) for _ in range(20)]
+            futures = [
+                executor.submit(loader.register_services, container, settings) for _ in range(20)
+            ]
             for future in futures:
                 future.result()
 
         assert provider.count == 1
         assert loader._registered_services is True
+
+    def test_register_services_returns_false_when_already_registered(self):
+        """register_services should return False when services are already registered."""
+        loader = VerticalLoader()
+        loader._registered_services = True
+
+        assert loader.register_services(MagicMock(), MagicMock()) is False
+
+
+class TestVerticalActivationHelpers:
+    """Tests for the canonical vertical activation helper."""
+
+    def test_activate_vertical_services_loads_and_registers(self):
+        """activate_vertical_services should load and register for a new vertical."""
+        container = MagicMock()
+        settings = MagicMock()
+        mock_loader = MagicMock()
+        mock_loader.active_vertical_name = None
+        mock_loader.active_vertical = None
+        mock_loader.register_services.return_value = True
+
+        with patch(
+            "victor.core.verticals.vertical_loader.get_vertical_loader",
+            return_value=mock_loader,
+        ):
+            result = activate_vertical_services(container, settings, "coding")
+
+        mock_loader.load.assert_called_once_with("coding")
+        mock_loader.register_services.assert_called_once_with(container, settings)
+        assert result.vertical_name == "coding"
+        assert result.previous_vertical is None
+        assert result.activated is True
+        assert result.services_registered is True
+
+    def test_activate_vertical_services_skips_reload_for_active_vertical(self):
+        """activate_vertical_services should not reload already active vertical."""
+        container = MagicMock()
+        settings = MagicMock()
+        mock_loader = MagicMock()
+        mock_loader.active_vertical_name = "coding"
+        mock_loader.active_vertical = MagicMock()
+        mock_loader.register_services.return_value = False
+
+        with patch(
+            "victor.core.verticals.vertical_loader.get_vertical_loader",
+            return_value=mock_loader,
+        ):
+            result = activate_vertical_services(container, settings, "coding")
+
+        mock_loader.load.assert_not_called()
+        mock_loader.register_services.assert_called_once_with(container, settings)
+        assert result.vertical_name == "coding"
+        assert result.previous_vertical == "coding"
+        assert result.activated is False
+        assert result.services_registered is False
 
 
 class TestVerticalLoaderDiscoveryTelemetry:
@@ -396,7 +454,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted_event.set()
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -420,7 +480,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted_event.set()
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 with patch(
@@ -445,7 +507,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -473,7 +537,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -501,7 +567,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -528,7 +596,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 mock_cache.get_entry_points.return_value = {}
@@ -556,7 +626,9 @@ class TestVerticalLoaderObservabilityEvents:
                     emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
 
@@ -586,7 +658,9 @@ class TestVerticalLoaderObservabilityEvents:
                 emitted.append((topic, data, source))
 
         with patch("victor.core.events.get_observability_bus", return_value=_Bus()):
-            with patch("victor.core.verticals.vertical_loader.get_entry_point_cache") as mock_cache_get:
+            with patch(
+                "victor.core.verticals.vertical_loader.get_entry_point_cache"
+            ) as mock_cache_get:
                 mock_cache = MagicMock()
                 mock_cache_get.return_value = mock_cache
                 with patch(

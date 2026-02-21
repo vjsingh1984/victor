@@ -40,9 +40,10 @@ Example:
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Generic, List, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -162,3 +163,73 @@ class BaseCapabilityProvider(ABC, Generic[T]):
             True if the capability exists, False otherwise.
         """
         return name in self.get_capabilities()
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get capability usage metrics.
+
+        Returns a dictionary of metrics for this capability provider.
+        Subclasses can override to provide custom metrics.
+
+        Returns:
+            Dictionary with metrics including:
+            - access_count: Total number of capability accesses
+            - last_accessed: Timestamp of last access
+            - error_count: Total number of errors
+            - capability_count: Number of registered capabilities
+
+        Example:
+            metrics = provider.get_metrics()
+            print(f"Accessed {metrics['access_count']} times")
+        """
+        return {
+            "access_count": getattr(self, "_access_count", 0),
+            "last_accessed": getattr(self, "_last_accessed", 0.0),
+            "error_count": getattr(self, "_error_count", 0),
+            "capability_count": len(self.get_capabilities()),
+        }
+
+    def record_access(self, capability_name: Optional[str] = None) -> None:
+        """Record a capability access for metrics.
+
+        Args:
+            capability_name: Name of the capability accessed (optional)
+
+        Example:
+            provider.record_access("code_review")
+        """
+        self._access_count = getattr(self, "_access_count", 0) + 1
+        self._last_accessed = time.time()
+
+    def record_error(self, capability_name: Optional[str] = None) -> None:
+        """Record a capability error for metrics.
+
+        Args:
+            capability_name: Name of the capability that errored (optional)
+
+        Example:
+            provider.record_error("code_review")
+        """
+        self._error_count = getattr(self, "_error_count", 0) + 1
+
+    def get_observability_data(self) -> Dict[str, Any]:
+        """Get observability data for dashboard integration.
+
+        Returns a dictionary formatted for the ObservabilityManager.
+        This method combines get_metrics() with additional metadata.
+
+        Returns:
+            Dictionary with observability data including:
+            - source_id: Unique identifier for this provider
+            - source_type: Type of metrics source ("capability")
+            - metrics: Dictionary of metrics
+
+        Example:
+            data = provider.get_observability_data()
+            print(f"Source: {data['source_id']}")
+        """
+        class_name = self.__class__.__name__
+        return {
+            "source_id": f"capability:{class_name}",
+            "source_type": "capability",
+            "metrics": self.get_metrics(),
+        }

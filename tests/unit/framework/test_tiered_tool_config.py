@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for tiered tool configuration fallback chain.
+"""Tests for tiered tool configuration canonical contract.
 
 These tests verify that the TieredConfigStepHandler correctly handles
-the API mismatch between get_tiered_tool_config() and get_tiered_tools().
+the canonical get_tiered_tool_config() API.
 
 Workstream D: OpenAI Codex feedback fixes.
 """
@@ -101,22 +101,14 @@ class MockVerticalWithNoneReturn:
     def get_tiered_tool_config(cls) -> Optional[TieredToolConfig]:
         return None
 
-    @classmethod
-    def get_tiered_tools(cls) -> TieredToolConfig:
-        return TieredToolConfig(
-            mandatory={"fallback"},
-            vertical_core=set(),
-            semantic_pool=set(),
-        )
-
 
 # =============================================================================
 # Tests for get_tiered_config helper function
 # =============================================================================
 
 
-class TestTieredToolConfigFallbackChain:
-    """Test get_tiered_config fallback chain."""
+class TestTieredToolConfigCanonicalContract:
+    """Test get_tiered_config canonical behavior."""
 
     def test_fallback_chain_prefers_get_tiered_tool_config(self):
         """get_tiered_config should prefer get_tiered_tool_config when available."""
@@ -127,14 +119,11 @@ class TestTieredToolConfigFallbackChain:
         assert "ls" in config.mandatory
         assert "write" in config.vertical_core
 
-    def test_fallback_chain_uses_get_tiered_tools_when_config_missing(self):
-        """get_tiered_config should fall back to get_tiered_tools."""
+    def test_no_legacy_fallback_by_default(self):
+        """get_tiered_config should not use deprecated fallback by default."""
         config = get_tiered_config(MockVerticalWithTieredTools)
 
-        assert config is not None
-        assert "read" in config.mandatory
-        assert "web" in config.vertical_core
-        assert "fetch" in config.vertical_core
+        assert config is None
 
     def test_fallback_chain_with_both_methods(self):
         """get_tiered_tool_config should take precedence over get_tiered_tools."""
@@ -154,11 +143,10 @@ class TestTieredToolConfigFallbackChain:
         assert config is None
 
     def test_fallback_chain_with_none_return(self):
-        """get_tiered_config should fall back when get_tiered_tool_config returns None."""
+        """get_tiered_config should return None if canonical method returns None."""
         config = get_tiered_config(MockVerticalWithNoneReturn)
 
-        assert config is not None
-        assert "fallback" in config.mandatory
+        assert config is None
 
 
 # =============================================================================
@@ -167,7 +155,7 @@ class TestTieredToolConfigFallbackChain:
 
 
 class TestTieredConfigStepHandler:
-    """Test TieredConfigStepHandler with fallback chain."""
+    """Test TieredConfigStepHandler with canonical contract."""
 
     def test_handler_properties(self):
         """Handler should have correct name and order."""
@@ -195,8 +183,8 @@ class TestTieredConfigStepHandler:
         config_arg = context.apply_tiered_config.call_args[0][0]
         assert "read" in config_arg.mandatory
 
-    def test_handler_falls_back_to_get_tiered_tools(self):
-        """Handler should fall back to get_tiered_tools."""
+    def test_handler_does_not_use_legacy_fallback_by_default(self):
+        """Handler should skip deprecated get_tiered_tools implementation."""
         handler = TieredConfigStepHandler()
         context = MagicMock()
         result = MagicMock()
@@ -209,10 +197,7 @@ class TestTieredConfigStepHandler:
             result,
         )
 
-        # Verify context.apply_tiered_config was called with fallback config
-        context.apply_tiered_config.assert_called_once()
-        config_arg = context.apply_tiered_config.call_args[0][0]
-        assert "web" in config_arg.vertical_core
+        context.apply_tiered_config.assert_not_called()
 
     def test_handler_handles_neither_method(self):
         """Handler should handle verticals with neither method gracefully."""

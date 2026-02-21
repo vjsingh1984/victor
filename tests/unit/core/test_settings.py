@@ -154,6 +154,119 @@ class TestSettings:
         assert settings.log_level == "INFO"
         assert settings.airgapped_mode is False
         assert settings.stream_responses is True
+        assert settings.event_queue_maxsize == 10000
+        assert settings.event_queue_overflow_policy == "drop_newest"
+        assert settings.event_queue_overflow_block_timeout_ms == 50.0
+        assert (
+            settings.event_queue_overflow_topic_policies["vertical.applied"] == "block_with_timeout"
+        )
+        assert settings.event_queue_overflow_topic_block_timeout_ms["lifecycle.session.*"] == 150.0
+        assert settings.extension_loader_warn_queue_threshold == 24
+        assert settings.extension_loader_error_queue_threshold == 32
+        assert settings.extension_loader_warn_in_flight_threshold == 6
+        assert settings.extension_loader_error_in_flight_threshold == 8
+        assert settings.extension_loader_pressure_cooldown_seconds == 5.0
+        assert settings.extension_loader_metrics_reporter_enabled is False
+        assert settings.extension_loader_metrics_reporter_interval_seconds == 60.0
+        assert settings.generic_result_cache_enabled is False
+        assert settings.http_connection_pool_enabled is False
+        assert settings.framework_preload_enabled is False
+        assert settings.framework_private_fallback_strict_mode is False
+        assert settings.framework_protocol_fallback_strict_mode is False
+
+    def test_settings_event_overflow_policy_validation(self):
+        """event_queue_overflow_policy should validate and normalize values."""
+        import pytest
+
+        settings = Settings(event_queue_overflow_policy="Drop_Oldest")
+        assert settings.event_queue_overflow_policy == "drop_oldest"
+
+        with pytest.raises(ValueError, match="event_queue_overflow_policy must be one of"):
+            Settings(event_queue_overflow_policy="reject")
+
+    def test_settings_event_topic_overflow_policy_validation(self):
+        """Per-topic overflow policy maps should validate and normalize values."""
+        import pytest
+
+        settings = Settings(
+            event_queue_overflow_topic_policies={" lifecycle.session.* ": "Drop_Oldest"}
+        )
+        assert settings.event_queue_overflow_topic_policies == {
+            "lifecycle.session.*": "drop_oldest"
+        }
+
+        with pytest.raises(
+            ValueError,
+            match="event_queue_overflow_topic_policies values must be one of",
+        ):
+            Settings(event_queue_overflow_topic_policies={"lifecycle.session.*": "reject"})
+
+    def test_settings_event_topic_block_timeout_validation(self):
+        """Per-topic block timeout overrides must be numeric and >= 0."""
+        import pytest
+
+        settings = Settings(event_queue_overflow_topic_block_timeout_ms={"error.*": 125})
+        assert settings.event_queue_overflow_topic_block_timeout_ms == {"error.*": 125.0}
+
+        with pytest.raises(
+            ValueError,
+            match="Input should be a valid number",
+        ):
+            Settings(event_queue_overflow_topic_block_timeout_ms={"error.*": "abc"})
+
+        with pytest.raises(
+            ValueError,
+            match="event_queue_overflow_topic_block_timeout_ms values must be >=",
+        ):
+            Settings(event_queue_overflow_topic_block_timeout_ms={"error.*": -1})
+
+    def test_settings_extension_loader_threshold_relationship_validation(self):
+        """Error thresholds must be >= warning thresholds."""
+        import pytest
+
+        with pytest.raises(
+            ValueError,
+            match="extension_loader_error_queue_threshold must be >=",
+        ):
+            Settings(
+                extension_loader_warn_queue_threshold=20,
+                extension_loader_error_queue_threshold=19,
+            )
+
+        with pytest.raises(
+            ValueError,
+            match="extension_loader_error_in_flight_threshold must be >=",
+        ):
+            Settings(
+                extension_loader_warn_in_flight_threshold=8,
+                extension_loader_error_in_flight_threshold=7,
+            )
+
+    def test_settings_extension_loader_reporter_interval_validation(self):
+        """extension_loader_metrics_reporter_interval_seconds must be > 0."""
+        import pytest
+
+        with pytest.raises(
+            ValueError,
+            match="extension_loader_metrics_reporter_interval_seconds must be > 0",
+        ):
+            Settings(extension_loader_metrics_reporter_interval_seconds=0)
+
+    def test_settings_runtime_infra_validation(self):
+        """Runtime infra thresholds must be valid."""
+        import pytest
+
+        with pytest.raises(ValueError, match="http_connection_pool_max_connections must be >= 1"):
+            Settings(http_connection_pool_max_connections=0)
+
+        with pytest.raises(
+            ValueError,
+            match="http_connection_pool_max_connections_per_host must be >= 1",
+        ):
+            Settings(http_connection_pool_max_connections_per_host=0)
+
+        with pytest.raises(ValueError, match="http_connection_pool_total_timeout must be > 0"):
+            Settings(http_connection_pool_total_timeout=0)
 
     def test_get_config_dir(self):
         """Test getting config directory uses GLOBAL_VICTOR_DIR."""

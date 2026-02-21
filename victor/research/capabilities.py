@@ -43,6 +43,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+)
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
@@ -50,6 +54,42 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Pilot)
+# =============================================================================
+
+
+_SOURCE_VERIFICATION_DEFAULTS: Dict[str, Any] = {
+    "min_credibility": 0.7,
+    "min_source_count": 3,
+    "require_diverse_sources": True,
+    "validate_urls": True,
+}
+_CITATION_DEFAULTS: Dict[str, Any] = {
+    "default_style": "apa",
+    "require_urls": True,
+    "include_authors": True,
+    "include_dates": True,
+}
+_RESEARCH_QUALITY_DEFAULTS: Dict[str, Any] = {
+    "min_coverage_score": 0.75,
+    "min_source_diversity": 2,
+    "check_recency": True,
+    "max_source_age_days": 365,
+}
+_LITERATURE_DEFAULTS: Dict[str, Any] = {
+    "min_relevance_score": 0.6,
+    "weight_citation_count": True,
+    "prefer_recent_papers": True,
+    "recent_paper_years": 5,
+}
+_FACT_CHECKING_DEFAULTS: Dict[str, Any] = {
+    "min_confidence_threshold": 0.5,
+    "require_multiple_sources": True,
+    "min_source_count_for_claim": 2,
+    "track_supporting_refuting": True,
+}
 
 # =============================================================================
 # Capability Handlers
@@ -76,13 +116,16 @@ def configure_source_verification(
         require_diverse_sources: Require source diversity (domains, types)
         validate_urls: Validate URL accessibility and format
     """
-    if hasattr(orchestrator, "source_verification_config"):
-        orchestrator.source_verification_config = {
+    store_capability_config(
+        orchestrator,
+        "source_verification_config",
+        {
             "min_credibility": min_credibility,
             "min_source_count": min_source_count,
             "require_diverse_sources": require_diverse_sources,
             "validate_urls": validate_urls,
-        }
+        },
+    )
 
     logger.info(
         f"Configured source verification: credibility>={min_credibility:.0%}, "
@@ -99,15 +142,8 @@ def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Source verification configuration dict
     """
-    return getattr(
-        orchestrator,
-        "source_verification_config",
-        {
-            "min_credibility": 0.7,
-            "min_source_count": 3,
-            "require_diverse_sources": True,
-            "validate_urls": True,
-        },
+    return load_capability_config(
+        orchestrator, "source_verification_config", _SOURCE_VERIFICATION_DEFAULTS
     )
 
 
@@ -128,13 +164,16 @@ def configure_citation_management(
         include_authors: Include author names in citations
         include_dates: Include publication dates
     """
-    if hasattr(orchestrator, "citation_config"):
-        orchestrator.citation_config = {
+    store_capability_config(
+        orchestrator,
+        "citation_config",
+        {
             "default_style": default_style,
             "require_urls": require_urls,
             "include_authors": include_authors,
             "include_dates": include_dates,
-        }
+        },
+    )
 
     logger.info(f"Configured citation management: style={default_style}")
 
@@ -148,16 +187,7 @@ def get_citation_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Citation configuration dict
     """
-    return getattr(
-        orchestrator,
-        "citation_config",
-        {
-            "default_style": "apa",
-            "require_urls": True,
-            "include_authors": True,
-            "include_dates": True,
-        },
-    )
+    return load_capability_config(orchestrator, "citation_config", _CITATION_DEFAULTS)
 
 
 def configure_research_quality(
@@ -177,13 +207,16 @@ def configure_research_quality(
         check_recency: Check source recency for time-sensitive topics
         max_source_age_days: Maximum acceptable source age in days
     """
-    if hasattr(orchestrator, "research_quality_config"):
-        orchestrator.research_quality_config = {
+    store_capability_config(
+        orchestrator,
+        "research_quality_config",
+        {
             "min_coverage_score": min_coverage_score,
             "min_source_diversity": min_source_diversity,
             "check_recency": check_recency,
             "max_source_age_days": max_source_age_days,
-        }
+        },
+    )
 
     logger.info(
         f"Configured research quality: coverage>={min_coverage_score:.0%}, "
@@ -200,15 +233,8 @@ def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Research quality configuration dict
     """
-    return getattr(
-        orchestrator,
-        "research_quality_config",
-        {
-            "min_coverage_score": 0.75,
-            "min_source_diversity": 2,
-            "check_recency": True,
-            "max_source_age_days": 365,
-        },
+    return load_capability_config(
+        orchestrator, "research_quality_config", _RESEARCH_QUALITY_DEFAULTS
     )
 
 
@@ -229,13 +255,16 @@ def configure_literature_analysis(
         prefer_recent_papers: Prioritize recent publications
         recent_paper_years: Years considered "recent"
     """
-    if hasattr(orchestrator, "literature_config"):
-        orchestrator.literature_config = {
+    store_capability_config(
+        orchestrator,
+        "literature_config",
+        {
             "min_relevance_score": min_relevance_score,
             "weight_citation_count": weight_citation_count,
             "prefer_recent_papers": prefer_recent_papers,
             "recent_paper_years": recent_paper_years,
-        }
+        },
+    )
 
     logger.info(
         f"Configured literature analysis: relevance>={min_relevance_score:.0%}, "
@@ -252,16 +281,7 @@ def get_literature_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Literature configuration dict
     """
-    return getattr(
-        orchestrator,
-        "literature_config",
-        {
-            "min_relevance_score": 0.6,
-            "weight_citation_count": True,
-            "prefer_recent_papers": True,
-            "recent_paper_years": 5,
-        },
-    )
+    return load_capability_config(orchestrator, "literature_config", _LITERATURE_DEFAULTS)
 
 
 def configure_fact_checking(
@@ -281,13 +301,16 @@ def configure_fact_checking(
         min_source_count_for_claim: Minimum sources to verify a claim
         track_supporting_refuting: Track supporting vs refuting evidence
     """
-    if hasattr(orchestrator, "fact_checking_config"):
-        orchestrator.fact_checking_config = {
+    store_capability_config(
+        orchestrator,
+        "fact_checking_config",
+        {
             "min_confidence_threshold": min_confidence_threshold,
             "require_multiple_sources": require_multiple_sources,
             "min_source_count_for_claim": min_source_count_for_claim,
             "track_supporting_refuting": track_supporting_refuting,
-        }
+        },
+    )
 
     logger.info(
         f"Configured fact checking: confidence>={min_confidence_threshold:.0%}, "
@@ -304,16 +327,7 @@ def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Fact-checking configuration dict
     """
-    return getattr(
-        orchestrator,
-        "fact_checking_config",
-        {
-            "min_confidence_threshold": 0.5,
-            "require_multiple_sources": True,
-            "min_source_count_for_claim": 2,
-            "track_supporting_refuting": True,
-        },
-    )
+    return load_capability_config(orchestrator, "fact_checking_config", _FACT_CHECKING_DEFAULTS)
 
 
 # =============================================================================

@@ -132,8 +132,8 @@ class ChunkProcessorHandler:
           inputs:
             documents: $ctx.raw_docs
             strategy: semantic
-            chunk_size: 512
-            overlap: 50
+            chunk_size: 1024
+            overlap: 128
           output: chunks
     """
 
@@ -150,8 +150,8 @@ class ChunkProcessorHandler:
         docs_key = node.input_mapping.get("documents")
         documents = context.get(docs_key) if docs_key else []
         strategy = node.input_mapping.get("strategy", "fixed")
-        chunk_size = node.input_mapping.get("chunk_size", 512)
-        overlap = node.input_mapping.get("overlap", 50)
+        chunk_size = node.input_mapping.get("chunk_size", 1024)
+        overlap = node.input_mapping.get("overlap", 128)
 
         try:
             chunks = []

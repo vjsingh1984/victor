@@ -14,12 +14,20 @@
 
 """Tests for VerticalBase class - LSP compliance and core functionality."""
 
+import asyncio
+import time
+
 import pytest
 from typing import List
 from unittest.mock import patch, MagicMock
 import threading
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
+from victor.core.verticals.extension_loader import (
+    VerticalExtensionLoader,
+    start_extension_loader_metrics_reporter,
+    stop_extension_loader_metrics_reporter,
+)
 
 
 class ConcreteVertical(VerticalBase):
@@ -188,6 +196,7 @@ class TestGetExtensionsAsync:
 
     def setup_method(self):
         ConcreteVertical.clear_config_cache(clear_all=True)
+        VerticalExtensionLoader.reset_extension_loader_metrics()
 
     @pytest.mark.asyncio
     async def test_get_extensions_async_never_returns_none(self):
@@ -276,6 +285,89 @@ class TestGetExtensionsAsync:
         assert extensions is not None
         assert len(extensions.safety_extensions) == 1
         assert len(extensions.prompt_contributors) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_reuses_shared_executor(self):
+        """Async extension loading should reuse the shared executor."""
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+        first_executor = VerticalExtensionLoader._extension_executor
+        assert first_executor is not None
+
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+        second_executor = VerticalExtensionLoader._extension_executor
+        assert first_executor is second_executor
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_updates_loader_metrics(self):
+        """Async loader should expose submission/in-flight completion metrics."""
+        VerticalExtensionLoader.reset_extension_loader_metrics()
+        await ConcreteVertical.get_extensions_async(use_cache=False)
+
+        metrics = VerticalExtensionLoader.get_extension_loader_metrics()
+        assert metrics["submitted"] >= 11
+        assert metrics["completed"] == metrics["submitted"]
+        assert metrics["in_flight"] == 0
+        assert metrics["max_in_flight"] >= 1
+        assert metrics["queue_limit"] == VerticalExtensionLoader._extension_executor_queue_limit
+
+    @pytest.mark.asyncio
+    async def test_get_extensions_async_records_pressure_threshold_events(self):
+        """Queue/in-flight saturation should increment pressure counters."""
+        old_settings = {
+            "warn_queue": VerticalExtensionLoader._extension_loader_warn_queue_threshold,
+            "error_queue": VerticalExtensionLoader._extension_loader_error_queue_threshold,
+            "warn_in_flight": VerticalExtensionLoader._extension_loader_warn_in_flight_threshold,
+            "error_in_flight": VerticalExtensionLoader._extension_loader_error_in_flight_threshold,
+            "cooldown": VerticalExtensionLoader._extension_loader_pressure_cooldown_seconds,
+            "emit_events": VerticalExtensionLoader._extension_loader_emit_pressure_events,
+        }
+        try:
+            VerticalExtensionLoader.configure_extension_loader_pressure(
+                warn_queue_threshold=1,
+                error_queue_threshold=2,
+                warn_in_flight_threshold=1,
+                error_in_flight_threshold=2,
+                cooldown_seconds=0.0,
+                emit_events=False,
+            )
+            VerticalExtensionLoader.reset_extension_loader_metrics()
+            await ConcreteVertical.get_extensions_async(use_cache=False)
+
+            metrics = VerticalExtensionLoader.get_extension_loader_metrics()
+            assert metrics["pressure_warnings"] + metrics["pressure_errors"] >= 1
+        finally:
+            VerticalExtensionLoader.configure_extension_loader_pressure(
+                warn_queue_threshold=old_settings["warn_queue"],
+                error_queue_threshold=old_settings["error_queue"],
+                warn_in_flight_threshold=old_settings["warn_in_flight"],
+                error_in_flight_threshold=old_settings["error_in_flight"],
+                cooldown_seconds=old_settings["cooldown"],
+                emit_events=old_settings["emit_events"],
+            )
+
+    @pytest.mark.asyncio
+    async def test_emit_extension_loader_metrics_event(self):
+        """Metrics event helper should emit a payload to observability bus."""
+        emitted = []
+
+        class _Bus:
+            async def emit(self, topic, data, source):
+                emitted.append((topic, data, source))
+
+        VerticalExtensionLoader.emit_extension_loader_metrics_event(event_bus=_Bus())
+        await asyncio.sleep(0.05)
+
+        assert len(emitted) >= 1
+        topic, data, source = emitted[-1]
+        assert topic == "vertical.extensions.loader.metrics"
+        assert source == "VerticalExtensionLoader"
+        assert "metrics" in data
+
+    def test_extension_loader_metrics_reporter_start_stop(self):
+        """Periodic reporter helper should start and stop cleanly."""
+        reporter = start_extension_loader_metrics_reporter(interval_seconds=0.05)
+        assert reporter.is_running is True
+        stop_extension_loader_metrics_reporter(timeout=1.0)
 
 
 class TestVerticalBaseConfig:
@@ -897,3 +989,59 @@ class TestIntegrationResultExtensionErrors:
         required = result.get_required_extension_failures()
         assert len(required) == 1
         assert required[0].extension_type == "safety"
+
+
+class TestConfigCacheTTL:
+    """Tests for config cache TTL expiry behavior."""
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        ConcreteVertical.clear_config_cache(clear_all=True)
+
+    def test_cache_returns_within_ttl(self):
+        """Verify same object reference is returned within TTL window."""
+        config1 = ConcreteVertical.get_config(use_cache=True)
+        config2 = ConcreteVertical.get_config(use_cache=True)
+
+        assert config1 is config2, "Should return same cached object within TTL"
+
+    def test_cache_expires_after_ttl(self):
+        """Verify cache rebuilds after TTL expires."""
+        # Set a very short TTL
+        original_ttl = ConcreteVertical._config_cache_ttl
+        ConcreteVertical._config_cache_ttl = 0.01  # 10ms
+
+        try:
+            config1 = ConcreteVertical.get_config(use_cache=True)
+            time.sleep(0.02)  # Wait for TTL to expire
+            config2 = ConcreteVertical.get_config(use_cache=True)
+
+            assert config1 is not config2, "Should rebuild config after TTL expires"
+        finally:
+            ConcreteVertical._config_cache_ttl = original_ttl
+
+    def test_custom_ttl_per_vertical(self):
+        """Verify subclass can override _config_cache_ttl."""
+
+        class ShortTTLVertical(VerticalBase):
+            name = "short_ttl"
+            description = "Short TTL vertical"
+            _config_cache_ttl = 60.0  # Custom TTL
+
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Short TTL prompt"
+
+        assert ShortTTLVertical._config_cache_ttl == 60.0
+        assert ConcreteVertical._config_cache_ttl == 300.0
+
+    def test_use_cache_false_bypasses_ttl(self):
+        """Verify use_cache=False always rebuilds regardless of TTL."""
+        config1 = ConcreteVertical.get_config(use_cache=True)
+        config2 = ConcreteVertical.get_config(use_cache=False)
+
+        assert config1 is not config2, "use_cache=False should always rebuild"

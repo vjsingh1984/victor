@@ -55,6 +55,7 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
     - YAML workflow loading with two-level caching
     - UnifiedWorkflowCompiler integration for consistent execution
     - Checkpointing support for resumable workflows
+    - Auto-workflow triggers via class attributes
 
     Example:
         provider = DevOpsWorkflowProvider()
@@ -69,6 +70,17 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
         async for node_id, state in provider.stream_compiled_workflow("deploy", {}):
             print(f"Completed: {node_id}")
     """
+
+    # Auto-workflow triggers for DevOps tasks
+    AUTO_WORKFLOW_PATTERNS = [
+        (r"deploy\s+infrastructure", "deploy_infrastructure"),
+        (r"terraform\s+apply", "deploy_infrastructure"),
+        (r"container(ize)?", "container_setup"),
+        (r"docker(file)?", "container_setup"),
+        (r"ci/?cd", "cicd_pipeline"),
+        (r"pipeline", "cicd_pipeline"),
+        (r"github\s+actions", "cicd_pipeline"),
+    ]
 
     def _get_escape_hatches_module(self) -> str:
         """Return the module path for DevOps escape hatches.
@@ -85,22 +97,6 @@ class DevOpsWorkflowProvider(BaseYAMLWorkflowProvider):
             Module path string for DevOpsCapabilityProvider
         """
         return "victor.devops.capabilities"
-
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
-        """Get automatic workflow triggers for DevOps tasks.
-
-        Returns:
-            List of (regex_pattern, workflow_name) tuples for auto-triggering
-        """
-        return [
-            (r"deploy\s+infrastructure", "deploy_infrastructure"),
-            (r"terraform\s+apply", "deploy_infrastructure"),
-            (r"container(ize)?", "container_setup"),
-            (r"docker(file)?", "container_setup"),
-            (r"ci/?cd", "cicd_pipeline"),
-            (r"pipeline", "cicd_pipeline"),
-            (r"github\s+actions", "cicd_pipeline"),
-        ]
 
 
 __all__ = [

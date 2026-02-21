@@ -193,7 +193,7 @@ from victor.devops.assistant import DevOpsAssistant
 prompt = DevOpsAssistant.get_system_prompt()
 
 # Get tiered tool configuration
-tiered_tools = DevOpsAssistant.get_tiered_tools()
+tiered_tools = DevOpsAssistant.get_tiered_tool_config()
 
 # Access capability provider
 capabilities = DevOpsAssistant.get_capability_provider()

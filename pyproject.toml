@@ -101,6 +101,7 @@ dependencies = [
     "diskcache>=5.6",
     "docker>=7.0",
     "docstring-parser>=0.15",
+    "psutil>=5.9",  # System metrics for observability and health monitoring
 
     # Semantic Tool Selection (Default: local embeddings)
     "sentence-transformers>=2.2.0",
@@ -149,6 +150,7 @@ build = [
 api = [
     "fastapi>=0.109",
     "uvicorn>=0.27",
+    "strawberry-graphql[fastapi]>=0.243",
 ]
 
 # Checkpoint persistence with SQLite backend
@@ -314,6 +316,11 @@ lang-all = [
     "tree-sitter-xml>=0.6",
 ]
 
+# Apple Silicon optimizations (optional)
+apple-silicon = [
+    "mlx-lm>=0.21.0",  # Apple's ML framework for LLMs
+]
+
 # Native Rust extensions for performance (optional)
 # Build with: cd rust && maturin develop --release
 native = [
@@ -321,7 +328,7 @@ native = [
 ]
 
 all = [
-    "victor[dev,docs,build,lang-all]",
+    "victor[dev,docs,build,lang-all,apple-silicon]",
 ]
 
 [project.urls]

@@ -25,6 +25,7 @@ Run with: pytest tests/unit/core/events/test_event_backends.py -v
 """
 
 import asyncio
+import time
 from typing import List
 
 import pytest
@@ -138,6 +139,14 @@ class TestInMemoryEventBackend:
         """Backend should report correct type."""
         backend = InMemoryEventBackend()
         assert backend.backend_type == BackendType.IN_MEMORY
+
+    def test_queue_maxsize_can_be_set_from_backend_config_extra(self):
+        """In-memory backend should honor queue_maxsize from BackendConfig.extra."""
+        backend = InMemoryEventBackend(
+            config=BackendConfig(extra={"queue_maxsize": 17}),
+            queue_maxsize=3,
+        )
+        assert backend._queue_maxsize == 17
 
     @pytest.mark.asyncio
     async def test_connect_disconnect(self):
@@ -289,6 +298,146 @@ class TestInMemoryEventBackend:
         await h1.unsubscribe()
         assert backend.get_subscription_count() == 1
 
+    @pytest.mark.asyncio
+    async def test_queue_overflow_drop_oldest_policy(self):
+        """drop_oldest should evict oldest event and queue the new one."""
+        config = BackendConfig(
+            extra={"queue_overflow_policy": "drop_oldest"},
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        first = MessagingEvent(topic="test.first", data={"v": 1})
+        second = MessagingEvent(topic="test.second", data={"v": 2})
+        assert await backend.publish(first) is True
+        assert await backend.publish(second) is True
+
+        queued = backend._event_queue.get_nowait()
+        assert queued.topic == "test.second"
+
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["overflow_policy"] == "drop_oldest"
+        assert pressure["stats"]["dropped_oldest"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_block_with_timeout_policy_times_out(self):
+        """block_with_timeout should drop event when timeout expires."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "block_with_timeout",
+                "queue_overflow_block_timeout_ms": 10,
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="test.full", data={})) is True
+        result = await backend.publish(MessagingEvent(topic="test.timeout", data={}))
+        assert result is False
+
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["overflow_policy"] == "block_with_timeout"
+        assert pressure["stats"]["blocked_timeout"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_block_with_timeout_can_succeed(self):
+        """block_with_timeout should succeed if queue space is freed in time."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "block_with_timeout",
+                "queue_overflow_block_timeout_ms": 100,
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="test.full", data={})) is True
+
+        async def _free_space():
+            await asyncio.sleep(0.01)
+            backend._event_queue.get_nowait()
+
+        task = asyncio.create_task(_free_space())
+        try:
+            result = await backend.publish(MessagingEvent(topic="test.after_wait", data={}))
+        finally:
+            await task
+        assert result is True
+
+        queued = backend._event_queue.get_nowait()
+        assert queued.topic == "test.after_wait"
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["blocked_success"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_writes_to_optional_durable_sink(self):
+        """Dropped events should be sent to optional durable sink callback."""
+        sink_records = []
+
+        def _sink(*, event, reason):
+            sink_records.append((event.topic, reason))
+
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "overflow_durable_sink": _sink,
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="test.keep", data={})) is True
+        assert await backend.publish(MessagingEvent(topic="test.drop", data={})) is False
+
+        assert sink_records == [("test.drop", "drop_newest")]
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["durable_sink_success"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_topic_policy_override_block_with_timeout(self):
+        """Topic policy override should apply block-with-timeout on queue pressure."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "queue_overflow_topic_policies": {"critical.*": "block_with_timeout"},
+                "queue_overflow_topic_block_timeout_ms": {"critical.*": 20},
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="noncritical.full", data={})) is True
+        t0 = time.perf_counter()
+        result = await backend.publish(MessagingEvent(topic="critical.timeout", data={}))
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+        assert result is False
+        assert elapsed_ms >= 12.0
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["blocked_timeout"] == 1
+        assert pressure["stats"]["topic_policy_override_hits"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_topic_policy_override_drop_oldest(self):
+        """Topic policy override should apply drop_oldest even when default differs."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "queue_overflow_topic_policies": {"critical.*": "drop_oldest"},
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="baseline.keep", data={"v": 1})) is True
+        assert await backend.publish(MessagingEvent(topic="critical.new", data={"v": 2})) is True
+
+        queued = backend._event_queue.get_nowait()
+        assert queued.topic == "critical.new"
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["dropped_oldest"] == 1
+        assert pressure["stats"]["topic_policy_override_hits"] == 1
+
 
 # =============================================================================
 # ObservabilityBus Tests
@@ -394,6 +543,17 @@ class TestObservabilityBus:
             "ObservabilityBus must have emit_metric() — "
             "continuation_strategy.py and native/observability.py depend on it"
         )
+
+    def test_get_delivery_pressure_stats_exposes_backend_metrics(self):
+        """ObservabilityBus should surface backend queue/drop pressure stats."""
+        backend = InMemoryEventBackend(
+            config=BackendConfig(extra={"queue_overflow_policy": "drop_oldest"}),
+            queue_maxsize=5,
+        )
+        bus = ObservabilityBus(backend=backend)
+        stats = bus.get_delivery_pressure_stats()
+        assert stats["overflow_policy"] == "drop_oldest"
+        assert "stats" in stats
 
     @pytest.mark.asyncio
     async def test_emit_auto_connects_using_protocol_property(self):
@@ -707,6 +867,33 @@ class TestBackendConfig:
 
         assert config.delivery_guarantee == DeliveryGuarantee.AT_LEAST_ONCE
         assert config.max_retries == 5
+
+    def test_build_backend_config_from_settings(self):
+        """Settings should map into backend config including overflow policy."""
+        from victor.core.events.backends import build_backend_config_from_settings
+
+        class _Settings:
+            event_backend_type = "redis"
+            event_delivery_guarantee = "at_least_once"
+            event_max_batch_size = 50
+            event_flush_interval_ms = 250.0
+            event_queue_maxsize = 64
+            event_queue_overflow_policy = "drop_oldest"
+            event_queue_overflow_block_timeout_ms = 12.5
+            event_queue_overflow_topic_policies = {"critical.*": "block_with_timeout"}
+            event_queue_overflow_topic_block_timeout_ms = {"critical.*": 90.0}
+
+        config = build_backend_config_from_settings(_Settings())
+
+        assert config.backend_type == BackendType.REDIS
+        assert config.delivery_guarantee == DeliveryGuarantee.AT_LEAST_ONCE
+        assert config.max_batch_size == 50
+        assert config.flush_interval_ms == 250.0
+        assert config.extra["queue_maxsize"] == 64
+        assert config.extra["queue_overflow_policy"] == "drop_oldest"
+        assert config.extra["queue_overflow_block_timeout_ms"] == 12.5
+        assert config.extra["queue_overflow_topic_policies"] == {"critical.*": "block_with_timeout"}
+        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {"critical.*": 90.0}
 
 
 # =============================================================================

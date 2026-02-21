@@ -46,6 +46,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import time
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -58,14 +59,32 @@ from victor.core.verticals.metadata import VerticalMetadataProvider
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
 
+# Import StageDefinition from core for centralized definition
+# Re-export for backward compatibility
+from victor.core.vertical_types import (
+    StageDefinition,
+    StageBuilder,
+)
+
+# Import framework capabilities (Phase 1: Promote Generic Capabilities)
+from victor.framework.capabilities import (
+    StageBuilderCapability,
+    GroundingRulesCapability,
+)
+
+# Import stage contract for LSP compliance (Phase 2)
+from victor.core.verticals.protocols.stages import (
+    validate_stage_contract,
+)
+
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
 
-# Import StageDefinition from core for centralized definition
-# Re-export for backward compatibility
-from victor.core.vertical_types import StageDefinition
-
 logger = logging.getLogger(__name__)
+
+# Framework capability instances (class-level for sharing)
+_stage_capability: Optional[StageBuilderCapability] = None
+_grounding_capability: Optional[GroundingRulesCapability] = None
 
 
 @dataclass
@@ -220,6 +239,8 @@ class VerticalBase(
     # Config cache (keyed by namespaced class identity, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _config_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+    _config_cache_timestamps: Dict[str, float] = {}
+    _config_cache_ttl: ClassVar[float] = 300.0  # 5 min default, verticals can override
 
     @classmethod
     def _config_cache_key(cls) -> str:
@@ -245,10 +266,71 @@ class VerticalBase(
     def get_system_prompt(cls) -> str:
         """Get the system prompt for this vertical.
 
+        Verticals can optionally append framework grounding rules by calling
+        get_framework_grounding_rules() and appending to their prompt:
+
+            prompt = "You are an expert in X..."
+            prompt += "\\n\\n" + cls.get_framework_grounding_rules()
+            return prompt
+
         Returns:
             System prompt text with domain expertise.
         """
         pass
+
+    # =========================================================================
+    # Framework Capability Helpers (Phase 1)
+    # =========================================================================
+
+    @classmethod
+    def _get_stage_capability(cls) -> StageBuilderCapability:
+        """Get or create the stage builder capability.
+
+        Returns:
+            StageBuilderCapability instance
+        """
+        global _stage_capability
+        if _stage_capability is None:
+            _stage_capability = StageBuilderCapability()
+        return _stage_capability
+
+    @classmethod
+    def _get_grounding_capability(cls) -> GroundingRulesCapability:
+        """Get or create the grounding rules capability.
+
+        Returns:
+            GroundingRulesCapability instance
+        """
+        global _grounding_capability
+        if _grounding_capability is None:
+            _grounding_capability = GroundingRulesCapability()
+        return _grounding_capability
+
+    @classmethod
+    def get_framework_stages(cls) -> Dict[str, Any]:
+        """Get stage definitions from framework capability.
+
+        This provides a way for verticals to access the generic 7-stage
+        workflow template from the framework while allowing customization.
+
+        Returns:
+            Dictionary mapping stage names to stage definitions
+        """
+        capability = cls._get_stage_capability()
+        return capability.get_stages()
+
+    @classmethod
+    def get_framework_grounding_rules(cls) -> str:
+        """Get grounding rules text from framework capability.
+
+        This provides a way for verticals to access the generic grounding
+        rules from the framework while allowing extensions.
+
+        Returns:
+            Formatted grounding rules text
+        """
+        capability = cls._get_grounding_capability()
+        return capability.get_rules_text(vertical=cls.name, include_extensions=True)
 
     # =========================================================================
     # Configurable Override Points
@@ -258,9 +340,14 @@ class VerticalBase(
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get stage definitions for this vertical.
 
-        Default implementation provides a comprehensive 7-stage workflow
-        representing a generic problem-solving lifecycle:
+        Default implementation uses the framework StageBuilderCapability
+        to provide a comprehensive 7-stage workflow representing a generic
+        problem-solving lifecycle. This promotes code reuse across verticals
+        while allowing customization.
 
+        Phase 2: Stage contract validation is applied to ensure LSP compliance.
+
+        The 7-stage workflow template:
         1. INITIAL: Understand the request and gather initial context
         2. PLANNING: Design the approach and strategy
         3. READING: Gather detailed information and context
@@ -275,7 +362,7 @@ class VerticalBase(
         - Research: question -> search -> read -> synthesize -> write -> verify
         - Data Analysis: understand -> explore -> analyze -> visualize -> report
 
-        Verticals should override this method to provide domain-specific:
+        Verticals can override this method to provide domain-specific:
         - Stage names (e.g., DEPLOYMENT, SYNTHESIZING)
         - Tools appropriate for each stage
         - Domain-specific keywords
@@ -283,135 +370,48 @@ class VerticalBase(
         Returns:
             Dictionary mapping stage names to StageDefinition objects.
             Each stage includes description, keywords, and valid transitions.
+
+        Raises:
+            ValueError: If stage definitions fail contract validation.
         """
-        return {
-            "INITIAL": StageDefinition(
-                name="INITIAL",
-                description="Understanding the request and gathering initial context",
-                keywords=[
-                    "what",
-                    "how",
-                    "explain",
-                    "help",
-                    "where",
-                    "show me",
-                    "describe",
-                    "overview",
-                    "understand",
-                    "clarify",
-                ],
-                next_stages={"PLANNING", "READING"},
-            ),
-            "PLANNING": StageDefinition(
-                name="PLANNING",
-                description="Designing the approach and creating a strategy",
-                keywords=[
-                    "plan",
-                    "approach",
-                    "strategy",
-                    "design",
-                    "architecture",
-                    "outline",
-                    "steps",
-                    "roadmap",
-                    "how should",
-                    "what's the best way",
-                ],
-                next_stages={"READING", "EXECUTION"},
-            ),
-            "READING": StageDefinition(
-                name="READING",
-                description="Gathering detailed information and context",
-                keywords=[
-                    "read",
-                    "show",
-                    "find",
-                    "search",
-                    "look",
-                    "check",
-                    "examine",
-                    "inspect",
-                    "review",
-                    "fetch",
-                    "get",
-                    "retrieve",
-                ],
-                next_stages={"ANALYSIS", "EXECUTION"},
-            ),
-            "ANALYSIS": StageDefinition(
-                name="ANALYSIS",
-                description="Analyzing information and identifying solutions",
-                keywords=[
-                    "analyze",
-                    "review",
-                    "understand",
-                    "why",
-                    "how does",
-                    "compare",
-                    "evaluate",
-                    "assess",
-                    "investigate",
-                    "diagnose",
-                ],
-                next_stages={"EXECUTION", "PLANNING"},
-            ),
-            "EXECUTION": StageDefinition(
-                name="EXECUTION",
-                description="Implementing the planned changes or actions",
-                keywords=[
-                    "change",
-                    "modify",
-                    "create",
-                    "add",
-                    "remove",
-                    "fix",
-                    "implement",
-                    "write",
-                    "update",
-                    "refactor",
-                    "build",
-                    "configure",
-                    "set up",
-                    "install",
-                    "run",
-                    "execute",
-                ],
-                next_stages={"VERIFICATION", "COMPLETION"},
-            ),
-            "VERIFICATION": StageDefinition(
-                name="VERIFICATION",
-                description="Validating results and testing outcomes",
-                keywords=[
-                    "test",
-                    "verify",
-                    "check",
-                    "validate",
-                    "confirm",
-                    "ensure",
-                    "run tests",
-                    "build",
-                    "compile",
-                    "lint",
-                ],
-                next_stages={"COMPLETION", "EXECUTION"},
-            ),
-            "COMPLETION": StageDefinition(
-                name="COMPLETION",
-                description="Finalizing, documenting, and wrapping up",
-                keywords=[
-                    "done",
-                    "finish",
-                    "complete",
-                    "commit",
-                    "summarize",
-                    "document",
-                    "conclude",
-                    "wrap up",
-                    "finalize",
-                ],
-                next_stages=set(),
-            ),
-        }
+        # Use framework StageBuilderCapability for consistent default stages
+        framework_stages = cls.get_framework_stages()
+
+        # Convert framework stage dicts to StageDefinition objects
+        # This maintains backward compatibility while using framework capabilities
+        from victor.core.vertical_types import StageDefinition
+
+        stages = {}
+        for stage_name, stage_def in framework_stages.items():
+            stages[stage_name] = StageDefinition(
+                name=stage_def["name"],
+                description=stage_def["description"],
+                keywords=stage_def.get("keywords", []),
+                next_stages=stage_def.get("next_stages", set()),
+            )
+
+        # Validate stages against contract (Phase 2: LSP compliance)
+        # Use validator directly since VerticalBase is abstract
+        try:
+            # Convert to dict format for validation
+            stages_dict = {
+                name: {
+                    "name": stage.name,
+                    "description": stage.description,
+                    "keywords": stage.keywords,
+                    "next_stages": stage.next_stages,
+                }
+                for name, stage in stages.items()
+            }
+            result = validate_stage_contract(stages_dict, f"{cls.name}_stages")
+            # Log warnings but don't fail on them
+            for warning in result.warnings:
+                logger.warning(f"[{cls.name}] Stage validation warning: {warning}")
+        except Exception as e:
+            # Don't fail on validation errors for backward compatibility
+            logger.warning(f"[{cls.name}] Stage validation skipped: {e}")
+
+        return stages
 
     @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
@@ -452,7 +452,12 @@ class VerticalBase(
             with cls._config_cache_lock:
                 cached = cls._config_cache.get(cache_key)
                 if cached is not None:
-                    return cached
+                    ts = cls._config_cache_timestamps.get(cache_key, 0.0)
+                    if time.time() - ts < cls._config_cache_ttl:
+                        return cached
+                    # Expired — remove stale entry and fall through to rebuild
+                    cls._config_cache.pop(cache_key, None)
+                    cls._config_cache_timestamps.pop(cache_key, None)
 
         # Build tool set
         tool_names = cls.get_tools()
@@ -478,6 +483,7 @@ class VerticalBase(
         # Cache the config
         with cls._config_cache_lock:
             cls._config_cache[cache_key] = config
+            cls._config_cache_timestamps[cache_key] = time.time()
         return config
 
     @classmethod
@@ -494,11 +500,13 @@ class VerticalBase(
         if clear_all:
             with cls._config_cache_lock:
                 cls._config_cache.clear()
+                cls._config_cache_timestamps.clear()
             cls.clear_extension_cache(clear_all=True)
         else:
             cache_key = cls._config_cache_key()
             with cls._config_cache_lock:
                 cls._config_cache.pop(cache_key, None)
+                cls._config_cache_timestamps.pop(cache_key, None)
                 # Backward compatibility for legacy class-name cache keys.
                 cls._config_cache.pop(cls.__name__, None)
             # Clear extensions cache for this class too

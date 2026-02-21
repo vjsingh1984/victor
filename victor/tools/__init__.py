@@ -115,6 +115,15 @@ from victor.tools.composition import (
     select_keys,
 )
 
+# Phase 3: HTTP Connection Pool
+from victor.tools.http_pool import (
+    HttpConnectionPool,
+    ConnectionPoolConfig,
+    PoolStatistics,
+    get_http_pool,
+    get_http_pool_sync,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base classes
@@ -183,4 +192,10 @@ __all__ = [
     "extract_if_success",
     "map_keys",
     "select_keys",
+    # Phase 3: HTTP Connection Pool
+    "HttpConnectionPool",
+    "ConnectionPoolConfig",
+    "PoolStatistics",
+    "get_http_pool",
+    "get_http_pool_sync",
 ]

@@ -39,17 +39,96 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+    update_capability_config_section,
+)
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+_INDEXING_DEFAULTS: Dict[str, Any] = {
+    "chunk_size": 1024,
+    "chunk_overlap": 128,
+    "embedding_model": "text-embedding-3-small",
+    "embedding_dimensions": 1536,
+    "store_backend": "lancedb",
+}
+_RETRIEVAL_DEFAULTS: Dict[str, Any] = {
+    "top_k": 5,
+    "similarity_threshold": 0.7,
+    "search_type": "hybrid",
+    "rerank_enabled": True,
+    "max_context_tokens": 4000,
+}
+_SYNTHESIS_DEFAULTS: Dict[str, Any] = {
+    "citation_style": "inline",
+    "include_sources": True,
+    "max_answer_tokens": 2000,
+    "temperature": 0.3,
+    "require_verification": True,
+}
+_SAFETY_DEFAULTS: Dict[str, Any] = {
+    "filter_sensitive_data": True,
+    "max_document_size_mb": 50,
+    "allowed_file_types": ["pdf", "docx", "txt", "md", "py", "js", "ts", "html"],
+    "validate_sources": True,
+}
+_QUERY_ENHANCEMENT_DEFAULTS: Dict[str, Any] = {
+    "enable_expansion": True,
+    "enable_decomposition": True,
+    "max_query_variants": 3,
+    "use_synonyms": True,
+}
+_RAG_DEFAULTS: Dict[str, Any] = {
+    "indexing": deepcopy(_INDEXING_DEFAULTS),
+    "retrieval": deepcopy(_RETRIEVAL_DEFAULTS),
+    "synthesis": deepcopy(_SYNTHESIS_DEFAULTS),
+    "safety": deepcopy(_SAFETY_DEFAULTS),
+    "query_enhancement": deepcopy(_QUERY_ENHANCEMENT_DEFAULTS),
+}
+
+
+def _load_rag_config(orchestrator: Any) -> Dict[str, Any]:
+    """Load the full RAG config from framework service or legacy orchestrator attr."""
+    return load_capability_config(orchestrator, "rag_config", _RAG_DEFAULTS)
+
+
+def _store_rag_config(orchestrator: Any, config: Dict[str, Any]) -> None:
+    """Store full RAG config in framework service or legacy orchestrator attr."""
+    store_capability_config(
+        orchestrator,
+        "rag_config",
+        config,
+        require_existing_attr=False,
+    )
+
+
+def _store_rag_section(orchestrator: Any, section: str, section_config: Dict[str, Any]) -> None:
+    """Store/update a section of rag_config while preserving other sections."""
+    update_capability_config_section(
+        orchestrator,
+        root_name="rag_config",
+        section_name=section,
+        section_config=section_config,
+        root_defaults=_RAG_DEFAULTS,
+        require_existing_attr=False,
+    )
 
 
 # =============================================================================
@@ -60,8 +139,8 @@ logger = logging.getLogger(__name__)
 def configure_indexing(
     orchestrator: Any,
     *,
-    chunk_size: int = 512,
-    chunk_overlap: int = 50,
+    chunk_size: int = 1024,
+    chunk_overlap: int = 128,
     embedding_model: str = "text-embedding-3-small",
     embedding_dimensions: int = 1536,
     store_backend: str = "lancedb",
@@ -79,24 +158,17 @@ def configure_indexing(
         embedding_dimensions: Dimension of embedding vectors
         store_backend: Vector store backend (lancedb, chromadb, etc.)
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["indexing"] = {
+    _store_rag_section(
+        orchestrator,
+        "indexing",
+        {
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
             "embedding_model": embedding_model,
             "embedding_dimensions": embedding_dimensions,
             "store_backend": store_backend,
-        }
-    else:
-        orchestrator.rag_config = {
-            "indexing": {
-                "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "embedding_model": embedding_model,
-                "embedding_dimensions": embedding_dimensions,
-                "store_backend": store_backend,
-            }
-        }
+        },
+    )
 
     logger.info(f"Configured RAG indexing: chunk_size={chunk_size}, model={embedding_model}")
 
@@ -110,15 +182,7 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Indexing configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
-        return orchestrator.rag_config.get("indexing", {})
-    return {
-        "chunk_size": 512,
-        "chunk_overlap": 50,
-        "embedding_model": "text-embedding-3-small",
-        "embedding_dimensions": 1536,
-        "store_backend": "lancedb",
-    }
+    return _load_rag_config(orchestrator).get("indexing", dict(_INDEXING_DEFAULTS))
 
 
 def configure_retrieval(
@@ -140,24 +204,17 @@ def configure_retrieval(
         rerank_enabled: Whether to rerank retrieved results
         max_context_tokens: Maximum tokens in context window
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["retrieval"] = {
+    _store_rag_section(
+        orchestrator,
+        "retrieval",
+        {
             "top_k": top_k,
             "similarity_threshold": similarity_threshold,
             "search_type": search_type,
             "rerank_enabled": rerank_enabled,
             "max_context_tokens": max_context_tokens,
-        }
-    else:
-        orchestrator.rag_config = {
-            "retrieval": {
-                "top_k": top_k,
-                "similarity_threshold": similarity_threshold,
-                "search_type": search_type,
-                "rerank_enabled": rerank_enabled,
-                "max_context_tokens": max_context_tokens,
-            }
-        }
+        },
+    )
 
     logger.info(f"Configured RAG retrieval: top_k={top_k}, search_type={search_type}")
 
@@ -171,15 +228,7 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Retrieval configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
-        return orchestrator.rag_config.get("retrieval", {})
-    return {
-        "top_k": 5,
-        "similarity_threshold": 0.7,
-        "search_type": "hybrid",
-        "rerank_enabled": True,
-        "max_context_tokens": 4000,
-    }
+    return _load_rag_config(orchestrator).get("retrieval", dict(_RETRIEVAL_DEFAULTS))
 
 
 def configure_synthesis(
@@ -201,24 +250,17 @@ def configure_synthesis(
         temperature: LLM temperature for synthesis
         require_verification: Whether to verify answer against sources
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["synthesis"] = {
+    _store_rag_section(
+        orchestrator,
+        "synthesis",
+        {
             "citation_style": citation_style,
             "include_sources": include_sources,
             "max_answer_tokens": max_answer_tokens,
             "temperature": temperature,
             "require_verification": require_verification,
-        }
-    else:
-        orchestrator.rag_config = {
-            "synthesis": {
-                "citation_style": citation_style,
-                "include_sources": include_sources,
-                "max_answer_tokens": max_answer_tokens,
-                "temperature": temperature,
-                "require_verification": require_verification,
-            }
-        }
+        },
+    )
 
     logger.info(f"Configured RAG synthesis: citation_style={citation_style}")
 
@@ -232,15 +274,7 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Synthesis configuration dict
     """
-    if hasattr(orchestrator, "rag_config"):
-        return orchestrator.rag_config.get("synthesis", {})
-    return {
-        "citation_style": "inline",
-        "include_sources": True,
-        "max_answer_tokens": 2000,
-        "temperature": 0.3,
-        "require_verification": True,
-    }
+    return _load_rag_config(orchestrator).get("synthesis", dict(_SYNTHESIS_DEFAULTS))
 
 
 def configure_safety(
@@ -260,24 +294,17 @@ def configure_safety(
         allowed_file_types: List of allowed file extensions
         validate_sources: Whether to validate source URLs
     """
-    default_types = ["pdf", "docx", "txt", "md", "py", "js", "ts", "html"]
-
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["safety"] = {
+    _store_rag_section(
+        orchestrator,
+        "safety",
+        {
             "filter_sensitive_data": filter_sensitive_data,
             "max_document_size_mb": max_document_size_mb,
-            "allowed_file_types": allowed_file_types or default_types,
+            "allowed_file_types": allowed_file_types
+            or list(_SAFETY_DEFAULTS["allowed_file_types"]),
             "validate_sources": validate_sources,
-        }
-    else:
-        orchestrator.rag_config = {
-            "safety": {
-                "filter_sensitive_data": filter_sensitive_data,
-                "max_document_size_mb": max_document_size_mb,
-                "allowed_file_types": allowed_file_types or default_types,
-                "validate_sources": validate_sources,
-            }
-        }
+        },
+    )
 
     logger.info(f"Configured RAG safety: filter_sensitive={filter_sensitive_data}")
 
@@ -299,22 +326,16 @@ def configure_query_enhancement(
         max_query_variants: Maximum number of query variants to generate
         use_synonyms: Whether to use synonym expansion
     """
-    if hasattr(orchestrator, "rag_config"):
-        orchestrator.rag_config["query_enhancement"] = {
+    _store_rag_section(
+        orchestrator,
+        "query_enhancement",
+        {
             "enable_expansion": enable_expansion,
             "enable_decomposition": enable_decomposition,
             "max_query_variants": max_query_variants,
             "use_synonyms": use_synonyms,
-        }
-    else:
-        orchestrator.rag_config = {
-            "query_enhancement": {
-                "enable_expansion": enable_expansion,
-                "enable_decomposition": enable_decomposition,
-                "max_query_variants": max_query_variants,
-                "use_synonyms": use_synonyms,
-            }
-        }
+        },
+    )
 
     logger.info(f"Configured query enhancement: expansion={enable_expansion}")
 

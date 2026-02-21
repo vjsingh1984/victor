@@ -76,6 +76,7 @@ from victor.framework.protocols import (
     CapabilityType,
     OrchestratorCapability,
 )
+from victor.framework.strict_mode import ensure_not_private_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -838,14 +839,21 @@ class CapabilityLoader(DynamicModuleLoader):
         """
         applied = []
 
-        # Check if orchestrator supports capability registration
-        if not isinstance(orchestrator, CapabilityRegistryProtocol):
-            # Try duck-typed access
-            if not hasattr(orchestrator, "_register_capability"):
-                raise TypeError(
-                    f"Orchestrator {type(orchestrator).__name__} does not implement "
-                    "CapabilityRegistryProtocol and lacks _register_capability method"
-                )
+        # Resolve registration path (public API first, private fallback only when allowed).
+        register_dynamic = getattr(orchestrator, "register_dynamic_capability", None)
+        private_register = getattr(orchestrator, "_register_capability", None)
+        use_public_registration = callable(register_dynamic)
+        use_private_registration = callable(private_register)
+
+        if not use_public_registration and not use_private_registration:
+            raise TypeError(
+                f"Orchestrator {type(orchestrator).__name__} does not expose a "
+                "capability registration API (expected register_dynamic_capability)"
+            )
+
+        # Strict mode blocks private registration fallback paths.
+        if not use_public_registration:
+            ensure_not_private_fallback("_register_capability", operation="capability registration")
 
         names_to_apply = capability_names or list(self._capabilities.keys())
 
@@ -856,15 +864,25 @@ class CapabilityLoader(DynamicModuleLoader):
                 continue
 
             try:
-                # Use orchestrator's registration method
-                if hasattr(orchestrator, "_register_capability"):
-                    orchestrator._register_capability(
+                if use_public_registration:
+                    result = register_dynamic(
                         entry.capability,
                         setter_method=entry.handler,
                         getter_method=entry.getter_handler,
                     )
-                    applied.append(name)
-                    logger.debug(f"Applied capability '{name}' to orchestrator")
+                    if result is False:
+                        raise RuntimeError(
+                            f"register_dynamic_capability returned False for '{name}'"
+                        )
+                else:
+                    private_register(
+                        entry.capability,
+                        setter_method=entry.handler,
+                        getter_method=entry.getter_handler,
+                    )
+
+                applied.append(name)
+                logger.debug(f"Applied capability '{name}' to orchestrator")
             except Exception as e:
                 logger.error(f"Failed to apply capability '{name}': {e}")
 

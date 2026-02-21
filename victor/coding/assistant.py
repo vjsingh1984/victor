@@ -330,66 +330,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         return cls._get_cached_extension("middleware", _create_middleware)
 
     @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        """Get coding-specific safety extension (cached).
-
-        Returns:
-            Safety extension for git/refactoring patterns
-        """
-        return cls._get_extension_factory("safety_extension", "victor.coding.safety")
-
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        """Get coding-specific prompt contributor (cached).
-
-        Returns:
-            Prompt contributor with task type hints
-        """
-        return cls._get_extension_factory("prompt_contributor", "victor.coding.prompts")
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        """Get coding-specific mode configuration provider (cached).
-
-        Returns:
-            Mode configuration provider
-        """
-        return cls._get_extension_factory("mode_config_provider", "victor.coding.mode_config")
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        """Get coding-specific tool dependency provider (cached).
-
-        Returns:
-            Tool dependency provider
-        """
-
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("coding")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
-        """Get coding-specific workflow provider (cached).
-
-        Provides workflows for common coding tasks:
-        - feature_implementation: Full feature development
-        - quick_feature: Fast feature implementation
-        - bug_fix: Systematic bug fixing
-        - quick_fix: Fast bug fix
-        - code_review: Comprehensive review
-        - quick_review: Fast review
-        - pr_review: Pull request review
-
-        Returns:
-            CodingWorkflowProvider instance
-        """
-        return cls._get_extension_factory("workflow_provider", "victor.coding.workflows")
-
-    @classmethod
     def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
         """Get coding-specific service provider (cached).
 
@@ -397,72 +337,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             Service provider for DI registration
         """
         return cls._get_extension_factory("service_provider", "victor.coding.service_provider")
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for coding."""
-        from victor.core.vertical_types import TieredToolTemplate
-
-        return TieredToolTemplate.for_vertical(cls.name)
-
-    @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for Coding vertical (cached).
-
-        Provides configuration for reinforcement learning integration,
-        including active learners, task type mappings, and quality thresholds.
-
-        Returns:
-            CodingRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        return cls._get_extension_factory(
-            "rl_config_provider", "victor.coding.rl", "CodingRLConfig"
-        )
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for coding vertical (cached).
-
-        Provides hooks for recording RL outcomes and getting recommendations.
-
-        Returns:
-            CodingRLHooks instance
-        """
-        return cls._get_extension_factory("rl_hooks", "victor.coding.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for Coding tasks (cached).
-
-        Provides pre-configured team specifications for:
-        - feature_team: Feature implementation
-        - bug_fix_team: Bug investigation and fix
-        - refactoring_team: Safe refactoring
-        - review_team: Comprehensive code review
-        - testing_team: Test coverage improvement
-        - documentation_team: Documentation generation
-
-        Returns:
-            CodingTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor.coding.teams")
-
-    @classmethod
-    def get_capability_provider(cls) -> Any:
-        """Get capability provider for dynamic capability loading (cached).
-
-        Provides CodingCapabilityProvider for runtime configuration
-        of coding-specific capabilities like:
-        - git_safety: Git operation safety rules
-        - code_style: Code formatting preferences
-        - test_requirements: Test configuration
-        - language_server: LSP settings
-        - refactoring: Refactoring capabilities
-
-        Returns:
-            CodingCapabilityProvider instance
-        """
-        return cls._get_extension_factory("capability_provider", "victor.coding.capabilities")
 
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
@@ -519,22 +393,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             return CODING_PERSONAS
 
         return cls._get_cached_extension("personas", _create)
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for workflow execution.
-
-        Provides coding-specific handlers for workflow nodes:
-        - code_validation: Validates code changes (lint, type check)
-        - test_runner: Runs tests with timeout and reporting
-        - code_analyzer: Deep code analysis for context gathering
-
-        Returns:
-            Dict mapping handler name to handler instance
-        """
-        from victor.coding.handlers import HANDLERS
-
-        return HANDLERS
 
     @classmethod
     def get_capability_configs(cls) -> Dict[str, Any]:

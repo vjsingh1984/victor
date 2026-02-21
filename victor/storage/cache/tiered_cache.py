@@ -17,7 +17,7 @@
 import hashlib
 import json
 import logging
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 import threading
 
 from cachetools import TTLCache  # type: ignore[import-untyped]
@@ -633,6 +633,29 @@ class TieredCache:
             except Exception as e:
                 logger.warning("Error closing disk cache: %s", e)
 
+    def get_observability_data(self) -> Dict[str, Any]:
+        """Get observability data for dashboard integration.
+
+        Returns a dictionary formatted for the ObservabilityManager.
+        Includes cache statistics like hit rates, sizes, and eviction counts.
+
+        Returns:
+            Dictionary with observability data including:
+            - source_id: Unique identifier for this cache
+            - source_type: Type of metrics source ("cache")
+            - stats: Cache statistics dictionary
+
+        Example:
+            data = cache.get_observability_data()
+            print(f"Hit rate: {data['stats']['memory_hit_rate']:.2%}")
+        """
+        stats = self.get_stats()
+        return {
+            "source_id": f"cache:tiered:{id(self)}",
+            "source_type": "cache",
+            "stats": stats,
+        }
+
     def __enter__(self) -> "TieredCache":
         """Context manager entry."""
         return self
@@ -764,6 +787,135 @@ class EmbeddingCache:
         """
         key = self._make_embedding_key(text, model)
         return self.cache.set(key, embedding, self.namespace, ttl)
+
+    def get_batch_embeddings(
+        self,
+        texts: List[str],
+        model: str,
+        embedding_fn: Optional[callable] = None,
+    ) -> List[Optional[list]]:
+        """Get embeddings for multiple texts, computing missing ones.
+
+        Args:
+            texts: List of texts to get embeddings for
+            model: Embedding model name
+            embedding_fn: Optional function to compute embeddings for missing texts.
+                           Should take (text, model) and return embedding list.
+
+        Returns:
+            List of embedding vectors (None for texts that couldn't be computed)
+
+        Example:
+            def compute_embedding(text, model):
+                return provider.get_embedding(text, model)
+
+            embeddings = cache.get_batch_embeddings(
+                texts=["hello", "world"],
+                model="text-embedding-3-small",
+                embedding_fn=compute_embedding
+            )
+        """
+        results = []
+        missing_indices = []
+
+        # First pass: check cache for all texts
+        for i, text in enumerate(texts):
+            embedding = self.get_embedding(text, model)
+            if embedding is not None:
+                results.append(embedding)
+            else:
+                results.append(None)
+                missing_indices.append((i, text))
+
+        # Second pass: compute missing embeddings if function provided
+        if embedding_fn and missing_indices:
+            for i, text in missing_indices:
+                try:
+                    embedding = embedding_fn(text, model)
+                    if embedding is not None:
+                        self.cache_embedding(text, model, embedding)
+                        results[i] = embedding
+                except Exception as e:
+                    logger.warning(f"Failed to compute embedding for text {i}: {e}")
+                    results[i] = None
+
+        return results
+
+    def preload_embeddings(
+        self,
+        texts: List[str],
+        model: str,
+        embedding_fn: callable,
+        batch_size: int = 10,
+    ) -> Dict[str, int]:
+        """Preload embeddings for a batch of texts.
+
+        Computes and caches embeddings for texts that aren't already cached.
+        Useful for warming up the cache during initialization.
+
+        Args:
+            texts: List of texts to preload embeddings for
+            model: Embedding model name
+            embedding_fn: Function to compute embeddings
+            batch_size: Number of texts to process in each batch
+
+        Returns:
+            Dictionary with statistics:
+            - "total": Total number of texts
+            - "cached": Number already cached
+            - "computed": Number of embeddings computed
+            - "failed": Number that failed to compute
+
+        Example:
+            def compute_embeddings_batch(texts, model):
+                return [provider.get_embedding(t, model) for t in texts]
+
+            stats = cache.preload_embeddings(
+                texts=["hello", "world", "test"],
+                model="text-embedding-3-small",
+                embedding_fn=lambda t, m: provider.get_embedding(t, m)
+            )
+            print(f"Computed {stats['computed']} embeddings")
+        """
+        stats = {
+            "total": len(texts),
+            "cached": 0,
+            "computed": 0,
+            "failed": 0,
+        }
+
+        # Check which texts are already cached
+        to_compute = []
+        for text in texts:
+            if self.get_embedding(text, model) is not None:
+                stats["cached"] += 1
+            else:
+                to_compute.append(text)
+
+        # Compute embeddings in batches
+        if to_compute and embedding_fn:
+            logger.info(f"Preloading {len(to_compute)} embeddings...")
+
+            for i in range(0, len(to_compute), batch_size):
+                batch = to_compute[i : i + batch_size]
+                for text in batch:
+                    try:
+                        embedding = embedding_fn(text, model)
+                        if embedding is not None:
+                            self.cache_embedding(text, model, embedding)
+                            stats["computed"] += 1
+                        else:
+                            stats["failed"] += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to preload embedding: {e}")
+                        stats["failed"] += 1
+
+        logger.info(
+            f"Preload complete: {stats['cached']} cached, "
+            f"{stats['computed']} computed, {stats['failed']} failed"
+        )
+
+        return stats
 
     def _make_embedding_key(self, text: str, model: str) -> str:
         """Create cache key for embedding.

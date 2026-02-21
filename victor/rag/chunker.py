@@ -30,7 +30,7 @@ Design:
     - detect_document_type: Document type detection (from framework)
 
 Example:
-    chunker = DocumentChunker(ChunkingConfig(chunk_size=512, overlap=50))
+    chunker = DocumentChunker(ChunkingConfig(chunk_size=1024, overlap=128))
 
     # Chunk a document with embeddings
     doc = Document(id="1", content="...", source="doc.md", doc_type="markdown")

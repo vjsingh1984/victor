@@ -140,6 +140,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     - <TOOL_OUTPUT>{...}</TOOL_OUTPUT>
     - {"name": "...", "arguments": {...}}
 
+    Note: Must distinguish from task plan JSON which also has "name" but different structure.
+    Tool calls have "arguments" which are dict objects with tool-specific structure.
+
     Args:
         content: Response content that may contain tool calls
 
@@ -149,6 +152,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     tool_calls = []
     remaining = content
 
+    # Planning keywords to avoid false positives
+    planning_keywords = {"complexity", "steps", "desc", "duration"}
+
     # Pattern 1: JSON code block with tool call
     json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
     matches = re.findall(json_block_pattern, content, re.DOTALL)
@@ -156,15 +162,20 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
         try:
             data = json.loads(match)
             if "name" in data:
-                tool_calls.append(
-                    {
-                        "id": f"fallback_{len(tool_calls)}",
-                        "name": data.get("name", ""),
-                        "arguments": data.get("arguments", {}),
-                    }
-                )
-                remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
-                remaining = remaining.replace(f"```json{match}```", "").strip()
+                arguments = data.get("arguments", {})
+                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": f"fallback_{len(tool_calls)}",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = remaining.replace(f"```json\n{match}\n```", "").strip()
+                    remaining = remaining.replace(f"```json{match}```", "").strip()
         except json.JSONDecodeError:
             pass
 
@@ -175,16 +186,21 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
         try:
             data = json.loads(match)
             if "name" in data:
-                tool_calls.append(
-                    {
-                        "id": f"fallback_{len(tool_calls)}",
-                        "name": data.get("name", ""),
-                        "arguments": data.get("arguments", {}),
-                    }
-                )
-                remaining = re.sub(
-                    r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
-                )
+                arguments = data.get("arguments", {})
+                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": f"fallback_{len(tool_calls)}",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = re.sub(
+                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
+                    )
         except json.JSONDecodeError:
             pass
 
@@ -194,14 +210,19 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
             # Try to parse the entire content as JSON
             data = json.loads(content.strip())
             if "name" in data:
-                tool_calls.append(
-                    {
-                        "id": "fallback_0",
-                        "name": data.get("name", ""),
-                        "arguments": data.get("arguments", {}),
-                    }
-                )
-                remaining = ""
+                arguments = data.get("arguments", {})
+                # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
+                    tool_calls.append(
+                        {
+                            "id": "fallback_0",
+                            "name": data.get("name", ""),
+                            "arguments": arguments,
+                        }
+                    )
+                    remaining = ""
         except json.JSONDecodeError:
             pass
 

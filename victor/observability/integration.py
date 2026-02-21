@@ -250,8 +250,25 @@ class ObservabilityIntegration:
         if hasattr(orchestrator, "conversation_state"):
             self.wire_state_machine(orchestrator.conversation_state)
 
-        # Store reference for event emission
-        orchestrator._observability = self
+        # Store reference for event emission via public interfaces only.
+        wired = False
+        set_observability = getattr(orchestrator, "set_observability", None)
+        if callable(set_observability):
+            set_observability(self)
+            wired = True
+        elif hasattr(orchestrator, "observability"):
+            try:
+                orchestrator.observability = self
+                wired = True
+            except Exception as e:
+                logger.debug("Failed to set observability via property: %s", e)
+
+        if not wired:
+            logger.warning(
+                "Could not wire observability: orchestrator lacks public observability setter"
+            )
+            return
+
         self._wired_components.append("orchestrator")
 
         logger.debug("Wired observability into orchestrator")

@@ -1,231 +1,356 @@
-# Victor Configuration - Single Source of Truth
-# Copy to ~/.victor/profiles.yaml to activate
+# =============================================================================
+# Victor Configuration - Model Profiles with Detailed Documentation
+# =============================================================================
+# This is an example configuration file for Victor.
+# Copy to ~/.victor/profiles.yaml to activate.
+#
+# Based on comprehensive model research (Feb 2026):
+#   - 40-56B model analysis: /tmp/models_40_56b_complete.md
+#   - 30-35B dense models: /tmp/dense_models_30_35b.md
+#   - Model comparisons: /tmp/model_comparison_40_56b.md
+#   - Optimal sizing for 48GB VRAM: /tmp/optimal_models_m1_max.md
 #
 # This file contains:
-# 1. User profiles (provider, model, temperature, etc.)
-# 2. Provider configuration (API keys, endpoints)
-# 3. Tool configuration (enabled/disabled tools)
-# 4. Model capabilities (tool calling support for each model)
+#   1. User profiles (provider, model, temperature, etc.)
+#   2. Provider configuration (API keys, endpoints)
+#   3. Tool configuration (enabled/disabled tools)
+#   4. Model capabilities (tool calling support for each model)
+# =============================================================================
 
-# =============================================================================
-# PROFILES - Define your LLM configurations
-# =============================================================================
-# Profiles are ordered by: Tool Support + Context Size + Quality
-# Use -tools variants for reliable function calling
-# =============================================================================
 profiles:
+  # ===========================================================================
+  # PRIMARY DEFAULT PROFILE
+  # ===========================================================================
+  # RECOMMENDATION: Choose based on your hardware and use case
+  #
+  # For 48GB VRAM (M1 Max/M2 Max):
+  #   ✅ qwen2.5-coder-tools:32b-262K (32B dense, 262K context)
+  #   ✅ mixtral-tools:8x7b-65K (46.7B MoE, fast)
+  #   ✅ deepseek-coder-tools:33b-262K (33B coding specialist)
+  #
+  # For cloud (API required):
+  #   ✅ GLM-5 (40B active, SOTA, MIT license)
+  #   ✅ DeepSeek V3 (37B active, massive MoE)
+  #   ✅ Qwen3-Coder 480B (massive coding model)
+  #
+  # KEYS FOR EACH PROFILE:
+  #   - provider: ollama, anthropic, openai, google, xai, etc.
+  #   - model: model name (e.g., qwen2.5-coder-tools:32b-262K)
+  #   - endpoint: URL for Ollama (optional, uses provider default)
+  #   - temperature: 0.0-2.0 (lower = more focused, higher = more creative)
+  #   - max_tokens: Maximum OUTPUT tokens (not context window!)
+  #                   - 4096: Quick tasks
+  #                   - 8192: Coding, complex tasks
+  #                   - 16384+: Reasoning chains
+  #   - description: Human-readable profile description
+  # ===========================================================================
+
   # ---------------------------------------------------------------------------
-  # PRIMARY PROFILES (Tool-enabled + High Context)
+  # DEFAULT PROFILE - Qwen2.5-Coder 32B (Recommended for 48GB VRAM)
   # ---------------------------------------------------------------------------
-  # max_tokens = maximum OUTPUT tokens per response (not context window)
-  # Rule of thumb: 4096 for coding, 8192+ for complex, 16384+ for reasoning
+  # WHY THIS DEFAULT:
+  #   ✅ 32B dense parameters - perfect sweet spot for 48GB VRAM
+  #   ✅ 262K context - MASSIVE context window (4x larger than most)
+  #   ✅ Near-SOTA performance - competitive with 70B models
+  #   ✅ Localhost - no network latency, no API costs
+  #   ✅ Tool calling - native function support
+  #   ✅ 19GB file - fits with 20GB+ VRAM headroom
+  #   ✅ Multilingual - excellent Chinese/English
+  #
+  # STRENGTHS:
+  #   - Best balance of size, context, and performance
+  #   - Excellent for 90% of tasks (chat, coding, reasoning, tools)
+  #   - Massive 262K context for large codebases/documents
+  #   - Near-SOTA benchmarks (HumanEval ~80%, GSM8K ~85%)
+  #   - Coding specialist variant available
+  #
+  # WEAKNESSES:
+  #   - Dense model (32B active per token, not sparse like MoE)
+  #   - Slower than MoE models for simple tasks
+  #   - Not the absolute SOTA (cloud models like GLM-5 are better)
+  #
+  # USE FOR:
+  #   - Daily driver (general use)
+  #   - Long-context tasks (large codebases, documents)
+  #   - Coding (it's a coder variant)
+  #   - Tool workflows
+  #   - Chinese/English bilingual
   # ---------------------------------------------------------------------------
   default:
     provider: ollama
-    model: qwen3-coder-tools:30b  # 262K context, tools, best coding
-    temperature: 0.7
-    max_tokens: 8192  # Allow long code generations
-    description: "Default: Qwen3-Coder 30B with tools (262K context)"
-
-  local:
-    provider: ollama
-    model: deepseek-r1-tools:32b  # 131K context, tools, thinking
-    temperature: 0.7
-    max_tokens: 16384  # Reasoning chains need more output
-    description: "DeepSeek-R1 32B with tools+thinking (131K context)"
-
-  local-heavy:
-    provider: ollama
-    model: deepseek-r1-tools:70b  # 131K context, tools, thinking, 70B
-    temperature: 0.7
-    max_tokens: 16384  # 70B can generate longer coherent outputs
-    endpoint: http://192.168.1.20:11434  # Remote server with more RAM
-    description: "DeepSeek-R1 70B with tools (131K, requires remote)"
-
-  devstral:
-    provider: ollama
-    model: devstral-tools:latest  # 131K context, agentic coding
-    temperature: 0.7
-    max_tokens: 8192  # Agentic outputs can be long
-    description: "Devstral 24B - Agentic coder with tools (131K context)"
-
-  gemma:
-    provider: ollama
-    model: gemma3-tools:27b  # 131K context, multimodal
-    temperature: 1.0
-    max_tokens: 4096  # Standard for general tasks
-    description: "Gemma3 27B with tools (131K, multimodal)"
-
-  quick:
-    provider: ollama
-    model: mistral-tools:7b-instruct  # Fast, lightweight, tools
-    temperature: 0.5
-    max_tokens: 2048  # Keep small for speed
-    description: "Mistral 7B with tools - fast responses"
-
-  # ---------------------------------------------------------------------------
-  # EXTENDED CONTEXT PROFILES (Build with scripts/ollama_context_modelfiles/)
-  # ---------------------------------------------------------------------------
-  deepseek-coder-128k:
-    provider: ollama
-    model: deepseek-coder-tools:33b-128K  # Extended to 128K
-    temperature: 0.7
-    max_tokens: 4096
-    description: "DeepSeek-Coder 33B with tools (128K extended)"
-
-  deepseek-r1-262k:
-    provider: ollama
-    model: deepseek-r1-tools:32b-262K  # Extended to 262K
+    model: qwen2.5-coder-tools:32b-262K
     temperature: 0.7
     max_tokens: 8192
-    endpoint: http://192.168.1.20:11434  # Remote for large context
-    description: "DeepSeek-R1 32B with 262K context (remote)"
+    description: 'DEFAULT: Qwen2.5-Coder 32B (262K context) - Best all-rounder for 48GB VRAM'
 
-  mixtral-65k:
-    provider: ollama
-    model: mixtral-tools:8x7b-65K  # Extended to 65K
-    temperature: 0.7
-    max_tokens: 4096
-    description: "Mixtral 8x7B with tools (65K extended)"
-
-  gemma-128k:
-    provider: ollama
-    model: gemma3-tools:27b-128K  # Extended to 131K
-    temperature: 1.0
-    max_tokens: 4096
-    description: "Gemma3 27B with tools (131K extended, multimodal)"
-
-  deepseek-r1-70b-262k:
-    provider: ollama
-    model: deepseek-r1-tools:70b-262K  # Extended to 262K
-    temperature: 0.7
-    max_tokens: 16384  # 70B can generate longer outputs
-    endpoint: http://192.168.1.20:11434  # Remote - needs 100GB+ memory
-    description: "DeepSeek-R1 70B with 262K context (remote, heavy)"
+  # ===========================================================================
+  # DENSE MODELS 30-35B (Predictable Performance)
+  # ===========================================================================
+  # Dense models activate ALL parameters per token (100% activation).
+  # More consistent than MoE, but slower and use more VRAM.
+  #
+  # RECOMMENDED FOR:
+  #   - Predictable performance (all params active)
+  #   - Long-context tasks (262K context)
+  #   - General-purpose use
+  # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # CLOUD PROVIDERS (Already have high context + tools)
+  # Qwen2.5 32B - Best All-Rounder Dense
   # ---------------------------------------------------------------------------
+  local:
+    provider: ollama
+    model: qwen2.5-coder-tools:32b-262K
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Qwen2.5-Coder 32B (262K) - Best all-rounder dense model'
+
+  # ---------------------------------------------------------------------------
+  # DeepSeek-Coder 33B - Coding Specialist
+  # ---------------------------------------------------------------------------
+  coding:
+    provider: ollama
+    model: deepseek-coder-tools:33b-262K
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'DeepSeek-Coder 33B (262K) - Best open-source coding model'
+
+  # ---------------------------------------------------------------------------
+  # Command R 35B - RAG Specialist
+  # ---------------------------------------------------------------------------
+  rag:
+    provider: ollama
+    model: command-r:35b
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Command R 35B (128K) - Optimized for RAG and tools'
+
+  # ===========================================================================
+  # Mixture of Experts (MoE) MODELS 40-56B (Efficient Scaling)
+  # ===========================================================================
+  # MoE models activate only a SUBSET of experts per token (sparse activation).
+  # More efficient than dense models, faster for same total parameters.
+  #
+  # RECOMMENDED FOR:
+  #   - Agent-heavy workflows (lots of tool calls)
+  #   - When you need larger model capacity
+  #   - Faster responses (sparse activation)
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Mixtral 8x7B - Best MoE for Tool-Based Agents (46.7B)
+  # ---------------------------------------------------------------------------
+  # WHY CHOOSE:
+  #   ✅ 46.7B total parameters (perfect for 40-56B target)
+  #   ✅ MoE efficiency - only 11.7B active per token (25%)
+  #   ✅ Native tool calling - excellent for agents
+  #   ✅ Multilingual - 5 languages supported
+  #   ✅ 32-65K context - decent context window
+  #   ✅ Apache 2.0 license - fully open
+  #
+  # STRENGTHS:
+  #   - Fast MoE inference (sparse activation)
+  #   - Best for tool-heavy agent workflows
+  #   - More capacity (46.7B total)
+  #   - Native parallel tool calls
+  #
+  # WEAKNESSES:
+  #   - Shorter context (32-65K vs 262K on Qwen2.5)
+  #   - Older model (late 2023 vs 2024)
+  #
+  # USE FOR:
+  #   - Agent-heavy workflows (lots of tool calls)
+  #   - When you need faster responses
+  #   - European languages (French, German, Spanish, Italian)
+  # ---------------------------------------------------------------------------
+  moe:
+    provider: ollama
+    model: mixtral-tools:8x7b-65K
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Mixtral 8x7B (46.7B MoE, 65K) - Best MoE for tool-based agents'
+
+  # ===========================================================================
+  # REASONING SPECIALISTS (Chain-of-Thought)
+  # ===========================================================================
+  # These models excel at complex reasoning, math, and logic.
+  # They use "thinking mode" to show their reasoning process.
+  #
+  # RECOMMENDED FOR:
+  #   - Complex problem-solving
+  #   - Mathematical reasoning
+  #   - Tasks requiring step-by-step logic
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # DeepSeek R1 32B - Reasoning with CoT
+  # ---------------------------------------------------------------------------
+  reasoning:
+    provider: ollama
+    model: deepseek-r1-tools:32b-262K
+    temperature: 0.7
+    max_tokens: 16384
+    description: 'DeepSeek-R1 32B (262K) - Chain-of-Thought reasoning'
+
+  # ---------------------------------------------------------------------------
+  # Qwen3 30B - Latest Gen with Thinking Mode
+  # ---------------------------------------------------------------------------
+  qwen3:
+    provider: ollama
+    model: qwen3-coder-tools:30b-262K
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Qwen3-Coder 30B (262K) - Latest gen, thinking mode, best Chinese'
+
+  # ===========================================================================
+  # CLOUD SOTA MODELS (API Required, Maximum Performance)
+  # ===========================================================================
+  # These cloud-only models offer state-of-the-art performance.
+  # They require API keys and incur costs.
+  #
+  # RECOMMENDED FOR:
+  #   - When you need maximum performance
+  #   - Production applications (cost acceptable)
+  #   - Complex reasoning/coding at SOTA level
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # GLM-5 - NEW SOTA Model (Feb 2026)
+  # ---------------------------------------------------------------------------
+  # WHY CHOOSE:
+  #   ✅ 744B total, 40B active - EXACT match for 40-56B target!
+  #   ✅ SOTA benchmarks - 92.7% AIME, 77.8% SWE-bench
+  #   ✅ 198K context - massive context window
+  #   ✅ MIT license - commercial-friendly
+  #
+  # STRENGTHS:
+  #   - State-of-the-art performance
+  #   - Perfect 40B active parameters (your target!)
+  #   - MIT license (fully open)
+  #
+  # WEAKNESSES:
+  #   - Cloud-only (not downloadable)
+  #   - API costs
+  #
+  # USE FOR:
+  #   - Maximum performance needed
+  #   - Complex reasoning (92.7% AIME!)
+  #   - SOTA coding (77.8% SWE-bench!)
+  # ---------------------------------------------------------------------------
+  glm5:
+    provider: ollama
+    model: glm-5:cloud
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'GLM-5 (744B total, 40B active) - NEW SOTA, 198K context, MIT'
+
+  # ---------------------------------------------------------------------------
+  # DeepSeek V3 - Massive MoE (Cloud)
+  # ---------------------------------------------------------------------------
+  deepseek-v3:
+    provider: fireworks
+    model: accounts/fireworks/models/deepseek-v3p2
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'DeepSeek V3.2 (685B MoE, 37B active) - SOTA reasoning, 256K'
+
+  # ---------------------------------------------------------------------------
+  # Qwen3-Coder 480B - Massive MoE Coding
+  # ---------------------------------------------------------------------------
+  qwen3-massive:
+    provider: fireworks
+    model: accounts/fireworks/models/qwen3-coder-480b-a35b-instruct
+    temperature: 0.7
+    max_tokens: 8192
+    description: 'Qwen3-Coder 480B MoE - Massive coding model'
+
+  # ===========================================================================
+  # CLASSIC CLOUD MODELS (Claude, GPT, Gemini, etc.)
+  # ===========================================================================
+
   claude:
     provider: anthropic
     model: claude-sonnet-4-5
     temperature: 1.0
     max_tokens: 8192
-    description: "Claude Sonnet for complex tasks"
+    description: 'Claude Sonnet 4.5 - Best for complex tasks'
 
-  gpt:
+  gpt-4.1:
     provider: openai
-    model: gpt-4o
+    model: gpt-4.1
     temperature: 0.7
-    max_tokens: 4096
-    description: "GPT-4o for general coding"
+    max_tokens: 8192
+    description: 'GPT-4.1 - Latest OpenAI flagship'
+
+  o3:
+    provider: openai
+    model: o3
+    temperature: 1.0
+    max_tokens: 65536
+    description: 'OpenAI o3 - Latest reasoning model'
+
+  gemini-2.5-pro:
+    provider: google
+    model: gemini-2.5-pro
+    temperature: 1.0
+    max_tokens: 8192
+    description: 'Gemini 2.5 Pro - 1M context window'
 
   grok:
     provider: xai
-    model: grok-code-fast-1
+    model: grok-3
     temperature: 0.7
-    max_tokens: 4096
-    description: "xAI Grok Code Fast - cheapest with tool calling ($0.20/$1.50 per M tokens)"
-    # Provider tuning: xAI benefits from more exploration latitude
-    max_continuation_prompts: 5  # More patience for thorough exploration
-    quality_threshold: 0.5  # Accept varied response styles
-    session_idle_timeout: 300  # Idle timeout: 5 min (resets on each response/tool execution)
-
-  grok-fast:
-    provider: xai
-    model: grok-4-1-fast-non-reasoning
-    temperature: 0.7
-    max_tokens: 4096
-    description: "xAI Grok 4.1 Fast - best tool calling model (2M context)"
+    max_tokens: 16384
+    description: 'Grok 3 - 128K context, tools'
 
   kimi:
     provider: moonshot
     model: kimi-k2-thinking
-    temperature: 1.0  # Recommended for reasoning
+    temperature: 1.0
     max_tokens: 8192
-    description: "Kimi K2 Thinking for complex reasoning tasks"
+    description: 'Kimi K2 Thinking - 256K context'
 
-  kimi-fast:
-    provider: moonshot
-    model: kimi-k2-thinking-turbo
-    temperature: 0.7
-    max_tokens: 4096
-    description: "Kimi K2 Turbo for faster responses"
+  # ===========================================================================
+  # FAST PROFILES (Ultra-Fast Inference)
+  # ===========================================================================
 
-  deepseek:
-    provider: deepseek
-    model: deepseek-chat
-    temperature: 0.7
-    max_tokens: 4096
-    description: "DeepSeek-V3 for coding with tool calling"
-    # Provider tuning: DeepSeek benefits from stricter loop detection
-    loop_repeat_threshold: 2  # Detect loops earlier (default: 3)
-    max_continuation_prompts: 4  # Force completion sooner (default: 6)
-    quality_threshold: 0.6  # Lower quality bar (uses grounding hints instead)
-    tool_deduplication_enabled: true
-
-  deepseek-reason:
-    provider: deepseek
-    model: deepseek-reasoner
-    max_tokens: 32768  # Supports up to 64K including reasoning
-    description: "DeepSeek Reasoner for complex problem solving (no tools)"
+  quick:
+    provider: ollama
+    model: mistral-tools:7b-instruct
+    temperature: 0.5
+    max_tokens: 2048
+    description: 'Mistral 7B - Fastest local model'
 
   groq:
     provider: groqcloud
     model: llama-3.3-70b-versatile
     temperature: 0.7
     max_tokens: 4096
-    description: "Groq Cloud Llama 3.3 70B - Ultra-fast inference (free tier)"
+    description: 'Groq: Llama 3.3 70B - Ultra-fast cloud'
 
   groq-fast:
     provider: groqcloud
     model: llama-3.1-8b-instant
     temperature: 0.7
     max_tokens: 2048
-    description: "Groq Cloud Llama 3.1 8B - Fastest responses"
-
-  groq-gptoss:
-    provider: groqcloud
-    model: openai/gpt-oss-120b
-    temperature: 0.7
-    max_tokens: 4096
-    description: "Groq Cloud GPT-OSS 120B - Reasoning support (free tier)"
+    description: 'Groq: Llama 3.1 8B - Fastest cloud'
 
   cerebras:
     provider: cerebras
     model: gpt-oss-120b
     temperature: 0.7
     max_tokens: 4096
-    description: "Cerebras GPT-OSS 120B - Ultra-fast inference (free tier)"
-
-  cerebras-fast:
-    provider: cerebras
-    model: llama3.1-8b
-    temperature: 0.7
-    max_tokens: 2048
-    description: "Cerebras Llama 3.1 8B - Fastest responses"
-
-  cerebras-glm:
-    provider: cerebras
-    model: zai-glm-4.7
-    temperature: 0.7
-    max_tokens: 4096
-    description: "Cerebras ZAI GLM 4.7 - Frontier coding and reasoning (preview)"
+    description: 'Cerebras: GPT-OSS 120B - Ultra-fast (free tier)'
 
 # =============================================================================
-# PROVIDERS - API keys and endpoints
+# PROVIDERS - API Keys and Endpoints
 # =============================================================================
 providers:
   ollama:
     base_url:
-      - http://192.168.1.20:11434  # Primary (LAN server)
-      - http://localhost:11434      # Fallback (localhost)
-    timeout: 300
-
-  lmstudio:
-    base_url:
-      - http://192.168.1.20:1234   # Primary (LAN server)
-      - http://127.0.0.1:1234      # Fallback (localhost)
+      - http://192.168.1.227:11434  # Primary (LAN server)
+      - http://192.168.1.20:11434    # Secondary (LAN server)
+      - http://localhost:11434        # Fallback (localhost)
     timeout: 300
 
   anthropic:
@@ -253,47 +378,38 @@ providers:
   groqcloud:
     api_key: ${GROQCLOUD_API_KEY}
     base_url: https://api.groq.com/openai/v1
-    timeout: 60  # Groq is very fast
+    timeout: 60
 
   cerebras:
     api_key: ${CEREBRAS_API_KEY}
     base_url: https://api.cerebras.ai/v1
-    timeout: 60  # Cerebras is very fast
+    timeout: 60
+
+  fireworks:
+    api_key: ${FIREWORKS_API_KEY}
+    base_url: https://api.fireworks.ai/inference/v1
+    timeout: 120
 
 # =============================================================================
-# TOOLS - Enable/disable specific tools
+# TOOLS - Enable/Disable Specific Tools
 # =============================================================================
 tools:
-  disabled: []  # Add tool names here to disable specific tools
+  disabled: []
 
-  # Individual tool configuration (optional)
-  # web_search:
-  #   enabled: true
-  # docker:
-  #   enabled: false
-
-# Web tools configuration
+# =============================================================================
+# WEB TOOLS CONFIGURATION
+# =============================================================================
 web_tools:
   summarize_fetch_top: 5
   summarize_fetch_pool: 10
   summarize_max_content_length: 50000
 
 # =============================================================================
-# MODEL CAPABILITIES - Tool calling support per model
+# MODEL CAPABILITIES - Tool Calling Support Per Model
 # =============================================================================
-# This section defines which models support native tool calling.
-# Patterns use glob-style matching: "qwen3*" matches "qwen3-coder:30b", "qwen3:32b", etc.
-#
-# Capability fields:
-#   native_tool_calls: bool - Model returns structured tool_calls
-#   streaming_tool_calls: bool - Tool calls can be streamed
-#   parallel_tool_calls: bool - Model can request multiple tools at once
-#   thinking_mode: bool - Supports /think /no_think (Qwen3)
-#   requires_strict_prompting: bool - Needs strict system prompts
-#   recommended_tool_budget: int - Max tool calls per conversation
-
+# See documentation in ~/.victor/profiles.yaml for details
+# =============================================================================
 model_capabilities:
-  # Default for unknown models
   defaults:
     native_tool_calls: false
     streaming_tool_calls: false
@@ -302,7 +418,6 @@ model_capabilities:
     requires_strict_prompting: true
     recommended_tool_budget: 10
 
-  # Provider-level defaults (cloud providers have native tool support)
   providers:
     anthropic:
       native_tool_calls: true
@@ -332,24 +447,6 @@ model_capabilities:
       requires_strict_prompting: false
       recommended_tool_budget: 15
 
-    # Local providers default to fallback parsing
-    ollama:
-      native_tool_calls: false
-      requires_strict_prompting: true
-      recommended_tool_budget: 12
-
-    lmstudio:
-      native_tool_calls: false
-      requires_strict_prompting: true
-      recommended_tool_budget: 12
-
-    vllm:
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
     moonshot:
       native_tool_calls: true
       streaming_tool_calls: true
@@ -358,7 +455,7 @@ model_capabilities:
       recommended_tool_budget: 30
 
     deepseek:
-      native_tool_calls: true  # Only deepseek-chat
+      native_tool_calls: true
       streaming_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
@@ -378,11 +475,44 @@ model_capabilities:
       requires_strict_prompting: false
       recommended_tool_budget: 20
 
-  # Model-specific overrides (patterns match model names)
+    fireworks:
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    ollama:
+      native_tool_calls: false
+      requires_strict_prompting: true
+      recommended_tool_budget: 12
+
   models:
-    # -------------------------------------------------------------------------
-    # Llama models - Native tool calling in 3.1+
-    # -------------------------------------------------------------------------
+    "*-tools:*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "*-tools":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "qwen2.5*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
     "llama3.1*":
       native_tool_calls: true
       parallel_tool_calls: true
@@ -401,44 +531,71 @@ model_capabilities:
       requires_strict_prompting: false
       recommended_tool_budget: 15
 
-    "llama-3.1*":
+    "llama-4.*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 25
+
+    "glm-4.*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      streaming_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "glm4*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      streaming_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "gemma3*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 12
+
+    "phi-4.*":
       native_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
       recommended_tool_budget: 15
 
-    # -------------------------------------------------------------------------
-    # Qwen models - Excellent tool support, Qwen3 has thinking mode
-    # -------------------------------------------------------------------------
-    "qwen2.5*":
+    "phi4*":
       native_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
       recommended_tool_budget: 15
 
-    "qwen3*":
+    "deepseek*":
+      native_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 15
+
+    "deepseek-v3*":
+      native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 20
+
+    "deepseek-r1*":
       native_tool_calls: true
       parallel_tool_calls: true
       thinking_mode: true
       requires_strict_prompting: false
-      recommended_tool_budget: 15
+      recommended_tool_budget: 20
 
-    "qwen-2.5*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "qwen-3*":
-      native_tool_calls: true
-      parallel_tool_calls: true
+    "deepseek-reasoner*":
+      native_tool_calls: false
       thinking_mode: true
       requires_strict_prompting: false
-      recommended_tool_budget: 15
+      recommended_tool_budget: 5
 
-    # -------------------------------------------------------------------------
-    # Mistral/Mixtral models
-    # -------------------------------------------------------------------------
     "mistral*":
       native_tool_calls: true
       parallel_tool_calls: true
@@ -447,89 +604,39 @@ model_capabilities:
 
     "mixtral*":
       native_tool_calls: true
+      streaming_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
-      recommended_tool_budget: 15
+      recommended_tool_budget: 20
 
-    "ministral*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    # -------------------------------------------------------------------------
-    # DeepSeek models - Strong coder with tool support
-    # -------------------------------------------------------------------------
-    "deepseek*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    # -------------------------------------------------------------------------
-    # Specialized tool-calling models
-    # -------------------------------------------------------------------------
-    "command-r*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "hermes*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "functionary*":
+    "devstral*":
       native_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
       recommended_tool_budget: 20
 
-    "firefunction*":
+    "kimi-k2*":
       native_tool_calls: true
+      streaming_tool_calls: true
+      parallel_tool_calls: true
+      thinking_mode: true
+      requires_strict_prompting: false
+      recommended_tool_budget: 30
+
+    "grok*":
+      native_tool_calls: true
+      streaming_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
-      recommended_tool_budget: 15
+      recommended_tool_budget: 20
 
-    "llama3-groq-tool-use*":
+    "llama-3.3-70b-versatile*":
       native_tool_calls: true
+      streaming_tool_calls: true
       parallel_tool_calls: true
       requires_strict_prompting: false
-      recommended_tool_budget: 15
+      recommended_tool_budget: 25
 
-    # -------------------------------------------------------------------------
-    # Gemma models - Gemma3 has tool support, older versions limited
-    # -------------------------------------------------------------------------
-    "gemma3*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 12
-
-    "gemma2*":
-      native_tool_calls: false
-      requires_strict_prompting: true
-      recommended_tool_budget: 8
-
-    "gemma*":
-      native_tool_calls: false
-      requires_strict_prompting: true
-      recommended_tool_budget: 8
-
-    # -------------------------------------------------------------------------
-    # GPT-OSS and other open models
-    # -------------------------------------------------------------------------
-    "gpt-oss*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    # -------------------------------------------------------------------------
-    # Models with limited/no tool support (use fallback parsing)
-    # -------------------------------------------------------------------------
     "codellama*":
       native_tool_calls: false
       requires_strict_prompting: true
@@ -540,181 +647,7 @@ model_capabilities:
       requires_strict_prompting: true
       recommended_tool_budget: 8
 
-    "yi*":
-      native_tool_calls: false
-      requires_strict_prompting: true
-      recommended_tool_budget: 10
-
-    # -------------------------------------------------------------------------
-    # Moonshot Kimi K2 models - Reasoning with tool support
-    # -------------------------------------------------------------------------
-    "kimi-k2-thinking*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      thinking_mode: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 30
-
-    "kimi-k2-instruct*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    # -------------------------------------------------------------------------
-    # DeepSeek API models
-    # -------------------------------------------------------------------------
-    "deepseek-chat*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    "deepseek-reasoner*":
-      native_tool_calls: false  # Reasoner does NOT support function calling
-      streaming_tool_calls: true
-      thinking_mode: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 5
-
-    # -------------------------------------------------------------------------
-    # xAI Grok models
-    # -------------------------------------------------------------------------
-    "grok-code*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    "grok-4*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    "grok-2*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    # -------------------------------------------------------------------------
-    # Groq Cloud models - Ultra-fast inference
-    # -------------------------------------------------------------------------
-    "llama-3.3-70b-versatile*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 25
-
-    "llama-3.1-8b-instant*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "openai/gpt-oss-*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: false  # GPT-OSS doesn't support parallel calls
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "qwen/qwen3-32b*":
-      native_tool_calls: true
-      streaming_tool_calls: true
-      parallel_tool_calls: true
-      thinking_mode: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    # -------------------------------------------------------------------------
-    # Tool-enabled variants (-tools suffix) - Native tool calling
-    # -------------------------------------------------------------------------
-    "*-tools:*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    "*-tools":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 15
-
-    # Devstral specifically (agentic model)
-    "devstral-tools*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    # DeepSeek-R1 tools variants (have thinking mode)
-    "deepseek-r1-tools*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      thinking_mode: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    # Qwen3-Coder tools (highest context)
-    "qwen3-coder-tools*":
-      native_tool_calls: true
-      parallel_tool_calls: true
-      thinking_mode: true
-      requires_strict_prompting: false
-      recommended_tool_budget: 20
-
-    # -------------------------------------------------------------------------
-    # Add your custom models here
-    # -------------------------------------------------------------------------
-    # "my-custom-model*":
-    #   native_tool_calls: true
-    #   parallel_tool_calls: true
-    #   requires_strict_prompting: false
-    #   recommended_tool_budget: 15
-
 # =============================================================================
-# CONTINUATION PROMPT OVERRIDES (Provider/Model-Specific Tuning)
+# COORDINATOR ORCHESTRATOR
 # =============================================================================
-# Override continuation prompt limits for specific provider:model combinations
-# This allows fine-tuning how many times Victor prompts a model to continue
-# before forcing completion. Different models have different continuation behaviors.
-#
-# Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
-#
-# Global defaults (can be overridden here):
-# - analysis tasks: 6 prompts
-# - action tasks: 5 prompts  
-# - default tasks: 3 prompts
-# =============================================================================
-# continuation_prompt_overrides:
-#   # Qwen models benefit from more continuation prompts
-#   "ollama:qwen3-coder-tools:30b-128k":
-#     analysis: 8  # 33% more than default 6
-#     action: 6    # 20% more than default 5
-#     default: 4   # 33% more than default 3
-#
-#   # DeepSeek-R1 with thinking mode needs fewer (thinking takes time)
-#   "ollama:deepseek-r1-tools:32b":
-#     analysis: 5  # 17% less than default 6
-#     action: 4    # 20% less than default 5
-#     default: 2   # 33% less than default 3
-#
-#   # Claude models are good at following instructions, need fewer prompts
-#   "anthropic:claude-sonnet-4-20250514":
-#     analysis: 4
-#     action: 3
-#     default: 2
-#
-# # Enable RL-based learning (future feature - automatically adjusts above values)
-# enable_continuation_rl_learning: false
+use_coordinator_orchestrator: true

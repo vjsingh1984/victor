@@ -148,6 +148,25 @@ class TestEmbeddingPreload:
         orchestrator.start_embedding_preload()
         # Should not create a new task
 
+    def test_start_embedding_preload_uses_runtime_preload_when_enabled(self, orchestrator):
+        """Feature-flagged runtime preload should supersede embedding-only preload."""
+        orchestrator.settings.framework_preload_enabled = True
+        orchestrator._runtime_preload_task = None
+        sentinel_task = MagicMock()
+
+        def _capture_task(coro, name="background_task"):
+            coro.close()
+            return sentinel_task
+
+        orchestrator._create_background_task = MagicMock(side_effect=_capture_task)
+
+        orchestrator.start_embedding_preload()
+
+        orchestrator._create_background_task.assert_called_once()
+        _, kwargs = orchestrator._create_background_task.call_args
+        assert kwargs["name"] == "runtime_preload"
+        assert orchestrator._runtime_preload_task is sentinel_task
+
 
 class TestToolDependencies:
     """Tests for tool dependency registration.

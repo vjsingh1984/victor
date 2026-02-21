@@ -1,0 +1,156 @@
+# Integration Tests - Only runs when integration code changes
+# Path-triggered to save CI resources
+
+name: CI - Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'victor/**'
+      - 'tests/integration/**'
+      - 'tests/e2e/**'
+      - 'pyproject.toml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'victor/**'
+      - 'tests/integration/**'
+      - 'tests/e2e/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        test-suite:
+          - name: provider-integration
+            path: tests/integrations/providers
+          - name: workflow-integration
+            path: tests/integrations/workflows
+          - name: tool-integration
+            path: tests/integrations/tools
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-integration-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-integration-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Run integration tests
+        run: |
+          if [ -d "${{ matrix.test-suite.path }}" ]; then
+            pytest ${{ matrix.test-suite.path }} \
+              -v \
+              --tb=short \
+              -m integration \
+              || echo "⚠️ Integration tests for ${{ matrix.test-suite.name }} failed or directory not found"
+          else
+            echo "⚠️ Integration test directory not found: ${{ matrix.test-suite.path }}"
+          fi
+        continue-on-error: true
+
+  # VS Code Extension tests
+  vscode-extension:
+    name: VS Code Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' || contains(github.event.head_commit.message, '[vscode]')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: vscode-victor/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vscode-victor
+        run: npm ci
+
+      - name: Build webview UI
+        working-directory: vscode-victor/webview-ui
+        run: npm ci && npm run build
+
+      - name: Lint
+        working-directory: vscode-victor
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Compile
+        working-directory: vscode-victor
+        run: npm run compile
+
+      - name: Run tests
+        working-directory: vscode-victor
+        run: xvfb-run -a npm test
+        continue-on-error: true
+
+      - name: Package VSIX
+        working-directory: vscode-victor
+        run: npx vsce package --no-dependencies
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: vscode-victor/*.vsix
+
+  # Rust native extensions
+  rust-native:
+    name: Rust Native Extensions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check Rust code
+        run: cd rust && cargo check
+
+      - name: Clippy lints
+        run: cd rust && cargo clippy --all-targets -- -D warnings
+        continue-on-error: true

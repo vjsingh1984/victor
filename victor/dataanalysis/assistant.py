@@ -24,7 +24,7 @@ class DataAnalysisAssistant(VerticalBase):
     Competitive with: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
     """
 
-    name = "data_analysis"
+    name = "dataanalysis"
     description = "Data exploration, statistical analysis, visualization, and ML insights"
     version = "1.0.0"
 
@@ -184,129 +184,6 @@ When presenting analysis:
 - Be transparent about limitations
 """
 
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[PromptContributorProtocol]:
-        return cls._get_extension_factory("prompt_contributor", "victor.dataanalysis.prompts")
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[ModeConfigProviderProtocol]:
-        return cls._get_extension_factory("mode_config_provider", "victor.dataanalysis.mode_config")
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[SafetyExtensionProtocol]:
-        return cls._get_extension_factory("safety_extension", "victor.dataanalysis.safety")
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
-        """Get tool dependency provider using centralized factory.
-
-        Phase 4: Migrated from deprecated DataAnalysisToolDependencyProvider
-        wrapper to centralized create_vertical_tool_dependency_provider().
-        """
-
-        def _create():
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return create_vertical_tool_dependency_provider("dataanalysis")
-
-        return cls._get_cached_extension("tool_dependency_provider", _create)
-
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[TieredToolConfig]:
-        """Get tiered tool configuration for Data Analysis."""
-        from victor.core.vertical_types import TieredToolTemplate
-
-        return TieredToolTemplate.for_vertical(cls.name)
-
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)
     # =========================================================================
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Get Data Analysis-specific workflow provider.
-
-        Provides workflows for:
-        - eda_workflow: Exploratory Data Analysis
-        - data_cleaning: Data cleaning and preparation
-        - statistical_analysis: Hypothesis testing and statistical modeling
-        - ml_pipeline: End-to-end machine learning pipeline
-
-        Returns:
-            DataAnalysisWorkflowProvider instance
-        """
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
-
-        return DataAnalysisWorkflowProvider()
-
-    @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for Data Analysis vertical.
-
-        Returns:
-            DataAnalysisRLConfig instance (implements RLConfigProviderProtocol)
-        """
-        from victor.dataanalysis.rl import DataAnalysisRLConfig
-
-        return DataAnalysisRLConfig()
-
-    @classmethod
-    def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for Data Analysis vertical.
-
-        Returns:
-            DataAnalysisRLHooks instance
-        """
-        from victor.dataanalysis.rl import DataAnalysisRLHooks
-
-        return DataAnalysisRLHooks()
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for Data Analysis tasks.
-
-        Provides pre-configured team specifications for:
-        - eda_team: Exploratory data analysis
-        - cleaning_team: Data quality and preparation
-        - statistics_team: Hypothesis testing
-        - ml_team: Machine learning pipeline
-        - visualization_team: Charts and dashboards
-
-        Returns:
-            DataAnalysisTeamSpecProvider instance (implements TeamSpecProviderProtocol)
-        """
-        from victor.dataanalysis.teams import DataAnalysisTeamSpecProvider
-
-        return DataAnalysisTeamSpecProvider()
-
-    @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Get capability provider for Data Analysis vertical.
-
-        Provides capabilities for:
-        - data_quality: Data quality rules and validation settings
-        - visualization_style: Visualization and plotting configuration
-        - statistical_analysis: Statistical analysis configuration
-        - ml_pipeline: Machine learning pipeline configuration
-        - data_privacy: Data privacy and anonymization settings
-
-        Returns:
-            DataAnalysisCapabilityProvider instance (implements BaseCapabilityProvider)
-        """
-        from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
-
-        return DataAnalysisCapabilityProvider()
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Get compute handlers for DataAnalysis workflows.
-
-        Returns handlers from victor.dataanalysis.handlers for workflow execution.
-        This replaces the previous import-side-effect registration pattern.
-
-        Returns:
-            Dict mapping handler names to handler instances
-        """
-        from victor.dataanalysis.handlers import HANDLERS
-
-        return HANDLERS

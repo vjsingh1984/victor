@@ -1,0 +1,249 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Unit tests for PlanningCoordinator integration with ChatCoordinator."""
+
+import pytest
+
+from victor.agent.coordinators.planning_coordinator import (
+    PlanningCoordinator,
+    PlanningConfig,
+    PlanningMode,
+    PlanningResult,
+)
+from victor.framework.task import TaskComplexity
+
+
+class TestPlanningConfig:
+    """Tests for PlanningConfig."""
+
+    def test_default_config(self):
+        """Test default configuration values."""
+        config = PlanningConfig()
+
+        assert config.min_planning_complexity == TaskComplexity.MEDIUM
+        assert config.min_steps_threshold == 3
+        assert len(config.complexity_keywords) > 0
+        assert config.show_plan_before_execution is True
+        assert config.fallback_on_planning_failure is True
+
+    def test_custom_config(self):
+        """Test custom configuration."""
+        config = PlanningConfig(
+            min_planning_complexity=TaskComplexity.COMPLEX,
+            min_steps_threshold=2,
+            show_plan_before_execution=False,
+        )
+
+        assert config.min_planning_complexity == TaskComplexity.COMPLEX
+        assert config.min_steps_threshold == 2
+        assert config.show_plan_before_execution is False
+
+
+class TestPlanningMode:
+    """Tests for PlanningMode enum."""
+
+    def test_planning_mode_values(self):
+        """Test planning mode enum values."""
+        assert PlanningMode.AUTO.value == "auto"
+        assert PlanningMode.ALWAYS.value == "always"
+        assert PlanningMode.NEVER.value == "never"
+
+
+class TestPlanningResult:
+    """Tests for PlanningResult."""
+
+    def test_planned_result_success(self):
+        """Test planned result with success."""
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
+
+        plan = ReadableTaskPlan(
+            name="Test plan",
+            complexity=PlanningTaskComplexity.MODERATE,
+            desc="Test description",
+            steps=[[1, "research", "Test step", "overview"]],
+            duration="10min",
+        )
+
+        result = PlanningResult(
+            mode="planned",
+            plan=plan,
+            steps_completed=1,
+            steps_total=1,
+        )
+
+        assert result.mode == "planned"
+        assert result.plan is not None
+        assert result.steps_completed == 1
+        assert result.steps_total == 1
+        # Success requires execution_result
+        assert result.success is False
+
+    def test_direct_result_success(self):
+        """Test direct chat result with success."""
+        from victor.providers.base import CompletionResponse
+
+        response = CompletionResponse(
+            content="Test response",
+            role="assistant",
+            tool_calls=None,
+        )
+
+        result = PlanningResult(
+            mode="direct",
+            response=response,
+        )
+
+        assert result.mode == "direct"
+        assert result.response is not None
+        assert result.success is True
+
+
+class TestPlanningCoordinator:
+    """Tests for PlanningCoordinator (without orchestrator)."""
+
+    def _create_mock_orchestrator(self):
+        """Helper to create a mock orchestrator."""
+
+        class MockOrchestrator:
+            provider = None
+            model = "test-model"
+            max_tokens = 4096
+
+        return MockOrchestrator()
+
+    def _create_coordinator(self):
+        """Helper to create a coordinator with default config."""
+        mock_orch = self._create_mock_orchestrator()
+        return PlanningCoordinator(mock_orch)
+
+    def test_planning_coordinator_init(self):
+        """Test coordinator initialization."""
+        mock_orch = self._create_mock_orchestrator()
+        coordinator = PlanningCoordinator(mock_orch)
+
+        assert coordinator.orchestrator == mock_orch
+        assert coordinator.active_plan is None
+        assert coordinator.config is not None
+
+    def test_planning_mode_setter(self):
+        """Test setting planning mode."""
+        coordinator = self._create_coordinator()
+
+        coordinator.set_planning_mode(PlanningMode.ALWAYS)
+        assert coordinator._planning_mode == PlanningMode.ALWAYS
+
+        coordinator.set_planning_mode(PlanningMode.NEVER)
+        assert coordinator._planning_mode == PlanningMode.NEVER
+
+    def test_clear_active_plan(self):
+        """Test clearing active plan."""
+        coordinator = self._create_coordinator()
+
+        # Set a mock plan
+        from victor.agent.planning.readable_schema import (
+            ReadableTaskPlan,
+            TaskComplexity as PlanningTaskComplexity,
+        )
+
+        plan = ReadableTaskPlan(
+            name="Test",
+            complexity=PlanningTaskComplexity.SIMPLE,
+            desc="Test",
+            steps=[[1, "research", "Test", "overview"]],
+            duration="5min",
+        )
+        coordinator.active_plan = plan
+
+        assert coordinator.get_active_plan() is not None
+
+        coordinator.clear_active_plan()
+
+        assert coordinator.get_active_plan() is None
+
+    def test_should_use_planning_keywords(self):
+        """Test planning detection via keywords."""
+        coordinator = self._create_coordinator()
+
+        # Test with multi-step keywords
+        message = "Analyze the architecture and evaluate scalability"
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is True
+
+    def test_should_not_use_planning_simple(self):
+        """Test that simple messages don't trigger planning."""
+        coordinator = self._create_coordinator()
+
+        # Test simple message
+        message = "What is the weather today?"
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is False
+
+    def test_should_use_planning_mode_never(self):
+        """Test NEVER planning mode."""
+        coordinator = self._create_coordinator()
+        coordinator.set_planning_mode(PlanningMode.NEVER)
+
+        # Even with keywords, should not plan
+        message = "Analyze the architecture and evaluate scalability"
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is False
+
+    def test_should_use_planning_mode_always(self):
+        """Test ALWAYS planning mode."""
+        coordinator = self._create_coordinator()
+        coordinator.set_planning_mode(PlanningMode.ALWAYS)
+
+        # Even simple message should plan
+        message = "Hello world"
+        should_plan = coordinator._should_use_planning(message)
+
+        assert should_plan is True
+
+
+class TestPlanningCoordinatorIntegration:
+    """Integration tests for PlanningCoordinator with ChatCoordinator."""
+
+    def test_planning_coordinator_protocol(self):
+        """Test that coordinator can be used with ChatCoordinator."""
+        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+
+        # This test verifies the integration structure
+        # Actual execution would require full orchestrator setup
+        assert hasattr(ChatCoordinator, "__init__")
+        assert hasattr(ChatCoordinator, "chat")
+        assert hasattr(ChatCoordinator, "_should_use_planning")
+        assert hasattr(ChatCoordinator, "_chat_with_planning")
+
+    def test_config_settings_exist(self):
+        """Test that planning settings exist in config."""
+        from victor.config.settings import Settings
+
+        settings = Settings()
+
+        # Check that planning settings are available
+        assert hasattr(settings, "enable_planning")
+        assert hasattr(settings, "planning_min_complexity")
+        assert hasattr(settings, "planning_show_plan")
+
+        # Check defaults
+        assert settings.enable_planning is False
+        assert settings.planning_min_complexity == "moderate"
+        assert settings.planning_show_plan is True

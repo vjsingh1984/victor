@@ -392,6 +392,11 @@ Complete reference for Victor configuration options from `victor/config/settings
 | `event_delivery_guarantee` | `at_most_once` | Delivery: `at_most_once`, `at_least_once`, `exactly_once` |
 | `event_max_batch_size` | `100` | Max batch size |
 | `event_flush_interval_ms` | `1000.0` | Flush interval in ms |
+| `event_queue_maxsize` | `10000` | In-memory backend queue bound |
+| `event_queue_overflow_policy` | `drop_newest` | Default overflow policy (`drop_newest`, `drop_oldest`, `block_with_timeout`) |
+| `event_queue_overflow_block_timeout_ms` | `50.0` | Default timeout for `block_with_timeout` policy |
+| `event_queue_overflow_topic_policies` | `{lifecycle.session.*: block_with_timeout, vertical.applied: block_with_timeout, error.*: block_with_timeout, core.events.emit_sync.metrics: drop_oldest, vertical.extensions.loader.metrics: drop_oldest}` | Per-topic policy overrides (supports `*` wildcard) |
+| `event_queue_overflow_topic_block_timeout_ms` | `{lifecycle.session.*: 150.0, vertical.applied: 120.0, error.*: 200.0}` | Per-topic timeout overrides for `block_with_timeout` |
 
 ---
 

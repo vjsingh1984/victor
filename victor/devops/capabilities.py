@@ -39,11 +39,14 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+)
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
@@ -51,6 +54,42 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
+# =============================================================================
+
+
+_DEPLOYMENT_SAFETY_DEFAULTS: Dict[str, Any] = {
+    "require_approval_for_production": True,
+    "require_backup_before_deploy": True,
+    "enable_rollback": True,
+    "protected_environments": ["production", "staging"],
+}
+_CONTAINER_DEFAULTS: Dict[str, Any] = {
+    "runtime": "docker",
+    "default_registry": None,
+    "security_scan_enabled": True,
+    "max_image_size_mb": 2000,
+}
+_INFRASTRUCTURE_DEFAULTS: Dict[str, Any] = {
+    "iac_tool": "terraform",
+    "auto_approve_non_destructive": False,
+    "require_plan_before_apply": True,
+    "state_backend": None,
+}
+_CICD_DEFAULTS: Dict[str, Any] = {
+    "platform": "github_actions",
+    "run_tests_before_deploy": True,
+    "require_passing_checks": True,
+    "enable_security_scan": True,
+}
+_MONITORING_DEFAULTS: Dict[str, Any] = {
+    "metrics_backend": "prometheus",
+    "logging_backend": "loki",
+    "alerting_enabled": True,
+    "dashboard_tool": "grafana",
+}
 
 # =============================================================================
 # Capability Handlers
@@ -77,7 +116,16 @@ def configure_deployment_safety(
         enable_rollback: Enable automatic rollback on failure
         protected_environments: List of environments that require extra caution
     """
-    if hasattr(orchestrator, "safety_config"):
+    config = {
+        "require_approval_for_production": require_approval_for_production,
+        "require_backup_before_deploy": require_backup_before_deploy,
+        "enable_rollback": enable_rollback,
+        "protected_environments": protected_environments or ["production", "staging"],
+    }
+    service_stored = store_capability_config(orchestrator, "deployment_safety", config)
+
+    # Legacy compatibility while runtime consumers migrate.
+    if not service_stored and hasattr(orchestrator, "safety_config"):
         orchestrator.safety_config["deployment"] = {
             "require_approval_for_production": require_approval_for_production,
             "require_backup_before_deploy": require_backup_before_deploy,
@@ -105,13 +153,16 @@ def configure_container_settings(
         security_scan_enabled: Enable security scanning for images
         max_image_size_mb: Maximum allowed image size in MB
     """
-    if hasattr(orchestrator, "container_config"):
-        orchestrator.container_config = {
+    store_capability_config(
+        orchestrator,
+        "container_config",
+        {
             "runtime": runtime,
             "default_registry": default_registry,
             "security_scan_enabled": security_scan_enabled,
             "max_image_size_mb": max_image_size_mb,
-        }
+        },
+    )
 
     logger.info(f"Configured container settings: runtime={runtime}")
 
@@ -125,16 +176,7 @@ def get_container_settings(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Container configuration dict
     """
-    return getattr(
-        orchestrator,
-        "container_config",
-        {
-            "runtime": "docker",
-            "default_registry": None,
-            "security_scan_enabled": True,
-            "max_image_size_mb": 2000,
-        },
-    )
+    return load_capability_config(orchestrator, "container_config", _CONTAINER_DEFAULTS)
 
 
 def configure_infrastructure_settings(
@@ -154,13 +196,17 @@ def configure_infrastructure_settings(
         require_plan_before_apply: Require plan step before apply
         state_backend: Backend for storing IaC state
     """
-    if hasattr(orchestrator, "infra_config"):
-        orchestrator.infra_config = {
+    store_capability_config(
+        orchestrator,
+        "infrastructure_config",
+        {
             "iac_tool": iac_tool,
             "auto_approve_non_destructive": auto_approve_non_destructive,
             "require_plan_before_apply": require_plan_before_apply,
             "state_backend": state_backend,
-        }
+        },
+        fallback_attr="infra_config",
+    )
 
     logger.info(f"Configured infrastructure settings: iac_tool={iac_tool}")
 
@@ -182,13 +228,16 @@ def configure_cicd_settings(
         require_passing_checks: Require all checks to pass
         enable_security_scan: Enable security scanning in pipeline
     """
-    if hasattr(orchestrator, "cicd_config"):
-        orchestrator.cicd_config = {
+    store_capability_config(
+        orchestrator,
+        "cicd_config",
+        {
             "platform": platform,
             "run_tests_before_deploy": run_tests_before_deploy,
             "require_passing_checks": require_passing_checks,
             "enable_security_scan": enable_security_scan,
-        }
+        },
+    )
 
     logger.info(f"Configured CI/CD settings: platform={platform}")
 
@@ -210,13 +259,16 @@ def configure_monitoring_settings(
         alerting_enabled: Enable alerting
         dashboard_tool: Dashboard visualization tool
     """
-    if hasattr(orchestrator, "monitoring_config"):
-        orchestrator.monitoring_config = {
+    store_capability_config(
+        orchestrator,
+        "monitoring_config",
+        {
             "metrics_backend": metrics_backend,
             "logging_backend": logging_backend,
             "alerting_enabled": alerting_enabled,
             "dashboard_tool": dashboard_tool,
-        }
+        },
+    )
 
     logger.info(f"Configured monitoring settings: metrics={metrics_backend}")
 

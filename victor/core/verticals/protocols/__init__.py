@@ -116,6 +116,16 @@ from victor.core.verticals.protocols.capability_provider import (
     VerticalPersonaProviderProtocol,
 )
 
+# Stage Contract (Phase 2: LSP Compliance)
+from victor.core.verticals.protocols.stages import (
+    StageContract,
+    StageValidator,
+    StageValidationResult,
+    ValidationError,
+    validate_stage_contract,
+    StageContractMixin,
+)
+
 # ISP-Compliant Vertical Providers
 from victor.core.verticals.protocols.providers import (
     MiddlewareProvider,
@@ -255,6 +265,13 @@ __all__ = [
     "ChainProviderProtocol",
     "PersonaProviderProtocol",
     "VerticalPersonaProviderProtocol",
+    # Stage Contract (Phase 2: LSP Compliance)
+    "StageContract",
+    "StageValidator",
+    "StageValidationResult",
+    "ValidationError",
+    "validate_stage_contract",
+    "StageContractMixin",
     # Re-exports from core
     "ToolDependency",
     "ToolDependencyProviderProtocol",

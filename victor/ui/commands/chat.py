@@ -194,6 +194,17 @@ def chat(
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
     ),
+    enable_planning: bool = typer.Option(
+        False,
+        "--planning/--no-planning",
+        help="Enable structured planning for complex multi-step tasks. Auto-detects when to use planning vs direct chat.",
+    ),
+    planning_model: Optional[str] = typer.Option(
+        None,
+        "--planning-model",
+        help="Override model for planning tasks (e.g., 'qwen3-coder-tools:30b-128K', 'deepseek-chat'). "
+        "Takes precedence over profile planning_model setting.",
+    ),
     # Session management options
     list_sessions: bool = typer.Option(
         False,
@@ -410,6 +421,8 @@ def chat(
                     max_iterations=max_iterations,
                     vertical=vertical,
                     enable_observability=enable_observability,
+                    enable_planning=enable_planning,
+                    planning_model=planning_model,
                     legacy_mode=legacy_mode,
                 )
             )
@@ -430,6 +443,8 @@ def chat(
                     max_iterations=max_iterations,
                     vertical=vertical,
                     enable_observability=enable_observability,
+                    enable_planning=enable_planning,
+                    planning_model=planning_model,
                     legacy_mode=legacy_mode,
                     use_tui=use_tui,
                     resume_session_id=session_id,
@@ -462,6 +477,8 @@ async def run_oneshot(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
+    enable_planning: bool = False,
+    planning_model: Optional[str] = None,
     legacy_mode: bool = False,
 ) -> None:
     """Run a single message and exit.
@@ -491,6 +508,14 @@ async def run_oneshot(
     except Exception:
         pass
 
+    # If planning is enabled, disable thinking mode to avoid context bloat
+    # Planning mode generates structured plans which don't need extended reasoning
+    if enable_planning and thinking:
+        console.print(
+            "[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]"
+        )
+        thinking = False
+
     agent = None
     shim: Optional[FrameworkShim] = None
     try:
@@ -513,6 +538,10 @@ async def run_oneshot(
                 session_id=session_id,
             )
             agent = await shim.create_orchestrator()
+
+            # Set planning model override if provided (for planning coordinator)
+            if planning_model:
+                agent._planning_model_override = planning_model
 
             # Emit session start event if observability is enabled
             shim.emit_session_start(
@@ -549,17 +578,40 @@ async def run_oneshot(
         model_name = None
 
         if stream and agent.provider.supports_streaming():
-            from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
+            # Planning mode requires non-streaming execution (plan generation → step execution → summary)
+            # Fall back to non-streaming when planning is enabled
+            if enable_planning and hasattr(agent, "chat_with_planning"):
+                response = await agent.chat_with_planning(message)
+                content_buffer = response.content
+                usage_stats = response.usage
+                model_name = response.model
+                formatter.response(
+                    content=content_buffer,
+                    usage=usage_stats,
+                    model=model_name,
+                )
+            else:
+                from victor.ui.rendering import (
+                    FormatterRenderer,
+                    LiveDisplayRenderer,
+                    stream_response,
+                )
 
-            use_live = renderer_choice in {"rich", "auto"}
-            if renderer_choice in {"rich-text", "text"}:
-                use_live = False
-            renderer = (
-                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
-            )
-            content_buffer = await stream_response(agent, message, renderer)
+                use_live = renderer_choice in {"rich", "auto"}
+                if renderer_choice in {"rich-text", "text"}:
+                    use_live = False
+                renderer = (
+                    LiveDisplayRenderer(console)
+                    if use_live
+                    else FormatterRenderer(formatter, console)
+                )
+                content_buffer = await stream_response(agent, message, renderer)
         else:
-            response = await agent.chat(message)
+            # Use planning mode if enabled and available
+            if enable_planning and hasattr(agent, "chat_with_planning"):
+                response = await agent.chat_with_planning(message)
+            else:
+                response = await agent.chat(message)
             content_buffer = response.content
             usage_stats = response.usage
             model_name = response.model
@@ -601,6 +653,8 @@ async def run_interactive(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
+    enable_planning: bool = False,
+    planning_model: Optional[str] = None,
     legacy_mode: bool = False,
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
@@ -648,6 +702,10 @@ async def run_interactive(
                 session_id=session_id,
             )
             agent = await shim.create_orchestrator()
+
+            # Set planning model override if provided (for planning coordinator)
+            if planning_model:
+                agent._planning_model_override = planning_model
 
             # Resume session if requested
             if resume_session_id:
@@ -747,6 +805,7 @@ async def run_interactive(
                 rl_suggestion,
                 renderer_choice=renderer_choice,
                 vertical_name=vertical,
+                enable_planning=enable_planning,
             )
 
         success = True
@@ -782,6 +841,7 @@ async def _run_cli_repl(
     rl_suggestion: Optional[tuple[str, str, float]] = None,
     renderer_choice: str = "auto",
     vertical_name: Optional[str] = None,
+    enable_planning: bool = False,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
@@ -830,23 +890,32 @@ async def _run_cli_repl(
             console.print("[blue]Assistant:[/]")
 
             if stream:
-                from victor.agent.response_sanitizer import sanitize_response
-                from victor.ui.rendering import (
-                    LiveDisplayRenderer,
-                    FormatterRenderer,
-                    stream_response,
-                )
+                # Planning mode requires non-streaming execution
+                if enable_planning and hasattr(agent, "chat_with_planning"):
+                    response = await agent.chat_with_planning(user_input)
+                    console.print(Markdown(response.content))
+                else:
+                    from victor.agent.response_sanitizer import sanitize_response
+                    from victor.ui.rendering import (
+                        LiveDisplayRenderer,
+                        FormatterRenderer,
+                        stream_response,
+                    )
 
-                use_live = renderer_choice in {"rich", "auto"}
-                renderer = (
-                    LiveDisplayRenderer(console)
-                    if use_live
-                    else FormatterRenderer(create_formatter(), console)
-                )
-                content_buffer = await stream_response(agent, user_input, renderer)
-                content_buffer = sanitize_response(content_buffer)
+                    use_live = renderer_choice in {"rich", "auto"}
+                    renderer = (
+                        LiveDisplayRenderer(console)
+                        if use_live
+                        else FormatterRenderer(create_formatter(), console)
+                    )
+                    content_buffer = await stream_response(agent, user_input, renderer)
+                    content_buffer = sanitize_response(content_buffer)
             else:
-                response = await agent.chat(user_input)
+                # Use planning mode if enabled and available
+                if enable_planning and hasattr(agent, "chat_with_planning"):
+                    response = await agent.chat_with_planning(user_input)
+                else:
+                    response = await agent.chat(user_input)
                 console.print(Markdown(response.content))
 
         except KeyboardInterrupt:

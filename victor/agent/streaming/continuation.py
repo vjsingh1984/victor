@@ -425,8 +425,8 @@ class ContinuationHandler:
             return result
 
         try:
-            # Import Message here to avoid circular dependency
-            from victor.core.types import Message
+            # Import Message from providers.base (not core.types)
+            from victor.providers.base import Message
 
             messages = self._messages_getter() + [
                 Message(

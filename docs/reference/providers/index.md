@@ -13,6 +13,14 @@ Complete reference for all 21 supported LLM providers in Victor.
 
 ## Provider Comparison
 
+### Startup Behavior
+
+Victor provider implementations are registered lazily and imported on first use. This avoids eager imports for optional runtimes and reduces startup cost for `import victor` and `Agent.create()`.
+
+MLX has an extra safety gate:
+- `VICTOR_ENABLE_MLX_PROVIDER=0`: disables MLX aliases completely.
+- `VICTOR_MLX_SKIP_PREFLIGHT=1`: bypasses the MLX subprocess runtime preflight (only if your MPS/Metal setup is known good).
+
 ### Quick Comparison Matrix
 
 | Provider | Models | Tool Calling | Streaming | Vision | API Key | Pricing |

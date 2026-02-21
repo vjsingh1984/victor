@@ -14,12 +14,17 @@
 
 """Tests for web_search_tool module."""
 
-from unittest.mock import MagicMock
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from victor.tools.base import ToolConfig
 from victor.tools.web_search_tool import (
     _parse_ddg_results,
     _get_web_config,
+    web_fetch,
+    web_search,
 )
 
 
@@ -35,6 +40,10 @@ class TestGetWebConfig:
             web_fetch_top=5,
             web_fetch_pool=10,
             max_content_length=8000,
+            generic_result_cache_enabled=True,
+            generic_result_cache_ttl=120,
+            http_connection_pool_enabled=True,
+            http_connection_pool_max_connections=64,
         )
         context = {"tool_config": tool_config}
 
@@ -45,6 +54,10 @@ class TestGetWebConfig:
         assert config["fetch_top"] == 5
         assert config["fetch_pool"] == 10
         assert config["max_content_length"] == 8000
+        assert config["generic_result_cache_enabled"] is True
+        assert config["generic_result_cache_ttl"] == 120
+        assert config["http_connection_pool_enabled"] is True
+        assert config["http_connection_pool_max_connections"] == 64
 
     def test_config_without_context(self):
         """Test getting config without context returns defaults."""
@@ -55,6 +68,8 @@ class TestGetWebConfig:
         assert config["fetch_top"] is None
         assert config["fetch_pool"] is None
         assert config["max_content_length"] == 5000
+        assert config["generic_result_cache_enabled"] is False
+        assert config["http_connection_pool_enabled"] is False
 
     def test_config_with_empty_context(self):
         """Test getting config with empty context returns defaults."""
@@ -126,3 +141,59 @@ class TestParseDDGResults:
         """
         results = _parse_ddg_results(html, max_results=10)
         assert results == []
+
+
+class TestRuntimeInfraIntegration:
+    """Tests for runtime cache/pool integrations in web tools."""
+
+    @pytest.mark.asyncio
+    async def test_web_search_passes_pool_enabled_config_to_request_layer(self):
+        """web_search should forward pool-enabled config to _request_text."""
+        html = """
+        <html><body>
+        <div class="result">
+            <a class="result__a" href="https://example.com">Example</a>
+            <a class="result__snippet">Snippet</a>
+        </div>
+        </body></html>
+        """
+        tool_config = ToolConfig(http_connection_pool_enabled=True)
+        context = {"tool_config": tool_config}
+
+        with patch(
+            "victor.tools.web_search_tool._request_text",
+            new=AsyncMock(return_value=(200, html)),
+        ) as mock_request:
+            result = await web_search(query="test query", context=context)
+
+        assert result["success"] is True
+        assert mock_request.await_count == 1
+        web_config = mock_request.await_args.kwargs["web_config"]
+        assert web_config["http_connection_pool_enabled"] is True
+
+    @pytest.mark.asyncio
+    async def test_web_fetch_uses_generic_cache_on_repeated_calls(self, monkeypatch):
+        """web_fetch should serve repeated identical requests from GenericResultCache."""
+        monkeypatch.setattr("victor.tools.web_search_tool._GENERIC_WEB_CACHE", None)
+        html = "<html><body><main>" + ("content " * 30) + "</main></body></html>"
+        url = f"https://example.com/{uuid.uuid4().hex}"
+        tool_config = ToolConfig(generic_result_cache_enabled=True, generic_result_cache_ttl=120)
+        context = {"tool_config": tool_config}
+
+        with patch(
+            "victor.tools.web_search_tool._request_text",
+            new=AsyncMock(return_value=(200, html)),
+        ) as mock_request:
+            first = await web_fetch(url, context=context)
+
+        assert first["success"] is True
+        assert mock_request.await_count == 1
+
+        with patch(
+            "victor.tools.web_search_tool._request_text",
+            new=AsyncMock(side_effect=AssertionError("network should not be called")),
+        ):
+            second = await web_fetch(url, context=context)
+
+        assert second["success"] is True
+        assert second["cached"] is True

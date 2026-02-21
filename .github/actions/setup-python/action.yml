@@ -1,0 +1,56 @@
+name: 'Setup Python with Dependencies'
+description: 'Composite action to set up Python with caching and install Victor dependencies'
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+  install-dev:
+    description: 'Install dev dependencies'
+    required: false
+    default: 'true'
+  cache-key-prefix:
+    description: 'Prefix for cache key'
+    required: false
+    default: 'victor'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/pipenv
+        key: ${{ inputs.cache-key-prefix }}-${{ runner.os }}-pip-${{ inputs.python-version }}-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-${{ runner.os }}-pip-${{ inputs.python-version }}-
+          ${{ inputs.cache-key-prefix }}-${{ runner.os }}-pip-
+
+    - name: Cache pytest
+      uses: actions/cache@v4
+      with:
+        path: .pytest_cache
+        key: ${{ inputs.cache-key-prefix }}-${{ runner.os }}-pytest-${{ github.run_id }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-${{ runner.os }}-pytest-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        # Use CPU-only torch for faster CI
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+        if [ "${{ inputs.install-dev }}" == "true" ]; then
+          pip install -e ".[dev]"
+        else
+          pip install -e .
+        fi
