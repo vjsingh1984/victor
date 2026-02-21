@@ -275,7 +275,7 @@ class TestSummaryAction:
 
             assert result.success is True
             # Accept both emoji (🟢) and text ([L]) versions
-            assert ("🟢" in result.output or "[L]" in result.output)  # low risk icon
+            assert "🟢" in result.output or "[L]" in result.output  # low risk icon
             assert "Low Risk" in result.output
 
     @pytest.mark.asyncio
@@ -300,7 +300,7 @@ class TestSummaryAction:
 
             assert result.success is True
             # In CI, emojis are disabled, so check for text version [!]
-            assert ("🔴" in result.output or "[!]" in result.output)  # critical risk icon
+            assert "🔴" in result.output or "[!]" in result.output  # critical risk icon
             assert "Critical Risk" in result.output
 
 
@@ -381,9 +381,9 @@ class TestScanAction:
             result = await tool.execute(action="scan")
 
             # In CI, emojis are disabled, so check for text versions
-            assert ("🔴" in result.output or "[!]" in result.output)  # critical severity
+            assert "🔴" in result.output or "[!]" in result.output  # critical severity
             assert "CRIT001" in result.output
-            assert ("💡" in result.output or "*" in result.output)  # remediation hint
+            assert "💡" in result.output or "*" in result.output  # remediation hint
 
 
 # =============================================================================
@@ -484,9 +484,9 @@ class TestFormatMethods:
 
         assert "Detected IaC Platforms" in output
         # Accept both emoji and text versions
-        assert ("🏗️" in output or "[TF]" in output)  # terraform
-        assert ("🐳" in output or "[DK]" in output)  # docker
-        assert ("☸️" in output or "[K8]" in output)  # kubernetes
+        assert "🏗️" in output or "[TF]" in output  # terraform
+        assert "🐳" in output or "[DK]" in output  # docker
+        assert "☸️" in output or "[K8]" in output  # kubernetes
 
     def test_format_summary_medium_risk(self, tool, sample_summary):
         """Test formatting summary with medium risk."""
@@ -494,7 +494,7 @@ class TestFormatMethods:
 
         assert "IaC Security Summary" in output
         # Accept both emoji (🟡) and text ([M]) versions
-        assert ("🟡" in output or "[M]" in output)  # medium risk icon
+        assert "🟡" in output or "[M]" in output  # medium risk icon
         assert "Medium Risk" in output
         assert "45/100" in output
 
@@ -512,7 +512,7 @@ class TestFormatMethods:
         output = tool._format_summary(summary)
 
         # Accept both emoji (🟠) and text ([H]) versions
-        assert ("🟠" in output or "[H]" in output)  # high risk icon
+        assert "🟠" in output or "[H]" in output  # high risk icon
         assert "High Risk" in output
 
     def test_format_summary_includes_categories(self, tool, sample_summary):
@@ -568,9 +568,9 @@ class TestFormatMethods:
         output = tool._format_scan_result(scan_result)
 
         # In CI, emojis are disabled, so check for text versions
-        assert ("🔴" in output or "[!]" in output)  # critical
-        assert ("🟠" in output or "[H]" in output)  # high
-        assert ("🟡" in output or "[M]" in output)  # medium
+        assert "🔴" in output or "[!]" in output  # critical
+        assert "🟠" in output or "[H]" in output  # high
+        assert "🟡" in output or "[M]" in output  # medium
 
     def test_format_findings_empty(self, tool):
         """Test formatting empty findings list."""
@@ -584,11 +584,11 @@ class TestFormatMethods:
         assert "Security Findings" in output
         assert "TF001" in output
         # Accept both emoji (🟠) and text ([H]) versions
-        assert ("🟠" in output or "[H]" in output)  # high severity
+        assert "🟠" in output or "[H]" in output  # high severity
         assert "Line: 15" in output
         # Accept both emoji (💡) and text (*) versions for remediation hint
         # In CI mode, the hint icon becomes a bullet point (*)
-        assert ("💡" in output or "* " in output or "Remediation" in output)
+        assert "💡" in output or "* " in output or "Remediation" in output
 
     def test_format_findings_different_severities(self, tool):
         """Test formatting findings with different severities."""
@@ -613,8 +613,8 @@ class TestFormatMethods:
         output = tool._format_findings(findings, Path("test.tf"))
 
         # In CI, emojis are disabled, so check for text versions
-        assert ("🔴" in output or "[!]" in output)  # critical
-        assert ("⚪" in output or "[?]" in output)  # info
+        assert "🔴" in output or "[!]" in output  # critical
+        assert "⚪" in output or "[?]" in output  # info
 
 
 # =============================================================================

@@ -300,7 +300,7 @@ class TestLogIterationEnd:
             debug_logger.log_iteration_end(1, has_tool_calls=True)
             message = mock_info.call_args[0][0]
             # Check for either emoji (→) or text (->) version of arrow
-            assert ("→ tools" in message or "-> tools" in message)
+            assert "→ tools" in message or "-> tools" in message
 
     def test_shows_done_indicator(self, debug_logger):
         """Test shows done indicator when no tool calls."""
@@ -308,7 +308,7 @@ class TestLogIterationEnd:
             debug_logger.log_iteration_end(1, has_tool_calls=False)
             message = mock_info.call_args[0][0]
             # Check for either emoji (→) or text (->) version of arrow
-            assert ("→ done" in message or "-> done" in message)
+            assert "→ done" in message or "-> done" in message
 
 
 class TestLogToolCall:
@@ -360,7 +360,7 @@ class TestLogToolResult:
             debug_logger.log_tool_result("test", True, "output", 100.0)
             call_str = mock_info.call_args[0][0]
             # Accept both emoji (✓) and text (+/√) versions
-            assert ("✓" in call_str or "√" in call_str or "+" in call_str)
+            assert "✓" in call_str or "√" in call_str or "+" in call_str
             assert "test" in call_str
 
     def test_logs_failure(self, debug_logger):
@@ -369,7 +369,7 @@ class TestLogToolResult:
             debug_logger.log_tool_result("test", False, "error", 50.0)
             call_str = mock_info.call_args[0][0]
             # Accept both emoji (✗) and text (x) versions
-            assert ("✗" in call_str or "x" in call_str)
+            assert "✗" in call_str or "x" in call_str
 
     def test_logs_output_size(self, debug_logger):
         """Test output size is logged."""

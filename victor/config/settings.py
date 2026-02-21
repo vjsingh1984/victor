@@ -598,7 +598,7 @@ class Settings(BaseSettings):
     stream_responses: bool = True
     use_emojis: bool = Field(
         default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
-        description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var."
+        description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var.",
     )
 
     # Interaction Mode

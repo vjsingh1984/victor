@@ -163,6 +163,7 @@ class TestFlushLogging:
 # Test _graceful_shutdown
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestGracefulShutdown:
     """Tests for _graceful_shutdown async function."""
