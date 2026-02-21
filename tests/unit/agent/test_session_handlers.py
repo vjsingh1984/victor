@@ -413,6 +413,7 @@ class TestTUISessionHandler:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_start_tui_with_pre_configured_agent(self, handler, mock_config):
         """Test starting TUI with pre-configured agent."""
         mock_agent = MagicMock()
@@ -425,6 +426,7 @@ class TestTUISessionHandler:
         mock_tui.run_async.assert_called_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_start_tui_creates_agent(self, handler, mock_config):
         """Test starting TUI creates agent if not provided."""
         mock_agent = MagicMock()

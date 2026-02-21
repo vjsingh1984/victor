@@ -1649,6 +1649,8 @@ class TempVertical:
 class TestCachingPerformance:
     """Performance benchmarks for caching (Phase 1)."""
 
+    @pytest.mark.slow
+    @pytest.mark.benchmark
     def test_cached_apply_faster_than_uncached(self, benchmark=False):
         """Test that cached application is faster than uncached."""
         import time

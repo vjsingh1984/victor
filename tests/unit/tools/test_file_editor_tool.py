@@ -198,6 +198,7 @@ class TestEditModifyOperation:
         assert test_file.read_text() == "modified content"
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_modify_file_with_new_content_key(self, tmp_path):
         """Test modify using 'new_content' key instead of 'content'."""
         test_file = tmp_path / "test.txt"
@@ -472,6 +473,7 @@ class TestEditMultipleOperations:
     """Tests for multiple operations in single edit call."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_multiple_operations(self, tmp_path):
         """Test multiple operations in single edit call."""
         file1 = tmp_path / "file1.txt"
