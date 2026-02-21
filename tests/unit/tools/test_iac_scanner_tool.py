@@ -298,7 +298,8 @@ class TestSummaryAction:
             result = await tool.execute(action="summary")
 
             assert result.success is True
-            assert "🔴" in result.output  # critical risk icon
+            # In CI, emojis are disabled, so check for text version [!]
+            assert ("🔴" in result.output or "[!]" in result.output)  # critical risk icon
             assert "Critical Risk" in result.output
 
 
@@ -378,9 +379,10 @@ class TestScanAction:
 
             result = await tool.execute(action="scan")
 
-            assert "🔴" in result.output  # critical severity
+            # In CI, emojis are disabled, so check for text versions
+            assert ("🔴" in result.output or "[!]" in result.output)  # critical severity
             assert "CRIT001" in result.output
-            assert "💡" in result.output  # remediation hint
+            assert ("💡" in result.output or "*" in result.output)  # remediation hint
 
 
 # =============================================================================
@@ -561,9 +563,10 @@ class TestFormatMethods:
         )
         output = tool._format_scan_result(scan_result)
 
-        assert "🔴" in output  # critical
-        assert "🟠" in output  # high
-        assert "🟡" in output  # medium
+        # In CI, emojis are disabled, so check for text versions
+        assert ("🔴" in output or "[!]" in output)  # critical
+        assert ("🟠" in output or "[H]" in output)  # high
+        assert ("🟡" in output or "[M]" in output)  # medium
 
     def test_format_findings_empty(self, tool):
         """Test formatting empty findings list."""
@@ -602,8 +605,9 @@ class TestFormatMethods:
         ]
         output = tool._format_findings(findings, Path("test.tf"))
 
-        assert "🔴" in output  # critical
-        assert "⚪" in output  # info
+        # In CI, emojis are disabled, so check for text versions
+        assert ("🔴" in output or "[!]" in output)  # critical
+        assert ("⚪" in output or "[?]" in output)  # info
 
 
 # =============================================================================

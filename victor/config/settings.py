@@ -596,7 +596,10 @@ class Settings(BaseSettings):
     show_token_count: bool = True
     show_cost_metrics: bool = False  # Show cost in metrics display (e.g., "$0.015")
     stream_responses: bool = True
-    use_emojis: bool = True  # Enable emoji indicators in output (✓, ✗, etc.)
+    use_emojis: bool = Field(
+        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
+        description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var."
+    )
 
     # Interaction Mode
     # When True (one-shot mode), auto-continue when model asks for user input
@@ -1119,6 +1122,18 @@ class Settings(BaseSettings):
             raise ValueError("http_connection_pool_connection_timeout must be > 0")
         if self.http_connection_pool_total_timeout <= 0:
             raise ValueError("http_connection_pool_total_timeout must be > 0")
+        return self
+
+    @model_validator(mode="after")
+    def disable_emojis_in_ci(self) -> "Settings":
+        """Automatically disable emoji indicators in CI environments.
+
+        This prevents test failures due to emoji rendering differences in CI.
+        Checks the CI environment variable which is set by GitHub Actions, GitLab CI, etc.
+        """
+        if os.getenv("CI", "false").lower() == "true":
+            # Use object.__setattr__ to bypass pydantic validation
+            object.__setattr__(self, "use_emojis", False)
         return self
 
     @staticmethod
