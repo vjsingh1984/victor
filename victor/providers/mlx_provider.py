@@ -227,8 +227,12 @@ class MLXProvider(BaseProvider):
                     # If load() doesn't accept some kwargs (like trust_remote_code),
                     # try without the problematic ones
                     if "trust_remote_code" in str(e) and "trust_remote_code" in load_kwargs:
-                        logger.debug("MLX load() doesn't accept trust_remote_code, retrying without it")
-                        load_kwargs = {k: v for k, v in load_kwargs.items() if k != "trust_remote_code"}
+                        logger.debug(
+                            "MLX load() doesn't accept trust_remote_code, retrying without it"
+                        )
+                        load_kwargs = {
+                            k: v for k, v in load_kwargs.items() if k != "trust_remote_code"
+                        }
                         self._model, self._tokenizer = await loop.run_in_executor(
                             None,
                             lambda: _mlx_load(self.model_path, **load_kwargs),
