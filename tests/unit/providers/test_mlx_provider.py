@@ -98,14 +98,20 @@ class TestMLXProvider:
 
 
 class TestMLXProviderIntegration:
-    """Integration tests for MLX provider (requires MLX installed)."""
+    """Integration tests for MLX provider (requires MLX installed and model download).
+
+    These tests are marked as slow and require actual model downloads.
+    They should be skipped in CI environments by default.
+    """
 
     @pytest.fixture
     def provider(self):
         """Create MLX provider instance."""
-        return MLXProvider(model="mlx-community/Llama-3.2-1B-Instruct")
+        return MLXProvider(model="mlx-community/Qwen2.5-7B-Instruct-4bit")
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_check_connection(self, provider):
         """Test connection check."""
         # This will try to load the model
@@ -113,12 +119,14 @@ class TestMLXProviderIntegration:
         assert isinstance(is_connected, bool)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_simple_completion(self, provider):
         """Test simple text completion."""
         messages = [Message(role="user", content="Say 'Hello, MLX!'")]
         response = await provider._make_request(
             messages=messages,
-            model="mlx-community/Llama-3.2-1B-Instruct",
+            model="mlx-community/Qwen2.5-7B-Instruct-4bit",
             temperature=0.7,
             max_tokens=50,
         )
@@ -128,6 +136,8 @@ class TestMLXProviderIntegration:
         assert len(response.content) > 0
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_multi_turn_conversation(self, provider):
         """Test multi-turn conversation."""
         messages = [
@@ -139,7 +149,7 @@ class TestMLXProviderIntegration:
 
         response = await provider._make_request(
             messages=messages,
-            model="mlx-community/Llama-3.2-1B-Instruct",
+            model="mlx-community/Qwen2.5-7B-Instruct-4bit",
             temperature=0.7,
             max_tokens=100,
         )
@@ -149,6 +159,8 @@ class TestMLXProviderIntegration:
         assert "alice" in response.content.lower()
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_streaming(self, provider):
         """Test streaming response."""
         messages = [Message(role="user", content="Count from 1 to 5")]
@@ -156,7 +168,7 @@ class TestMLXProviderIntegration:
         chunks = []
         async for chunk in provider.stream(
             messages=messages,
-            model="mlx-community/Llama-3.2-1B-Instruct",
+            model="mlx-community/Qwen2.5-7B-Instruct-4bit",
             temperature=0.7,
             max_tokens=50,
         ):

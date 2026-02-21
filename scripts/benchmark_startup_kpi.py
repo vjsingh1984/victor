@@ -201,10 +201,21 @@ def _measure_activation_probe(
 
         from victor.framework import Agent
 
+        # Import the vertical module directly to ensure registration
+        import victor.core.verticals
+        victor.core.verticals._register_builtin_verticals()
+
+        # Get vertical class from registry
+        from victor.core.verticals.base import VerticalRegistry
+        from victor.framework.shim import get_vertical
+
         vertical = {vertical_literal}
         provider = {provider_literal}
         model = {model_literal}
         warm_iters = {iterations}
+        vertical_cls = get_vertical(vertical)
+        if vertical_cls is None:
+            raise ValueError(f"Unknown vertical: {{vertical}}")
 
         def _percentile(values, q):
             if not values:
@@ -291,7 +302,7 @@ def _measure_activation_probe(
             agent = await Agent.create(
                 provider=provider,
                 model=model,
-                vertical=vertical,
+                vertical=vertical_cls,
                 enable_observability=False,
             )
             elapsed_ms = (time.perf_counter() - t0) * 1000.0

@@ -1,131 +1,133 @@
 # Framework + Vertical Integration Re-Analysis
 
 Generated: 2026-02-20 04:34:27Z  
-Baseline commit: `baa309109`
-Updated: 2026-02-21 03:38:41Z (post-runtime-slice-6 + KPI hardening verification)
+Baseline commit: `59ad5aae8`  
+Updated: 2026-02-21 04:04:58Z (full architecture re-analysis + scoring refresh)
 
 ## Scope
 - Framework core: API, orchestration, tool system, events/observability.
 - Vertical system: registration, pipelines, adapters, extensions, workflows, RL, teams.
 - Framework/vertical boundary quality and where generic capabilities should live.
 
-## Verification Addendum (2026-02-21 03:38Z)
-- Strict-mode scope expanded beyond capability-config helpers to protocol fallback probes in capability runtime and integration snapshot getters (`victor/framework/strict_mode.py`, `victor/framework/capability_runtime.py`, `victor/framework/vertical_integration.py`, `victor/framework/_internal.py`, `victor/config/settings.py`).
-- Added fast-CI strict protocol-fallback lane to prevent regression of duck-typed fallback probes (`.github/workflows/ci-fast.yml`).
-- Capability-config model finalized as DI-global service with scoped session keys resolved via protocol port (`victor/framework/capability_config_service.py`, `victor/framework/capability_config_helpers.py`, `victor/framework/protocols.py`, `victor/agent/orchestrator.py`, `victor/framework/step_handlers.py`).
-- Observability overflow defaults now codified per topic (`block_with_timeout` for critical topics, `drop_oldest` for metrics-heavy topics) with settings validation + backend enforcement (`victor/config/settings.py`, `victor/core/events/backends.py`).
-- Orchestrator decomposition progressed with lazy coordination runtime for recovery/planner/task/chunk components (`victor/agent/runtime/coordination_runtime.py`, `victor/agent/orchestrator.py`).
-- Orchestrator decomposition advanced with lazy interaction + resilience runtime boundaries (`victor/agent/runtime/interaction_runtime.py`, `victor/agent/runtime/resilience_runtime.py`, `victor/agent/orchestrator.py`).
-- Non-MLX local provider decision closed: `vllm`/`llamacpp` stay lazy-only without hardware preflight (`victor/providers/registry.py`, `tests/unit/providers/test_providers_registry.py`).
-- Startup KPI script now validates activation cold/warm thresholds and runtime lazy flags, and fast CI enforces `coordination_runtime_lazy` + `interaction_runtime_lazy` expectations (`scripts/benchmark_startup_kpi.py`, `.github/workflows/ci-fast.yml`, `tests/unit/test_benchmark_startup_kpi.py`).
-- Regression evidence after latest changes:
-  - `../.venv/bin/pytest tests/unit/agent/test_coordination_runtime.py tests/unit/agent/test_provider_runtime.py tests/unit/agent/test_metrics_runtime.py tests/unit/agent/test_workflow_runtime.py -q` -> `6 passed`.
-  - `../.venv/bin/pytest tests/unit/agent/test_orchestrator_core.py -k "tool_planner or recovery_coordinator or task_coordinator" -q` -> `3 passed`.
-  - `../.venv/bin/pytest tests/unit/providers/test_providers_registry.py -q` -> `23 passed`.
-- Startup KPI + activation probe guardrails revalidated:
-  - `import_victor.cold_ms=1458.54`, `agent_create.cold_ms=881.55`, `activation.cold_ms=974.74`
-  - `activation.warm_mean_ms=261.51`, framework registry totals `attempted=19`, `applied=57`
-  - Required runtime flags all true (`generic_result_cache_enabled`, `http_connection_pool_enabled`, `framework_preload_enabled`).
+## Verification Addendum (2026-02-21 04:05Z)
+- Fresh KPI strict-guard run (same flags as fast CI) failed only one expectation:
+  - `activation_probe.runtime_flags.interaction_runtime_lazy: False != True`.
+  - Evidence: `scripts/benchmark_startup_kpi.py:469`, `scripts/benchmark_startup_kpi.py:471`, `.github/workflows/ci-fast.yml:121`, `.github/workflows/ci-fast.yml:122`.
+- Fresh KPI baseline run (without `--require-interaction-runtime-lazy`) passed all thresholds:
+  - `import_victor.cold_ms=1572.92`, `agent_create.cold_ms=902.72`, `activation.cold_ms=872.35`.
+  - `activation.warm_mean_ms=379.71`, framework registry totals `attempted=19`, `applied=57`.
+  - Runtime flags: cache/http/preload/coordination lazy=true, interaction lazy=false.
+- Fresh validation suite run in `../.venv`:
+  - `../.venv/bin/pytest ... test_runtime_lazy_init.py ... test_benchmark_startup_kpi.py -q` -> `28 passed in 71.48s`.
+- KPI script activation probe is now class-safe via shim resolution (raw vertical string bug fixed):
+  - `scripts/benchmark_startup_kpi.py:203`, `scripts/benchmark_startup_kpi.py:209`, `scripts/benchmark_startup_kpi.py:298`.
 
 ## 1) Architecture Map (Framework <-> Verticals)
 
 ### Core modules and roles
 | Layer | Key modules | Current role |
 |---|---|---|
-| Public framework API | `victor/framework/agent.py:112` | `Agent.create()` entrypoint and SDK-facing lifecycle. |
-| API -> runtime bridge | `victor/framework/_internal.py:49` | Creates orchestrator, bootstraps container, applies vertical + observability integration. |
-| Shared vertical application service | `victor/framework/vertical_service.py:40`, `victor/framework/vertical_service.py:92` | Singleton `VerticalIntegrationPipeline` and unified `apply_vertical_configuration()`. |
-| Vertical activation | `victor/core/verticals/vertical_loader.py:732`, `victor/core/bootstrap.py:550`, `victor/core/bootstrap.py:668` | Canonical `activate_vertical_services()` used by bootstrap and switch/step-handler paths. |
-| Integration pipeline | `victor/framework/vertical_integration.py:872` | Builds context, runs step handlers, caches plans, supports dependency-driven parallel execution. |
-| Step handlers | `victor/framework/step_handlers.py:2303` | Ordered application of capability config/tools/tiered config/extensions/framework/context. |
-| Orchestrator runtime facade | `victor/agent/orchestrator.py:430` | Runtime host; now partially decomposed into provider/memory/metrics/workflow/coordination/interaction/resilience runtime modules. |
-| Runtime decomposition modules | `victor/agent/runtime/provider_runtime.py:71`, `victor/agent/runtime/memory_runtime.py:31`, `victor/agent/runtime/metrics_runtime.py:36`, `victor/agent/runtime/workflow_runtime.py:32`, `victor/agent/runtime/coordination_runtime.py:26`, `victor/agent/runtime/interaction_runtime.py:25`, `victor/agent/runtime/resilience_runtime.py:23` | Lazy boundaries for heavy subsystems and coordinator/recovery creation. |
-| Observability/event transport | `victor/observability/integration.py:54`, `victor/core/events/backends.py:136` | Orchestrator wiring + queue/backpressure policies + optional durable overflow sink. |
+| Public framework API | `victor/framework/agent.py:112` | `Agent.create()` entrypoint and SDK lifecycle. |
+| API -> runtime bridge | `victor/framework/_internal.py:53` | Creates orchestrator, bootstraps container, applies vertical + observability integration. |
+| Shared vertical application service | `victor/framework/vertical_service.py:92` | Unified `apply_vertical_configuration()` backed by shared `VerticalIntegrationPipeline`. |
+| Vertical activation | `victor/core/bootstrap.py:633`, `victor/core/bootstrap.py:747`, `victor/core/verticals/vertical_loader.py:732` | Canonical vertical activation and switch path. |
+| Integration pipeline | `victor/framework/vertical_integration.py:745`, `victor/framework/vertical_integration.py:889` | Builds context, executes step handlers, caches integration plans, emits `vertical.applied`. |
+| Step handlers | `victor/framework/step_handlers.py:987` | Ordered handlers for tools/tiered config/extensions/framework registries/context. |
+| Framework registry facade | `victor/framework/framework_integration_registry_service.py:36`, `victor/framework/framework_integration_registry_service.py:307` | Versioned/idempotent framework registration + per-kind metrics snapshot. |
+| Orchestrator runtime facade | `victor/agent/orchestrator.py:430` | Large facade with provider/memory/metrics/workflow/coordination/interaction/resilience runtime wiring. |
+| Runtime decomposition modules | `victor/agent/orchestrator.py:452`, `victor/agent/orchestrator.py:492`, `victor/agent/orchestrator.py:518`, `victor/agent/orchestrator.py:525`, `victor/agent/orchestrator.py:537`, `victor/agent/orchestrator.py:550`, `victor/agent/runtime/coordination_runtime.py:26`, `victor/agent/runtime/interaction_runtime.py:25`, `victor/agent/runtime/resilience_runtime.py:24` | Lazy runtime proxies and subsystem boundary extraction. |
+| Observability/event transport | `victor/observability/integration.py:239`, `victor/core/events/backends.py:321`, `victor/config/settings.py:954` | EventBus wiring, overflow policies, topic-level backpressure controls. |
 
 ### End-to-end data flow
-1. `Agent.create()` calls `create_orchestrator_from_options()` (`victor/framework/agent.py:112`, `victor/framework/_internal.py:49`).
-2. Bootstrap ensures container + vertical activation path (`victor/core/bootstrap.py:640`, `victor/core/bootstrap.py:668`, `victor/core/verticals/vertical_loader.py:732`).
-3. Factory builds orchestrator and runtime boundaries (`victor/framework/_internal.py:134`, `victor/agent/orchestrator.py:452`, `victor/agent/orchestrator.py:492`, `victor/agent/orchestrator.py:518`, `victor/agent/orchestrator.py:525`).
-4. Vertical integration runs via shared service + pipeline (`victor/framework/_internal.py:169`, `victor/framework/vertical_service.py:92`, `victor/framework/vertical_integration.py:1042`).
-5. Step handlers apply vertical artifacts into context + orchestrator ports (`victor/framework/step_handlers.py:2303`).
-6. Framework-level registries/workflows/RL/teams/chains/personas/handlers are populated from vertical providers (`victor/framework/step_handlers.py:1158`, `victor/framework/step_handlers.py:1207`, `victor/framework/step_handlers.py:1283`, `victor/framework/step_handlers.py:1364`, `victor/framework/step_handlers.py:1414`, `victor/framework/step_handlers.py:1604`).
-7. Observability integration binds event bus to orchestrator via public setter path (`victor/observability/integration.py:241`, `victor/framework/_internal.py:187`).
+1. `Agent.create()` enters framework API (`victor/framework/agent.py:112`) and bridges through internal factory/bootstrap (`victor/framework/_internal.py:53`).
+2. Bootstrap ensures container + vertical activation (`victor/core/bootstrap.py:633`, `victor/core/bootstrap.py:747`, `victor/core/verticals/vertical_loader.py:732`).
+3. Orchestrator is instantiated and runtime boundaries are attached (`victor/agent/orchestrator.py:452`, `victor/agent/orchestrator.py:525`, `victor/agent/orchestrator.py:550`).
+4. Vertical pipeline applies step handlers and cached plan decisions (`victor/framework/vertical_service.py:92`, `victor/framework/vertical_integration.py:889`, `victor/framework/vertical_integration.py:1871`).
+5. Framework artifacts are registered via service facade (`victor/framework/step_handlers.py:1148`, `victor/framework/step_handlers.py:1313`, `victor/framework/step_handlers.py:1614`, `victor/framework/framework_integration_registry_service.py:307`).
+6. Observability emits final integration payload with extension + registry metrics (`victor/framework/vertical_integration.py:1556`, `victor/framework/vertical_integration.py:1614`, `victor/framework/vertical_integration.py:1642`).
 
 ## 2) Gaps: Generic Capabilities Still Embedded in Verticals
 
-| Gap ID | Gap | Evidence | What should move to framework | Concrete suggestion |
+| Gap ID | Gap | Evidence | Promote to framework | Specific suggestion |
 |---|---|---|---|---|
-| G11 | Resolved: capability helper logic is now centralized in framework runtime helper | `victor/framework/capability_runtime.py:10`, `victor/framework/step_handlers.py:148`, `victor/framework/vertical_integration.py:160`, `victor/framework/_internal.py:42` | Single `framework.capability_runtime` helper surface | Keep this as the only capability helper import path and remove any future local helper re-introductions in reviews. |
-| G12 | Resolved for current scope: adapter private writes removed and snapshot reads are protocol/getter-first | `victor/agent/vertical_integration_adapter.py:304`, `victor/framework/vertical_integration.py:1383`, `victor/agent/capability_registry.py:138`, `victor/agent/orchestrator.py:1636` | Strict protocol-only framework/orchestrator contract | Keep strict-mode guards expanding to other framework probes and block regressions in CI. |
-| G13 | Resolved: framework registry inversion now includes versioned idempotence + metrics | `victor/framework/framework_integration_registry_service.py:48`, `victor/framework/framework_integration_registry_service.py:309`, `victor/framework/vertical_integration.py:1549` | Framework-owned integration registry facade/service | Keep metrics surfaced in observability and add KPI thresholds for registration churn regressions. |
-| G14 | Resolved for built-ins: per-vertical `get_tiered_tools()` wrappers removed | `victor/coding/assistant.py:369`, `victor/research/assistant.py:188`, `victor/rag/assistant.py:173`, `victor/devops/assistant.py:216`, `victor/dataanalysis/assistant.py:192`, `victor/core/verticals/extension_loader.py:721` | Single migration adapter in framework/core | Keep compatibility only in extension-loader adapter and set explicit removal deadline. |
-| G15 | Resolved: capability config storage now uses DI-global scoped service contract | `victor/framework/capability_config_service.py:13`, `victor/framework/capability_config_helpers.py:37`, `victor/framework/protocols.py:609`, `victor/agent/orchestrator.py:1218`, `victor/framework/step_handlers.py:898` | Strict service-backed capability config store with session scoping | Keep using `get_capability_config_scope_key()` as the single scope source and block attr-based fallback regressions in strict mode CI. |
-| G16 | Partially addressed: generic runtime infra is now wired into active web/preload paths behind flags | `victor/tools/web_search_tool.py:362`, `victor/tools/http_pool.py:121`, `victor/agent/orchestrator.py:1237`, `victor/tools/base.py:119` | Framework runtime services for caching/http preloading | Add benchmark/CI KPI gates proving value and retire unused generic modules. |
+| G11 | Resolved: capability helper logic centralized. | `victor/framework/capability_runtime.py:14`, `victor/framework/step_handlers.py:148`, `victor/framework/vertical_integration.py:166` | Keep one capability runtime helper surface. | Block new local helper copies in review checks. |
+| G12 | Mostly resolved: strict fallback guards are active but fallback paths still exist for compatibility. | `victor/framework/strict_mode.py:12`, `victor/framework/vertical_integration.py:1401`, `.github/workflows/ci-fast.yml:144` | Protocol-only framework/orchestrator contract. | Continue removing fallback code paths and keep strict lanes required in CI. |
+| G13 | Resolved: framework registry writes are service-owned and measurable. | `victor/framework/framework_integration_registry_service.py:36`, `victor/framework/framework_integration_registry_service.py:307`, `victor/framework/step_handlers.py:1148` | Registry idempotence/metrics should remain framework-owned. | Add alert thresholds on registry churn deltas in KPI reporting. |
+| G14 | Partial: legacy tiered-tools adapter still exists in extension loader compatibility path. | `victor/core/verticals/extension_loader.py:737`, `victor/core/verticals/extension_loader.py:774`, `victor/rag/assistant.py:173` | Canonical `get_tiered_tool_config()` only. | Enforce hard removal after 2026-06-30 and add static check for banned `get_tiered_tools()`. |
+| G15 | Resolved: capability-config storage is DI-scoped service with scope-key resolution. | `victor/framework/capability_config_service.py:13`, `victor/framework/capability_config_helpers.py:39`, `victor/framework/capability_config_helpers.py:69` | Service-backed capability config as framework primitive. | Keep `resolve_capability_config_scope_key()` as the only scope source. |
+| G16 | Partial: generic cache/http/preload capabilities are integrated but still uneven in adoption/ROI evidence. | `victor/tools/base.py:137`, `victor/tools/web_search_tool.py:123`, `victor/framework/preload.py:184`, `victor/agent/orchestrator.py:2372` | Generic runtime services should be first-class framework infra. | Keep only paths with measured KPI benefit; retire non-adopted generic modules. |
+| G17 | Active: interaction runtime laziness breaks during activation path. | `victor/agent/orchestrator.py:550`, `victor/agent/orchestrator.py:570`, `victor/agent/orchestrator.py:4059`, `victor/framework/step_handlers.py:438`, `scripts/benchmark_startup_kpi.py:471` | Lazy-boundary semantics should be framework-defined and testable. | Split `set_enabled_tools` into lightweight state update + deferred coordinator sync on first tool execution. |
 
 ## 3) SOLID Evaluation (Violations and Fixes)
 
-| Principle | Status | Evidence | Violation summary | Fix |
+| Principle | Status | Evidence | Violation | Fix |
 |---|---|---|---|---|
-| SRP | Partial | `victor/agent/orchestrator.py` (4272 LOC), `wc -l` | Orchestrator still owns too many concerns despite runtime slices. | Continue P4 decomposition: split tool/runtime + chat/runtime + session/runtime modules with facade-only orchestration. |
-| OCP | Improved | Metadata-driven handlers (`victor/framework/step_handlers.py:399`, `victor/framework/vertical_integration.py:1943`) plus service-facade registry writes (`victor/framework/framework_integration_registry_service.py:13`, `victor/framework/step_handlers.py:1082`) | Extension points now avoid direct global registry imports in step handlers; remaining work is service-level idempotence/versioning policy. | Keep expanding service-backed boundaries and implement registration policy hooks inside service. |
-| LSP | Partial | Deprecated tiered adapter (`victor/core/verticals/extension_loader.py:721`), remaining duck-typed compatibility probes (`victor/framework/step_handlers.py:1060`) | Substitutability risk is now mostly isolated to explicit compatibility adapters. | Remove `get_tiered_tools()` adapter after 2026-06-30 and keep protocol conformance tests mandatory. |
-| ISP | Improved | Focused infrastructure ports (`victor/framework/protocols.py:597`, `victor/framework/protocols.py:606`, `victor/framework/protocols.py:623`) | Vertical/framework integration still depends on broad orchestrator surface via `hasattr` in places. | Define focused `VerticalRuntimePort` (context/tools/middleware/safety only) and pass into pipeline. |
-| DIP | Partial | Port usage exists (`victor/agent/orchestrator.py:1201`, `victor/agent/orchestrator.py:1214`, `victor/agent/orchestrator.py:1226`) but private/global fallback remains (`victor/framework/vertical_integration.py:1539`, `victor/framework/step_handlers.py:1062`) | Framework still depends on concrete internals in fallback paths. | Eliminate fallback internals and route all framework writes through protocol/DI services only. |
+| SRP | Partial | `victor/agent/orchestrator.py` (4274 LOC), runtime init spread across constructor path | Orchestrator still mixes lifecycle, routing, tooling, session, recovery, observability. | Extract `tool_runtime`, `chat_runtime`, `session_runtime` facades and keep orchestrator as coordinator shell. |
+| OCP | Improved | Metadata-driven plan/handler execution (`victor/framework/vertical_integration.py:1871`, `victor/framework/step_handlers.py:295`) | Extension points improved, but legacy compatibility branches still alter behavior. | Move compatibility adapters behind explicit plugin policies and keep core path closed to legacy conditionals. |
+| LSP | Partial | Deprecated tiered adapter remains (`victor/core/verticals/extension_loader.py:737`) | Old adapter contracts allow non-canonical substitution behavior. | Remove adapter deadline path and enforce canonical contract-only vertical base tests. |
+| ISP | Partial | Broad orchestrator port remains required by framework steps (`victor/framework/step_handlers.py:438`, `victor/agent/orchestrator.py:4050`) | Step handlers depend on large orchestrator surface. | Introduce narrow `VerticalRuntimePort` with only context/tools/middleware/safety operations. |
+| DIP | Partial | Service inversion present (`victor/framework/framework_integration_registry_service.py:36`) but method-mapping fallback still used (`victor/framework/capability_registry.py:25`) | Framework still relies on concrete method naming in fallback mode. | Remove fallback mapping from active path; require protocol registry capabilities for framework-owned writes. |
 
 ## 4) Scalability + Performance Risks
 
 | Hot path | Risk | Evidence | Mitigation |
 |---|---|---|---|
-| Agent startup | Large orchestrator still initializes many components early | `victor/agent/orchestrator.py:430` (file size 4272 LOC), constructor body starts at `victor/agent/orchestrator.py:537` | Continue lazy boundaries for chat/tool/session coordinators; gate via first-use materialization. |
-| Vertical application on repeated sessions | Registry writes now centralized, but idempotence/version policy is still implicit | `victor/framework/framework_integration_registry_service.py:13`, `victor/framework/step_handlers.py:1082` | Add explicit dedup/version keying in `FrameworkIntegrationRegistryService` and expose registration metrics for cache-hit paths. |
-| Integration cache safety checks | Reduced risk: snapshot now has strict-mode fallback blocking for protocol probes | `victor/framework/vertical_integration.py:1383`, `victor/framework/vertical_integration.py:1401`, `tests/unit/framework/test_vertical_integration.py:1964` | Add CI strict-mode lane and keep snapshot probe tests mandatory to prevent regression. |
-| Extension loading saturation | Shared pool is bounded but statically configured and globally shared | `victor/core/verticals/extension_loader.py:137`, `victor/core/verticals/extension_loader.py:186`, `victor/core/verticals/extension_loader.py:253` | Make worker/queue limits adaptive (CPU count + workload), expose autoscaling policy. |
-| Event delivery under load | Topic defaults now reduce critical-event loss, but pressure tuning remains static | `victor/config/settings.py:957`, `victor/core/events/backends.py:337`, `victor/core/events/backends.py:503`, `tests/integration/framework/test_vertical_reliability_stress.py:110` | Add env/profile presets per deployment tier and emit alert thresholds when topic override hits exceed baseline. |
-| Startup/import overhead creep | New generic modules exported but not integrated, increasing surface without measurable ROI | `victor/storage/cache/__init__.py:61`, `victor/tools/__init__.py:119`, `victor/framework/preload.py:184`, `scripts/benchmark_startup_kpi.py:173` | Use startup+activation KPI guardrails (runtime flags + registry totals) and remove/park modules that remain off active path. |
+| Agent startup | Constructor remains heavy despite runtime slicing. | `victor/agent/orchestrator.py:430`, `victor/agent/orchestrator.py:970`, `victor/agent/orchestrator.py:1013` | Continue constructor slimming; instantiate only immutable/lightweight coordinators in `__init__`. |
+| Activation lazy-boundary regression | Vertical tool application currently forces interaction runtime materialization. | `victor/framework/step_handlers.py:438`, `victor/agent/orchestrator.py:4059`, KPI failure on `interaction_runtime_lazy` | Decouple activation-time tool state from `ToolCoordinator` object creation. |
+| Registry churn in repeated integrations | Metrics exist but no enforced drift thresholds per vertical/version. | `victor/framework/framework_integration_registry_service.py:307`, `victor/framework/vertical_integration.py:1578` | Add baseline envelopes and fail KPI if attempted/applied drift exceeds tolerance. |
+| Extension loading saturation | Shared executor is bounded but static. | `victor/core/verticals/extension_loader.py:137`, `victor/core/verticals/extension_loader.py:180`, `victor/core/verticals/extension_loader.py:225` | Make worker/queue sizing adaptive to CPU + workload profile. |
+| Event pipeline under pressure | Topic-level policies exist but tuning remains static. | `victor/config/settings.py:956`, `victor/core/events/backends.py:465`, `victor/core/events/backends.py:689` | Add deployment presets and alerting on sustained queue-pressure transitions. |
+| Generic infra surface creep | Cache/preload/http exports exceed proven active-path ROI. | `victor/storage/cache/__init__.py:61`, `victor/framework/preload.py:184`, `victor/tools/http_pool.py:121` | Keep KPI-gated features only; prune dormant generic modules. |
 
-## 5) Competitive Comparison (5-7 dimensions, 1-10 with rationale)
+## 5) Competitive Comparison (6 dimensions, 1-10 + one-line rationale)
 
 Weights: Boundary Clarity 20, Orchestration Determinism 20, Observability/Reliability 15, Runtime Performance 15, Vertical Extensibility 15, Multi-agent/Workflow Depth 15.
 
 | Dimension (Weight) | Victor | LangGraph | CrewAI | LangChain | LlamaIndex | AutoGen |
 |---|---|---|---|---|---|---|
-| Boundary clarity (20) | 8 - Strong protocol/DI direction but fallback internals remain. | 8 - Clear graph runtime boundary, fewer vertical conventions. | 6 - Team abstractions are clear, core boundary less strict. | 6 - Broad abstractions but mixed historical layering. | 7 - Clear data/RAG boundary, less full-stack orchestration separation. | 6 - Agent abstractions clear, framework boundary is less strict. |
-| Orchestration determinism (20) | 8 - Metadata dependency levels + handler plan cache. | 9 - StateGraph/DAG execution is mature and explicit. | 6 - Good role flows, weaker deterministic dependency model. | 7 - Flexible chains/agents, determinism varies by stack. | 6 - Strong pipelines for retrieval, less general orchestration control. | 7 - Strong conversation orchestration, weaker static dependency controls. |
-| Observability/reliability (15) | 8 - Queue policies + pressure metrics + durable sink hooks. | 7 - Good tracing integrations, fewer built-in queue policy controls. | 5 - Basic telemetry; reliability policy surface is smaller. | 6 - Good ecosystem observability, less unified runtime policy. | 6 - Good pipeline observability, less system-wide event policy. | 5 - Core telemetry exists, backpressure policy is less structured. |
-| Runtime performance/startup (15) | 8 - Provider/memory/metrics/workflow/coordination/interaction/resilience lazy slices plus CI-enforced activation guards; constructor still heavy but improving. | 7 - Lean runtime core, user integrations can add overhead. | 6 - Moderate runtime footprint; team overhead in larger runs. | 6 - Rich but heavier import/runtime footprint. | 7 - Efficient for RAG pipelines; broader runtime still moderate. | 6 - Multi-agent orchestration can be resource heavy. |
-| Vertical extensibility (15) | 8 - Rich vertical protocol surface (workflows/RL/teams/tools). | 6 - Extensible graph nodes, less vertical package convention. | 7 - Team-centric extension model is straightforward. | 8 - Very broad extension ecosystem and integrations. | 9 - Best-in-class retrieval/data extension ecosystem. | 6 - Extensible agents, less verticalized domain packaging. |
-| Multi-agent/workflow depth (15) | 8 - Teams/workflows/RL integrated in one vertical pipeline. | 7 - Strong workflow graphing, less built-in team policy. | 8 - Strong team collaboration primitives. | 6 - Multi-agent available but less cohesive by default. | 5 - Focus is retrieval/data more than teams. | 9 - Deep multi-agent conversation and delegation patterns. |
-| **Overall weighted score** | **8.00** | **7.45** | **6.30** | **6.50** | **6.65** | **6.50** |
+| Boundary clarity (20) | 8 - Protocol/DI trajectory is strong, with remaining fallback compatibility paths. | 8 - Graph runtime boundaries are explicit and clean. | 6 - Crew abstraction is clear but framework internals are less rigid. | 6 - Broad APIs with mixed-era layering patterns. | 7 - Clear data/retrieval boundary with narrower orchestration focus. | 6 - Agent abstractions are strong, boundaries less strict. |
+| Orchestration determinism (20) | 8 - Metadata dependency levels + plan cache make execution predictable. | 9 - Mature DAG/state graph determinism. | 6 - Role flow is good but less dependency-explicit. | 7 - Determinism varies by chain/agent mix. | 6 - Strong retrieval pipeline control, less general orchestration depth. | 7 - Conversation orchestration is strong, static dependency control is lighter. |
+| Observability/reliability (15) | 8 - Topic overflow policy + pressure metrics + vertical.applied payload are integrated. | 7 - Good tracing integrations, less built-in queue policy depth. | 5 - Basic telemetry/reliability controls. | 6 - Strong integrations, less unified runtime reliability policy. | 6 - Good pipeline telemetry, limited runtime-wide policy controls. | 5 - Core telemetry exists, policy model is lighter. |
+| Runtime performance/startup (15) | 7 - Runtime slices exist, but activation still eagerly materializes interaction runtime in current path. | 7 - Lean core with integration-dependent overhead. | 6 - Moderate overhead grows with crew complexity. | 6 - Feature-rich but heavier runtime/import profile. | 7 - Efficient for RAG-centric workloads. | 6 - Multi-agent patterns can be heavy at runtime. |
+| Vertical extensibility (15) | 8 - Rich vertical protocol surface across workflows/RL/teams/tools. | 6 - Extensible nodes, fewer vertical packaging conventions. | 7 - Team-centric extension model is practical. | 8 - Very broad extension ecosystem. | 9 - Strongest retrieval/data extension ecosystem. | 6 - Extensible agents with less vertical packaging depth. |
+| Multi-agent/workflow depth (15) | 8 - Teams/workflows/RL integrated in one vertical pipeline path. | 7 - Strong workflow modeling, less team-policy depth. | 8 - Strong collaboration primitives. | 6 - Multi-agent available but less cohesive by default. | 5 - Focus remains retrieval/data over teams. | 9 - Deep agent-to-agent delegation patterns. |
 
 ## 6) Roadmap to Best-in-Class
 
-### Phase A (0-2 weeks): Contract hardening
-- Remove private fallback reads/writes in framework integration paths.
-- Completed: merged duplicated capability helper logic into `victor.framework.capability_runtime`.
-- Completed: strict-mode fallback blocking now covers capability config, capability runtime fallback, and integration snapshot getter fallback paths.
-- Completed: strict CI tests for protocol-only integration are active in fast CI.
+### Phase A (0-2 weeks): Runtime lazy-boundary correctness
+- Refactor `set_enabled_tools()` to avoid forcing `ToolCoordinator` materialization during activation (`victor/agent/orchestrator.py:4050`).
+- Add explicit runtime-lazy contract test at activation boundary and align KPI guardrail semantics (`scripts/benchmark_startup_kpi.py:469`, `.github/workflows/ci-fast.yml:121`).
+- Decide contract: either keep strict lazy requirement and fix code, or intentionally relax requirement and update CI/KPI accordingly.
 
-### Phase B (2-5 weeks): Registry inversion
-- Completed: introduced `FrameworkIntegrationRegistryService` and migrated `FrameworkStepHandler` global registry writes to service calls.
-- Completed: added idempotence/versioning policy and exposed registry metrics in `vertical.applied` payloads.
+### Phase B (2-5 weeks): Contract hardening + fallback retirement
+- Continue removal of compatibility fallbacks from framework integration paths (`victor/framework/vertical_integration.py:1401`, `victor/framework/capability_runtime.py:38`).
+- Keep strict fallback CI lanes mandatory and expand to framework step-handler probes.
 
-### Phase C (5-8 weeks): Legacy cleanup completion
-- Completed: removed framework-level tiered-tools fallback and built-in `get_tiered_tools()` wrappers; remaining adapter lives only in extension-loader compatibility layer with explicit removal warning (`after 2026-06-30`).
-- Enforce canonical `get_tiered_tool_config()` in static checks.
+### Phase C (5-8 weeks): Orchestrator decomposition completion
+- Extract `tool_runtime`, `chat_runtime`, `session_runtime` modules and leave orchestrator as facade/composer.
+- Reduce constructor work and side effects in `AgentOrchestrator.__init__` (`victor/agent/orchestrator.py:537` onward).
 
-### Phase D (8-12 weeks): Runtime and startup optimization
-- Continue orchestrator decomposition (tool/runtime, chat/runtime, recovery/runtime).
-- Completed: integrated KPI thresholds from `scripts/benchmark_startup_kpi.py` into CI fast-check guardrails (`.github/workflows/ci-fast.yml`).
-- Completed: added coordination runtime lazy boundaries for recovery/planner/task/chunk components.
-- Completed: added interaction + resilience runtime boundaries for chat/tool/session + recovery handler/integration components.
-- Completed: CI startup guardrails now enforce activation cold/warm thresholds and runtime lazy flags for coordination/interaction boundaries.
-- Add import/startup flamegraph checks for regression triage.
+### Phase D (8-12 weeks): Adaptive scaling + registry economics
+- Make extension loader queue/worker settings adaptive (`victor/core/verticals/extension_loader.py:137`, `victor/core/verticals/extension_loader.py:225`).
+- Add KPI drift budgets for framework registry attempted/applied totals per vertical/version.
 
-### Phase E (12-16 weeks): Generic infrastructure assimilation
-- Integrate `GenericResultCache`, `HttpConnectionPool`, and `PreloadManager` into active framework services behind flags.
-- Completed: startup KPI harness now supports activation probe telemetry + guardrails for runtime flags and framework registry totals (`scripts/benchmark_startup_kpi.py`, `tests/unit/test_benchmark_startup_kpi.py`).
-- Keep only features with measured startup/latency wins; remove dead generic modules if unused.
+### Phase E (12-16 weeks): Generic infra consolidation
+- Retain only cache/http/preload features with measured startup/latency improvements.
+- Remove or park non-adopted generic exports to reduce import surface and maintenance load.
 
-## 7) Session Handoff
+## 7) Weighted Scoring Table (frameworks as columns)
 
-Use `docs/analysis_reports/09_framework_vertical_integration_remediation_plan.md` as the source of truth plan, and treat this report as the refreshed architecture baseline for post-refactor decisions.
+| Dimension (Weight) | Victor | LangGraph | CrewAI | LangChain | LlamaIndex | AutoGen |
+|---|---:|---:|---:|---:|---:|---:|
+| Boundary clarity (20) | 8 | 8 | 6 | 6 | 7 | 6 |
+| Orchestration determinism (20) | 8 | 9 | 6 | 7 | 6 | 7 |
+| Observability/reliability (15) | 8 | 7 | 5 | 6 | 6 | 5 |
+| Runtime performance/startup (15) | 7 | 7 | 6 | 6 | 7 | 6 |
+| Vertical extensibility (15) | 8 | 6 | 7 | 8 | 9 | 6 |
+| Multi-agent/workflow depth (15) | 8 | 7 | 8 | 6 | 5 | 9 |
+| **Overall weighted score** | **7.85** | **7.45** | **6.30** | **6.50** | **6.65** | **6.50** |
+
+## Session Handoff
+
+Source-of-truth execution plan remains `docs/analysis_reports/09_framework_vertical_integration_remediation_plan.md`.  
+This report is now the refreshed architecture/scoring baseline for subsequent phases.

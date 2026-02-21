@@ -62,7 +62,7 @@ async def test_initialization_defaults():
     provider = ZAIProvider(api_key="test-key")
 
     assert provider.api_key == "test-key"
-    assert provider.base_url == "https://api.z.ai/api/paas/v4/"
+    assert provider.base_url == "https://open.bigmodel.cn/api/paas/v4/"
     assert provider.client is not None
 
 

@@ -212,12 +212,30 @@ class MLXProvider(BaseProvider):
                 logger.info(f"Loading MLX model: {self.model_path}")
                 if _mlx_load is None:
                     raise RuntimeError("mlx-lm loader unavailable")
-                # Load in thread pool to avoid blocking event loop
+
+                # Try loading with model_kwargs, filter out unsupported kwargs
+                load_kwargs = self.model_kwargs.copy()
                 loop = asyncio.get_event_loop()
-                self._model, self._tokenizer = await loop.run_in_executor(
-                    None,
-                    lambda: _mlx_load(self.model_path, **self.model_kwargs),
-                )
+
+                # First attempt: with all kwargs
+                try:
+                    self._model, self._tokenizer = await loop.run_in_executor(
+                        None,
+                        lambda: _mlx_load(self.model_path, **load_kwargs),
+                    )
+                except TypeError as e:
+                    # If load() doesn't accept some kwargs (like trust_remote_code),
+                    # try without the problematic ones
+                    if "trust_remote_code" in str(e) and "trust_remote_code" in load_kwargs:
+                        logger.debug("MLX load() doesn't accept trust_remote_code, retrying without it")
+                        load_kwargs = {k: v for k, v in load_kwargs.items() if k != "trust_remote_code"}
+                        self._model, self._tokenizer = await loop.run_in_executor(
+                            None,
+                            lambda: _mlx_load(self.model_path, **load_kwargs),
+                        )
+                    else:
+                        raise
+
                 logger.info(f"MLX model loaded: {self.model_path}")
             except Exception as e:
                 raise ProviderConnectionError(f"Failed to load MLX model {self.model_path}: {e}")
