@@ -487,14 +487,14 @@ class TestLogContextSize:
     def test_warns_very_large_context(self, debug_logger):
         """Test warning for very large context."""
         with patch.object(debug_logger.logger, "warning") as mock_warn:
-            debug_logger.log_context_size(150000, 40000)
+            debug_logger.log_context_size(150001, 40000)
             mock_warn.assert_called_once()
             assert "Large context" in mock_warn.call_args[0][0]
 
     def test_info_medium_context(self, debug_logger):
         """Test info for medium context."""
         with patch.object(debug_logger.logger, "info") as mock_info:
-            debug_logger.log_context_size(75000, 20000)
+            debug_logger.log_context_size(75001, 20000)
             mock_info.assert_called_once()
             assert "Context" in mock_info.call_args[0][0]
 

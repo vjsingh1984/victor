@@ -123,6 +123,16 @@ class HandlerRegistry:
             cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance (primarily for testing).
+
+        This clears all registered handlers and creates a fresh instance
+        on the next call to get_instance().
+        """
+        cls._instance = None
+        logger.debug("HandlerRegistry instance reset")
+
     def register_vertical(
         self,
         vertical_name: str,
