@@ -584,8 +584,9 @@ class TestFormatMethods:
         # Accept both emoji (🟠) and text ([H]) versions
         assert ("🟠" in output or "[H]" in output)  # high severity
         assert "Line: 15" in output
-        # Accept both emoji (💡) and text ([R]) versions for remediation
-        assert ("💡" in output or "[R]" in output or "Remediation" in output)
+        # Accept both emoji (💡) and text (*) versions for remediation hint
+        # In CI mode, the hint icon becomes a bullet point (*)
+        assert ("💡" in output or "* " in output or "Remediation" in output)
 
     def test_format_findings_different_severities(self, tool):
         """Test formatting findings with different severities."""
