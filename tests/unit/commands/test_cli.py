@@ -120,6 +120,7 @@ class TestConfigureLogging:
 # =============================================================================
 
 
+@pytest.mark.slow
 class TestFlushLogging:
     """Tests for _flush_logging function."""
 
@@ -162,11 +163,12 @@ class TestFlushLogging:
 # Test _graceful_shutdown
 # =============================================================================
 
-
+@pytest.mark.slow
 class TestGracefulShutdown:
     """Tests for _graceful_shutdown async function."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_none_agent(self):
         """Test shutdown with None agent."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown
@@ -175,6 +177,7 @@ class TestGracefulShutdown:
         await _graceful_shutdown(None)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_calls_agent_methods(self, mock_agent):
         """Test that shutdown calls agent methods."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown
@@ -185,6 +188,7 @@ class TestGracefulShutdown:
         mock_agent.shutdown.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_graceful_shutdown_handles_exception(self, mock_agent):
         """Test that exceptions are handled gracefully."""
         from victor.ui.commands.utils import graceful_shutdown as _graceful_shutdown

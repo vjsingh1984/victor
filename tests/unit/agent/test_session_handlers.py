@@ -163,6 +163,7 @@ class TestSessionMetrics:
         assert "duration_seconds" in result
 
 
+@pytest.mark.slow
 class TestBaseSessionHandler:
     """Test BaseSessionHandler implementation."""
 
@@ -250,6 +251,7 @@ class TestBaseSessionHandler:
         assert metrics.iterations == 5
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_cleanup_handles_missing_metrics(self, handler):
         """Test cleanup when agent doesn't have session metrics."""
         mock_agent = MagicMock()
@@ -394,6 +396,7 @@ class TestInteractiveSessionHandler:
             await handler._get_user_input()
 
 
+@pytest.mark.slow
 class TestTUISessionHandler:
     """Test TUISessionHandler."""
 
