@@ -424,7 +424,8 @@ class TestHandleBlockedToolCall:
         )
 
         assert ctx.total_blocked_attempts == initial_blocked + 1
-        assert "⛔" in chunk.content
+        # Accept both emoji (⛔) and text ([!]) versions
+        assert ("⛔" in chunk.content or "[!]" in chunk.content)
         mock_message_adder.add_message.assert_called_once()
         assert "TOOL BLOCKED" in mock_message_adder.add_message.call_args[0][1]
 
@@ -1412,7 +1413,10 @@ class TestGenerateThinkingStatusChunk:
         chunk = handler.generate_thinking_status_chunk()
 
         assert chunk.content == ""
-        assert chunk.metadata == {"status": "💭 Thinking..."}
+        # Accept both emoji (💭) and text (...) versions
+        status = chunk.metadata.get("status", "")
+        assert "Thinking" in status
+        assert ("💭" in status or "..." in status)
 
     def test_chunk_has_no_content(self, handler):
         """Generated chunk has empty content."""

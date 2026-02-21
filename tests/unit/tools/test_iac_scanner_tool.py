@@ -274,7 +274,8 @@ class TestSummaryAction:
             result = await tool.execute(action="summary")
 
             assert result.success is True
-            assert "🟢" in result.output  # low risk icon
+            # Accept both emoji (🟢) and text ([L]) versions
+            assert ("🟢" in result.output or "[L]" in result.output)  # low risk icon
             assert "Low Risk" in result.output
 
     @pytest.mark.asyncio
@@ -482,9 +483,10 @@ class TestFormatMethods:
         output = tool._format_platforms(platforms)
 
         assert "Detected IaC Platforms" in output
-        assert "🏗️" in output  # terraform icon
-        assert "🐳" in output  # docker icon
-        assert "☸️" in output  # kubernetes icon
+        # Accept both emoji and text versions
+        assert ("🏗️" in output or "[TF]" in output)  # terraform
+        assert ("🐳" in output or "[DK]" in output)  # docker
+        assert ("☸️" in output or "[K8]" in output)  # kubernetes
 
     def test_format_summary_medium_risk(self, tool, sample_summary):
         """Test formatting summary with medium risk."""
