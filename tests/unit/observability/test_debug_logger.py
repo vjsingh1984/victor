@@ -298,13 +298,17 @@ class TestLogIterationEnd:
         """Test shows tools indicator when has tool calls."""
         with patch.object(debug_logger.logger, "info") as mock_info:
             debug_logger.log_iteration_end(1, has_tool_calls=True)
-            assert "→ tools" in mock_info.call_args[0][0]
+            message = mock_info.call_args[0][0]
+            # Check for either emoji (→) or text (->) version of arrow
+            assert ("→ tools" in message or "-> tools" in message)
 
     def test_shows_done_indicator(self, debug_logger):
         """Test shows done indicator when no tool calls."""
         with patch.object(debug_logger.logger, "info") as mock_info:
             debug_logger.log_iteration_end(1, has_tool_calls=False)
-            assert "→ done" in mock_info.call_args[0][0]
+            message = mock_info.call_args[0][0]
+            # Check for either emoji (→) or text (->) version of arrow
+            assert ("→ done" in message or "-> done" in message)
 
 
 class TestLogToolCall:
