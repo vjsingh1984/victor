@@ -226,7 +226,7 @@ from victor.rag.assistant import RAGAssistant
 prompt = RAGAssistant.get_system_prompt()
 
 # Get tiered tools
-tiered_tools = RAGAssistant.get_tiered_tools()
+tiered_tools = RAGAssistant.get_tiered_tool_config()
 
 # Access capability provider
 capabilities = RAGAssistant.get_capability_provider()

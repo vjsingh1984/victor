@@ -147,10 +147,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from victor.framework.capability_registry import (
-    CAPABILITY_METHOD_MAPPINGS,
-    get_method_for_capability,
-)
+from victor.framework.capability_registry import get_method_for_capability
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -304,13 +301,14 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_middleware"):
             vertical_context.apply_middleware(middleware)
 
-        # Store reference via internal setter (DIP-compliant)
-        # Uses orchestrator's controlled storage setter instead of direct attribute access
-        if hasattr(self._orchestrator, "_set_vertical_middleware_storage"):
-            self._orchestrator._set_vertical_middleware_storage(middleware)
+        # Persist middleware via public storage protocol.
+        set_middleware = getattr(self._orchestrator, "set_middleware", None)
+        if callable(set_middleware):
+            set_middleware(middleware)
         else:
-            # Fallback for backward compatibility
-            self._orchestrator._vertical_middleware = middleware
+            logger.warning(
+                "Orchestrator lacks set_middleware(); middleware storage was not persisted."
+            )
 
         # Get middleware chain via capability (DIP-compliant read)
         chain = self._get_capability_value("middleware_chain")
@@ -320,11 +318,15 @@ class VerticalIntegrationAdapter:
                 from victor.agent.middleware_chain import MiddlewareChain
 
                 chain = MiddlewareChain()
-                # Store via internal setter (DIP-compliant)
-                if hasattr(self._orchestrator, "_set_middleware_chain_storage"):
-                    self._orchestrator._set_middleware_chain_storage(chain)
-                elif hasattr(self._orchestrator, "_middleware_chain"):
-                    self._orchestrator._middleware_chain = chain
+                set_chain = getattr(self._orchestrator, "set_middleware_chain", None)
+                if callable(set_chain):
+                    set_chain(chain)
+                else:
+                    logger.warning(
+                        "Orchestrator lacks set_middleware_chain(); "
+                        "middleware chain cannot be attached."
+                    )
+                    return
             except ImportError:
                 logger.warning("MiddlewareChain not available")
                 return
@@ -367,13 +369,15 @@ class VerticalIntegrationAdapter:
         if vertical_context is not None and hasattr(vertical_context, "apply_safety_patterns"):
             vertical_context.apply_safety_patterns(patterns)
 
-        # Store reference via internal setter (DIP-compliant)
-        # Uses orchestrator's controlled storage setter instead of direct attribute access
-        if hasattr(self._orchestrator, "_set_safety_patterns_storage"):
-            self._orchestrator._set_safety_patterns_storage(patterns)
+        # Persist safety patterns via public storage protocol.
+        set_safety_patterns = getattr(self._orchestrator, "set_safety_patterns", None)
+        if callable(set_safety_patterns):
+            set_safety_patterns(patterns)
         else:
-            # Fallback for backward compatibility
-            self._orchestrator._vertical_safety_patterns = patterns
+            logger.warning(
+                "Orchestrator lacks set_safety_patterns(); "
+                "safety pattern storage was not persisted."
+            )
 
         # Get safety checker via capability or public method
         checker = None
@@ -381,9 +385,6 @@ class VerticalIntegrationAdapter:
             checker = self._get_capability_value("safety_checker")
         elif hasattr(self._orchestrator, "get_safety_checker"):
             checker = self._orchestrator.get_safety_checker()
-        elif hasattr(self._orchestrator, "_safety_checker"):
-            # Last resort fallback for testing
-            checker = self._orchestrator._safety_checker
 
         if checker is None:
             logger.debug("No safety checker available for pattern application")

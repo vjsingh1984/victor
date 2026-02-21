@@ -81,7 +81,10 @@ class TestCLIFrameworkIntegration:
         orch.prompt_builder = MagicMock()
         orch.prompt_builder.set_custom_prompt = MagicMock()
         orch.conversation_state = MagicMock()
-        orch._observability = None
+        orch.observability = None
+        orch.set_observability = MagicMock(
+            side_effect=lambda obs: setattr(orch, "observability", obs)
+        )
 
         # Add protocol methods for tools
         orch._enabled_tools = set()

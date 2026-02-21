@@ -111,8 +111,14 @@ class MockOrchestrator:
     def set_vertical_context(self, context: VerticalContext) -> None:
         self._vertical_context = context
 
+    def get_vertical_context(self) -> VerticalContext:
+        return self._vertical_context
+
     def set_enabled_tools(self, tools: Set[str]) -> None:
         self._enabled_tools = tools
+
+    def get_enabled_tools(self) -> Set[str]:
+        return set(self._enabled_tools)
 
     def apply_vertical_middleware(self, middleware: List[any]) -> None:
         self._middleware = middleware
@@ -1920,6 +1926,75 @@ class TestIntegrationPlanCache:
         def get_ordered_handlers(self):
             return self._handlers
 
+    def test_state_snapshot_ignores_private_only_attributes(self):
+        """Snapshot should not read legacy private fallback attributes."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        class LegacyOnlyOrchestrator:
+            def __init__(self):
+                self._vertical_context = create_vertical_context(name="legacy_only")
+                self._enabled_tools = {"read", "write"}
+
+        snapshot = pipeline._orchestrator_state_snapshot(LegacyOnlyOrchestrator())
+        assert "vertical_name" not in snapshot
+        assert "enabled_tools_hash" not in snapshot
+
+    def test_state_snapshot_uses_getter_without_enabled_tools_attr_probe(self):
+        """Snapshot should rely on getter and never probe enabled_tools attribute."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        class GetterOnlyOrchestrator:
+            def __init__(self):
+                self._vertical_context = create_vertical_context(name="getter_only")
+
+            def get_vertical_context(self):
+                return self._vertical_context
+
+            def get_enabled_tools(self):
+                return {"read", "write"}
+
+            @property
+            def enabled_tools(self):  # pragma: no cover - should never be touched
+                raise AssertionError("enabled_tools attribute probe is forbidden")
+
+        snapshot = pipeline._orchestrator_state_snapshot(GetterOnlyOrchestrator())
+        assert snapshot.get("vertical_name") == "getter_only"
+        assert "enabled_tools_hash" in snapshot
+
+    def test_state_snapshot_getter_fallback_blocked_in_protocol_strict_mode(self, monkeypatch):
+        """Protocol strict mode should block snapshot getter fallback probes."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        class GetterOnlyOrchestrator:
+            def __init__(self):
+                self._vertical_context = create_vertical_context(name="getter_only")
+
+            def get_vertical_context(self):
+                return self._vertical_context
+
+            def get_enabled_tools(self):
+                return {"read", "write"}
+
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS", "1")
+        with pytest.raises(RuntimeError, match="Protocol fallback blocked"):
+            pipeline._orchestrator_state_snapshot(GetterOnlyOrchestrator())
+
+    def test_state_snapshot_ignores_enabled_tools_attribute_without_getter(self):
+        """Snapshot should ignore direct enabled_tools attribute without protocol getter."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+
+        class AttributeOnlyOrchestrator:
+            def __init__(self):
+                self._vertical_context = create_vertical_context(name="attribute_only")
+                self.enabled_tools = {"read", "write"}
+
+            def get_vertical_context(self):
+                return self._vertical_context
+
+        snapshot = pipeline._orchestrator_state_snapshot(AttributeOnlyOrchestrator())
+        assert snapshot.get("vertical_name") == "attribute_only"
+        assert "enabled_tools_hash" not in snapshot
+
     def test_cache_hit_skips_side_effect_handlers_when_plan_matches(self):
         """Cache hit should skip side-effect handlers when plan is unchanged."""
         orchestrator = MockOrchestrator()
@@ -1998,6 +2073,7 @@ class TestVerticalIntegrationObservability:
         assert "integration_plan_stats" in data
         assert "extension_loader_metrics" in data
         assert "observability_delivery_stats" in data
+        assert "framework_registry_metrics" in data
 
     @pytest.mark.asyncio
     async def test_vertical_applied_event_includes_cache_telemetry(self):
@@ -2024,6 +2100,7 @@ class TestVerticalIntegrationObservability:
         assert "integration_plan_stats" in data
         assert "extension_loader_metrics" in data
         assert "observability_delivery_stats" in data
+        assert "framework_registry_metrics" in data
 
     @pytest.mark.asyncio
     async def test_apply_async_emits_vertical_applied_event_with_cache_telemetry(self):
@@ -2050,6 +2127,7 @@ class TestVerticalIntegrationObservability:
         assert "integration_plan_stats" in data
         assert "extension_loader_metrics" in data
         assert "observability_delivery_stats" in data
+        assert "framework_registry_metrics" in data
 
 
 # =============================================================================

@@ -22,6 +22,7 @@ Phase 4 - Agent Creation Unification:
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
 from victor.framework.events import (
@@ -38,8 +39,11 @@ from victor.framework.events import (
 from victor.framework.tools import ToolSet
 from victor.framework.protocols import ObservabilityPortProtocol
 
-# Import capability helpers for protocol-based access
-from victor.framework.vertical_integration import _check_capability, _invoke_capability
+# Import shared capability helpers for protocol-based access
+from victor.framework.capability_runtime import (
+    check_capability as _check_capability,
+    invoke_capability as _invoke_capability,
+)
 
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
@@ -95,7 +99,7 @@ async def create_orchestrator_from_options(
     from victor.agent.orchestrator_factory import OrchestratorFactory
     from victor.config.settings import load_settings
     from victor.core.bootstrap import ensure_bootstrapped
-    from victor.providers.registry import get_provider_class
+    from victor.providers.registry import ProviderRegistry
 
     # Load settings
     settings = load_settings()
@@ -110,6 +114,11 @@ async def create_orchestrator_from_options(
     if airgapped:
         settings.airgapped_mode = True
 
+    if getattr(settings, "framework_private_fallback_strict_mode", False):
+        os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
+    if getattr(settings, "framework_protocol_fallback_strict_mode", False):
+        os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS", "1")
+
     # Resolve vertical name for bootstrap
     vertical_name = None
     if vertical:
@@ -123,7 +132,7 @@ async def create_orchestrator_from_options(
     ensure_bootstrapped(settings, vertical=vertical_name)
 
     # Create OrchestratorFactory with provider
-    provider_class = get_provider_class(provider)
+    provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
         model=model or settings.default_model,
         temperature=temperature,

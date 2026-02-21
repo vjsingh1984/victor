@@ -93,6 +93,29 @@ class TestProviderRegistry:
         assert result.returncode == 0
         assert "notfound" in result.stdout
 
+    def test_non_mlx_local_aliases_remain_lazy_without_mlx_preflight(self):
+        """vLLM/llama.cpp aliases should resolve independently of MLX preflight flags."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import os\n"
+                    "os.environ['VICTOR_ENABLE_MLX_PROVIDER']='0'\n"
+                    "from victor.providers.registry import ProviderRegistry\n"
+                    "print(ProviderRegistry.get_optional('vllm') is not None)\n"
+                    "print(ProviderRegistry.get_optional('llamacpp') is not None)\n"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert result.returncode == 0
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        assert lines == ["True", "True"]
+
     def test_get_provider_ollama(self):
         """Test getting Ollama provider class."""
         from victor.providers.base import ProviderNotFoundError

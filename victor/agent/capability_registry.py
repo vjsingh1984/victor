@@ -139,9 +139,11 @@ class CapabilityRegistryMixin:
                 name="enabled_tools",
                 capability_type=CapabilityType.TOOL,
                 setter="set_enabled_tools",
+                getter="get_enabled_tools",
                 description="Set enabled tools from vertical",
             ),
             setter_method=getattr(self, "set_enabled_tools", None),
+            getter_method=getattr(self, "get_enabled_tools", None),
         )
 
         # Prompt capabilities
@@ -308,7 +310,7 @@ class CapabilityRegistryMixin:
                 description="Vertical context management",
             ),
             setter_method=getattr(self, "set_vertical_context", None),
-            getter_method=lambda: getattr(self, "_vertical_context", None),
+            getter_method=getattr(self, "get_vertical_context", None),
         )
 
         # RL capabilities

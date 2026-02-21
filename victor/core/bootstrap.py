@@ -248,6 +248,9 @@ def bootstrap_container(
 def _register_core_services(container: ServiceContainer, settings: Settings) -> None:
     """Register core infrastructure services."""
     from victor.framework.capability_config_service import CapabilityConfigService
+    from victor.framework.framework_integration_registry_service import (
+        FrameworkIntegrationRegistryService,
+    )
 
     # Cache service
     container.register(
@@ -256,10 +259,17 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
         ServiceLifetime.SINGLETON,
     )
 
-    # Capability config service
+    # Capability config service (DI-global store with per-session scope buckets)
     container.register(
         CapabilityConfigService,
         lambda c: CapabilityConfigService(),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Framework integration registry facade service
+    container.register(
+        FrameworkIntegrationRegistryService,
+        lambda c: FrameworkIntegrationRegistryService(),
         ServiceLifetime.SINGLETON,
     )
 
@@ -324,28 +334,71 @@ def _configure_extension_loader_runtime(settings: Settings) -> None:
         logger.debug("Failed to import extension loader runtime config hooks: %s", e)
         return
 
+    def _setting_int(name: str, default: int) -> int:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                return default
+        return default
+
+    def _setting_float(name: str, default: float) -> float:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return float(value)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value.strip())
+            except ValueError:
+                return default
+        return default
+
+    def _setting_bool(name: str, default: bool) -> bool:
+        value = getattr(settings, name, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return default
+
+    def _setting_str(name: str, default: str) -> str:
+        value = getattr(settings, name, default)
+        return value if isinstance(value, str) and value.strip() else default
+
     VerticalExtensionLoader.configure_extension_loader_pressure(
-        warn_queue_threshold=getattr(settings, "extension_loader_warn_queue_threshold", 24),
-        error_queue_threshold=getattr(settings, "extension_loader_error_queue_threshold", 32),
-        warn_in_flight_threshold=getattr(settings, "extension_loader_warn_in_flight_threshold", 6),
-        error_in_flight_threshold=getattr(settings, "extension_loader_error_in_flight_threshold", 8),
-        cooldown_seconds=getattr(settings, "extension_loader_pressure_cooldown_seconds", 5.0),
-        emit_events=getattr(settings, "extension_loader_emit_pressure_events", False),
+        warn_queue_threshold=_setting_int("extension_loader_warn_queue_threshold", 24),
+        error_queue_threshold=_setting_int("extension_loader_error_queue_threshold", 32),
+        warn_in_flight_threshold=_setting_int("extension_loader_warn_in_flight_threshold", 6),
+        error_in_flight_threshold=_setting_int("extension_loader_error_in_flight_threshold", 8),
+        cooldown_seconds=_setting_float("extension_loader_pressure_cooldown_seconds", 5.0),
+        emit_events=_setting_bool("extension_loader_emit_pressure_events", False),
     )
 
-    if getattr(settings, "extension_loader_metrics_reporter_enabled", False):
+    if _setting_bool("extension_loader_metrics_reporter_enabled", False):
         start_extension_loader_metrics_reporter(
-            interval_seconds=getattr(
-                settings, "extension_loader_metrics_reporter_interval_seconds", 60.0
+            interval_seconds=_setting_float(
+                "extension_loader_metrics_reporter_interval_seconds", 60.0
             ),
-            topic=getattr(
-                settings,
+            topic=_setting_str(
                 "extension_loader_metrics_reporter_topic",
                 "vertical.extensions.loader.metrics",
             ),
             source="BootstrapExtensionLoaderMetricsReporter",
-            reset_after_emit=getattr(
-                settings, "extension_loader_metrics_reporter_reset_after_emit", False
+            reset_after_emit=_setting_bool(
+                "extension_loader_metrics_reporter_reset_after_emit", False
             ),
         )
     else:
@@ -570,7 +623,11 @@ def _register_vertical_services(
     # Determine which vertical to load
     # Priority: explicit parameter > settings.default_vertical > "coding"
     if vertical_name is None:
-        vertical_name = getattr(settings, "default_vertical", None) or "coding"
+        default_vertical = getattr(settings, "default_vertical", None)
+        if isinstance(default_vertical, str) and default_vertical.strip():
+            vertical_name = default_vertical
+        else:
+            vertical_name = "coding"
 
     try:
         from victor.core.verticals.vertical_loader import activate_vertical_services

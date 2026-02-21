@@ -156,143 +156,17 @@ if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
     from victor.framework.vertical_cache_policy import VerticalIntegrationCachePolicy
 
-# Import protocols for runtime isinstance checks
-
-# Import capability registry protocol for type-safe capability access
-from victor.framework.protocols import CapabilityRegistryProtocol
+from victor.framework.capability_runtime import (
+    check_capability as _check_capability,
+    invoke_capability as _invoke_capability,
+)
+from victor.framework.framework_integration_registry_service import (
+    resolve_framework_integration_registry_service,
+)
+from victor.framework.strict_mode import ensure_protocol_fallback_allowed
 from victor.framework.vertical_cache_policy import (
     InMemoryLRUVerticalIntegrationCachePolicy,
 )
-
-
-def _check_capability(
-    obj: Any,
-    capability_name: str,
-    min_version: Optional[str] = None,
-) -> bool:
-    """Check if object has capability via registry with optional version check.
-
-    Uses protocol-based capability discovery. Orchestrators must implement
-    CapabilityRegistryProtocol for proper capability checking.
-
-    SOLID Compliance:
-    - Uses protocol, not hasattr (DIP - Dependency Inversion)
-    - No private attribute access (SRP - Single Responsibility)
-
-    Args:
-        obj: Object to check (should implement CapabilityRegistryProtocol)
-        capability_name: Name of capability
-        min_version: Minimum required version (default: None = any version)
-
-    Returns:
-        True if capability is available via the registry and meets version requirement
-
-    Example:
-        # Check for any version
-        if _check_capability(obj, "enabled_tools"):
-            ...
-
-        # Check for minimum version
-        if _check_capability(obj, "enabled_tools", min_version="1.1"):
-            ...
-    """
-    # Check capability registry (protocol-based only)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        return obj.has_capability(capability_name, min_version=min_version)
-
-    # For objects not implementing protocol, check for public method
-    # Note: Version checking not available without protocol implementation
-    # Note: No private attribute fallbacks (SOLID compliant)
-    if min_version is not None:
-        logger.debug(
-            f"Version check requested for '{capability_name}' but object does not "
-            f"implement CapabilityRegistryProtocol. Falling back to hasattr check."
-        )
-
-    public_methods = {
-        "enabled_tools": "set_enabled_tools",
-        "prompt_builder": "prompt_builder",
-        "vertical_middleware": "apply_vertical_middleware",
-        "vertical_safety_patterns": "apply_vertical_safety_patterns",
-        "vertical_context": "set_vertical_context",
-        "adaptive_mode_controller": "adaptive_mode_controller",
-    }
-
-    method_name = public_methods.get(capability_name, capability_name)
-    return hasattr(obj, method_name) and (
-        callable(getattr(obj, method_name, None))
-        or not callable(getattr(obj, method_name, None))  # Allow properties
-    )
-
-
-def _invoke_capability(
-    obj: Any,
-    capability_name: str,
-    *args: Any,
-    min_version: Optional[str] = None,
-    **kwargs: Any,
-) -> Any:
-    """Invoke a capability on an object via public methods only.
-
-    SOLID Compliance (DIP): This function only uses public methods.
-    It never writes to private attributes (_attr) to maintain
-    proper encapsulation and dependency inversion.
-
-    Uses protocol-based capability invocation. Orchestrators must implement
-    CapabilityRegistryProtocol for proper capability invocation. When the
-    protocol is not implemented, falls back to public method mappings but
-    never resorts to private attribute access.
-
-    Args:
-        obj: Object implementing the capability (should implement CapabilityRegistryProtocol)
-        capability_name: Name of the capability to invoke
-        *args: Arguments for capability (value to pass to the capability method)
-        min_version: Minimum required version (default: None = no check)
-        **kwargs: Additional arguments for capability
-
-    Returns:
-        Result of capability invocation, True if capability was invoked successfully
-
-    Raises:
-        AttributeError: If capability cannot be invoked via public methods
-
-    Example:
-        # Invoke without version check
-        _invoke_capability(obj, "enabled_tools", {"read", "write"})
-
-        # Invoke with version requirement
-        _invoke_capability(obj, "enabled_tools", {"read", "write"}, min_version="1.1")
-    """
-    # Use capability registry if available (preferred)
-    if isinstance(obj, CapabilityRegistryProtocol):
-        try:
-            return obj.invoke_capability(capability_name, *args, min_version=min_version, **kwargs)
-        except (KeyError, TypeError) as e:
-            logger.debug(f"Registry invoke failed for {capability_name}: {e}")
-            # Fall through to public method fallback
-
-    # Fallback: use public method mappings only (no private attributes)
-    # Note: Version checking not available without protocol implementation
-    if min_version is not None:
-        logger.debug(
-            f"Version check requested for '{capability_name}' but object does not "
-            f"implement CapabilityRegistryProtocol. Invoking without version check."
-        )
-
-    # Use centralized capability method mappings (single source of truth)
-    from victor.framework.capability_registry import get_method_for_capability
-
-    method_name = get_method_for_capability(capability_name)
-    method = getattr(obj, method_name, None)
-    if callable(method):
-        return method(*args, **kwargs)
-
-    # No private attribute fallback - raise clear error instead
-    raise AttributeError(
-        f"Cannot invoke capability '{capability_name}' on {type(obj).__name__}. "
-        f"Expected method '{method_name}' not found. "
-        f"Object should implement CapabilityRegistryProtocol."
-    )
 
 
 logger = logging.getLogger(__name__)
@@ -1093,6 +967,14 @@ class VerticalIntegrationPipeline:
         skip_handlers: Set[str] = set()
         if cache_hit and cache_key:
             cached_plan = self._load_plan_from_cache(cache_key)
+            if cached_plan:
+                try:
+                    context.set_capability_config(
+                        "framework.internal.registration_version",
+                        cached_plan.get("signature"),
+                    )
+                except Exception:
+                    pass
             skip_handlers = self._compute_skip_handlers(
                 orchestrator,
                 cache_key=cache_key,
@@ -1127,7 +1009,7 @@ class VerticalIntegrationPipeline:
         )
 
         # Emit vertical_applied event for observability
-        self._emit_vertical_applied_event(result, cache_hit=cache_hit)
+        self._emit_vertical_applied_event(orchestrator, result, cache_hit=cache_hit)
 
         # Note: result.persist() available for opt-in audit logging
         # Not called automatically to avoid duplication with EventBus
@@ -1481,6 +1363,68 @@ class VerticalIntegrationPipeline:
             stats["max_entries"] = self._max_cache_entries
         return stats
 
+    def _get_capability_snapshot_value(self, orchestrator: Any, capability: str) -> Any:
+        """Read capability value through registry protocol when available."""
+        has_capability = getattr(orchestrator, "has_capability", None)
+        get_capability_value = getattr(orchestrator, "get_capability_value", None)
+        if not callable(has_capability) or not callable(get_capability_value):
+            return None
+
+        try:
+            if not has_capability(capability):
+                return None
+        except Exception:
+            return None
+
+        try:
+            return get_capability_value(capability)
+        except Exception:
+            return None
+
+    def _resolve_vertical_context(self, orchestrator: Any) -> Optional[Any]:
+        """Resolve vertical context via protocol-first reads."""
+        context = self._get_capability_snapshot_value(orchestrator, "vertical_context")
+        if context is not None:
+            return context
+
+        ensure_protocol_fallback_allowed(
+            operation="vertical context snapshot",
+            fallback_target="get_vertical_context",
+        )
+        getter = getattr(orchestrator, "get_vertical_context", None)
+        if callable(getter):
+            try:
+                return getter()
+            except Exception:
+                return None
+        return None
+
+    def _resolve_enabled_tools_snapshot(self, orchestrator: Any) -> Optional[Set[str]]:
+        """Resolve enabled tools via protocol-first reads."""
+        value = self._get_capability_snapshot_value(orchestrator, "enabled_tools")
+        if value is not None:
+            try:
+                return set(value)
+            except Exception:
+                return None
+
+        ensure_protocol_fallback_allowed(
+            operation="enabled tools snapshot",
+            fallback_target="get_enabled_tools",
+        )
+        getter = getattr(orchestrator, "get_enabled_tools", None)
+        if callable(getter):
+            try:
+                value = getter()
+            except Exception:
+                return None
+            if value is not None:
+                try:
+                    return set(value)
+                except Exception:
+                    return None
+        return None
+
     def _get_applied_plan_for_orchestrator(self, orchestrator: Any) -> Optional[Dict[str, Any]]:
         """Get previously applied plan metadata for this orchestrator."""
         try:
@@ -1490,14 +1434,7 @@ class VerticalIntegrationPipeline:
         if cached is not None:
             return copy.deepcopy(cached)
 
-        context = getattr(orchestrator, "vertical_context", None)
-        if context is None:
-            getter = getattr(orchestrator, "get_vertical_context", None)
-            if callable(getter):
-                try:
-                    context = getter()
-                except Exception:
-                    context = None
+        context = self._resolve_vertical_context(orchestrator)
 
         if context is None:
             return None
@@ -1526,38 +1463,12 @@ class VerticalIntegrationPipeline:
         """Collect lightweight orchestrator state used for no-op safety checks."""
         snapshot: Dict[str, Any] = {}
 
-        context = getattr(orchestrator, "vertical_context", None)
-        if context is None:
-            getter = getattr(orchestrator, "get_vertical_context", None)
-            if callable(getter):
-                try:
-                    context = getter()
-                except Exception:
-                    context = None
-        if context is None:
-            # Compatibility fallback for legacy/test orchestrators.
-            context = getattr(orchestrator, "_vertical_context", None)
+        context = self._resolve_vertical_context(orchestrator)
 
         if context is not None:
             snapshot["vertical_name"] = getattr(context, "name", None)
 
-        enabled_tools: Optional[Set[str]] = None
-        get_enabled_tools = getattr(orchestrator, "get_enabled_tools", None)
-        if callable(get_enabled_tools):
-            try:
-                value = get_enabled_tools()
-                if value is not None:
-                    enabled_tools = set(value)
-            except Exception:
-                enabled_tools = None
-        if enabled_tools is None:
-            # Compatibility fallback for legacy/test orchestrators.
-            raw = getattr(orchestrator, "_enabled_tools", None)
-            if raw is not None:
-                try:
-                    enabled_tools = set(raw)
-                except Exception:
-                    enabled_tools = None
+        enabled_tools = self._resolve_enabled_tools_snapshot(orchestrator)
         if enabled_tools is not None:
             snapshot["enabled_tools_hash"] = self._hash_plan_payload(sorted(enabled_tools))
 
@@ -1638,6 +1549,7 @@ class VerticalIntegrationPipeline:
 
     def _build_vertical_applied_payload(
         self,
+        orchestrator: Any,
         result: IntegrationResult,
         *,
         cache_hit: bool,
@@ -1647,6 +1559,7 @@ class VerticalIntegrationPipeline:
         integration_plan_stats = self.get_integration_plan_stats() if self._enable_cache else {}
         extension_loader_metrics: Dict[str, Any] = {}
         observability_delivery_stats: Dict[str, Any] = {}
+        framework_registry_metrics: Dict[str, Any] = {}
         try:
             from victor.core.verticals.extension_loader import VerticalExtensionLoader
 
@@ -1662,6 +1575,13 @@ class VerticalIntegrationPipeline:
                 observability_delivery_stats = getter() or {}
         except Exception:
             observability_delivery_stats = {}
+        try:
+            registry_service = resolve_framework_integration_registry_service(orchestrator)
+            snapshot_metrics = getattr(registry_service, "snapshot_metrics", None)
+            if callable(snapshot_metrics):
+                framework_registry_metrics = snapshot_metrics() or {}
+        except Exception:
+            framework_registry_metrics = {}
 
         return {
             "vertical": result.vertical_name,
@@ -1681,11 +1601,13 @@ class VerticalIntegrationPipeline:
             "integration_plan_stats": integration_plan_stats,
             "extension_loader_metrics": extension_loader_metrics,
             "observability_delivery_stats": observability_delivery_stats,
+            "framework_registry_metrics": framework_registry_metrics,
             "category": "vertical",  # Preserve for observability
         }
 
     def _emit_vertical_applied_event(
         self,
+        orchestrator: Any,
         result: IntegrationResult,
         *,
         cache_hit: bool,
@@ -1696,7 +1618,11 @@ class VerticalIntegrationPipeline:
 
             bus = get_observability_bus()
             if bus:
-                payload = self._build_vertical_applied_payload(result, cache_hit=cache_hit)
+                payload = self._build_vertical_applied_payload(
+                    orchestrator,
+                    result,
+                    cache_hit=cache_hit,
+                )
                 emit_event_sync(
                     bus,
                     "vertical.applied",
@@ -1709,6 +1635,7 @@ class VerticalIntegrationPipeline:
 
     async def _emit_vertical_applied_event_async(
         self,
+        orchestrator: Any,
         result: IntegrationResult,
         *,
         cache_hit: bool,
@@ -1719,7 +1646,11 @@ class VerticalIntegrationPipeline:
 
             bus = get_observability_bus()
             if bus:
-                payload = self._build_vertical_applied_payload(result, cache_hit=cache_hit)
+                payload = self._build_vertical_applied_payload(
+                    orchestrator,
+                    result,
+                    cache_hit=cache_hit,
+                )
                 await bus.emit(
                     topic="vertical.applied",
                     data=payload,
@@ -1853,7 +1784,7 @@ class VerticalIntegrationPipeline:
                     )
 
         # Emit vertical_applied event for observability (async parity with sync apply)
-        await self._emit_vertical_applied_event_async(result, cache_hit=cache_hit)
+        await self._emit_vertical_applied_event_async(orchestrator, result, cache_hit=cache_hit)
 
         # Cache result (Phase 1)
         if self._enable_cache and result.success:

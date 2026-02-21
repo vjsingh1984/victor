@@ -134,6 +134,13 @@ class ToolConfig:
         max_content_length: int = 5000,
         batch_concurrency: int = 5,
         batch_max_files: int = 100,
+        generic_result_cache_enabled: bool = False,
+        generic_result_cache_ttl: int = 300,
+        http_connection_pool_enabled: bool = False,
+        http_connection_pool_max_connections: int = 100,
+        http_connection_pool_max_connections_per_host: int = 10,
+        http_connection_pool_connection_timeout: int = 30,
+        http_connection_pool_total_timeout: int = 60,
     ):
         """Initialize tool configuration.
 
@@ -146,6 +153,13 @@ class ToolConfig:
             max_content_length: Maximum content length for web scraping
             batch_concurrency: Concurrent operations for batch processing
             batch_max_files: Maximum files for batch operations
+            generic_result_cache_enabled: Enable GenericResultCache for tool runtime paths
+            generic_result_cache_ttl: TTL for generic result cache entries in seconds
+            http_connection_pool_enabled: Enable shared HTTP connection pool for web tools
+            http_connection_pool_max_connections: Max total pooled HTTP connections
+            http_connection_pool_max_connections_per_host: Max pooled connections per host
+            http_connection_pool_connection_timeout: HTTP connect timeout in seconds
+            http_connection_pool_total_timeout: Total HTTP timeout in seconds
         """
         self.provider = provider
         self.model = model
@@ -155,6 +169,13 @@ class ToolConfig:
         self.max_content_length = max_content_length
         self.batch_concurrency = batch_concurrency
         self.batch_max_files = batch_max_files
+        self.generic_result_cache_enabled = generic_result_cache_enabled
+        self.generic_result_cache_ttl = generic_result_cache_ttl
+        self.http_connection_pool_enabled = http_connection_pool_enabled
+        self.http_connection_pool_max_connections = http_connection_pool_max_connections
+        self.http_connection_pool_max_connections_per_host = http_connection_pool_max_connections_per_host
+        self.http_connection_pool_connection_timeout = http_connection_pool_connection_timeout
+        self.http_connection_pool_total_timeout = http_connection_pool_total_timeout
 
     @classmethod
     def from_context(cls, context: Dict[str, Any]) -> Optional["ToolConfig"]:

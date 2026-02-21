@@ -52,14 +52,10 @@ import traceback
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable, Deque, Dict, List, Optional, Set, WeakSet
+from typing import Any, Callable, Deque, Dict, List, Optional, Set
+from weakref import WeakSet
 
 import psutil
-
-try:
-    from weakref import WeakSet
-except ImportError:
-    from weakref import WeakSet
 
 from victor.framework.observability.metrics import (
     CounterMetric,

@@ -45,6 +45,7 @@ import asyncio
 import logging
 import threading
 import uuid
+from fnmatch import fnmatchcase
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -133,6 +134,58 @@ def _parse_float_setting(raw: Any, *, default: float, minimum: float) -> float:
     return max(minimum, value)
 
 
+def _normalize_topic_policy_overrides(raw: Any) -> Dict[str, str]:
+    """Normalize optional per-topic overflow policy overrides."""
+    if not isinstance(raw, dict):
+        return {}
+
+    normalized: Dict[str, str] = {}
+    for topic_pattern, policy in raw.items():
+        pattern = str(topic_pattern).strip()
+        if not pattern:
+            continue
+        normalized_policy = str(policy).strip().lower()
+        if normalized_policy not in _VALID_QUEUE_POLICIES:
+            logger.warning(
+                "Ignoring invalid topic overflow policy '%s' for pattern '%s'",
+                policy,
+                topic_pattern,
+            )
+            continue
+        normalized[pattern] = normalized_policy
+    return normalized
+
+
+def _normalize_topic_block_timeout_overrides(raw: Any) -> Dict[str, float]:
+    """Normalize optional per-topic timeout overrides for block-with-timeout policy."""
+    if not isinstance(raw, dict):
+        return {}
+
+    normalized: Dict[str, float] = {}
+    for topic_pattern, timeout_ms in raw.items():
+        pattern = str(topic_pattern).strip()
+        if not pattern:
+            continue
+        try:
+            parsed_timeout = float(timeout_ms)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Ignoring non-numeric topic block timeout '%s' for pattern '%s'",
+                timeout_ms,
+                topic_pattern,
+            )
+            continue
+        if parsed_timeout < 0:
+            logger.warning(
+                "Ignoring negative topic block timeout '%s' for pattern '%s'",
+                timeout_ms,
+                topic_pattern,
+            )
+            continue
+        normalized[pattern] = parsed_timeout
+    return normalized
+
+
 def build_backend_config_from_settings(settings: Any) -> BackendConfig:
     """Build backend config from settings object with normalized defaults."""
     backend_type = _parse_backend_type(getattr(settings, "event_backend_type", "in_memory"))
@@ -171,6 +224,12 @@ def build_backend_config_from_settings(settings: Any) -> BackendConfig:
         default=50.0,
         minimum=0.0,
     )
+    topic_policy_overrides = _normalize_topic_policy_overrides(
+        getattr(settings, "event_queue_overflow_topic_policies", {})
+    )
+    topic_block_timeout_overrides = _normalize_topic_block_timeout_overrides(
+        getattr(settings, "event_queue_overflow_topic_block_timeout_ms", {})
+    )
 
     return BackendConfig(
         backend_type=backend_type,
@@ -181,6 +240,8 @@ def build_backend_config_from_settings(settings: Any) -> BackendConfig:
             "queue_maxsize": queue_maxsize,
             "queue_overflow_policy": overflow_policy,
             "queue_overflow_block_timeout_ms": block_timeout_ms,
+            "queue_overflow_topic_policies": topic_policy_overrides,
+            "queue_overflow_topic_block_timeout_ms": topic_block_timeout_overrides,
         },
     )
 
@@ -273,6 +334,17 @@ class InMemoryEventBackend:
         except (TypeError, ValueError):
             timeout_ms = 50.0
         self._queue_overflow_block_timeout_ms = timeout_ms
+        self._queue_overflow_topic_policies = _normalize_topic_policy_overrides(
+            extra.get("queue_overflow_topic_policies", {})
+        )
+        # Prioritize specific patterns first (fewer wildcards, then longer string).
+        self._queue_overflow_topic_policy_items = sorted(
+            self._queue_overflow_topic_policies.items(),
+            key=lambda item: (item[0].count("*"), -len(item[0])),
+        )
+        self._queue_overflow_topic_block_timeout_ms = _normalize_topic_block_timeout_overrides(
+            extra.get("queue_overflow_topic_block_timeout_ms", {})
+        )
         self._overflow_durable_sink = extra.get("overflow_durable_sink")
 
         self._subscriptions: Dict[str, _Subscription] = {}
@@ -293,6 +365,7 @@ class InMemoryEventBackend:
             "durable_sink_success": 0,
             "durable_sink_failures": 0,
             "max_queue_depth": 0,
+            "topic_policy_override_hits": 0,
         }
 
     @property
@@ -387,6 +460,17 @@ class InMemoryEventBackend:
             self._increment_publish_stat("durable_sink_failures")
             logger.debug("Durable sink write failed: %s", e)
 
+    def _resolve_overflow_policy_for_topic(self, topic: str) -> tuple[str, float]:
+        """Resolve effective overflow policy + timeout for a topic."""
+        for pattern, policy in self._queue_overflow_topic_policy_items:
+            if fnmatchcase(topic, pattern):
+                timeout_ms = self._queue_overflow_topic_block_timeout_ms.get(
+                    pattern,
+                    self._queue_overflow_block_timeout_ms,
+                )
+                return policy, timeout_ms
+        return self._queue_overflow_policy, self._queue_overflow_block_timeout_ms
+
     async def publish(self, event: MessagingEvent) -> bool:
         """Publish an event to all matching subscribers.
 
@@ -409,7 +493,16 @@ class InMemoryEventBackend:
             self._update_max_queue_depth()
             return True
         except asyncio.QueueFull:
-            if self._queue_overflow_policy == _QUEUE_POLICY_DROP_OLDEST:
+            effective_policy, effective_block_timeout_ms = self._resolve_overflow_policy_for_topic(
+                event.topic
+            )
+            if (
+                effective_policy != self._queue_overflow_policy
+                or effective_block_timeout_ms != self._queue_overflow_block_timeout_ms
+            ):
+                self._increment_publish_stat("topic_policy_override_hits")
+
+            if effective_policy == _QUEUE_POLICY_DROP_OLDEST:
                 try:
                     oldest = self._event_queue.get_nowait()
                     self._increment_publish_stat("dropped_oldest")
@@ -431,8 +524,8 @@ class InMemoryEventBackend:
                     )
                     return False
 
-            if self._queue_overflow_policy == _QUEUE_POLICY_BLOCK_WITH_TIMEOUT:
-                timeout_s = self._queue_overflow_block_timeout_ms / 1000.0
+            if effective_policy == _QUEUE_POLICY_BLOCK_WITH_TIMEOUT:
+                timeout_s = effective_block_timeout_ms / 1000.0
                 try:
                     await asyncio.wait_for(self._event_queue.put(event), timeout=timeout_s)
                     self._increment_publish_stat("blocked_success")
@@ -444,7 +537,7 @@ class InMemoryEventBackend:
                     self._write_to_durable_sink(event, "block_timeout")
                     logger.warning(
                         "Event queue full (block timeout %.1fms), dropping event: %s",
-                        self._queue_overflow_block_timeout_ms,
+                        effective_block_timeout_ms,
                         event.topic,
                     )
                     return False
@@ -599,6 +692,8 @@ class InMemoryEventBackend:
             "queue_maxsize": self._queue_maxsize,
             "overflow_policy": self._queue_overflow_policy,
             "block_timeout_ms": self._queue_overflow_block_timeout_ms,
+            "topic_overflow_policies": dict(self._queue_overflow_topic_policies),
+            "topic_block_timeout_ms": dict(self._queue_overflow_topic_block_timeout_ms),
             "stats": stats,
         }
 

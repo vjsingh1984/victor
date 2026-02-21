@@ -25,16 +25,21 @@ This tool provides:
 import re
 import logging
 from typing import Any, Dict, List, Optional
+from threading import RLock
 
 import httpx
 from bs4 import BeautifulSoup
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ToolConfig
 from victor.tools.decorators import tool
+from victor.storage.cache.generic_result_cache import GenericResultCache, ResultType
 
 # Constants
 _USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
 _DEFAULT_MAX_CONTENT_LENGTH = 5000
+
+_GENERIC_WEB_CACHE: Optional[GenericResultCache] = None
+_GENERIC_WEB_CACHE_LOCK = RLock()
 
 
 def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -54,6 +59,29 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             "fetch_top": config.web_fetch_top,
             "fetch_pool": config.web_fetch_pool,
             "max_content_length": config.max_content_length or _DEFAULT_MAX_CONTENT_LENGTH,
+            "generic_result_cache_enabled": getattr(config, "generic_result_cache_enabled", False),
+            "generic_result_cache_ttl": getattr(config, "generic_result_cache_ttl", 300),
+            "http_connection_pool_enabled": getattr(config, "http_connection_pool_enabled", False),
+            "http_connection_pool_max_connections": getattr(
+                config,
+                "http_connection_pool_max_connections",
+                100,
+            ),
+            "http_connection_pool_max_connections_per_host": getattr(
+                config,
+                "http_connection_pool_max_connections_per_host",
+                10,
+            ),
+            "http_connection_pool_connection_timeout": getattr(
+                config,
+                "http_connection_pool_connection_timeout",
+                30,
+            ),
+            "http_connection_pool_total_timeout": getattr(
+                config,
+                "http_connection_pool_total_timeout",
+                60,
+            ),
         }
     return {
         "provider": None,
@@ -61,7 +89,86 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "fetch_top": None,
         "fetch_pool": None,
         "max_content_length": _DEFAULT_MAX_CONTENT_LENGTH,
+        "generic_result_cache_enabled": False,
+        "generic_result_cache_ttl": 300,
+        "http_connection_pool_enabled": False,
+        "http_connection_pool_max_connections": 100,
+        "http_connection_pool_max_connections_per_host": 10,
+        "http_connection_pool_connection_timeout": 30,
+        "http_connection_pool_total_timeout": 60,
     }
+
+
+def _get_generic_web_cache(default_ttl: int) -> GenericResultCache:
+    """Return singleton GenericResultCache used by web tools."""
+    global _GENERIC_WEB_CACHE
+    with _GENERIC_WEB_CACHE_LOCK:
+        if _GENERIC_WEB_CACHE is None:
+            _GENERIC_WEB_CACHE = GenericResultCache(default_ttl=max(1, int(default_ttl)))
+        return _GENERIC_WEB_CACHE
+
+
+async def _request_text(
+    method: str,
+    url: str,
+    *,
+    headers: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+    timeout_seconds: float = 15.0,
+    follow_redirects: bool = True,
+    web_config: Optional[Dict[str, Any]] = None,
+) -> tuple[int, str]:
+    """Perform HTTP request, optionally using pooled connections."""
+    config = web_config or {}
+    use_http_pool = bool(config.get("http_connection_pool_enabled", False))
+    logger = logging.getLogger(__name__)
+
+    if use_http_pool:
+        try:
+            from victor.tools.http_pool import (
+                AIOHTTP_AVAILABLE,
+                ConnectionPoolConfig,
+                get_http_pool,
+            )
+
+            if AIOHTTP_AVAILABLE:
+                pool = await get_http_pool(
+                    ConnectionPoolConfig(
+                        max_connections=int(config.get("http_connection_pool_max_connections", 100)),
+                        max_connections_per_host=int(
+                            config.get("http_connection_pool_max_connections_per_host", 10)
+                        ),
+                        connection_timeout=int(
+                            config.get("http_connection_pool_connection_timeout", 30)
+                        ),
+                        total_timeout=int(config.get("http_connection_pool_total_timeout", 60)),
+                    )
+                )
+                response = await pool.request(
+                    method,
+                    url,
+                    headers=headers,
+                    data=data,
+                    allow_redirects=follow_redirects,
+                    timeout=timeout_seconds,
+                )
+                try:
+                    payload = await response.text()
+                    return int(response.status), payload
+                finally:
+                    response.release()
+        except Exception as e:
+            logger.debug("HTTP pool request failed, falling back to httpx: %s", e)
+
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        response = await client.request(
+            method,
+            url,
+            data=data,
+            headers=headers,
+            follow_redirects=follow_redirects,
+        )
+        return int(response.status_code), response.text
 
 
 def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
@@ -245,44 +352,67 @@ async def web_search(
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
 
+    config = _get_web_config(context)
+
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
     safe_value = safe_map.get(safe_search, "-1")
     logger = logging.getLogger(__name__)
 
+    cache: Optional[GenericResultCache] = None
+    cache_params = {
+        "max_results": max_results,
+        "region": region,
+        "safe_search": safe_search,
+    }
+    if config.get("generic_result_cache_enabled"):
+        cache = _get_generic_web_cache(int(config.get("generic_result_cache_ttl", 300)))
+        cached_result = cache.get(ResultType.SEARCH, query, cache_params)
+        if isinstance(cached_result, dict):
+            payload = dict(cached_result)
+            payload["cached"] = True
+            return payload
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            # DuckDuckGo HTML search
-            search_url = "https://html.duckduckgo.com/html/"
+        # DuckDuckGo HTML search
+        search_url = "https://html.duckduckgo.com/html/"
+        data = {"q": query, "kl": region, "p": safe_value}
 
-            data = {"q": query, "kl": region, "p": safe_value}
+        status_code, payload = await _request_text(
+            "POST",
+            search_url,
+            data=data,
+            headers={"User-Agent": _USER_AGENT},
+            follow_redirects=True,
+            timeout_seconds=15.0,
+            web_config=config,
+        )
 
-            response = await client.post(
-                search_url, data=data, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
-            )
+        if status_code != 200:
+            return {
+                "success": False,
+                "error": f"Search failed with status {status_code}",
+            }
 
-            if response.status_code != 200:
-                return {
-                    "success": False,
-                    "error": f"Search failed with status {response.status_code}",
-                }
+        # Parse results
+        results = _parse_ddg_results(payload, max_results)
+        logger.info(f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}")
+        if results:
+            sample_urls = [r.get("url", "") for r in results[:5]]
+            logger.info(f"[web_search] top URLs: {sample_urls}")
 
-            # Parse results
-            results = _parse_ddg_results(response.text, max_results)
-            logger.info(
-                f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}"
-            )
-            if results:
-                sample_urls = [r.get("url", "") for r in results[:5]]
-                logger.info(f"[web_search] top URLs: {sample_urls}")
+        if not results:
+            result_payload = {"success": True, "results": "No results found", "result_count": 0}
+            if cache is not None:
+                cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
+            return result_payload
 
-            if not results:
-                return {"success": True, "results": "No results found", "result_count": 0}
-
-            # Format results
-            output = _format_results(query, results)
-
-            return {"success": True, "results": output, "result_count": len(results)}
+        # Format results
+        output = _format_results(query, results)
+        result_payload = {"success": True, "results": output, "result_count": len(results)}
+        if cache is not None:
+            cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
+        return result_payload
 
     except httpx.TimeoutException:
         return {"success": False, "error": "Search request timed out"}
@@ -304,7 +434,7 @@ async def web_search(
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
 )
-async def web_fetch(url: str) -> Dict[str, Any]:
+async def web_fetch(url: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -313,25 +443,50 @@ async def web_fetch(url: str) -> Dict[str, Any]:
     if not url:
         return {"success": False, "error": "Missing required parameter: url"}
 
+    config = _get_web_config(context)
+    cache: Optional[GenericResultCache] = None
+    cache_params = {"max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))}
+    if config.get("generic_result_cache_enabled"):
+        cache = _get_generic_web_cache(int(config.get("generic_result_cache_ttl", 300)))
+        cached_result = cache.get(ResultType.SEARCH, f"fetch:{url}", cache_params)
+        if isinstance(cached_result, dict):
+            payload = dict(cached_result)
+            payload["cached"] = True
+            return payload
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
-                url, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
+        status_code, payload = await _request_text(
+            "GET",
+            url,
+            headers={"User-Agent": _USER_AGENT},
+            follow_redirects=True,
+            timeout_seconds=15.0,
+            web_config=config,
+        )
+        if status_code != 200:
+            return {
+                "success": False,
+                "error": f"Failed to fetch URL (status {status_code})",
+            }
+
+        # Extract text content
+        content = _extract_content(
+            payload,
+            max_length=int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH)),
+        )
+
+        if not content:
+            return {"success": False, "error": "No content could be extracted from URL"}
+
+        result_payload = {"success": True, "content": content, "url": url}
+        if cache is not None:
+            cache.set(
+                ResultType.SEARCH,
+                f"fetch:{url}",
+                dict(result_payload),
+                params=cache_params,
             )
-
-            if response.status_code != 200:
-                return {
-                    "success": False,
-                    "error": f"Failed to fetch URL (status {response.status_code})",
-                }
-
-            # Extract text content
-            content = _extract_content(response.text)
-
-            if not content:
-                return {"success": False, "error": "No content could be extracted from URL"}
-
-            return {"success": True, "content": content, "url": url}
+        return result_payload
 
     except httpx.TimeoutException:
         return {"success": False, "error": "Request timed out"}
@@ -392,36 +547,39 @@ async def _summarize_search(
 
     try:
         # First, perform search
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            search_url = "https://html.duckduckgo.com/html/"
+        search_url = "https://html.duckduckgo.com/html/"
+        data = {"q": query, "kl": region, "p": safe_value}
 
-            data = {"q": query, "kl": region, "p": safe_value}
+        status_code, payload = await _request_text(
+            "POST",
+            search_url,
+            data=data,
+            headers={"User-Agent": _USER_AGENT},
+            follow_redirects=True,
+            timeout_seconds=15.0,
+            web_config=config,
+        )
+        if status_code != 200:
+            return {
+                "success": False,
+                "error": f"Search failed with status {status_code}",
+            }
 
-            response = await client.post(
-                search_url, data=data, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
-            )
+        # Parse results
+        results = _parse_ddg_results(payload, fetch_pool)
+        logger.info(f"[web_summarize] search query='{query}', parsed_results={len(results)}")
+        if results:
+            logger.info(f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}")
 
-            if response.status_code != 200:
-                return {
-                    "success": False,
-                    "error": f"Search failed with status {response.status_code}",
-                }
+        if not results:
+            return {
+                "success": True,
+                "summary": "No results found to summarize",
+                "original_results": "",
+            }
 
-            # Parse results
-            results = _parse_ddg_results(response.text, fetch_pool)
-            logger.info(f"[web_summarize] search query='{query}', parsed_results={len(results)}")
-            if results:
-                logger.info(f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}")
-
-            if not results:
-                return {
-                    "success": True,
-                    "summary": "No results found to summarize",
-                    "original_results": "",
-                }
-
-            # Format results
-            results_text = _format_results(query, results)
+        # Format results
+        results_text = _format_results(query, results)
 
         # Fetch top content for deeper summary (best-effort)
         fetched_contents = []
@@ -431,7 +589,7 @@ async def _summarize_search(
             url = result.get("url")
             if not url:
                 continue
-            fetch_res = await web_fetch(url=url)
+            fetch_res = await web_fetch(url=url, context=context)
             if fetch_res.get("success") and fetch_res.get("content"):
                 content = fetch_res["content"][:max_content_length]
                 fetched_contents.append({"url": url, "content": content})

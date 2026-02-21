@@ -53,3 +53,24 @@ class TestCapabilityConfigService:
         service.clear()
         assert service.snapshot() == {}
 
+    def test_scope_isolation_between_sessions(self):
+        service = CapabilityConfigService()
+
+        service.set_config("citation_config", {"style": "apa"}, scope_key="session-a")
+        service.set_config("citation_config", {"style": "mla"}, scope_key="session-b")
+
+        assert service.get_config("citation_config", scope_key="session-a") == {"style": "apa"}
+        assert service.get_config("citation_config", scope_key="session-b") == {"style": "mla"}
+        assert service.get_config("citation_config", scope_key="missing", default=None) is None
+
+    def test_clear_scope_only_does_not_remove_other_scopes(self):
+        service = CapabilityConfigService()
+        service.set_config("source_verification_config", {"min_credibility": 0.8}, scope_key="session-a")
+        service.set_config("source_verification_config", {"min_credibility": 0.6}, scope_key="session-b")
+
+        service.clear(scope_key="session-a")
+
+        assert service.snapshot(scope_key="session-a") == {}
+        assert service.snapshot(scope_key="session-b") == {
+            "source_verification_config": {"min_credibility": 0.6}
+        }

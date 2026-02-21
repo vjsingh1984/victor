@@ -107,6 +107,43 @@ async def test_queue_overflow_block_timeout_default_under_sustained_pressure():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_queue_overflow_topic_defaults_apply_blocking_only_to_critical_topics():
+    """Critical topics should block-with-timeout while default telemetry uses drop-newest."""
+    backend = InMemoryEventBackend(
+        config=BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "queue_overflow_topic_policies": {"vertical.applied": "block_with_timeout"},
+                "queue_overflow_topic_block_timeout_ms": {"vertical.applied": 30.0},
+            }
+        ),
+        queue_maxsize=1,
+    )
+    backend._is_connected = True
+
+    assert await backend.publish(MessagingEvent(topic="metric.latency", data={"i": 1})) is True
+
+    t0 = time.perf_counter()
+    critical_result = await backend.publish(MessagingEvent(topic="vertical.applied", data={"i": 2}))
+    critical_elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+    t1 = time.perf_counter()
+    telemetry_result = await backend.publish(MessagingEvent(topic="metric.latency", data={"i": 3}))
+    telemetry_elapsed_ms = (time.perf_counter() - t1) * 1000.0
+
+    assert critical_result is False
+    assert telemetry_result is False
+    assert critical_elapsed_ms >= 20.0
+    assert telemetry_elapsed_ms < 15.0
+
+    stats = backend.get_queue_pressure_stats()["stats"]
+    assert stats["blocked_timeout"] == 1
+    assert stats["dropped_newest"] == 1
+    assert stats["topic_policy_override_hits"] == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_extension_loader_saturation_surfaces_pressure_with_default_thresholds():
     """Concurrent async extension loads should trigger queue wait/pressure telemetry."""
     original: dict[str, Any] = {

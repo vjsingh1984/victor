@@ -654,6 +654,26 @@ class Settings(BaseSettings):
         "plan_files",
     ]
 
+    # Generic runtime cache for non-tool payloads (feature-flagged integration path)
+    generic_result_cache_enabled: bool = False
+    generic_result_cache_ttl: int = 300  # seconds
+
+    # Shared HTTP connection pool for network tools (feature-flagged integration path)
+    http_connection_pool_enabled: bool = False
+    http_connection_pool_max_connections: int = 100
+    http_connection_pool_max_connections_per_host: int = 10
+    http_connection_pool_connection_timeout: int = 30  # seconds
+    http_connection_pool_total_timeout: int = 60  # seconds
+
+    # Startup/runtime preloading coordinator for warm-path dependencies.
+    framework_preload_enabled: bool = False
+    framework_preload_parallel: bool = True
+
+    # Strict mode for blocking private attribute fallbacks in framework integration.
+    framework_private_fallback_strict_mode: bool = False
+    # Strict mode for blocking non-registry protocol fallback probes in framework integration.
+    framework_protocol_fallback_strict_mode: bool = False
+
     # Tool Argument Validation
     # Controls pre-execution JSON Schema validation of tool arguments
     # Options: "strict" (block on errors), "lenient" (warn only), "off" (disable)
@@ -934,6 +954,24 @@ class Settings(BaseSettings):
     event_queue_maxsize: int = 10000
     event_queue_overflow_policy: str = "drop_newest"
     event_queue_overflow_block_timeout_ms: float = 50.0
+    event_queue_overflow_topic_policies: Dict[str, str] = Field(
+        default_factory=lambda: {
+            # Critical lifecycle/integration/error events should prefer bounded blocking
+            "lifecycle.session.*": "block_with_timeout",
+            "vertical.applied": "block_with_timeout",
+            "error.*": "block_with_timeout",
+            # High-volume telemetry should preserve recency and avoid hard stalls
+            "core.events.emit_sync.metrics": "drop_oldest",
+            "vertical.extensions.loader.metrics": "drop_oldest",
+        }
+    )
+    event_queue_overflow_topic_block_timeout_ms: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": 150.0,
+            "vertical.applied": 120.0,
+            "error.*": 200.0,
+        }
+    )
 
     # Sync emit metrics reporter configuration
     # Emits periodic snapshots for emit_helper delivery counters.
@@ -992,6 +1030,64 @@ class Settings(BaseSettings):
             )
         return normalized
 
+    @field_validator("event_queue_overflow_topic_policies")
+    @classmethod
+    def validate_event_queue_overflow_topic_policies(
+        cls,
+        value: Dict[str, str],
+    ) -> Dict[str, str]:
+        """Validate per-topic overflow policy overrides."""
+        if not isinstance(value, dict):
+            raise ValueError("event_queue_overflow_topic_policies must be a dict[str, str]")
+
+        allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
+        normalized: Dict[str, str] = {}
+        for topic_pattern, policy in value.items():
+            pattern = str(topic_pattern).strip()
+            if not pattern:
+                raise ValueError("event_queue_overflow_topic_policies keys must be non-empty")
+            normalized_policy = str(policy).strip().lower()
+            if normalized_policy not in allowed:
+                allowed_csv = ", ".join(sorted(allowed))
+                raise ValueError(
+                    "event_queue_overflow_topic_policies values must be one of: "
+                    f"{allowed_csv}; got '{policy}' for key '{topic_pattern}'"
+                )
+            normalized[pattern] = normalized_policy
+        return normalized
+
+    @field_validator("event_queue_overflow_topic_block_timeout_ms")
+    @classmethod
+    def validate_event_queue_overflow_topic_block_timeout_ms(
+        cls,
+        value: Dict[str, float],
+    ) -> Dict[str, float]:
+        """Validate per-topic timeout overrides for block-with-timeout policy."""
+        if not isinstance(value, dict):
+            raise ValueError(
+                "event_queue_overflow_topic_block_timeout_ms must be a dict[str, float]"
+            )
+
+        normalized: Dict[str, float] = {}
+        for topic_pattern, timeout_ms in value.items():
+            pattern = str(topic_pattern).strip()
+            if not pattern:
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms keys must be non-empty"
+                )
+            try:
+                parsed_timeout = float(timeout_ms)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms values must be numeric"
+                ) from None
+            if parsed_timeout < 0:
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms values must be >= 0"
+                )
+            normalized[pattern] = parsed_timeout
+        return normalized
+
     @model_validator(mode="after")
     def validate_extension_loader_thresholds(self) -> "Settings":
         """Validate extension-loader pressure threshold relationships."""
@@ -1019,6 +1115,16 @@ class Settings(BaseSettings):
                 "extension_loader_error_in_flight_threshold must be >= "
                 "extension_loader_warn_in_flight_threshold"
             )
+        if self.generic_result_cache_ttl < 0:
+            raise ValueError("generic_result_cache_ttl must be >= 0")
+        if self.http_connection_pool_max_connections < 1:
+            raise ValueError("http_connection_pool_max_connections must be >= 1")
+        if self.http_connection_pool_max_connections_per_host < 1:
+            raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
+        if self.http_connection_pool_connection_timeout <= 0:
+            raise ValueError("http_connection_pool_connection_timeout must be > 0")
+        if self.http_connection_pool_total_timeout <= 0:
+            raise ValueError("http_connection_pool_total_timeout must be > 0")
         return self
 
     @staticmethod

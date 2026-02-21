@@ -153,6 +153,8 @@ class TestGetObservabilityBusFactory:
             event_queue_maxsize = 42
             event_queue_overflow_policy = "drop_oldest"
             event_queue_overflow_block_timeout_ms = 33.0
+            event_queue_overflow_topic_policies = {"critical.*": "block_with_timeout"}
+            event_queue_overflow_topic_block_timeout_ms = {"critical.*": 77.0}
             event_backend_lazy_init = True
             event_emit_sync_metrics_enabled = False
             event_emit_sync_metrics_interval_seconds = 30.0
@@ -180,6 +182,8 @@ class TestGetObservabilityBusFactory:
         assert config.extra["queue_maxsize"] == 42
         assert config.extra["queue_overflow_policy"] == "drop_oldest"
         assert config.extra["queue_overflow_block_timeout_ms"] == 33.0
+        assert config.extra["queue_overflow_topic_policies"] == {"critical.*": "block_with_timeout"}
+        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {"critical.*": 77.0}
 
 
 # =============================================================================

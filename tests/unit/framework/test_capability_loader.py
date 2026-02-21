@@ -357,6 +357,58 @@ class TestLoaderOrchestratorIntegration:
         applied = orch.load_capabilities_from_loader(loader)
         assert "via_method_cap" in applied
 
+    def test_apply_to_prefers_public_register_dynamic_capability(self):
+        """Loader should use public register_dynamic_capability when available."""
+
+        class MockOrchestrator:
+            def __init__(self):
+                self.calls = []
+
+            def register_dynamic_capability(
+                self,
+                capability,
+                setter_method=None,
+                getter_method=None,
+            ):
+                self.calls.append((capability.name, setter_method, getter_method))
+                return True
+
+            def _register_capability(self, *args, **kwargs):  # pragma: no cover - guard rail
+                raise AssertionError("_register_capability should not be used")
+
+        orch = MockOrchestrator()
+        loader = CapabilityLoader()
+
+        loader.register_capability(
+            name="public_cap",
+            handler=lambda x: x,
+            capability_type=CapabilityType.TOOL,
+        )
+
+        applied = loader.apply_to(orch)
+
+        assert applied == ["public_cap"]
+        assert len(orch.calls) == 1
+        assert orch.calls[0][0] == "public_cap"
+
+    def test_apply_to_blocks_private_registration_fallback_in_strict_mode(self, monkeypatch):
+        """Strict mode should block private registration fallback paths."""
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
+
+        class LegacyOrchestrator:
+            def _register_capability(self, *args, **kwargs):
+                return None
+
+        loader = CapabilityLoader()
+        loader.register_capability(
+            name="legacy_cap",
+            handler=lambda x: x,
+            capability_type=CapabilityType.TOOL,
+        )
+
+        with pytest.raises(RuntimeError, match="Private attribute fallback blocked"):
+            loader.apply_to(LegacyOrchestrator())
+
 
 class TestContextManager:
     """Tests for context manager support."""

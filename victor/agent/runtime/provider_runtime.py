@@ -33,6 +33,8 @@ T = TypeVar("T")
 class LazyRuntimeProxy(Generic[T]):
     """Thread-safe lazy proxy for runtime components."""
 
+    _INTERNAL_ATTRS = {"_factory", "_name", "_instance", "_lock"}
+
     def __init__(self, *, factory: Callable[[], T], name: str) -> None:
         self._factory = factory
         self._name = name
@@ -58,6 +60,12 @@ class LazyRuntimeProxy(Generic[T]):
 
     def __getattr__(self, attr: str) -> Any:
         return getattr(self.get_instance(), attr)
+
+    def __setattr__(self, attr: str, value: Any) -> None:
+        if attr in self._INTERNAL_ATTRS:
+            object.__setattr__(self, attr, value)
+            return
+        setattr(self.get_instance(), attr, value)
 
 
 @dataclass(frozen=True)

@@ -462,6 +462,101 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._provider_coordinator = self._provider_runtime.provider_coordinator
         self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
 
+    def _initialize_memory_runtime(self) -> None:
+        """Initialize memory/session runtime boundaries."""
+        from victor.agent.runtime.memory_runtime import create_memory_runtime_components
+
+        self._memory_runtime = create_memory_runtime_components(
+            factory=self._factory,
+            provider_name=self.provider_name,
+            native_tool_calls=self.tool_calling_caps.native_tool_calls,
+        )
+        self.memory_manager = self._memory_runtime.memory_manager
+        self._memory_session_id = self._memory_runtime.memory_session_id
+
+        # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled.
+        if self.memory_manager and getattr(self.settings, "conversation_embeddings_enabled", True):
+            try:
+                self._init_conversation_embedding_store()
+            except ImportError as embed_err:
+                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
+            except (OSError, IOError) as embed_err:
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
+                )
+            except (ValueError, TypeError) as embed_err:
+                logger.warning(
+                    f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}"
+                )
+
+    def _initialize_metrics_runtime(self) -> None:
+        """Initialize metrics/analytics runtime boundaries."""
+        from victor.agent.runtime.metrics_runtime import create_metrics_runtime_components
+
+        self._metrics_runtime = create_metrics_runtime_components(
+            factory=self._factory,
+            provider=self.provider,
+            model=self.model,
+            debug_logger=self.debug_logger,
+            cumulative_token_usage=self._cumulative_token_usage,
+            tool_cost_lookup=lambda name: (
+                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
+            ),
+        )
+        self.usage_logger = self._metrics_runtime.usage_logger
+        self.streaming_metrics_collector = self._metrics_runtime.streaming_metrics_collector
+        self._metrics_collector = self._metrics_runtime.metrics_collector
+        self._session_cost_tracker = self._metrics_runtime.session_cost_tracker
+        self._metrics_coordinator = self._metrics_runtime.metrics_coordinator
+
+        self.usage_logger.log_event(
+            "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
+        )
+        if self.streaming_metrics_collector:
+            logger.info("StreamingMetricsCollector initialized via runtime boundary")
+
+    def _initialize_workflow_runtime(self) -> None:
+        """Initialize workflow runtime boundaries with lazy registry loading."""
+        from victor.agent.runtime.workflow_runtime import create_workflow_runtime_components
+
+        self._workflow_runtime = create_workflow_runtime_components(factory=self._factory)
+        self._workflow_registry = self._workflow_runtime.workflow_registry
+
+    def _initialize_coordination_runtime(self) -> None:
+        """Initialize coordination runtime boundaries with lazy components."""
+        from victor.agent.runtime.coordination_runtime import (
+            create_coordination_runtime_components,
+        )
+
+        self._coordination_runtime = create_coordination_runtime_components(factory=self._factory)
+        self._recovery_coordinator = self._coordination_runtime.recovery_coordinator
+        self._chunk_generator = self._coordination_runtime.chunk_generator
+        self._tool_planner = self._coordination_runtime.tool_planner
+        self._task_coordinator = self._coordination_runtime.task_coordinator
+
+    def _initialize_interaction_runtime(self) -> None:
+        """Initialize interaction runtime boundaries for chat/tool/session coordinators."""
+        from victor.agent.runtime.interaction_runtime import (
+            create_interaction_runtime_components,
+        )
+
+        self._interaction_runtime = create_interaction_runtime_components(
+            orchestrator=self,
+            tool_pipeline=self._tool_pipeline,
+            tool_registry=self.tools,
+            tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
+            tool_access_controller=getattr(self, "_tool_access_controller", None),
+            mode_controller=self.mode_controller if hasattr(self, "mode_controller") else None,
+            session_state_manager=self._session_state,
+            lifecycle_manager=self._lifecycle_manager,
+            memory_manager=self.memory_manager,
+            checkpoint_manager=self._checkpoint_manager,
+            cost_tracker=self._session_cost_tracker,
+        )
+        self._chat_coordinator = self._interaction_runtime.chat_coordinator
+        self._tool_coordinator = self._interaction_runtime.tool_coordinator
+        self._session_coordinator = self._interaction_runtime.session_coordinator
+
     def __init__(
         self,
         settings: Settings,
@@ -597,19 +692,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_budget=self.tool_budget,
         )
 
-        # Analytics - usage logger with DI support (via factory)
-        self.usage_logger = self._factory.create_usage_logger()
-        self.usage_logger.log_event(
-            "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
-        )
-
-        # Streaming metrics collector for performance monitoring (via factory)
-        self.streaming_metrics_collector = self._factory.create_streaming_metrics_collector()
-        if self.streaming_metrics_collector:
-            logger.info("StreamingMetricsCollector initialized via factory")
-
         # Debug logger for incremental output and conversation tracking (via factory)
         self.debug_logger = self._factory.create_debug_logger_configured()
+
+        # Metrics/analytics runtime boundary with lazy collector/coordinator loading.
+        self._initialize_metrics_runtime()
 
         # Cancellation support for streaming
         self._cancel_event: Optional[asyncio.Event] = None
@@ -617,33 +704,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Background task tracking for graceful shutdown
         self._background_tasks: set[asyncio.Task] = set()
-
-        # Metrics collection (via factory)
-        self._metrics_collector = self._factory.create_metrics_collector(
-            streaming_metrics_collector=self.streaming_metrics_collector,
-            usage_logger=self.usage_logger,
-            debug_logger=self.debug_logger,
-            tool_cost_lookup=lambda name: (
-                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
-            ),
-        )
-
-        # Session cost tracking (for LLM API cost monitoring)
-        from victor.agent.session_cost_tracker import SessionCostTracker
-
-        self._session_cost_tracker = SessionCostTracker(
-            provider=self.provider.name,
-            model=self.model,
-        )
-
-        # Metrics coordinator (Phase 2 refactoring - aggregates metrics/cost/token tracking)
-        from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
-
-        self._metrics_coordinator = MetricsCoordinator(
-            metrics_collector=self._metrics_collector,
-            session_cost_tracker=self._session_cost_tracker,
-            cumulative_token_usage=self._cumulative_token_usage,
-        )
 
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
@@ -655,33 +715,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Code execution manager for Docker-based code execution (via factory, DI with fallback)
         self.code_manager = self._factory.create_code_execution_manager()
 
-        # Workflow registry (via factory, DI with fallback)
-        self.workflow_registry = self._factory.create_workflow_registry()
-        self._register_default_workflows()
+        # Workflow runtime boundary (lazy registry + default workflow registration).
+        self._initialize_workflow_runtime()
 
         # Conversation history (via factory) - MessageHistory for better encapsulation
         self.conversation = self._factory.create_message_history(self._system_prompt)
 
-        # Persistent conversation memory with SQLite backing (via factory)
-        # Provides session recovery, token-aware pruning, and multi-turn context retention
-        self.memory_manager, self._memory_session_id = self._factory.create_memory_components(
-            self.provider_name, self.tool_calling_caps.native_tool_calls
-        )
-
-        # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled
-        if self.memory_manager and getattr(settings, "conversation_embeddings_enabled", True):
-            try:
-                self._init_conversation_embedding_store()
-            except ImportError as embed_err:
-                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
-            except (OSError, IOError) as embed_err:
-                logger.warning(
-                    f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
-                )
-            except (ValueError, TypeError) as embed_err:
-                logger.warning(
-                    f"Failed to initialize ConversationEmbeddingStore (config error): {embed_err}"
-                )
+        # Memory/session runtime boundary with embedding-store initialization.
+        self._initialize_memory_runtime()
 
         # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
         self.conversation_state = self._factory.create_conversation_state_machine()
@@ -758,6 +799,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.use_semantic_selection, self._embedding_preload_task = (
             self._factory.setup_semantic_selection()
         )
+        self._runtime_preload_task: Optional[asyncio.Task] = None
         self.semantic_selector = self._factory.create_semantic_selector()
 
         # Initialize UnifiedTaskTracker (via factory, DI with fallback)
@@ -919,21 +961,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._recovery_handler
         )
 
-        # Initialize RecoveryCoordinator for centralized recovery logic (via factory, DI)
-        # Consolidates all recovery/error handling methods from orchestrator
-        self._recovery_coordinator = self._factory.create_recovery_coordinator()
-
-        # Initialize ChunkGenerator for centralized chunk generation (via factory, DI)
-        # Consolidates all chunk generation methods from orchestrator
-        self._chunk_generator = self._factory.create_chunk_generator()
-
-        # Initialize ToolPlanner for centralized tool planning (via factory, DI)
-        # Consolidates all tool planning methods from orchestrator
-        self._tool_planner = self._factory.create_tool_planner()
-
-        # Initialize TaskCoordinator for centralized task coordination (via factory, DI)
-        # Consolidates task preparation, intent detection, and guidance methods
-        self._task_coordinator = self._factory.create_task_coordinator()
+        # Coordination runtime boundary: defer recovery/chunk/planner/task coordinators.
+        self._initialize_coordination_runtime()
 
         # Initialize ObservabilityIntegration for unified event bus (via factory)
         self._observability = self._factory.create_observability()
@@ -972,38 +1001,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Lazy initialization pattern - coordinator is created on first access
         self._mode_workflow_team_coordinator: Optional[Any] = None
 
-        # Initialize ChatCoordinator for delegated chat/stream_chat operations
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-
-        self._chat_coordinator = ChatCoordinator(self)
-
-        # Initialize ToolCoordinator for delegated tool access operations
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator as _ToolCoordinator
-
-        self._tool_coordinator = _ToolCoordinator(
-            tool_pipeline=self._tool_pipeline,
-            tool_registry=self.tools,
-            tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
-            tool_access_controller=getattr(self, "_tool_access_controller", None),
-        )
-        self._tool_coordinator.set_mode_controller(
-            self.mode_controller if hasattr(self, "mode_controller") else None
-        )
-        self._tool_coordinator.set_orchestrator_reference(self)
-
-        # Initialize SessionCoordinator for delegated session management
-        from victor.agent.coordinators.session_coordinator import (
-            SessionCoordinator as _SessionCoordinator,
-            create_session_coordinator,
-        )
-
-        self._session_coordinator = create_session_coordinator(
-            session_state_manager=self._session_state,
-            lifecycle_manager=self._lifecycle_manager,
-            memory_manager=self.memory_manager,
-            checkpoint_manager=self._checkpoint_manager,
-            cost_tracker=self._session_cost_tracker,
-        )
+        # Interaction runtime boundary: lazily materialize chat/tool/session coordinators.
+        self._initialize_interaction_runtime()
 
         # Initialize capability registry for explicit capability discovery
         # This replaces hasattr duck-typing with type-safe protocol conformance
@@ -1130,6 +1129,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._tool_pipeline
 
     @property
+    def workflow_registry(self) -> Any:
+        """Get workflow registry, materializing lazy runtime on first access."""
+        registry = getattr(self, "_workflow_registry", None)
+        if hasattr(registry, "get_instance"):
+            resolved = registry.get_instance()
+            self._workflow_registry = resolved
+            return resolved
+        return registry
+
+    @workflow_registry.setter
+    def workflow_registry(self, value: Any) -> None:
+        """Set workflow registry (supports test overrides)."""
+        self._workflow_registry = value
+
+    @property
     def streaming_controller(self) -> "StreamingController":
         """Get the streaming controller component.
 
@@ -1193,6 +1207,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_service_container(self) -> Any:
         """Get the DI service container via explicit port method."""
         return self._container
+
+    def get_capability_config_scope_key(self) -> Optional[str]:
+        """Get stable scope key for framework capability-config service storage."""
+        if self.active_session_id:
+            normalized_active = str(self.active_session_id).strip()
+            if normalized_active:
+                return normalized_active
+
+        memory_session_id = getattr(self, "_memory_session_id", None)
+        if memory_session_id:
+            normalized_memory = str(memory_session_id).strip()
+            if normalized_memory:
+                return normalized_memory
+
+        return f"orchestrator:{id(self)}"
 
     def get_capability_loader(self) -> Optional[Any]:
         """Get the cached framework CapabilityLoader if available."""
@@ -1610,6 +1639,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._vertical_context
 
+    def get_vertical_context(self) -> VerticalContext:
+        """Get vertical context via explicit protocol getter."""
+        return self._vertical_context
+
     @property
     def coordination(self) -> Any:
         """Get the mode-workflow-team coordinator (lazy initialization).
@@ -1986,6 +2019,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return getattr(self, "_middleware_chain", None)
 
+    def set_middleware_chain(self, chain: Any) -> None:
+        """Store middleware chain via public runtime port."""
+        self._middleware_chain = chain
+
     # =========================================================================
     # Internal Storage Setters (DIP Compliance)
     # These methods provide controlled access for adapter implementations,
@@ -2002,7 +2039,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Args:
             middleware: List of middleware instances
         """
-        self._vertical_middleware = middleware
+        self.set_middleware(middleware)
 
     def _set_middleware_chain_storage(self, chain: Any) -> None:
         """Internal: Set middleware chain storage.
@@ -2013,7 +2050,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Args:
             chain: MiddlewareChain instance
         """
-        self._middleware_chain = chain
+        self.set_middleware_chain(chain)
 
     def _set_safety_patterns_storage(self, patterns: List[Any]) -> None:
         """Internal: Set safety patterns storage.
@@ -2024,7 +2061,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Args:
             patterns: List of safety pattern instances
         """
-        self._vertical_safety_patterns = patterns
+        self.set_safety_patterns(patterns)
 
     # =========================================================================
     # VerticalStorageProtocol Implementation (DIP Compliance)
@@ -2170,9 +2207,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize embedding store. Delegates to SessionCoordinator."""
-        from victor.agent.coordinators.session_coordinator import SessionCoordinator
+        from victor.agent.runtime.memory_runtime import initialize_conversation_embedding_store
 
-        store, cache = SessionCoordinator.init_conversation_embedding_store(
+        store, cache = initialize_conversation_embedding_store(
             memory_manager=self.memory_manager,
         )
         self._conversation_embedding_store = store
@@ -2313,12 +2350,90 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"No event loop available for background task: {name}")
             return None
 
+    async def _run_runtime_preload(self) -> None:
+        """Run feature-flagged runtime preload tasks via PreloadManager."""
+        from victor.framework.preload import (
+            PreloadManager,
+            PreloadPriority,
+            preload_configuration,
+        )
+
+        preload_manager = PreloadManager(
+            enable_parallel=bool(getattr(self.settings, "framework_preload_parallel", True))
+        )
+        preload_manager.add_task(
+            "configuration",
+            preload_configuration,
+            priority=PreloadPriority.CRITICAL.value,
+            required=False,
+        )
+
+        if self.use_semantic_selection:
+            preload_manager.add_task(
+                "tool_embeddings",
+                self._preload_embeddings,
+                priority=PreloadPriority.HIGH.value,
+                required=False,
+            )
+
+        if getattr(self.settings, "http_connection_pool_enabled", False):
+
+            async def _preload_http_pool() -> None:
+                from victor.tools.http_pool import ConnectionPoolConfig, get_http_pool
+
+                await get_http_pool(
+                    ConnectionPoolConfig(
+                        max_connections=int(
+                            getattr(self.settings, "http_connection_pool_max_connections", 100)
+                        ),
+                        max_connections_per_host=int(
+                            getattr(self.settings, "http_connection_pool_max_connections_per_host", 10)
+                        ),
+                        connection_timeout=int(
+                            getattr(self.settings, "http_connection_pool_connection_timeout", 30)
+                        ),
+                        total_timeout=int(
+                            getattr(self.settings, "http_connection_pool_total_timeout", 60)
+                        ),
+                    )
+                )
+
+            preload_manager.add_task(
+                "http_pool",
+                _preload_http_pool,
+                priority=PreloadPriority.HIGH.value,
+                required=False,
+            )
+
+        if not preload_manager.list_tasks():
+            return
+
+        if getattr(self.settings, "framework_preload_parallel", True):
+            stats = await preload_manager.preload_parallel()
+        else:
+            stats = await preload_manager.preload_all()
+        logger.info(
+            "Runtime preload completed: %s/%s tasks in %.2fs",
+            stats.completed_tasks,
+            stats.total_tasks,
+            stats.duration,
+        )
+
     def start_embedding_preload(self) -> None:
         """Start background embedding preload task.
 
         Should be called after orchestrator initialization to avoid blocking
         the main thread. Safe to call multiple times (no-op if already started).
         """
+        if getattr(self.settings, "framework_preload_enabled", False):
+            if self._runtime_preload_task is not None:
+                return
+            task = self._create_background_task(self._run_runtime_preload(), name="runtime_preload")
+            if task:
+                self._runtime_preload_task = task
+                logger.info("Started runtime preload task")
+            return
+
         if not self.use_semantic_selection or self._embedding_preload_task:
             return
 

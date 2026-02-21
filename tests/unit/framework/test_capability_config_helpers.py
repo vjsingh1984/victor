@@ -5,8 +5,11 @@
 
 """Unit tests for shared capability config helper utilities."""
 
+import pytest
+
 from victor.framework.capability_config_helpers import (
     load_capability_config,
+    resolve_capability_config_scope_key,
     resolve_capability_config_service,
     store_capability_config,
     update_capability_config_section,
@@ -32,6 +35,15 @@ class _ServiceBackedOrchestrator:
         return self._container
 
 
+class _ScopedServiceBackedOrchestrator(_ServiceBackedOrchestrator):
+    def __init__(self, service, scope_key: str):
+        super().__init__(service)
+        self._scope_key = scope_key
+
+    def get_capability_config_scope_key(self):
+        return self._scope_key
+
+
 class _FallbackOrchestrator:
     def __init__(self):
         self.existing_config = {"value": 1}
@@ -55,6 +67,22 @@ class TestCapabilityConfigHelpers:
 
         assert stored_in_service is True
         assert loaded == {"x": 1}
+
+    def test_resolve_scope_key_uses_port_when_available(self):
+        service = CapabilityConfigService()
+        orchestrator = _ScopedServiceBackedOrchestrator(service, "session-123")
+        assert resolve_capability_config_scope_key(orchestrator) == "session-123"
+
+    def test_store_and_load_are_scope_isolated(self):
+        service = CapabilityConfigService()
+        orchestrator_a = _ScopedServiceBackedOrchestrator(service, "session-a")
+        orchestrator_b = _ScopedServiceBackedOrchestrator(service, "session-b")
+
+        store_capability_config(orchestrator_a, "alpha", {"x": 1})
+        store_capability_config(orchestrator_b, "alpha", {"x": 9})
+
+        assert load_capability_config(orchestrator_a, "alpha", {"x": 0}) == {"x": 1}
+        assert load_capability_config(orchestrator_b, "alpha", {"x": 0}) == {"x": 9}
 
     def test_load_uses_legacy_service_name_when_present(self):
         service = CapabilityConfigService()
@@ -108,3 +136,27 @@ class TestCapabilityConfigHelpers:
             "retrieval": {"top_k": 8},
         }
 
+    def test_load_private_fallback_blocked_in_strict_mode(self, monkeypatch):
+        orchestrator = _FallbackOrchestrator()
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
+
+        with pytest.raises(RuntimeError):
+            load_capability_config(
+                orchestrator,
+                "private_config",
+                {"enabled": True},
+                fallback_attr="_private_config",
+            )
+
+    def test_store_private_fallback_blocked_in_strict_mode(self, monkeypatch):
+        orchestrator = _FallbackOrchestrator()
+        monkeypatch.setenv("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "true")
+
+        with pytest.raises(RuntimeError):
+            store_capability_config(
+                orchestrator,
+                "private_config",
+                {"enabled": True},
+                fallback_attr="_private_config",
+                require_existing_attr=False,
+            )

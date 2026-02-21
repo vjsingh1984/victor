@@ -603,6 +603,15 @@ class ServiceContainerPortProtocol(Protocol):
 
 
 @runtime_checkable
+class CapabilityConfigScopePortProtocol(Protocol):
+    """Protocol for orchestrators exposing capability-config scope identity."""
+
+    def get_capability_config_scope_key(self) -> Optional[str]:
+        """Return stable capability-config scope key for this orchestrator/session."""
+        ...
+
+
+@runtime_checkable
 class CapabilityLoaderPortProtocol(Protocol):
     """Protocol for orchestrators exposing capability loader lifecycle."""
 

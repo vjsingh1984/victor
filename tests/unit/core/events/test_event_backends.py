@@ -25,6 +25,7 @@ Run with: pytest tests/unit/core/events/test_event_backends.py -v
 """
 
 import asyncio
+import time
 from typing import List
 
 import pytest
@@ -391,6 +392,51 @@ class TestInMemoryEventBackend:
         assert sink_records == [("test.drop", "drop_newest")]
         pressure = backend.get_queue_pressure_stats()
         assert pressure["stats"]["durable_sink_success"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_topic_policy_override_block_with_timeout(self):
+        """Topic policy override should apply block-with-timeout on queue pressure."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "queue_overflow_topic_policies": {"critical.*": "block_with_timeout"},
+                "queue_overflow_topic_block_timeout_ms": {"critical.*": 20},
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="noncritical.full", data={})) is True
+        t0 = time.perf_counter()
+        result = await backend.publish(MessagingEvent(topic="critical.timeout", data={}))
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+        assert result is False
+        assert elapsed_ms >= 12.0
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["blocked_timeout"] == 1
+        assert pressure["stats"]["topic_policy_override_hits"] == 1
+
+    @pytest.mark.asyncio
+    async def test_queue_overflow_topic_policy_override_drop_oldest(self):
+        """Topic policy override should apply drop_oldest even when default differs."""
+        config = BackendConfig(
+            extra={
+                "queue_overflow_policy": "drop_newest",
+                "queue_overflow_topic_policies": {"critical.*": "drop_oldest"},
+            }
+        )
+        backend = InMemoryEventBackend(config=config, queue_maxsize=1)
+        backend._is_connected = True
+
+        assert await backend.publish(MessagingEvent(topic="baseline.keep", data={"v": 1})) is True
+        assert await backend.publish(MessagingEvent(topic="critical.new", data={"v": 2})) is True
+
+        queued = backend._event_queue.get_nowait()
+        assert queued.topic == "critical.new"
+        pressure = backend.get_queue_pressure_stats()
+        assert pressure["stats"]["dropped_oldest"] == 1
+        assert pressure["stats"]["topic_policy_override_hits"] == 1
 
 
 # =============================================================================
@@ -834,6 +880,8 @@ class TestBackendConfig:
             event_queue_maxsize = 64
             event_queue_overflow_policy = "drop_oldest"
             event_queue_overflow_block_timeout_ms = 12.5
+            event_queue_overflow_topic_policies = {"critical.*": "block_with_timeout"}
+            event_queue_overflow_topic_block_timeout_ms = {"critical.*": 90.0}
 
         config = build_backend_config_from_settings(_Settings())
 
@@ -844,6 +892,8 @@ class TestBackendConfig:
         assert config.extra["queue_maxsize"] == 64
         assert config.extra["queue_overflow_policy"] == "drop_oldest"
         assert config.extra["queue_overflow_block_timeout_ms"] == 12.5
+        assert config.extra["queue_overflow_topic_policies"] == {"critical.*": "block_with_timeout"}
+        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {"critical.*": 90.0}
 
 
 # =============================================================================

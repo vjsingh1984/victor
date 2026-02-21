@@ -240,6 +240,56 @@ class MLXProvider(BaseProvider):
         """
         return _model_supports_tools(self.model_path)
 
+    @property
+    def name(self) -> str:
+        """Provider name.
+
+        Returns:
+            Provider identifier
+        """
+        return "mlx"
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        """Send a chat completion request.
+
+        Args:
+            messages: List of conversation messages
+            model: Model identifier
+            temperature: Sampling temperature (0-2)
+            max_tokens: Maximum tokens to generate
+            tools: Available tools for the model to use
+            **kwargs: Additional provider-specific parameters
+
+        Returns:
+            CompletionResponse with generated content
+        """
+        return await self._make_request(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            **kwargs,
+        )
+
+    async def close(self) -> None:
+        """Close any open connections or resources.
+
+        For MLX, this just releases model references to allow GC.
+        """
+        self._model = None
+        self._tokenizer = None
+        logger.debug(f"MLX provider resources released for model: {self.model_path}")
+
     async def _make_request(
         self,
         messages: List[Message],

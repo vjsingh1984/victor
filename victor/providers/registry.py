@@ -437,7 +437,10 @@ def _register_default_providers() -> None:
         class_name="CerebrasProvider",
     )
 
-    # Local backends (hardware/runtime dependent: CUDA/ROCm/CPU/MPS)
+    # Local backends (hardware/runtime dependent: CUDA/ROCm/CPU/MPS).
+    # Keep these lazy-only without hardware preflight because they are
+    # OpenAI-compatible server adapters (local or remote endpoints), not
+    # in-process runtime initializers.
     _register_lazy_provider(
         ["vllm"],
         module_path="victor.providers.vllm_provider",

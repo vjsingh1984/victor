@@ -39,6 +39,8 @@ CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
     "default_budget": "set_default_budget",
     # Prompt capabilities
     "custom_prompt": "set_custom_prompt",
+    # Exposes prompt builder object for legacy/public fallback paths
+    "prompt_builder": "prompt_builder",
     "prompt_section": "add_prompt_section",
     "task_type_hints": "set_task_type_hints",
     # Safety capabilities

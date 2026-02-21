@@ -96,6 +96,60 @@ jobs:
           python -c "from victor.framework import Agent; print('✓ Agent imports')"
           python -c "from victor.framework.graph import StateGraph; print('✓ StateGraph imports')"
 
+      - name: Startup KPI Guardrails
+        env:
+          GENERIC_RESULT_CACHE_ENABLED: "1"
+          HTTP_CONNECTION_POOL_ENABLED: "1"
+          FRAMEWORK_PRELOAD_ENABLED: "1"
+        run: |
+          python scripts/benchmark_startup_kpi.py \
+            --iterations 3 \
+            --provider ollama \
+            --model qwen3-coder:30b \
+            --activation-vertical coding \
+            --max-import-cold-ms 5000 \
+            --max-import-warm-mean-ms 25 \
+            --max-agent-create-cold-ms 5000 \
+            --max-agent-create-warm-mean-ms 1500 \
+            --max-activation-cold-ms 5000 \
+            --max-activation-warm-mean-ms 2000 \
+            --min-framework-registry-attempted-total 10 \
+            --min-framework-registry-applied-total 10 \
+            --require-generic-result-cache-enabled \
+            --require-http-connection-pool-enabled \
+            --require-framework-preload-enabled
+
+  strict-fallback-guards:
+    name: Strict Fallback Guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      - name: Enforce strict fallback guards on focused suites
+        run: |
+          VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS=1 pytest \
+            tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_check_capability_fallback_blocked_in_protocol_strict_mode \
+            tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_invoke_capability_fallback_blocked_in_protocol_strict_mode \
+            tests/unit/framework/test_vertical_integration.py::TestIntegrationPlanCache::test_state_snapshot_getter_fallback_blocked_in_protocol_strict_mode \
+            -q
+          VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS=1 pytest \
+            tests/unit/framework/test_capability_config_helpers.py::TestCapabilityConfigHelpers::test_load_private_fallback_blocked_in_strict_mode \
+            tests/unit/framework/test_capability_config_helpers.py::TestCapabilityConfigHelpers::test_store_private_fallback_blocked_in_strict_mode \
+            tests/unit/framework/test_capability_loader.py::TestLoaderOrchestratorIntegration::test_apply_to_blocks_private_registration_fallback_in_strict_mode \
+            -q
+
   guards:
     name: CI Guards
     runs-on: ubuntu-latest

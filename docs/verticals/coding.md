@@ -198,7 +198,7 @@ from victor.coding.assistant import CodingAssistant
 prompt = CodingAssistant.get_system_prompt()
 
 # Get tiered tool configuration
-tiered_tools = CodingAssistant.get_tiered_tools()
+tiered_tools = CodingAssistant.get_tiered_tool_config()
 
 # Access capability provider
 capabilities = CodingAssistant.get_capability_provider()

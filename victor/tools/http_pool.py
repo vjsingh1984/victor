@@ -319,13 +319,12 @@ class HttpConnectionPool:
 
         try:
             session = await self.session()
-            async with session.request(method, url, **kwargs) as response:
-                # Update stats
-                if self._config.enable_stats:
-                    request_time = time.time() - start_time
-                    await self._update_request_stats(url, response.status, request_time)
-
-                return response
+            response = await session.request(method, url, **kwargs)
+            # Update stats
+            if self._config.enable_stats:
+                request_time = time.time() - start_time
+                await self._update_request_stats(url, response.status, request_time)
+            return response
         finally:
             if self._config.enable_stats:
                 async with self._stats_lock:
