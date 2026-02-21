@@ -1494,7 +1494,9 @@ class FrameworkStepHandler(BaseStepHandler):
             else:
                 # Compatibility path for orchestrators that expose the same public methods
                 # but do not explicitly satisfy the runtime protocol check.
-                get_or_create_loader = getattr(orchestrator, "get_or_create_capability_loader", None)
+                get_or_create_loader = getattr(
+                    orchestrator, "get_or_create_capability_loader", None
+                )
                 if callable(get_or_create_loader):
                     loader = get_or_create_loader()
 
@@ -2027,7 +2029,9 @@ class ExtensionsStepHandler(BaseStepHandler):
                 return
 
             if not vertical_name:
-                result.add_warning("Cannot register vertical services: missing vertical context name")
+                result.add_warning(
+                    "Cannot register vertical services: missing vertical context name"
+                )
                 return
 
             try:

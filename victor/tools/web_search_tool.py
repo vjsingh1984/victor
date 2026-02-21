@@ -134,7 +134,9 @@ async def _request_text(
             if AIOHTTP_AVAILABLE:
                 pool = await get_http_pool(
                     ConnectionPoolConfig(
-                        max_connections=int(config.get("http_connection_pool_max_connections", 100)),
+                        max_connections=int(
+                            config.get("http_connection_pool_max_connections", 100)
+                        ),
                         max_connections_per_host=int(
                             config.get("http_connection_pool_max_connections_per_host", 10)
                         ),
@@ -396,7 +398,9 @@ async def web_search(
 
         # Parse results
         results = _parse_ddg_results(payload, max_results)
-        logger.info(f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}")
+        logger.info(
+            f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}"
+        )
         if results:
             sample_urls = [r.get("url", "") for r in results[:5]]
             logger.info(f"[web_search] top URLs: {sample_urls}")
@@ -445,7 +449,9 @@ async def web_fetch(url: str, context: Optional[Dict[str, Any]] = None) -> Dict[
 
     config = _get_web_config(context)
     cache: Optional[GenericResultCache] = None
-    cache_params = {"max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))}
+    cache_params = {
+        "max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))
+    }
     if config.get("generic_result_cache_enabled"):
         cache = _get_generic_web_cache(int(config.get("generic_result_cache_ttl", 300)))
         cached_result = cache.get(ResultType.SEARCH, f"fetch:{url}", cache_params)

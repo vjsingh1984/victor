@@ -22,7 +22,9 @@ from victor.framework.strict_mode import ensure_not_private_fallback
 def resolve_capability_config_service(orchestrator: Any) -> Optional[CapabilityConfigService]:
     """Resolve framework CapabilityConfigService via orchestrator container port."""
     get_container = getattr(orchestrator, "get_service_container", None)
-    container = get_container() if callable(get_container) else getattr(orchestrator, "container", None)
+    container = (
+        get_container() if callable(get_container) else getattr(orchestrator, "container", None)
+    )
     if container is None or not hasattr(container, "get_optional"):
         return None
 

@@ -336,12 +336,11 @@ class ProfileConfig(BaseSettings):
     # -------------------------------------------------------------------------
 
     planning_provider: Optional[str] = Field(
-        None,
-        description="Override provider for planning (e.g., 'deepseek', 'anthropic')"
+        None, description="Override provider for planning (e.g., 'deepseek', 'anthropic')"
     )
     planning_model: Optional[str] = Field(
         None,
-        description="Override model for planning tasks (e.g., 'deepseek-chat', 'claude-sonnet-4-5')"
+        description="Override model for planning tasks (e.g., 'deepseek-chat', 'claude-sonnet-4-5')",
     )
 
     # -------------------------------------------------------------------------
@@ -1082,9 +1081,7 @@ class Settings(BaseSettings):
                     "event_queue_overflow_topic_block_timeout_ms values must be numeric"
                 ) from None
             if parsed_timeout < 0:
-                raise ValueError(
-                    "event_queue_overflow_topic_block_timeout_ms values must be >= 0"
-                )
+                raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
             normalized[pattern] = parsed_timeout
         return normalized
 
@@ -1099,10 +1096,7 @@ class Settings(BaseSettings):
             raise ValueError("extension_loader_pressure_cooldown_seconds must be >= 0")
         if self.extension_loader_metrics_reporter_interval_seconds <= 0:
             raise ValueError("extension_loader_metrics_reporter_interval_seconds must be > 0")
-        if (
-            self.extension_loader_error_queue_threshold
-            < self.extension_loader_warn_queue_threshold
-        ):
+        if self.extension_loader_error_queue_threshold < self.extension_loader_warn_queue_threshold:
             raise ValueError(
                 "extension_loader_error_queue_threshold must be >= "
                 "extension_loader_warn_queue_threshold"

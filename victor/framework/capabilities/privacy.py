@@ -50,7 +50,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capability_config_helpers import load_capability_config, store_capability_config
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+)
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -61,6 +64,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Capability Config Helpers (P1: Framework CapabilityConfigService Migration)
 # =============================================================================
+
 
 def _store_config(orchestrator: Any, name: str, config: Dict[str, Any]) -> None:
     """Store config in framework service when available, else fallback to orchestrator attr."""

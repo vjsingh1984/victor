@@ -173,7 +173,9 @@ class ToolConfig:
         self.generic_result_cache_ttl = generic_result_cache_ttl
         self.http_connection_pool_enabled = http_connection_pool_enabled
         self.http_connection_pool_max_connections = http_connection_pool_max_connections
-        self.http_connection_pool_max_connections_per_host = http_connection_pool_max_connections_per_host
+        self.http_connection_pool_max_connections_per_host = (
+            http_connection_pool_max_connections_per_host
+        )
         self.http_connection_pool_connection_timeout = http_connection_pool_connection_timeout
         self.http_connection_pool_total_timeout = http_connection_pool_total_timeout
 

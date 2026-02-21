@@ -157,10 +157,10 @@ class TestSettings:
         assert settings.event_queue_maxsize == 10000
         assert settings.event_queue_overflow_policy == "drop_newest"
         assert settings.event_queue_overflow_block_timeout_ms == 50.0
-        assert settings.event_queue_overflow_topic_policies["vertical.applied"] == "block_with_timeout"
         assert (
-            settings.event_queue_overflow_topic_block_timeout_ms["lifecycle.session.*"] == 150.0
+            settings.event_queue_overflow_topic_policies["vertical.applied"] == "block_with_timeout"
         )
+        assert settings.event_queue_overflow_topic_block_timeout_ms["lifecycle.session.*"] == 150.0
         assert settings.extension_loader_warn_queue_threshold == 24
         assert settings.extension_loader_error_queue_threshold == 32
         assert settings.extension_loader_warn_in_flight_threshold == 6

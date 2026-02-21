@@ -117,7 +117,9 @@ jobs:
             --min-framework-registry-applied-total 10 \
             --require-generic-result-cache-enabled \
             --require-http-connection-pool-enabled \
-            --require-framework-preload-enabled
+            --require-framework-preload-enabled \
+            --require-coordination-runtime-lazy \
+            --require-interaction-runtime-lazy
 
   strict-fallback-guards:
     name: Strict Fallback Guards

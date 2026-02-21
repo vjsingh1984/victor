@@ -853,22 +853,22 @@ class CodebaseAnalyzer:
 
         # Regular Python imports
         # import module
-        imports.extend(re.findall(r'^import\s+(\S+)', content, re.MULTILINE))
+        imports.extend(re.findall(r"^import\s+(\S+)", content, re.MULTILINE))
         # from module import ...
-        imports.extend(re.findall(r'^from\s+(\S+)\s+import', content, re.MULTILINE))
+        imports.extend(re.findall(r"^from\s+(\S+)\s+import", content, re.MULTILINE))
 
         # Databricks-specific patterns
         # %run /path/to/notebook or %run ../path/to/module
-        run_matches = re.findall(r'%run\s+(\S+)', content)
+        run_matches = re.findall(r"%run\s+(\S+)", content)
         for match in run_matches:
             # Extract module name from path
             # e.g., "../include/library/a.utils/import" -> "include.library.a.utils.import"
             parts = Path(match).parts
-            if parts and parts[-1].endswith('.py'):
+            if parts and parts[-1].endswith(".py"):
                 # Remove .py extension
                 parts = parts[:-1]
             if parts:
-                imports.append('.'.join(parts))
+                imports.append(".".join(parts))
 
         # Dynamic imports
         # importlib.import_module("module.name")
@@ -2298,8 +2298,8 @@ async def generate_victor_md_from_index(
         loc = enhanced_info.loc_stats
 
         # Overall totals
-        total_lines = loc.get('total_lines', 0)
-        total_files = loc.get('total_files', 0)
+        total_lines = loc.get("total_lines", 0)
+        total_files = loc.get("total_files", 0)
         stats_line = f"- **{total_lines:,}** lines of code across **{total_files}** files"
 
         if enhanced_info.test_coverage is not None:

@@ -40,6 +40,10 @@ from victor.agent.runtime.interaction_runtime import (
     InteractionRuntimeComponents,
     create_interaction_runtime_components,
 )
+from victor.agent.runtime.resilience_runtime import (
+    ResilienceRuntimeComponents,
+    create_resilience_runtime_components,
+)
 
 __all__ = [
     "MemoryRuntimeComponents",
@@ -47,6 +51,7 @@ __all__ = [
     "LazyRuntimeProxy",
     "CoordinationRuntimeComponents",
     "InteractionRuntimeComponents",
+    "ResilienceRuntimeComponents",
     "ProviderRuntimeComponents",
     "WorkflowRuntimeComponents",
     "create_coordination_runtime_components",
@@ -54,6 +59,7 @@ __all__ = [
     "create_memory_runtime_components",
     "create_metrics_runtime_components",
     "create_provider_runtime_components",
+    "create_resilience_runtime_components",
     "create_workflow_runtime_components",
     "initialize_conversation_embedding_store",
 ]

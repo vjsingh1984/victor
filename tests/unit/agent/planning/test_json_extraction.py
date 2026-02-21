@@ -56,15 +56,7 @@ class TestExtractLLMResponseContent:
 
     def test_dict_response_with_openai_choices(self):
         """Test extracting content from OpenAI-style choices format."""
-        response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": '{"key": "value"}'
-                    }
-                }
-            ]
-        }
+        response = {"choices": [{"message": {"content": '{"key": "value"}'}}]}
         content = extract_llm_response_content(response)
         assert content == '{"key": "value"}'
 
@@ -86,11 +78,7 @@ class TestExtractLLMResponseContent:
 
     def test_nested_message_dict(self):
         """Test extracting content from nested message dict."""
-        response = {
-            "message": {
-                "content": '{"key": "value"}'
-            }
-        }
+        response = {"message": {"content": '{"key": "value"}'}}
         content = extract_llm_response_content(response)
         assert content == '{"key": "value"}'
 
@@ -106,6 +94,7 @@ class TestExtractLLMResponseContent:
 
     def test_unsupported_type(self):
         """Test handling of unsupported type (falls back to str)."""
+
         class CustomObject:
             def __str__(self):
                 return "custom"
@@ -125,21 +114,21 @@ class TestExtractJSONFromLLMResponse:
 
     def test_markdown_wrapped_json(self):
         """Test extracting JSON from markdown code block."""
-        response = '''```json
+        response = """```json
 {
   "name": "test",
   "complexity": "simple"
 }
-```'''
+```"""
         json_str = extract_json_from_llm_response(response)
         assert '"name": "test"' in json_str
         assert '"complexity": "simple"' in json_str
 
     def test_markdown_without_json_tag(self):
         """Test extracting JSON from markdown without json tag."""
-        response = '''```
+        response = """```
 {"name": "test", "complexity": "simple"}
-```'''
+```"""
         json_str = extract_json_from_llm_response(response)
         assert json_str == '{"name": "test", "complexity": "simple"}'
 
@@ -157,11 +146,11 @@ class TestExtractJSONFromLLMResponse:
 
     def test_json_with_text_both_sides(self):
         """Test extracting JSON when response has text on both sides."""
-        response = '''Here is your plan:
+        response = """Here is your plan:
 
 {"name": "test", "complexity": "simple"}
 
-Let me know if you need help.'''
+Let me know if you need help."""
         json_str = extract_json_from_llm_response(response)
         assert json_str == '{"name": "test", "complexity": "simple"}'
 
@@ -222,7 +211,7 @@ class TestReadableTaskPlanValidation:
 
     def test_valid_plan_from_json(self):
         """Test creating plan from valid JSON."""
-        json_str = '''{
+        json_str = """{
   "name": "Test Plan",
   "complexity": "simple",
   "desc": "Test description",
@@ -230,7 +219,7 @@ class TestReadableTaskPlanValidation:
     [1, "research", "Analyze", "overview"],
     [2, "feature", "Implement", "write"]
   ]
-}'''
+}"""
         plan = ReadableTaskPlan.model_validate_json(json_str)
         assert plan.name == "Test Plan"
         assert plan.complexity == TaskComplexity.SIMPLE
@@ -238,7 +227,7 @@ class TestReadableTaskPlanValidation:
 
     def test_plan_with_dependencies(self):
         """Test creating plan with step dependencies."""
-        json_str = '''{
+        json_str = """{
   "name": "Test Plan",
   "complexity": "moderate",
   "desc": "Test description",
@@ -247,7 +236,7 @@ class TestReadableTaskPlanValidation:
     [2, "feature", "Implement", "write"],
     [3, "test", "Verify", "pytest", [2]]
   ]
-}'''
+}"""
         plan = ReadableTaskPlan.model_validate_json(json_str)
         assert len(plan.steps) == 3
         # Third step should have dependency on step 2
@@ -255,36 +244,36 @@ class TestReadableTaskPlanValidation:
 
     def test_plan_with_duration(self):
         """Test creating plan with duration."""
-        json_str = '''{
+        json_str = """{
   "name": "Test Plan",
   "complexity": "simple",
   "desc": "Test description",
   "steps": [[1, "research", "Analyze", "overview"]],
   "duration": "30min"
-}'''
+}"""
         plan = ReadableTaskPlan.model_validate_json(json_str)
         assert plan.duration == "30min"
 
     def test_invalid_plan_raises_error(self):
         """Test that invalid plan raises ValidationError."""
         # Missing required field 'desc'
-        json_str = '''{
+        json_str = """{
   "name": "Test Plan",
   "complexity": "simple",
   "steps": [[1, "research", "Analyze", "overview"]]
-}'''
+}"""
         with pytest.raises(Exception):  # ValidationError from pydantic
             ReadableTaskPlan.model_validate_json(json_str)
 
     def test_invalid_steps_raises_error(self):
         """Test that invalid step format raises error."""
         # Step missing required elements
-        json_str = '''{
+        json_str = """{
   "name": "Test Plan",
   "complexity": "simple",
   "desc": "Test description",
   "steps": [[1, "research"]]
-}'''
+}"""
         with pytest.raises(Exception):  # ValidationError from pydantic
             ReadableTaskPlan.model_validate_json(json_str)
 
@@ -306,7 +295,7 @@ class TestEndToEndExtractionAndValidation:
 
     def test_full_pipeline_markdown_json(self):
         """Test full pipeline with markdown-wrapped JSON."""
-        llm_response = '''Here is your plan:
+        llm_response = """Here is your plan:
 
 ```json
 {
@@ -317,7 +306,7 @@ class TestEndToEndExtractionAndValidation:
 }
 ```
 
-Let me know if you need help.'''
+Let me know if you need help."""
 
         # Extract
         json_str = extract_json_from_llm_response(llm_response)

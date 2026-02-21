@@ -43,7 +43,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
-from victor.framework.capability_config_helpers import load_capability_config, store_capability_config
+from victor.framework.capability_config_helpers import (
+    load_capability_config,
+    store_capability_config,
+)
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
@@ -139,7 +142,9 @@ def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Source verification configuration dict
     """
-    return load_capability_config(orchestrator, "source_verification_config", _SOURCE_VERIFICATION_DEFAULTS)
+    return load_capability_config(
+        orchestrator, "source_verification_config", _SOURCE_VERIFICATION_DEFAULTS
+    )
 
 
 def configure_citation_management(
@@ -228,7 +233,9 @@ def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
     Returns:
         Research quality configuration dict
     """
-    return load_capability_config(orchestrator, "research_quality_config", _RESEARCH_QUALITY_DEFAULTS)
+    return load_capability_config(
+        orchestrator, "research_quality_config", _RESEARCH_QUALITY_DEFAULTS
+    )
 
 
 def configure_literature_analysis(

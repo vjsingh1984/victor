@@ -67,7 +67,7 @@ class VerticalWorkflowProvider(ABC):
         """
         # Try auto-import from victor.{vertical_name}.handlers
         try:
-            if hasattr(cls, 'name'):
+            if hasattr(cls, "name"):
                 module_path = f"victor.{cls.name}.handlers"
                 module = __import__(module_path, fromlist=["HANDLERS"])
                 return getattr(module, "HANDLERS", {})
@@ -102,7 +102,7 @@ class VerticalWorkflowProvider(ABC):
         Returns:
             Workflow provider instance (WorkflowProviderProtocol) or None if not found
         """
-        if not hasattr(cls, 'name'):
+        if not hasattr(cls, "name"):
             return None
 
         vertical_name = cls.name.title()

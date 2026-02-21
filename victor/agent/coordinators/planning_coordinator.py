@@ -318,39 +318,51 @@ class PlanningCoordinator:
         planning_model = self.orchestrator.model
 
         # Try to get CLI override first (stored in orchestrator if set)
-        if hasattr(self.orchestrator, '_planning_model_override'):
+        if hasattr(self.orchestrator, "_planning_model_override"):
             cli_planning_model = self.orchestrator._planning_model_override
             if cli_planning_model:
                 logger.info(f"Using CLI planning model override: {cli_planning_model}")
                 # Parse planning model (format: "model" or "provider:model")
-                if ':' in cli_planning_model:
-                    planning_provider_name, planning_model = cli_planning_model.split(':', 1)
+                if ":" in cli_planning_model:
+                    planning_provider_name, planning_model = cli_planning_model.split(":", 1)
                     from victor.providers.provider_factory import get_provider
+
                     try:
                         planning_provider = get_provider(planning_provider_name)
-                        logger.info(f"Using planning provider from CLI override: {planning_provider_name}")
+                        logger.info(
+                            f"Using planning provider from CLI override: {planning_provider_name}"
+                        )
                     except Exception as e:
-                        logger.warning(f"Failed to get planning provider {planning_provider_name}: {e}")
+                        logger.warning(
+                            f"Failed to get planning provider {planning_provider_name}: {e}"
+                        )
                 else:
                     planning_model = cli_planning_model
 
         # Try profile override if no CLI override
-        elif hasattr(self.orchestrator, '_profile') and self.orchestrator._profile:
+        elif hasattr(self.orchestrator, "_profile") and self.orchestrator._profile:
             profile = self.orchestrator._profile
-            planning_provider_override = getattr(profile, 'planning_provider', None)
-            planning_model_override = getattr(profile, 'planning_model', None)
+            planning_provider_override = getattr(profile, "planning_provider", None)
+            planning_model_override = getattr(profile, "planning_model", None)
 
             if planning_provider_override:
-                logger.info(f"Using planning provider override from profile: {planning_provider_override}")
+                logger.info(
+                    f"Using planning provider override from profile: {planning_provider_override}"
+                )
                 from victor.providers.provider_factory import get_provider
+
                 try:
                     planning_provider = get_provider(planning_provider_override)
                 except Exception as e:
-                    logger.warning(f"Failed to get planning provider {planning_provider_override}: {e}")
+                    logger.warning(
+                        f"Failed to get planning provider {planning_provider_override}: {e}"
+                    )
                     logger.info("Falling back to default provider for planning")
 
             if planning_model_override:
-                logger.info(f"Using planning model override from profile: {planning_model_override}")
+                logger.info(
+                    f"Using planning model override from profile: {planning_model_override}"
+                )
                 planning_model = planning_model_override
 
         # Generate plan using readable schema

@@ -168,7 +168,6 @@ from victor.framework.vertical_cache_policy import (
     InMemoryLRUVerticalIntegrationCachePolicy,
 )
 
-
 logger = logging.getLogger(__name__)
 
 _INTEGRATION_PLAN_VERSION = 1
@@ -1903,7 +1902,7 @@ class VerticalIntegrationPipeline:
             name_to_handler[unique_name] = handler
             ordered_names.append(unique_name)
 
-        indegree: Dict[str, int] = {name: 0 for name in ordered_names}
+        indegree: Dict[str, int] = dict.fromkeys(ordered_names, 0)
         dependents: Dict[str, Set[str]] = {name: set() for name in ordered_names}
 
         for name in ordered_names:
@@ -1920,7 +1919,9 @@ class VerticalIntegrationPipeline:
         ready = [name for name in ordered_names if indegree[name] == 0]
 
         while ready:
-            ready_sorted = sorted(ready, key=lambda item: self._handler_sort_key(name_to_handler[item]))
+            ready_sorted = sorted(
+                ready, key=lambda item: self._handler_sort_key(name_to_handler[item])
+            )
             levels.append([name_to_handler[name] for name in ready_sorted])
             completed.update(ready_sorted)
 

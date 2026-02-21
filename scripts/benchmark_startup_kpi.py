@@ -183,6 +183,7 @@ def _measure_agent_create(
 def _measure_activation_probe(
     *,
     python_executable: str,
+    iterations: int,
     vertical: str,
     provider: str,
     model: str,
@@ -190,7 +191,8 @@ def _measure_activation_probe(
 ) -> Dict[str, Any]:
     """Measure activation probe timing and metrics for a specific vertical."""
     provider_literal = json.dumps(provider)
-    model_literal = json.dumps(vertical)
+    vertical_literal = json.dumps(vertical)
+    model_literal = json.dumps(model)
     code = textwrap.dedent(
         f"""
         import asyncio
@@ -199,11 +201,92 @@ def _measure_activation_probe(
 
         from victor.framework import Agent
 
-        vertical = {model_literal}
+        vertical = {vertical_literal}
         provider = {provider_literal}
-        model = {json.dumps(model)}
+        model = {model_literal}
+        warm_iters = {iterations}
 
-        async def run():
+        def _percentile(values, q):
+            if not values:
+                return 0.0
+            if len(values) == 1:
+                return float(values[0])
+            ordered = sorted(values)
+            idx = round((len(ordered) - 1) * q)
+            return float(ordered[idx])
+
+        def _runtime_component_lazy(orchestrator, runtime_name, component_names):
+            runtime = getattr(orchestrator, runtime_name, None)
+            if runtime is None:
+                return False
+            for component_name in component_names:
+                component = getattr(runtime, component_name, None)
+                if component is None:
+                    return False
+                initialized = getattr(component, "initialized", None)
+                if initialized is None or bool(initialized):
+                    return False
+            return True
+
+        def _extract_runtime_flags(orchestrator):
+            settings = getattr(orchestrator, "settings", None)
+            return {{
+                "generic_result_cache_enabled": bool(
+                    getattr(settings, "generic_result_cache_enabled", False)
+                ),
+                "http_connection_pool_enabled": bool(
+                    getattr(settings, "http_connection_pool_enabled", False)
+                ),
+                "framework_preload_enabled": bool(
+                    getattr(settings, "framework_preload_enabled", False)
+                ),
+                "coordination_runtime_lazy": _runtime_component_lazy(
+                    orchestrator,
+                    "_coordination_runtime",
+                    (
+                        "recovery_coordinator",
+                        "chunk_generator",
+                        "tool_planner",
+                        "task_coordinator",
+                    ),
+                ),
+                "interaction_runtime_lazy": _runtime_component_lazy(
+                    orchestrator,
+                    "_interaction_runtime",
+                    (
+                        "chat_coordinator",
+                        "tool_coordinator",
+                        "session_coordinator",
+                    ),
+                ),
+            }}
+
+        def _extract_registry_metrics(orchestrator):
+            metrics = {{}}
+            try:
+                from victor.framework.framework_integration_registry_service import (
+                    resolve_framework_integration_registry_service,
+                )
+
+                registry_service = resolve_framework_integration_registry_service(orchestrator)
+                snapshot_metrics = getattr(registry_service, "snapshot_metrics", None)
+                if callable(snapshot_metrics):
+                    metrics = snapshot_metrics() or {{}}
+            except Exception:
+                metrics = {{}}
+            return metrics
+
+        def _registry_totals(metrics):
+            attempted_total = 0
+            applied_total = 0
+            for entry in metrics.values():
+                if not isinstance(entry, dict):
+                    continue
+                attempted_total += int(entry.get("attempted", 0) or 0)
+                applied_total += int(entry.get("applied", 0) or 0)
+            return attempted_total, applied_total
+
+        async def _sample_activation():
             t0 = time.perf_counter()
             agent = await Agent.create(
                 provider=provider,
@@ -211,21 +294,47 @@ def _measure_activation_probe(
                 vertical=vertical,
                 enable_observability=False,
             )
-            cold_ms = (time.perf_counter() - t0) * 1000.0
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
-            # Get activation probe data from the orchestrator
             orchestrator = agent._orchestrator
-            activation_probe = getattr(orchestrator, "_activation_probe", {{}})
+            runtime_flags = _extract_runtime_flags(orchestrator)
+            framework_registry_metrics = _extract_registry_metrics(orchestrator)
+            framework_registry_attempted_total, framework_registry_applied_total = (
+                _registry_totals(framework_registry_metrics)
+            )
 
             await agent.close()
 
+            return {{
+                "elapsed_ms": elapsed_ms,
+                "runtime_flags": runtime_flags,
+                "framework_registry_metrics": framework_registry_metrics,
+                "framework_registry_attempted_total": framework_registry_attempted_total,
+                "framework_registry_applied_total": framework_registry_applied_total,
+            }}
+
+        async def run():
+            cold_probe = await _sample_activation()
+            warm_samples_ms = []
+            for _ in range(warm_iters):
+                sample = await _sample_activation()
+                warm_samples_ms.append(sample["elapsed_ms"])
+
+            warm_mean_ms = (
+                (sum(warm_samples_ms) / len(warm_samples_ms)) if warm_samples_ms else 0.0
+            )
+            warm_p95_ms = _percentile(warm_samples_ms, 0.95)
+
             print(json.dumps({{
                 "vertical": vertical,
-                "cold_ms": cold_ms,
-                "warm_samples_ms": [],
-                "warm_mean_ms": 0.0,
-                "warm_p95_ms": 0.0,
-                **activation_probe,
+                "cold_ms": cold_probe["elapsed_ms"],
+                "warm_samples_ms": warm_samples_ms,
+                "warm_mean_ms": warm_mean_ms,
+                "warm_p95_ms": warm_p95_ms,
+                "runtime_flags": cold_probe["runtime_flags"],
+                "framework_registry_metrics": cold_probe["framework_registry_metrics"],
+                "framework_registry_attempted_total": cold_probe["framework_registry_attempted_total"],
+                "framework_registry_applied_total": cold_probe["framework_registry_applied_total"],
             }}))
 
         asyncio.run(run())
@@ -272,6 +381,10 @@ def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
         thresholds["agent_create.cold_ms"] = args.max_agent_create_cold_ms
     if hasattr(args, 'max_agent_create_warm_mean_ms') and args.max_agent_create_warm_mean_ms is not None:
         thresholds["agent_create.warm_mean_ms"] = args.max_agent_create_warm_mean_ms
+    if hasattr(args, 'max_activation_cold_ms') and args.max_activation_cold_ms is not None:
+        thresholds["activation_probe.cold_ms"] = args.max_activation_cold_ms
+    if hasattr(args, 'max_activation_warm_mean_ms') and args.max_activation_warm_mean_ms is not None:
+        thresholds["activation_probe.warm_mean_ms"] = args.max_activation_warm_mean_ms
 
     return thresholds
 
@@ -348,6 +461,10 @@ def _collect_flag_expectations(args: argparse.Namespace) -> Dict[str, bool]:
         expectations["activation_probe.runtime_flags.http_connection_pool_enabled"] = True
     if hasattr(args, 'require_framework_preload_enabled') and args.require_framework_preload_enabled:
         expectations["activation_probe.runtime_flags.framework_preload_enabled"] = True
+    if hasattr(args, 'require_coordination_runtime_lazy') and args.require_coordination_runtime_lazy:
+        expectations["activation_probe.runtime_flags.coordination_runtime_lazy"] = True
+    if hasattr(args, 'require_interaction_runtime_lazy') and args.require_interaction_runtime_lazy:
+        expectations["activation_probe.runtime_flags.interaction_runtime_lazy"] = True
 
     return expectations
 
@@ -440,6 +557,18 @@ def main() -> int:
         default=None,
         help="Maximum acceptable agent_create warm mean time in milliseconds.",
     )
+    parser.add_argument(
+        "--max-activation-cold-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable activation-probe cold time in milliseconds.",
+    )
+    parser.add_argument(
+        "--max-activation-warm-mean-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable activation-probe warm mean time in milliseconds.",
+    )
 
     # Minimum value arguments
     parser.add_argument(
@@ -470,6 +599,16 @@ def main() -> int:
         "--require-framework-preload-enabled",
         action="store_true",
         help="Require framework_preload_enabled to be True.",
+    )
+    parser.add_argument(
+        "--require-coordination-runtime-lazy",
+        action="store_true",
+        help="Require coordination runtime components to remain lazily uninitialized.",
+    )
+    parser.add_argument(
+        "--require-interaction-runtime-lazy",
+        action="store_true",
+        help="Require interaction runtime components to remain lazily uninitialized.",
     )
 
     # Activation probe arguments
@@ -511,6 +650,7 @@ def main() -> int:
     if args.activation_vertical:
         activation_probe = _measure_activation_probe(
             python_executable=args.python,
+            iterations=args.iterations,
             vertical=args.activation_vertical,
             provider=args.provider,
             model=args.model,
@@ -558,6 +698,12 @@ def main() -> int:
     print(f"  cold_ms: {report['agent_create']['cold_ms']:.2f}")
     print(f"  warm_mean_ms: {report['agent_create']['warm_mean_ms']:.2f}")
     print(f"  warm_p95_ms: {report['agent_create']['warm_p95_ms']:.2f}")
+    if "activation_probe" in report:
+        print("")
+        print(f"Activation probe ({report['activation_probe']['vertical']})")
+        print(f"  cold_ms: {report['activation_probe']['cold_ms']:.2f}")
+        print(f"  warm_mean_ms: {report['activation_probe']['warm_mean_ms']:.2f}")
+        print(f"  warm_p95_ms: {report['activation_probe']['warm_p95_ms']:.2f}")
 
     if all_failures:
         print("")

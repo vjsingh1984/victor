@@ -203,9 +203,11 @@ def build_backend_config_from_settings(settings: Any) -> BackendConfig:
         minimum=0.0,
     )
 
-    overflow_policy = str(
-        getattr(settings, "event_queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)
-    ).strip().lower()
+    overflow_policy = (
+        str(getattr(settings, "event_queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST))
+        .strip()
+        .lower()
+    )
     if overflow_policy not in _VALID_QUEUE_POLICIES:
         logger.warning(
             "Unknown event_queue_overflow_policy '%s'; defaulting to '%s'",
@@ -316,9 +318,9 @@ class InMemoryEventBackend:
             resolved_queue_maxsize = max(0, int(queue_maxsize))
         self._queue_maxsize = resolved_queue_maxsize
 
-        overflow_policy = str(
-            extra.get("queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)
-        ).strip().lower()
+        overflow_policy = (
+            str(extra.get("queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)).strip().lower()
+        )
         if overflow_policy not in _VALID_QUEUE_POLICIES:
             logger.warning(
                 "Unknown queue_overflow_policy '%s'; defaulting to '%s'",

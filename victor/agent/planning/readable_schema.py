@@ -81,7 +81,7 @@ except ImportError:
 
     # Fallback implementations if unified parser not available
     def extract_llm_response_content(
-        response: Union[str, Dict[str, Any], "CompletionResponse", Any],
+        response: Union[str, Dict[str, Any], Any],
     ) -> Optional[str]:
         """Fallback content extraction."""
         if response is None:
@@ -97,7 +97,7 @@ except ImportError:
         return None
 
     def extract_json_from_llm_response(
-        response: Union[str, Dict[str, Any], "CompletionResponse", Any],
+        response: Union[str, Dict[str, Any], Any],
     ) -> Optional[str]:
         """Fallback JSON extraction."""
         content = extract_llm_response_content(response)
@@ -691,14 +691,12 @@ async def generate_task_plan(
     # Get model identifier
     if not model:
         # Try to get from orchestrator if available
-        if hasattr(provider, 'model') and provider.model:
+        if hasattr(provider, "model") and provider.model:
             model = provider.model
-        elif hasattr(provider, '_provider') and hasattr(provider._provider, 'model'):
+        elif hasattr(provider, "_provider") and hasattr(provider._provider, "model"):
             model = provider._provider.model
         else:
-            raise ValueError(
-                "Model identifier must be provided or available from provider"
-            )
+            raise ValueError("Model identifier must be provided or available from provider")
 
     # Classify complexity if not provided
     task_complexity = complexity

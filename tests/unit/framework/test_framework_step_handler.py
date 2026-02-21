@@ -521,7 +521,9 @@ class TestServiceProviderRegistrationPorts:
         class NoContainerOrchestrator:
             settings = MagicMock()
 
-        handler._do_apply(NoContainerOrchestrator(), MockVerticalWithServiceProvider, context, result)
+        handler._do_apply(
+            NoContainerOrchestrator(), MockVerticalWithServiceProvider, context, result
+        )
         assert result.add_warning.call_count >= 1
 
 

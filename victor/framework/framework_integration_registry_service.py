@@ -58,7 +58,7 @@ class FrameworkIntegrationRegistryService:
 
         get_registry = getattr(workflow_registry_module, "get_workflow_registry", None)
         if not callable(get_registry):
-            get_registry = getattr(workflow_registry_module, "get_global_registry")
+            get_registry = workflow_registry_module.get_global_registry
         registry = get_registry()
 
         applied = 0
@@ -283,11 +283,9 @@ class FrameworkIntegrationRegistryService:
             from victor.framework.handler_registry import get_handler_registry
 
             registry = get_handler_registry()
-            if hasattr(registry, "register_vertical") and callable(
-                getattr(registry, "register_vertical")
-            ):
+            if hasattr(registry, "register_vertical") and callable(registry.register_vertical):
                 registry.register_vertical(vertical_name, handlers)
-            elif hasattr(registry, "register") and callable(getattr(registry, "register")):
+            elif hasattr(registry, "register") and callable(registry.register):
                 for name, handler in handlers.items():
                     registry.register(name, handler, vertical=vertical_name, replace=replace)
             else:
@@ -333,15 +331,15 @@ class FrameworkIntegrationRegistryService:
         for copier in (copy.deepcopy, copy.copy):
             try:
                 clone = copier(workflow)
-                setattr(clone, "name", target_name)
+                clone.name = target_name
                 return clone, None
             except Exception:
                 continue
 
-        setattr(workflow, "name", target_name)
+        workflow.name = target_name
 
         def _restore() -> None:
-            setattr(workflow, "name", current_name)
+            workflow.name = current_name
 
         return workflow, _restore
 
@@ -427,15 +425,13 @@ class FrameworkIntegrationRegistryService:
 
         if callable(value):
             module = getattr(value, "__module__", "")
-            qualname = getattr(value, "__qualname__", getattr(value, "__name__", type(value).__name__))
+            qualname = getattr(
+                value, "__qualname__", getattr(value, "__name__", type(value).__name__)
+            )
             return {"__callable__": f"{module}.{qualname}"}
 
         if hasattr(value, "__dict__"):
-            attrs = {
-                k: v
-                for k, v in vars(value).items()
-                if not str(k).startswith("_")
-            }
+            attrs = {k: v for k, v in vars(value).items() if not str(k).startswith("_")}
             if attrs:
                 return {
                     "__type__": type(value).__name__,
@@ -445,7 +441,7 @@ class FrameworkIntegrationRegistryService:
         if hasattr(value, "name"):
             return {
                 "__type__": type(value).__name__,
-                "name": str(getattr(value, "name")),
+                "name": str(value.name),
             }
 
         return repr(value)

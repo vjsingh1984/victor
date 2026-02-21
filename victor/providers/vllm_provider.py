@@ -164,7 +164,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
             if "name" in data:
                 arguments = data.get("arguments", {})
                 # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(key in arguments for key in planning_keywords):
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
                     tool_calls.append(
                         {
                             "id": f"fallback_{len(tool_calls)}",
@@ -186,7 +188,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
             if "name" in data:
                 arguments = data.get("arguments", {})
                 # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(key in arguments for key in planning_keywords):
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
                     tool_calls.append(
                         {
                             "id": f"fallback_{len(tool_calls)}",
@@ -208,7 +212,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
             if "name" in data:
                 arguments = data.get("arguments", {})
                 # Only treat as tool call if arguments is a dict and doesn't look like planning JSON
-                if isinstance(arguments, dict) and not any(key in arguments for key in planning_keywords):
+                if isinstance(arguments, dict) and not any(
+                    key in arguments for key in planning_keywords
+                ):
                     tool_calls.append(
                         {
                             "id": "fallback_0",

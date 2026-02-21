@@ -156,13 +156,19 @@ class TestHandlerRegistryWiring:
         registry = get_handler_registry()
 
         # Register handlers for multiple verticals
-        registry.register_vertical("coding", {
-            "coding_h1": MagicMock(),
-            "coding_h2": MagicMock(),
-        })
-        registry.register_vertical("devops", {
-            "devops_h1": MagicMock(),
-        })
+        registry.register_vertical(
+            "coding",
+            {
+                "coding_h1": MagicMock(),
+                "coding_h2": MagicMock(),
+            },
+        )
+        registry.register_vertical(
+            "devops",
+            {
+                "devops_h1": MagicMock(),
+            },
+        )
 
         coding_handlers = registry.get_vertical_handlers("coding")
         assert len(coding_handlers) == 2

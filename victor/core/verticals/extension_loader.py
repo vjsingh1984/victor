@@ -277,9 +277,7 @@ class VerticalExtensionLoader(ABC):
                     0, int(error_in_flight_threshold)
                 )
             if cooldown_seconds is not None:
-                base._extension_loader_pressure_cooldown_seconds = max(
-                    0.0, float(cooldown_seconds)
-                )
+                base._extension_loader_pressure_cooldown_seconds = max(0.0, float(cooldown_seconds))
             if emit_events is not None:
                 base._extension_loader_emit_pressure_events = bool(emit_events)
 
@@ -1208,9 +1206,7 @@ class VerticalExtensionLoader(ABC):
             "middleware": asyncio.create_task(
                 _submit_with_limits("middleware", cls.get_middleware, True)
             ),
-            "safety": asyncio.create_task(
-                _submit_with_limits("safety", cls.get_safety_extension)
-            ),
+            "safety": asyncio.create_task(_submit_with_limits("safety", cls.get_safety_extension)),
             "prompt": asyncio.create_task(
                 _submit_with_limits("prompt", cls.get_prompt_contributor)
             ),

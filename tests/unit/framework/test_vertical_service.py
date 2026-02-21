@@ -156,7 +156,11 @@ class TestVerticalService:
                 source="sdk",
             )
 
-        expected_args = (orchestrator.get_service_container(), orchestrator.settings, "service_vertical")
+        expected_args = (
+            orchestrator.get_service_container(),
+            orchestrator.settings,
+            "service_vertical",
+        )
         assert mock_activate.call_count == 2
         assert mock_activate.call_args_list[0].args == expected_args
         assert mock_activate.call_args_list[1].args == expected_args

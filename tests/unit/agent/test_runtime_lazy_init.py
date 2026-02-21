@@ -58,7 +58,9 @@ class TestRuntimeLazyInitialization:
                 assert component is not None, f"{component_name} should exist"
                 # Check initialized property - should be False
                 initialized = getattr(component, "initialized", False)
-                assert not initialized, f"{component_name} should NOT be initialized after Agent.create()"
+                assert (
+                    not initialized
+                ), f"{component_name} should NOT be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -93,7 +95,39 @@ class TestRuntimeLazyInitialization:
                 assert component is not None, f"{component_name} should exist"
                 # Check initialized property - should be False
                 initialized = getattr(component, "initialized", False)
-                assert not initialized, f"{component_name} should NOT be initialized after Agent.create()"
+                assert (
+                    not initialized
+                ), f"{component_name} should NOT be initialized after Agent.create()"
+
+        finally:
+            await agent.close()
+
+    @pytest.mark.asyncio
+    async def test_resilience_runtime_components_are_lazy(self):
+        """Test that resilience runtime components are NOT initialized during Agent.create()."""
+        agent = await Agent.create(
+            provider="ollama",
+            model="qwen3-coder:30b",
+            enable_observability=False,
+        )
+
+        try:
+            orchestrator = agent.get_orchestrator()
+            resilience_runtime = getattr(orchestrator, "_resilience_runtime", None)
+            assert resilience_runtime is not None, "resilience_runtime should exist"
+
+            recovery_handler = getattr(resilience_runtime, "recovery_handler", None)
+            recovery_integration = getattr(resilience_runtime, "recovery_integration", None)
+
+            for component_name, component in [
+                ("recovery_handler", recovery_handler),
+                ("recovery_integration", recovery_integration),
+            ]:
+                assert component is not None, f"{component_name} should exist"
+                initialized = getattr(component, "initialized", False)
+                assert (
+                    not initialized
+                ), f"{component_name} should NOT be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -119,13 +153,17 @@ class TestRuntimeLazyInitialization:
             assert recovery_coordinator is not None
 
             # Verify it's NOT initialized initially
-            assert not recovery_coordinator.initialized, "recovery_coordinator should NOT be initialized initially"
+            assert (
+                not recovery_coordinator.initialized
+            ), "recovery_coordinator should NOT be initialized initially"
 
             # Call get_instance() to trigger lazy initialization
             _ = recovery_coordinator.get_instance()
 
             # After calling get_instance(), the component should be initialized
-            assert recovery_coordinator.initialized, "recovery_coordinator should be initialized after get_instance() call"
+            assert (
+                recovery_coordinator.initialized
+            ), "recovery_coordinator should be initialized after get_instance() call"
 
         finally:
             await agent.close()
@@ -148,7 +186,9 @@ class TestRuntimeLazyInitialization:
 
             # Check that components are NOT initialized (lazy)
             provider_coordinator = getattr(provider_runtime, "provider_coordinator", None)
-            provider_switch_coordinator = getattr(provider_runtime, "provider_switch_coordinator", None)
+            provider_switch_coordinator = getattr(
+                provider_runtime, "provider_switch_coordinator", None
+            )
 
             for component_name, component in [
                 ("provider_coordinator", provider_coordinator),
@@ -156,7 +196,9 @@ class TestRuntimeLazyInitialization:
             ]:
                 assert component is not None, f"{component_name} should exist"
                 initialized = getattr(component, "initialized", False)
-                assert not initialized, f"{component_name} should NOT be initialized after Agent.create()"
+                assert (
+                    not initialized
+                ), f"{component_name} should NOT be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -182,7 +224,9 @@ class TestRuntimeLazyInitialization:
 
             assert workflow_registry is not None, "workflow_registry should exist"
             initialized = getattr(workflow_registry, "initialized", False)
-            assert not initialized, "workflow_registry should NOT be initialized after Agent.create()"
+            assert (
+                not initialized
+            ), "workflow_registry should NOT be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -208,7 +252,9 @@ class TestRuntimeLazyInitialization:
 
             assert metrics_collector is not None, "metrics_collector should exist"
             initialized = getattr(metrics_collector, "initialized", False)
-            assert not initialized, "metrics_collector should NOT be initialized after Agent.create()"
+            assert (
+                not initialized
+            ), "metrics_collector should NOT be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -232,6 +278,7 @@ class TestRuntimeLazyInitialization:
             assert hasattr(orchestrator, "_workflow_runtime"), "workflow_runtime missing"
             assert hasattr(orchestrator, "_coordination_runtime"), "coordination_runtime missing"
             assert hasattr(orchestrator, "_interaction_runtime"), "interaction_runtime missing"
+            assert hasattr(orchestrator, "_resilience_runtime"), "resilience_runtime missing"
 
         finally:
             await agent.close()

@@ -94,4 +94,3 @@ class TestResearchCapabilityConfigStorage:
             "require_diverse_sources": False,
             "validate_urls": False,
         }
-

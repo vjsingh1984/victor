@@ -40,6 +40,19 @@ def test_lazy_runtime_proxy_initializes_once():
     assert calls["count"] == 1
 
 
+def test_lazy_runtime_proxy_setattr_delegates_to_instance():
+    target = SimpleNamespace(value=1)
+
+    proxy = LazyRuntimeProxy(factory=lambda: target, name="test_component")
+    assert proxy.initialized is False
+
+    proxy.value = 7
+
+    assert proxy.initialized is True
+    assert target.value == 7
+    assert proxy.value == 7
+
+
 def test_create_provider_runtime_components_provider_coordinator_lazy():
     factory = MagicMock()
     manager = MagicMock()

@@ -111,6 +111,7 @@ _PERFORMANCE_DEFAULTS: Dict[str, Any] = {
     "profile_memory": False,
 }
 
+
 def _load_config(orchestrator: Any, name: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
     """Load config from framework service when available, else fallback to orchestrator attr."""
     return load_capability_config(orchestrator, name, defaults)

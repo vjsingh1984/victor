@@ -56,7 +56,9 @@ def test_register_handlers_uses_vertical_registry() -> None:
     mock_registry.register_vertical = MagicMock()
     handler = object()
 
-    with patch("victor.framework.handler_registry.get_handler_registry", return_value=mock_registry):
+    with patch(
+        "victor.framework.handler_registry.get_handler_registry", return_value=mock_registry
+    ):
         count = service.register_handlers("coding", {"lint": handler}, replace=True)
 
     assert count == 1

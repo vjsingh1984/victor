@@ -103,6 +103,7 @@ _RAG_DEFAULTS: Dict[str, Any] = {
     "query_enhancement": deepcopy(_QUERY_ENHANCEMENT_DEFAULTS),
 }
 
+
 def _load_rag_config(orchestrator: Any) -> Dict[str, Any]:
     """Load the full RAG config from framework service or legacy orchestrator attr."""
     return load_capability_config(orchestrator, "rag_config", _RAG_DEFAULTS)
@@ -299,7 +300,8 @@ def configure_safety(
         {
             "filter_sensitive_data": filter_sensitive_data,
             "max_document_size_mb": max_document_size_mb,
-            "allowed_file_types": allowed_file_types or list(_SAFETY_DEFAULTS["allowed_file_types"]),
+            "allowed_file_types": allowed_file_types
+            or list(_SAFETY_DEFAULTS["allowed_file_types"]),
             "validate_sources": validate_sources,
         },
     )

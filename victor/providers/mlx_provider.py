@@ -220,9 +220,7 @@ class MLXProvider(BaseProvider):
                 )
                 logger.info(f"MLX model loaded: {self.model_path}")
             except Exception as e:
-                raise ProviderConnectionError(
-                    f"Failed to load MLX model {self.model_path}: {e}"
-                )
+                raise ProviderConnectionError(f"Failed to load MLX model {self.model_path}: {e}")
 
     def supports_streaming(self) -> bool:
         """Check if provider supports streaming.
@@ -383,9 +381,7 @@ class MLXProvider(BaseProvider):
             Formatted prompt string
         """
         # Convert to MLX format
-        mlx_messages = [
-            {"role": msg.role, "content": msg.content} for msg in messages
-        ]
+        mlx_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
         # Apply chat template if available
         if hasattr(self._tokenizer, "apply_chat_template"):
@@ -396,9 +392,7 @@ class MLXProvider(BaseProvider):
             )
         else:
             # Fallback: simple concatenation
-            prompt = "\n".join(
-                f"{msg.role}: {msg.content}" for msg in messages
-            )
+            prompt = "\n".join(f"{msg.role}: {msg.content}" for msg in messages)
             prompt += "\nassistant:"
 
         return prompt

@@ -30,6 +30,8 @@ def test_collect_thresholds_maps_cli_args():
         max_import_warm_mean_ms=15.5,
         max_agent_create_cold_ms=None,
         max_agent_create_warm_mean_ms=240.0,
+        max_activation_cold_ms=980.0,
+        max_activation_warm_mean_ms=None,
     )
 
     thresholds = module._collect_thresholds(args)
@@ -38,6 +40,7 @@ def test_collect_thresholds_maps_cli_args():
         "import_victor.cold_ms": 120.0,
         "import_victor.warm_mean_ms": 15.5,
         "agent_create.warm_mean_ms": 240.0,
+        "activation_probe.cold_ms": 980.0,
     }
 
 
@@ -81,6 +84,8 @@ def test_collect_flag_expectations_maps_cli_args():
         require_generic_result_cache_enabled=True,
         require_http_connection_pool_enabled=False,
         require_framework_preload_enabled=True,
+        require_coordination_runtime_lazy=True,
+        require_interaction_runtime_lazy=False,
     )
 
     expectations = module._collect_flag_expectations(args)
@@ -88,6 +93,7 @@ def test_collect_flag_expectations_maps_cli_args():
     assert expectations == {
         "activation_probe.runtime_flags.generic_result_cache_enabled": True,
         "activation_probe.runtime_flags.framework_preload_enabled": True,
+        "activation_probe.runtime_flags.coordination_runtime_lazy": True,
     }
 
 
@@ -117,18 +123,21 @@ def test_evaluate_flag_expectation_failures_reports_mismatch():
             "runtime_flags": {
                 "generic_result_cache_enabled": False,
                 "framework_preload_enabled": True,
+                "coordination_runtime_lazy": False,
             }
         }
     }
     expectations = {
         "activation_probe.runtime_flags.generic_result_cache_enabled": True,
         "activation_probe.runtime_flags.framework_preload_enabled": True,
+        "activation_probe.runtime_flags.coordination_runtime_lazy": True,
     }
 
     failures = module._evaluate_flag_expectation_failures(report, expectations)
 
-    assert len(failures) == 1
+    assert len(failures) == 2
     assert "generic_result_cache_enabled" in failures[0]
+    assert any("coordination_runtime_lazy" in failure for failure in failures)
 
 
 def test_main_returns_exit_code_2_when_thresholds_fail(monkeypatch, capsys):
@@ -189,6 +198,8 @@ def test_main_returns_exit_code_2_when_activation_expectations_fail(monkeypatch,
                 "generic_result_cache_enabled": False,
                 "http_connection_pool_enabled": True,
                 "framework_preload_enabled": True,
+                "coordination_runtime_lazy": False,
+                "interaction_runtime_lazy": True,
             },
             "framework_registry_metrics": {"workflows": {"attempted": 1, "applied": 1}},
             "framework_registry_attempted_total": 1,
@@ -203,7 +214,10 @@ def test_main_returns_exit_code_2_when_activation_expectations_fail(monkeypatch,
             "--json",
             "--activation-vertical",
             "coding",
+            "--max-activation-cold-ms",
+            "20",
             "--require-generic-result-cache-enabled",
+            "--require-coordination-runtime-lazy",
             "--min-framework-registry-attempted-total",
             "2",
         ],
@@ -217,6 +231,8 @@ def test_main_returns_exit_code_2_when_activation_expectations_fail(monkeypatch,
     assert "activation_probe" in payload
     assert payload["threshold_failures"]
     assert any("generic_result_cache_enabled" in item for item in payload["threshold_failures"])
+    assert any("coordination_runtime_lazy" in item for item in payload["threshold_failures"])
+    assert any("activation_probe.cold_ms" in item for item in payload["threshold_failures"])
     assert any(
         "framework_registry_attempted_total" in item for item in payload["threshold_failures"]
     )

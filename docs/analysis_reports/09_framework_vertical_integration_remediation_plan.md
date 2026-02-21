@@ -175,8 +175,8 @@ Acceptance criteria:
 
 Use this section in every follow-up session.
 
-**Current Phase**: `P4 in progress + post-hardening decision closure (capability-config scoping + observability topic defaults)`  
-**Last Updated**: `2026-02-20 14:54:42Z`  
+**Current Phase**: `P4 in progress + startup/activation KPI hardening`  
+**Last Updated**: `2026-02-21 03:38:41Z`  
 **Owner**: `framework-architecture`
 
 ### Open Decisions
@@ -186,9 +186,9 @@ Use this section in every follow-up session.
 - [x] Decide whether non-MLX local providers should get runtime preflight checks (or remain lazy-only) -> `remain lazy-only (server-adapter providers)`.
 
 ### Next 3 Tasks
-- [x] Continue P4 decomposition by extracting chat/tool/session coordinator wiring into runtime module boundaries with lazy materialization.
-- [x] Extend startup KPI guardrails to assert coordination-runtime lazy init expectations (cold/warm and activation probes).
-- [x] Tighten protocol-only boundaries by removing remaining non-critical `hasattr` compatibility probes in framework/orchestrator integration paths.
+- [x] Continue P4 decomposition by extracting recovery handler/integration wiring into dedicated runtime boundaries with lazy materialization.
+- [x] Extend startup KPI guardrails to enforce activation cold/warm thresholds and runtime lazy expectations in CI.
+- [ ] Re-execute full framework+vertical architecture re-analysis with updated scoring after slice 6 runtime decomposition.
 
 ### Progress Log
 | Date | Phase | Update | Evidence/PR |
@@ -240,6 +240,8 @@ Use this section in every follow-up session.
 | 2026-02-20 | P3/P4 | Closed non-MLX preflight decision by keeping `vllm`/`llamacpp` lazy-only (no hardware preflight) and adding regression coverage for MLX-flag independence | `victor/providers/registry.py`, `tests/unit/providers/test_providers_registry.py` |
 | 2026-02-20 | P4 | Completed orchestrator decomposition slice 4 by introducing coordination runtime boundaries with lazy `recovery_coordinator`, `chunk_generator`, `tool_planner`, and `task_coordinator` materialization | `victor/agent/runtime/coordination_runtime.py`, `victor/agent/runtime/__init__.py`, `victor/agent/orchestrator.py`, `tests/unit/agent/test_coordination_runtime.py` |
 | 2026-02-20 | P4 | Completed orchestrator decomposition slice 5 by extracting interaction runtime boundaries with lazy `chat_coordinator`, `tool_coordinator`, and `session_coordinator` materialization; added comprehensive unit tests validating lazy initialization for all runtime boundaries (coordination, interaction, provider, metrics, workflow); removed redundant `hasattr` compatibility probes from framework step handlers, enforcing protocol-only boundaries | `victor/agent/runtime/interaction_runtime.py`, `victor/agent/runtime/__init__.py`, `victor/agent/orchestrator.py`, `victor/framework/step_handlers.py`, `tests/unit/agent/test_runtime_lazy_init.py` |
+| 2026-02-21 | P4 | Completed orchestrator decomposition slice 6 by introducing resilience runtime boundaries with lazy `recovery_handler` and `recovery_integration` materialization, while preserving property-level compatibility for callers expecting concrete instances | `victor/agent/runtime/resilience_runtime.py`, `victor/agent/runtime/__init__.py`, `victor/agent/orchestrator.py`, `tests/unit/agent/test_resilience_runtime.py` |
+| 2026-02-21 | P4/P3 | Hardened startup KPI guardrails: activation probe now measures cold+warm timing, resolves framework registry totals directly from service metrics, and enforces lazy runtime expectations (`coordination` + `interaction`) through script flags wired into fast CI | `scripts/benchmark_startup_kpi.py`, `.github/workflows/ci-fast.yml`, `tests/unit/test_benchmark_startup_kpi.py` |
 
 ---
 

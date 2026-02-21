@@ -225,9 +225,7 @@ def setup_observability_integration(
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
         orchestrator.set_observability(integration)
-    elif hasattr(orchestrator, "set_observability") and callable(
-        getattr(orchestrator, "set_observability")
-    ):
+    elif hasattr(orchestrator, "set_observability") and callable(orchestrator.set_observability):
         orchestrator.set_observability(integration)
     elif hasattr(orchestrator, "observability"):
         orchestrator.observability = integration

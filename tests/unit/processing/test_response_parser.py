@@ -34,7 +34,6 @@ from victor.processing.response_parser import (
     repair_malformed_json,
 )
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -88,15 +87,7 @@ class TestExtractContentFromResponse:
 
     def test_openai_style_choices_response(self):
         """Test extracting content from OpenAI-style choices format."""
-        response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": "OpenAI response content"
-                    }
-                }
-            ]
-        }
+        response = {"choices": [{"message": {"content": "OpenAI response content"}}]}
         content = extract_content_from_response(response)
         assert content == "OpenAI response content"
 
@@ -331,7 +322,7 @@ class TestIsValidJSON:
 
     def test_valid_json_array(self):
         """Test checking valid JSON array."""
-        assert is_valid_json('[1, 2, 3]') is True
+        assert is_valid_json("[1, 2, 3]") is True
 
     def test_valid_json_string(self):
         """Test checking valid JSON string."""
@@ -339,11 +330,11 @@ class TestIsValidJSON:
 
     def test_valid_json_number(self):
         """Test checking valid JSON number."""
-        assert is_valid_json('123') is True
+        assert is_valid_json("123") is True
 
     def test_invalid_json_syntax(self):
         """Test checking invalid JSON syntax."""
-        assert is_valid_json('{name: test}') is False
+        assert is_valid_json("{name: test}") is False
 
     def test_invalid_json_unclosed_brace(self):
         """Test checking invalid JSON with unclosed brace."""
@@ -351,11 +342,11 @@ class TestIsValidJSON:
 
     def test_plain_text(self):
         """Test checking plain text is not JSON."""
-        assert is_valid_json('This is plain text') is False
+        assert is_valid_json("This is plain text") is False
 
     def test_empty_string(self):
         """Test checking empty string is not valid JSON."""
-        assert is_valid_json('') is False
+        assert is_valid_json("") is False
 
     def test_none_input(self):
         """Test checking None input returns False."""
@@ -377,22 +368,22 @@ class TestSafeJSONParse:
 
     def test_parse_with_fallback(self):
         """Test parsing with fallback value."""
-        result = safe_json_parse('invalid json', fallback={"default": True})
+        result = safe_json_parse("invalid json", fallback={"default": True})
         assert result == {"default": True}
 
     def test_parse_invalid_json_no_fallback(self):
         """Test parsing invalid JSON without fallback."""
-        result = safe_json_parse('invalid json')
+        result = safe_json_parse("invalid json")
         assert result is None
 
     def test_parse_empty_string(self):
         """Test parsing empty string."""
-        result = safe_json_parse('', fallback={})
+        result = safe_json_parse("", fallback={})
         assert result == {}
 
     def test_parse_with_none_fallback(self):
         """Test parsing with None as fallback."""
-        result = safe_json_parse('invalid', fallback=None)
+        result = safe_json_parse("invalid", fallback=None)
         assert result is None
 
 

@@ -34,7 +34,9 @@ class CapabilityConfigService:
         normalized = str(scope_key).strip()
         return normalized or DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY
 
-    def _get_scope_bucket(self, scope_key: Optional[str], *, create: bool = False) -> Dict[str, Any]:
+    def _get_scope_bucket(
+        self, scope_key: Optional[str], *, create: bool = False
+    ) -> Dict[str, Any]:
         """Get the config bucket for one scope."""
         normalized_scope_key = self.normalize_scope_key(scope_key)
         if create:

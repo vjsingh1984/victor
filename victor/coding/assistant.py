@@ -329,7 +329,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
         return cls._get_cached_extension("middleware", _create_middleware)
 
-
     @classmethod
     def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
         """Get coding-specific service provider (cached).

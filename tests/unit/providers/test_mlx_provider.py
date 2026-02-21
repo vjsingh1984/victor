@@ -31,7 +31,11 @@ def _mlx_runtime_available() -> bool:
         return False
     try:
         probe = subprocess.run(
-            [sys.executable, "-c", "import mlx_lm\nimport mlx.core as mx\nprint(mx.default_device())"],
+            [
+                sys.executable,
+                "-c",
+                "import mlx_lm\nimport mlx.core as mx\nprint(mx.default_device())",
+            ],
             capture_output=True,
             text=True,
             timeout=8,

@@ -534,6 +534,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._tool_planner = self._coordination_runtime.tool_planner
         self._task_coordinator = self._coordination_runtime.task_coordinator
 
+    def _initialize_resilience_runtime(self, *, context_compactor: Any) -> None:
+        """Initialize resilience runtime boundaries with lazy recovery components."""
+        from victor.agent.runtime.resilience_runtime import (
+            create_resilience_runtime_components,
+        )
+
+        self._resilience_runtime = create_resilience_runtime_components(
+            factory=self._factory,
+            context_compactor=context_compactor,
+        )
+        self._recovery_handler = self._resilience_runtime.recovery_handler
+        self._recovery_integration = self._resilience_runtime.recovery_integration
+
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries for chat/tool/session coordinators."""
         from victor.agent.runtime.interaction_runtime import (
@@ -953,13 +966,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._context_compactor
         )
 
-        # Initialize RecoveryHandler for handling model failures and stuck states (via factory)
-        self._recovery_handler = self._factory.create_recovery_handler()
-
-        # Create recovery integration submodule for clean delegation (via factory)
-        self._recovery_integration = self._factory.create_recovery_integration(
-            self._recovery_handler
-        )
+        # Resilience runtime boundary: lazily materialize recovery handler/integration.
+        self._initialize_resilience_runtime(context_compactor=self._context_compactor)
 
         # Coordination runtime boundary: defer recovery/chunk/planner/task coordinators.
         self._initialize_coordination_runtime()
@@ -983,7 +991,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Wire component dependencies (via factory)
         self._factory.wire_component_dependencies(
-            recovery_handler=self._recovery_handler,
+            recovery_handler=None,
             context_compactor=self._context_compactor,
             observability=self._observability,
             conversation_state=self.conversation_state,
@@ -1293,7 +1301,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             RecoveryHandler instance or None if not enabled
         """
-        return self._recovery_handler
+        handler = getattr(self, "_recovery_handler", None)
+        if hasattr(handler, "get_instance"):
+            resolved = handler.get_instance()
+            self._recovery_handler = resolved
+            return resolved
+        return handler
 
     @property
     def recovery_integration(self) -> "OrchestratorRecoveryIntegration":
@@ -1302,7 +1315,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             OrchestratorRecoveryIntegration for delegated recovery handling
         """
-        return self._recovery_integration
+        integration = getattr(self, "_recovery_integration", None)
+        if hasattr(integration, "get_instance"):
+            resolved = integration.get_instance()
+            self._recovery_integration = resolved
+            return resolved
+        return integration
 
     @property
     def recovery_coordinator(self) -> "StreamingRecoveryCoordinator":
@@ -2387,7 +2405,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             getattr(self.settings, "http_connection_pool_max_connections", 100)
                         ),
                         max_connections_per_host=int(
-                            getattr(self.settings, "http_connection_pool_max_connections_per_host", 10)
+                            getattr(
+                                self.settings, "http_connection_pool_max_connections_per_host", 10
+                            )
                         ),
                         connection_timeout=int(
                             getattr(self.settings, "http_connection_pool_connection_timeout", 30)
