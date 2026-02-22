@@ -131,6 +131,9 @@ dev = [
     # Type stubs
     "types-pyyaml",
     "types-aiofiles",
+
+    # Integration test dependencies
+    "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
 ]
 
 docs = [
