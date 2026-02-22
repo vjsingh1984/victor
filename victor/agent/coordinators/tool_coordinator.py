@@ -468,6 +468,14 @@ class ToolCoordinator:
         if self._enabled_tools:
             return self._enabled_tools
 
+        # Fall back to orchestrator's enabled tools (if set before coordinator was initialized)
+        if hasattr(self, "_orchestrator") and self._orchestrator:
+            orch_tools = getattr(self._orchestrator, "_enabled_tools", None)
+            if orch_tools:
+                # Sync to coordinator's state for future access
+                self._enabled_tools = orch_tools
+                return orch_tools
+
         # Fall back to all available tools
         return self.get_available_tools()
 
