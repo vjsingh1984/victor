@@ -4058,7 +4058,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tiered_config: Optional TieredToolConfig to propagate for stage filtering.
         """
         self._enabled_tools = tools
-        self._tool_coordinator.set_enabled_tools(tools)
+        # Only propagate to tool_coordinator if it's already initialized
+        # to avoid eager materialization during orchestrator setup
+        if hasattr(self, "_tool_coordinator") and self._tool_coordinator.initialized:
+            self._tool_coordinator.set_enabled_tools(tools)
 
         # Apply to vertical context and tool access controller
         self._apply_vertical_tools(tools)
