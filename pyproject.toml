@@ -333,32 +333,32 @@ native = [
 # Vertical packages (domain-specific assistants)
 # Usage: pip install victor[verticals] or pip install victor[rag]
 verticals = [
-    "victor-coding>=0.5.6",
-    "victor-rag>=0.5.6",
-    "victor-research>=0.5.6",
-    "victor-devops>=0.5.6",
-    "victor-dataanalysis>=0.5.6",
+    "victor-coding>=0.5.7",
+    "victor-rag>=0.5.7",
+    "victor-research>=0.5.7",
+    "victor-devops>=0.5.7",
+    "victor-dataanalysis>=0.5.7",
 ]
 
 # Individual vertical installations
 rag = [
-    "victor-rag>=0.5.6",
+    "victor-rag>=0.5.7",
 ]
 
 coding = [
-    "victor-coding>=0.5.6",
+    "victor-coding>=0.5.7",
 ]
 
 research = [
-    "victor-research>=0.5.6",
+    "victor-research>=0.5.7",
 ]
 
 devops = [
-    "victor-devops>=0.5.6",
+    "victor-devops>=0.5.7",
 ]
 
 dataanalysis = [
-    "victor-dataanalysis>=0.5.6",
+    "victor-dataanalysis>=0.5.7",
 ]
 
 all = [
