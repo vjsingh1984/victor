@@ -50,11 +50,7 @@ class ReindexCommand(BaseSlashCommand):
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-try:
-                from victor_coding.codebase.indexer import CodebaseIndex
-except ImportError:
-    # External vertical package may not be installed
-    pass
+            from victor_coding.codebase.indexer import CodebaseIndex
             from victor.config.settings import get_project_paths, load_settings
 
             root = Path.cwd()

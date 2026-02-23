@@ -1014,11 +1014,7 @@ class VictorFastAPIServer:
         async def lsp_completions(request: LSPRequest) -> JSONResponse:
             """LSP completions."""
             try:
-try:
-                    from victor_coding.lsp.manager import get_lsp_manager
-except ImportError:
-    # External vertical package may not be installed
-    pass
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 completions = await manager.get_completions(
@@ -1047,11 +1043,7 @@ except ImportError:
         async def lsp_hover(request: LSPRequest) -> JSONResponse:
             """LSP hover."""
             try:
-try:
-                    from victor_coding.lsp.manager import get_lsp_manager
-except ImportError:
-    # External vertical package may not be installed
-    pass
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 hover = await manager.get_hover(request.file, request.line, request.character)
@@ -1066,11 +1058,7 @@ except ImportError:
         async def lsp_definition(request: LSPRequest) -> JSONResponse:
             """LSP definition."""
             try:
-try:
-                    from victor_coding.lsp.manager import get_lsp_manager
-except ImportError:
-    # External vertical package may not be installed
-    pass
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 locations = await manager.get_definition(
@@ -1087,11 +1075,7 @@ except ImportError:
         async def lsp_references(request: LSPRequest) -> JSONResponse:
             """LSP references."""
             try:
-try:
-                    from victor_coding.lsp.manager import get_lsp_manager
-except ImportError:
-    # External vertical package may not be installed
-    pass
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 locations = await manager.get_references(
@@ -1108,11 +1092,7 @@ except ImportError:
         async def lsp_diagnostics(request: LSPRequest) -> JSONResponse:
             """LSP diagnostics."""
             try:
-try:
-                    from victor_coding.lsp.manager import get_lsp_manager
-except ImportError:
-    # External vertical package may not be installed
-    pass
+                from victor_coding.lsp.manager import get_lsp_manager
 
                 manager = get_lsp_manager()
                 diagnostics = manager.get_diagnostics(request.file)

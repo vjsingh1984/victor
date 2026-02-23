@@ -32,14 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-try:
-try:
-        from victor_coding.codebase.ignore_patterns import (
-except ImportError:
-    # External vertical package may not be installed
-    pass
-except ImportError:
-    # victor-coding is an external package and may not be installed
+from victor_coding.codebase.ignore_patterns import (
     DEFAULT_SKIP_DIRS,
     is_hidden_path,
     should_ignore_path,
@@ -2124,14 +2117,7 @@ async def generate_victor_md_from_index(
     Returns:
         Generated markdown content for .victor/init.md.
     """
-try:
-try:
-            from victor_coding.codebase.symbol_store import SymbolStore
-except ImportError:
-    # External vertical package may not be installed
-    pass
-except ImportError:
-    # victor-coding is an external package and may not be installed
+    from victor_coding.codebase.symbol_store import SymbolStore
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
@@ -2661,14 +2647,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     """
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-try:
-try:
-            from victor_coding.codebase.graph.registry import create_graph_store
-except ImportError:
-    # External vertical package may not be installed
-    pass
-except ImportError:
-    # victor-coding is an external package and may not be installed
+    from victor_coding.codebase.graph.registry import create_graph_store
     from victor.core.schema import Tables
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
