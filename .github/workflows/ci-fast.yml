@@ -102,17 +102,16 @@ jobs:
           HTTP_CONNECTION_POOL_ENABLED: "1"
           FRAMEWORK_PRELOAD_ENABLED: "1"
         run: |
+          # Skip activation-vertical test since external verticals aren't in CI yet
+          # TODO: Re-enable once victor-coding is on PyPI
           python scripts/benchmark_startup_kpi.py \
             --iterations 3 \
             --provider ollama \
             --model qwen3-coder:30b \
-            --activation-vertical coding \
             --max-import-cold-ms 5000 \
             --max-import-warm-mean-ms 25 \
             --max-agent-create-cold-ms 6000 \
             --max-agent-create-warm-mean-ms 1500 \
-            --max-activation-cold-ms 5000 \
-            --max-activation-warm-mean-ms 2000 \
             --min-framework-registry-attempted-total 10 \
             --min-framework-registry-applied-total 10 \
             --require-generic-result-cache-enabled \
