@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
-from victor.coding.codebase.tree_sitter_manager import get_parser
+from victor_coding.codebase.tree_sitter_manager import get_parser
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 

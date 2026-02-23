@@ -114,7 +114,7 @@ class SqliteLanceDBStore:
         await self._graph_store.initialize()
 
         # Initialize embedding model
-        from victor.coding.codebase.embeddings.models import (
+        from victor_coding.codebase.embeddings.models import (
             EmbeddingModelConfig,
             create_embedding_model,
         )

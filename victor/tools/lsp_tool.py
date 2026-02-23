@@ -56,7 +56,7 @@ KIND_NAMES = {
 
 async def _do_status() -> Dict[str, Any]:
     """Get LSP status."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     manager = get_lsp_manager()
     status = manager.get_status()
@@ -88,8 +88,8 @@ async def _do_status() -> Dict[str, Any]:
 
 async def _do_start(language: str) -> Dict[str, Any]:
     """Start a language server."""
-    from victor.coding.lsp.manager import get_lsp_manager
-    from victor.coding.lsp.config import LANGUAGE_SERVERS
+    from victor_coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.config import LANGUAGE_SERVERS
 
     if not language:
         return {"success": False, "error": "Missing required parameter: language"}
@@ -123,7 +123,7 @@ async def _do_start(language: str) -> Dict[str, Any]:
 
 async def _do_stop(language: str) -> Dict[str, Any]:
     """Stop a language server."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not language:
         return {"success": False, "error": "Missing required parameter: language"}
@@ -144,7 +144,7 @@ async def _do_completions(
     max_items: int = 20,
 ) -> Dict[str, Any]:
     """Get code completions."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -174,7 +174,7 @@ async def _do_completions(
 
 async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]:
     """Get hover information."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -195,7 +195,7 @@ async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]
 
 async def _do_definition(file_path: str, line: int, character: int) -> Dict[str, Any]:
     """Go to definition."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -222,7 +222,7 @@ async def _do_references(
     max_results: int = 50,
 ) -> Dict[str, Any]:
     """Find references."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -245,7 +245,7 @@ async def _do_references(
 async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
     """Get diagnostics."""
     import asyncio
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -269,7 +269,7 @@ async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
 
 async def _do_open(file_path: str) -> Dict[str, Any]:
     """Open a file in LSP."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -288,7 +288,7 @@ async def _do_open(file_path: str) -> Dict[str, Any]:
 
 async def _do_close(file_path: str) -> Dict[str, Any]:
     """Close a file in LSP."""
-    from victor.coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.manager import get_lsp_manager
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}

@@ -53,12 +53,12 @@ class VerticalWorkflowProvider(ABC):
         Example:
             # Default implementation (no override needed):
             # For CodingAssistant (name="coding"):
-            # - Imports from victor.coding.handlers → HANDLERS
+            # - Imports from victor_coding.handlers → HANDLERS
             #
             # Custom override (if needed):
             @classmethod
             def get_handlers(cls) -> Dict[str, Any]:
-                from victor.coding.handlers import HANDLERS
+                from victor_coding.handlers import HANDLERS
                 return HANDLERS
 
         Returns:
@@ -90,13 +90,13 @@ class VerticalWorkflowProvider(ABC):
         Example:
             # Default implementation (no override needed):
             # For CodingAssistant (name="coding"):
-            # - Imports CodingWorkflowProvider from victor.coding.workflows
+            # - Imports CodingWorkflowProvider from victor_coding.workflows
             # - Returns an instance: CodingWorkflowProvider()
             #
             # Custom override (if needed):
             @classmethod
             def get_workflow_provider(cls) -> Optional[Any]:
-                from victor.coding.workflows import CodingWorkflowProvider
+                from victor_coding.workflows import CodingWorkflowProvider
                 return CodingWorkflowProvider()
 
         Returns:

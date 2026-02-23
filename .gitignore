@@ -231,3 +231,8 @@ models/
 **/sentence-transformers/
 **/bge-*/
 embeddings/
+victor-coding/
+victor-dataanalysis/
+victor-devops/
+victor-rag/
+victor-research/

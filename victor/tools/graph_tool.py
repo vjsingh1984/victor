@@ -33,8 +33,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-from victor.coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-from victor.coding.codebase.graph.registry import create_graph_store
+from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+from victor_coding.codebase.graph.registry import create_graph_store
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -1338,7 +1338,7 @@ async def graph(
         if not analyzer.nodes:
             logger.info("Graph is empty, triggering lazy indexing...")
             try:
-                from victor.coding.codebase.indexer import CodebaseIndex
+                from victor_coding.codebase.indexer import CodebaseIndex
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()

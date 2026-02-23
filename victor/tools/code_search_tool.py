@@ -212,7 +212,7 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
-    from victor.coding.codebase.indexer import CodebaseIndex
+    from victor_coding.codebase.indexer import CodebaseIndex
 
     # Get cache using DI-aware accessor
     index_cache = _get_index_cache(exec_ctx)

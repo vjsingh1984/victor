@@ -656,7 +656,7 @@ class SWEBenchWorkspaceManager:
 
         try:
             # Run indexer on the repo with embeddings enabled for semantic search
-            from victor.coding.codebase.indexer import CodebaseIndex
+            from victor_coding.codebase.indexer import CodebaseIndex
 
             indexer = CodebaseIndex(cache_path, use_embeddings=True)
             await indexer.index_codebase()

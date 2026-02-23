@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 import logging
 
 if TYPE_CHECKING:
-    from victor.coding.languages.base import DocCommentPattern
+    from victor_coding.languages.base import DocCommentPattern
 
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
@@ -411,7 +411,7 @@ def _has_doc_comment_before(
     Returns:
         True if a doc comment was found immediately before the symbol.
     """
-    from victor.coding.languages.base import DocCommentPattern  # noqa: F811
+    from victor_coding.languages.base import DocCommentPattern  # noqa: F811
 
     idx = symbol_line - 2  # Convert to 0-index, then go one line above
     if idx < 0:
@@ -946,7 +946,7 @@ async def docs_coverage(
     def _get_extractor():
         nonlocal _extractor
         if _extractor is None:
-            from victor.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+            from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
 
             _extractor = TreeSitterExtractor()
         return _extractor
@@ -1002,7 +1002,7 @@ async def docs_coverage(
             continue
 
         try:
-            from victor.coding.languages.registry import get_language_registry
+            from victor_coding.languages.registry import get_language_registry
 
             registry = get_language_registry()
             if not registry._plugins:

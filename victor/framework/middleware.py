@@ -1461,7 +1461,7 @@ class MiddlewareComposer:
         Returns:
             Self for method chaining
         """
-        from victor.coding.middleware import (
+        from victor_coding.middleware import (
             CodeCorrectionMiddleware,
             GitSafetyMiddleware,
         )

@@ -92,7 +92,7 @@ Usage Examples
 Basic runtime middleware application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-    from victor.coding.middleware import CodeReviewMiddleware
+    from victor_coding.middleware import CodeReviewMiddleware
 
     # Create adapter with orchestrator reference
     adapter = VerticalIntegrationAdapter(orchestrator)
@@ -104,7 +104,7 @@ Basic runtime middleware application::
 Runtime safety pattern application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-    from victor.coding.safety import DangerousOperationPattern
+    from victor_coding.safety import DangerousOperationPattern
 
     adapter = VerticalIntegrationAdapter(orchestrator)
 

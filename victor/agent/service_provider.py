@@ -1000,7 +1000,7 @@ class OrchestratorServiceProvider:
 
     def _create_task_type_hinter(self) -> Any:
         """Create TaskTypeHinter wrapper."""
-        from victor.coding.prompts import get_task_type_hint
+        from victor_coding.prompts import get_task_type_hint
 
         class TaskTypeHinter:
             """Wrapper for task type hint retrieval."""

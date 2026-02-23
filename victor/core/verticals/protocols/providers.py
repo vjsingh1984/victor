@@ -107,7 +107,7 @@ class MiddlewareProvider(Protocol):
         class CodingVertical(VerticalBase, MiddlewareProvider):
             @classmethod
             def get_middleware(cls) -> List[Any]:
-                from victor.coding.middleware import CodeValidationMiddleware
+                from victor_coding.middleware import CodeValidationMiddleware
                 return [CodeValidationMiddleware()]
     """
 
@@ -138,7 +138,7 @@ class SafetyProvider(Protocol):
         class DevOpsVertical(VerticalBase, SafetyProvider):
             @classmethod
             def get_safety_extension(cls) -> Optional[Any]:
-                from victor.devops.safety import DevOpsSafetyExtension
+                from victor_devops.safety import DevOpsSafetyExtension
                 return DevOpsSafetyExtension()
     """
 
@@ -168,7 +168,7 @@ class WorkflowProvider(Protocol):
         class CodingVertical(VerticalBase, WorkflowProvider):
             @classmethod
             def get_workflow_provider(cls) -> Optional[Any]:
-                from victor.coding.workflows import CodingWorkflowProvider
+                from victor_coding.workflows import CodingWorkflowProvider
                 return CodingWorkflowProvider()
 
             @classmethod
@@ -212,7 +212,7 @@ class TeamProvider(Protocol):
         class ResearchVertical(VerticalBase, TeamProvider):
             @classmethod
             def get_team_spec_provider(cls) -> Optional[Any]:
-                from victor.research.teams import ResearchTeamProvider
+                from victor_research.teams import ResearchTeamProvider
                 return ResearchTeamProvider()
 
             @classmethod
@@ -256,7 +256,7 @@ class RLProvider(Protocol):
         class CodingVertical(VerticalBase, RLProvider):
             @classmethod
             def get_rl_config_provider(cls) -> Optional[Any]:
-                from victor.coding.rl import CodingRLProvider
+                from victor_coding.rl import CodingRLProvider
                 return CodingRLProvider()
 
             @classmethod
@@ -304,7 +304,7 @@ class EnrichmentProvider(Protocol):
         class CodingVertical(VerticalBase, EnrichmentProvider):
             @classmethod
             def get_enrichment_strategy(cls) -> Optional[Any]:
-                from victor.coding.enrichment import CodingEnrichmentStrategy
+                from victor_coding.enrichment import CodingEnrichmentStrategy
                 return CodingEnrichmentStrategy()
     """
 
@@ -338,7 +338,7 @@ class ToolProvider(Protocol):
 
             @classmethod
             def get_tool_graph(cls) -> Optional[Any]:
-                from victor.coding.tools import CodingToolGraph
+                from victor_coding.tools import CodingToolGraph
                 return CodingToolGraph()
     """
 
@@ -377,7 +377,7 @@ class HandlerProvider(Protocol):
         class DataAnalysisVertical(VerticalBase, HandlerProvider):
             @classmethod
             def get_handlers(cls) -> Dict[str, Any]:
-                from victor.dataanalysis.handlers import HANDLERS
+                from victor_dataanalysis.handlers import HANDLERS
                 return HANDLERS
     """
 
@@ -407,7 +407,7 @@ class CapabilityProvider(Protocol):
         class CodingVertical(VerticalBase, CapabilityProvider):
             @classmethod
             def get_capability_provider(cls) -> Optional[Any]:
-                from victor.coding.capabilities import CodingCapabilityProvider
+                from victor_coding.capabilities import CodingCapabilityProvider
                 return CodingCapabilityProvider()
     """
 
@@ -438,7 +438,7 @@ class ModeConfigProvider(Protocol):
         class CodingVertical(VerticalBase, ModeConfigProvider):
             @classmethod
             def get_mode_config_provider(cls) -> Optional[Any]:
-                from victor.coding.modes import CodingModeProvider
+                from victor_coding.modes import CodingModeProvider
                 return CodingModeProvider()
 
             @classmethod
@@ -484,7 +484,7 @@ class PromptContributorProvider(Protocol):
         class ResearchVertical(VerticalBase, PromptContributorProvider):
             @classmethod
             def get_prompt_contributor(cls) -> Optional[Any]:
-                from victor.research.prompts import ResearchPromptContributor
+                from victor_research.prompts import ResearchPromptContributor
                 return ResearchPromptContributor()
 
             @classmethod
@@ -597,7 +597,7 @@ class ServiceProvider(Protocol):
         class CodingVertical(VerticalBase, ServiceProvider):
             @classmethod
             def get_service_provider(cls) -> Optional[Any]:
-                from victor.coding.services import CodingServiceProvider
+                from victor_coding.services import CodingServiceProvider
                 return CodingServiceProvider()
     """
 

@@ -19,7 +19,7 @@ from victor.agent.safety import (
     OperationalRiskLevel,
     set_confirmation_callback,
 )
-from victor.coding.codebase.indexer import CodebaseIndex
+from victor_coding.codebase.indexer import CodebaseIndex
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 if TYPE_CHECKING:

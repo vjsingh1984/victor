@@ -250,7 +250,7 @@ class EscapeHatchRegistry:
             Tuple of (conditions_registered, transforms_registered)
 
         Example:
-            from victor.coding.escape_hatches import CONDITIONS, TRANSFORMS
+            from victor_coding.escape_hatches import CONDITIONS, TRANSFORMS
 
             registry.register_from_vertical(
                 "coding",

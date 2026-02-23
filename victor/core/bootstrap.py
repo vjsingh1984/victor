@@ -447,7 +447,7 @@ def _register_coding_services(container: ServiceContainer, settings: Settings) -
     This ensures language plugins are discovered at startup, not mid-conversation.
     """
     try:
-        from victor.coding.languages.registry import get_language_registry
+        from victor_coding.languages.registry import get_language_registry
 
         registry = get_language_registry()
         # Only discover if not already discovered (check if plugins list is empty)
