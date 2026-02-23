@@ -114,21 +114,31 @@ class SqliteLanceDBStore:
         await self._graph_store.initialize()
 
         # Initialize embedding model
-try:
+        # Note: Embedding model from victor-coding is optional
+        # If not available, we'll use a default implementation
+        try:
             from victor_coding.codebase.embeddings.models import (
-except ImportError:
-    # External vertical package may not be installed
-    pass
-            EmbeddingModelConfig,
-            create_embedding_model,
-        )
+                EmbeddingModelConfig,
+                create_embedding_model,
+            )
 
-        model_config = EmbeddingModelConfig(
-            model_type=self.embedding_model_type,
-            model_name=self.embedding_model_name,
-        )
-        self._embedding_model = create_embedding_model(model_config)
-        await self._embedding_model.initialize()
+            model_config = EmbeddingModelConfig(
+                model_type=self.embedding_model_type,
+                model_name=self.embedding_model_name,
+            )
+            self._embedding_model = create_embedding_model(model_config)
+            await self._embedding_model.initialize()
+        except ImportError:
+            # victor-coding not installed, use default embedding model
+            logger.warning(
+                "victor-coding not installed, using default embedding model. "
+                "Install with: pip install victor-coding"
+            )
+            # Use a simple default model
+            from sentence_transformers import SentenceTransformer
+
+            self._embedding_model = SentenceTransformer(self.embedding_model_name)
+            logger.info(f"Using default SentenceTransformer model: {self.embedding_model_name}")
 
         # Initialize LanceDB vector store (vectors only, no content)
         await self._init_vector_store()
