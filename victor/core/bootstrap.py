@@ -447,11 +447,7 @@ def _register_coding_services(container: ServiceContainer, settings: Settings) -
     This ensures language plugins are discovered at startup, not mid-conversation.
     """
     try:
-try:
-            from victor_coding.languages.registry import get_language_registry
-except ImportError:
-    # External vertical package may not be installed
-    pass
+        from victor_coding.languages.registry import get_language_registry
 
         registry = get_language_registry()
         # Only discover if not already discovered (check if plugins list is empty)
@@ -460,6 +456,8 @@ except ImportError:
             logger.info(f"Discovered {count} language plugins at startup")
         else:
             logger.debug(f"Language plugins already discovered: {len(registry._plugins)} plugins")
+    except ImportError:
+        logger.debug("Language plugins not available - victor-coding package not installed")
     except Exception as e:
         logger.warning(f"Failed to discover language plugins: {e}")
 
