@@ -19,6 +19,7 @@ from victor.agent.safety import (
     OperationalRiskLevel,
     set_confirmation_callback,
 )
+
 try:
     from victor_coding.codebase.indexer import CodebaseIndex
 except ImportError:

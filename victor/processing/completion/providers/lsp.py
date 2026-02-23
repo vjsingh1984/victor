@@ -114,6 +114,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
 
         try:
             from victor_coding.lsp.manager import LSPConnectionPool
+
             self._lsp_manager = LSPConnectionPool()
             return self._lsp_manager
         except ImportError:

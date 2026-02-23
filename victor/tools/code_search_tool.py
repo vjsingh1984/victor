@@ -212,8 +212,10 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
+
+
 try:
-        from victor_coding.codebase.indexer import CodebaseIndex
+    from victor_coding.codebase.indexer import CodebaseIndex
 except ImportError:
     # External vertical package may not be installed
     pass

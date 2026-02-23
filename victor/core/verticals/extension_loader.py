@@ -466,36 +466,36 @@ class VerticalExtensionLoader(ABC):
     ) -> Any:
         """Generic factory for lazy-loading and caching extensions.
 
-        Eliminates boilerplate across all verticals by providing a single
-        implementation of the lazy import + create + cache pattern.
+                Eliminates boilerplate across all verticals by providing a single
+                implementation of the lazy import + create + cache pattern.
 
-        Args:
-            extension_key: Cache key (e.g., "safety_extension", "prompt_contributor")
-            import_path: Full Python import path (e.g., "victor.coding.safety")
-            attribute_name: Class name to import. If None, auto-generates from vertical name
-                          (e.g., "CodingSafetyExtension" for CodingAssistant)
+                Args:
+                    extension_key: Cache key (e.g., "safety_extension", "prompt_contributor")
+                    import_path: Full Python import path (e.g., "victor.coding.safety")
+                    attribute_name: Class name to import. If None, auto-generates from vertical name
+                                  (e.g., "CodingSafetyExtension" for CodingAssistant)
 
-        Returns:
-            Cached or newly created extension instance
+                Returns:
+                    Cached or newly created extension instance
 
-        Example:
-            # Before (13 lines)
-            def get_safety_extension(cls):
-                def _create():
-try:
-                        from victor_coding.safety import CodingSafetyExtension
-except ImportError:
-    # External vertical package may not be installed
-    pass
-                    return CodingSafetyExtension()
-                return cls._get_cached_extension("safety_extension", _create)
+                Example:
+                    # Before (13 lines)
+                    def get_safety_extension(cls):
+                        def _create():
+        try:
+                                from victor_coding.safety import CodingSafetyExtension
+        except ImportError:
+            # External vertical package may not be installed
+            pass
+                            return CodingSafetyExtension()
+                        return cls._get_cached_extension("safety_extension", _create)
 
-            # After (3 lines)
-            def get_safety_extension(cls):
-                return cls._get_extension_factory(
-                    "safety_extension",
-                    "victor.coding.safety",
-                )
+                    # After (3 lines)
+                    def get_safety_extension(cls):
+                        return cls._get_extension_factory(
+                            "safety_extension",
+                            "victor.coding.safety",
+                        )
         """
 
         def _create():
