@@ -113,16 +113,11 @@ class LSPCompletionProvider(BaseCompletionProvider):
             return self._lsp_manager
 
         try:
-try:
-                from victor_coding.lsp.manager import LSPConnectionPool
-except ImportError:
-    # External vertical package may not be installed
-    pass
-
+            from victor_coding.lsp.manager import LSPConnectionPool
             self._lsp_manager = LSPConnectionPool()
             return self._lsp_manager
         except ImportError:
-            logger.debug("LSP manager not available")
+            logger.debug("LSP manager not available - victor-coding package not installed")
             return None
 
     async def provide_completions(self, params: CompletionParams) -> CompletionList:
