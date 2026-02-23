@@ -330,8 +330,39 @@ native = [
     "maturin>=1.4",
 ]
 
+# Vertical packages (domain-specific assistants)
+# Usage: pip install victor[verticals] or pip install victor[rag]
+verticals = [
+    "victor-coding>=0.5.6",
+    "victor-rag>=0.5.6",
+    "victor-research>=0.5.6",
+    "victor-devops>=0.5.6",
+    "victor-dataanalysis>=0.5.6",
+]
+
+# Individual vertical installations
+rag = [
+    "victor-rag>=0.5.6",
+]
+
+coding = [
+    "victor-coding>=0.5.6",
+]
+
+research = [
+    "victor-research>=0.5.6",
+]
+
+devops = [
+    "victor-devops>=0.5.6",
+]
+
+dataanalysis = [
+    "victor-dataanalysis>=0.5.6",
+]
+
 all = [
-    "victor[dev,docs,build,lang-all,apple-silicon]",
+    "victor[dev,docs,build,lang-all,apple-silicon,verticals]",
 ]
 
 [project.urls]

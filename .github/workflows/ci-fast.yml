@@ -96,6 +96,47 @@ jobs:
           python -c "from victor.framework import Agent; print('✓ Agent imports')"
           python -c "from victor.framework.graph import StateGraph; print('✓ StateGraph imports')"
 
+  imports-with-verticals:
+    name: Import Check with Verticals
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies with verticals
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[verticals]"
+
+      - name: Check vertical imports
+        run: |
+          python -c "from victor_coding import CodingAssistant; print('✓ victor-coding imports')"
+          python -c "from victor_rag import RAGAssistant; print('✓ victor-rag imports')"
+          python -c "from victor_research import ResearchAssistant; print('✓ victor-research imports')"
+          python -c "from victor_devops import DevOpsAssistant; print('✓ victor-devops imports')"
+          python -c "from victor_dataanalysis import DataAnalysisAssistant; print('✓ victor-dataanalysis imports')"
+
+      - name: Check vertical entry point loading
+        run: |
+          python - <<'PY'
+          from victor.core.verticals import load_vertical_from_entry_point
+
+          verticals_to_test = ["coding", "rag", "research", "devops", "dataanalysis"]
+          for vertical_name in verticals_to_test:
+              try:
+                  vertical = load_vertical_from_entry_point(vertical_name)
+                  print(f"✓ {vertical_name} loads via entry point: {vertical.__name__}")
+              except Exception as e:
+                  print(f"✗ {vertical_name} failed: {e}")
+                  raise
+          PY
+
       # - name: Startup KPI Guardrails
       #   TODO: Re-enable once external verticals are on PyPI
       #   The benchmark script requires activation-vertical which needs external packages

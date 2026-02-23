@@ -74,6 +74,84 @@ jobs:
           fi
         continue-on-error: true
 
+  # Test with external vertical packages installed
+  verticals-integration:
+    name: Verticals Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-verticals-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-verticals-
+            ${{ runner.os }}-pip-
+
+      - name: Install victor with verticals
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,verticals]"
+
+      - name: Verify vertical packages are installed
+        run: |
+          echo "=== Checking vertical package installations ==="
+          python -c "from victor_coding import CodingAssistant; print('✓ victor-coding installed')" || echo "✗ victor-coding not found"
+          python -c "from victor_rag import RAGAssistant; print('✓ victor-rag installed')" || echo "✗ victor-rag not found"
+          python -c "from victor_research import ResearchAssistant; print('✓ victor-research installed')" || echo "✗ victor-research not found"
+          python -c "from victor_devops import DevOpsAssistant; print('✓ victor-devops installed')" || echo "✗ victor-devops not found"
+          python -c "from victor_dataanalysis import DataAnalysisAssistant; print('✓ victor-dataanalysis installed')" || echo "✗ victor-dataanalysis not found"
+
+      - name: Verify vertical entry points are discoverable
+        run: |
+          echo "=== Checking vertical entry point discovery ==="
+          python - <<'PY'
+          from importlib.metadata import entry_points
+          try:
+              victor_eps = entry_points(group="victor.verticals")
+              print(f"Found {len(victor_eps)} vertical entry points:")
+              for ep in victor_eps:
+                  print(f"  - {ep.name}: {ep.value}")
+          except Exception as e:
+              print(f"Error loading entry points: {e}")
+          PY
+
+      - name: Test vertical loading via core framework
+        run: |
+          echo "=== Testing vertical loading through victor.core ==="
+          python - <<'PY'
+          from victor.core.verticals import load_vertical_from_entry_point
+
+          # Test loading each vertical by name
+          verticals_to_test = ["coding", "rag", "research", "devops", "dataanalysis"]
+
+          for vertical_name in verticals_to_test:
+              try:
+                  vertical = load_vertical_from_entry_point(vertical_name)
+                  print(f"✓ {vertical_name}: {vertical.__name__}")
+              except Exception as e:
+                  print(f"✗ {vertical_name}: {e}")
+          PY
+
+      - name: Run framework tests with verticals
+        run: |
+          pytest tests/unit/framework/test_vertical_integration.py \
+            -v \
+            --tb=short \
+            -m "not slow" \
+            -k "vertical" \
+          || echo "⚠️ Some vertical integration tests failed"
+        continue-on-error: true
+
   # VS Code Extension tests
   vscode-extension:
     name: VS Code Extension
