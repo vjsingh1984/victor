@@ -118,14 +118,26 @@ class SessionProtocol(Protocol):
 
 
 class BuilderPreset(str, Enum):
-    """Pre-defined builder configurations."""
+    """Pre-defined builder configurations.
+
+    Note: Domain-specific presets (CODING, RESEARCH, etc.) have been removed.
+    Users should install the relevant vertical package and use it directly:
+
+        # For coding tasks:
+        pip install victor-coding
+        from victor_coding import CodingAssistant
+        agent = await Agent.create(vertical=CodingAssistant)
+
+        # For research tasks:
+        pip install victor-research
+        from victor_research import ResearchAssistant
+        agent = await Agent.create(vertical=ResearchAssistant)
+    """
 
     DEFAULT = "default"  # Balanced configuration
     MINIMAL = "minimal"  # Minimal resources
     HIGH_BUDGET = "high_budget"  # Extended resources
     AIRGAPPED = "airgapped"  # No network access
-    CODING = "coding"  # Optimized for coding tasks
-    RESEARCH = "research"  # Optimized for research tasks
 
 
 @dataclass
@@ -282,24 +294,8 @@ class AgentBuilder:
             self._options.airgapped = True
             self._options.tools = ToolSet.airgapped()
 
-        elif preset == BuilderPreset.CODING:
-            try:
-                from victor_coding import CodingAssistant
-            except ImportError:
-                raise ImportError(
-                    "Coding vertical not installed. Install with: pip install victor-coding"
-                )
-            self._options.vertical = CodingAssistant
-            self._options.tools = ToolSet.default()
-
-        elif preset == BuilderPreset.RESEARCH:
-            try:
-                from victor_research import ResearchAssistant
-            except ImportError:
-                raise ImportError(
-                    "Research vertical not installed. Install with: pip install victor-research"
-                )
-            self._options.vertical = ResearchAssistant
+        else:
+            raise ValueError(f"Unknown preset: {preset}")
 
         return self
 
