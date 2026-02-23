@@ -109,7 +109,11 @@ class CodeEntityExtractor(EntityExtractor):
 
         if use_treesitter:
             try:
-                from victor_coding.codebase.indexer import CodebaseIndexer
+try:
+                    from victor_coding.codebase.indexer import CodebaseIndexer
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
                 self._treesitter_available = True
             except ImportError:

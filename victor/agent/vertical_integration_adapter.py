@@ -92,7 +92,11 @@ Usage Examples
 Basic runtime middleware application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-    from victor_coding.middleware import CodeReviewMiddleware
+try:
+        from victor_coding.middleware import CodeReviewMiddleware
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     # Create adapter with orchestrator reference
     adapter = VerticalIntegrationAdapter(orchestrator)
@@ -104,7 +108,11 @@ Basic runtime middleware application::
 Runtime safety pattern application::
 
     from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
-    from victor_coding.safety import DangerousOperationPattern
+try:
+        from victor_coding.safety import DangerousOperationPattern
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     adapter = VerticalIntegrationAdapter(orchestrator)
 

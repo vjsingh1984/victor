@@ -113,7 +113,11 @@ class LSPCompletionProvider(BaseCompletionProvider):
             return self._lsp_manager
 
         try:
-            from victor_coding.lsp.manager import LSPConnectionPool
+try:
+                from victor_coding.lsp.manager import LSPConnectionPool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             self._lsp_manager = LSPConnectionPool()
             return self._lsp_manager

@@ -30,7 +30,14 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 import logging
 
 if TYPE_CHECKING:
-    from victor_coding.languages.base import DocCommentPattern
+try:
+try:
+            from victor_coding.languages.base import DocCommentPattern
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
@@ -411,7 +418,14 @@ def _has_doc_comment_before(
     Returns:
         True if a doc comment was found immediately before the symbol.
     """
-    from victor_coding.languages.base import DocCommentPattern  # noqa: F811
+try:
+try:
+            from victor_coding.languages.base import DocCommentPattern  # noqa: F811
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
     idx = symbol_line - 2  # Convert to 0-index, then go one line above
     if idx < 0:
@@ -946,7 +960,14 @@ async def docs_coverage(
     def _get_extractor():
         nonlocal _extractor
         if _extractor is None:
-            from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+try:
+try:
+                    from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
             _extractor = TreeSitterExtractor()
         return _extractor
@@ -1002,7 +1023,14 @@ async def docs_coverage(
             continue
 
         try:
-            from victor_coding.languages.registry import get_language_registry
+try:
+try:
+                    from victor_coding.languages.registry import get_language_registry
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
             registry = get_language_registry()
             if not registry._plugins:

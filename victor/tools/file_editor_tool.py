@@ -157,7 +157,14 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
 
-from victor_coding.editing import FileEditor
+try:
+try:
+        from victor_coding.editing import FileEditor
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path

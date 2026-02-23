@@ -33,8 +33,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-from victor_coding.codebase.graph.registry import create_graph_store
+try:
+try:
+        from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+        from victor_coding.codebase.graph.registry import create_graph_store
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -1338,7 +1345,14 @@ async def graph(
         if not analyzer.nodes:
             logger.info("Graph is empty, triggering lazy indexing...")
             try:
-                from victor_coding.codebase.indexer import CodebaseIndex
+try:
+try:
+                        from victor_coding.codebase.indexer import CodebaseIndex
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()

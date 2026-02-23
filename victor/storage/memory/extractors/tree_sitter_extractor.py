@@ -64,7 +64,11 @@ class TreeSitterEntityExtractor(EntityExtractor):
         """Lazily initialize Tree-sitter extractor."""
         if self._extractor is None:
             try:
-                from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+try:
+                    from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
                 self._extractor = TreeSitterExtractor(auto_discover=self._auto_discover)
             except ImportError as e:

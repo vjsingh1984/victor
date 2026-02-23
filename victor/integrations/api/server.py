@@ -822,7 +822,11 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+try:
+                from victor_coding.lsp.manager import get_lsp_manager
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             manager = get_lsp_manager()
             completions = await manager.get_completions(file_path, line, character)
@@ -853,7 +857,11 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+try:
+                from victor_coding.lsp.manager import get_lsp_manager
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             manager = get_lsp_manager()
             hover = await manager.get_hover(file_path, line, character)
@@ -876,7 +884,11 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+try:
+                from victor_coding.lsp.manager import get_lsp_manager
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             manager = get_lsp_manager()
             locations = await manager.get_definition(file_path, line, character)
@@ -895,7 +907,11 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+try:
+                from victor_coding.lsp.manager import get_lsp_manager
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             manager = get_lsp_manager()
             locations = await manager.get_references(file_path, line, character)
@@ -912,7 +928,11 @@ class VictorAPIServer:
             data = await request.json()
             file_path = data.get("file", "")
 
-            from victor_coding.lsp.manager import get_lsp_manager
+try:
+                from victor_coding.lsp.manager import get_lsp_manager
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             manager = get_lsp_manager()
             diagnostics = manager.get_diagnostics(file_path)

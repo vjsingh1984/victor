@@ -482,7 +482,11 @@ class VerticalExtensionLoader(ABC):
             # Before (13 lines)
             def get_safety_extension(cls):
                 def _create():
-                    from victor_coding.safety import CodingSafetyExtension
+try:
+                        from victor_coding.safety import CodingSafetyExtension
+except ImportError:
+    # External vertical package may not be installed
+    pass
                     return CodingSafetyExtension()
                 return cls._get_cached_extension("safety_extension", _create)
 

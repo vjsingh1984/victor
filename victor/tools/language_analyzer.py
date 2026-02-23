@@ -1554,7 +1554,14 @@ class BaseLanguageAnalyzer(ABC):
         """Lazy-load tree-sitter parser for this language."""
         if self._parser is None:
             try:
-                from victor_coding.codebase.tree_sitter_manager import get_parser
+try:
+try:
+                        from victor_coding.codebase.tree_sitter_manager import get_parser
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 
                 self._parser = get_parser(self.language)
             except (ImportError, ValueError) as e:

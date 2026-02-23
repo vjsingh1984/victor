@@ -1000,7 +1000,11 @@ class OrchestratorServiceProvider:
 
     def _create_task_type_hinter(self) -> Any:
         """Create TaskTypeHinter wrapper."""
-        from victor_coding.prompts import get_task_type_hint
+try:
+            from victor_coding.prompts import get_task_type_hint
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
         class TaskTypeHinter:
             """Wrapper for task type hint retrieval."""

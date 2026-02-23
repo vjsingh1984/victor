@@ -1461,7 +1461,14 @@ class MiddlewareComposer:
         Returns:
             Self for method chaining
         """
-        from victor_coding.middleware import (
+try:
+try:
+                from victor_coding.middleware import (
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
             CodeCorrectionMiddleware,
             GitSafetyMiddleware,
         )

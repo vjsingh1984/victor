@@ -250,7 +250,11 @@ class EscapeHatchRegistry:
             Tuple of (conditions_registered, transforms_registered)
 
         Example:
-            from victor_coding.escape_hatches import CONDITIONS, TRANSFORMS
+try:
+                from victor_coding.escape_hatches import CONDITIONS, TRANSFORMS
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
             registry.register_from_vertical(
                 "coding",

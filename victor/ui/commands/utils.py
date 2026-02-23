@@ -19,7 +19,11 @@ from victor.agent.safety import (
     OperationalRiskLevel,
     set_confirmation_callback,
 )
-from victor_coding.codebase.indexer import CodebaseIndex
+try:
+    from victor_coding.codebase.indexer import CodebaseIndex
+except ImportError:
+    # victor-coding is an external package and may not be installed
+    CodebaseIndex = None  # type: ignore
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 if TYPE_CHECKING:

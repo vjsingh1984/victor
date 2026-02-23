@@ -107,7 +107,14 @@ class MiddlewareProvider(Protocol):
         class CodingVertical(VerticalBase, MiddlewareProvider):
             @classmethod
             def get_middleware(cls) -> List[Any]:
-                from victor_coding.middleware import CodeValidationMiddleware
+try:
+try:
+                        from victor_coding.middleware import CodeValidationMiddleware
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return [CodeValidationMiddleware()]
     """
 
@@ -138,7 +145,11 @@ class SafetyProvider(Protocol):
         class DevOpsVertical(VerticalBase, SafetyProvider):
             @classmethod
             def get_safety_extension(cls) -> Optional[Any]:
-                from victor_devops.safety import DevOpsSafetyExtension
+try:
+                    from victor_devops.safety import DevOpsSafetyExtension
+except ImportError:
+    # External vertical package may not be installed
+    pass
                 return DevOpsSafetyExtension()
     """
 
@@ -168,7 +179,14 @@ class WorkflowProvider(Protocol):
         class CodingVertical(VerticalBase, WorkflowProvider):
             @classmethod
             def get_workflow_provider(cls) -> Optional[Any]:
-                from victor_coding.workflows import CodingWorkflowProvider
+try:
+try:
+                        from victor_coding.workflows import CodingWorkflowProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingWorkflowProvider()
 
             @classmethod
@@ -212,7 +230,11 @@ class TeamProvider(Protocol):
         class ResearchVertical(VerticalBase, TeamProvider):
             @classmethod
             def get_team_spec_provider(cls) -> Optional[Any]:
-                from victor_research.teams import ResearchTeamProvider
+try:
+                    from victor_research.teams import ResearchTeamProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
                 return ResearchTeamProvider()
 
             @classmethod
@@ -256,7 +278,14 @@ class RLProvider(Protocol):
         class CodingVertical(VerticalBase, RLProvider):
             @classmethod
             def get_rl_config_provider(cls) -> Optional[Any]:
-                from victor_coding.rl import CodingRLProvider
+try:
+try:
+                        from victor_coding.rl import CodingRLProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingRLProvider()
 
             @classmethod
@@ -304,7 +333,14 @@ class EnrichmentProvider(Protocol):
         class CodingVertical(VerticalBase, EnrichmentProvider):
             @classmethod
             def get_enrichment_strategy(cls) -> Optional[Any]:
-                from victor_coding.enrichment import CodingEnrichmentStrategy
+try:
+try:
+                        from victor_coding.enrichment import CodingEnrichmentStrategy
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingEnrichmentStrategy()
     """
 
@@ -338,7 +374,14 @@ class ToolProvider(Protocol):
 
             @classmethod
             def get_tool_graph(cls) -> Optional[Any]:
-                from victor_coding.tools import CodingToolGraph
+try:
+try:
+                        from victor_coding.tools import CodingToolGraph
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingToolGraph()
     """
 
@@ -377,7 +420,11 @@ class HandlerProvider(Protocol):
         class DataAnalysisVertical(VerticalBase, HandlerProvider):
             @classmethod
             def get_handlers(cls) -> Dict[str, Any]:
-                from victor_dataanalysis.handlers import HANDLERS
+try:
+                    from victor_dataanalysis.handlers import HANDLERS
+except ImportError:
+    # External vertical package may not be installed
+    pass
                 return HANDLERS
     """
 
@@ -407,7 +454,14 @@ class CapabilityProvider(Protocol):
         class CodingVertical(VerticalBase, CapabilityProvider):
             @classmethod
             def get_capability_provider(cls) -> Optional[Any]:
-                from victor_coding.capabilities import CodingCapabilityProvider
+try:
+try:
+                        from victor_coding.capabilities import CodingCapabilityProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingCapabilityProvider()
     """
 
@@ -438,7 +492,14 @@ class ModeConfigProvider(Protocol):
         class CodingVertical(VerticalBase, ModeConfigProvider):
             @classmethod
             def get_mode_config_provider(cls) -> Optional[Any]:
-                from victor_coding.modes import CodingModeProvider
+try:
+try:
+                        from victor_coding.modes import CodingModeProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingModeProvider()
 
             @classmethod
@@ -484,7 +545,11 @@ class PromptContributorProvider(Protocol):
         class ResearchVertical(VerticalBase, PromptContributorProvider):
             @classmethod
             def get_prompt_contributor(cls) -> Optional[Any]:
-                from victor_research.prompts import ResearchPromptContributor
+try:
+                    from victor_research.prompts import ResearchPromptContributor
+except ImportError:
+    # External vertical package may not be installed
+    pass
                 return ResearchPromptContributor()
 
             @classmethod
@@ -597,7 +662,14 @@ class ServiceProvider(Protocol):
         class CodingVertical(VerticalBase, ServiceProvider):
             @classmethod
             def get_service_provider(cls) -> Optional[Any]:
-                from victor_coding.services import CodingServiceProvider
+try:
+try:
+                        from victor_coding.services import CodingServiceProvider
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
                 return CodingServiceProvider()
     """
 

@@ -17,7 +17,14 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
-from victor_coding.codebase.tree_sitter_manager import get_parser
+try:
+try:
+        from victor_coding.codebase.tree_sitter_manager import get_parser
+except ImportError:
+    # External vertical package may not be installed
+    pass
+except ImportError:
+    # victor-coding is an external package and may not be installed
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 

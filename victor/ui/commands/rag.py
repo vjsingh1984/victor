@@ -148,7 +148,11 @@ async def _ingest_async(
     doc_id: Optional[str],
 ) -> None:
     """Async implementation of ingest command."""
-    from victor_rag.tools.ingest import RAGIngestTool
+try:
+        from victor_rag.tools.ingest import RAGIngestTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     tool = RAGIngestTool()
 
@@ -203,7 +207,11 @@ def search(
 
 async def _search_async(query: str, top_k: int) -> None:
     """Async implementation of search command."""
-    from victor_rag.tools.search import RAGSearchTool
+try:
+        from victor_rag.tools.search import RAGSearchTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     tool = RAGSearchTool()
 
@@ -278,7 +286,11 @@ async def _query_async(
     from rich.panel import Panel
     from rich.text import Text
 
-    from victor_rag.tools.query import RAGQueryTool
+try:
+        from victor_rag.tools.query import RAGQueryTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     # Show enrichment details if enabled
     if show_enrichment:
@@ -321,8 +333,12 @@ async def _show_enrichment_details(question: str) -> None:
     from rich.table import Table
     from rich.text import Text
 
-    from victor_rag.document_store import DocumentStore
-    from victor_rag.enrichment import get_rag_enrichment_strategy, reset_rag_enrichment_strategy
+try:
+        from victor_rag.document_store import DocumentStore
+        from victor_rag.enrichment import get_rag_enrichment_strategy, reset_rag_enrichment_strategy
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     # Reset to ensure fresh initialization
     reset_rag_enrichment_strategy()
@@ -410,7 +426,11 @@ def list_docs() -> None:
 
 async def _list_async() -> None:
     """Async implementation of list command."""
-    from victor_rag.tools.management import RAGListTool
+try:
+        from victor_rag.tools.management import RAGListTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     tool = RAGListTool()
     result = await tool.execute()
@@ -434,7 +454,11 @@ def stats() -> None:
 
 async def _stats_async() -> None:
     """Async implementation of stats command."""
-    from victor_rag.tools.management import RAGStatsTool
+try:
+        from victor_rag.tools.management import RAGStatsTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     tool = RAGStatsTool()
     result = await tool.execute()
@@ -475,7 +499,11 @@ def delete(
 
 async def _delete_async(doc_id: str) -> None:
     """Async implementation of delete command."""
-    from victor_rag.tools.management import RAGDeleteTool
+try:
+        from victor_rag.tools.management import RAGDeleteTool
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     tool = RAGDeleteTool()
     result = await tool.execute(doc_id=doc_id)
@@ -603,7 +631,11 @@ def demo_sec(
         victor rag demo-sec --stats                  # Show SEC filing stats
         victor rag demo-sec --clear                  # Clear all SEC filings
     """
-    from victor_rag.demo_sec_filings import (
+try:
+        from victor_rag.demo_sec_filings import (
+except ImportError:
+    # External vertical package may not be installed
+    pass
         COMPANY_PRESETS,
         SP500_COMPANIES,
         clear_sec_filings,
@@ -693,7 +725,11 @@ def demo_sec(
 
 async def _demo_docs() -> None:
     """Run the project docs demo."""
-    from victor_rag.demo_docs import ingest_victor_docs
+try:
+        from victor_rag.demo_docs import ingest_victor_docs
+except ImportError:
+    # External vertical package may not be installed
+    pass
 
     try:
         results = await ingest_victor_docs()
