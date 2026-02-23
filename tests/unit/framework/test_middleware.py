@@ -122,14 +122,6 @@ class TestMiddlewareComposer:
         assert len(middleware) == 1
         assert isinstance(middleware[0], MetricsMiddleware)
 
-    def test_standard_coding_preset(self) -> None:
-        """Test standard_coding preset."""
-        composer = MiddlewareComposer().standard_coding()
-        middleware = composer.build()
-        # Should add CodeCorrectionMiddleware and GitSafetyMiddleware
-        assert len(middleware) == 2
-        assert all(isinstance(m, MiddlewareProtocol) for m in middleware)
-
     def test_standard_devops_preset(self) -> None:
         """Test standard_devops preset."""
         composer = MiddlewareComposer().standard_devops()
@@ -228,20 +220,20 @@ class TestMiddlewareComposer:
     def test_preset_after_custom(self) -> None:
         """Test adding a preset after custom middleware."""
         custom = SecretMaskingMiddleware(replacement="[CUSTOM]")
-        composer = MiddlewareComposer().add(custom).standard_coding()
+        composer = MiddlewareComposer().add(custom).git_safety()
         middleware = composer.build()
         # Custom middleware should be first, then preset middleware
-        assert len(middleware) == 3
+        assert len(middleware) == 2
         assert middleware[0] is custom
-        # standard_coding adds CodeCorrectionMiddleware, then GitSafetyMiddleware
-        assert isinstance(middleware[2], GitSafetyMiddleware)
+        # git_safety adds GitSafetyMiddleware
+        assert isinstance(middleware[1], GitSafetyMiddleware)
 
     def test_multiple_presets(self) -> None:
         """Test combining multiple presets."""
-        composer = MiddlewareComposer().standard_coding().standard_production()
+        composer = MiddlewareComposer().git_safety().standard_production()
         middleware = composer.build()
         # Should have middleware from both presets
-        assert len(middleware) == 5  # 2 from coding + 3 from production
+        assert len(middleware) == 4  # 1 from git_safety + 3 from production
 
     def test_immutability_of_built_list(self) -> None:
         """Test that modifying the returned list doesn't affect the composer."""

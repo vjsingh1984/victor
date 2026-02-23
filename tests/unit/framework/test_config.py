@@ -585,7 +585,11 @@ class TestVerticalSafetyIntegration:
 
     def test_create_all_rag_safety_rules(self):
         """create_all_rag_safety_rules should register all RAG rules."""
-        from victor.rag.safety import create_all_rag_safety_rules
+        try:
+            from victor_rag.safety import create_all_rag_safety_rules
+        except ImportError:
+            # victor-rag not installed, skip test
+            pytest.skip("victor-rag package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_rag_safety_rules(enforcer)
@@ -603,7 +607,11 @@ class TestVerticalSafetyIntegration:
 
     def test_research_safety_source_rules(self):
         """Research source safety rules should block low-credibility sources."""
-        from victor.research.safety import create_research_source_safety_rules
+        try:
+            from victor_research.safety import create_research_source_safety_rules
+        except ImportError:
+            # victor-research not installed, skip test
+            pytest.skip("victor-research package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_research_source_safety_rules(

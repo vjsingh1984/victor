@@ -301,16 +301,6 @@ class TestBuilderPresets:
         builder = AgentBuilder().preset(BuilderPreset.AIRGAPPED)
         assert builder._options.airgapped
 
-    def test_preset_coding(self):
-        """Test CODING preset."""
-        builder = AgentBuilder().preset(BuilderPreset.CODING)
-        assert builder._options.vertical is not None
-
-    def test_preset_research(self):
-        """Test RESEARCH preset."""
-        builder = AgentBuilder().preset(BuilderPreset.RESEARCH)
-        assert builder._options.vertical is not None
-
     def test_multiple_presets(self):
         """Test applying multiple presets."""
         builder = AgentBuilder().preset(BuilderPreset.DEFAULT).preset(BuilderPreset.HIGH_BUDGET)
