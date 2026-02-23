@@ -66,6 +66,11 @@ rag = "victor_rag.assistant:RAGAssistant"
 [tool.setuptools]
 packages = [
     "victor_rag",
+    "victor_rag.tools",
+    "victor_rag.ui",
+    "victor_rag.workflows",
+    "victor_rag.teams",
+    "victor_rag.rl",
 ]
 
 [tool.black]
