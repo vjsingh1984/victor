@@ -22,7 +22,6 @@ from victor.agent.safety import (
 try:
     from victor_coding.codebase.indexer import CodebaseIndex
 except ImportError:
-    # victor-coding is an external package and may not be installed
     CodebaseIndex = None  # type: ignore
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
@@ -391,6 +390,10 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
 
 async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
     """Check codebase index status at startup and reindex if needed."""
+    if CodebaseIndex is None:
+        if not silent:
+            logger.debug("Codebase indexing not available - victor-coding package not installed")
+        return
     try:
         index = CodebaseIndex(root_path=cwd, use_embeddings=False, enable_watcher=False)
         is_stale, modified, deleted = index.check_staleness_by_mtime()
