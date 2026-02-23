@@ -129,14 +129,14 @@ jobs:
         run: |
           echo "=== Testing vertical loading through victor.core ==="
           python - <<'PY'
-          from victor.core.verticals import load_vertical_from_entry_point
+          from victor.core.verticals import load_vertical
 
           # Test loading each vertical by name
           verticals_to_test = ["coding", "rag", "research", "devops", "dataanalysis"]
 
           for vertical_name in verticals_to_test:
               try:
-                  vertical = load_vertical_from_entry_point(vertical_name)
+                  vertical = load_vertical(vertical_name)
                   print(f"✓ {vertical_name}: {vertical.__name__}")
               except Exception as e:
                   print(f"✗ {vertical_name}: {e}")
