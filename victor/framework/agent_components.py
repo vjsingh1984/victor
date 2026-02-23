@@ -283,14 +283,22 @@ class AgentBuilder:
             self._options.tools = ToolSet.airgapped()
 
         elif preset == BuilderPreset.CODING:
-            from victor.coding import CodingAssistant
-
+            try:
+                from victor_coding import CodingAssistant
+            except ImportError:
+                raise ImportError(
+                    "Coding vertical not installed. Install with: pip install victor-coding"
+                )
             self._options.vertical = CodingAssistant
             self._options.tools = ToolSet.default()
 
         elif preset == BuilderPreset.RESEARCH:
-            from victor.research import ResearchAssistant
-
+            try:
+                from victor_research import ResearchAssistant
+            except ImportError:
+                raise ImportError(
+                    "Research vertical not installed. Install with: pip install victor-research"
+                )
             self._options.vertical = ResearchAssistant
 
         return self

@@ -1451,29 +1451,6 @@ class MiddlewareComposer:
         self._middleware.append(validation_middleware)
         return self
 
-    def standard_coding(self) -> "MiddlewareComposer":
-        """Add standard coding middleware setup.
-
-        Includes:
-        - Code correction with auto-fix
-        - Git safety (warnings only, not blocking)
-
-        Returns:
-            Self for method chaining
-        """
-        from victor_coding.middleware import (
-            CodeCorrectionMiddleware,
-            GitSafetyMiddleware,
-        )
-
-        self._middleware.extend(
-            [
-                CodeCorrectionMiddleware(enabled=True, auto_fix=True),
-                GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
-            ]
-        )
-        return self
-
     def standard_devops(self) -> "MiddlewareComposer":
         """Add standard DevOps middleware setup.
 
