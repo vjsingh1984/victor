@@ -22,6 +22,8 @@ specific coordination responsibilities from the AgentOrchestrator:
 - ToolCoordinator: Tool selection, budgeting, access control, and execution
 - MetricsCoordinator: Metrics collection and reporting
 - ProviderCoordinator: Provider management and switching
+- ConversationCoordinator: Message history, turn tracking, context management
+- SafetyCoordinator: Safety rule enforcement and operation blocking
 
 Design Philosophy:
 ------------------
@@ -76,6 +78,24 @@ from victor.agent.coordinators.protocols import (
     DictConfigProvider,
 )
 
+# Phase 2: New Coordinators for SOLID compliance
+from victor.agent.coordinators.conversation_coordinator import (
+    ConversationCoordinator,
+    TurnType,
+    ConversationTurn,
+    ConversationStats,
+    ConversationContext,
+)
+from victor.agent.coordinators.safety_coordinator import (
+    SafetyCoordinator,
+    SafetyRule,
+    SafetyCheckResult,
+    SafetyStats,
+    SafetyAction,
+    SafetyCategory,
+)
+from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+
 __all__ = [
     "ChatCoordinator",
     "ChatContextProtocol",
@@ -102,4 +122,17 @@ __all__ = [
     "NoOpCacheProvider",
     "NoOpEventEmitter",
     "DictConfigProvider",
+    # Phase 2: New Coordinators for SOLID compliance
+    "ConversationCoordinator",
+    "TurnType",
+    "ConversationTurn",
+    "ConversationStats",
+    "ConversationContext",
+    "SafetyCoordinator",
+    "SafetyRule",
+    "SafetyCheckResult",
+    "SafetyStats",
+    "SafetyAction",
+    "SafetyCategory",
+    "MetricsCoordinator",
 ]
