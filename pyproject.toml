@@ -413,8 +413,8 @@ vic = "victor.ui.cli:app"
 # =============================================================================
 
 [tool.setuptools.packages.find]
-include = ["victor*"]
-exclude = ["tests*", "docs*"]
+include = ["victor", "victor.*"]
+exclude = ["tests*", "docs*", "victor_test*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
