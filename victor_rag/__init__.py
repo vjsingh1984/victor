@@ -88,3 +88,20 @@ __all__ = [
     "RAGDeleteTool",
     "RAGStatsTool",
 ]
+
+# Enhanced features with new coordinators
+from victor_rag.safety_enhanced import (
+    RAGSafetyRules,
+    EnhancedRAGSafetyExtension,
+)
+from victor_rag.conversation_enhanced import (
+    RAGContext,
+    EnhancedRAGConversationManager,
+)
+
+__all__.extend([
+    "RAGSafetyRules",
+    "EnhancedRAGSafetyExtension",
+    "RAGContext",
+    "EnhancedRAGConversationManager",
+])
