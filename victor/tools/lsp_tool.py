@@ -56,7 +56,13 @@ KIND_NAMES = {
 
 async def _do_status() -> Dict[str, Any]:
     """Get LSP status."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    try:
+        from victor_coding.lsp.manager import get_lsp_manager
+    except ImportError:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     manager = get_lsp_manager()
     status = manager.get_status()

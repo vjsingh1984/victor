@@ -33,8 +33,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-from victor_coding.codebase.graph.registry import create_graph_store
+# Lazy load graph components from external victor-coding package
+try:
+    from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+    from victor_coding.codebase.graph.registry import create_graph_store
+    _GRAPH_AVAILABLE = True
+except ImportError:
+    _GRAPH_AVAILABLE = False
+    GraphEdge = None
+    GraphNode = None
+    GraphStoreProtocol = None
+    create_graph_store = None
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 

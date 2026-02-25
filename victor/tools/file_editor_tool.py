@@ -157,8 +157,16 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return [normalize_edit_operation(op) if isinstance(op, dict) else op for op in ops]
 
 
-from victor_coding.editing import FileEditor
 from victor.tools.base import AccessMode, DangerLevel, Priority
+
+# Lazy load FileEditor from external victor-coding package
+# This prevents circular dependency - framework doesn't import from verticals
+try:
+    from victor_coding.editing import FileEditor
+    _FILE_EDITOR_AVAILABLE = True
+except ImportError:
+    _FILE_EDITOR_AVAILABLE = False
+    FileEditor = None
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path
 
@@ -227,6 +235,15 @@ async def edit(
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file edits.
     """
+    # Check if FileEditor is available from external victor-coding package
+    if not _FILE_EDITOR_AVAILABLE:
+        return {
+            "success": False,
+            "error": "File editing requires the victor-coding package to be installed. "
+                   "Install it with: pip install victor-coding",
+            "ops": ops,
+        }
+
     # Validate required 'ops' parameter with helpful error message
     if ops is None:
         return {

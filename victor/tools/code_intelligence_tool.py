@@ -17,7 +17,13 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
-from victor_coding.codebase.tree_sitter_manager import get_parser
+# Lazy load parser from external victor-coding package
+try:
+    from victor_coding.codebase.tree_sitter_manager import get_parser
+    _PARSER_AVAILABLE = True
+except ImportError:
+    _PARSER_AVAILABLE = False
+    get_parser = None
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 

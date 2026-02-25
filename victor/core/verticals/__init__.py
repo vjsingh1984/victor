@@ -136,45 +136,19 @@ __all__ = [
 
 
 def _register_builtin_verticals() -> None:
-    """Register all built-in verticals with the registry."""
-    try:
-        from victor.coding import CodingAssistant
+    """Register all built-in verticals with the registry.
 
-        VerticalRegistry.register(CodingAssistant)
-    except ImportError:
-        pass
+    Built-in verticals are those that exist in the victor namespace.
+    External verticals (coding, research, devops, rag, dataanalysis) are
+    discovered via entry points in _discover_external_verticals().
+    """
+    # NOTE: coding, research, devops, rag, dataanalysis are now EXTERNAL verticals
+    # They are discovered via entry points, not imported directly.
+    # This prevents circular dependencies.
 
-    try:
-        from victor.research import ResearchAssistant
-
-        VerticalRegistry.register(ResearchAssistant)
-    except ImportError:
-        pass
-
-    try:
-        from victor.devops import DevOpsAssistant
-
-        VerticalRegistry.register(DevOpsAssistant)
-    except ImportError:
-        pass
-
-    try:
-        from victor.dataanalysis import DataAnalysisAssistant
-
-        VerticalRegistry.register(DataAnalysisAssistant)
-    except ImportError:
-        pass
-
-    try:
-        from victor.rag import RAGAssistant
-
-        VerticalRegistry.register(RAGAssistant)
-    except ImportError:
-        pass
-
+    # Only register verticals that truly exist in the victor package
     try:
         from victor.benchmark import BenchmarkVertical
-
         VerticalRegistry.register(BenchmarkVertical)
     except ImportError:
         pass
@@ -203,11 +177,27 @@ def _discover_external_verticals() -> None:
         pass
 
 
-# Register built-in verticals on import
-_register_builtin_verticals()
+# NOTE: We do NOT call _register_builtin_verticals() or _discover_external_verticals()
+# at module import time to avoid circular dependencies.
+# These are called lazily when first needed via get_vertical() or list_verticals()
 
-# Discover and register external verticals from entry points
-_discover_external_verticals()
+_registration_done = False
+
+
+def _ensure_registration() -> None:
+    """Ensure verticals are registered (lazy initialization).
+
+    This is called on first access to avoid circular dependencies during
+    framework initialization. External verticals may import from framework,
+    so we must complete framework initialization before loading them.
+    """
+    global _registration_done
+    if _registration_done:
+        return
+
+    _register_builtin_verticals()
+    _discover_external_verticals()
+    _registration_done = True
 
 
 def get_vertical(name: str | None) -> type[VerticalBase] | None:
@@ -219,6 +209,9 @@ def get_vertical(name: str | None) -> type[VerticalBase] | None:
     Returns:
         Vertical class or None if not found.
     """
+    # Ensure verticals are registered before lookup (lazy initialization)
+    _ensure_registration()
+
     if name is None:
         return None
 
@@ -242,4 +235,6 @@ def list_verticals() -> list[str]:
     Returns:
         List of registered vertical names.
     """
+    # Ensure verticals are registered before listing (lazy initialization)
+    _ensure_registration()
     return VerticalRegistry.list_names()

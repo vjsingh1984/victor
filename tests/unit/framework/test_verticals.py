@@ -305,10 +305,12 @@ class TestVerticalRegistry:
 
     def test_list_all(self):
         """list_all should return all registered verticals."""
-        verticals = VerticalRegistry.list_all()
-        assert isinstance(verticals, list)
-        # Should have at least coding and research
-        names = [name for name, _ in verticals]
+        # Use the public API which ensures lazy initialization
+        from victor.core.verticals import list_verticals
+        names = list_verticals()
+        assert isinstance(names, list)
+        # Should have at least coding and research (if external packages are installed)
+        # Note: In CI without external packages, only built-ins like 'benchmark' will be present
         assert "coding" in names
         assert "research" in names
 

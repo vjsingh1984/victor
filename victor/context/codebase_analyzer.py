@@ -32,11 +32,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor_coding.codebase.ignore_patterns import (
-    DEFAULT_SKIP_DIRS,
-    is_hidden_path,
-    should_ignore_path,
-)
+# Lazy load ignore patterns from external victor-coding package
+try:
+    from victor_coding.codebase.ignore_patterns import (
+        DEFAULT_SKIP_DIRS,
+        is_hidden_path,
+        should_ignore_path,
+    )
+    _IGNORE_PATTERNS_AVAILABLE = True
+except ImportError:
+    _IGNORE_PATTERNS_AVAILABLE = False
+    DEFAULT_SKIP_DIRS = frozenset({
+        ".git", ".venv", "venv", "__pycache__", "*.pyc",
+        "node_modules", ".pytest_cache", ".mypy_cache",
+        "dist", "build", "*.egg-info",
+    })
+
+    def is_hidden_path(path: Path) -> bool:
+        return path.name.startswith(".")
+
+    def should_ignore_path(path: Path, root: Path) -> bool:
+        return False
+
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor.core.utils.ast_helpers import (
     extract_base_classes,
