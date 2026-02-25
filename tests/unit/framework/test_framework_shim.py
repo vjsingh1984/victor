@@ -562,17 +562,27 @@ class TestListVerticalsFunction:
     def register_mock_vertical(self):
         """Register mock vertical for tests and ensure built-ins are present."""
         # Ensure built-in verticals are registered (they may have been cleared by other tests)
-        from victor.coding import CodingAssistant
-        from victor.devops import DevOpsAssistant
-        from victor.research import ResearchAssistant
+        # Try importing from external vertical packages, skip if not available
+        try:
+            from victor_coding.assistant import CodingAssistant
+            if not VerticalRegistry.get("coding"):
+                VerticalRegistry.register(CodingAssistant)
+        except ImportError:
+            pass
 
-        # Register built-ins if not already present
-        if not VerticalRegistry.get("coding"):
-            VerticalRegistry.register(CodingAssistant)
-        if not VerticalRegistry.get("devops"):
-            VerticalRegistry.register(DevOpsAssistant)
-        if not VerticalRegistry.get("research"):
-            VerticalRegistry.register(ResearchAssistant)
+        try:
+            from victor_devops.assistant import DevOpsAssistant
+            if not VerticalRegistry.get("devops"):
+                VerticalRegistry.register(DevOpsAssistant)
+        except ImportError:
+            pass
+
+        try:
+            from victor_research.assistant import ResearchAssistant
+            if not VerticalRegistry.get("research"):
+                VerticalRegistry.register(ResearchAssistant)
+        except ImportError:
+            pass
 
         # Register mock vertical
         VerticalRegistry.register(MockVertical)

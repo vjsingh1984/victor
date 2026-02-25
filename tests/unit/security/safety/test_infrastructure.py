@@ -395,7 +395,10 @@ class TestVerticalIntegration:
 
     def test_coding_safety_extension_uses_scanner(self):
         """CodingSafetyExtension should delegate to CodePatternScanner."""
-        from victor.coding.safety import CodingSafetyExtension
+        try:
+            from victor_coding.safety import CodingSafetyExtension
+        except ImportError:
+            pytest.skip("victor-coding package not installed")
 
         ext = CodingSafetyExtension()
         patterns = ext.get_bash_patterns()
@@ -405,7 +408,10 @@ class TestVerticalIntegration:
 
     def test_devops_safety_extension_uses_scanner(self):
         """DevOpsSafetyExtension should delegate to InfrastructureScanner."""
-        from victor.devops.safety import DevOpsSafetyExtension
+        try:
+            from victor_devops.safety import DevOpsSafetyExtension
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         ext = DevOpsSafetyExtension()
         patterns = ext.get_bash_patterns()
@@ -415,7 +421,10 @@ class TestVerticalIntegration:
 
     def test_coding_extension_scan_command(self):
         """CodingSafetyExtension.scan_command should work."""
-        from victor.coding.safety import CodingSafetyExtension
+        try:
+            from victor_coding.safety import CodingSafetyExtension
+        except ImportError:
+            pytest.skip("victor-coding package not installed")
 
         ext = CodingSafetyExtension()
         matches = ext.scan_command("git push --force origin main")
@@ -423,7 +432,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_scan_command(self):
         """DevOpsSafetyExtension.scan_command should work."""
-        from victor.devops.safety import DevOpsSafetyExtension
+        try:
+            from victor_devops.safety import DevOpsSafetyExtension
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         ext = DevOpsSafetyExtension()
         result = ext.scan_command("kubectl delete namespace prod")
@@ -431,7 +443,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_validate_dockerfile(self):
         """DevOpsSafetyExtension.validate_dockerfile should work."""
-        from victor.devops.safety import DevOpsSafetyExtension
+        try:
+            from victor_devops.safety import DevOpsSafetyExtension
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         ext = DevOpsSafetyExtension()
         warnings = ext.validate_dockerfile("FROM python:latest")
@@ -439,7 +454,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_validate_k8s(self):
         """DevOpsSafetyExtension.validate_kubernetes_manifest should work."""
-        from victor.devops.safety import DevOpsSafetyExtension
+        try:
+            from victor_devops.safety import DevOpsSafetyExtension
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         ext = DevOpsSafetyExtension()
         warnings = ext.validate_kubernetes_manifest("privileged: true")

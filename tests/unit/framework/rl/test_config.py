@@ -203,7 +203,10 @@ class TestBaseRLConfigVerticalInheritance:
 
     def test_research_config_inherits_base(self):
         """ResearchRLConfig should inherit from BaseRLConfig."""
-        from victor.research.rl import ResearchRLConfig
+        try:
+            from victor_research.rl import ResearchRLConfig
+        except ImportError:
+            pytest.skip("victor-research package not installed")
 
         config = ResearchRLConfig()
         assert isinstance(config, BaseRLConfig)
@@ -211,28 +214,40 @@ class TestBaseRLConfigVerticalInheritance:
 
     def test_dataanalysis_config_inherits_base(self):
         """DataAnalysisRLConfig should inherit from BaseRLConfig."""
-        from victor.dataanalysis.rl import DataAnalysisRLConfig
+        try:
+            from victor_dataanalysis.rl import DataAnalysisRLConfig
+        except ImportError:
+            pytest.skip("victor-dataanalysis package not installed")
 
         config = DataAnalysisRLConfig()
         assert isinstance(config, BaseRLConfig)
 
     def test_devops_config_inherits_base(self):
         """DevOpsRLConfig should inherit from BaseRLConfig."""
-        from victor.devops.rl import DevOpsRLConfig
+        try:
+            from victor_devops.rl import DevOpsRLConfig
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         config = DevOpsRLConfig()
         assert isinstance(config, BaseRLConfig)
 
     def test_rag_config_inherits_base(self):
         """RAGRLConfig should inherit from BaseRLConfig."""
-        from victor.rag.rl import RAGRLConfig
+        try:
+            from victor_rag.rl import RAGRLConfig
+        except ImportError:
+            pytest.skip("victor-rag package not installed")
 
         config = RAGRLConfig()
         assert isinstance(config, BaseRLConfig)
 
     def test_coding_config_inherits_base(self):
         """CodingRLConfig should inherit from BaseRLConfig."""
-        from victor.coding.rl import CodingRLConfig
+        try:
+            from victor_coding.rl.config import CodingRLConfig
+        except ImportError:
+            pytest.skip("victor-coding package not installed")
 
         config = CodingRLConfig()
         assert isinstance(config, BaseRLConfig)

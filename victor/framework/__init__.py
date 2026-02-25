@@ -566,6 +566,28 @@ try:
 except ImportError:
     _MODULE_LOADER_EXPORTS = []
 
+# Entry Point Loader (Phase 3 - Dynamic loading of vertical capabilities)
+try:
+    from victor.framework.entry_point_loader import (
+        load_safety_rules_from_entry_points,
+        load_tool_dependency_provider_from_entry_points,
+        load_rl_config_from_entry_points,
+        register_escape_hatches_from_entry_points,
+        register_commands_from_entry_points,
+        list_installed_verticals,
+    )
+
+    _ENTRY_POINT_LOADER_EXPORTS = [
+        "load_safety_rules_from_entry_points",
+        "load_tool_dependency_provider_from_entry_points",
+        "load_rl_config_from_entry_points",
+        "register_escape_hatches_from_entry_points",
+        "register_commands_from_entry_points",
+        "list_installed_verticals",
+    ]
+except ImportError:
+    _ENTRY_POINT_LOADER_EXPORTS = []
+
 # Capability Loader (Phase 4.4 - Dynamic capability loading for plugins)
 try:
     from victor.framework.capability_loader import (
@@ -770,6 +792,7 @@ __all__ = (
     + _CREW_EXPORTS
     + _MODULE_LOADER_EXPORTS
     + _CAPABILITY_LOADER_EXPORTS
+    + _ENTRY_POINT_LOADER_EXPORTS
     + _TOOL_NAMING_EXPORTS
     + _MIDDLEWARE_EXPORTS
     + _TASK_TYPES_EXPORTS

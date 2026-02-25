@@ -19,6 +19,8 @@ import ast
 import tempfile
 from pathlib import Path
 
+pytest.importorskip("victor_coding.languages.base")
+
 from victor.tools.documentation_tool import (
     _generate_function_docstring,
     _generate_class_docstring,
@@ -29,7 +31,7 @@ from victor.tools.documentation_tool import (
     docs,
     docs_coverage,
 )
-from victor.coding.languages.base import DocCommentPattern
+from victor_coding.languages.base import DocCommentPattern
 
 
 class TestGenerateFunctionDocstring:

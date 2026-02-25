@@ -859,7 +859,7 @@ class TestMiddlewareIntegration:
     @pytest.mark.asyncio
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
-        from victor.devops.assistant import DevOpsAssistant
+        from victor_devops.assistant import DevOpsAssistant
 
         middleware_list = DevOpsAssistant.get_middleware()
 

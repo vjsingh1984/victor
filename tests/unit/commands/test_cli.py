@@ -480,9 +480,12 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.return_value = (False, [], [])
 
-        with patch("victor.coding.codebase.indexer.CodebaseIndex", return_value=mock_index):
-            await check_codebase_index("/tmp", mock_console, silent=True)
-            # No output expected when not stale and silent
+        try:
+            with patch("victor_coding.codebase.indexer.CodebaseIndex", return_value=mock_index):
+                await check_codebase_index("/tmp", mock_console, silent=True)
+                # No output expected when not stale and silent
+        except ImportError:
+            pytest.skip("victor-coding package not installed")
 
 
 # =============================================================================

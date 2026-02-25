@@ -452,13 +452,29 @@ class EscapeHatchRegistry:
         Raises:
             ImportError: If the escape_hatches module cannot be imported
         """
-        module_path = f"victor.{vertical_name}.escape_hatches"
+        # Try external package first (e.g., victor_coding.escape_hatches)
+        # Map vertical names to their external package names
+        vertical_to_package = {
+            "coding": "victor_coding",
+            "devops": "victor_devops",
+            "research": "victor_research",
+            "rag": "victor_rag",
+            "dataanalysis": "victor_dataanalysis",
+        }
+
+        package_name = vertical_to_package.get(vertical_name, f"victor_{vertical_name}")
+        module_path = f"{package_name}.escape_hatches"
 
         try:
             module = importlib.import_module(module_path)
-        except ImportError as e:
-            logger.warning(f"Could not import escape hatches from {module_path}: {e}")
-            raise
+        except ImportError:
+            # Fall back to legacy internal path (for backward compatibility during migration)
+            legacy_path = f"victor.{vertical_name}.escape_hatches"
+            try:
+                module = importlib.import_module(legacy_path)
+            except ImportError as e:
+                logger.warning(f"Could not import escape hatches from {module_path} or {legacy_path}: {e}")
+                raise
 
         conditions = getattr(module, "CONDITIONS", {})
         transforms = getattr(module, "TRANSFORMS", {})

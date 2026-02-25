@@ -16,7 +16,10 @@
 
 from pathlib import Path
 
-from victor.coding.testgen.protocol import (
+import pytest
+pytest.importorskip("victor_coding")
+
+from victor_coding.testgen.protocol import (
     AssertionType,
     ClassSignature,
     FunctionSignature,

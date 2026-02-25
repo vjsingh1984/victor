@@ -531,10 +531,10 @@ def load_all_verticals() -> int:
 
     # Define verticals and their team specs attribute names
     verticals = [
-        ("victor.coding.teams", "CODING_TEAM_SPECS", "coding"),
-        ("victor.devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
-        ("victor.research.teams", "RESEARCH_TEAM_SPECS", "research"),
-        ("victor.dataanalysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
+        ("victor_coding.teams", "CODING_TEAM_SPECS", "coding"),
+        ("victor_devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
+        ("victor_research.teams", "RESEARCH_TEAM_SPECS", "research"),
+        ("victor_dataanalysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
     ]
 
     for module_name, specs_attr, vertical_name in verticals:

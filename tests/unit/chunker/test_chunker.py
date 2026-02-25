@@ -15,10 +15,14 @@
 """Tests for the robust code chunking module."""
 
 import pytest
+
+# Skip all tests in this module if victor-coding package is not installed
+pytest.importorskip("victor_coding.codebase.chunker")
+
 import tempfile
 from pathlib import Path
 
-from victor.coding.codebase.chunker import (
+from victor_coding.codebase.chunker import (
     CodeChunker,
     ChunkConfig,
     ChunkingStrategy,

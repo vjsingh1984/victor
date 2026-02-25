@@ -24,73 +24,79 @@ from typing import Any, Dict
 @pytest.mark.parametrize(
     "vertical,module_path,config_class",
     [
-        ("coding", "victor.coding.rl.config", "CodingRLConfig"),
-        ("research", "victor.research.rl", "ResearchRLConfig"),
-        ("devops", "victor.devops.rl", "DevOpsRLConfig"),
-        ("dataanalysis", "victor.dataanalysis.rl", "DataAnalysisRLConfig"),
+        ("coding", "victor_coding.rl.config", "CodingRLConfig"),
+        ("research", "victor_research.rl", "ResearchRLConfig"),
+        ("devops", "victor_devops.rl", "DevOpsRLConfig"),
+        ("dataanalysis", "victor_dataanalysis.rl", "DataAnalysisRLConfig"),
     ],
 )
 def test_rl_config_has_get_rl_config_method(vertical: str, module_path: str, config_class: str):
     """All RL configs must implement get_rl_config() per protocol."""
     import importlib
 
-    # Dynamically import the module
-    module = importlib.import_module(module_path)
-    config_cls = getattr(module, config_class)
+    try:
+        # Dynamically import the module
+        module = importlib.import_module(module_path)
+        config_cls = getattr(module, config_class)
 
-    # Instantiate the config
-    config = config_cls()
+        # Instantiate the config
+        config = config_cls()
 
-    # Verify the method exists
-    assert hasattr(
-        config, "get_rl_config"
-    ), f"{config_class} must implement get_rl_config() per RLConfigProviderProtocol"
+        # Verify the method exists
+        assert hasattr(
+            config, "get_rl_config"
+        ), f"{config_class} must implement get_rl_config() per RLConfigProviderProtocol"
 
-    # Verify the method is callable
-    assert callable(config.get_rl_config), f"{config_class}.get_rl_config must be callable"
+        # Verify the method is callable
+        assert callable(config.get_rl_config), f"{config_class}.get_rl_config must be callable"
+    except ImportError as e:
+        pytest.skip(f"External vertical package not installed: {vertical}")
 
 
 @pytest.mark.parametrize(
     "vertical,module_path,config_class",
     [
-        ("coding", "victor.coding.rl.config", "CodingRLConfig"),
-        ("research", "victor.research.rl", "ResearchRLConfig"),
-        ("devops", "victor.devops.rl", "DevOpsRLConfig"),
-        ("dataanalysis", "victor.dataanalysis.rl", "DataAnalysisRLConfig"),
+        ("coding", "victor_coding.rl.config", "CodingRLConfig"),
+        ("research", "victor_research.rl", "ResearchRLConfig"),
+        ("devops", "victor_devops.rl", "DevOpsRLConfig"),
+        ("dataanalysis", "victor_dataanalysis.rl", "DataAnalysisRLConfig"),
     ],
 )
 def test_get_rl_config_returns_dict(vertical: str, module_path: str, config_class: str):
     """get_rl_config() must return Dict[str, Any] with expected keys."""
     import importlib
 
-    # Dynamically import the module
-    module = importlib.import_module(module_path)
-    config_cls = getattr(module, config_class)
+    try:
+        # Dynamically import the module
+        module = importlib.import_module(module_path)
+        config_cls = getattr(module, config_class)
 
-    # Instantiate and call get_rl_config
-    config = config_cls()
-    result = config.get_rl_config()
+        # Instantiate and call get_rl_config
+        config = config_cls()
+        result = config.get_rl_config()
 
-    # Verify return type is dict
-    assert isinstance(
-        result, dict
-    ), f"{config_class}.get_rl_config() must return Dict[str, Any], got {type(result)}"
+        # Verify return type is dict
+        assert isinstance(
+            result, dict
+        ), f"{config_class}.get_rl_config() must return Dict[str, Any], got {type(result)}"
 
-    # Verify expected keys are present
-    expected_keys = {
-        "active_learners",
-        "task_type_mappings",
-        "quality_thresholds",
-        "default_patience",
-    }
-    missing_keys = expected_keys - set(result.keys())
-    assert not missing_keys, f"{config_class}.get_rl_config() missing expected keys: {missing_keys}"
+        # Verify expected keys are present
+        expected_keys = {
+            "active_learners",
+            "task_type_mappings",
+            "quality_thresholds",
+            "default_patience",
+        }
+        missing_keys = expected_keys - set(result.keys())
+        assert not missing_keys, f"{config_class}.get_rl_config() missing expected keys: {missing_keys}"
 
-    # Verify types of values
-    assert isinstance(result["active_learners"], list), "active_learners must be a list"
-    assert isinstance(result["task_type_mappings"], dict), "task_type_mappings must be a dict"
-    assert isinstance(result["quality_thresholds"], dict), "quality_thresholds must be a dict"
-    assert isinstance(result["default_patience"], dict), "default_patience must be a dict"
+        # Verify types of values
+        assert isinstance(result["active_learners"], list), "active_learners must be a list"
+        assert isinstance(result["task_type_mappings"], dict), "task_type_mappings must be a dict"
+        assert isinstance(result["quality_thresholds"], dict), "quality_thresholds must be a dict"
+        assert isinstance(result["default_patience"], dict), "default_patience must be a dict"
+    except ImportError as e:
+        pytest.skip(f"External vertical package not installed: {vertical}")
 
 
 def test_rl_config_implements_protocol():
@@ -101,10 +107,14 @@ def test_rl_config_implements_protocol():
     with defaults. We verify structural compliance by checking the required method.
     """
     from victor.core.verticals.protocols import RLConfigProviderProtocol
-    from victor.coding.rl.config import CodingRLConfig
-    from victor.research.rl import ResearchRLConfig
-    from victor.devops.rl import DevOpsRLConfig
-    from victor.dataanalysis.rl import DataAnalysisRLConfig
+
+    try:
+        from victor_coding.rl.config import CodingRLConfig
+        from victor_research.rl import ResearchRLConfig
+        from victor_devops.rl import DevOpsRLConfig
+        from victor_dataanalysis.rl import DataAnalysisRLConfig
+    except ImportError as e:
+        pytest.skip(f"External vertical packages not installed: {e}")
 
     configs = [
         CodingRLConfig(),

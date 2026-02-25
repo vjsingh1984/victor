@@ -81,7 +81,7 @@ class TestLspStatus:
             {"language": "typescript", "name": "tsserver", "installed": True, "running": False},
         ]
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(action="status")
 
             assert result["success"] is True
@@ -105,8 +105,8 @@ class TestLspStart:
         """Test start with unknown language."""
         mock_manager = MagicMock()
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
-            with patch("victor.coding.lsp.config.LANGUAGE_SERVERS", {}):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+            with patch("victor_coding.lsp.config.LANGUAGE_SERVERS", {}):
                 result = await lsp(action="start", language="unknown_lang")
 
                 assert result["success"] is False
@@ -122,8 +122,8 @@ class TestLspStart:
         mock_config.name = "Python LSP"
         mock_config.install_command = "pip install python-lsp-server"
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
-            with patch("victor.coding.lsp.config.LANGUAGE_SERVERS", {"python": mock_config}):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+            with patch("victor_coding.lsp.config.LANGUAGE_SERVERS", {"python": mock_config}):
                 result = await lsp(action="start", language="python")
 
                 assert result["success"] is True
@@ -140,8 +140,8 @@ class TestLspStart:
         mock_config.name = "Python LSP"
         mock_config.install_command = "pip install python-lsp-server"
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
-            with patch("victor.coding.lsp.config.LANGUAGE_SERVERS", {"python": mock_config}):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+            with patch("victor_coding.lsp.config.LANGUAGE_SERVERS", {"python": mock_config}):
                 result = await lsp(action="start", language="python")
 
                 assert result["success"] is False
@@ -164,7 +164,7 @@ class TestLspStop:
         mock_manager = MagicMock()
         mock_manager.stop_server = AsyncMock()
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(action="stop", language="python")
 
             assert result["success"] is True
@@ -208,7 +208,7 @@ class TestLspCompletions:
             ]
         )
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="completions",
                 file_path="test.py",
@@ -228,7 +228,7 @@ class TestLspCompletions:
         mock_manager.open_document = AsyncMock(return_value=True)
         mock_manager.get_completions = AsyncMock(return_value=[])
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="completions",
                 file_path="test.py",
@@ -258,7 +258,7 @@ class TestLspHover:
             return_value=MockHover(contents="def print(*args) -> None")
         )
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="hover",
                 file_path="test.py",
@@ -276,7 +276,7 @@ class TestLspHover:
         mock_manager.open_document = AsyncMock(return_value=True)
         mock_manager.get_hover = AsyncMock(return_value=None)
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="hover",
                 file_path="test.py",
@@ -306,7 +306,7 @@ class TestLspDefinition:
             return_value=[{"uri": "file:///utils.py", "line": 15, "character": 0}]
         )
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="definition",
                 file_path="test.py",
@@ -324,7 +324,7 @@ class TestLspDefinition:
         mock_manager.open_document = AsyncMock(return_value=True)
         mock_manager.get_definition = AsyncMock(return_value=[])
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="definition",
                 file_path="test.py",
@@ -358,7 +358,7 @@ class TestLspReferences:
             ]
         )
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="references",
                 file_path="test.py",
@@ -376,7 +376,7 @@ class TestLspReferences:
         mock_manager.open_document = AsyncMock(return_value=True)
         mock_manager.get_references = AsyncMock(return_value=[])
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(
                 action="references",
                 file_path="test.py",
@@ -408,7 +408,7 @@ class TestLspDiagnostics:
             {"severity": "info", "message": "Hint"},
         ]
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             with patch("asyncio.sleep", new_callable=AsyncMock):
                 result = await lsp(action="diagnostics", file_path="test.py")
 
@@ -433,7 +433,7 @@ class TestLspOpen:
         mock_manager = MagicMock()
         mock_manager.open_document = AsyncMock(return_value=True)
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(action="open", file_path="test.py")
 
             assert result["success"] is True
@@ -445,7 +445,7 @@ class TestLspOpen:
         mock_manager = MagicMock()
         mock_manager.open_document = AsyncMock(return_value=False)
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(action="open", file_path="test.py")
 
             assert result["success"] is False
@@ -467,7 +467,7 @@ class TestLspClose:
         mock_manager = MagicMock()
         mock_manager.close_document = MagicMock()
 
-        with patch("victor.coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
+        with patch("victor_coding.lsp.manager.get_lsp_manager", return_value=mock_manager):
             result = await lsp(action="close", file_path="test.py")
 
             assert result["success"] is True

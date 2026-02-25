@@ -16,13 +16,17 @@
 
 import pytest
 
-from victor.coding.lsp.config import (
+pytest.importorskip("victor_coding.lsp.config")
+pytest.importorskip("victor_coding.lsp.client")
+pytest.importorskip("victor_coding.lsp.manager")
+
+from victor_coding.lsp.config import (
     LSPServerConfig,
     LANGUAGE_SERVERS,
     get_server_for_file,
     get_language_id,
 )
-from victor.coding.lsp.client import (
+from victor_coding.lsp.client import (
     Position,
     Range,
     Location,
@@ -30,7 +34,7 @@ from victor.coding.lsp.client import (
     CompletionItem,
     Hover,
 )
-from victor.coding.lsp.manager import (
+from victor_coding.lsp.manager import (
     LSPConnectionPool,
     LSPStatus,
     get_lsp_manager,

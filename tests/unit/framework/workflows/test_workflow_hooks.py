@@ -35,44 +35,44 @@ class MinimalWorkflowProvider(BaseYAMLWorkflowProvider):
     """Minimal workflow provider without capability provider hook."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.research.escape_hatches"
+        return "victor_research.escape_hatches"
 
 
 class ResearchWorkflowProviderWithCapability(BaseYAMLWorkflowProvider):
     """Workflow provider with capability provider hook (mimics ResearchWorkflowProvider)."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.research.escape_hatches"
+        return "victor_research.escape_hatches"
 
     def _get_capability_provider_module(self) -> Optional[str]:
-        return "victor.research.capabilities"
+        return "victor_research.capabilities"
 
 
 class DevOpsWorkflowProviderWithCapability(BaseYAMLWorkflowProvider):
     """Workflow provider with capability provider hook (mimics DevOpsWorkflowProvider)."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.devops.escape_hatches"
+        return "victor_devops.escape_hatches"
 
     def _get_capability_provider_module(self) -> Optional[str]:
-        return "victor.devops.capabilities"
+        return "victor_devops.capabilities"
 
 
 class DataAnalysisWorkflowProviderWithCapability(BaseYAMLWorkflowProvider):
     """Workflow provider with capability provider hook (mimics DataAnalysisWorkflowProvider)."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.dataanalysis.escape_hatches"
+        return "victor_dataanalysis.escape_hatches"
 
     def _get_capability_provider_module(self) -> Optional[str]:
-        return "victor.dataanalysis.capabilities"
+        return "victor_dataanalysis.capabilities"
 
 
 class InvalidModuleWorkflowProvider(BaseYAMLWorkflowProvider):
     """Workflow provider with invalid capability module path."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.research.escape_hatches"
+        return "victor_research.escape_hatches"
 
     def _get_capability_provider_module(self) -> Optional[str]:
         return "victor.nonexistent.capabilities"
@@ -82,10 +82,10 @@ class NoCapabilityClassWorkflowProvider(BaseYAMLWorkflowProvider):
     """Workflow provider with module that has no capability provider class."""
 
     def _get_escape_hatches_module(self) -> str:
-        return "victor.research.escape_hatches"
+        return "victor_research.escape_hatches"
 
     def _get_capability_provider_module(self) -> Optional[str]:
-        return "victor.research.escape_hatches"  # This module has no CapabilityProvider
+        return "victor_research.escape_hatches"  # This module has no CapabilityProvider
 
 
 # =============================================================================
@@ -108,21 +108,21 @@ class TestGetCapabilityProviderModuleHook:
         provider = ResearchWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
-        assert result == "victor.research.capabilities"
+        assert result == "victor_research.capabilities"
 
     def test_devops_provider_returns_module_path(self):
         """DevOpsWorkflowProvider should return correct module path."""
         provider = DevOpsWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
-        assert result == "victor.devops.capabilities"
+        assert result == "victor_devops.capabilities"
 
     def test_dataanalysis_provider_returns_module_path(self):
         """DataAnalysisWorkflowProvider should return correct module path."""
         provider = DataAnalysisWorkflowProviderWithCapability()
         result = provider._get_capability_provider_module()
 
-        assert result == "victor.dataanalysis.capabilities"
+        assert result == "victor_dataanalysis.capabilities"
 
     def test_returns_optional_string(self):
         """Method should return Optional[str]."""

@@ -19,8 +19,11 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
 
-from victor.coding.codebase.embeddings.chunker import ASTAwareChunker
-from victor.coding.languages.base import CodeChunk
+pytest.importorskip("victor_coding.codebase.embeddings.chunker")
+pytest.importorskip("victor_coding.languages.base")
+
+from victor_coding.codebase.embeddings.chunker import ASTAwareChunker
+from victor_coding.languages.base import CodeChunk
 
 
 class TestASTAwareChunkerInit:

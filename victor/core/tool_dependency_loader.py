@@ -55,6 +55,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from importlib.metadata import entry_points
 
 import yaml
 
@@ -641,25 +642,21 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,
-) -> YAMLToolDependencyProvider:
-    """Factory function to create tool dependency providers for verticals.
+) -> BaseToolDependencyProvider:
+    """Factory function to create tool dependency providers for verticals using entry points.
 
-    Consolidates vertical-specific tool dependency provider creation into
-    a single factory function, reducing code duplication. This replaces the
-    need for individual wrapper classes like CodingToolDependencyProvider,
-    DevOpsToolDependencyProvider, etc.
+    This function loads tool dependency providers from external vertical packages
+    via the victor.tool_dependencies entry point group. This decouples the framework
+    from hardcoded knowledge about specific verticals.
 
     Args:
         vertical: Vertical name (coding, devops, research, rag, dataanalysis)
         canonicalize: Whether to canonicalize tool names. If None, uses the
-            vertical's default setting (some verticals disable canonicalization
-            to preserve distinct tool names like 'grep' vs 'code_search').
+            vertical's default setting.
 
     Returns:
-        Configured YAMLToolDependencyProvider for the vertical
-
-    Raises:
-        ValueError: If vertical is not recognized
+        Configured tool dependency provider for the vertical, or EmptyToolDependencyProvider
+        if the vertical package is not installed.
 
     Example:
         # Create provider for coding vertical
@@ -672,12 +669,34 @@ def create_vertical_tool_dependency_provider(
         # Get recommended sequence for edit task
         sequence = provider.get_recommended_sequence("edit")
 
-    Note:
-        This factory is the preferred way to create vertical providers for new code.
-        The individual wrapper classes (e.g., CodingToolDependencyProvider) are
-        maintained for backward compatibility but delegate to this factory internally.
+    Entry Point Registration:
+        Vertical packages register their provider factory via entry points:
+
+        [project.entry-points."victor.tool_dependencies"]
+        coding = "victor_coding.tool_dependencies:get_provider"
+        devops = "victor_devops.tool_dependencies:get_provider"
+
+        # In victor_coding/tool_dependencies.py:
+        def get_provider() -> BaseToolDependencyProvider:
+            return YAMLToolDependencyProvider(
+                yaml_path=Path(__file__).parent / "tool_dependencies.yaml",
+                canonicalize=True,
+            )
     """
-    # Map verticals to their tool dependency YAML files
+    # Try to load from entry points (external vertical packages)
+    try:
+        eps = entry_points(group="victor.tool_dependencies")
+        for ep in eps:
+            if ep.name == vertical:
+                provider_factory = ep.load()
+                provider = provider_factory()
+                logger.debug(f"Loaded tool dependency provider for '{vertical}' from entry point")
+                return provider
+    except Exception as e:
+        logger.debug(f"No tool dependency provider found for '{vertical}' in entry points: {e}")
+
+    # Fallback to legacy hardcoded paths (for backward compatibility during transition)
+    # This will be removed in a future version
     yaml_paths = {
         "coding": Path(__file__).parent.parent / "coding" / "tool_dependencies.yaml",
         "devops": Path(__file__).parent.parent / "devops" / "tool_dependencies.yaml",
@@ -693,19 +712,17 @@ def create_vertical_tool_dependency_provider(
     yaml_path = yaml_paths[vertical]
 
     # Check if YAML exists, fall back to empty provider if not
-    if not yaml_path.exists():
+    if yaml_path.exists():
+        # Determine canonicalization setting
+        if canonicalize is None:
+            canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
+        from victor.core.tool_dependency_base import YAMLToolDependencyProvider
+        return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)
+    else:
         logger.warning(f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}")
         # Return an LSP-compliant empty provider (Null Object pattern)
-        # This allows the system to function even without YAML files
         from victor.core.tool_types import EmptyToolDependencyProvider
-
         return EmptyToolDependencyProvider(vertical)
-
-    # Determine canonicalization setting
-    if canonicalize is None:
-        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
-
-    return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)
 
 
 __all__ = [

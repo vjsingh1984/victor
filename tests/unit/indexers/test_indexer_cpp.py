@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import pytest
+pytest.importorskip("victor_coding.codebase.indexer")
+
 from pathlib import Path
-from victor.coding.codebase.indexer import CodebaseIndex
+from victor_coding.codebase.indexer import CodebaseIndex
 
 
 @pytest.mark.asyncio

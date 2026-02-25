@@ -358,7 +358,7 @@ class TestAutoRegistration:
 
     def test_coding_vertical_team_specs_available(self):
         """Coding team specs should be available and match registered count."""
-        from victor.coding.teams import CODING_TEAM_SPECS
+        from victor_coding.teams import CODING_TEAM_SPECS
 
         # Load via load_all_verticals to ensure registration
         load_all_verticals()
@@ -375,7 +375,7 @@ class TestAutoRegistration:
 
     def test_devops_vertical_team_specs_available(self):
         """DevOps team specs should be available and match registered count."""
-        from victor.devops.teams import DEVOPS_TEAM_SPECS
+        from victor_devops.teams import DEVOPS_TEAM_SPECS
 
         load_all_verticals()
 
@@ -390,7 +390,7 @@ class TestAutoRegistration:
 
     def test_research_vertical_team_specs_available(self):
         """Research team specs should be available and match registered count."""
-        from victor.research.teams import RESEARCH_TEAM_SPECS
+        from victor_research.teams import RESEARCH_TEAM_SPECS
 
         load_all_verticals()
 
@@ -405,7 +405,7 @@ class TestAutoRegistration:
 
     def test_data_analysis_vertical_team_specs_available(self):
         """Data analysis team specs should be available and match registered count."""
-        from victor.dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
+        from victor_dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
 
         load_all_verticals()
 

@@ -618,7 +618,10 @@ class TestCapabilityConfigPersistence:
     def test_end_to_end_defaults_flow_service_to_runtime_getter(self):
         """Defaults should flow from step handler into runtime capability getter via service."""
         from victor.framework.step_handlers import CapabilityConfigStepHandler
-        from victor.research.capabilities import get_source_verification
+        try:
+            from victor_research.capabilities import get_source_verification
+        except ImportError:
+            pytest.skip("victor-research package not installed")
 
         class StubContainer:
             def __init__(self) -> None:

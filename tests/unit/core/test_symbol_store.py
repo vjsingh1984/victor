@@ -28,7 +28,9 @@ from pathlib import Path
 
 import pytest
 
-from victor.coding.codebase.symbol_store import SymbolStore, SymbolInfo
+pytest.importorskip("victor_coding.codebase.symbol_store")
+
+from victor_coding.codebase.symbol_store import SymbolStore, SymbolInfo
 
 
 class TestPythonExtraction:

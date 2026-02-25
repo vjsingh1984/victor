@@ -14,10 +14,13 @@
 
 """Tests for codebase/indexer module."""
 
+import pytest
+pytest.importorskip("victor_coding.codebase.indexer")
+
 import tempfile
 from pathlib import Path
 
-from victor.coding.codebase.indexer import Symbol, FileMetadata, CodebaseIndex
+from victor_coding.codebase.indexer import Symbol, FileMetadata, CodebaseIndex
 
 
 class TestSymbol:

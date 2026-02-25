@@ -443,7 +443,7 @@ class TestVerticalSafetyIntegration:
 
     def test_coding_safety_git_rules(self):
         """Coding git safety rules should block dangerous git operations."""
-        from victor.coding.safety import create_git_safety_rules
+        from victor.framework.safety import create_git_safety_rules
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_git_safety_rules(enforcer, block_force_push=True, block_main_push=True)
@@ -460,7 +460,7 @@ class TestVerticalSafetyIntegration:
 
     def test_coding_safety_file_rules(self):
         """Coding file safety rules should block destructive commands."""
-        from victor.coding.safety import create_file_safety_rules
+        from victor.framework.safety import create_file_safety_rules
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_file_safety_rules(enforcer, block_destructive_commands=True)
@@ -472,7 +472,10 @@ class TestVerticalSafetyIntegration:
 
     def test_devops_safety_deployment_rules(self):
         """DevOps deployment safety rules should require approval for production."""
-        from victor.devops.safety import create_deployment_safety_rules
+        try:
+            from victor_devops.safety import create_deployment_safety_rules
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_deployment_safety_rules(enforcer, require_approval_for_production=True)
@@ -484,7 +487,10 @@ class TestVerticalSafetyIntegration:
 
     def test_devops_safety_container_rules(self):
         """DevOps container safety rules should block privileged containers."""
-        from victor.devops.safety import create_container_safety_rules
+        try:
+            from victor_devops.safety import create_container_safety_rules
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_container_safety_rules(enforcer, block_privileged_containers=True)
@@ -496,7 +502,10 @@ class TestVerticalSafetyIntegration:
 
     def test_devops_safety_infrastructure_rules(self):
         """DevOps infrastructure safety rules should block destructive commands."""
-        from victor.devops.safety import create_infrastructure_safety_rules
+        try:
+            from victor_devops.safety import create_infrastructure_safety_rules
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_infrastructure_safety_rules(enforcer, block_destructive_commands=True)
@@ -513,7 +522,10 @@ class TestVerticalSafetyIntegration:
 
     def test_create_all_coding_safety_rules(self):
         """create_all_coding_safety_rules should register all coding rules."""
-        from victor.coding.safety import create_all_coding_safety_rules
+        try:
+            from victor_coding.safety import create_all_coding_safety_rules
+        except ImportError:
+            pytest.skip("victor-coding package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_coding_safety_rules(enforcer)
@@ -527,7 +539,10 @@ class TestVerticalSafetyIntegration:
 
     def test_create_all_devops_safety_rules(self):
         """create_all_devops_safety_rules should register all devops rules."""
-        from victor.devops.safety import create_all_devops_safety_rules
+        try:
+            from victor_devops.safety import create_all_devops_safety_rules
+        except ImportError:
+            pytest.skip("victor-devops package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_devops_safety_rules(enforcer)
@@ -541,7 +556,10 @@ class TestVerticalSafetyIntegration:
 
     def test_rag_safety_deletion_rules(self):
         """RAG deletion safety rules should block bulk deletions."""
-        from victor.rag.safety import create_rag_deletion_safety_rules
+        try:
+            from victor_rag.safety import create_rag_deletion_safety_rules
+        except ImportError:
+            pytest.skip("victor-rag package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_rag_deletion_safety_rules(enforcer, block_bulk_delete=True, block_delete_all=True)
@@ -558,7 +576,10 @@ class TestVerticalSafetyIntegration:
 
     def test_rag_safety_ingestion_rules(self):
         """RAG ingestion safety rules should block unsafe ingestion."""
-        from victor.rag.safety import create_rag_ingestion_safety_rules
+        try:
+            from victor_rag.safety import create_rag_ingestion_safety_rules
+        except ImportError:
+            pytest.skip("victor-rag package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_rag_ingestion_safety_rules(
@@ -641,7 +662,10 @@ class TestVerticalSafetyIntegration:
 
     def test_research_safety_content_rules(self):
         """Research content safety rules should block fabricated content."""
-        from victor.research.safety import create_research_content_safety_rules
+        try:
+            from victor_research.safety import create_research_content_safety_rules
+        except ImportError:
+            pytest.skip("victor-research package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_research_content_safety_rules(
@@ -663,7 +687,10 @@ class TestVerticalSafetyIntegration:
 
     def test_create_all_research_safety_rules(self):
         """create_all_research_safety_rules should register all research rules."""
-        from victor.research.safety import create_all_research_safety_rules
+        try:
+            from victor_research.safety import create_all_research_safety_rules
+        except ImportError:
+            pytest.skip("victor-research package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_research_safety_rules(enforcer)
@@ -681,7 +708,10 @@ class TestVerticalSafetyIntegration:
 
     def test_dataanalysis_safety_pii_rules(self):
         """DataAnalysis PII safety rules should block PII exports."""
-        from victor.dataanalysis.safety import create_dataanalysis_pii_safety_rules
+        try:
+            from victor_dataanalysis.safety import create_dataanalysis_pii_safety_rules
+        except ImportError:
+            pytest.skip("victor-dataanalysis package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_dataanalysis_pii_safety_rules(
@@ -702,7 +732,10 @@ class TestVerticalSafetyIntegration:
 
     def test_dataanalysis_safety_export_rules(self):
         """DataAnalysis export safety rules should block external uploads."""
-        from victor.dataanalysis.safety import create_dataanalysis_export_safety_rules
+        try:
+            from victor_dataanalysis.safety import create_dataanalysis_export_safety_rules
+        except ImportError:
+            pytest.skip("victor-dataanalysis package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_dataanalysis_export_safety_rules(
@@ -723,7 +756,10 @@ class TestVerticalSafetyIntegration:
 
     def test_create_all_dataanalysis_safety_rules(self):
         """create_all_dataanalysis_safety_rules should register all dataanalysis rules."""
-        from victor.dataanalysis.safety import create_all_dataanalysis_safety_rules
+        try:
+            from victor_dataanalysis.safety import create_all_dataanalysis_safety_rules
+        except ImportError:
+            pytest.skip("victor-dataanalysis package not installed")
 
         enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
         create_all_dataanalysis_safety_rules(enforcer)
