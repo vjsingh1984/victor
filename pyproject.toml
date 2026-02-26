@@ -142,6 +142,26 @@ docs = [
     "mkdocstrings[python]>=0.24",
 ]
 
+sphinx-docs = [
+    # Sphinx documentation framework
+    "sphinx>=7.0.0",
+    # Sphinx extensions
+    "sphinx-autodoc-typehints>=2.0.0",
+    "sphinxcontrib-apidoc>=0.5.0",
+    # Napoleon for Google/NumPy style docstrings
+    "sphinx-napoleon>=0.9",
+    # Additional Sphinx extensions
+    "sphinx-viewcode>=2.0",
+    "sphinx-intersphinx>=2.0",
+    "sphinx-duration>=0.2",
+    "sphinx-doctest>=1.0",
+    "sphinx-coverage>=2.0",
+    # Theme
+    "furo>=2023.0.0",
+    # Live reloading
+    "sphinx-autobuild>=2023.0.0",
+]
+
 build = [
     # Binary distribution
     "pyinstaller>=6.0",

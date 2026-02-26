@@ -1,0 +1,27 @@
+# Sphinx build directory
+_build/
+
+# Sphinx auto-generated files (only auto-generated, not manual docs)
+# Auto-generated files will be in api/generated/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
