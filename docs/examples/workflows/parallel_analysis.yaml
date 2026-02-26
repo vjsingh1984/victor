@@ -1,0 +1,83 @@
+name: "Multi-Perspective Analysis"
+description: "Analyze a topic from multiple perspectives in parallel"
+
+nodes:
+  # Analyze from technical perspective
+  - id: "technical_analysis"
+    type: "agent"
+    config:
+      prompt: |
+        As a technical expert, analyze: {{topic}}
+        Focus on:
+        - Technical feasibility
+        - Implementation challenges
+        - Required technologies
+        - Performance considerations
+
+  # Analyze from business perspective
+  - id: "business_analysis"
+    type: "agent"
+    config:
+      prompt: |
+        As a business analyst, analyze: {{topic}}
+        Focus on:
+        - Market potential
+        - Business model
+        - Revenue streams
+        - Competitive landscape
+
+  # Analyze from user perspective
+  - id: "user_analysis"
+    type: "agent"
+    config:
+      prompt: |
+        As a UX researcher, analyze: {{topic}}
+        Focus on:
+        - User needs
+        - User experience
+        - Accessibility
+        - Adoption barriers
+
+  # Synthesize all perspectives
+  - id: "synthesize"
+    type: "agent"
+    config:
+      prompt: |
+        Synthesize these three analyses into a comprehensive report:
+
+        Technical Analysis:
+        {{technical_analysis.output}}
+
+        Business Analysis:
+        {{business_analysis.output}}
+
+        User Analysis:
+        {{user_analysis.output}}
+
+        Provide:
+        1. Executive summary
+        2. Key findings from each perspective
+        3. Recommendations
+        4. Risk assessment
+        5. Next steps
+
+edges:
+  # Start all analyses in parallel
+  - from: "start"
+    to: "technical_analysis"
+  - from: "start"
+    to: "business_analysis"
+  - from: "start"
+    to: "user_analysis"
+
+  # Wait for all analyses to complete, then synthesize
+  - from: "technical_analysis"
+    to: "synthesize"
+  - from: "business_analysis"
+    to: "synthesize"
+  - from: "user_analysis"
+    to: "synthesize"
+
+  # Complete after synthesis
+  - from: "synthesize"
+    to: "complete"

@@ -1,0 +1,23 @@
+name: "Simple Greeting Workflow"
+description: "A simple workflow that greets the user and asks how to help"
+
+nodes:
+  - id: "greet"
+    type: "agent"
+    config:
+      prompt: "Hello! How can I help you today?"
+
+  - id: "respond"
+    type: "agent"
+    config:
+      prompt: |
+        Based on the user's input: "{{user_input}}"
+        Provide a helpful and friendly response.
+
+edges:
+  - from: "start"
+    to: "greet"
+  - from: "greet"
+    to: "respond"
+  - from: "respond"
+    to: "complete"
