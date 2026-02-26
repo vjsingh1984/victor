@@ -1,0 +1,125 @@
+name: "Bug Fix Workflow"
+description: "Systematic workflow for identifying and fixing bugs"
+
+nodes:
+  # Step 1: Understand the bug report
+  - id: "understand_issue"
+    type: "agent"
+    config:
+      prompt: |
+        Analyze this bug report: {{bug_report}}
+
+        Identify:
+        1. Expected behavior
+        2. Actual behavior
+        3. Error messages
+        4. Steps to reproduce
+        5. Severity level
+
+  # Step 2: Search for related code
+  - id: "search_code"
+    type: "handler"
+    config:
+      tool: "grep"
+      arguments:
+        pattern: "{{understand_issue.keywords}}"
+        path: "src/"
+
+  # Step 3: Analyze the code
+  - id: "analyze_code"
+    type: "handler"
+    config:
+      tool: "read"
+      arguments:
+        file_path: "{{search_code.files[0]}}"
+
+  # Step 4: Identify root cause
+  - id: "root_cause"
+    type: "agent"
+    config:
+      tools: ["read", "grep"]
+      prompt: |
+        Based on the bug analysis:
+        {{understand_issue.output}}
+
+        And the code:
+        {{analyze_code.result}}
+
+        Identify:
+        1. Root cause of the bug
+        2. Why it occurs
+        3. Conditions that trigger it
+
+  # Step 5: Propose fix
+    type: "agent"
+    config:
+      tools: ["read", "write"]
+      prompt: |
+        Propose a fix for the bug:
+
+        Root cause: {{root_cause.output}}
+
+        Provide:
+        1. Fix description
+        2. Code changes needed
+        3. Potential side effects
+        4. Test cases to verify
+
+  # Step 6: Implement fix
+  - id: "implement_fix"
+    type: "agent"
+    config:
+      tools: ["edit"]
+      prompt: |
+        Implement the fix:
+
+        {{propose_fix.output}}
+
+        Make the necessary code changes.
+
+  # Step 7: Verify fix
+  - id: "verify_fix"
+    type: "handler"
+    config:
+      tool: "shell"
+      arguments:
+        command: "pytest tests/ -v -k {{understand_issue.test_name}}"
+
+  # Step 8: Document changes
+    type: "agent"
+    config:
+      prompt: |
+        Document the bug fix:
+
+        Bug: {{understand_issue.output}}
+        Fix: {{propose_fix.output}}
+
+        Create:
+        1. Commit message
+        2. CHANGELOG entry
+        3. Documentation updates needed
+
+edges:
+  - from: "start"
+    to: "understand_issue"
+  - from: "understand_issue"
+    to: "search_code"
+  - from: "search_code"
+    to: "analyze_code"
+  - from: "analyze_code"
+    to: "root_cause"
+  - from: "root_cause"
+    to: "propose_fix"
+  - from: "propose_fix"
+    to: "implement_fix"
+  - from: "implement_fix"
+    to: "verify_fix"
+  - from: "verify_fix"
+    to: "document_changes"
+  - from: "document_changes"
+    to: "complete"
+
+  # Conditional: If tests fail, go back to implementation
+  - from: "verify_fix"
+    to: "implement_fix"
+    condition: "{{verify_fix.success}} == false"
