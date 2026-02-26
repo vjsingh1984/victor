@@ -153,6 +153,8 @@ async def create_orchestrator_from_options(
     # This delegates to existing factory infrastructure (SOLID DIP)
     agent = await factory.create_agent(
         mode="foreground",
+        provider=provider,
+        model=model or settings.default_model,
         tools=tools,
         airgapped=airgapped,
         vertical=vertical,
