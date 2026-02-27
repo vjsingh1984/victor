@@ -51,8 +51,14 @@ except ImportError:
     def is_hidden_path(path: Path) -> bool:
         return path.name.startswith(".")
 
-    def should_ignore_path(path: Path, root: Path) -> bool:
-        return False
+    def should_ignore_path(path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None) -> bool:
+        """Fallback implementation when victor-coding is not available."""
+        # Simple fallback: check if path is hidden or in skip_dirs
+        if path.name.startswith("."):
+            return True
+        if extra_skip_dirs and any(part in extra_skip_dirs for part in path.parts):
+            return True
+        return any(skip_dir in path.parts for skip_dir in skip_dirs)
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor.core.utils.ast_helpers import (
