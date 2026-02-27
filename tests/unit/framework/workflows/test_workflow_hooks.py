@@ -163,6 +163,7 @@ class TestGetCapabilityProviderMethod:
 
         assert result is None
 
+    @pytest.mark.integration
     def test_returns_capability_provider_for_research(self):
         """get_capability_provider should return ResearchCapabilityProvider."""
         provider = ResearchWorkflowProviderWithCapability()
@@ -171,6 +172,7 @@ class TestGetCapabilityProviderMethod:
         assert result is not None
         assert isinstance(result, BaseCapabilityProvider)
 
+    @pytest.mark.integration
     def test_returns_capability_provider_for_devops(self):
         """get_capability_provider should return DevOpsCapabilityProvider."""
         provider = DevOpsWorkflowProviderWithCapability()
@@ -179,6 +181,7 @@ class TestGetCapabilityProviderMethod:
         assert result is not None
         assert isinstance(result, BaseCapabilityProvider)
 
+    @pytest.mark.integration
     def test_returns_capability_provider_for_dataanalysis(self):
         """get_capability_provider should return DataAnalysisCapabilityProvider."""
         provider = DataAnalysisWorkflowProviderWithCapability()

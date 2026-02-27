@@ -317,6 +317,9 @@ class TestAutoRegistration:
     since Python's import caching means auto-registration only happens once
     per interpreter session. The clear() in fixtures removes the registrations
     but doesn't reset the import cache.
+
+    These tests require external vertical packages (victor-coding, victor-devops, etc.)
+    to be installed and are marked as integration tests.
     """
 
     @pytest.fixture(autouse=True)
@@ -328,6 +331,7 @@ class TestAutoRegistration:
         # Clean up after test
         get_team_registry().clear()
 
+    @pytest.mark.integration
     def test_load_all_verticals_registers_teams(self):
         """load_all_verticals should register teams from all verticals."""
         # Load all verticals
@@ -356,6 +360,7 @@ class TestAutoRegistration:
             len(data_analysis_teams) >= 5
         ), f"Expected at least 5 data_analysis teams, got {len(data_analysis_teams)}"
 
+    @pytest.mark.integration
     def test_coding_vertical_team_specs_available(self):
         """Coding team specs should be available and match registered count."""
         from victor_coding.teams import CODING_TEAM_SPECS
@@ -373,6 +378,7 @@ class TestAutoRegistration:
         assert registry.get("coding:bug_fix_team") is not None
         assert registry.get("coding:review_team") is not None
 
+    @pytest.mark.integration
     def test_devops_vertical_team_specs_available(self):
         """DevOps team specs should be available and match registered count."""
         from victor_devops.teams import DEVOPS_TEAM_SPECS
@@ -388,6 +394,7 @@ class TestAutoRegistration:
         assert registry.get("devops:deployment_team") is not None
         assert registry.get("devops:container_team") is not None
 
+    @pytest.mark.integration
     def test_research_vertical_team_specs_available(self):
         """Research team specs should be available and match registered count."""
         from victor_research.teams import RESEARCH_TEAM_SPECS
@@ -403,6 +410,7 @@ class TestAutoRegistration:
         assert registry.get("research:deep_research_team") is not None
         assert registry.get("research:fact_check_team") is not None
 
+    @pytest.mark.integration
     def test_data_analysis_vertical_team_specs_available(self):
         """Data analysis team specs should be available and match registered count."""
         from victor_dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
@@ -418,6 +426,7 @@ class TestAutoRegistration:
         assert registry.get("data_analysis:eda_team") is not None
         assert registry.get("data_analysis:ml_team") is not None
 
+    @pytest.mark.integration
     def test_find_team_for_task_with_loaded_verticals(self):
         """find_team_for_task should work after loading all verticals."""
         load_all_verticals()
@@ -433,6 +442,7 @@ class TestAutoRegistration:
         assert research_team is not None, "Should find research team"
         assert ml_team is not None, "Should find ML team"
 
+    @pytest.mark.integration
     def test_cross_vertical_discovery(self):
         """Should be able to discover teams across verticals."""
         load_all_verticals()
@@ -447,6 +457,7 @@ class TestAutoRegistration:
         assert any("research:" in t for t in all_teams)
         assert any("data_analysis:" in t for t in all_teams)
 
+    @pytest.mark.integration
     def test_total_team_count(self):
         """Should register 23 teams total across all verticals."""
         load_all_verticals()
@@ -456,6 +467,7 @@ class TestAutoRegistration:
         # Coding: 6, DevOps: 5, Research: 6, Data Analysis: 6 = 23 total
         assert len(teams) == 23, f"Expected 23 teams, got {len(teams)}: {teams}"
 
+    @pytest.mark.integration
     def test_registered_teams_have_valid_specs(self):
         """All registered teams should have valid spec objects."""
         load_all_verticals()

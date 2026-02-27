@@ -33,17 +33,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-# Lazy load graph components from external victor-coding package
+# Lazy load graph components - try main framework first, then victor-coding
+_GRAPH_AVAILABLE = False
+GraphEdge = None
+GraphNode = None
+GraphStoreProtocol = None
+create_graph_store = None
+
+# Try main framework's graph protocol first
 try:
-    from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-    from victor_coding.codebase.graph.registry import create_graph_store
+    from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+    from victor.storage.graph.registry import create_graph_store
     _GRAPH_AVAILABLE = True
 except ImportError:
-    _GRAPH_AVAILABLE = False
-    GraphEdge = None
-    GraphNode = None
-    GraphStoreProtocol = None
-    create_graph_store = None
+    # Fall back to victor-coding external package
+    try:
+        from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
+        from victor_coding.codebase.graph.registry import create_graph_store
+        _GRAPH_AVAILABLE = True
+    except ImportError:
+        pass  # Leave all as None
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
