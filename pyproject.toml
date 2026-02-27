@@ -112,6 +112,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Interactive examples and playground (typer, rich already in main deps)
+examples = []
+
 dev = [
     # Testing
     "pytest>=8.0",
@@ -394,6 +397,7 @@ Issues = "https://github.com/vijayksingh/victor/issues"
 [project.scripts]
 victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
+victor-examples = "examples.playground.cli:app"
 
 # =============================================================================
 # External Vertical Registration (for third-party packages)
