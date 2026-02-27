@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for unified LSP tool module."""
+"""Tests for unified LSP tool module.
+
+These tests require victor-coding package to be installed and are
+marked as integration tests.
+"""
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from dataclasses import dataclass
 
 from victor.tools.lsp_tool import lsp, KIND_NAMES
+
+# Mark all tests in this module as integration tests (require victor-coding)
+pytestmark = pytest.mark.integration
 
 
 @dataclass

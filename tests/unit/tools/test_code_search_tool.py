@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for code_search_tool module."""
+"""Tests for code_search_tool module.
+
+These tests require victor-coding package to be installed and are
+marked as integration tests.
+"""
 
 import tempfile
 from pathlib import Path
@@ -26,6 +30,9 @@ from victor.tools.code_search_tool import (
     _keyword_score,
     code_search,
 )
+
+# Mark all tests in this module as integration tests (require victor-coding)
+pytestmark = pytest.mark.integration
 
 
 class TestLatestMtime:

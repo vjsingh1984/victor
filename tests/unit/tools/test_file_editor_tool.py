@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for file_editor_tool module - TEXT-BASED file editing."""
+"""Tests for file_editor_tool module - TEXT-BASED file editing.
+
+These tests require victor-coding package to be installed and are
+marked as integration tests.
+"""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from victor.tools.file_editor_tool import edit
+
+# Mark all tests in this module as integration tests (require victor-coding)
+pytestmark = pytest.mark.integration
 
 
 class TestEditBasicOperations:

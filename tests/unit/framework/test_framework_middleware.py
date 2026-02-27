@@ -857,6 +857,7 @@ class TestMiddlewareIntegration:
         assert execution_order == ["critical_before", "high_before", "low_before"]
 
     @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
         from victor_devops.assistant import DevOpsAssistant

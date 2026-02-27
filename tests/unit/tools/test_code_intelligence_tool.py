@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for code_intelligence_tool module and consolidated rename from refactor_tool."""
+"""Tests for code_intelligence_tool module and consolidated rename from refactor_tool.
+
+These tests require victor-coding package to be installed and are
+marked as integration tests.
+"""
 
 import pytest
 
@@ -21,6 +25,9 @@ from victor.tools.code_intelligence_tool import (
     refs,
 )
 from victor.tools.refactor_tool import rename
+
+# Mark all tests in this module as integration tests (require victor-coding)
+pytestmark = pytest.mark.integration
 
 
 class TestSymbol:
