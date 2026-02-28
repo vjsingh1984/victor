@@ -12,639 +12,370 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Provider Health Check System.
+"""
+Provider Health Check API.
 
-Provides proactive health monitoring for LLM providers:
-- Lightweight health check probes
-- Aggregated health status
-- Provider ranking by health
-- Background health monitoring
-- Integration with circuit breakers
+This module provides pre-flight health checks for provider configuration:
+- Check if provider is registered
+- Check if API key is available
+- Validate API key format
+- Optional connectivity test (without consuming tokens)
 
 Usage:
-    from victor.providers.health import ProviderHealthChecker, HealthStatus
+    from victor.providers.health import ProviderHealthChecker
 
-    # Create health checker
     checker = ProviderHealthChecker()
+    result = await checker.check_provider(
+        provider="deepseek",
+        model="deepseek-chat",
+        check_connectivity=False,
+    )
 
-    # Check single provider
-    status = await checker.check_provider("anthropic")
-
-    # Check all providers
-    report = await checker.check_all()
-
-    # Get healthy providers ranked by latency
-    healthy = checker.get_healthy_providers()
-
-    # Start background monitoring
-    await checker.start_monitoring(interval_seconds=60)
+    if not result.healthy:
+        print(result.error_message)
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
-import time
+import re
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+from victor.providers.registry import ProviderRegistry
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+    APIKeyResult,
+)
+
 
 logger = logging.getLogger(__name__)
 
 
-class HealthStatus(Enum):
-    """Health status levels."""
-
-    HEALTHY = "healthy"  # Provider responding normally
-    DEGRADED = "degraded"  # Provider slow but functional
-    UNHEALTHY = "unhealthy"  # Provider failing or unavailable
-    UNKNOWN = "unknown"  # Not yet checked
-
-
 @dataclass
-class HealthCheckResult:
-    """Result of a single health check.
+class ProviderHealthResult:
+    """Result of provider health check."""
 
-    Attributes:
-        provider_name: Name of the provider checked
-        status: Health status
-        latency_ms: Response latency in milliseconds
-        error: Error message if unhealthy
-        timestamp: Time of check
-        model: Model used for check (if applicable)
-        details: Additional check details
-    """
+    healthy: bool
+    provider: str
+    model: str
+    issues: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    info: Dict[str, Any] = field(default_factory=dict)
 
-    provider_name: str
-    status: HealthStatus
-    latency_ms: float = 0.0
-    error: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.now)
-    model: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    @property
+    def error_message(self) -> str:
+        """Get formatted error message."""
+        if self.healthy:
+            return "Provider is healthy"
+        return "\n".join(self.issues)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
+        """Convert to dictionary for API responses."""
         return {
-            "provider_name": self.provider_name,
-            "status": self.status.value,
-            "latency_ms": round(self.latency_ms, 2),
-            "error": self.error,
-            "timestamp": self.timestamp.isoformat(),
+            "healthy": self.healthy,
+            "provider": self.provider,
             "model": self.model,
-            "details": self.details,
+            "issues": self.issues,
+            "warnings": self.warnings,
+            "info": self.info,
+            "status": "HEALTHY" if self.healthy else "UNHEALTHY",
         }
-
-
-@dataclass
-class ProviderHealthReport:
-    """Aggregated health report for all providers.
-
-    Attributes:
-        results: Individual provider results
-        healthy_count: Number of healthy providers
-        degraded_count: Number of degraded providers
-        unhealthy_count: Number of unhealthy providers
-        timestamp: Report generation time
-        total_check_time_ms: Time to complete all checks
-    """
-
-    results: Dict[str, HealthCheckResult] = field(default_factory=dict)
-    healthy_count: int = 0
-    degraded_count: int = 0
-    unhealthy_count: int = 0
-    timestamp: datetime = field(default_factory=datetime.now)
-    total_check_time_ms: float = 0.0
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "results": {name: r.to_dict() for name, r in self.results.items()},
-            "summary": {
-                "healthy": self.healthy_count,
-                "degraded": self.degraded_count,
-                "unhealthy": self.unhealthy_count,
-                "total": len(self.results),
-            },
-            "timestamp": self.timestamp.isoformat(),
-            "total_check_time_ms": round(self.total_check_time_ms, 2),
-        }
-
-
-# Default health check configuration per provider
-PROVIDER_HEALTH_CONFIG = {
-    "anthropic": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 5000,
-        "unhealthy_threshold_ms": 15000,
-        "timeout_seconds": 20,
-    },
-    "openai": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 3000,
-        "unhealthy_threshold_ms": 10000,
-        "timeout_seconds": 15,
-    },
-    "ollama": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 1000,
-        "unhealthy_threshold_ms": 5000,
-        "timeout_seconds": 10,
-    },
-    "lmstudio": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 1000,
-        "unhealthy_threshold_ms": 5000,
-        "timeout_seconds": 10,
-    },
-    "google": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 4000,
-        "unhealthy_threshold_ms": 12000,
-        "timeout_seconds": 15,
-    },
-    "xai": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 5000,
-        "unhealthy_threshold_ms": 15000,
-        "timeout_seconds": 20,
-    },
-    "groq": {
-        "check_endpoint": True,
-        "degraded_threshold_ms": 2000,
-        "unhealthy_threshold_ms": 8000,
-        "timeout_seconds": 12,
-    },
-}
-
-# Default config for unknown providers
-DEFAULT_HEALTH_CONFIG = {
-    "check_endpoint": True,
-    "degraded_threshold_ms": 5000,
-    "unhealthy_threshold_ms": 15000,
-    "timeout_seconds": 20,
-}
 
 
 class ProviderHealthChecker:
-    """Health checker for LLM providers.
+    """
+    Pre-flight health checks for provider configuration.
 
-    Features:
-    - Lightweight health probes (minimal token usage)
-    - Configurable thresholds per provider
-    - Parallel checking for efficiency
-    - Health history tracking
-    - Integration with circuit breakers
+    Checks:
+    1. Provider is registered
+    2. API key is available (or not required)
+    3. API key format is valid
+    4. Optional: Connectivity test (actual API call)
 
     Usage:
         checker = ProviderHealthChecker()
 
-        # Check single provider
-        result = await checker.check_provider("anthropic")
+        # Fast check (no API calls)
+        result = await checker.check_provider("deepseek", "deepseek-chat")
 
-        # Check all registered providers
-        report = await checker.check_all()
-
-        # Get ranked healthy providers
-        healthy = checker.get_healthy_providers()
+        # Thorough check (with API call)
+        result = await checker.check_provider(
+            "deepseek",
+            "deepseek-chat",
+            check_connectivity=True,
+        )
     """
 
-    def __init__(
-        self,
-        history_size: int = 100,
-        custom_configs: Optional[Dict[str, Dict[str, Any]]] = None,
-    ):
-        """Initialize health checker.
+    # API key format patterns
+    KEY_PATTERNS = {
+        "anthropic": r"^sk-ant-[a-zA-Z0-9_-]{95,}$",
+        "openai": r"^sk-[a-zA-Z0-9]{48,}$",
+        "deepseek": r"^sk-[a-zA-Z0-9]{20,}$",
+        "google": r"^.{20,}$",  # Google keys vary
+        "xai": r"^xai-[a-zA-Z0-9]{40,}$",
+    }
 
-        Args:
-            history_size: Number of health check results to retain per provider
-            custom_configs: Custom health check configurations per provider
-        """
-        self.history_size = history_size
-        self._configs = {**PROVIDER_HEALTH_CONFIG, **(custom_configs or {})}
+    # Providers that don't need API keys
+    LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
-        # Health check history per provider
-        self._history: Dict[str, List[HealthCheckResult]] = {}
-
-        # Latest result per provider
-        self._latest: Dict[str, HealthCheckResult] = {}
-
-        # Background monitoring task
-        self._monitoring_task: Optional[asyncio.Task] = None
-        self._stop_monitoring = asyncio.Event()
-
-        # Registered provider instances
-        self._providers: Dict[str, Any] = {}
-
-        # Callbacks for health changes
-        self._on_health_change: List[Callable[[str, HealthStatus, HealthStatus], None]] = []
-
-        logger.debug(f"ProviderHealthChecker initialized with history_size={history_size}")
-
-    def register_provider(self, name: str, provider: Any) -> None:
-        """Register a provider for health checking.
-
-        Args:
-            name: Provider name
-            provider: Provider instance
-        """
-        self._providers[name] = provider
-        logger.info(f"Registered provider for health checking: {name}")
-
-    def unregister_provider(self, name: str) -> None:
-        """Unregister a provider.
-
-        Args:
-            name: Provider name to unregister
-        """
-        if name in self._providers:
-            del self._providers[name]
-            logger.info(f"Unregistered provider: {name}")
-
-    def add_health_change_callback(
-        self, callback: Callable[[str, HealthStatus, HealthStatus], None]
-    ) -> None:
-        """Add callback for health status changes.
-
-        Args:
-            callback: Function(provider_name, old_status, new_status)
-        """
-        self._on_health_change.append(callback)
-
-    def _get_config(self, provider_name: str) -> Dict[str, Any]:
-        """Get health check config for provider."""
-        return self._configs.get(provider_name, DEFAULT_HEALTH_CONFIG)
-
-    def _determine_status(
-        self,
-        latency_ms: float,
-        config: Dict[str, Any],
-        error: Optional[str] = None,
-    ) -> HealthStatus:
-        """Determine health status from latency and config.
-
-        Args:
-            latency_ms: Response latency
-            config: Provider health config
-            error: Optional error message
-
-        Returns:
-            HealthStatus based on thresholds
-        """
-        if error:
-            return HealthStatus.UNHEALTHY
-
-        if latency_ms > config.get("unhealthy_threshold_ms", 15000):
-            return HealthStatus.UNHEALTHY
-        elif latency_ms > config.get("degraded_threshold_ms", 5000):
-            return HealthStatus.DEGRADED
-        else:
-            return HealthStatus.HEALTHY
-
-    def _record_result(self, result: HealthCheckResult) -> None:
-        """Record health check result.
-
-        Args:
-            result: Health check result to record
-        """
-        provider = result.provider_name
-
-        # Check for status change
-        old_status = self._latest.get(
-            provider, HealthCheckResult(provider_name=provider, status=HealthStatus.UNKNOWN)
-        ).status
-
-        if old_status != result.status:
-            logger.info(
-                f"Provider '{provider}' health changed: "
-                f"{old_status.value} -> {result.status.value}"
-            )
-            for callback in self._on_health_change:
-                try:
-                    callback(provider, old_status, result.status)
-                except Exception as e:
-                    logger.warning(f"Health change callback failed: {e}")
-
-        # Update latest
-        self._latest[provider] = result
-
-        # Update history
-        if provider not in self._history:
-            self._history[provider] = []
-
-        self._history[provider].append(result)
-
-        # Trim history
-        if len(self._history[provider]) > self.history_size:
-            self._history[provider] = self._history[provider][-self.history_size :]
+    def __init__(self):
+        """Initialize health checker."""
+        self.resolver = UnifiedApiKeyResolver()
 
     async def check_provider(
         self,
-        provider_name: str,
-        provider: Optional[Any] = None,
-    ) -> HealthCheckResult:
-        """Check health of a single provider.
+        provider: str,
+        model: str,
+        check_connectivity: bool = False,
+        timeout: float = 5.0,
+        **kwargs: Any,
+    ) -> ProviderHealthResult:
+        """
+        Check if provider is properly configured.
 
         Args:
-            provider_name: Name of the provider
-            provider: Optional provider instance (uses registered if not provided)
+            provider: Provider name
+            model: Model to check
+            check_connectivity: Make actual API call (slower but thorough)
+            timeout: Timeout for connectivity check
+            **kwargs: Additional provider arguments
 
         Returns:
-            HealthCheckResult with status and latency
+            ProviderHealthResult with status and actionable issues
         """
-        # Use provided or registered provider
-        provider = provider or self._providers.get(provider_name)
+        provider = provider.lower()
+        issues: List[str] = []
+        warnings: List[str] = []
+        info: Dict[str, Any] = {}
 
-        if provider is None:
-            return HealthCheckResult(
-                provider_name=provider_name,
-                status=HealthStatus.UNKNOWN,
-                error="Provider not registered",
+        # Check 1: Provider registration
+        if not self._check_provider_registered(provider):
+            issues.append(
+                f"Provider '{provider}' is not registered. "
+                f"Available providers: {self._list_available_providers()}"
+            )
+            return ProviderHealthResult(
+                healthy=False,
+                provider=provider,
+                model=model,
+                issues=issues,
+                warnings=warnings,
+                info=info,
             )
 
-        config = self._get_config(provider_name)
-        timeout = config.get("timeout_seconds", 20)
+        info["registered"] = True
+        logger.debug(f"Provider '{provider}' is registered")
 
-        start_time = time.perf_counter()
-        error = None
+        # Check 2: API key availability
+        key_result = self._check_api_key(provider, kwargs.get("api_key"))
 
+        if key_result.key is None and provider not in self.LOCAL_PROVIDERS:
+            # Build detailed error with sources attempted
+            error = APIKeyNotFoundError(
+                provider=provider,
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
+                model=model,
+            )
+            issues.append(str(error))
+            info["key_sources_attempted"] = [
+                {
+                    "source": s.source,
+                    "description": s.description,
+                    "found": s.found,
+                }
+                for s in key_result.sources_attempted
+            ]
+        else:
+            info["key_source"] = key_result.source_detail
+            logger.debug(f"Provider '{provider}' API key found: {key_result.source_detail}")
+
+        # Check 3: API key format (if key exists)
+        if key_result.key and provider in self.KEY_PATTERNS:
+            if not self._validate_key_format(provider, key_result.key):
+                issues.append(
+                    f"API key format validation failed for '{provider}'. "
+                    f"Expected format: {self._get_format_description(provider)}"
+                )
+            else:
+                info["key_format_valid"] = True
+                logger.debug(f"Provider '{provider}' API key format valid")
+
+        # Check 4: Connectivity (optional)
+        if check_connectivity and provider not in self.LOCAL_PROVIDERS:
+            connectivity_result = await self._check_connectivity(
+                provider, model, key_result.key, timeout, **kwargs
+            )
+            if not connectivity_result["success"]:
+                issues.append(connectivity_result.get("error", "Connectivity check failed"))
+            else:
+                info["connectivity"] = "OK"
+                logger.debug(f"Provider '{provider}' connectivity check passed")
+
+        # Warnings
+        if key_result.key and key_result.source == "keyring":
+            if key_result.non_interactive:
+                warnings.append(
+                    f"Using keychain for API key in non-interactive mode. "
+                    f"This may block background jobs. "
+                    f"Set {self._get_env_var(provider)} environment variable instead."
+                )
+
+        return ProviderHealthResult(
+            healthy=len(issues) == 0,
+            provider=provider,
+            model=model,
+            issues=issues,
+            warnings=warnings,
+            info=info,
+        )
+
+    def _check_provider_registered(self, provider: str) -> bool:
+        """Check if provider is registered."""
         try:
-            # Use a lightweight health check if available
-            if hasattr(provider, "health_check"):
-                await asyncio.wait_for(
-                    provider.health_check(),
-                    timeout=timeout,
-                )
-            elif hasattr(provider, "list_models"):
-                # Try listing models as a health check
-                await asyncio.wait_for(
-                    provider.list_models(),
-                    timeout=timeout,
-                )
-            elif hasattr(provider, "chat"):
-                # Minimal chat request (provider should handle this efficiently)
-                from victor.providers.base import Message
+            ProviderRegistry.get(provider)
+            return True
+        except Exception:
+            return False
 
-                await asyncio.wait_for(
-                    provider.chat(
-                        messages=[Message(role="user", content="Hi")],
-                        model=getattr(provider, "default_model", None),
-                        max_tokens=1,
-                    ),
-                    timeout=timeout,
-                )
-            else:
-                # No health check method available
-                error = "No health check method available"
+    def _list_available_providers(self) -> List[str]:
+        """Get list of available providers."""
+        try:
+            return ProviderRegistry.list_providers()
+        except Exception:
+            return []
 
-        except asyncio.TimeoutError:
-            error = f"Timeout after {timeout}s"
-        except Exception as e:
-            error = str(e)
-
-        latency_ms = (time.perf_counter() - start_time) * 1000
-        status = self._determine_status(latency_ms, config, error)
-
-        result = HealthCheckResult(
-            provider_name=provider_name,
-            status=status,
-            latency_ms=latency_ms,
-            error=error,
-            details={
-                "timeout_seconds": timeout,
-                "threshold_degraded_ms": config.get("degraded_threshold_ms"),
-                "threshold_unhealthy_ms": config.get("unhealthy_threshold_ms"),
-            },
-        )
-
-        self._record_result(result)
-        return result
-
-    async def check_all(
+    def _check_api_key(
         self,
-        providers: Optional[Dict[str, Any]] = None,
-    ) -> ProviderHealthReport:
-        """Check health of all registered providers in parallel.
+        provider: str,
+        explicit_key: Optional[str],
+    ) -> APIKeyResult:
+        """Check if API key is available."""
+        return self.resolver.get_api_key(provider, explicit_key=explicit_key)
 
-        Args:
-            providers: Optional dict of providers (uses registered if not provided)
+    def _validate_key_format(self, provider: str, key: str) -> bool:
+        """Validate API key format."""
+        pattern = self.KEY_PATTERNS.get(provider)
+        if not pattern:
+            return True  # No pattern defined, skip validation
+        return bool(re.match(pattern, key))
 
-        Returns:
-            ProviderHealthReport with all results
-        """
-        providers = providers or self._providers
-
-        if not providers:
-            return ProviderHealthReport()
-
-        start_time = time.perf_counter()
-
-        # Run checks in parallel
-        tasks = [self.check_provider(name, provider) for name, provider in providers.items()]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Build report
-        report = ProviderHealthReport()
-        report.total_check_time_ms = (time.perf_counter() - start_time) * 1000
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning(f"Health check failed with exception: {result}")
-                continue
-
-            report.results[result.provider_name] = result
-
-            if result.status == HealthStatus.HEALTHY:
-                report.healthy_count += 1
-            elif result.status == HealthStatus.DEGRADED:
-                report.degraded_count += 1
-            else:
-                report.unhealthy_count += 1
-
-        return report
-
-    def get_latest_status(self, provider_name: str) -> HealthStatus:
-        """Get latest health status for a provider.
-
-        Args:
-            provider_name: Provider name
-
-        Returns:
-            Latest HealthStatus or UNKNOWN if not checked
-        """
-        result = self._latest.get(provider_name)
-        return result.status if result else HealthStatus.UNKNOWN
-
-    def get_healthy_providers(self) -> List[str]:
-        """Get list of healthy providers sorted by latency (fastest first).
-
-        Returns:
-            List of provider names that are healthy, sorted by latency
-        """
-        healthy = [
-            (name, result)
-            for name, result in self._latest.items()
-            if result.status == HealthStatus.HEALTHY
-        ]
-        # Sort by latency
-        healthy.sort(key=lambda x: x[1].latency_ms)
-        return [name for name, _ in healthy]
-
-    def get_available_providers(self) -> List[str]:
-        """Get list of available providers (healthy or degraded).
-
-        Returns:
-            List of provider names that are operational
-        """
-        available = [
-            (name, result)
-            for name, result in self._latest.items()
-            if result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
-        ]
-        # Sort: healthy first, then by latency
-        available.sort(
-            key=lambda x: (
-                0 if x[1].status == HealthStatus.HEALTHY else 1,
-                x[1].latency_ms,
-            )
-        )
-        return [name for name, _ in available]
-
-    def get_provider_history(
-        self,
-        provider_name: str,
-        limit: Optional[int] = None,
-    ) -> List[HealthCheckResult]:
-        """Get health check history for a provider.
-
-        Args:
-            provider_name: Provider name
-            limit: Maximum results to return (most recent)
-
-        Returns:
-            List of HealthCheckResult in chronological order
-        """
-        history = self._history.get(provider_name, [])
-        if limit:
-            return history[-limit:]
-        return history
-
-    def calculate_uptime(
-        self,
-        provider_name: str,
-        window_size: Optional[int] = None,
-    ) -> float:
-        """Calculate uptime percentage from history.
-
-        Args:
-            provider_name: Provider name
-            window_size: Number of recent checks to consider
-
-        Returns:
-            Uptime as percentage (0.0 - 100.0)
-        """
-        history = self.get_provider_history(provider_name, window_size)
-        if not history:
-            return 0.0
-
-        healthy_count = sum(
-            1 for r in history if r.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
-        )
-        return (healthy_count / len(history)) * 100.0
-
-    def get_stats(self) -> Dict[str, Any]:
-        """Get health checker statistics.
-
-        Returns:
-            Dictionary with checker statistics
-        """
-        return {
-            "registered_providers": list(self._providers.keys()),
-            "checked_providers": list(self._latest.keys()),
-            "healthy_count": len(self.get_healthy_providers()),
-            "available_count": len(self.get_available_providers()),
-            "total_checks": sum(len(h) for h in self._history.values()),
-            "monitoring_active": self._monitoring_task is not None
-            and not self._monitoring_task.done(),
-            "uptime_by_provider": {
-                name: self.calculate_uptime(name) for name in self._latest.keys()
-            },
+    def _get_format_description(self, provider: str) -> str:
+        """Get human-readable format description."""
+        descriptions = {
+            "anthropic": "sk-ant- followed by 95+ characters",
+            "openai": "sk- followed by 48+ characters",
+            "deepseek": "sk- followed by 20+ characters",
+            "xai": "xai- followed by 40+ characters",
         }
+        return descriptions.get(provider, "valid API key format")
 
-    async def start_monitoring(
+    def _get_env_var(self, provider: str) -> Optional[str]:
+        """Get environment variable name for provider."""
+        from victor.providers.resolution import _get_provider_env_var
+        return _get_provider_env_var(provider)
+
+    async def _check_connectivity(
         self,
-        interval_seconds: float = 60.0,
-        providers: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Start background health monitoring.
+        provider: str,
+        model: str,
+        api_key: str,
+        timeout: float,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Check provider connectivity with minimal API call.
+
+        Makes a minimal API call to verify the provider is accessible
+        and the API key is valid.
 
         Args:
-            interval_seconds: Check interval in seconds
-            providers: Optional providers to monitor (uses registered if not provided)
+            provider: Provider name
+            model: Model to test
+            api_key: API key to use
+            timeout: Timeout for check
+            **kwargs: Additional arguments
+
+        Returns:
+            Dict with 'success' and optional 'error' key
         """
-        if self._monitoring_task and not self._monitoring_task.done():
-            logger.warning("Monitoring already active")
-            return
-
-        self._stop_monitoring.clear()
-
-        async def _monitor():
-            logger.info(f"Starting health monitoring (interval={interval_seconds}s)")
-            while not self._stop_monitoring.is_set():
-                try:
-                    await self.check_all(providers)
-                except Exception as e:
-                    logger.warning(f"Health monitoring error: {e}")
-
-                # Wait for interval or stop signal
-                try:
-                    await asyncio.wait_for(
-                        self._stop_monitoring.wait(),
-                        timeout=interval_seconds,
-                    )
-                    break  # Stop signal received
-                except asyncio.TimeoutError:
-                    pass  # Continue monitoring
-
-            logger.info("Health monitoring stopped")
-
-        self._monitoring_task = asyncio.create_task(_monitor())
-
-    async def stop_monitoring(self) -> None:
-        """Stop background health monitoring."""
-        if not self._monitoring_task:
-            return
-
-        self._stop_monitoring.set()
-
         try:
-            await asyncio.wait_for(self._monitoring_task, timeout=5.0)
-        except asyncio.TimeoutError:
-            self._monitoring_task.cancel()
+            # Create provider instance
+            provider_instance = ProviderRegistry.create(
+                provider,
+                api_key=api_key,
+                timeout=timeout,
+                **kwargs,
+            )
 
-        self._monitoring_task = None
-        logger.info("Health monitoring stopped")
+            # Make minimal test call
+            from victor.providers.base import Message
+
+            test_message = Message(role="user", content="Hi")
+
+            # Try to make a simple call (most providers will fail or succeed quickly)
+            try:
+                with asyncio.timeout(timeout):
+                    response = await provider_instance.chat(
+                        messages=[test_message],
+                        model=model,
+                        max_tokens=1,
+                    )
+                return {"success": True, "response": "Connectivity OK"}
+            except asyncio.TimeoutError:
+                return {
+                    "success": False,
+                    "error": f"Connectivity check timed out after {timeout}s"
+                }
+            except Exception as e:
+                # Some providers may return auth errors which is also useful info
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key"]):
+                    return {
+                        "success": False,
+                        "error": f"Authentication failed: {e}"
+                    }
+                # Other errors still indicate connectivity (just not a successful call)
+                return {
+                    "success": True,
+                    "warning": f"Provider responded with error (but is reachable): {e}"
+                }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to create provider: {e}"
+            }
 
 
-# Singleton instance for global access
-_health_checker: Optional[ProviderHealthChecker] = None
+async def check_provider_health(
+    provider: str,
+    model: str,
+    check_connectivity: bool = False,
+    timeout: float = 5.0,
+    **kwargs: Any,
+) -> ProviderHealthResult:
+    """
+    Convenience function to check provider health.
 
-
-def get_health_checker() -> ProviderHealthChecker:
-    """Get the global health checker instance.
+    Args:
+        provider: Provider name
+        model: Model to check
+        check_connectivity: Make actual API call
+        timeout: Timeout for connectivity check
+        **kwargs: Additional provider arguments
 
     Returns:
-        Global ProviderHealthChecker singleton
+        ProviderHealthResult
     """
-    global _health_checker
-    if _health_checker is None:
-        _health_checker = ProviderHealthChecker()
-    return _health_checker
-
-
-def reset_health_checker() -> None:
-    """Reset the global health checker (mainly for testing)."""
-    global _health_checker
-    if _health_checker and _health_checker._monitoring_task:
-        # Don't await in sync function - just set the stop flag
-        _health_checker._stop_monitoring.set()
-    _health_checker = None
+    checker = ProviderHealthChecker()
+    return await checker.check_provider(
+        provider=provider,
+        model=model,
+        check_connectivity=check_connectivity,
+        timeout=timeout,
+        **kwargs,
+    )
