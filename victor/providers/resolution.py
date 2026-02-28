@@ -144,7 +144,7 @@ class APIKeyNotFoundError(Exception):
         if self.model:
             lines.append(f"\n  Context: Provider={self.provider}, Model={self.model}")
         if self.non_interactive:
-            lines.append("  Environment: Non-interactive mode (daemon/container/CI)")
+            lines.append("  Environment: non-interactive mode (daemon/container/CI)")
 
         return "\n".join(lines)
 
@@ -429,11 +429,13 @@ class UnifiedApiKeyResolver:
 
     def _preview_key(self, key: str) -> str:
         """Get safe preview of key (first few chars)."""
-        if not key:
+        if not key or len(key) <= 2:
             return "(empty)"
         if len(key) <= 8:
-            return f"{key[:4]}..."
-        return f"{key[:8]}..."
+            # Show all but last 2 characters
+            return f"{key[:-2]}..."
+        # For longer keys, show first 10 characters
+        return f"{key[:10]}..."
 
     def clear_cache(self) -> None:
         """Clear cached results."""
