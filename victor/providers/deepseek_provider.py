@@ -28,7 +28,6 @@ References:
 
 import json
 import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -42,6 +41,12 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+    get_api_key_with_resolution,
+)
+from victor.providers.logging import ProviderLogger
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +91,7 @@ class DeepSeekProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize DeepSeek provider.
@@ -94,22 +100,36 @@ class DeepSeekProvider(BaseProvider):
             api_key: DeepSeek API key (or set DEEPSEEK_API_KEY env var)
             base_url: API endpoint (default: https://api.deepseek.com/v1)
             timeout: Request timeout (default: 120s)
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter, environment, or keyring
-        self._api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("deepseek", __name__)
 
-                self._api_key = get_api_key("deepseek") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "DeepSeek API key not provided. Set DEEPSEEK_API_KEY environment variable, "
-                "use 'victor keys --set deepseek --keyring', or pass api_key parameter."
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("deepseek", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="deepseek",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="deepseek-chat",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -177,53 +197,73 @@ class DeepSeekProvider(BaseProvider):
         Raises:
             ProviderError: If request fails
         """
-        try:
-            # Filter tools if model doesn't support them
-            effective_tools = tools if self._model_supports_tools(model) else None
-            if tools and not self._model_supports_tools(model):
-                logger.debug(f"Model {model} doesn't support tools, ignoring tools parameter")
-
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=effective_tools,
-                stream=False,
-                **kwargs,
-            )
-
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"DeepSeek request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
+        # Use structured logging context manager
+        async with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"DeepSeek HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"DeepSeek unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                # Filter tools if model doesn't support them
+                effective_tools = tools if self._model_supports_tools(model) else None
+                if tools and not self._model_supports_tools(model):
+                    logger.debug(f"Model {model} doesn't support tools, ignoring tools parameter")
+
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=effective_tools,
+                    stream=False,
+                    **kwargs,
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Will be set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"DeepSeek request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = ""
+                try:
+                    error_body = e.response.text[:500]
+                except Exception:
+                    pass
+                raise ProviderError(
+                    message=f"DeepSeek HTTP error {e.response.status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=e.response.status_code,
+                    raw_error=e,
+                ) from e
+            except Exception as e:
+                raise ProviderError(
+                    message=f"DeepSeek unexpected error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     async def stream(
         self,
