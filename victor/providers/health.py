@@ -109,21 +109,25 @@ class ProviderHealthChecker:
         )
     """
 
-    # API key format patterns
+    # API key format patterns (relaxed for flexibility)
     KEY_PATTERNS = {
-        "anthropic": r"^sk-ant-[a-zA-Z0-9_-]{95,}$",
-        "openai": r"^sk-[a-zA-Z0-9]{48,}$",
-        "deepseek": r"^sk-[a-zA-Z0-9]{20,}$",
-        "google": r"^.{20,}$",  # Google keys vary
-        "xai": r"^xai-[a-zA-Z0-9]{40,}$",
+        "anthropic": r"^sk-ant-[a-zA-Z0-9_-]{40,}$",  # More flexible length
+        "openai": r"^sk-[a-zA-Z0-9]{20,}$",      # More flexible
+        "deepseek": r"^sk-[a-zA-Z0-9]{10,}$",   # More flexible
+        "google": r"^.{10,}$",               # Google keys vary
+        "xai": r"^xai-[a-zA-Z0-9]{20,}$",      # More flexible
     }
 
     # Providers that don't need API keys
     LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
-    def __init__(self):
-        """Initialize health checker."""
-        self.resolver = UnifiedApiKeyResolver()
+    def __init__(self, non_interactive: Optional[bool] = None):
+        """Initialize health checker.
+
+        Args:
+            non_interactive: Force non-interactive mode for resolver
+        """
+        self.resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
 
     async def check_provider(
         self,

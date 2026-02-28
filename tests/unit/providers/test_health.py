@@ -178,18 +178,37 @@ class TestProviderHealthChecker:
 
     def test_keyring_warning_in_non_interactive(self):
         """Test warning when using keychain in non-interactive mode."""
+        from victor.providers.resolution import APIKeyResult, KeySource
+
         checker = ProviderHealthChecker(non_interactive=True)
 
-        with patch("victor.providers.health.is_keyring_available", return_value=True):
-            with patch("victor.providers.health._get_key_from_keyring", return_value="sk-from-keyring"):
-                with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
-                    async def run_check():
-                        return await checker.check_provider("deepseek", "deepseek-chat")
+        # Create a mock result that simulates getting a key from keyring in non-interactive mode
+        # Use valid key format (sk- followed by 20+ characters for DeepSeek)
+        mock_result = APIKeyResult(
+            key="sk-test12345678901234567890",  # Valid DeepSeek format
+            source="keyring",
+            source_detail="System keyring (test)",
+            sources_attempted=[
+                KeySource(
+                    source="keyring",
+                    description="System keyring",
+                    found=True,
+                )
+            ],
+            non_interactive=True,  # This should trigger the warning
+            confidence="medium",
+        )
 
-                    result = asyncio.run(run_check())
-                    assert result.healthy is True
-                    assert len(result.warnings) > 0
-                    assert any("keychain" in w.lower() for w in result.warnings)
+        # Patch the resolver's get_api_key to return our mock result
+        with patch.object(checker.resolver, "get_api_key", return_value=mock_result):
+            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+                async def run_check():
+                    return await checker.check_provider("deepseek", "deepseek-chat")
+
+                result = asyncio.run(run_check())
+                assert result.healthy is True
+                assert len(result.warnings) > 0
+                assert any("keychain" in w.lower() for w in result.warnings)
 
     def test_get_env_var(self):
         """Test _get_env_var method."""

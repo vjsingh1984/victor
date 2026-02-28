@@ -99,7 +99,7 @@ class ProviderLogger:
             config: Provider configuration (sanitized)
         """
         self.logger.info(
-            "PROVIDER_INIT",
+            f"PROVIDER_INIT provider={self.provider} model={model}",
             extra={
                 "event": "PROVIDER_INIT",
                 "provider": self.provider,
@@ -132,7 +132,7 @@ class ProviderLogger:
         ]
 
         self.logger.info(
-            "API_KEY_RESOLUTION",
+            f"API_KEY_RESOLUTION provider={self.provider} source={result.source} success={result.key is not None}",
             extra={
                 "event": "API_KEY_RESOLUTION",
                 "provider": self.provider,
@@ -170,7 +170,7 @@ class ProviderLogger:
         call_id = f"{self.provider}_{model}_{int(start_time * 1000)}"
 
         self.logger.info(
-            "API_CALL_START",
+            f"API_CALL_START provider={self.provider} model={model} operation={operation}",
             extra={
                 "event": "API_CALL_START",
                 "call_id": call_id,
@@ -205,7 +205,7 @@ class ProviderLogger:
         duration_ms = (time.time() - start_time) * 1000
 
         self.logger.info(
-            "API_CALL_SUCCESS",
+            f"API_CALL_SUCCESS provider={self.provider} model={model} duration_ms={round(duration_ms, 2)}",
             extra={
                 "event": "API_CALL_SUCCESS",
                 "call_id": call_id,
@@ -236,7 +236,7 @@ class ProviderLogger:
         retryable = self._is_retryable_error(error)
 
         self.logger.error(
-            "API_CALL_ERROR",
+            f"API_CALL_ERROR provider={self.provider} model={model} error_type={error_type} retryable={retryable}",
             extra={
                 "event": "API_CALL_ERROR",
                 "call_id": call_id,
@@ -288,7 +288,16 @@ class ProviderLogger:
         for key, value in config.items():
             if key.lower() in sensitive_keys:
                 if isinstance(value, str) and len(value) > 0:
-                    sanitized[key] = f"{value[:8]}..." if len(value) > 8 else "***"
+                    # Show first few chars for debugging, but hide most
+                    if len(value) <= 2:
+                        sanitized[key] = "(empty)"
+                    elif len(value) <= 4:
+                        # Show first char only
+                        sanitized[key] = f"{value[:1]}***"
+                    else:
+                        # Show first 2 chars for short keys, up to 8 for longer keys
+                        prefix_len = min(len(value) - 2, 8)
+                        sanitized[key] = f"{value[:prefix_len]}..."
                 else:
                     sanitized[key] = "***"
             else:
@@ -324,7 +333,7 @@ def log_provider_operation(
     start_time = time.time()
 
     op_logger.info(
-        f"PROVIDER_OPERATION_START",
+        f"PROVIDER_OPERATION_START operation={operation} provider={provider} model={model}",
         extra={
             "event": "PROVIDER_OPERATION_START",
             "operation": operation,
@@ -339,7 +348,7 @@ def log_provider_operation(
     except Exception as e:
         duration = time.time() - start_time
         op_logger.error(
-            f"PROVIDER_OPERATION_ERROR",
+            f"PROVIDER_OPERATION_ERROR operation={operation} provider={provider} error_type={type(e).__name__}",
             extra={
                 "event": "PROVIDER_OPERATION_ERROR",
                 "operation": operation,
@@ -355,7 +364,7 @@ def log_provider_operation(
     else:
         duration = time.time() - start_time
         op_logger.info(
-            f"PROVIDER_OPERATION_SUCCESS",
+            f"PROVIDER_OPERATION_SUCCESS operation={operation} provider={provider} duration_s={round(duration, 2)}",
             extra={
                 "event": "PROVIDER_OPERATION_SUCCESS",
                 "operation": operation,

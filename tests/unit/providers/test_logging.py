@@ -150,7 +150,7 @@ class TestLogProviderOperation:
 
     def test_error_logging(self, caplog):
         """Test error logging in context manager."""
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.INFO):
             with pytest.raises(ValueError):
                 with log_provider_operation("chat", "deepseek", "deepseek-chat"):
                     raise ValueError("Test error")

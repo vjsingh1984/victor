@@ -25,9 +25,24 @@ PROVIDER_ALIASES = {
 }
 
 
+@providers_app.callback(invoke_without_command=True)
+def providers_callback(ctx: typer.Context) -> None:
+    """Handle providers command with optional subcommand.
+
+    If no subcommand is provided, lists all available providers.
+    """
+    if ctx.invoked_subcommand is None:
+        # No subcommand provided, default to listing providers
+        _list_providers_impl()
+
+
 @providers_app.command("list")
 def list_providers() -> None:
     """List all available providers."""
+    _list_providers_impl()
+
+
+def _list_providers_impl() -> None:
     available_providers = ProviderRegistry.list_providers()
 
     # Provider info: (status, features, aliases)

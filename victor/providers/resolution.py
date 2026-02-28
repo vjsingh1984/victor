@@ -434,8 +434,8 @@ class UnifiedApiKeyResolver:
         if len(key) <= 8:
             # Show all but last 2 characters
             return f"{key[:-2]}..."
-        # For longer keys, show first 10 characters
-        return f"{key[:10]}..."
+        # For longer keys, show first min(11, len(key)) characters
+        return f"{key[:min(11, len(key)-2)]}..."
 
     def clear_cache(self) -> None:
         """Clear cached results."""
