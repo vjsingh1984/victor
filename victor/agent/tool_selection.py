@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from victor.providers.base import ToolDefinition
     from victor.tools.base import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
+    from victor.storage.cache.generic_result_cache import GenericResultCache
 
 logger = logging.getLogger(__name__)
 
@@ -697,6 +698,11 @@ class ToolSelector(ModeAwareMixin):
         # Selection statistics
         self.stats = ToolSelectionStats()
 
+        # Tool selection result cache (for expensive semantic selection)
+        self._tool_selection_cache: Optional["GenericResultCache"] = None
+        self._tool_selection_cache_enabled: bool = False
+        self._tool_selection_cache_ttl: int = 300  # default 5 minutes
+
         # Cache last selection to avoid redundant logging
         self._last_selection: Optional[Set[str]] = None
 
@@ -732,6 +738,48 @@ class ToolSelector(ModeAwareMixin):
             )
         except Exception as e:
             logger.warning(f"Failed to populate metadata registry: {e}")
+
+    def _init_tool_selection_cache(self) -> Optional["GenericResultCache"]:
+        """Initialize tool selection cache if enabled.
+
+        Returns:
+            GenericResultCache instance if enabled, None otherwise
+        """
+        if self._tool_selection_cache is not None:
+            return self._tool_selection_cache
+
+        try:
+            from victor.config.settings import get_settings
+            from victor.storage.cache.generic_result_cache import (
+                GenericResultCache,
+                _create_tool_selection_cache_key,
+            )
+
+            settings = get_settings()
+
+            if not settings.tool_selection_cache_enabled:
+                logger.debug("Tool selection cache disabled in settings")
+                self._tool_selection_cache_enabled = False
+                return None
+
+            # Initialize cache with tool selection TTL
+            self._tool_selection_cache = GenericResultCache()
+            self._tool_selection_cache_enabled = True
+            self._tool_selection_cache_ttl = settings.tool_selection_cache_ttl
+
+            logger.debug(
+                f"Tool selection cache initialized with TTL={self._tool_selection_cache_ttl}s"
+            )
+            return self._tool_selection_cache
+
+        except ImportError as e:
+            logger.warning(f"Failed to import cache modules: {e}")
+            self._tool_selection_cache_enabled = False
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to initialize tool selection cache: {e}")
+            self._tool_selection_cache_enabled = False
+            return None
 
     def _load_vertical_config(self) -> Dict[str, Any]:
         """Load vertical tool configurations from YAML.
@@ -1576,6 +1624,56 @@ class ToolSelector(ModeAwareMixin):
         if not self.semantic_selector:
             return self.select_keywords(user_message, planned_tools=planned_tools)
 
+        # Check cache for tool selection results
+        # Cache key depends on: message, conversation context, stage, depth
+        stage = self.conversation_state.get_stage() if self.conversation_state else None
+        cache_key = None
+        if self._tool_selection_cache_enabled:
+            cache = self._init_tool_selection_cache()
+            if cache:
+                from victor.storage.cache.generic_result_cache import (
+                    _create_tool_selection_cache_key,
+                    ResultType,
+                )
+
+                cache_key = _create_tool_selection_cache_key(
+                    user_message=user_message,
+                    conversation_history=conversation_history,
+                    conversation_depth=conversation_depth,
+                    stage=stage.value if stage else None,
+                    use_semantic=True,
+                )
+
+                cached_result = cache.get(
+                    ResultType.TOOL_SELECTION,
+                    cache_key,
+                )
+                if cached_result is not None:
+                    # Reconstruct ToolDefinition objects from cached data
+                    try:
+                        tool_names = cached_result.get("tool_names", [])
+                        tool_descriptions = cached_result.get("tool_descriptions", {})
+                        tool_parameters = cached_result.get("tool_parameters", {})
+
+                        reconstructed_tools = []
+                        for name in tool_names:
+                            if name in tool_descriptions:
+                                reconstructed_tools.append(
+                                    ToolDefinition(
+                                        name=name,
+                                        description=tool_descriptions[name],
+                                        parameters=tool_parameters.get(name),
+                                    )
+                                )
+
+                        if reconstructed_tools:
+                            logger.debug(
+                                f"Tool selection cache HIT: {len(reconstructed_tools)} tools"
+                            )
+                            return reconstructed_tools
+                    except Exception as e:
+                        logger.warning(f"Failed to reconstruct cached tools: {e}")
+
         # Initialize embeddings on first call
         if not self._embeddings_initialized:
             logger.info("Initializing tool embeddings (one-time operation)...")
@@ -1664,6 +1762,34 @@ class ToolSelector(ModeAwareMixin):
         # Apply vertical-specific tool selection strategy (DIP/OCP)
         # This allows verticals to prioritize/reorder tools based on domain knowledge
         tools = self._apply_vertical_strategy(tools, user_message)
+
+        # Cache tool selection results for future lookups
+        if cache_key and self._tool_selection_cache_enabled:
+            cache = self._init_tool_selection_cache()
+            if cache:
+                try:
+                    from victor.storage.cache.generic_result_cache import ResultType
+
+                    # Serialize tool definitions for caching
+                    tool_names = [t.name for t in tools]
+                    tool_descriptions = {t.name: t.description for t in tools}
+                    tool_parameters = {t.name: t.parameters for t in tools}
+
+                    cache_data = {
+                        "tool_names": tool_names,
+                        "tool_descriptions": tool_descriptions,
+                        "tool_parameters": tool_parameters,
+                    }
+
+                    cache.set(
+                        ResultType.TOOL_SELECTION,
+                        cache_key,
+                        cache_data,
+                        ttl=self._tool_selection_cache_ttl,
+                    )
+                    logger.debug(f"Tool selection cached: {len(tools)} tools")
+                except Exception as e:
+                    logger.warning(f"Failed to cache tool selection: {e}")
 
         return tools
 
