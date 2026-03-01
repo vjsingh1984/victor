@@ -35,8 +35,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -45,13 +43,18 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Azure OpenAI API versions
 DEFAULT_API_VERSION = "2024-08-01-preview"
@@ -154,6 +157,7 @@ class AzureOpenAIProvider(BaseProvider):
         deployment_name: Optional[str] = None,
         api_version: str = DEFAULT_API_VERSION,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Azure OpenAI provider.
@@ -164,36 +168,53 @@ class AzureOpenAIProvider(BaseProvider):
             deployment_name: Default deployment name (or set AZURE_OPENAI_DEPLOYMENT)
             api_version: API version to use
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("AZURE_OPENAI_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("azure", __name__)
 
-                resolved_key = get_api_key("azure_openai") or get_api_key("azure") or ""
-            except ImportError:
-                pass
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("azure_openai", explicit_key=api_key)
 
-        if not resolved_key:
-            logger.warning(
-                "Azure OpenAI API key not provided. Set AZURE_OPENAI_API_KEY environment variable, "
-                "use 'victor keys --set azure_openai --keyring', or pass api_key parameter."
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="azure_openai",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
 
-        self._api_key = resolved_key
-        self._endpoint = endpoint or os.environ.get("AZURE_OPENAI_ENDPOINT", "")
-        self._default_deployment = deployment_name or os.environ.get("AZURE_OPENAI_DEPLOYMENT", "")
+        self._api_key = key_result.key
+        self._endpoint = endpoint or ""
+        self._default_deployment = deployment_name or ""
         self._api_version = api_version
 
         if not self._endpoint:
-            logger.warning(
+            self._provider_logger.logger.warning(
                 "Azure OpenAI endpoint not provided. Set AZURE_OPENAI_ENDPOINT environment variable."
             )
 
         # Clean endpoint URL
         self._endpoint = self._endpoint.rstrip("/")
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="azure",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={
+                "endpoint": self._endpoint,
+                "api_version": api_version,
+                "deployment_name": deployment_name,
+                "timeout": timeout,
+                **kwargs,
+            },
+        )
 
         super().__init__(base_url=self._endpoint, timeout=timeout, **kwargs)
 
@@ -242,29 +263,82 @@ class AzureOpenAIProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Azure OpenAI."""
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, False, **kwargs
-            )
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, False, **kwargs
+                )
 
-            url = self._get_deployment_url(model)
-            response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
-            response.raise_for_status()
+                url = self._get_deployment_url(model)
+                response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
+                response.raise_for_status()
 
-            return self._parse_response(response.json(), model)
+                parsed = self._parse_response(response.json(), model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Azure OpenAI request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Azure OpenAI HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Azure OpenAI request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                if isinstance(e, httpx.TimeoutException):
+                    raise ProviderTimeoutError(
+                        message=f"Azure OpenAI request timed out after {self.timeout}s",
+                        provider=self.name,
+                    ) from e
+
+                if isinstance(e, httpx.HTTPStatusError):
+                    error_body = e.response.text[:500] if e.response.text else ""
+                    error_str = error_body.lower()
+
+                    if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                        raise ProviderAuthError(
+                            message=f"Authentication failed: {error_body}",
+                            provider=self.name,
+                        ) from e
+                    elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                        raise ProviderRateLimitError(
+                            message=f"Rate limit exceeded: {error_body}",
+                            provider=self.name,
+                            status_code=e.response.status_code,
+                        ) from e
+                    else:
+                        raise ProviderError(
+                            message=f"Azure OpenAI HTTP error {e.response.status_code}: {error_body}",
+                            provider=self.name,
+                            status_code=e.response.status_code,
+                        ) from e
+
+                # Wrap generic errors in ProviderError
+                raise ProviderError(
+                    message=f"Azure OpenAI API error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     async def stream(
         self,

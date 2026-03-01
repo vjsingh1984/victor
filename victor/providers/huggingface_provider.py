@@ -39,7 +39,6 @@ References:
 """
 
 import json
-import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -49,13 +48,18 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 DEFAULT_BASE_URL = "https://api-inference.huggingface.co"
 
@@ -152,6 +156,7 @@ class HuggingFaceProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Hugging Face provider.
@@ -160,25 +165,44 @@ class HuggingFaceProvider(BaseProvider):
             api_key: HF API token (or set HF_TOKEN / HUGGINGFACE_API_KEY env var)
             base_url: API endpoint
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env vars, then keyring/api_keys.yaml
-        self._api_key = (
-            api_key or os.environ.get("HF_TOKEN", "") or os.environ.get("HUGGINGFACE_API_KEY", "")
-        )
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("huggingface", __name__)
 
-                # Try both huggingface and hf aliases
-                self._api_key = get_api_key("huggingface") or get_api_key("hf") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Hugging Face API key not provided. Set HF_TOKEN or HUGGINGFACE_API_KEY environment variable "
-                "or add to keyring with: victor keys --set huggingface --keyring"
+        # For backward compatibility, support both HF_TOKEN and HUGGINGFACE_API_KEY
+        # If no explicit key and HF_TOKEN is not set, check HUGGINGFACE_API_KEY
+        effective_api_key = api_key
+        if effective_api_key is None:
+            env_key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY")
+            # Convert empty string to None so resolver knows to check other sources
+            effective_api_key = env_key if env_key else None
+
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("huggingface", explicit_key=effective_api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="huggingface",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="hf",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -210,40 +234,117 @@ class HuggingFaceProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to Hugging Face."""
-        try:
-            # Use OpenAI-compatible Messages API
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, False, **kwargs
-            )
+        """Send chat completion request to Hugging Face.
 
-            # HF uses model name in URL path
-            url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+        Args:
+            messages: Conversation messages
+            model: Model name (e.g., "meta-llama/Llama-3.3-70B-Instruct")
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Available tools
+            **kwargs: Additional HuggingFace parameters
 
-            response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
-            response.raise_for_status()
+        Returns:
+            CompletionResponse with generated content
 
-            return self._parse_response(response.json(), model)
+        Raises:
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
+        """
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint=f"/models/{model}/v1/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                # Use OpenAI-compatible Messages API
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, False, **kwargs
+                )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Hugging Face request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            # Check for model loading status
-            if e.response.status_code == 503:
-                raise ProviderError(
-                    message=f"Hugging Face model is loading. Please retry in a few seconds. {error_body}",
+                # HF uses model name in URL path
+                url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+
+                response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
+                response.raise_for_status()
+
+                parsed = self._parse_response(response.json(), model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint=f"/models/{model}/v1/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Hugging Face request timed out after {self.timeout}s",
                     provider=self.name,
-                    status_code=e.response.status_code,
                 ) from e
-            raise ProviderError(
-                message=f"Hugging Face HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = e.response.text[:500] if e.response.text else ""
+
+                # Convert to specific provider error types based on status code
+                if e.response.status_code == 401:
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                # Check for model loading status
+                elif e.response.status_code == 503:
+                    raise ProviderError(
+                        message=f"Hugging Face model is loading. Please retry in a few seconds. {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Hugging Face HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Hugging Face API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,

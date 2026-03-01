@@ -35,22 +35,28 @@ class TestHuggingFaceProviderInitialization:
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
         with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+            # Mock the keyring source in unified resolver
             with patch(
-                "victor.config.api_keys.get_api_key",
+                "victor.providers.resolution._get_key_from_keyring",
                 return_value="keyring-hf-key",
             ):
-                provider = HuggingFaceProvider()
+                provider = HuggingFaceProvider(non_interactive=False)
                 assert provider._api_key == "keyring-hf-key"
 
-    def test_initialization_warning_without_key(self, caplog):
-        """Test warning is logged when no API key provided."""
+    def test_initialization_error_without_key(self):
+        """Test APIKeyNotFoundError is raised when no API key provided."""
+        from victor.providers.resolution import APIKeyNotFoundError
+
         with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+            # Mock all sources to return None
             with patch(
-                "victor.config.api_keys.get_api_key",
+                "victor.providers.resolution._get_key_from_keyring",
                 return_value=None,
             ):
-                provider = HuggingFaceProvider()
-                assert provider._api_key == ""
+                with pytest.raises(APIKeyNotFoundError) as exc_info:
+                    HuggingFaceProvider(non_interactive=True)
+
+                assert "HUGGINGFACE API key not found" in str(exc_info.value)
 
     def test_hf_token_priority_over_huggingface_api_key(self):
         """Test HF_TOKEN takes priority over HUGGINGFACE_API_KEY."""

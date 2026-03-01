@@ -35,7 +35,6 @@ References:
 """
 
 import asyncio
-import logging
 import os
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -46,13 +45,15 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import UnifiedApiKeyResolver, APIKeyNotFoundError
+from victor.providers.logging import ProviderLogger
 
 DEFAULT_BASE_URL = "https://api.replicate.com/v1"
 
@@ -124,6 +125,7 @@ class ReplicateProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Replicate provider.
@@ -132,22 +134,36 @@ class ReplicateProvider(BaseProvider):
             api_key: Replicate API token (or set REPLICATE_API_TOKEN env var)
             base_url: API endpoint
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env var, then keyring/api_keys.yaml
-        self._api_key = api_key or os.environ.get("REPLICATE_API_TOKEN", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("replicate", __name__)
 
-                self._api_key = get_api_key("replicate") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Replicate API token not provided. Set REPLICATE_API_TOKEN environment variable "
-                "or add to keyring with: victor keys --set replicate --keyring"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("replicate", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="replicate",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="replicate",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -180,48 +196,106 @@ class ReplicateProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Replicate."""
-        try:
-            # Convert messages to prompt format for Replicate
-            prompt = self._messages_to_prompt(messages)
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/predictions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=False,  # Replicate doesn't support tools
+        ):
+            try:
+                # Convert messages to prompt format for Replicate
+                prompt = self._messages_to_prompt(messages)
 
-            # Create prediction
-            prediction = await self._create_prediction(
-                model=model, prompt=prompt, temperature=temperature, max_tokens=max_tokens, **kwargs
-            )
-
-            # Wait for completion
-            prediction = await self._wait_for_prediction(prediction["id"])
-
-            if prediction["status"] == "failed":
-                raise ProviderError(
-                    message=f"Replicate prediction failed: {prediction.get('error', 'Unknown error')}",
-                    provider=self.name,
+                # Create prediction
+                prediction = await self._create_prediction(
+                    model=model, prompt=prompt, temperature=temperature, max_tokens=max_tokens, **kwargs
                 )
 
-            # Parse output
-            output = prediction.get("output", "")
-            if isinstance(output, list):
-                output = "".join(output)
+                # Wait for completion
+                prediction = await self._wait_for_prediction(prediction["id"])
 
-            return CompletionResponse(
-                content=output,
-                role="assistant",
-                model=model,
-                raw_response=prediction,
-            )
+                if prediction["status"] == "failed":
+                    raise ProviderError(
+                        message=f"Replicate prediction failed: {prediction.get('error', 'Unknown error')}",
+                        provider=self.name,
+                    )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Replicate request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Replicate HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+                # Parse output
+                output = prediction.get("output", "")
+                if isinstance(output, list):
+                    output = "".join(output)
+
+                response = CompletionResponse(
+                    content=output,
+                    role="assistant",
+                    model=model,
+                    raw_response=prediction,
+                )
+
+                # Log success
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(prompt)}",
+                    endpoint="/predictions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=None,  # Replicate doesn't provide token counts
+                )
+
+                return response
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Replicate request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = e.response.text[:500] if e.response.text else ""
+
+                # Convert to specific error types
+                if e.response.status_code == 401:
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Replicate HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid token", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Replicate API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,

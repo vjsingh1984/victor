@@ -35,7 +35,6 @@ References:
 """
 
 import json
-import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -45,13 +44,14 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.logging import ProviderLogger
 
 # Vertex AI models available
 VERTEX_MODELS = {
@@ -106,6 +106,7 @@ class VertexAIProvider(BaseProvider):
         location: str = "us-central1",
         api_key: Optional[str] = None,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Vertex AI provider.
@@ -113,17 +114,27 @@ class VertexAIProvider(BaseProvider):
         Args:
             project_id: GCP project ID (or set GOOGLE_CLOUD_PROJECT env var)
             location: GCP region (default: us-central1)
-            api_key: Optional API key (alternative to service account, or use keyring)
+            api_key: Optional API key (alternative to service account auth)
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("vertex", __name__)
+
         # Resolution order: parameter → env var → keyring → warning
         resolved_key = api_key or os.environ.get("VERTEX_API_KEY", "")
-        if not resolved_key:
+        key_source = None
+
+        if resolved_key:
+            key_source = "explicit parameter or VERTEX_API_KEY environment variable"
+        else:
             try:
                 from victor.config.api_keys import get_api_key
 
                 resolved_key = get_api_key("vertex") or get_api_key("gcp") or ""
+                if resolved_key:
+                    key_source = "keyring (victor.config.api_keys)"
             except ImportError:
                 pass
 
@@ -131,14 +142,32 @@ class VertexAIProvider(BaseProvider):
         self._location = location
         self._api_key = resolved_key
         self._access_token: Optional[str] = None
+        self._non_interactive = non_interactive
 
+        # Determine auth method for logging
         if not self._project_id:
-            logger.warning(
+            self._provider_logger.logger.warning(
                 "Vertex AI project ID not provided. Set GOOGLE_CLOUD_PROJECT environment variable."
             )
 
+        auth_method = "API key" if self._api_key else "Google Cloud ADC (Application Default Credentials)"
+
         # Build base URL for Vertex AI
         base_url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{self._project_id}/locations/{location}/publishers/google/models"
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="gemini-1.5-pro",  # Default model
+            key_source=key_source or auth_method,
+            non_interactive=non_interactive or False,
+            config={
+                "project_id": self._project_id,
+                "location": location,
+                "auth_method": auth_method,
+                "timeout": timeout,
+                **kwargs,
+            },
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -186,9 +215,9 @@ class VertexAIProvider(BaseProvider):
                         token = result.stdout.strip()
                         headers["Authorization"] = f"Bearer {token}"
                     else:
-                        logger.warning("Failed to get access token from gcloud CLI")
+                        self._provider_logger.logger.warning("Failed to get access token from gcloud CLI")
                 except Exception as e:
-                    logger.warning(f"Failed to get access token: {e}")
+                    self._provider_logger.logger.warning(f"Failed to get access token: {e}")
 
         return headers
 
@@ -213,32 +242,75 @@ class VertexAIProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Vertex AI."""
-        try:
-            headers = await self._get_auth_headers()
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, **kwargs
-            )
+        with self._provider_logger.log_api_call(
+            endpoint=f"/{model}:generateContent",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                headers = await self._get_auth_headers()
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, **kwargs
+                )
 
-            url = f"{self.base_url}/{model}:generateContent"
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, url, json=payload, headers=headers
-            )
-            response.raise_for_status()
+                url = f"{self.base_url}/{model}:generateContent"
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, url, json=payload, headers=headers
+                )
+                response.raise_for_status()
 
-            return self._parse_response(response.json(), model)
+                result = self._parse_response(response.json(), model)
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Vertex AI request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Vertex AI HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+                # Log success with usage info
+                tokens = result.usage.get("total_tokens") if result.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint=f"/{model}:generateContent",
+                    model=model,
+                    start_time=0,  # Will be set by context manager
+                    tokens=tokens,
+                )
+
+                return result
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Vertex AI request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = e.response.text[:500] if e.response.text else ""
+
+                # Convert specific HTTP status codes to appropriate error types
+                status_code = e.response.status_code
+                if status_code in (401, 403):
+                    raise ProviderAuthError(
+                        message=f"Vertex AI authentication failed: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                    ) from e
+                elif status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Vertex AI rate limit exceeded: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Vertex AI HTTP error {status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                    ) from e
+            except ProviderError:
+                # Re-raise already-converted provider errors
+                raise
+            except Exception as e:
+                raise ProviderError(
+                    message=f"Vertex AI request failed: {str(e)}",
+                    provider=self.name,
+                ) from e
 
     async def stream(
         self,
@@ -258,6 +330,10 @@ class VertexAIProvider(BaseProvider):
             )
 
             url = f"{self.base_url}/{model}:streamGenerateContent?alt=sse"
+
+            self._provider_logger.logger.debug(
+                f"Vertex AI streaming request: model={model}, msgs={len(messages)}, tools={tools is not None}"
+            )
 
             async with self.client.stream("POST", url, json=payload, headers=headers) as response:
                 response.raise_for_status()
@@ -281,7 +357,9 @@ class VertexAIProvider(BaseProvider):
                         chunk_data = json.loads(data_str)
                         yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                     except json.JSONDecodeError:
-                        pass
+                        self._provider_logger.logger.warning(
+                            f"Vertex AI JSON decode error on line: {line[:100]}"
+                        )
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -289,10 +367,35 @@ class VertexAIProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            error_body = e.response.text[:500] if e.response.text else ""
+
+            # Convert specific HTTP status codes to appropriate error types
+            if status_code in (401, 403):
+                raise ProviderAuthError(
+                    message=f"Vertex AI authentication failed: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                ) from e
+            elif status_code == 429:
+                raise ProviderRateLimitError(
+                    message=f"Vertex AI rate limit exceeded: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                ) from e
+            else:
+                raise ProviderError(
+                    message=f"Vertex AI streaming error {status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                ) from e
+        except ProviderError:
+            # Re-raise already-converted provider errors
+            raise
+        except Exception as e:
             raise ProviderError(
-                message=f"Vertex AI streaming error {e.response.status_code}",
+                message=f"Vertex AI stream error: {str(e)}",
                 provider=self.name,
-                status_code=e.response.status_code,
             ) from e
 
     def _build_request_payload(

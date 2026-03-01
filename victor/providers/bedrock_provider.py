@@ -44,11 +44,14 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.logging import ProviderLogger
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +190,7 @@ class BedrockProvider(BaseProvider):
         region: Optional[str] = None,
         profile_name: Optional[str] = None,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Bedrock provider.
@@ -195,12 +199,40 @@ class BedrockProvider(BaseProvider):
             region: AWS region (default: us-east-1 or AWS_DEFAULT_REGION)
             profile_name: AWS profile name from ~/.aws/credentials
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration (passed to boto3)
         """
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("bedrock", __name__)
+
         self._region = region or os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         self._profile_name = profile_name
         self._client = None
         self._runtime_client = None
+
+        # Determine authentication source for logging
+        auth_source = []
+        if profile_name:
+            auth_source.append(f"AWS profile: {profile_name}")
+        if os.environ.get("AWS_ACCESS_KEY_ID"):
+            auth_source.append("AWS_ACCESS_KEY_ID environment variable")
+        if os.environ.get("AWS_WEB_IDENTITY_TOKEN_FILE"):
+            auth_source.append("AWS IAM role (ECS/EKS/Lambda)")
+        if not auth_source:
+            auth_source.append("Default AWS credential chain")
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="bedrock",  # Will be set on chat()
+            key_source=", ".join(auth_source) if auth_source else None,
+            non_interactive=non_interactive if non_interactive is not None else True,
+            config={
+                "region": self._region,
+                "profile_name": profile_name,
+                "timeout": timeout,
+                **kwargs,
+            },
+        )
 
         super().__init__(
             base_url=f"bedrock.{self._region}.amazonaws.com", timeout=timeout, **kwargs
@@ -262,38 +294,78 @@ class BedrockProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Bedrock."""
-        try:
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint=f"bedrock.{self._region}.amazonaws.com",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                client = await self._get_client()
 
-            client = await self._get_client()
+                # Determine model family for request format
+                if model.startswith("anthropic."):
+                    response = await self._chat_anthropic(
+                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                    )
+                elif model.startswith("meta."):
+                    response = await self._chat_meta(
+                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                    )
+                elif model.startswith("mistral."):
+                    response = await self._chat_mistral(
+                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                    )
+                else:
+                    response = await self._chat_converse(
+                        client, messages, model, temperature, max_tokens, tools, **kwargs
+                    )
 
-            # Determine model family for request format
-            if model.startswith("anthropic."):
-                return await self._chat_anthropic(
-                    client, messages, model, temperature, max_tokens, tools, **kwargs
-                )
-            elif model.startswith("meta."):
-                return await self._chat_meta(
-                    client, messages, model, temperature, max_tokens, tools, **kwargs
-                )
-            elif model.startswith("mistral."):
-                return await self._chat_mistral(
-                    client, messages, model, temperature, max_tokens, tools, **kwargs
-                )
-            else:
-                return await self._chat_converse(
-                    client, messages, model, temperature, max_tokens, tools, **kwargs
+                # Log success with usage info
+                tokens = response.usage.get("total_tokens") if response.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(messages)}",
+                    endpoint=f"bedrock.{self._region}.amazonaws.com",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
                 )
 
-        except Exception as e:
-            if "timeout" in str(e).lower():
-                raise ProviderTimeoutError(
-                    message=f"Bedrock request timed out after {self.timeout}s",
-                    provider=self.name,
-                ) from e
-            raise ProviderError(
-                message=f"Bedrock error: {e}",
-                provider=self.name,
-            ) from e
+                return response
+
+            except Exception as e:
+                # Convert to specific provider error types based on error
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                auth_terms = ["auth", "unauthorized", "access denied", "401", "403"]
+                rate_limit_terms = ["rate limit", "429", "throttling", "too many requests"]
+
+                if any(term in error_str for term in auth_terms):
+                    raise ProviderAuthError(
+                        message=f"AWS Bedrock authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in rate_limit_terms):
+                    raise ProviderRateLimitError(
+                        message=f"AWS Bedrock rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                elif "timeout" in error_str:
+                    raise ProviderTimeoutError(
+                        message=f"Bedrock request timed out after {self.timeout}s",
+                        provider=self.name,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Bedrock error: {e}",
+                        provider=self.name,
+                    ) from e
 
     async def _chat_converse(
         self, client, messages, model, temperature, max_tokens, tools, **kwargs
@@ -450,6 +522,12 @@ class BedrockProvider(BaseProvider):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Bedrock using Converse Stream API."""
+        # Log stream start
+        num_tools = len(tools) if tools else 0
+        self._provider_logger.logger.debug(
+            f"Starting Bedrock stream: model={model}, msgs={len(messages)}, tools={num_tools}"
+        )
+
         try:
             import asyncio
 
@@ -552,15 +630,36 @@ class BedrockProvider(BaseProvider):
                     )
 
         except Exception as e:
-            if "timeout" in str(e).lower():
+            # Convert to specific provider error types based on error
+            # Skip if already a ProviderError to avoid double-wrapping
+            if isinstance(e, ProviderError):
+                raise
+
+            error_str = str(e).lower()
+            auth_terms = ["auth", "unauthorized", "access denied", "401", "403"]
+            rate_limit_terms = ["rate limit", "429", "throttling", "too many requests"]
+
+            if any(term in error_str for term in auth_terms):
+                raise ProviderAuthError(
+                    message=f"AWS Bedrock authentication failed: {str(e)}",
+                    provider=self.name,
+                ) from e
+            elif any(term in error_str for term in rate_limit_terms):
+                raise ProviderRateLimitError(
+                    message=f"AWS Bedrock rate limit exceeded: {str(e)}",
+                    provider=self.name,
+                    status_code=429,
+                ) from e
+            elif "timeout" in error_str:
                 raise ProviderTimeoutError(
                     message="Bedrock stream timed out",
                     provider=self.name,
                 ) from e
-            raise ProviderError(
-                message=f"Bedrock streaming error: {e}",
-                provider=self.name,
-            ) from e
+            else:
+                raise ProviderError(
+                    message=f"Bedrock streaming error: {e}",
+                    provider=self.name,
+                ) from e
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Bedrock foundation models."""
@@ -590,7 +689,7 @@ class BedrockProvider(BaseProvider):
             ]
 
         except Exception as e:
-            logger.debug(f"Failed to list Bedrock models: {e}")
+            self._provider_logger.logger.debug(f"Failed to list Bedrock models: {e}")
             return [
                 {"id": model_id, **model_info} for model_id, model_info in BEDROCK_MODELS.items()
             ]
