@@ -27,8 +27,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -45,8 +43,11 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.openai_compat import convert_tools_to_openai_format
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Available zhipuAI GLM models
 # Reference: https://open.bigmodel.cn/dev/api
@@ -173,6 +174,7 @@ class ZAIProvider(BaseProvider):
         base_url: str = "https://open.bigmodel.cn/api/paas/v4/",
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize ZhipuAI provider.
@@ -182,30 +184,39 @@ class ZAIProvider(BaseProvider):
             base_url: ZhipuAI API base URL (default: https://open.bigmodel.cn/api/paas/v4/)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("ZAI_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("zai", __name__)
 
-                # Try multiple aliases: zai, zhipuai, zhipu
-                resolved_key = (
-                    get_api_key("zai") or get_api_key("zhipuai") or get_api_key("zhipu") or ""
-                )
-            except ImportError:
-                pass
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("zai", explicit_key=api_key)
 
-        if not resolved_key:
-            logger.warning(
-                "ZhipuAI API key not provided. Set ZAI_API_KEY environment variable, "
-                "use 'victor keys --set zai --keyring', or pass api_key parameter."
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="zai",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
-        self._api_key = resolved_key
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="zai",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(
-            api_key=resolved_key,
+            api_key=self._api_key,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
@@ -214,7 +225,7 @@ class ZAIProvider(BaseProvider):
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={
-                "Authorization": f"Bearer {resolved_key}",
+                "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
             timeout=httpx.Timeout(timeout),
@@ -280,47 +291,115 @@ class ZAIProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderError: For other errors
         """
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=False,
-                thinking=thinking,
-                **kwargs,
-            )
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    stream=False,
+                    thinking=thinking,
+                    **kwargs,
+                )
 
-            num_tools = len(tools) if tools else 0
-            logger.debug(
-                f"z.ai chat request: model={model}, msgs={len(messages)}, tools={num_tools}, thinking={thinking}"
-            )
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
 
-            # Make API call with circuit breaker protection
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+                result = response.json()
+                parsed = self._parse_response(result, model)
 
-            result = response.json()
-            return self._parse_response(result, model)
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"z.ai request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            self._handle_http_error(e)
-        except Exception as e:
-            raise ProviderError(
-                message=f"z.ai API error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"z.ai request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                # Convert HTTP errors to specific provider error types
+                error_text = e.response.text[:200] if e.response.text else ""
+                if e.response.status_code == 401:
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {error_text or 'HTTP 401'}",
+                        provider=self.name,
+                        status_code=401,
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    error_body = ""
+                    try:
+                        error_body = e.response.text[:500]
+                    except Exception:
+                        pass
+                    raise ProviderError(
+                        message=f"z.ai HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                        raw_error=e,
+                    ) from e
+            except Exception as e:
+                # Skip if already a ProviderError
+                if isinstance(e, ProviderError):
+                    raise
+                # Convert to specific provider error types based on error message
+                error_str = str(e).lower()
+                auth_keywords = [
+                    "auth",
+                    "unauthorized",
+                    "invalid key",
+                    "invalid api",
+                    "api_key",
+                    "401",
+                ]
+                rate_limit_keywords = ["rate limit", "429", "too many requests"]
+                if any(term in error_str for term in auth_keywords):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in rate_limit_keywords):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"z.ai API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -348,7 +427,10 @@ class ZAIProvider(BaseProvider):
             StreamChunk with incremental content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderError: For other errors
         """
         try:
             payload = self._build_request_payload(
@@ -360,11 +442,6 @@ class ZAIProvider(BaseProvider):
                 stream=True,
                 thinking=thinking,
                 **kwargs,
-            )
-
-            num_tools = len(tools) if tools else 0
-            logger.debug(
-                f"z.ai streaming request: model={model}, msgs={len(messages)}, tools={num_tools}, thinking={thinking}"
             )
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
@@ -403,7 +480,9 @@ class ZAIProvider(BaseProvider):
                                     has_sent_final = True
                                 yield chunk
                         except json.JSONDecodeError:
-                            logger.warning(f"z.ai JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(
+                                f"z.ai JSON decode error on line: {line[:100]}"
+                            )
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -411,13 +490,64 @@ class ZAIProvider(BaseProvider):
                 provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e)
+            # Convert HTTP errors to specific provider error types
+            error_text = e.response.text[:200] if e.response.text else ""
+            if e.response.status_code == 401:
+                raise ProviderAuthError(
+                    message=f"Authentication failed: {error_text or 'HTTP 401'}",
+                    provider=self.name,
+                    status_code=401,
+                ) from e
+            elif e.response.status_code == 429:
+                raise ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
+                    provider=self.name,
+                    status_code=429,
+                ) from e
+            else:
+                error_body = ""
+                try:
+                    error_body = e.response.text[:500]
+                except Exception:
+                    pass
+                raise ProviderError(
+                    message=f"z.ai streaming HTTP error {e.response.status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=e.response.status_code,
+                    raw_error=e,
+                ) from e
         except Exception as e:
-            raise ProviderError(
-                message=f"z.ai streaming error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
+            # Skip if already a ProviderError
+            if isinstance(e, ProviderError):
+                raise
+            # Convert to specific provider error types based on error message
+            error_str = str(e).lower()
+            auth_keywords = [
+                "auth",
+                "unauthorized",
+                "invalid key",
+                "invalid api",
+                "api_key",
+                "401",
+            ]
+            rate_limit_keywords = ["rate limit", "429", "too many requests"]
+            if any(term in error_str for term in auth_keywords):
+                raise ProviderAuthError(
+                    message=f"Authentication failed: {str(e)}",
+                    provider=self.name,
+                ) from e
+            elif any(term in error_str for term in rate_limit_keywords):
+                raise ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {str(e)}",
+                    provider=self.name,
+                    status_code=429,
+                ) from e
+            else:
+                raise ProviderError(
+                    message=f"z.ai streaming error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to z.ai format (OpenAI-compatible)."""
@@ -671,44 +801,6 @@ class ZAIProvider(BaseProvider):
             metadata=metadata,
             usage=usage,
         )
-
-    def _handle_http_error(self, error: httpx.HTTPStatusError) -> ProviderError:
-        """Handle HTTP errors from z.ai API.
-
-        Args:
-            error: HTTP error
-
-        Raises:
-            ProviderError: Converted error
-        """
-        status_code = error.response.status_code
-        # Safely get error message - streaming responses may not have .text available
-        try:
-            error_msg = error.response.text
-        except httpx.ResponseNotRead:
-            error_msg = f"HTTP {status_code} error (response body not available)"
-
-        if status_code == 401:
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
-        elif status_code == 429:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"z.ai API error ({status_code}): {error_msg}",
-                provider=self.name,
-                status_code=status_code,
-                raw_error=error,
-            )
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available z.ai GLM models.
