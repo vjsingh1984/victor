@@ -68,6 +68,10 @@ git push origin feature/your-feature-name
 # Visit https://github.com/vjsingh1984/victor/pulls
 ```
 
+**IMPORTANT**: Victor uses a strict PR-based workflow with CI/CD validation. All changes must go through pull requests, and all status checks must pass before merging to main.
+
+For detailed information about the PR workflow, branch structure, and release process, see [PR Workflow Guide](docs/development/PR_WORKFLOW.md).
+
 ---
 
 ## Types of Contributions

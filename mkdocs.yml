@@ -188,3 +188,4 @@ nav:
       - Setup: development/setup.md
       - Code Style: development/code-style.md
       - Testing: development/testing.md
+      - PR Workflow: development/PR_WORKFLOW.md

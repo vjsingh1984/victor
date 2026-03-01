@@ -39,7 +39,8 @@ docs/
 │   │   ├── verticals.md               # Vertical development
 │   │   └── plugins.md                 # Plugin system
 │   ├── testing/                       # Testing strategy
-│   └── releasing/                     # Release process
+│   ├── releasing/                     # Release process
+│   └── PR_WORKFLOW.md                 # Pull request workflow guide
 ├── guides/                            # How-to guides
 │   ├── vertical-quickstart.md         # Vertical quick reference
 │   ├── tool-reference.md              # Tool catalog
@@ -187,12 +188,21 @@ workflows:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Run `make test && make lint`
-5. Commit with conventional commits
-6. Push and create PR
+**IMPORTANT**: All changes must go through pull requests with CI/CD validation.
+
+### PR Workflow
+
+Victor uses a strict PR-based workflow to ensure code quality:
+
+1. Create feature branch from `develop`
+2. Make changes with tests
+3. Run `make test && make lint`
+4. Commit with conventional commits
+5. Push and create PR: `feature` → `develop`
+6. After review and merge to `develop`, create PR: `develop` → `main`
+7. All status checks must pass before merging to `main`
+
+[Detailed PR Workflow Guide →](PR_WORKFLOW.md)
 
 [Contribution Workflow →](../../CONTRIBUTING.md)
 

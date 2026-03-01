@@ -103,7 +103,8 @@ docs/
     ├── index.md
     ├── setup.md
     ├── code-style.md
-    └── testing.md
+    ├── testing.md
+    └── PR_WORKFLOW.md                 # Pull request workflow guide
 ```
 
 ## Deployment to GitHub Pages
