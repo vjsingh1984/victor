@@ -353,39 +353,27 @@ native = [
     "maturin>=1.4",
 ]
 
-# Vertical packages (domain-specific assistants)
-# Usage: pip install victor[verticals] or pip install victor[rag]
-verticals = [
-    "victor-coding>=0.5.7",
-    "victor-rag>=0.5.7",
-    "victor-research>=0.5.7",
-    "victor-devops>=0.5.7",
-    "victor-dataanalysis>=0.5.7",
-]
+# Vertical packages are now included in the main package (migrated 2026-03-01)
+# Contrib verticals: coding, rag, devops, dataanalysis, research
+# Built-in verticals: benchmark, classification, iac, security
+# All verticals are available via victor.verticals.* entry points
+# No additional dependencies needed - all verticals are bundled
 
-# Individual vertical installations
-rag = [
-    "victor-rag>=0.5.7",
-]
+# Individual vertical installations (no-ops, kept for backward compatibility)
+rag = []
 
-coding = [
-    "victor-coding>=0.5.7",
-]
+coding = []
 
-research = [
-    "victor-research>=0.5.7",
-]
+research = []
 
-devops = [
-    "victor-devops>=0.5.7",
-]
+devops = []
 
-dataanalysis = [
-    "victor-dataanalysis>=0.5.7",
-]
+dataanalysis = []
+
+verticals = []
 
 all = [
-    "victor[dev,docs,build,lang-all,apple-silicon,verticals]",
+    "victor[dev,docs,build,lang-all,apple-silicon]",
 ]
 
 [project.urls]
@@ -398,6 +386,26 @@ Issues = "https://github.com/vijayksingh/victor/issues"
 victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 victor-examples = "examples.playground.cli:app"
+
+# =============================================================================
+# Contrib Vertical Entry Points (migrated from external packages 2026-03-01)
+# =============================================================================
+# These verticals were previously distributed as separate packages:
+# - victor-coding → victor.verticals.contrib.coding
+# - victor-rag → victor.verticals.contrib.rag
+# - victor-devops → victor.verticals.contrib.devops
+# - victor-dataanalysis → victor.verticals.contrib.dataanalysis
+# - victor-research → victor.verticals.contrib.research
+#
+# All contrib verticals are now bundled with the main victor package.
+# =============================================================================
+[project.entry-points."victor.verticals"]
+# Contrib verticals (migrated from external packages)
+coding = "victor.verticals.contrib.coding:CodingAssistant"
+rag = "victor.verticals.contrib.rag:RAGAssistant"
+devops = "victor.verticals.contrib.devops:DevOpsAssistant"
+dataanalysis = "victor.verticals.contrib.dataanalysis:DataAnalysisAssistant"
+research = "victor.verticals.contrib.research:ResearchAssistant"
 
 # =============================================================================
 # External Vertical Registration (for third-party packages)
@@ -439,6 +447,9 @@ victor-examples = "examples.playground.cli:app"
 [tool.setuptools.packages.find]
 include = ["victor", "victor.*"]
 exclude = ["tests*", "docs*", "victor_test*"]
+
+# Ensure verticals.contrib packages are included
+namespaces = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,340 @@
+# Statistical Analysis Workflow
+# =============================
+# Comprehensive statistical analysis pipeline:
+# 1. Hypothesis formulation
+# 2. Data preparation
+# 3. Statistical tests
+# 4. Results interpretation
+# 5. Report generation
+
+workflows:
+  statistical_analysis:
+    description: "Statistical analysis with hypothesis testing"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: dataanalysis
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Problem Formulation
+      # =====================================================================
+      - id: formulate_hypotheses
+        type: agent
+        name: "Formulate Hypotheses"
+        role: researcher
+        goal: |
+          Analyze the research question and formulate hypotheses:
+
+          1. **Understand the Research Question**
+             - What is being investigated?
+             - What are the variables of interest?
+             - What outcomes are expected?
+
+          2. **Define Hypotheses**
+             - State null hypothesis (H0)
+             - State alternative hypothesis (H1)
+             - Determine if one-tailed or two-tailed
+
+          3. **Select Appropriate Tests**
+             Based on data characteristics:
+             - Continuous vs categorical variables
+             - Sample size considerations
+             - Distribution assumptions
+             - Independence of observations
+
+             Suggest tests from:
+             - t-test (paired, independent, one-sample)
+             - ANOVA / MANOVA
+             - Chi-square test
+             - Correlation (Pearson, Spearman)
+             - Regression analysis
+             - Non-parametric alternatives (Mann-Whitney, Wilcoxon)
+
+          4. **Determine Effect Size Metrics**
+             - Cohen's d, eta-squared, r, odds ratio as appropriate
+        tool_budget: 15
+        tools: [read, web_search]
+        llm_config:
+          temperature: 0.3
+          model_hint: claude-3-sonnet
+        input_mapping:
+          research_question: research_question
+          data_path: data_path
+        output: hypotheses
+        next: [prepare_data]
+
+      # =====================================================================
+      # Stage 2: Data Preparation
+      # =====================================================================
+      - id: prepare_data
+        type: parallel
+        name: "Prepare Data for Analysis"
+        parallel_nodes: [check_assumptions, prepare_variables]
+        join_strategy: all
+        next: [assumption_check]
+
+      - id: check_assumptions
+        type: agent
+        name: "Check Statistical Assumptions"
+        role: analyst
+        goal: |
+          Check assumptions for the proposed statistical tests:
+
+          1. **Normality Tests**
+             - Shapiro-Wilk test
+             - Q-Q plots
+             - Skewness and kurtosis
+
+          2. **Homogeneity of Variance**
+             - Levene's test
+             - Bartlett's test
+
+          3. **Independence**
+             - Autocorrelation checks
+             - Durbin-Watson (for regression)
+
+          4. **Linearity** (if applicable)
+             - Scatter plots
+             - Residual plots
+
+          5. **Sample Size Adequacy**
+             - Power analysis
+             - Minimum sample requirements
+
+          Document any violations and their severity.
+        tool_budget: 20
+        tools: [shell, read]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          data_path: data_path
+          tests: hypotheses.tests
+        output: assumptions_report
+
+      - id: prepare_variables
+        type: agent
+        name: "Prepare Variables"
+        role: executor
+        goal: |
+          Prepare variables for statistical analysis:
+
+          1. Handle missing values appropriately
+          2. Apply transformations if needed (log, sqrt, Box-Cox)
+          3. Create dummy variables for categorical predictors
+          4. Standardize/normalize if required
+          5. Create interaction terms if specified
+          6. Split data if doing train/test validation
+        tool_budget: 20
+        tools: [shell, read, write]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          data_path: data_path
+          variables: hypotheses.variables
+        output: prepared_data
+
+      - id: assumption_check
+        type: condition
+        name: "Check Assumption Results"
+        condition: "assumptions_report.violations_count <= 2"
+        branches:
+          "true": run_tests
+          "false": suggest_alternatives
+          "default": run_tests
+
+      - id: suggest_alternatives
+        type: agent
+        name: "Suggest Alternative Tests"
+        role: analyst
+        goal: |
+          Assumption violations detected. Suggest alternatives:
+
+          - If normality violated: Non-parametric tests
+          - If variance homogeneity violated: Welch's t-test, robust methods
+          - If independence violated: Mixed models, repeated measures
+
+          Update the test plan with robust alternatives.
+        tool_budget: 10
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          original_tests: hypotheses.tests
+          violations: assumptions_report.violations
+        output: alternative_tests
+        next: [run_tests]
+
+      # =====================================================================
+      # Stage 3: Run Statistical Tests
+      # =====================================================================
+      - id: run_tests
+        type: agent
+        name: "Execute Statistical Tests"
+        role: executor
+        goal: |
+          Execute all planned statistical tests:
+
+          For each test:
+          1. Run the test using appropriate Python/R libraries
+          2. Calculate test statistic, p-value, and confidence intervals
+          3. Compute effect size measures
+          4. Generate relevant visualizations
+          5. Store all numerical results
+
+          Document:
+          - Test name and parameters used
+          - Sample sizes and degrees of freedom
+          - Test statistics and exact p-values
+          - Effect sizes with confidence intervals
+          - Any warnings or convergence issues
+        tool_budget: 30
+        tools: [shell, write]
+        llm_config:
+          temperature: 0.1
+          model_hint: claude-3-sonnet
+        input_mapping:
+          data: prepared_data
+          tests: hypotheses.tests
+          alternative_tests: alternative_tests
+        output: test_results
+        next: [interpret_results]
+
+      # =====================================================================
+      # Stage 4: Interpretation
+      # =====================================================================
+      - id: interpret_results
+        type: agent
+        name: "Interpret Results"
+        role: analyst
+        goal: |
+          Provide thorough interpretation of statistical results:
+
+          1. **For Each Test**
+             - State whether null hypothesis is rejected
+             - Interpret p-value in context
+             - Discuss practical significance (effect size)
+             - Note any caveats or limitations
+
+          2. **Overall Conclusions**
+             - Answer the original research question
+             - Discuss unexpected findings
+             - Consider alternative explanations
+
+          3. **Limitations**
+             - Sample size constraints
+             - Assumption violations and impact
+             - Generalizability concerns
+
+          4. **Recommendations**
+             - Follow-up analyses suggested
+             - Additional data needed
+             - Methodological improvements
+
+          Use appropriate statistical language while remaining accessible.
+        tool_budget: 20
+        tools: [read]
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          results: test_results
+          hypotheses: hypotheses
+          assumptions: assumptions_report
+        output: interpretation
+        next: [review_gate]
+
+      # =====================================================================
+      # Stage 5: Human Review
+      # =====================================================================
+      - id: review_gate
+        type: hitl
+        name: "Statistical Review"
+        hitl_type: review
+        prompt: |
+          ## Statistical Analysis Results
+
+          **Research Question:** {research_question}
+
+          **Tests Performed:**
+          {test_results.summary}
+
+          **Key Findings:**
+          {interpretation.key_findings}
+
+          **Statistical Significance:** {test_results.significant_count} of {test_results.total_tests} tests significant (p < 0.05)
+
+          **Effect Sizes:** {interpretation.effect_summary}
+
+          Please review the statistical analysis and provide feedback.
+        context_keys:
+          - research_question
+          - test_results
+          - interpretation
+        timeout: 900
+        fallback: continue
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 6: Report Generation
+      # =====================================================================
+      - id: generate_report
+        type: agent
+        name: "Generate Statistical Report"
+        role: writer
+        goal: |
+          Generate a professional statistical report in markdown:
+
+          ## Structure
+
+          1. **Executive Summary**
+             - Key findings in plain language
+             - Main conclusions
+
+          2. **Introduction**
+             - Research question
+             - Hypotheses
+
+          3. **Methods**
+             - Data description
+             - Statistical tests used
+             - Assumptions and checks
+
+          4. **Results**
+             - Descriptive statistics table
+             - Test results with statistics
+             - Visualizations (reference figures)
+             - Effect sizes
+
+          5. **Discussion**
+             - Interpretation
+             - Limitations
+             - Recommendations
+
+          6. **Appendix**
+             - Full statistical output
+             - Additional tables
+
+          Use APA-style statistical reporting where applicable.
+        tool_budget: 20
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+          max_tokens: 8000
+        input_mapping:
+          hypotheses: hypotheses
+          results: test_results
+          interpretation: interpretation
+          review_feedback: review_feedback
+        output: report_path
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          workflow_status = "completed"
+          outputs = {
+            "report": report_path,
+            "results": test_results,
+            "interpretation": interpretation
+          }
