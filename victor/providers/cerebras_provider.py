@@ -35,7 +35,6 @@ References:
 
 import asyncio
 import json
-import logging
 import os
 import re
 import ssl
@@ -48,13 +47,18 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 
 @dataclass
@@ -115,10 +119,8 @@ class StreamingThinkingFilter:
             if self._in_thinking:
                 # Check if buffer is too large - give up and emit everything
                 if len(self._buffer) > self.max_thinking_buffer:
-                    logger.debug(
-                        f"Cerebras streaming: Buffer exceeded {self.max_thinking_buffer} chars, "
-                        "giving up on thinking detection"
-                    )
+                    # Buffer too large, give up on thinking detection
+                    pass
                     self._gave_up = True
                     emit_content = self._buffer
                     self._buffer = ""
@@ -151,7 +153,6 @@ class StreamingThinkingFilter:
         for pattern in QWEN3_THINKING_PATTERNS:
             if re.match(pattern, content, re.IGNORECASE):
                 self._in_thinking = True
-                logger.debug("Cerebras streaming: Detected thinking pattern at start")
                 return
 
         # No thinking pattern detected - treat as main content
@@ -174,10 +175,6 @@ class StreamingThinkingFilter:
                     self._thinking_content = "\n".join(lines[: i + 1])
                     self._buffer = remaining
                     self._in_thinking = False
-                    logger.debug(
-                        f"Cerebras streaming: Transitioned from thinking "
-                        f"({len(self._thinking_content)} chars) to main content"
-                    )
                     return
 
     def _looks_like_main_content(self, text: str) -> bool:
@@ -433,6 +430,7 @@ class CerebrasProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Cerebras provider.
@@ -441,22 +439,40 @@ class CerebrasProvider(BaseProvider):
             api_key: Cerebras API key (or set CEREBRAS_API_KEY env var)
             base_url: API endpoint
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env var, then keyring/api_keys.yaml
-        self._api_key = api_key or os.environ.get("CEREBRAS_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("cerebras", __name__)
 
-                self._api_key = get_api_key("cerebras") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Cerebras API key not provided. Set CEREBRAS_API_KEY environment variable "
-                "or add to keyring with: victor keys set cerebras"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("cerebras", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="cerebras",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="llama",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                **kwargs,
+            },
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -489,10 +505,32 @@ class CerebrasProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to Cerebras."""
-        last_exc: Optional[Exception] = None
+        """Send chat completion request to Cerebras.
 
-        for attempt in range(_MAX_TRANSIENT_RETRIES + 1):
+        Args:
+            messages: Conversation messages
+            model: Model name
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Available tools
+            **kwargs: Additional parameters
+
+        Returns:
+            CompletionResponse with generated content
+
+        Raises:
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
+        """
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
                 payload = self._build_request_payload(
                     messages, model, temperature, max_tokens, tools, False, **kwargs
@@ -503,34 +541,45 @@ class CerebrasProvider(BaseProvider):
                 )
                 response.raise_for_status()
 
-                return self._parse_response(response.json(), model)
+                parsed = self._parse_response(response.json(), model)
 
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"Cerebras request timed out after {self.timeout}s",
-                    provider=self.name,
-                ) from e
-            except httpx.HTTPStatusError as e:
-                error_body = e.response.text[:500] if e.response.text else ""
-                raise ProviderError(
-                    message=f"Cerebras HTTP error {e.response.status_code}: {error_body}",
-                    provider=self.name,
-                    status_code=e.response.status_code,
-                ) from e
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
             except Exception as e:
-                if _is_transient_error(e) and attempt < _MAX_TRANSIENT_RETRIES:
-                    last_exc = e
-                    wait = _TRANSIENT_BACKOFF_BASE * (2**attempt)
-                    logger.warning(
-                        f"Cerebras transient error (attempt {attempt + 1}/"
-                        f"{_MAX_TRANSIENT_RETRIES + 1}), retrying in {wait:.1f}s: {e}"
-                    )
-                    await asyncio.sleep(wait)
-                    continue
-                raise
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
 
-        # Should not reach here, but satisfy type checker
-        raise last_exc  # type: ignore[misc]
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Cerebras API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -542,47 +591,35 @@ class CerebrasProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from Cerebras with thinking content filtering."""
-        last_exc: Optional[Exception] = None
+        """Stream chat completion from Cerebras with thinking content filtering.
 
-        for attempt in range(_MAX_TRANSIENT_RETRIES + 1):
-            try:
-                async for chunk in self._stream_inner(
-                    messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=tools,
-                    **kwargs,
-                ):
-                    yield chunk
-                return  # Successful stream, exit retry loop
+        Args:
+            messages: Conversation messages
+            model: Model name
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Available tools
+            **kwargs: Additional parameters
 
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message="Cerebras stream timed out",
-                    provider=self.name,
-                ) from e
-            except httpx.HTTPStatusError as e:
-                raise ProviderError(
-                    message=f"Cerebras streaming error {e.response.status_code}",
-                    provider=self.name,
-                    status_code=e.response.status_code,
-                ) from e
-            except Exception as e:
-                if _is_transient_error(e) and attempt < _MAX_TRANSIENT_RETRIES:
-                    last_exc = e
-                    wait = _TRANSIENT_BACKOFF_BASE * (2**attempt)
-                    logger.warning(
-                        f"Cerebras stream transient error (attempt {attempt + 1}/"
-                        f"{_MAX_TRANSIENT_RETRIES + 1}), retrying in {wait:.1f}s: {e}"
-                    )
-                    await asyncio.sleep(wait)
-                    continue
-                raise
+        Yields:
+            StreamChunk with incremental content
 
-        # Should not reach here, but satisfy type checker
-        raise last_exc  # type: ignore[misc]
+        Raises:
+            ProviderError: If request fails
+        """
+        try:
+            async for chunk in self._stream_inner(
+                messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                **kwargs,
+            ):
+                yield chunk
+
+        except Exception as e:
+            raise self._handle_error(e)
 
     async def _stream_inner(
         self,
@@ -729,7 +766,6 @@ class CerebrasProvider(BaseProvider):
             if thinking:
                 metadata["reasoning_content"] = thinking
                 content = main_content
-                logger.debug(f"Cerebras: Extracted {len(thinking)} chars of thinking content")
 
         usage = None
         if usage_data := result.get("usage"):
@@ -823,6 +859,46 @@ class CerebrasProvider(BaseProvider):
             stop_reason=finish_reason,
             is_final=finish_reason is not None,
         )
+
+    def _handle_error(self, error: Exception) -> ProviderError:
+        """Handle and convert API errors.
+
+        Args:
+            error: Original exception
+
+        Returns:
+            ProviderError with details
+
+        Raises:
+            ProviderError: Always raises after converting
+        """
+        error_msg = str(error)
+
+        if "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+            raise ProviderAuthError(
+                message=f"Authentication failed: {error_msg}",
+                provider=self.name,
+                raw_error=error,
+            )
+        elif "invalid api" in error_msg.lower() or "invalid key" in error_msg.lower() or "api_key" in error_msg.lower():
+            raise ProviderAuthError(
+                message=f"Authentication failed: {error_msg}",
+                provider=self.name,
+                raw_error=error,
+            )
+        elif "rate limit" in error_msg.lower() or "rate_limit" in error_msg.lower() or "429" in error_msg or "too many requests" in error_msg.lower():
+            raise ProviderRateLimitError(
+                message=f"Rate limit exceeded: {error_msg}",
+                provider=self.name,
+                status_code=429,
+                raw_error=error,
+            )
+        else:
+            raise ProviderError(
+                message=f"Cerebras API error: {error_msg}",
+                provider=self.name,
+                raw_error=error,
+            )
 
     async def close(self) -> None:
         await self.client.aclose()

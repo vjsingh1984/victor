@@ -32,6 +32,7 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.resolution import APIKeyResult
 
 # =============================================================================
 # FIXTURES
@@ -47,7 +48,18 @@ def mock_api_key():
 @pytest.fixture
 def groq_provider(mock_api_key):
     """Create a GroqProvider instance for testing."""
-    with patch.dict("os.environ", {"GROQ_API_KEY": mock_api_key}):
+    # Mock the UnifiedApiKeyResolver to return our test key
+    mock_key_result = APIKeyResult(
+        key=mock_api_key,
+        source="explicit",
+        source_detail="Explicitly provided",
+        sources_attempted=[],
+        non_interactive=True,
+    )
+    with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+        mock_resolver_instance = MagicMock()
+        mock_resolver_instance.get_api_key.return_value = mock_key_result
+        mock_resolver.return_value = mock_resolver_instance
         provider = GroqProvider(api_key=mock_api_key)
         yield provider
 
@@ -178,48 +190,132 @@ class TestGroqProviderInit:
 
     def test_init_with_api_key(self):
         """Test initialization with explicit API key."""
-        provider = GroqProvider(api_key="test-key")
-        assert provider._api_key == "test-key"
-        assert provider.name == "groq"
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key")
+            assert provider._api_key == "test-key"
+            assert provider.name == "groq"
 
     def test_init_from_env_var(self):
         """Test initialization from GROQ_API_KEY env var."""
-        with patch.dict("os.environ", {"GROQ_API_KEY": "env-test-key"}, clear=False):
+        mock_key_result = APIKeyResult(
+            key="env-test-key",
+            source="environment",
+            source_detail="Environment variable GROQ_API_KEY",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
             provider = GroqProvider()
             assert provider._api_key == "env-test-key"
 
     def test_init_from_groqcloud_env_var(self):
         """Test initialization from GROQCLOUD_API_KEY env var."""
-        with patch.dict("os.environ", {"GROQCLOUD_API_KEY": "groqcloud-key"}, clear=False):
-            # Clear GROQ_API_KEY if present
-            with patch.dict("os.environ", {"GROQ_API_KEY": ""}, clear=False):
-                provider = GroqProvider()
-                assert provider._api_key == "groqcloud-key"
+        mock_key_result = APIKeyResult(
+            key="groqcloud-key",
+            source="environment",
+            source_detail="Environment variable GROQCLOUD_API_KEY",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider()
+            assert provider._api_key == "groqcloud-key"
 
     def test_default_base_url(self):
         """Test default base URL is set correctly."""
-        provider = GroqProvider(api_key="test-key")
-        assert DEFAULT_BASE_URL == "https://api.groq.com/openai/v1"
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key")
+            assert DEFAULT_BASE_URL == "https://api.groq.com/openai/v1"
 
     def test_custom_timeout(self):
         """Test custom timeout configuration."""
-        provider = GroqProvider(api_key="test-key", timeout=120)
-        assert provider.timeout == 120
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key", timeout=120)
+            assert provider.timeout == 120
 
     def test_supports_tools(self):
         """Test that provider indicates tool support."""
-        provider = GroqProvider(api_key="test-key")
-        assert provider.supports_tools() is True
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key")
+            assert provider.supports_tools() is True
 
     def test_supports_streaming(self):
         """Test that provider indicates streaming support."""
-        provider = GroqProvider(api_key="test-key")
-        assert provider.supports_streaming() is True
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key")
+            assert provider.supports_streaming() is True
 
     def test_provider_name(self):
         """Test provider name property."""
-        provider = GroqProvider(api_key="test-key")
-        assert provider.name == "groq"
+        mock_key_result = APIKeyResult(
+            key="test-key",
+            source="explicit",
+            source_detail="Explicitly provided",
+            sources_attempted=[],
+            non_interactive=True,
+        )
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
+            mock_resolver_instance = MagicMock()
+            mock_resolver_instance.get_api_key.return_value = mock_key_result
+            mock_resolver.return_value = mock_resolver_instance
+            provider = GroqProvider(api_key="test-key")
+            assert provider.name == "groq"
 
 
 # =============================================================================
@@ -275,7 +371,7 @@ class TestGroqProviderChat:
                     messages=sample_messages,
                     model="llama-3.3-70b-versatile",
                 )
-            assert "unexpected error" in str(exc_info.value.message).lower()
+            assert "api error" in str(exc_info.value.message).lower()
 
 
 # =============================================================================

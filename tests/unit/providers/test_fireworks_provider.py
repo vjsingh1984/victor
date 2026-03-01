@@ -29,22 +29,28 @@ class TestFireworksProviderInitialization:
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
         with patch.dict("os.environ", {"FIREWORKS_API_KEY": ""}, clear=False):
+            # Mock the keyring source in unified resolver
             with patch(
-                "victor.config.api_keys.get_api_key",
+                "victor.providers.resolution._get_key_from_keyring",
                 return_value="keyring-test-key",
             ):
-                provider = FireworksProvider()
+                provider = FireworksProvider(non_interactive=False)
                 assert provider._api_key == "keyring-test-key"
 
-    def test_initialization_warning_without_key(self, caplog):
-        """Test warning is logged when no API key provided."""
+    def test_initialization_error_without_key(self):
+        """Test APIKeyNotFoundError is raised when no API key provided."""
+        from victor.providers.resolution import APIKeyNotFoundError
+
         with patch.dict("os.environ", {"FIREWORKS_API_KEY": ""}, clear=False):
+            # Mock all sources to return None
             with patch(
-                "victor.config.api_keys.get_api_key",
+                "victor.providers.resolution._get_key_from_keyring",
                 return_value=None,
             ):
-                provider = FireworksProvider()
-                assert provider._api_key == ""
+                with pytest.raises(APIKeyNotFoundError) as exc_info:
+                    FireworksProvider(non_interactive=True)
+
+                assert "FIREWORKS API key not found" in str(exc_info.value)
 
     def test_custom_base_url(self):
         """Test initialization with custom base URL."""

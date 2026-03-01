@@ -125,10 +125,24 @@ class TestOpenRouterProviderInitialization:
 
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
+        from victor.providers.resolution import KeySource
+
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": ""}, clear=False):
+            # Mock the UnifiedApiKeyResolver to return a key
+            mock_result = MagicMock()
+            mock_result.key = "keyring-test-key"
+            mock_result.source = "keyring"
+            mock_result.source_detail = "System keyring"
+            mock_result.sources_attempted = [
+                KeySource(source="explicit", description="Explicit parameter", found=False),
+                KeySource(source="environment", description="OPENROUTER_API_KEY env var", found=False),
+                KeySource(source="keyring", description="System keyring", found=True),
+            ]
+            mock_result.non_interactive = False
+
             with patch(
-                "victor.config.api_keys.get_api_key",
-                return_value="keyring-test-key",
+                "victor.providers.resolution.UnifiedApiKeyResolver.get_api_key",
+                return_value=mock_result,
             ):
                 provider = OpenRouterProvider()
                 assert provider._api_key == "keyring-test-key"

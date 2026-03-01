@@ -37,8 +37,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -47,13 +45,18 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Mistral API endpoint
 DEFAULT_BASE_URL = "https://api.mistral.ai/v1"
@@ -130,6 +133,7 @@ class MistralProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Mistral provider.
@@ -138,22 +142,36 @@ class MistralProvider(BaseProvider):
             api_key: Mistral API key (or set MISTRAL_API_KEY env var)
             base_url: API endpoint (default: https://api.mistral.ai/v1)
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env var, then keyring/api_keys.yaml
-        self._api_key = api_key or os.environ.get("MISTRAL_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("mistral", __name__)
 
-                self._api_key = get_api_key("mistral") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Mistral API key not provided. Set MISTRAL_API_KEY environment variable "
-                "or add to keyring with: victor keys --set mistral --keyring"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("mistral", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="mistral",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="mistral",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -201,49 +219,105 @@ class MistralProvider(BaseProvider):
 
         Returns:
             CompletionResponse with generated content
+
+        Raises:
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
         """
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=False,
-                **kwargs,
-            )
-
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Mistral request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Mistral HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"Mistral unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    stream=False,
+                    **kwargs,
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Mistral request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                # Convert HTTP errors to specific provider error types
+                if e.response.status_code == 401:
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {e.response.text[:200]}",
+                        provider=self.name,
+                        status_code=401,
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {e.response.text[:200]}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    error_body = ""
+                    try:
+                        error_body = e.response.text[:500]
+                    except Exception:
+                        pass
+                    raise ProviderError(
+                        message=f"Mistral HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                        raw_error=e,
+                    ) from e
+            except Exception as e:
+                # Skip if already a ProviderError
+                if isinstance(e, ProviderError):
+                    raise
+                # Convert to specific provider error types based on error message
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Mistral API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -559,7 +633,7 @@ class MistralProvider(BaseProvider):
                 result = response.json()
                 return result.get("data", [])
         except Exception as e:
-            logger.debug(f"Failed to fetch models from Mistral API: {e}")
+            self._provider_logger.logger.debug(f"Failed to fetch models from Mistral API: {e}")
 
         return [
             {"id": model_id, "object": "model", **model_info}

@@ -39,8 +39,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -49,7 +47,9 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
@@ -58,8 +58,11 @@ from victor.providers.payload_limiter import (
     ProviderPayloadLimiter,
     TruncationStrategy,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Groq OpenAI-compatible API endpoint
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
@@ -150,6 +153,7 @@ class GroqProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Groq provider.
@@ -158,26 +162,36 @@ class GroqProvider(BaseProvider):
             api_key: Groq API key (or set GROQ_API_KEY or GROQCLOUD_API_KEY env var)
             base_url: API endpoint (default: https://api.groq.com/openai/v1)
             timeout: Request timeout (default: 60s - Groq is fast)
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env vars, then keyring/api_keys.yaml
-        # Support both GROQ_API_KEY and GROQCLOUD_API_KEY for flexibility
-        self._api_key = (
-            api_key or os.environ.get("GROQ_API_KEY") or os.environ.get("GROQCLOUD_API_KEY", "")
-        )
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("groq", __name__)
 
-                # Try both groqcloud and groq aliases
-                self._api_key = get_api_key("groqcloud") or get_api_key("groq") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Groq API key not provided. Set GROQ_API_KEY environment variable "
-                "or add to keyring with: victor keys --set groqcloud --keyring"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("groq", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="groq",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="llama",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -236,68 +250,109 @@ class GroqProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
         """
-        try:
-            # Check payload size before building request
-            ok, warning = self._payload_limiter.check_limit(messages, tools)
-            if warning:
-                logger.warning(warning)
-
-            # Truncate if payload exceeds Groq's limit
-            if not ok:
-                truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
-                messages = truncation_result.messages
-                tools = truncation_result.tools
-                if truncation_result.warning:
-                    logger.warning(truncation_result.warning)
-                if truncation_result.truncated:
-                    logger.info(
-                        f"Truncated payload: removed {truncation_result.messages_removed} messages, "
-                        f"saved {truncation_result.bytes_saved:,} bytes"
-                    )
-
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=False,
-                **kwargs,
-            )
-
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Groq request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Groq HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"Groq unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                # Check payload size before building request
+                ok, warning = self._payload_limiter.check_limit(messages, tools)
+                if warning:
+                    self._provider_logger.logger.warning(warning)
+
+                # Truncate if payload exceeds Groq's limit
+                if not ok:
+                    truncation_result = self._payload_limiter.truncate_if_needed(messages, tools)
+                    messages = truncation_result.messages
+                    tools = truncation_result.tools
+                    if truncation_result.warning:
+                        self._provider_logger.logger.warning(truncation_result.warning)
+                    if truncation_result.truncated:
+                        self._provider_logger.logger.info(
+                            f"Truncated payload: removed {truncation_result.messages_removed} messages, "
+                            f"saved {truncation_result.bytes_saved:,} bytes"
+                        )
+
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    stream=False,
+                    **kwargs,
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                elif isinstance(e, httpx.TimeoutException):
+                    raise ProviderTimeoutError(
+                        message=f"Groq request timed out after {self.timeout}s",
+                        provider=self.name,
+                    ) from e
+                elif isinstance(e, httpx.HTTPStatusError):
+                    error_body = ""
+                    try:
+                        error_body = e.response.text[:500]
+                    except Exception:
+                        pass
+                    raise ProviderError(
+                        message=f"Groq HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                        raw_error=e,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Groq API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -323,13 +378,15 @@ class GroqProvider(BaseProvider):
             StreamChunk with incremental content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
         """
         try:
             # Check payload size before building request
             ok, warning = self._payload_limiter.check_limit(messages, tools)
             if warning:
-                logger.warning(warning)
+                self._provider_logger.logger.warning(warning)
 
             # Truncate if payload exceeds Groq's limit
             if not ok:
@@ -337,9 +394,9 @@ class GroqProvider(BaseProvider):
                 messages = truncation_result.messages
                 tools = truncation_result.tools
                 if truncation_result.warning:
-                    logger.warning(truncation_result.warning)
+                    self._provider_logger.logger.warning(truncation_result.warning)
                 if truncation_result.truncated:
-                    logger.info(
+                    self._provider_logger.logger.info(
                         f"Truncated payload: removed {truncation_result.messages_removed} messages, "
                         f"saved {truncation_result.bytes_saved:,} bytes"
                     )
@@ -355,7 +412,7 @@ class GroqProvider(BaseProvider):
             )
 
             num_tools = len(tools) if tools else 0
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"Groq streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
 
@@ -392,31 +449,52 @@ class GroqProvider(BaseProvider):
                             yield chunk
 
                         except json.JSONDecodeError:
-                            logger.warning(f"Groq JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(
+                                f"Groq JSON decode error on line: {line[:100]}"
+                            )
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Groq stream timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
-            try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Groq streaming HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
         except Exception as e:
-            raise ProviderError(
-                message=f"Groq stream error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+            # Convert to specific provider error types based on error message
+            # Skip if already a ProviderError to avoid double-wrapping
+            if isinstance(e, ProviderError):
+                raise
+
+            error_str = str(e).lower()
+            if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                raise ProviderAuthError(
+                    message=f"Authentication failed: {str(e)}",
+                    provider=self.name,
+                ) from e
+            elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                raise ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {str(e)}",
+                    provider=self.name,
+                    status_code=429,
+                ) from e
+            elif isinstance(e, httpx.TimeoutException):
+                raise ProviderTimeoutError(
+                    message=f"Groq stream timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            elif isinstance(e, httpx.HTTPStatusError):
+                error_body = ""
+                try:
+                    error_body = e.response.text[:500]
+                except Exception:
+                    pass
+                raise ProviderError(
+                    message=f"Groq streaming HTTP error {e.response.status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=e.response.status_code,
+                    raw_error=e,
+                ) from e
+            else:
+                # Wrap generic errors in ProviderError
+                raise ProviderError(
+                    message=f"Groq stream error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     def _build_request_payload(
         self,
@@ -659,7 +737,9 @@ class GroqProvider(BaseProvider):
                 result = response.json()
                 return result.get("data", [])
         except Exception as e:
-            logger.debug(f"Failed to fetch models from Groq API: {e}")
+            self._provider_logger.logger.debug(
+                f"Failed to fetch models from Groq API: {e}"
+            )
 
         # Return static list as fallback
         return [

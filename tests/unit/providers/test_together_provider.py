@@ -28,23 +28,70 @@ class TestTogetherProviderInitialization:
 
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
+        from victor.providers.resolution import APIKeyResult, KeySource
+
         with patch.dict("os.environ", {"TOGETHER_API_KEY": ""}, clear=False):
+            # Mock UnifiedApiKeyResolver to return a key
+            mock_result = APIKeyResult(
+                key="keyring-test-key",
+                source="keyring",
+                source_detail="keyring",
+                sources_attempted=[
+                    KeySource(
+                        source="environment",
+                        description="TOGETHER_API_KEY environment variable",
+                        found=False,
+                    ),
+                    KeySource(
+                        source="keyring",
+                        description="Secure keyring storage",
+                        found=True,
+                        value_preview="key***",
+                    ),
+                ],
+                non_interactive=True,
+                confidence="high",
+            )
+
             with patch(
-                "victor.config.api_keys.get_api_key",
-                return_value="keyring-test-key",
+                "victor.providers.resolution.UnifiedApiKeyResolver.get_api_key",
+                return_value=mock_result,
             ):
                 provider = TogetherProvider()
                 assert provider._api_key == "keyring-test-key"
 
     def test_initialization_warning_without_key(self, caplog):
-        """Test warning is logged when no API key provided."""
+        """Test APIKeyNotFoundError is raised when no API key provided."""
+        from victor.providers.resolution import APIKeyResult, KeySource, APIKeyNotFoundError
+
         with patch.dict("os.environ", {"TOGETHER_API_KEY": ""}, clear=False):
+            # Mock UnifiedApiKeyResolver to return None
+            mock_result = APIKeyResult(
+                key=None,
+                source="none",
+                source_detail="none",
+                sources_attempted=[
+                    KeySource(
+                        source="environment",
+                        description="TOGETHER_API_KEY environment variable",
+                        found=False,
+                    ),
+                    KeySource(
+                        source="keyring",
+                        description="Secure keyring storage",
+                        found=False,
+                    ),
+                ],
+                non_interactive=True,
+                confidence="low",
+            )
+
             with patch(
-                "victor.config.api_keys.get_api_key",
-                return_value=None,
+                "victor.providers.resolution.UnifiedApiKeyResolver.get_api_key",
+                return_value=mock_result,
             ):
-                provider = TogetherProvider()
-                assert provider._api_key == ""
+                with pytest.raises(APIKeyNotFoundError):
+                    TogetherProvider()
 
     def test_custom_base_url(self):
         """Test initialization with custom base URL."""
@@ -539,15 +586,15 @@ class TestTogetherProviderChat:
                 "401", request=MagicMock(), response=mock_response
             )
 
-            from victor.providers.base import Message, ProviderError
+            from victor.providers.base import Message, ProviderAuthError
 
-            with pytest.raises(ProviderError) as exc_info:
+            with pytest.raises(ProviderAuthError) as exc_info:
                 await provider.chat(
                     messages=[Message(role="user", content="Hello")],
                     model="test-model",
                 )
 
-            assert "401" in str(exc_info.value)
+            assert "401" in str(exc_info.value) or "Authentication" in str(exc_info.value)
 
 
 class TestTogetherProviderCleanup:

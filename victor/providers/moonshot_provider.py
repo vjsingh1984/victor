@@ -26,8 +26,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -36,13 +34,18 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Default Moonshot API endpoint
 DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
@@ -85,6 +88,8 @@ class MoonshotProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        max_retries: int = 3,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Moonshot provider.
@@ -93,24 +98,50 @@ class MoonshotProvider(BaseProvider):
             api_key: Moonshot API key (or set MOONSHOT_API_KEY env var)
             base_url: API endpoint (default: https://api.moonshot.cn/v1)
             timeout: Request timeout (default: 120s)
+            max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter, environment, or keyring
-        self._api_key = api_key or os.environ.get("MOONSHOT_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("moonshot", __name__)
 
-                self._api_key = get_api_key("moonshot") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Moonshot API key not provided. Set MOONSHOT_API_KEY environment variable, "
-                "use 'victor keys --set moonshot --keyring', or pass api_key parameter."
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("moonshot", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="moonshot",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
 
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="kimi-k2",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                "max_retries": max_retries,
+                **kwargs,
+            },
+        )
+
+        super().__init__(
+            api_key=self._api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
+        )
 
         # Use httpx for consistent behavior with other providers
         self.client = httpx.AsyncClient(
@@ -159,50 +190,91 @@ class MoonshotProvider(BaseProvider):
             CompletionResponse with generated content and optional reasoning
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
         """
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=False,
-                **kwargs,
-            )
-
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Moonshot request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            raise ProviderError(
-                message=f"Moonshot HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"Moonshot unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    stream=False,
+                    **kwargs,
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                elif isinstance(e, httpx.TimeoutException):
+                    raise ProviderTimeoutError(
+                        message=f"Moonshot request timed out after {self.timeout}s",
+                        provider=self.name,
+                    ) from e
+                elif isinstance(e, httpx.HTTPStatusError):
+                    error_body = ""
+                    try:
+                        error_body = e.response.text[:500]
+                    except Exception:
+                        pass
+                    raise ProviderError(
+                        message=f"Moonshot HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                        raw_error=e,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Moonshot API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -239,11 +311,6 @@ class MoonshotProvider(BaseProvider):
                 tools=tools,
                 stream=True,
                 **kwargs,
-            )
-
-            num_tools = len(tools) if tools else 0
-            logger.debug(
-                f"Moonshot streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
@@ -291,7 +358,7 @@ class MoonshotProvider(BaseProvider):
                             yield chunk
 
                         except json.JSONDecodeError:
-                            logger.warning(f"Moonshot JSON decode error on line: {line[:100]}")
+                            pass  # Skip invalid JSON chunks
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -448,7 +515,6 @@ class MoonshotProvider(BaseProvider):
         metadata = {}
         if reasoning_content:
             metadata["reasoning_content"] = reasoning_content
-            logger.debug(f"Moonshot: Extracted reasoning content ({len(reasoning_content)} chars)")
 
         # Parse usage stats
         usage = None

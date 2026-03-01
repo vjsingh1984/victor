@@ -34,8 +34,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -44,13 +42,15 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import UnifiedApiKeyResolver, APIKeyNotFoundError
+from victor.providers.logging import ProviderLogger
 
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -129,6 +129,7 @@ class OpenRouterProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         site_url: Optional[str] = None,
         site_name: Optional[str] = None,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize OpenRouter provider.
@@ -139,22 +140,42 @@ class OpenRouterProvider(BaseProvider):
             timeout: Request timeout
             site_url: Your site URL (for rankings)
             site_name: Your site/app name
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env var, then keyring/api_keys.yaml
-        self._api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("openrouter", __name__)
 
-                self._api_key = get_api_key("openrouter") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "OpenRouter API key not provided. Set OPENROUTER_API_KEY environment variable "
-                "or add to keyring with: victor keys --set openrouter --keyring"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("openrouter", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="openrouter",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="openrouter",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                "site_url": site_url,
+                "site_name": site_name,
+                **kwargs,
+            },
+        )
 
         super().__init__(base_url=base_url, timeout=timeout, **kwargs)
 
@@ -194,31 +215,95 @@ class OpenRouterProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request via OpenRouter."""
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, False, **kwargs
-            )
+        """Send chat completion request via OpenRouter.
 
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+        Args:
+            messages: Conversation messages
+            model: Model name (e.g., "anthropic/claude-sonnet-4.5")
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Available tools
+            **kwargs: Additional OpenRouter parameters
 
-            return self._parse_response(response.json(), model)
+        Returns:
+            CompletionResponse with generated content
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"OpenRouter request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"OpenRouter HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+        Raises:
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
+        """
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, False, **kwargs
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                parsed = self._parse_response(response.json(), model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                # Check for httpx-specific errors first
+                if isinstance(e, httpx.TimeoutException):
+                    raise ProviderTimeoutError(
+                        message=f"OpenRouter request timed out: {str(e)}",
+                        provider=self.name,
+                    ) from e
+
+                # Extract status code from httpx.HTTPStatusError if available
+                status_code = None
+                if isinstance(e, httpx.HTTPStatusError):
+                    status_code = e.response.status_code
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                        status_code=status_code,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=status_code or 429,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"OpenRouter API error: {str(e)}",
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,
@@ -429,7 +514,8 @@ class OpenRouterProvider(BaseProvider):
                 result = response.json()
                 return result.get("data", [])
         except Exception as e:
-            logger.debug(f"Failed to fetch models from OpenRouter: {e}")
+            # Use provider logger for debug output
+            self._provider_logger.logger.debug(f"Failed to fetch models from OpenRouter: {e}")
 
         return [
             {"id": model_id, **model_info} for model_id, model_info in OPENROUTER_MODELS.items()

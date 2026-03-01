@@ -35,8 +35,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -45,13 +43,15 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import UnifiedApiKeyResolver, APIKeyNotFoundError
+from victor.providers.logging import ProviderLogger
 
 DEFAULT_BASE_URL = "https://api.together.xyz/v1"
 
@@ -119,6 +119,7 @@ class TogetherProvider(BaseProvider):
         api_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Together AI provider.
@@ -127,24 +128,43 @@ class TogetherProvider(BaseProvider):
             api_key: Together API key (or set TOGETHER_API_KEY env var)
             base_url: API endpoint
             timeout: Request timeout
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Try provided key, then env var, then keyring/api_keys.yaml
-        self._api_key = api_key or os.environ.get("TOGETHER_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("together", __name__)
 
-                self._api_key = get_api_key("together") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "Together API key not provided. Set TOGETHER_API_KEY environment variable "
-                "or add to keyring with: victor keys --set together --keyring"
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("together", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="together",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
 
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="together",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
+
+        super().__init__(
+            api_key=self._api_key,
+            base_url=base_url,
+            timeout=timeout,
+            **kwargs,
+        )
 
         self.client = httpx.AsyncClient(
             base_url=base_url,
@@ -175,36 +195,106 @@ class TogetherProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to Together AI."""
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, False, **kwargs
-            )
+        """Send chat completion request to Together AI.
 
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+        Args:
+            messages: Conversation messages
+            model: Model name
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Available tools
+            **kwargs: Additional Together AI parameters
 
-            return self._parse_response(response.json(), model)
+        Returns:
+            CompletionResponse with generated content
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Together AI request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Together AI HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"Together AI error: {str(e)}",
-                provider=self.name,
-            ) from e
+        Raises:
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
+        """
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, False, **kwargs
+                )
+
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                parsed = self._parse_response(response.json(), model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Together AI request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = e.response.text[:500] if e.response.text else ""
+                # Convert to specific provider error types based on status code
+                if e.response.status_code == 401:
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"Together AI HTTP error {e.response.status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=e.response.status_code,
+                    ) from e
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"Together AI error: {str(e)}",
+                        provider=self.name,
+                    ) from e
 
     async def stream(
         self,
