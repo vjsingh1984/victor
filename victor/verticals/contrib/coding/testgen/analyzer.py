@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.testgen.protocol import ClassSignature, FunctionSignature
+from victor.verticals.contrib.coding.testgen.protocol import ClassSignature, FunctionSignature
 
 logger = logging.getLogger(__name__)
 

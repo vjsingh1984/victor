@@ -219,7 +219,7 @@ approach for safety enforcement in DevOps workflows.
 
 Example:
     from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-    from victor_devops.safety import create_all_devops_safety_rules
+    from victor.verticals.contrib.devops.safety import create_all_devops_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
     create_all_devops_safety_rules(enforcer)

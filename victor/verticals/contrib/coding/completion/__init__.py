@@ -21,7 +21,7 @@ and IDE integrations. Supports multiple completion sources:
 - Snippets for template-based completions
 
 Example usage:
-    from victor_coding.completion import get_completion_manager
+    from victor.verticals.contrib.coding.completion import get_completion_manager
     from pathlib import Path
 
     manager = get_completion_manager()
@@ -50,7 +50,7 @@ Example usage:
         print(token, end="", flush=True)
 """
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionContext,
     CompletionItem,
@@ -67,19 +67,19 @@ from victor_coding.completion.protocol import (
     Range,
     TextEdit,
 )
-from victor_coding.completion.provider import (
+from victor.verticals.contrib.coding.completion.provider import (
     BaseCompletionProvider,
     CachingCompletionProvider,
     CompositeCompletionProvider,
     CompletionProvider,
     StreamingCompletionProvider,
 )
-from victor_coding.completion.registry import (
+from victor.verticals.contrib.coding.completion.registry import (
     CompletionProviderRegistry,
     get_completion_registry,
     reset_completion_registry,
 )
-from victor_coding.completion.manager import (
+from victor.verticals.contrib.coding.completion.manager import (
     CompletionManager,
     get_completion_manager,
     reset_completion_manager,

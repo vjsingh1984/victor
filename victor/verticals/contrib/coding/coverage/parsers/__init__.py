@@ -15,7 +15,7 @@
 """Coverage parsers subpackage."""
 
 # Re-export from parent parser module for convenience
-from victor_coding.coverage.parser import (
+from victor.verticals.contrib.coding.coverage.parser import (
     BaseCoverageParser,
     CloverParser,
     CoberturaParser,

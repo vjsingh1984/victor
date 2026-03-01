@@ -129,7 +129,7 @@ class RAGIngestTool(BaseTool):
         Returns:
             ToolResult with ingestion status
         """
-        from victor_rag.document_store import Document, DocumentStore
+        from victor.verticals.contrib.rag.document_store import Document, DocumentStore
 
         try:
             # Get or create document store
@@ -221,7 +221,7 @@ class RAGIngestTool(BaseTool):
         metadata: Optional[Dict[str, Any]],
     ) -> ToolResult:
         """Ingest content from a URL."""
-        from victor_rag.document_store import Document
+        from victor.verticals.contrib.rag.document_store import Document
 
         try:
             # Fetch URL content
@@ -336,7 +336,7 @@ class RAGIngestTool(BaseTool):
         metadata: Optional[Dict[str, Any]],
     ) -> ToolResult:
         """Ingest all matching files from a directory."""
-        from victor_rag.document_store import Document
+        from victor.verticals.contrib.rag.document_store import Document
 
         # Find matching files
         if recursive:
@@ -447,7 +447,7 @@ class RAGIngestTool(BaseTool):
 
     def _get_document_store(self):
         """Get or create document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         # Use a singleton pattern for the store
         if not hasattr(self, "_store"):

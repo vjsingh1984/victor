@@ -23,8 +23,8 @@ import logging
 from pathlib import Path
 from typing import Callable, Optional, Type
 
-from victor_coding.completion.protocol import CompletionCapabilities
-from victor_coding.completion.provider import BaseCompletionProvider
+from victor.verticals.contrib.coding.completion.protocol import CompletionCapabilities
+from victor.verticals.contrib.coding.completion.provider import BaseCompletionProvider
 
 logger = logging.getLogger(__name__)
 

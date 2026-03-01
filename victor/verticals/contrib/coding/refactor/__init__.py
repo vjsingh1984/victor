@@ -18,7 +18,7 @@ This module provides code refactoring capabilities using AST analysis
 for safe and accurate code transformations.
 
 Example usage:
-    from victor_coding.refactor import get_refactor_manager, RefactorType
+    from victor.verticals.contrib.coding.refactor import get_refactor_manager, RefactorType
     from pathlib import Path
 
     # Get manager
@@ -52,7 +52,7 @@ Example usage:
         manager.undo(result)
 """
 
-from victor_coding.refactor.protocol import (
+from victor.verticals.contrib.coding.refactor.protocol import (
     CodeEdit,
     CodePattern,
     RefactorCapabilities,
@@ -66,13 +66,13 @@ from victor_coding.refactor.protocol import (
     SourceLocation,
     Symbol,
 )
-from victor_coding.refactor.analyzer import (
+from victor.verticals.contrib.coding.refactor.analyzer import (
     BaseCodeAnalyzer,
     CodeAnalyzer,
     PythonAnalyzer,
     get_analyzer,
 )
-from victor_coding.refactor.transforms import (
+from victor.verticals.contrib.coding.refactor.transforms import (
     BaseTransform,
     CodeTransform,
     ExtractConstantTransform,
@@ -81,7 +81,7 @@ from victor_coding.refactor.transforms import (
     RenameFileTransform,
     RenameSymbolTransform,
 )
-from victor_coding.refactor.manager import (
+from victor.verticals.contrib.coding.refactor.manager import (
     RefactorManager,
     get_refactor_manager,
     reset_refactor_manager,

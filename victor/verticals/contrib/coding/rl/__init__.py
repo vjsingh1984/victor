@@ -19,7 +19,7 @@ vertical, enabling adaptive tool selection, continuation patience,
 and quality thresholds.
 
 Example:
-    from victor_coding.rl import CodingRLHooks, CodingRLConfig
+    from victor.verticals.contrib.coding.rl import CodingRLHooks, CodingRLConfig
 
     # Create hooks with custom config
     config = CodingRLConfig()
@@ -41,11 +41,11 @@ Example:
     )
 """
 
-from victor_coding.rl.config import (
+from victor.verticals.contrib.coding.rl.config import (
     CodingRLConfig,
     get_default_config,
 )
-from victor_coding.rl.hooks import (
+from victor.verticals.contrib.coding.rl.hooks import (
     CodingRLHooks,
     get_coding_rl_hooks,
 )

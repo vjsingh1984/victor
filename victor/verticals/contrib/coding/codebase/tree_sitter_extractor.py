@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from tree_sitter import Query, QueryCursor
 
-from victor_coding.languages.base import TreeSitterQueries
-from victor_coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.base import TreeSitterQueries
+from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
 
 if TYPE_CHECKING:
     from tree_sitter import Node, Parser, Tree
@@ -103,7 +103,7 @@ class TreeSitterExtractor:
             return self._parsers[language]
 
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
 
             parser = get_parser(language)
             self._parsers[language] = parser

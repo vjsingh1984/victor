@@ -30,7 +30,7 @@ Example:
     loader.load_from_module("victor_rag.capabilities")
 
     # Or use directly
-    from victor_rag.capabilities import (
+    from victor.verticals.contrib.rag.capabilities import (
         get_rag_capabilities,
         RAGCapabilityProvider,
     )

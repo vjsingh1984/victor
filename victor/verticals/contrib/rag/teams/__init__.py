@@ -18,7 +18,7 @@ This package provides team specifications for common RAG tasks with
 rich persona attributes for natural agent characterization.
 
 Example:
-    from victor_rag.teams import (
+    from victor.verticals.contrib.rag.teams import (
         get_team_for_task,
         RAG_TEAM_SPECS,
     )

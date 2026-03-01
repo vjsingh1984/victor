@@ -30,7 +30,7 @@ Example:
     loader.load_from_module("victor.coding.capabilities")
 
     # Or use directly
-    from victor_coding.capabilities import (
+    from victor.verticals.contrib.coding.capabilities import (
         get_coding_capabilities,
         CodingCapabilityProvider,
     )
@@ -107,7 +107,7 @@ def configure_git_safety(
         require_tests_before_commit: Require tests pass before commit
         allowed_branches: Whitelist of branches for push
     """
-    from victor_coding.safety import CodingSafetyExtension
+    from victor.verticals.contrib.coding.safety import CodingSafetyExtension
 
     safety = CodingSafetyExtension()
 

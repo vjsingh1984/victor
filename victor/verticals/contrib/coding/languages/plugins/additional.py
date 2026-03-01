@@ -35,7 +35,7 @@ These plugins support embedding-based indexing for:
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.languages.base import (
+from victor.verticals.contrib.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,

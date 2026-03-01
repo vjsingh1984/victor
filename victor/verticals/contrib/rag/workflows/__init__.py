@@ -36,7 +36,7 @@ Example:
         print(f"Completed: {node_id}")
 
 Usage:
-    from victor_rag.workflows import RAGWorkflowProvider
+    from victor.verticals.contrib.rag.workflows import RAGWorkflowProvider
 
     provider = RAGWorkflowProvider()
 

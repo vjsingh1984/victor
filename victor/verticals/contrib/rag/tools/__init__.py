@@ -23,10 +23,10 @@ Provides tools for RAG operations:
 - RAGStatsTool: Get store statistics
 """
 
-from victor_rag.tools.ingest import RAGIngestTool
-from victor_rag.tools.search import RAGSearchTool
-from victor_rag.tools.query import RAGQueryTool
-from victor_rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
+from victor.verticals.contrib.rag.tools.ingest import RAGIngestTool
+from victor.verticals.contrib.rag.tools.search import RAGSearchTool
+from victor.verticals.contrib.rag.tools.query import RAGQueryTool
+from victor.verticals.contrib.rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
 
 __all__ = [
     "RAGIngestTool",

@@ -22,7 +22,7 @@ These plugins support indexing of configuration files for:
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.languages.base import (
+from victor.verticals.contrib.coding.languages.base import (
     BaseLanguagePlugin,
     CommentStyle,
     LanguageCapabilities,

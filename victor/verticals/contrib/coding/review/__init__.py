@@ -18,7 +18,7 @@ This module provides automated code review capabilities with
 configurable rules and multiple analyzers.
 
 Example usage:
-    from victor_coding.review import get_review_manager, ReviewConfig
+    from victor.verticals.contrib.coding.review import get_review_manager, ReviewConfig
     from pathlib import Path
 
     # Get manager
@@ -47,7 +47,7 @@ Example usage:
     print(report)
 
     # Configure rules
-    from victor_coding.review import get_rule_registry
+    from victor.verticals.contrib.coding.review import get_rule_registry
     registry = get_rule_registry()
     registry.configure_rule(
         "complexity-cyclomatic",
@@ -55,7 +55,7 @@ Example usage:
     )
 """
 
-from victor_coding.review.protocol import (
+from victor.verticals.contrib.coding.review.protocol import (
     ComplexityMetrics,
     DuplicationResult,
     FileReview,
@@ -69,7 +69,7 @@ from victor_coding.review.protocol import (
     Severity,
     SourceLocation,
 )
-from victor_coding.review.analyzers import (
+from victor.verticals.contrib.coding.review.analyzers import (
     BaseAnalyzer,
     BestPracticesAnalyzer,
     ComplexityAnalyzer,
@@ -77,14 +77,14 @@ from victor_coding.review.analyzers import (
     NamingAnalyzer,
     SecurityAnalyzer,
 )
-from victor_coding.review.rules import (
+from victor.verticals.contrib.coding.review.rules import (
     DEFAULT_RULES,
     DEFAULT_RULESETS,
     RuleRegistry,
     get_rule_registry,
     reset_rule_registry,
 )
-from victor_coding.review.manager import (
+from victor.verticals.contrib.coding.review.manager import (
     ReviewManager,
     get_review_manager,
     reset_review_manager,

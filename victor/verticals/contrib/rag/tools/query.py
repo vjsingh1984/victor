@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.framework.enrichment import EnrichmentContext
 from victor.tools.base import BaseTool, CostTier, ToolResult
-from victor_rag.enrichment import get_rag_enrichment_strategy
+from victor.verticals.contrib.rag.enrichment import get_rag_enrichment_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class RAGQueryTool(BaseTool):
         Returns:
             ToolResult with synthesized answer or formatted context
         """
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -171,7 +171,7 @@ class RAGQueryTool(BaseTool):
                 return await self._handle_metadata_query(question, store)
 
             # Initialize enrichment strategy with document store for entity resolution
-            from victor_rag.enrichment import (
+            from victor.verticals.contrib.rag.enrichment import (
                 get_rag_enrichment_strategy,
                 reset_rag_enrichment_strategy,
             )
@@ -418,7 +418,7 @@ class RAGQueryTool(BaseTool):
 
     def _get_document_store(self):
         """Get document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         if not hasattr(self, "_store"):
             self._store = DocumentStore()

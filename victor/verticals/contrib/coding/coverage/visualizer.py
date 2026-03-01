@@ -23,7 +23,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.coverage.protocol import (
+from victor.verticals.contrib.coding.coverage.protocol import (
     CoverageDiff,
     CoverageReport,
     CoverageStatus,

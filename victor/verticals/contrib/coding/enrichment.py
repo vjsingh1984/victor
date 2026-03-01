@@ -22,7 +22,7 @@ relevant code context such as:
 - Code snippets from mentioned files
 
 Example:
-    from victor_coding.enrichment import CodingEnrichmentStrategy
+    from victor.verticals.contrib.coding.enrichment import CodingEnrichmentStrategy
 
     # Create strategy with knowledge graph
     strategy = CodingEnrichmentStrategy(graph_store=graph_store)

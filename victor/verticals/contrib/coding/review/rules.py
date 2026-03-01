@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 import yaml
 
-from victor_coding.review.protocol import (
+from victor.verticals.contrib.coding.review.protocol import (
     ReviewCategory,
     ReviewRule,
     ReviewRuleSet,

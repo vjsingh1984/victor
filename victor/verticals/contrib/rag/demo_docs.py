@@ -67,7 +67,7 @@ async def ingest_project_docs(
     Returns:
         Dict mapping pattern to chunk counts
     """
-    from victor_rag.document_store import Document, DocumentStore
+    from victor.verticals.contrib.rag.document_store import Document, DocumentStore
 
     if project_path is None:
         project_path = Path.cwd()
@@ -183,7 +183,7 @@ async def query_docs(query: str, top_k: int = 5) -> None:
         query: Search query
         top_k: Number of results to return
     """
-    from victor_rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.document_store import DocumentStore
 
     store = DocumentStore()
     await store.initialize()
@@ -217,7 +217,7 @@ async def query_docs(query: str, top_k: int = 5) -> None:
 
 async def show_stats() -> None:
     """Show RAG store statistics."""
-    from victor_rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.document_store import DocumentStore
 
     store = DocumentStore()
     await store.initialize()

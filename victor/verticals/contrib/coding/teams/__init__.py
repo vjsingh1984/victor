@@ -19,7 +19,7 @@ tasks, including pre-configured teams for feature implementation,
 bug fixing, refactoring, code review, and testing.
 
 Example:
-    from victor_coding.teams import (
+    from victor.verticals.contrib.coding.teams import (
         get_team_for_task,
         CODING_TEAM_SPECS,
     )
@@ -44,7 +44,7 @@ import logging
 
 from victor.framework.team_schema import TeamSpec
 
-from victor_coding.teams.specs import (
+from victor.verticals.contrib.coding.teams.specs import (
     # Types
     CodingRoleConfig,
     # Role configurations
@@ -58,7 +58,7 @@ from victor_coding.teams.specs import (
     list_roles,
 )
 
-from victor_coding.teams.personas import (
+from victor.verticals.contrib.coding.teams.personas import (
     # Framework types (re-exported for convenience)
     FrameworkPersonaTraits,
     FrameworkCommunicationStyle,

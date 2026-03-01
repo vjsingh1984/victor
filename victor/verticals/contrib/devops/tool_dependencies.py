@@ -28,7 +28,7 @@ Migration Notes:
     - All exports preserved for backward compatibility
 
 Example:
-    from victor_devops.tool_dependencies import (
+    from victor.verticals.contrib.devops.tool_dependencies import (
         DevOpsToolDependencyProvider,
         get_devops_tool_graph,
         DEVOPS_COMPOSED_PATTERNS,

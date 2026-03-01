@@ -27,7 +27,7 @@ Migration Note:
     Backward compatibility is maintained - all existing exports still work.
 
 Example:
-    from victor_rag.tool_dependencies import (
+    from victor.verticals.contrib.rag.tool_dependencies import (
         RAGToolDependencyProvider,
         get_rag_tool_graph,
         RAG_COMPOSED_PATTERNS,

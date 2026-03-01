@@ -18,7 +18,7 @@ This package provides team specifications for common data analysis tasks with
 rich persona attributes for natural agent characterization.
 
 Example:
-    from victor_dataanalysis.teams import (
+    from victor.verticals.contrib.dataanalysis.teams import (
         get_team_for_task,
         DATA_ANALYSIS_TEAM_SPECS,
     )
@@ -610,7 +610,7 @@ class DataAnalysisTeamSpecProvider:
 
 
 # Import personas
-from victor_dataanalysis.teams.personas import (
+from victor.verticals.contrib.dataanalysis.teams.personas import (
     # Framework types (re-exported for convenience)
     FrameworkPersonaTraits,
     FrameworkCommunicationStyle,

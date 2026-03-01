@@ -47,7 +47,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor_rag.entity_resolver import EntityInfo
+    from victor.verticals.contrib.rag.entity_resolver import EntityInfo
 
 logger = logging.getLogger(__name__)
 

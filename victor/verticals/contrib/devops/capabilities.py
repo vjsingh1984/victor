@@ -30,7 +30,7 @@ Example:
     loader.load_from_module("victor.devops.capabilities")
 
     # Or use directly
-    from victor_devops.capabilities import (
+    from victor.verticals.contrib.devops.capabilities import (
         get_devops_capabilities,
         DevOpsCapabilityProvider,
     )

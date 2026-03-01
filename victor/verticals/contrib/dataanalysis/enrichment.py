@@ -21,7 +21,7 @@ Provides prompt enrichment using data context such as:
 - Statistical method recommendations
 
 Example:
-    from victor_dataanalysis.enrichment import DataAnalysisEnrichmentStrategy
+    from victor.verticals.contrib.dataanalysis.enrichment import DataAnalysisEnrichmentStrategy
 
     # Create strategy
     strategy = DataAnalysisEnrichmentStrategy()

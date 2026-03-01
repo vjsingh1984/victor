@@ -158,7 +158,7 @@ approach for safety enforcement in research workflows.
 
 Example:
     from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-    from victor_research.safety import create_all_research_safety_rules
+    from victor.verticals.contrib.research.safety import create_all_research_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
     create_all_research_safety_rules(enforcer)

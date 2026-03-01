@@ -49,7 +49,7 @@ Each language plugin provides:
 - Language server configuration
 """
 
-from victor_coding.languages.base import (
+from victor.verticals.contrib.coding.languages.base import (
     LanguagePlugin,
     LanguageCapabilities,
     TestRunner,
@@ -58,9 +58,9 @@ from victor_coding.languages.base import (
     Linter,
     LanguageConfig,
 )
-from victor_coding.languages.registry import LanguageRegistry, get_language_registry
-from victor_coding.languages.manager import LanguageManager
-from victor_coding.languages.tiers import (
+from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.manager import LanguageManager
+from victor.verticals.contrib.coding.languages.tiers import (
     LanguageTier,
     TierConfig,
     LANGUAGE_TIERS,

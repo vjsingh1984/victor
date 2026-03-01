@@ -14,6 +14,6 @@
 
 """Codebase intelligence module for code awareness and understanding."""
 
-from victor_coding.codebase.indexer import CodebaseIndex, FileMetadata, Symbol
+from victor.verticals.contrib.coding.codebase.indexer import CodebaseIndex, FileMetadata, Symbol
 
 __all__ = ["CodebaseIndex", "FileMetadata", "Symbol"]

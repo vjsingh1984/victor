@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionContext,
     CompletionItem,
@@ -35,11 +35,11 @@ from victor_coding.completion.protocol import (
     InlineCompletionParams,
     Position,
 )
-from victor_coding.completion.provider import (
+from victor.verticals.contrib.coding.completion.provider import (
     BaseCompletionProvider,
     StreamingCompletionProvider,
 )
-from victor_coding.completion.registry import (
+from victor.verticals.contrib.coding.completion.registry import (
     CompletionProviderRegistry,
     get_completion_registry,
 )

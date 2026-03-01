@@ -20,8 +20,8 @@ Provides interactive TUI components for RAG operations:
 - SearchResults: Search results display
 """
 
-from victor_rag.ui.panel import RAGPanel
-from victor_rag.ui.widgets import DocumentList, SearchResults
+from victor.verticals.contrib.rag.ui.panel import RAGPanel
+from victor.verticals.contrib.rag.ui.widgets import DocumentList, SearchResults
 
 __all__ = [
     "RAGPanel",

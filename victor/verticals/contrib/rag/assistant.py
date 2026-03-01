@@ -267,6 +267,6 @@ You: [Use rag_query tool with query="authentication"]
         Returns:
             Dict with default RAG capability configurations
         """
-        from victor_rag.capabilities import get_capability_configs
+        from victor.verticals.contrib.rag.capabilities import get_capability_configs
 
         return get_capability_configs()

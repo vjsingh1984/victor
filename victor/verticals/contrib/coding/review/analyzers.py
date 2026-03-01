@@ -23,7 +23,7 @@ import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from victor_coding.review.protocol import (
+from victor.verticals.contrib.coding.review.protocol import (
     ComplexityMetrics,
     ReviewCategory,
     ReviewFinding,

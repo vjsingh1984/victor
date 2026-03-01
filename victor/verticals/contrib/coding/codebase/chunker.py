@@ -1036,7 +1036,7 @@ class TierAwareChunker:
 
         # Check if language has tree-sitter support
         try:
-            from victor_coding.languages.tiers import get_tier, LanguageTier
+            from victor.verticals.contrib.coding.languages.tiers import get_tier, LanguageTier
 
             tier_config = get_tier(language)
             has_tree_sitter = tier_config.has_tree_sitter and self._ts is not None

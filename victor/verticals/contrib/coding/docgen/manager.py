@@ -23,9 +23,9 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.docgen.formatter import BaseFormatter, get_formatter
-from victor_coding.docgen.parser import CodeAnalyzer
-from victor_coding.docgen.protocol import (
+from victor.verticals.contrib.coding.docgen.formatter import BaseFormatter, get_formatter
+from victor.verticals.contrib.coding.docgen.parser import CodeAnalyzer
+from victor.verticals.contrib.coding.docgen.protocol import (
     DocConfig,
     DocFormat,
     DocGenResult,

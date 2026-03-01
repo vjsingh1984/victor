@@ -18,7 +18,7 @@ This package provides team specifications for common DevOps tasks with
 rich persona attributes for natural agent characterization.
 
 Example:
-    from victor_devops.teams import (
+    from victor.verticals.contrib.devops.teams import (
         get_team_for_task,
         DEVOPS_TEAM_SPECS,
     )

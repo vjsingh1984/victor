@@ -171,7 +171,7 @@ approach for safety enforcement in coding workflows.
 
 Example:
     from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-    from victor_coding.safety import create_all_coding_safety_rules
+    from victor.verticals.contrib.coding.safety import create_all_coding_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
     create_all_coding_safety_rules(enforcer)

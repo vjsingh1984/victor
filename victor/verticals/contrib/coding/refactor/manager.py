@@ -23,8 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.refactor.analyzer import BaseCodeAnalyzer, get_analyzer
-from victor_coding.refactor.protocol import (
+from victor.verticals.contrib.coding.refactor.analyzer import BaseCodeAnalyzer, get_analyzer
+from victor.verticals.contrib.coding.refactor.protocol import (
     RefactorCapabilities,
     RefactorPreview,
     RefactorRequest,
@@ -34,13 +34,13 @@ from victor_coding.refactor.protocol import (
     RefactorType,
     SourceLocation,
 )
-from victor_coding.refactor.transforms.base import BaseTransform
-from victor_coding.refactor.transforms.extract import (
+from victor.verticals.contrib.coding.refactor.transforms.base import BaseTransform
+from victor.verticals.contrib.coding.refactor.transforms.extract import (
     ExtractConstantTransform,
     ExtractFunctionTransform,
     ExtractVariableTransform,
 )
-from victor_coding.refactor.transforms.rename import RenameFileTransform, RenameSymbolTransform
+from victor.verticals.contrib.coding.refactor.transforms.rename import RenameFileTransform, RenameSymbolTransform
 
 logger = logging.getLogger(__name__)
 

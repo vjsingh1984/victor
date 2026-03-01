@@ -14,9 +14,9 @@
 
 """Built-in completion providers."""
 
-from victor_coding.completion.providers.lsp import LSPCompletionProvider
-from victor_coding.completion.providers.ai import AICompletionProvider
-from victor_coding.completion.providers.snippet import SnippetCompletionProvider
+from victor.verticals.contrib.coding.completion.providers.lsp import LSPCompletionProvider
+from victor.verticals.contrib.coding.completion.providers.ai import AICompletionProvider
+from victor.verticals.contrib.coding.completion.providers.snippet import SnippetCompletionProvider
 
 __all__ = [
     "LSPCompletionProvider",

@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor_rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.document_store import DocumentStore
 
 logger = logging.getLogger(__name__)
 

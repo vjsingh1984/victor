@@ -197,7 +197,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         """Lazy-load the RL hooks."""
         if self._rl_hooks is None and self._enable_rl:
             try:
-                from victor_coding.rl import CodingRLHooks
+                from victor.verticals.contrib.coding.rl import CodingRLHooks
 
                 self._rl_hooks = CodingRLHooks()
             except ImportError:

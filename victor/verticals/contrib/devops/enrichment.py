@@ -21,7 +21,7 @@ Provides prompt enrichment using infrastructure context such as:
 - Command history patterns from similar tasks
 
 Example:
-    from victor_devops.enrichment import DevOpsEnrichmentStrategy
+    from victor.verticals.contrib.devops.enrichment import DevOpsEnrichmentStrategy
 
     # Create strategy
     strategy = DevOpsEnrichmentStrategy()

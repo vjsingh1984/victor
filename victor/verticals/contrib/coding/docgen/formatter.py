@@ -21,7 +21,7 @@ import html
 import logging
 from abc import ABC, abstractmethod
 
-from victor_coding.docgen.protocol import (
+from victor.verticals.contrib.coding.docgen.protocol import (
     ClassDoc,
     DocConfig,
     DocFormat,

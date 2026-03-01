@@ -25,11 +25,11 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from victor_coding.languages.base import (
+from victor.verticals.contrib.coding.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
 )
-from victor_coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
 
 logger = logging.getLogger(__name__)
 

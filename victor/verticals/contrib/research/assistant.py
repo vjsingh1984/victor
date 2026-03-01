@@ -193,6 +193,6 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
         Returns:
             Dict with default research capability configurations
         """
-        from victor_research.capabilities import get_capability_configs
+        from victor.verticals.contrib.research.capabilities import get_capability_configs
 
         return get_capability_configs()

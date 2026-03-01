@@ -342,7 +342,7 @@ class DocumentStore:
         Returns:
             List of created chunks
         """
-        from victor_rag.chunker import DocumentChunker
+        from victor.verticals.contrib.rag.chunker import DocumentChunker
 
         await self.initialize()
 

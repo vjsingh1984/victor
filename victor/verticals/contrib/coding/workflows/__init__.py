@@ -29,7 +29,7 @@ Available workflows (all YAML-defined):
 - refactor: Code refactoring workflow
 
 Usage:
-    from victor_coding.workflows import CodingWorkflowProvider
+    from victor.verticals.contrib.coding.workflows import CodingWorkflowProvider
 
     provider = CodingWorkflowProvider()
 
@@ -47,10 +47,10 @@ This package also provides LCEL-composed tool chains for fine-grained
 code operations (explore, analyze, edit, refactor, etc.).
 """
 
-from victor_coding.workflows.provider import CodingWorkflowProvider
+from victor.verticals.contrib.coding.workflows.provider import CodingWorkflowProvider
 
 # LCEL-composed tool chains
-from victor_coding.composed_chains import (
+from victor.verticals.contrib.coding.composed_chains import (
     # Pre-built chains
     explore_file_chain,
     analyze_function_chain,

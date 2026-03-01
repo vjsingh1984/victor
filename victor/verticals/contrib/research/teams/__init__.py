@@ -18,7 +18,7 @@ This package provides team specifications for common research tasks with
 rich persona attributes for natural agent characterization.
 
 Example:
-    from victor_research.teams import (
+    from victor.verticals.contrib.research.teams import (
         get_team_for_task,
         RESEARCH_TEAM_SPECS,
     )

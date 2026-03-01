@@ -17,7 +17,7 @@
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.languages.base import (
+from victor.verticals.contrib.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,

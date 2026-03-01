@@ -18,7 +18,7 @@ This module provides automated documentation generation from
 Python source code with support for multiple output formats.
 
 Example usage:
-    from victor_coding.docgen import get_docgen_manager, DocConfig, DocFormat
+    from victor.verticals.contrib.coding.docgen import get_docgen_manager, DocConfig, DocFormat
     from pathlib import Path
 
     # Get manager
@@ -46,7 +46,7 @@ Example usage:
         print(f"{file}: {stats['coverage_percent']:.1f}% documented")
 """
 
-from victor_coding.docgen.protocol import (
+from victor.verticals.contrib.coding.docgen.protocol import (
     Attribute,
     ClassDoc,
     DocConfig,
@@ -62,20 +62,20 @@ from victor_coding.docgen.protocol import (
     RaisedException,
     ReturnValue,
 )
-from victor_coding.docgen.parser import (
+from victor.verticals.contrib.coding.docgen.parser import (
     BaseDocstringParser,
     CodeAnalyzer,
     GoogleDocstringParser,
     NumpyDocstringParser,
 )
-from victor_coding.docgen.formatter import (
+from victor.verticals.contrib.coding.docgen.formatter import (
     BaseFormatter,
     HTMLFormatter,
     MarkdownFormatter,
     RSTFormatter,
     get_formatter,
 )
-from victor_coding.docgen.manager import (
+from victor.verticals.contrib.coding.docgen.manager import (
     DocGenManager,
     get_docgen_manager,
     reset_docgen_manager,

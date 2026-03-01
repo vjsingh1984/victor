@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor_coding.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
+from victor.verticals.contrib.coding.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
 
 logger = logging.getLogger(__name__)
 
@@ -761,7 +761,7 @@ class SymbolStore:
         Tree-sitter is error-tolerant and can parse files with syntax errors,
         making it ideal for imperfect codebases.
         """
-        from victor_coding.codebase.tree_sitter_manager import get_parser, LANGUAGE_MODULES
+        from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser, LANGUAGE_MODULES
 
         # Check if language is supported
         if language not in LANGUAGE_MODULES:

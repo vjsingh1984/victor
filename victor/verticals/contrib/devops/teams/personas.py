@@ -26,7 +26,7 @@ The personas are designed to improve agent behavior through more
 nuanced context injection and role-specific guidance for DevOps tasks.
 
 Example:
-    from victor_devops.teams.personas import (
+    from victor.verticals.contrib.devops.teams.personas import (
         get_persona,
         DEVOPS_PERSONAS,
         apply_persona_to_spec,

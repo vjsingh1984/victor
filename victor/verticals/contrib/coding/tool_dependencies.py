@@ -33,11 +33,11 @@ Backward Compatibility:
 
 Migration Path:
     Before (hand-coded Python):
-        from victor_coding.tool_dependencies import CodingToolDependencyProvider
+        from victor.verticals.contrib.coding.tool_dependencies import CodingToolDependencyProvider
         provider = CodingToolDependencyProvider()
 
     After (YAML-based, same interface):
-        from victor_coding.tool_dependencies import CodingToolDependencyProvider
+        from victor.verticals.contrib.coding.tool_dependencies import CodingToolDependencyProvider
         provider = CodingToolDependencyProvider()  # Now loads from YAML
 
 Uses canonical tool names from ToolNames to ensure consistent naming

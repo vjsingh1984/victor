@@ -400,6 +400,9 @@ victor-examples = "examples.playground.cli:app"
 # All contrib verticals are now bundled with the main victor package.
 # =============================================================================
 [project.entry-points."victor.verticals"]
+# Built-in vertical
+benchmark = "victor.benchmark:BenchmarkVertical"
+
 # Contrib verticals (migrated from external packages)
 coding = "victor.verticals.contrib.coding:CodingAssistant"
 rag = "victor.verticals.contrib.rag:RAGAssistant"

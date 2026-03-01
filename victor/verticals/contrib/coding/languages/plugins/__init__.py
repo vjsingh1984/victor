@@ -26,21 +26,21 @@ Provides language support for:
 - Additional: Kotlin, C#, Ruby, PHP, Swift, Scala, Bash, SQL, HTML, CSS, Lua, Elixir, Haskell, R, Markdown, XML
 """
 
-from victor_coding.languages.plugins.python import PythonPlugin
-from victor_coding.languages.plugins.javascript import JavaScriptPlugin
-from victor_coding.languages.plugins.typescript import TypeScriptPlugin
-from victor_coding.languages.plugins.rust import RustPlugin
-from victor_coding.languages.plugins.go import GoPlugin
-from victor_coding.languages.plugins.java import JavaPlugin
-from victor_coding.languages.plugins.cpp import CppPlugin
-from victor_coding.languages.plugins.config import (
+from victor.verticals.contrib.coding.languages.plugins.python import PythonPlugin
+from victor.verticals.contrib.coding.languages.plugins.javascript import JavaScriptPlugin
+from victor.verticals.contrib.coding.languages.plugins.typescript import TypeScriptPlugin
+from victor.verticals.contrib.coding.languages.plugins.rust import RustPlugin
+from victor.verticals.contrib.coding.languages.plugins.go import GoPlugin
+from victor.verticals.contrib.coding.languages.plugins.java import JavaPlugin
+from victor.verticals.contrib.coding.languages.plugins.cpp import CppPlugin
+from victor.verticals.contrib.coding.languages.plugins.config import (
     JsonPlugin,
     YamlPlugin,
     TomlPlugin,
     IniPlugin,
     HoconPlugin,
 )
-from victor_coding.languages.plugins.additional import (
+from victor.verticals.contrib.coding.languages.plugins.additional import (
     CPlugin,
     KotlinPlugin,
     CSharpPlugin,

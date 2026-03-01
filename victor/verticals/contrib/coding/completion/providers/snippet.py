@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionItem,
     CompletionItemKind,
@@ -33,7 +33,7 @@ from victor_coding.completion.protocol import (
     InlineCompletionList,
     InlineCompletionParams,
 )
-from victor_coding.completion.provider import CachingCompletionProvider
+from victor.verticals.contrib.coding.completion.provider import CachingCompletionProvider
 
 logger = logging.getLogger(__name__)
 

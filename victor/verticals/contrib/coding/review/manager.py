@@ -23,7 +23,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.review.analyzers import (
+from victor.verticals.contrib.coding.review.analyzers import (
     BaseAnalyzer,
     BestPracticesAnalyzer,
     ComplexityAnalyzer,
@@ -31,7 +31,7 @@ from victor_coding.review.analyzers import (
     NamingAnalyzer,
     SecurityAnalyzer,
 )
-from victor_coding.review.protocol import (
+from victor.verticals.contrib.coding.review.protocol import (
     FileReview,
     ReviewCategory,
     ReviewConfig,
@@ -40,7 +40,7 @@ from victor_coding.review.protocol import (
     ReviewRule,
     Severity,
 )
-from victor_coding.review.rules import RuleRegistry, get_rule_registry
+from victor.verticals.contrib.coding.review.rules import RuleRegistry, get_rule_registry
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ class ReviewManager:
 
     def _create_location(self, file_path: Path, line: int):
         """Create a source location."""
-        from victor_coding.review.protocol import SourceLocation
+        from victor.verticals.contrib.coding.review.protocol import SourceLocation
 
         return SourceLocation(file_path=file_path, start_line=line)
 

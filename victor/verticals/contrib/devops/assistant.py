@@ -215,7 +215,7 @@ When creating configurations:
         Returns:
             DevOpsCapabilityProvider instance
         """
-        from victor_devops.capabilities import DevOpsCapabilityProvider
+        from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
 
         return DevOpsCapabilityProvider()
 

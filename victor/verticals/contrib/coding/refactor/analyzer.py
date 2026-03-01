@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
-from victor_coding.refactor.protocol import (
+from victor.verticals.contrib.coding.refactor.protocol import (
     RefactorRisk,
     RefactorSuggestion,
     RefactorType,

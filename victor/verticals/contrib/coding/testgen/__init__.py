@@ -18,7 +18,7 @@ This module provides automated test generation capabilities using
 static code analysis to create comprehensive test suites.
 
 Example usage:
-    from victor_coding.testgen import get_testgen_manager, TestGenConfig, TestFramework
+    from victor.verticals.contrib.coding.testgen import get_testgen_manager, TestGenConfig, TestFramework
     from pathlib import Path
 
     # Get manager
@@ -57,7 +57,7 @@ Example usage:
     )
 """
 
-from victor_coding.testgen.protocol import (
+from victor.verticals.contrib.coding.testgen.protocol import (
     AssertionType,
     ClassSignature,
     FunctionSignature,
@@ -71,14 +71,14 @@ from victor_coding.testgen.protocol import (
     TestSuite,
     TestType,
 )
-from victor_coding.testgen.analyzer import TestTargetAnalyzer
-from victor_coding.testgen.generator import (
+from victor.verticals.contrib.coding.testgen.analyzer import TestTargetAnalyzer
+from victor.verticals.contrib.coding.testgen.generator import (
     BaseTestGenerator,
     PytestGenerator,
     TestCaseGenerator,
     UnittestGenerator,
 )
-from victor_coding.testgen.manager import (
+from victor.verticals.contrib.coding.testgen.manager import (
     TestGenManager,
     get_testgen_manager,
     reset_testgen_manager,

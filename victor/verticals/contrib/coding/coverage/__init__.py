@@ -18,7 +18,7 @@ Provides comprehensive coverage parsing, visualization, and management
 for multiple coverage formats (Cobertura, LCOV, Go, Jest, Clover).
 """
 
-from victor_coding.coverage.protocol import (
+from victor.verticals.contrib.coding.coverage.protocol import (
     BranchCoverage,
     CoverageDiff,
     CoverageReport,
@@ -29,7 +29,7 @@ from victor_coding.coverage.protocol import (
     FunctionCoverage,
     LineCoverage,
 )
-from victor_coding.coverage.parser import (
+from victor.verticals.contrib.coding.coverage.parser import (
     BaseCoverageParser,
     CloverParser,
     CoberturaParser,
@@ -40,8 +40,8 @@ from victor_coding.coverage.parser import (
     get_parser_for_file,
     parse_coverage_file,
 )
-from victor_coding.coverage.visualizer import CoverageVisualizer
-from victor_coding.coverage.manager import (
+from victor.verticals.contrib.coding.coverage.visualizer import CoverageVisualizer
+from victor.verticals.contrib.coding.coverage.manager import (
     CoverageManager,
     get_coverage_manager,
     reset_coverage_manager,

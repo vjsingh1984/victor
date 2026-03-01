@@ -22,7 +22,7 @@ import logging
 import time
 from typing import Any, AsyncIterator, Optional
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionItem,
     CompletionItemKind,
@@ -32,7 +32,7 @@ from victor_coding.completion.protocol import (
     InlineCompletionList,
     InlineCompletionParams,
 )
-from victor_coding.completion.provider import StreamingCompletionProvider
+from victor.verticals.contrib.coding.completion.provider import StreamingCompletionProvider
 
 logger = logging.getLogger(__name__)
 

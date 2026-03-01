@@ -24,7 +24,7 @@ import logging
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Type, Union
 
-from victor_coding.languages.base import LanguagePlugin
+from victor.verticals.contrib.coding.languages.base import LanguagePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +252,7 @@ class LanguageRegistry:
         Returns:
             Number of plugins registered
         """
-        from victor_coding.languages.plugins import (
+        from victor.verticals.contrib.coding.languages.plugins import (
             # Core languages
             PythonPlugin,
             JavaScriptPlugin,

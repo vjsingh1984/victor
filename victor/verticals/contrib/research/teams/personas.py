@@ -26,7 +26,7 @@ The personas are designed to improve agent behavior through more
 nuanced context injection and role-specific guidance.
 
 Example:
-    from victor_research.teams.personas import (
+    from victor.verticals.contrib.research.teams.personas import (
         get_persona,
         RESEARCH_PERSONAS,
         apply_persona_to_spec,

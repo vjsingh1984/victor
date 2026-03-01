@@ -273,7 +273,7 @@ if TEXTUAL_AVAILABLE:
                 await self._render_results()
             else:
                 # Default search using document store
-                from victor_rag.document_store import DocumentStore
+                from victor.verticals.contrib.rag.document_store import DocumentStore
 
                 store = DocumentStore()
                 await store.initialize()
@@ -318,7 +318,7 @@ if TEXTUAL_AVAILABLE:
                     status.update(f"Success: {result}")
                 else:
                     # Default ingestion
-                    from victor_rag.document_store import Document, DocumentStore
+                    from victor.verticals.contrib.rag.document_store import Document, DocumentStore
 
                     file_path = Path(path)
                     if not file_path.exists():
@@ -349,7 +349,7 @@ if TEXTUAL_AVAILABLE:
 
         async def _refresh_documents(self) -> None:
             """Refresh document list."""
-            from victor_rag.document_store import DocumentStore
+            from victor.verticals.contrib.rag.document_store import DocumentStore
 
             store = DocumentStore()
             await store.initialize()
@@ -376,7 +376,7 @@ if TEXTUAL_AVAILABLE:
                     if self._on_delete:
                         await self._on_delete(doc_id)
                     else:
-                        from victor_rag.document_store import DocumentStore
+                        from victor.verticals.contrib.rag.document_store import DocumentStore
 
                         store = DocumentStore()
                         await store.initialize()
@@ -387,7 +387,7 @@ if TEXTUAL_AVAILABLE:
 
         async def _refresh_stats(self) -> None:
             """Refresh statistics."""
-            from victor_rag.document_store import DocumentStore
+            from victor.verticals.contrib.rag.document_store import DocumentStore
 
             store = DocumentStore()
             await store.initialize()

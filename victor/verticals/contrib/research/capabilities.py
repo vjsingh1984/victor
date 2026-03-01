@@ -30,7 +30,7 @@ Example:
     loader.load_from_module("victor.research.capabilities")
 
     # Or use directly
-    from victor_research.capabilities import (
+    from victor.verticals.contrib.research.capabilities import (
         get_research_capabilities,
         ResearchCapabilityProvider,
     )

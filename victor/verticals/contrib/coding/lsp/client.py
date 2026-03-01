@@ -22,7 +22,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from victor_coding.lsp.config import LSPServerConfig
+from victor.verticals.contrib.coding.lsp.config import LSPServerConfig
 
 # Use core LSP types from victor.protocols
 from victor.protocols.lsp_types import (

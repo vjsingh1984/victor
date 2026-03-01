@@ -42,14 +42,14 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 from pydantic import BaseModel, Field
 from tree_sitter import Query
 
-from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode
-from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
-from victor_coding.codebase.unified_extractor import UnifiedSymbolExtractor, EnrichedSymbol
-from victor_coding.languages.registry import get_language_registry
-from victor_coding.languages.tiers import get_tier, LanguageTier
-from victor_coding.codebase.graph.registry import create_graph_store
+from victor.verticals.contrib.coding.codebase.graph.protocol import GraphEdge, GraphNode
+from victor.verticals.contrib.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+from victor.verticals.contrib.coding.codebase.unified_extractor import UnifiedSymbolExtractor, EnrichedSymbol
+from victor.verticals.contrib.coding.languages.registry import get_language_registry
+from victor.verticals.contrib.coding.languages.tiers import get_tier, LanguageTier
+from victor.verticals.contrib.coding.codebase.graph.registry import create_graph_store
 from victor.storage.graph.sqlite_store import SqliteGraphStore
-from victor_coding.codebase.symbol_resolver import SymbolResolver
+from victor.verticals.contrib.coding.codebase.symbol_resolver import SymbolResolver
 from victor.core.utils.ast_helpers import (
     STDLIB_MODULES,
     build_signature,
@@ -59,8 +59,8 @@ from victor.core.utils.ast_helpers import (
 )
 
 if TYPE_CHECKING:
-    from victor_coding.codebase.embeddings.base import BaseEmbeddingProvider
-    from victor_coding.codebase.graph.protocol import GraphStoreProtocol
+    from victor.verticals.contrib.coding.codebase.embeddings.base import BaseEmbeddingProvider
+    from victor.verticals.contrib.coding.codebase.graph.protocol import GraphStoreProtocol
 
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ def _get_plugin_query(language: str, field: str) -> Optional[str]:
     discovers plugins if needed.
     """
     try:
-        from victor_coding.languages.registry import get_language_registry
+        from victor.verticals.contrib.coding.languages.registry import get_language_registry
 
         registry = get_language_registry()
         if not registry._plugins:
@@ -184,7 +184,7 @@ def _get_plugin_query(language: str, field: str) -> Optional[str]:
 def _get_plugin_enclosing_scopes(language: str) -> List[Tuple[str, str]]:
     """Get enclosing scope definitions from language plugin, or empty list."""
     try:
-        from victor_coding.languages.registry import get_language_registry
+        from victor.verticals.contrib.coding.languages.registry import get_language_registry
 
         registry = get_language_registry()
         if not registry._plugins:
@@ -269,7 +269,7 @@ def _process_file_parallel(
 
     # Tree-sitter symbol extraction
     try:
-        from victor_coding.codebase.tree_sitter_manager import get_parser
+        from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
         from tree_sitter import Query, QueryCursor
 
         parser = get_parser(language)
@@ -283,7 +283,7 @@ def _process_file_parallel(
             if not query_defs:
                 # Try language plugin for symbol queries
                 try:
-                    from victor_coding.languages.registry import get_language_registry
+                    from victor.verticals.contrib.coding.languages.registry import get_language_registry
 
                     _reg = get_language_registry()
                     if not _reg._plugins:
@@ -1833,7 +1833,7 @@ class CodebaseIndex:
         if not query_src:
             return list(refs)
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
         except Exception:
             return list(refs)
 
@@ -1931,7 +1931,7 @@ class CodebaseIndex:
         symbols: List[Symbol] = []
         parser = None
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
 
             try:
                 parser = get_parser(language)
@@ -2050,7 +2050,7 @@ class CodebaseIndex:
 
         parser = None
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
 
             parser = get_parser(language)
         except Exception:
@@ -2103,7 +2103,7 @@ class CodebaseIndex:
             query_src = IMPLEMENTS_QUERIES.get(language)
         parser = None
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
 
             parser = get_parser(language)
         except Exception:
@@ -2168,7 +2168,7 @@ class CodebaseIndex:
 
         parser = None
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
 
             parser = get_parser(language)
         except Exception:
@@ -2287,7 +2287,7 @@ class CodebaseIndex:
         if not query_src:
             return []
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
         except Exception:
             return []
         try:
@@ -2374,7 +2374,7 @@ class CodebaseIndex:
         if not query_src:
             return []
         try:
-            from victor_coding.codebase.tree_sitter_manager import get_parser
+            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
         except Exception:
             return []
         try:
@@ -2960,7 +2960,7 @@ class CodebaseIndex:
             config: Embedding configuration dict (overrides settings if provided)
         """
         try:
-            from victor_coding.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
+            from victor.verticals.contrib.coding.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
 
             # Create config with defaults from settings
             if not config:
@@ -3041,7 +3041,7 @@ class CodebaseIndex:
         # Query expansion to improve recall (fix false negatives)
         queries_to_search = [query]
         if expand_query:
-            from victor_coding.codebase.query_expander import expand_query as expand_fn
+            from victor.verticals.contrib.coding.codebase.query_expander import expand_query as expand_fn
 
             queries_to_search = expand_fn(query, max_expansions=5)
             if len(queries_to_search) > 1:

@@ -30,7 +30,7 @@ Example:
     loader.load_from_module("victor.dataanalysis.capabilities")
 
     # Or use directly
-    from victor_dataanalysis.capabilities import (
+    from victor.verticals.contrib.dataanalysis.capabilities import (
         get_data_analysis_capabilities,
         DataAnalysisCapabilityProvider,
     )

@@ -22,7 +22,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional, Protocol, runtime_checkable
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionItem,
     CompletionList,

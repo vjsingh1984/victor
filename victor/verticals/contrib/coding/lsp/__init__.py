@@ -20,9 +20,9 @@ like completion, go-to-definition, find references, and diagnostics.
 LSP types are provided by victor.protocols.lsp_types for cross-vertical use.
 """
 
-from victor_coding.lsp.client import LSPClient
-from victor_coding.lsp.manager import LSPConnectionPool, get_lsp_manager
-from victor_coding.lsp.config import LSPServerConfig, LANGUAGE_SERVERS
+from victor.verticals.contrib.coding.lsp.client import LSPClient
+from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool, get_lsp_manager
+from victor.verticals.contrib.coding.lsp.config import LSPServerConfig, LANGUAGE_SERVERS
 
 # Re-export core LSP types for convenience
 from victor.protocols.lsp_types import (

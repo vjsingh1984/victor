@@ -25,16 +25,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.coverage.parser import (
+from victor.verticals.contrib.coding.coverage.parser import (
     COVERAGE_PARSERS,
     parse_coverage_file,
 )
-from victor_coding.coverage.protocol import (
+from victor.verticals.contrib.coding.coverage.protocol import (
     CoverageDiff,
     CoverageReport,
     CoverageThreshold,
 )
-from victor_coding.coverage.visualizer import CoverageVisualizer
+from victor.verticals.contrib.coding.coverage.visualizer import CoverageVisualizer
 
 logger = logging.getLogger(__name__)
 
@@ -483,7 +483,7 @@ class CoverageManager:
 
     def _deserialize_report(self, data: dict) -> CoverageReport:
         """Deserialize a coverage report from JSON-compatible dict."""
-        from victor_coding.coverage.protocol import LineCoverage, CoverageStatus
+        from victor.verticals.contrib.coding.coverage.protocol import LineCoverage, CoverageStatus
 
         report = CoverageReport(
             timestamp=datetime.fromisoformat(data["timestamp"]),
@@ -492,7 +492,7 @@ class CoverageManager:
         )
 
         for path_str, file_data in data.get("files", {}).items():
-            from victor_coding.coverage.protocol import FileCoverage
+            from victor.verticals.contrib.coding.coverage.protocol import FileCoverage
 
             file_cov = FileCoverage(file_path=Path(path_str))
 

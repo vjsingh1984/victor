@@ -25,7 +25,7 @@ from victor.framework.rl import (
     RLManager,
     get_rl_coordinator,
 )
-from victor_coding.rl.config import CodingRLConfig, get_default_config
+from victor.verticals.contrib.coding.rl.config import CodingRLConfig, get_default_config
 
 
 class CodingRLHooks:

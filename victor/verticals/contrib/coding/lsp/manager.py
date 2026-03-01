@@ -21,13 +21,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-from victor_coding.lsp.client import (
+from victor.verticals.contrib.coding.lsp.client import (
     LSPClient,
     CompletionItem,
     Hover,
     Position,
 )
-from victor_coding.lsp.config import (
+from victor.verticals.contrib.coding.lsp.config import (
     LANGUAGE_SERVERS,
     get_server_for_file,
 )

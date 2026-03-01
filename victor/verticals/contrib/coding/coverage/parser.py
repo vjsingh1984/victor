@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
-from victor_coding.coverage.protocol import (
+from victor.verticals.contrib.coding.coverage.protocol import (
     BranchCoverage,
     CoverageReport,
     CoverageStatus,

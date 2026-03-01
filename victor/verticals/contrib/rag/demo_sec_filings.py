@@ -375,7 +375,7 @@ async def clear_sec_filings() -> int:
     Returns:
         Number of documents removed
     """
-    from victor_rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.document_store import DocumentStore
 
     store = DocumentStore()
     await store.initialize()
@@ -412,7 +412,7 @@ async def ingest_sec_filings(
     Returns:
         Dict mapping company symbols to chunk counts
     """
-    from victor_rag.document_store import Document, DocumentStore
+    from victor.verticals.contrib.rag.document_store import Document, DocumentStore
 
     if companies is None:
         companies = COMPANY_PRESETS["faang"]
@@ -523,7 +523,7 @@ async def query_filings(
         filter_sector: Filter by sector
         filter_symbol: Filter by company symbol
     """
-    from victor_rag.tools.query import RAGQueryTool
+    from victor.verticals.contrib.rag.tools.query import RAGQueryTool
 
     tool = RAGQueryTool()
 
@@ -558,7 +558,7 @@ async def query_filings(
 
 async def show_stats() -> None:
     """Show RAG store statistics."""
-    from victor_rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.document_store import DocumentStore
 
     store = DocumentStore()
     await store.initialize()

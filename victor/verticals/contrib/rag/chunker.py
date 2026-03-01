@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Coroutine, List, Optional, Tuple
 
-from victor_rag.document_store import Document, DocumentChunk
+from victor.verticals.contrib.rag.document_store import Document, DocumentChunk
 
 logger = logging.getLogger(__name__)
 

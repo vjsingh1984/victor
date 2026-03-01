@@ -24,7 +24,7 @@ Tier System:
     - Tier 3: Tree-sitter only (Ruby, PHP, and others)
 
 Usage:
-    from victor_coding.languages.tiers import get_tier, LanguageTier
+    from victor.verticals.contrib.coding.languages.tiers import get_tier, LanguageTier
 
     config = get_tier("python")
     if config.tier == LanguageTier.TIER_1 and config.has_native_ast:

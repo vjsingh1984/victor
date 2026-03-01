@@ -45,7 +45,7 @@ class RAGListTool(BaseTool):
         Returns:
             ToolResult with document list
         """
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -135,7 +135,7 @@ class RAGListTool(BaseTool):
 
     def _get_document_store(self):
         """Get document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         if not hasattr(self, "_store"):
             self._store = DocumentStore()
@@ -172,7 +172,7 @@ class RAGDeleteTool(BaseTool):
         Returns:
             ToolResult with deletion status
         """
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -203,7 +203,7 @@ class RAGDeleteTool(BaseTool):
 
     def _get_document_store(self):
         """Get document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         if not hasattr(self, "_store"):
             self._store = DocumentStore()
@@ -232,7 +232,7 @@ class RAGStatsTool(BaseTool):
         Returns:
             ToolResult with statistics
         """
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -281,7 +281,7 @@ class RAGStatsTool(BaseTool):
 
     def _get_document_store(self):
         """Get document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         if not hasattr(self, "_store"):
             self._store = DocumentStore()

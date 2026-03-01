@@ -22,14 +22,14 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.testgen.analyzer import TestTargetAnalyzer
-from victor_coding.testgen.generator import (
+from victor.verticals.contrib.coding.testgen.analyzer import TestTargetAnalyzer
+from victor.verticals.contrib.coding.testgen.generator import (
     BaseTestGenerator,
     PytestGenerator,
     TestCaseGenerator,
     UnittestGenerator,
 )
-from victor_coding.testgen.protocol import (
+from victor.verticals.contrib.coding.testgen.protocol import (
     GeneratedTest,
     TestFramework,
     TestGenConfig,

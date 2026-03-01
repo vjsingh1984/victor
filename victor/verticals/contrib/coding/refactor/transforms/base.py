@@ -22,8 +22,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from victor_coding.refactor.analyzer import BaseCodeAnalyzer
-from victor_coding.refactor.protocol import (
+from victor.verticals.contrib.coding.refactor.analyzer import BaseCodeAnalyzer
+from victor.verticals.contrib.coding.refactor.protocol import (
     CodeEdit,
     RefactorPreview,
     RefactorRequest,

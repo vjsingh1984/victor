@@ -22,7 +22,7 @@ This module provides RAG-specific safety patterns for:
 - Data loss prevention
 
 Example:
-    from victor_rag.safety import RAGSafetyExtension
+    from victor.verticals.contrib.rag.safety import RAGSafetyExtension
 
     safety = RAGSafetyExtension()
     patterns = safety.get_bash_patterns()
@@ -419,7 +419,7 @@ approach for safety enforcement in RAG workflows.
 
 Example:
     from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-    from victor_rag.safety import create_all_rag_safety_rules
+    from victor.verticals.contrib.rag.safety import create_all_rag_safety_rules
 
     enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
     create_all_rag_safety_rules(enforcer)

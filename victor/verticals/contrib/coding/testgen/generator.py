@@ -23,8 +23,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.testgen.analyzer import TestTargetAnalyzer
-from victor_coding.testgen.protocol import (
+from victor.verticals.contrib.coding.testgen.analyzer import TestTargetAnalyzer
+from victor.verticals.contrib.coding.testgen.protocol import (
     AssertionType,
     ClassSignature,
     FunctionSignature,

@@ -18,8 +18,8 @@ import ast
 import textwrap
 from pathlib import Path
 
-from victor_coding.refactor.analyzer import BaseCodeAnalyzer
-from victor_coding.refactor.protocol import (
+from victor.verticals.contrib.coding.refactor.analyzer import BaseCodeAnalyzer
+from victor.verticals.contrib.coding.refactor.protocol import (
     CodeEdit,
     RefactorPreview,
     RefactorRequest,
@@ -27,7 +27,7 @@ from victor_coding.refactor.protocol import (
     RefactorType,
     SourceLocation,
 )
-from victor_coding.refactor.transforms.base import BaseTransform
+from victor.verticals.contrib.coding.refactor.transforms.base import BaseTransform
 
 
 class ExtractFunctionTransform(BaseTransform):

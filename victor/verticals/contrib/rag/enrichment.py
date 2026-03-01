@@ -27,7 +27,7 @@ This module implements best-of-class RAG enrichment techniques:
 3. Contextual enrichment - Adds relevant context for synthesis
 
 Example:
-    from victor_rag.enrichment import RAGEnrichmentStrategy
+    from victor.verticals.contrib.rag.enrichment import RAGEnrichmentStrategy
 
     strategy = RAGEnrichmentStrategy()
     await strategy.initialize(document_store)
@@ -57,9 +57,9 @@ from victor.framework.enrichment import (
 )
 
 if TYPE_CHECKING:
-    from victor_rag.document_store import DocumentStore
-    from victor_rag.entity_resolver import EntityInfo, EntityResolver
-    from victor_rag.query_enhancer import QueryEnhancer, EnhancementTechnique
+    from victor.verticals.contrib.rag.document_store import DocumentStore
+    from victor.verticals.contrib.rag.entity_resolver import EntityInfo, EntityResolver
+    from victor.verticals.contrib.rag.query_enhancer import QueryEnhancer, EnhancementTechnique
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class RAGEnrichmentStrategy:
 
         # Initialize entity resolver
         if self.config.use_entity_resolution and self._document_store:
-            from victor_rag.entity_resolver import EntityResolver
+            from victor.verticals.contrib.rag.entity_resolver import EntityResolver
 
             self._entity_resolver = EntityResolver(self._document_store)
             await self._entity_resolver.initialize()
@@ -150,7 +150,7 @@ class RAGEnrichmentStrategy:
 
         # Initialize query enhancer if LLM enhancement is enabled
         if self.config.use_llm_enhancement:
-            from victor_rag.query_enhancer import QueryEnhancer
+            from victor.verticals.contrib.rag.query_enhancer import QueryEnhancer
 
             self._query_enhancer = QueryEnhancer(
                 provider=self.config.llm_provider,
@@ -290,7 +290,7 @@ class RAGEnrichmentStrategy:
         # LLM enhancement if enabled
         should_use_llm = use_llm if use_llm is not None else self.config.use_llm_enhancement
         if should_use_llm and self._query_enhancer:
-            from victor_rag.query_enhancer import EnhancementTechnique
+            from victor.verticals.contrib.rag.query_enhancer import EnhancementTechnique
 
             techniques = [EnhancementTechnique(t) for t in self.config.enhancement_techniques]
 

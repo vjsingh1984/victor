@@ -100,7 +100,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.container import ServiceLifetime
 
         def create_middleware(_):
-            from victor_coding.middleware import CodeCorrectionMiddleware
+            from victor.verticals.contrib.coding.middleware import CodeCorrectionMiddleware
 
             enabled = getattr(settings, "enable_code_correction", True)
             auto_fix = getattr(settings, "code_correction_auto_fix", True)
@@ -121,7 +121,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.container import ServiceLifetime
 
         def create_safety(_):
-            from victor_coding.safety import CodingSafetyExtension
+            from victor.verticals.contrib.coding.safety import CodingSafetyExtension
 
             return CodingSafetyExtension()
 
@@ -140,7 +140,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.container import ServiceLifetime
 
         def create_prompts(_):
-            from victor_coding.prompts import CodingPromptContributor
+            from victor.verticals.contrib.coding.prompts import CodingPromptContributor
 
             # Use extended grounding for local providers
             use_extended = getattr(settings, "use_extended_grounding", False)
@@ -162,7 +162,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.core.verticals.protocols import ModeConfigProviderProtocol
 
         def create_mode_config(_):
-            from victor_coding.mode_config import CodingModeConfigProvider
+            from victor.verticals.contrib.coding.mode_config import CodingModeConfigProvider
 
             default_mode = getattr(settings, "default_mode", "default")
             return CodingModeConfigProvider(default_mode=default_mode)

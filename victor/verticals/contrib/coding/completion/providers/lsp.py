@@ -21,7 +21,7 @@ language-aware code completions.
 import logging
 from typing import Any, Optional
 
-from victor_coding.completion.protocol import (
+from victor.verticals.contrib.coding.completion.protocol import (
     CompletionCapabilities,
     CompletionItem,
     CompletionItemKind,
@@ -35,7 +35,7 @@ from victor_coding.completion.protocol import (
     Range,
     TextEdit,
 )
-from victor_coding.completion.provider import BaseCompletionProvider
+from victor.verticals.contrib.coding.completion.provider import BaseCompletionProvider
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
             return self._lsp_manager
 
         try:
-            from victor_coding.lsp.manager import LSPConnectionPool
+            from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool
 
             self._lsp_manager = LSPConnectionPool()
             return self._lsp_manager

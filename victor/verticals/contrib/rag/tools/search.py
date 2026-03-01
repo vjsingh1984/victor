@@ -87,7 +87,7 @@ class RAGSearchTool(BaseTool):
         Returns:
             ToolResult with search results
         """
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -137,7 +137,7 @@ class RAGSearchTool(BaseTool):
 
     def _get_document_store(self):
         """Get document store instance."""
-        from victor_rag.document_store import DocumentStore
+        from victor.verticals.contrib.rag.document_store import DocumentStore
 
         if not hasattr(self, "_store"):
             self._store = DocumentStore()

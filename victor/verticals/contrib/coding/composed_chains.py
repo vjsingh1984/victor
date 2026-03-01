@@ -25,7 +25,7 @@ The chains leverage victor.tools.composition primitives:
 - RunnableLambda: Transform functions
 
 Example:
-    from victor_coding.composed_chains import (
+    from victor.verticals.contrib.coding.composed_chains import (
         explore_file_chain,
         analyze_function_chain,
         safe_edit_chain,

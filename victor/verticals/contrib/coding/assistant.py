@@ -317,7 +317,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         """
 
         def _create_middleware() -> List[MiddlewareProtocol]:
-            from victor_coding.middleware import (
+            from victor.verticals.contrib.coding.middleware import (
                 CodeCorrectionMiddleware,
                 GitSafetyMiddleware,
             )
@@ -357,7 +357,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         """
 
         def _create() -> Dict[str, Any]:
-            from victor_coding.composed_chains import CODING_CHAINS
+            from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
 
             return CODING_CHAINS
 
@@ -388,7 +388,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         """
 
         def _create() -> Dict[str, Any]:
-            from victor_coding.teams import CODING_PERSONAS
+            from victor.verticals.contrib.coding.teams import CODING_PERSONAS
 
             return CODING_PERSONAS
 
@@ -407,7 +407,7 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
         Returns:
             Dict with coding capability configurations
         """
-        from victor_coding.capabilities import get_capability_configs
+        from victor.verticals.contrib.coding.capabilities import get_capability_configs
 
         return get_capability_configs()
 

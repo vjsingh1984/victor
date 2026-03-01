@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from victor_coding.docgen.protocol import (
+from victor.verticals.contrib.coding.docgen.protocol import (
     Attribute,
     ClassDoc,
     DocStyle,
