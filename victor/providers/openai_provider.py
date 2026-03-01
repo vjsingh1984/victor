@@ -14,7 +14,6 @@
 
 """OpenAI GPT provider implementation."""
 
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from openai import AsyncOpenAI
@@ -33,6 +32,11 @@ from victor.providers.base import (
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
 )
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 
 class OpenAIProvider(BaseProvider):
@@ -41,52 +45,73 @@ class OpenAIProvider(BaseProvider):
     # O-series reasoning models have different parameter requirements
     O_SERIES_MODELS = {"o1", "o1-pro", "o3", "o3-mini"}
 
+    # Cloud provider timeout
+    DEFAULT_TIMEOUT = 60
+
     def __init__(
         self,
         api_key: Optional[str] = None,
         organization: Optional[str] = None,
         base_url: Optional[str] = None,
-        timeout: int = 60,
+        timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize OpenAI provider.
 
         Args:
-            api_key: OpenAI API key (or set OPENAI_API_KEY env var, or use keyring)
+            api_key: OpenAI API key (or set OPENAI_API_KEY env var)
             organization: OpenAI organization ID (optional)
             base_url: Optional base URL for API
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("openai", __name__)
 
-                resolved_key = get_api_key("openai") or ""
-            except ImportError:
-                pass
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("openai", explicit_key=api_key)
 
-        if not resolved_key:
-            import logging
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
 
-            logging.getLogger(__name__).warning(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable, "
-                "use 'victor keys --set openai --keyring', or pass api_key parameter."
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="openai",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
 
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="gpt",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                "max_retries": max_retries,
+                "organization": organization,
+                **kwargs,
+            },
+        )
+
         super().__init__(
-            api_key=resolved_key,
+            api_key=self._api_key,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
             **kwargs,
         )
         self.client = AsyncOpenAI(
-            api_key=resolved_key,
+            api_key=self._api_key,
             organization=organization,
             base_url=base_url,
             timeout=timeout,
@@ -147,46 +172,91 @@ class OpenAIProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderError: For other errors
         """
-        try:
-            # Convert messages to OpenAI format
-            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                # Convert messages to OpenAI format
+                openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
-            # Check if O-series reasoning model
-            is_o_series = self._is_o_series_model(model)
+                # Check if O-series reasoning model
+                is_o_series = self._is_o_series_model(model)
 
-            # Build request parameters
-            request_params = {
-                "model": model,
-                "messages": openai_messages,
-                **kwargs,
-            }
+                # Build request parameters
+                request_params = {
+                    "model": model,
+                    "messages": openai_messages,
+                    **kwargs,
+                }
 
-            if is_o_series:
-                # O-series models use max_completion_tokens instead of max_tokens
-                # and don't support temperature or tools
-                request_params["max_completion_tokens"] = max_tokens
-                # Remove any temperature if passed in kwargs
-                request_params.pop("temperature", None)
-            else:
-                # Standard models use max_tokens and temperature
-                request_params["temperature"] = temperature
-                request_params["max_tokens"] = max_tokens
+                if is_o_series:
+                    # O-series models use max_completion_tokens instead of max_tokens
+                    # and don't support temperature or tools
+                    request_params["max_completion_tokens"] = max_tokens
+                    # Remove any temperature if passed in kwargs
+                    request_params.pop("temperature", None)
+                else:
+                    # Standard models use max_tokens and temperature
+                    request_params["temperature"] = temperature
+                    request_params["max_tokens"] = max_tokens
 
-                if tools:
-                    request_params["tools"] = self._convert_tools(tools)
-                    request_params["tool_choice"] = "auto"
+                    if tools:
+                        request_params["tools"] = self._convert_tools(tools)
+                        request_params["tool_choice"] = "auto"
 
-            # Make API call with circuit breaker protection
-            response: ChatCompletion = await self._execute_with_circuit_breaker(
-                self.client.chat.completions.create, **request_params
-            )
+                # Make API call with circuit breaker protection
+                response: ChatCompletion = await self._execute_with_circuit_breaker(
+                    self.client.chat.completions.create, **request_params
+                )
 
-            return self._parse_response(response, model)
+                parsed = self._parse_response(response, model)
 
-        except Exception as e:
-            return self._handle_error(e)
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(request_params)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except Exception as e:
+                # Convert to specific provider error types based on error message
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_str = str(e).lower()
+                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {str(e)}",
+                        provider=self.name,
+                    ) from e
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {str(e)}",
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                else:
+                    # Wrap generic errors in ProviderError
+                    raise ProviderError(
+                        message=f"OpenAI API error: {str(e)}",
+                        provider=self.name,
+                        raw_error=e,
+                    ) from e
 
     async def stream(
         self,

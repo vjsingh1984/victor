@@ -20,7 +20,6 @@ Note: This module uses the new google-genai SDK (google.genai) instead of
 the deprecated google-generativeai package.
 """
 
-import logging
 import os
 import warnings
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -58,8 +57,11 @@ from victor.providers.base import (
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Safety threshold levels mapping to new SDK string values
 # The new SDK uses string-based category and threshold identifiers
@@ -96,58 +98,73 @@ class GoogleProvider(BaseProvider):
         provider = GoogleProvider(api_key=key, safety_level="block_none")
     """
 
+    # Cloud provider timeout
+    DEFAULT_TIMEOUT = 60
+
     def __init__(
         self,
         api_key: Optional[str] = None,
-        timeout: int = 60,
+        timeout: int = DEFAULT_TIMEOUT,
         safety_level: str = "block_none",
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Google provider.
 
         Args:
-            api_key: Google API key (or set GOOGLE_API_KEY env var, or use keyring)
+            api_key: Google API key (or set GOOGLE_API_KEY env var)
             timeout: Request timeout in seconds
             safety_level: Safety filter level - "block_none", "block_few",
                          "block_some", or "block_most" (default: "block_none")
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
 
         Raises:
             ImportError: If google-genai package is not installed
         """
-        # Resolution order: parameter → env var → keyring → warning
-        resolved_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
-        if not resolved_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("google", __name__)
 
-                resolved_key = get_api_key("google") or ""
-            except ImportError:
-                pass
+        # Resolve API key using unified resolver
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("google", explicit_key=api_key)
 
-        if not resolved_key:
-            logger.warning(
-                "Google API key not provided. Set GOOGLE_API_KEY environment variable, "
-                "use 'victor keys --set google --keyring', or pass api_key parameter."
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="google",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
 
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
-                "google-genai package not installed. " "Install with: pip install google-genai"
+                "google-genai package not installed. Install with: pip install google-genai"
             )
-        super().__init__(api_key=resolved_key, timeout=timeout, **kwargs)
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="gemini",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"timeout": timeout, "safety_level": safety_level, **kwargs},
+        )
+
+        super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
 
         # Initialize client with API key (new SDK pattern)
-        self.client = genai.Client(api_key=resolved_key)
+        self.client = genai.Client(api_key=self._api_key)
 
         # Configure safety settings using string-based thresholds
         threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")
         self.safety_settings = [
             types.SafetySetting(category=cat, threshold=threshold) for cat in HARM_CATEGORIES
         ]
-        logger.info(
-            f"GoogleProvider initialized with safety_level={safety_level}, categories={len(self.safety_settings)}"
-        )
 
     @property
     def name(self) -> str:

@@ -25,8 +25,6 @@ References:
 """
 
 import json
-import logging
-import os
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -43,8 +41,11 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.openai_compat import convert_tools_to_openai_format
-
-logger = logging.getLogger(__name__)
+from victor.providers.resolution import (
+    UnifiedApiKeyResolver,
+    APIKeyNotFoundError,
+)
+from victor.providers.logging import ProviderLogger
 
 # Default xAI API endpoint
 DEFAULT_BASE_URL = "https://api.x.ai/v1"
@@ -115,32 +116,50 @@ class XAIProvider(BaseProvider):
         base_url: str = DEFAULT_BASE_URL,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize xAI provider.
 
         Args:
-            api_key: xAI API key (or set XAI_API_KEY env var, or use keyring)
+            api_key: xAI API key (or set XAI_API_KEY env var)
             base_url: xAI API base URL
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
-        # Get API key from parameter, environment, or keyring
-        self._api_key = api_key or os.environ.get("XAI_API_KEY", "")
-        if not self._api_key:
-            try:
-                from victor.config.api_keys import get_api_key
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("xai", __name__)
 
-                # Try "xai" first, then "grok" alias
-                self._api_key = get_api_key("xai") or get_api_key("grok") or ""
-            except ImportError:
-                pass
-        if not self._api_key:
-            logger.warning(
-                "xAI API key not provided. Set XAI_API_KEY environment variable, "
-                "use 'victor keys --set xai --keyring', or pass api_key parameter."
+        # Resolve API key using unified resolver
+        # Try "xai" first, then "grok" alias for backwards compatibility
+        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        key_result = resolver.get_api_key("xai", explicit_key=api_key)
+        if key_result.key is None:
+            # Try grok alias
+            key_result = resolver.get_api_key("grok", explicit_key=api_key)
+
+        # Log API key resolution
+        self._provider_logger.log_api_key_resolution(key_result)
+
+        if key_result.key is None:
+            # Raise detailed error with actionable suggestions
+            raise APIKeyNotFoundError(
+                provider="xai",
+                sources_attempted=key_result.sources_attempted,
+                non_interactive=key_result.non_interactive,
             )
+
+        self._api_key = key_result.key
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="grok",  # Will be set on chat()
+            key_source=key_result.source_detail,
+            non_interactive=key_result.non_interactive,
+            config={"base_url": base_url, "timeout": timeout, "max_retries": max_retries, **kwargs},
+        )
 
         super().__init__(
             api_key=self._api_key,
@@ -230,7 +249,7 @@ class XAIProvider(BaseProvider):
             )
 
             num_tools = len(tools) if tools else 0
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"xAI chat request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
 
@@ -295,7 +314,7 @@ class XAIProvider(BaseProvider):
             )
 
             num_tools = len(tools) if tools else 0
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"xAI streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
 
@@ -335,7 +354,7 @@ class XAIProvider(BaseProvider):
                                     has_sent_final = True
                                 yield chunk
                         except json.JSONDecodeError:
-                            logger.warning(f"xAI JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(f"xAI JSON decode error on line: {line[:100]}")
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(

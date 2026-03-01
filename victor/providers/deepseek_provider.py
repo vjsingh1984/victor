@@ -198,72 +198,47 @@ class DeepSeekProvider(BaseProvider):
             ProviderError: If request fails
         """
         # Use structured logging context manager
-        async with self._provider_logger.log_api_call(
+        with self._provider_logger.log_api_call(
             endpoint="/chat/completions",
             model=model,
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
         ):
-            try:
-                # Filter tools if model doesn't support them
-                effective_tools = tools if self._model_supports_tools(model) else None
-                if tools and not self._model_supports_tools(model):
-                    logger.debug(f"Model {model} doesn't support tools, ignoring tools parameter")
+            # Filter tools if model doesn't support them
+            effective_tools = tools if self._model_supports_tools(model) else None
+            if tools and not self._model_supports_tools(model):
+                logger.debug(f"Model {model} doesn't support tools, ignoring tools parameter")
 
-                payload = self._build_request_payload(
-                    messages=messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=effective_tools,
-                    stream=False,
-                    **kwargs,
-                )
+            payload = self._build_request_payload(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=effective_tools,
+                stream=False,
+                **kwargs,
+            )
 
-                response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/chat/completions", json=payload
-                )
-                response.raise_for_status()
+            response = await self._execute_with_circuit_breaker(
+                self.client.post, "/chat/completions", json=payload
+            )
+            response.raise_for_status()
 
-                result = response.json()
-                parsed = self._parse_response(result, model)
+            result = response.json()
+            parsed = self._parse_response(result, model)
 
-                # Log success with usage info
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint="/chat/completions",
-                    model=model,
-                    start_time=0,  # Will be set by context manager
-                    tokens=tokens,
-                )
+            # Log success with usage info
+            tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+            self._provider_logger._log_api_call_success(
+                call_id=f"chat_{model}_{id(payload)}",
+                endpoint="/chat/completions",
+                model=model,
+                start_time=0,  # Will be set by context manager
+                tokens=tokens,
+            )
 
-                return parsed
-
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"DeepSeek request timed out after {self.timeout}s",
-                    provider=self.name,
-                ) from e
-            except httpx.HTTPStatusError as e:
-                error_body = ""
-                try:
-                    error_body = e.response.text[:500]
-                except Exception:
-                    pass
-                raise ProviderError(
-                    message=f"DeepSeek HTTP error {e.response.status_code}: {error_body}",
-                    provider=self.name,
-                    status_code=e.response.status_code,
-                    raw_error=e,
-                ) from e
-            except Exception as e:
-                raise ProviderError(
-                    message=f"DeepSeek unexpected error: {str(e)}",
-                    provider=self.name,
-                    raw_error=e,
-                ) from e
+            return parsed
 
     async def stream(
         self,
