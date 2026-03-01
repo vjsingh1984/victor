@@ -863,7 +863,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager = self._factory.create_lifecycle_manager(
             conversation_controller=self._conversation_controller,
             metrics_collector=(
-                self._metrics_collector if hasattr(self, "_metrics_collector") else None
+                self._metrics_coordinator.metrics_collector if hasattr(self, "_metrics_coordinator") else None
             ),
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
@@ -1061,7 +1061,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
         iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-        self._metrics_collector.on_tool_start(tool_name, arguments, iteration)
+        self._metrics_coordinator.on_tool_start(tool_name, arguments, iteration)
 
         # Emit observability event for tool start
         if hasattr(self, "_observability") and self._observability:
@@ -1078,7 +1078,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._tool_coordinator.on_tool_complete(
             result=result,
-            metrics_collector=self._metrics_collector,
+            metrics_collector=self._metrics_coordinator.metrics_collector,
             read_files_session=self._read_files_session,
             required_files=self._required_files,
             required_outputs=self._required_outputs,
@@ -1097,11 +1097,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Callback when streaming session completes (from StreamingController).
 
         This callback:
-        1. Records metrics via MetricsCollector
+        1. Records metrics via MetricsCoordinator
         2. Ends UsageAnalytics session
         3. Sends RL reward signal to update provider Q-values
         """
-        self._metrics_collector.on_streaming_session_complete(session)
+        self._metrics_coordinator.on_streaming_session_complete(session)
 
         # End UsageAnalytics session
         if hasattr(self, "_usage_analytics") and self._usage_analytics:
@@ -2469,7 +2469,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             method: Selection method used ('semantic', 'keyword', 'fallback')
             num_tools: Number of tools selected
         """
-        self._metrics_collector.record_tool_selection(method, num_tools)
+        self._metrics_coordinator.record_tool_selection(method, num_tools)
 
     def route_search_query(self, query: str) -> Dict[str, Any]:
         """Route a search query to the optimal search tool using SearchRouter.
@@ -2552,6 +2552,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
+        Delegates to MetricsCoordinator (Phase 2 refactoring).
+
         Returns:
             Dictionary with usage analytics including:
             - Selection stats (semantic/keyword/fallback counts)
@@ -2559,7 +2561,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        return self._metrics_collector.get_tool_usage_stats(
+        return self._metrics_coordinator.get_tool_usage_stats(
             conversation_state_summary=self.conversation_state.get_state_summary()
         )
 
