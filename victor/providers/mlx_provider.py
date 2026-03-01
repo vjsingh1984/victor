@@ -36,7 +36,6 @@ Download models from: https://huggingface.co/mlx-community
 """
 
 import asyncio
-import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
@@ -44,13 +43,15 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderConnectionError,
     ProviderError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
-
-logger = logging.getLogger(__name__)
+from victor.providers.logging import ProviderLogger
 
 # NOTE: Keep mlx_lm imports out of module top-level.
 # Importing mlx can crash process on some environments with broken Metal/MPS.
@@ -167,12 +168,14 @@ class MLXProvider(BaseProvider):
     def __init__(
         self,
         model: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize MLX provider.
 
         Args:
             model: Model path or HuggingFace ID (default: small fast model)
+            non_interactive: Non-interactive mode flag (for consistency)
             **kwargs: Additional configuration (ignored for MLX)
         """
         try:
@@ -193,7 +196,14 @@ class MLXProvider(BaseProvider):
         self._tokenizer: Optional[Any] = None
         self._load_lock = asyncio.Lock()
 
-        logger.info(f"MLX provider initialized for model: {model}")
+        # Initialize provider logger
+        self._provider_logger = ProviderLogger("mlx", __name__)
+        self._provider_logger.log_provider_init(
+            model=model,
+            key_source=None,  # MLX is local, no API key
+            non_interactive=non_interactive or False,
+            config=self.model_kwargs,
+        )
 
     async def _ensure_model_loaded(self) -> None:
         """Load MLX model if not already loaded (thread-safe).
@@ -209,7 +219,7 @@ class MLXProvider(BaseProvider):
                 return
 
             try:
-                logger.info(f"Loading MLX model: {self.model_path}")
+                self._provider_logger.logger.info(f"Loading MLX model: {self.model_path}")
                 if _mlx_load is None:
                     raise RuntimeError("mlx-lm loader unavailable")
 
@@ -227,7 +237,7 @@ class MLXProvider(BaseProvider):
                     # If load() doesn't accept some kwargs (like trust_remote_code),
                     # try without the problematic ones
                     if "trust_remote_code" in str(e) and "trust_remote_code" in load_kwargs:
-                        logger.debug(
+                        self._provider_logger.logger.debug(
                             "MLX load() doesn't accept trust_remote_code, retrying without it"
                         )
                         load_kwargs = {
@@ -240,8 +250,11 @@ class MLXProvider(BaseProvider):
                     else:
                         raise
 
-                logger.info(f"MLX model loaded: {self.model_path}")
+                self._provider_logger.logger.info(f"MLX model loaded: {self.model_path}")
             except Exception as e:
+                # Convert specific exception types to provider errors
+                if isinstance(e, ProviderError):
+                    raise
                 raise ProviderConnectionError(f"Failed to load MLX model {self.model_path}: {e}")
 
     def supports_streaming(self) -> bool:
@@ -308,7 +321,7 @@ class MLXProvider(BaseProvider):
         """
         self._model = None
         self._tokenizer = None
-        logger.debug(f"MLX provider resources released for model: {self.model_path}")
+        self._provider_logger.logger.debug(f"MLX provider resources released for model: {self.model_path}")
 
     async def _make_request(
         self,
@@ -337,19 +350,28 @@ class MLXProvider(BaseProvider):
         # Convert messages to prompt
         prompt = self._messages_to_prompt(messages)
 
-        # Generate response in thread pool
+        # Generate response in thread pool with structured logging
         loop = asyncio.get_event_loop()
-        try:
-            response_text = await loop.run_in_executor(
-                None,
-                lambda: self._sync_generate(
-                    prompt=prompt,
-                    temp=temperature,
-                    max_tokens=max_tokens,
-                ),
-            )
-        except Exception as e:
-            raise ProviderError(f"MLX generation failed: {e}")
+        with self._provider_logger.log_api_call(
+            endpoint="local",
+            model=model or self.model_path,
+            operation="chat",
+        ):
+            try:
+                response_text = await loop.run_in_executor(
+                    None,
+                    lambda: self._sync_generate(
+                        prompt=prompt,
+                        temp=temperature,
+                        max_tokens=max_tokens,
+                    ),
+                )
+            except ProviderError:
+                # Re-raise provider errors as-is
+                raise
+            except Exception as e:
+                # Convert generic exceptions to ProviderError
+                raise ProviderError(f"MLX generation failed: {e}")
 
         # Extract tool calls if present
         tool_calls, content = _extract_tool_calls_from_content(response_text)
@@ -447,7 +469,7 @@ class MLXProvider(BaseProvider):
         # Convert messages to prompt
         prompt = self._messages_to_prompt(messages)
 
-        # Stream in thread pool
+        # Stream in thread pool with structured logging
         loop = asyncio.get_event_loop()
 
         def generate_sync():
@@ -464,9 +486,13 @@ class MLXProvider(BaseProvider):
                     verbose=False,
                 ):
                     yield response.text
-            except Exception as e:
-                logger.error(f"MLX streaming error: {e}")
+            except ProviderError:
+                # Re-raise provider errors as-is
                 raise
+            except Exception as e:
+                # Convert generic exceptions to ProviderError
+                self._provider_logger.logger.error(f"MLX streaming error: {e}")
+                raise ProviderError(f"MLX streaming failed: {e}")
 
         # Create async generator from sync generator
         stream_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
@@ -477,23 +503,34 @@ class MLXProvider(BaseProvider):
                 for chunk in await loop.run_in_executor(None, lambda: list(generate_sync())):
                     await stream_queue.put(chunk)
                 await stream_queue.put(None)  # Sentinel
+            except ProviderError:
+                # Re-raise provider errors as-is
+                raise
             except Exception as e:
                 await stream_queue.put(e)
 
-        # Start producer task
-        producer_task = asyncio.create_task(stream_producer())
+        # Start producer task with structured logging
+        with self._provider_logger.log_api_call(
+            endpoint="local",
+            model=model or self.model_path,
+            operation="stream",
+        ):
+            producer_task = asyncio.create_task(stream_producer())
 
-        try:
-            while True:
-                item = await stream_queue.get()
-                if item is None:  # Sentinel
-                    break
-                if isinstance(item, Exception):
-                    raise ProviderError(f"MLX streaming failed: {item}")
+            try:
+                while True:
+                    item = await stream_queue.get()
+                    if item is None:  # Sentinel
+                        break
+                    if isinstance(item, Exception):
+                        # Convert specific exception types to provider errors
+                        if isinstance(item, ProviderError):
+                            raise item
+                        raise ProviderError(f"MLX streaming failed: {item}")
 
-                yield StreamChunk(content=item, model=model or self.model_path)
-        finally:
-            await producer_task
+                    yield StreamChunk(content=item, model=model or self.model_path)
+            finally:
+                await producer_task
 
     async def check_connection(self) -> bool:
         """Check if MLX is available and model can be loaded.
@@ -508,7 +545,7 @@ class MLXProvider(BaseProvider):
             await self._ensure_model_loaded()
             return True
         except Exception as e:
-            logger.warning(f"MLX connection check failed: {e}")
+            self._provider_logger.logger.warning(f"MLX connection check failed: {e}")
             return False
 
     async def list_models(self) -> List[str]:

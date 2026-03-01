@@ -40,7 +40,6 @@ Download models from: https://huggingface.co/models?sort=trending&search=gguf
 """
 
 import json
-import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
@@ -50,18 +49,20 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderConnectionError,
     ProviderError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.logging import ProviderLogger
 from victor.providers.openai_compat import (
     convert_messages_to_openai_format,
     convert_tools_to_openai_format,
     parse_openai_tool_calls,
 )
-
-logger = logging.getLogger(__name__)
 
 # Default llama.cpp server endpoints
 DEFAULT_LLAMACPP_URLS = [
@@ -226,6 +227,7 @@ class LlamaCppProvider(BaseProvider):
         api_key: str = "not-needed",  # llama.cpp doesn't require auth
         timeout: int = 300,  # Longer timeout for CPU inference
         max_retries: int = 2,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize llama.cpp provider.
@@ -235,8 +237,12 @@ class LlamaCppProvider(BaseProvider):
             api_key: API key (not required for llama.cpp)
             timeout: Request timeout in seconds (default: 300 for CPU)
             max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("llamacpp", __name__)
+
         super().__init__(
             api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
         )
@@ -252,6 +258,14 @@ class LlamaCppProvider(BaseProvider):
             headers={"Content-Type": "application/json"},
         )
         self._loaded_model: Optional[str] = None
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="llama.cpp",  # Will be updated on connection
+            key_source=None,  # No API key for local server
+            non_interactive=non_interactive or False,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
     @classmethod
     async def create(cls, **kwargs: Any) -> "LlamaCppProvider":
@@ -289,10 +303,10 @@ class LlamaCppProvider(BaseProvider):
                                 provider._loaded_model = data["data"][0].get("id", "default")
                     except Exception:
                         provider._loaded_model = "default"
-                    logger.info(f"Connected to llama.cpp server at {url}")
+                    provider._provider_logger.logger.info(f"Connected to llama.cpp server at {url}")
                     return provider
             except Exception as e:
-                logger.debug(f"llama.cpp not available at {url}: {e}")
+                provider._provider_logger.logger.debug(f"llama.cpp not available at {url}: {e}")
                 continue
 
         raise ProviderConnectionError(
@@ -336,7 +350,7 @@ class LlamaCppProvider(BaseProvider):
                 return data.get("data", [])
             return []
         except Exception as e:
-            logger.warning(f"Failed to list llama.cpp models: {e}")
+            self._provider_logger.logger.warning(f"Failed to list llama.cpp models: {e}")
             return []
 
     async def check_health(self) -> Dict[str, Any]:
@@ -394,7 +408,11 @@ class LlamaCppProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails (for authenticated servers)
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderConnectionError: If connection fails
+            ProviderError: For other errors
         """
         # Use loaded model if none specified
         if model == "default" and self._loaded_model:
@@ -429,50 +447,113 @@ class LlamaCppProvider(BaseProvider):
             payload["tools"] = convert_tools_to_openai_format(tools)
             payload["tool_choice"] = kwargs.get("tool_choice", "auto")
 
-        try:
-            response = await self.client.post(
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-            )
-
-            if response.status_code != 200:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get("error", {}).get("message") or response.text
-                raise ProviderError(
-                    message=f"llama.cpp API error: {error_msg}",
-                    provider="llamacpp",
-                    details={"status_code": response.status_code, "response": error_data},
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            try:
+                response = await self.client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
                 )
 
-            result = response.json()
-            return self._parse_response(result, model)
+                response.raise_for_status()
 
-        except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"llama.cpp request timed out after {self.timeout}s",
-                provider="llamacpp",
-                details={
-                    "model": model,
-                    "timeout": self.timeout,
-                    "suggestion": (
-                        "CPU inference can be slow. Try:\n"
-                        "  1. Use a smaller/more quantized model (Q4_K_M)\n"
-                        "  2. Reduce max_tokens\n"
-                        "  3. Increase timeout with --timeout flag"
-                    ),
-                },
-            ) from e
+                result = response.json()
+                parsed = self._parse_response(result, model)
 
-        except httpx.ConnectError as e:
-            raise ProviderConnectionError(
-                message=f"Cannot connect to llama.cpp server at {self.base_url}",
-                provider="llamacpp",
-                details={
-                    "suggestion": (
-                        "Start llama.cpp server:\n" "  llama-server -m model.gguf --port 8080"
-                    )
-                },
-            ) from e
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/chat/completions",
+                    model=model,
+                    start_time=0,  # Will be set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.HTTPStatusError as e:
+                # Convert HTTP errors to specific provider errors
+                status_code = e.response.status_code
+
+                # Check if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+
+                error_data = {}
+                try:
+                    error_data = e.response.json() if e.response.content else {}
+                except Exception:
+                    pass
+
+                error_msg = error_data.get("error", {}).get("message") if isinstance(error_data, dict) else str(error_data)
+                if not error_msg:
+                    error_msg = e.response.text[:500] if e.response.text else "Unknown error"
+
+                if status_code in (401, 403):
+                    # Some llama.cpp servers may require authentication
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: {error_msg}",
+                        provider="llamacpp",
+                        details={"status_code": status_code},
+                    ) from e
+                elif status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_msg}",
+                        provider="llamacpp",
+                        status_code=status_code,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"llama.cpp API error: {error_msg}",
+                        provider="llamacpp",
+                        details={"status_code": status_code, "response": error_data},
+                    ) from e
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"llama.cpp request timed out after {self.timeout}s",
+                    provider="llamacpp",
+                    details={
+                        "model": model,
+                        "timeout": self.timeout,
+                        "suggestion": (
+                            "CPU inference can be slow. Try:\n"
+                            "  1. Use a smaller/more quantized model (Q4_K_M)\n"
+                            "  2. Reduce max_tokens\n"
+                            "  3. Increase timeout with --timeout flag"
+                        ),
+                    },
+                ) from e
+
+            except httpx.ConnectError as e:
+                raise ProviderConnectionError(
+                    message=f"Cannot connect to llama.cpp server at {self.base_url}",
+                    provider="llamacpp",
+                    details={
+                        "suggestion": (
+                            "Start llama.cpp server:\n" "  llama-server -m model.gguf --port 8080"
+                        )
+                    },
+                ) from e
+
+            except ProviderError:
+                # Re-raise ProviderError instances as-is
+                raise
+
+            except Exception as e:
+                # Wrap unexpected errors
+                raise ProviderError(
+                    message=f"llama.cpp request failed: {str(e)}",
+                    provider="llamacpp",
+                    raw_error=e,
+                ) from e
 
     async def stream(
         self,
@@ -496,6 +577,13 @@ class LlamaCppProvider(BaseProvider):
 
         Yields:
             StreamChunk with content or tool calls
+
+        Raises:
+            ProviderAuthError: If authentication fails (for authenticated servers)
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderConnectionError: If connection fails
+            ProviderError: For other errors
         """
         if model == "default" and self._loaded_model:
             model = self._loaded_model
@@ -525,14 +613,31 @@ class LlamaCppProvider(BaseProvider):
                 json=payload,
             ) as response:
                 if response.status_code != 200:
+                    # Check for specific error codes
+                    status_code = response.status_code
+
                     error_text = ""
                     async for chunk in response.aiter_text():
                         error_text += chunk
-                    raise ProviderError(
-                        message=f"llama.cpp streaming error: {error_text}",
-                        provider="llamacpp",
-                        details={"status_code": response.status_code},
-                    )
+
+                    if status_code in (401, 403):
+                        raise ProviderAuthError(
+                            message=f"Authentication failed: {error_text[:500]}",
+                            provider="llamacpp",
+                            details={"status_code": status_code},
+                        )
+                    elif status_code == 429:
+                        raise ProviderRateLimitError(
+                            message=f"Rate limit exceeded: {error_text[:500]}",
+                            provider="llamacpp",
+                            status_code=status_code,
+                        )
+                    else:
+                        raise ProviderError(
+                            message=f"llama.cpp streaming error: {error_text[:500]}",
+                            provider="llamacpp",
+                            details={"status_code": status_code},
+                        )
 
                 async for line in response.aiter_lines():
                     if not line or line == "data: [DONE]":
@@ -616,7 +721,7 @@ class LlamaCppProvider(BaseProvider):
                                     if fallback_calls:
                                         parsed_tool_calls = fallback_calls
                                         final_content = remaining
-                                        logger.debug(
+                                        self._provider_logger.logger.debug(
                                             f"llama.cpp stream: Extracted {len(fallback_calls)} "
                                             "tool call(s) from content"
                                         )
@@ -631,13 +736,31 @@ class LlamaCppProvider(BaseProvider):
                                 )
 
                         except json.JSONDecodeError:
-                            logger.debug(f"Failed to parse streaming chunk: {line}")
+                            self._provider_logger.logger.debug(f"Failed to parse streaming chunk: {line}")
                             continue
 
         except httpx.TimeoutException as e:
-            raise ProviderError(
+            raise ProviderTimeoutError(
                 message=f"llama.cpp streaming timed out after {self.timeout}s",
                 provider="llamacpp",
+            ) from e
+
+        except httpx.ConnectError as e:
+            raise ProviderConnectionError(
+                message=f"Cannot connect to llama.cpp server at {self.base_url}",
+                provider="llamacpp",
+            ) from e
+
+        except ProviderError:
+            # Re-raise ProviderError instances as-is
+            raise
+
+        except Exception as e:
+            # Wrap unexpected errors
+            raise ProviderError(
+                message=f"llama.cpp stream error: {str(e)}",
+                provider="llamacpp",
+                raw_error=e,
             ) from e
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
@@ -680,7 +803,7 @@ class LlamaCppProvider(BaseProvider):
             if fallback_calls:
                 tool_calls = fallback_calls
                 content = remaining_content
-                logger.debug(
+                self._provider_logger.logger.debug(
                     f"llama.cpp: Extracted {len(tool_calls)} tool call(s) from content using fallback"
                 )
 

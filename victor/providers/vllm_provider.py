@@ -48,11 +48,15 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderConnectionError,
     ProviderError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.logging import ProviderLogger
 from victor.providers.openai_compat import (
     convert_messages_to_openai_format,
     convert_tools_to_openai_format,
@@ -246,6 +250,7 @@ class VLLMProvider(BaseProvider):
         api_key: str = "EMPTY",  # vLLM doesn't require auth
         timeout: int = 300,  # Longer timeout for large models
         max_retries: int = 2,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize vLLM provider.
@@ -255,8 +260,12 @@ class VLLMProvider(BaseProvider):
             api_key: API key (vLLM typically doesn't require one)
             timeout: Request timeout in seconds (default: 300 for large models)
             max_retries: Maximum retry attempts
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("vllm", __name__)
+
         super().__init__(
             api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
         )
@@ -272,6 +281,14 @@ class VLLMProvider(BaseProvider):
             headers={"Content-Type": "application/json"},
         )
         self._available_model: Optional[str] = None
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model=self._available_model or "unknown",
+            key_source="None (vLLM is a local server)",
+            non_interactive=non_interactive or False,
+            config={"base_url": base_url, "timeout": timeout, **kwargs},
+        )
 
     @classmethod
     async def create(cls, **kwargs: Any) -> "VLLMProvider":
@@ -302,10 +319,10 @@ class VLLMProvider(BaseProvider):
                     data = response.json()
                     if data.get("data"):
                         provider._available_model = data["data"][0].get("id")
-                    logger.info(f"Connected to vLLM server at {url}")
+                    provider._provider_logger.logger.info(f"Connected to vLLM server at {url}")
                     return provider
             except Exception as e:
-                logger.debug(f"vLLM not available at {url}: {e}")
+                provider._provider_logger.logger.debug(f"vLLM not available at {url}: {e}")
                 continue
 
         raise ProviderConnectionError(
@@ -348,7 +365,7 @@ class VLLMProvider(BaseProvider):
                 return data.get("data", [])
             return []
         except Exception as e:
-            logger.warning(f"Failed to list vLLM models: {e}")
+            self._provider_logger.logger.warning(f"Failed to list vLLM models: {e}")
             return []
 
     async def check_health(self) -> bool:
@@ -393,75 +410,121 @@ class VLLMProvider(BaseProvider):
         if not model and self._available_model:
             model = self._available_model
 
-        # Build request payload
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": convert_messages_to_openai_format(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/v1/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
+            # Build request payload
+            payload: Dict[str, Any] = {
+                "model": model,
+                "messages": convert_messages_to_openai_format(messages),
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
 
-        # Add optional parameters
-        if "top_p" in kwargs:
-            payload["top_p"] = kwargs["top_p"]
-        if "top_k" in kwargs:
-            payload["top_k"] = kwargs["top_k"]
-        if "repetition_penalty" in kwargs:
-            payload["repetition_penalty"] = kwargs["repetition_penalty"]
-        if "stop" in kwargs:
-            payload["stop"] = kwargs["stop"]
+            # Add optional parameters
+            if "top_p" in kwargs:
+                payload["top_p"] = kwargs["top_p"]
+            if "top_k" in kwargs:
+                payload["top_k"] = kwargs["top_k"]
+            if "repetition_penalty" in kwargs:
+                payload["repetition_penalty"] = kwargs["repetition_penalty"]
+            if "stop" in kwargs:
+                payload["stop"] = kwargs["stop"]
 
-        # Add tools if provided and model supports them
-        if tools and _model_supports_tools(model):
-            payload["tools"] = convert_tools_to_openai_format(tools)
-            payload["tool_choice"] = kwargs.get("tool_choice", "auto")
+            # Add tools if provided and model supports them
+            if tools and _model_supports_tools(model):
+                payload["tools"] = convert_tools_to_openai_format(tools)
+                payload["tool_choice"] = kwargs.get("tool_choice", "auto")
 
-        try:
-            response = await self.client.post(
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-            )
-
-            if response.status_code != 200:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get("detail") or error_data.get("message") or response.text
-                raise ProviderError(
-                    message=f"vLLM API error: {error_msg}",
-                    provider="vllm",
-                    details={"status_code": response.status_code, "response": error_data},
+            try:
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post,
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
                 )
 
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderError(
-                message=f"vLLM request timed out after {self.timeout}s",
-                provider="vllm",
-                details={
-                    "model": model,
-                    "timeout": self.timeout,
-                    "suggestion": (
-                        "Try:\n"
-                        "  1. Increase timeout with --timeout flag\n"
-                        "  2. Use a smaller model\n"
-                        "  3. Reduce max_tokens"
-                    ),
-                },
-            ) from e
-
-        except httpx.ConnectError as e:
-            raise ProviderConnectionError(
-                message=f"Cannot connect to vLLM server at {self.base_url}",
-                provider="vllm",
-                details={
-                    "suggestion": (
-                        "Ensure vLLM server is running:\n"
-                        "  python -m vllm.entrypoints.openai.api_server \\\n"
-                        "    --model YOUR_MODEL --port 8000"
+                if response.status_code != 200:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get("detail") or error_data.get("message") or response.text
+                    raise ProviderError(
+                        message=f"vLLM API error: {error_msg}",
+                        provider="vllm",
+                        details={"status_code": response.status_code, "response": error_data},
                     )
-                },
-            ) from e
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/v1/chat/completions",
+                    model=model,
+                    start_time=0,  # Will be set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.HTTPStatusError as e:
+                # Convert specific HTTP errors to provider error types
+                if e.response.status_code in (401, 403):
+                    raise ProviderAuthError(
+                        message=f"vLLM authentication failed: {e.response.text}",
+                        provider="vllm",
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=f"vLLM rate limit exceeded: {e.response.text}",
+                        provider="vllm",
+                    ) from e
+                elif isinstance(e, ProviderError):
+                    # Already wrapped, re-raise as-is
+                    raise
+                else:
+                    raise ProviderError(
+                        message=f"vLLM HTTP error {e.response.status_code}: {e.response.text}",
+                        provider="vllm",
+                    ) from e
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"vLLM request timed out after {self.timeout}s",
+                    provider="vllm",
+                    details={
+                        "model": model,
+                        "timeout": self.timeout,
+                        "suggestion": (
+                            "Try:\n"
+                            "  1. Increase timeout with --timeout flag\n"
+                            "  2. Use a smaller model\n"
+                            "  3. Reduce max_tokens"
+                        ),
+                    },
+                ) from e
+
+            except httpx.ConnectError as e:
+                raise ProviderConnectionError(
+                    message=f"Cannot connect to vLLM server at {self.base_url}",
+                    provider="vllm",
+                    details={
+                        "suggestion": (
+                            "Ensure vLLM server is running:\n"
+                            "  python -m vllm.entrypoints.openai.api_server \\\n"
+                            "    --model YOUR_MODEL --port 8000"
+                        )
+                    },
+                ) from e
+
+            except ProviderError:
+                # Already a provider error, re-raise as-is
+                raise
 
     async def stream(
         self,
@@ -604,7 +667,7 @@ class VLLMProvider(BaseProvider):
                                     if fallback_calls:
                                         parsed_tool_calls = fallback_calls
                                         final_content = remaining
-                                        logger.debug(
+                                        self._provider_logger.logger.debug(
                                             f"vLLM stream: Extracted {len(fallback_calls)} tool call(s) "
                                             "from content using fallback parser"
                                         )
@@ -619,14 +682,39 @@ class VLLMProvider(BaseProvider):
                                 )
 
                         except json.JSONDecodeError:
-                            logger.debug(f"Failed to parse streaming chunk: {line}")
+                            self._provider_logger.logger.debug(f"Failed to parse streaming chunk: {line}")
                             continue
 
+        except httpx.HTTPStatusError as e:
+            # Convert specific HTTP errors to provider error types
+            if e.response.status_code in (401, 403):
+                raise ProviderAuthError(
+                    message=f"vLLM authentication failed: {e.response.text}",
+                    provider="vllm",
+                ) from e
+            elif e.response.status_code == 429:
+                raise ProviderRateLimitError(
+                    message=f"vLLM rate limit exceeded: {e.response.text}",
+                    provider="vllm",
+                ) from e
+            elif isinstance(e, ProviderError):
+                # Already wrapped, re-raise as-is
+                raise
+            else:
+                raise ProviderError(
+                    message=f"vLLM streaming HTTP error {e.response.status_code}: {e.response.text}",
+                    provider="vllm",
+                ) from e
+
         except httpx.TimeoutException as e:
-            raise ProviderError(
+            raise ProviderTimeoutError(
                 message=f"vLLM streaming timed out after {self.timeout}s",
                 provider="vllm",
             ) from e
+
+        except ProviderError:
+            # Already a provider error, re-raise as-is
+            raise
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse vLLM API response.
@@ -668,7 +756,7 @@ class VLLMProvider(BaseProvider):
             if fallback_calls:
                 tool_calls = fallback_calls
                 content = remaining_content
-                logger.debug(
+                self._provider_logger.logger.debug(
                     f"vLLM: Extracted {len(tool_calls)} tool call(s) from content using fallback parser"
                 )
 

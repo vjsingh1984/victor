@@ -15,7 +15,6 @@
 """Ollama provider implementation for local model inference."""
 
 import json
-import logging
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
@@ -25,15 +24,16 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.logging import ProviderLogger
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
-
-logger = logging.getLogger(__name__)
 
 
 class OllamaProvider(BaseProvider):
@@ -44,6 +44,7 @@ class OllamaProvider(BaseProvider):
         base_url: Union[str, List[str]] = "http://localhost:11434",
         timeout: int = 300,
         _skip_discovery: bool = False,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Ollama provider.
@@ -54,9 +55,13 @@ class OllamaProvider(BaseProvider):
                      Use OllamaProvider.create() for async discovery of reachable endpoint.
             timeout: Request timeout (longer for local models)
             _skip_discovery: Deprecated flag (kept for compatibility).
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
         import os
+
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("ollama", __name__)
 
         # Resolve candidates (logic from _select_base_url but without network I/O)
         candidates: List[str] = []
@@ -84,6 +89,18 @@ class OllamaProvider(BaseProvider):
 
         # Pick first candidate (blindly)
         chosen_base = candidates[0]
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="local",  # Ollama runs local models
+            key_source=None,  # No API key for local server
+            non_interactive=non_interactive or False,
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                **kwargs,
+            },
+        )
 
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
@@ -160,7 +177,9 @@ class OllamaProvider(BaseProvider):
             supports_tools = self._detect_tool_support(template)
 
         except Exception as exc:
-            logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
+            self._provider_logger.logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
 
         from victor.config.config_loaders import get_provider_limits
 
@@ -256,12 +275,14 @@ class OllamaProvider(BaseProvider):
                 with httpx.Client(base_url=url, timeout=httpx.Timeout(2)) as client:
                     resp = client.get("/api/tags")
                     resp.raise_for_status()
-                    logger.info(f"Ollama base URL selected: {url}")
+                    self._provider_logger.logger.info(f"Ollama base URL selected: {url}")
                     return url
             except Exception as exc:
-                logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
+                self._provider_logger.logger.warning(
+                    f"Ollama endpoint {url} not reachable ({exc}); trying next."
+                )
 
-        logger.error(
+        self._provider_logger.logger.error(
             f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
         )
         return base_url
@@ -304,17 +325,22 @@ class OllamaProvider(BaseProvider):
             else:
                 candidates = [str(base_url)]
 
+        # Use module logger since this is a classmethod
+        from victor.providers.logging import logger as provider_logger
+
         for url in candidates:
             try:
                 async with httpx.AsyncClient(base_url=url, timeout=httpx.Timeout(2)) as client:
                     resp = await client.get("/api/tags")
                     resp.raise_for_status()
-                    logger.info(f"Ollama base URL selected (async): {url}")
+                    provider_logger.info(f"Ollama base URL selected (async): {url}")
                     return url
             except Exception as exc:
-                logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
+                provider_logger.warning(
+                    f"Ollama endpoint {url} not reachable ({exc}); trying next."
+                )
 
-        logger.error(
+        provider_logger.error(
             f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
         )
         return base_url if isinstance(base_url, str) else str(base_url)
@@ -343,88 +369,139 @@ class OllamaProvider(BaseProvider):
             CompletionResponse with generated content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails (for authenticated servers)
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderError: For other errors
         """
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                stream=False,
-                **kwargs,
-            )
-
-            # Log the endpoint URL being used for connection
-            endpoint_url = f"{self.base_url}/api/chat"
-            logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
-
-            # Make API call with circuit breaker protection
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/api/chat", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            # Check for "does not support tools" error (HTTP 400)
-            # Retry without tools if model doesn't support them
-            if e.response.status_code == 400 and tools:
-                try:
-                    error_text = e.response.text
-                    if "does not support tools" in error_text.lower():
-                        logger.warning(
-                            f"Model {model} doesn't support tools via Ollama API. "
-                            "Retrying without tools (will use fallback parsing)."
-                        )
-                        # Cache that this model doesn't support tools
-                        self._models_without_tools.add(model)
-                        # Retry without tools
-                        payload = self._build_request_payload(
-                            messages=messages,
-                            model=model,
-                            temperature=temperature,
-                            max_tokens=max_tokens,
-                            tools=None,  # No tools
-                            stream=False,
-                            **kwargs,
-                        )
-                        response = await self._execute_with_circuit_breaker(
-                            self.client.post, "/api/chat", json=payload
-                        )
-                        response.raise_for_status()
-                        result = response.json()
-                        return self._parse_response(result, model)
-                except Exception:
-                    pass  # Fall through to original error
-
-            # Include error body for better debugging
-            error_body = ""
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/api/chat",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=tools is not None,
+        ):
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-            logger.error(f"Ollama HTTP error {e.response.status_code}: {error_body}")
-            raise ProviderError(
-                message=f"HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"Unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    stream=False,
+                    **kwargs,
+                )
+
+                # Log the endpoint URL being used for connection
+                endpoint_url = f"{self.base_url}/api/chat"
+                self._provider_logger.logger.debug(
+                    f"Connecting to Ollama endpoint: {endpoint_url}"
+                )
+
+                # Make API call with circuit breaker protection
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/api/chat", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                self._provider_logger._log_api_call_success(
+                    call_id=f"chat_{model}_{id(payload)}",
+                    endpoint="/api/chat",
+                    model=model,
+                    start_time=0,  # Set by context manager
+                    tokens=tokens,
+                )
+
+                return parsed
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                # Check for "does not support tools" error (HTTP 400)
+                # Retry without tools if model doesn't support them
+                if e.response.status_code == 400 and tools:
+                    try:
+                        error_text = e.response.text
+                        if "does not support tools" in error_text.lower():
+                            self._provider_logger.logger.warning(
+                                f"Model {model} doesn't support tools via Ollama API. "
+                                "Retrying without tools (will use fallback parsing)."
+                            )
+                            # Cache that this model doesn't support tools
+                            self._models_without_tools.add(model)
+                            # Retry without tools
+                            payload = self._build_request_payload(
+                                messages=messages,
+                                model=model,
+                                temperature=temperature,
+                                max_tokens=max_tokens,
+                                tools=None,  # No tools
+                                stream=False,
+                                **kwargs,
+                            )
+                            response = await self._execute_with_circuit_breaker(
+                                self.client.post, "/api/chat", json=payload
+                            )
+                            response.raise_for_status()
+                            result = response.json()
+                            return self._parse_response(result, model)
+                    except Exception:
+                        pass  # Fall through to original error
+
+                # Include error body for better debugging
+                error_body = ""
+                try:
+                    error_body = e.response.text[:500]
+                except Exception:
+                    pass
+
+                # Convert to specific error types based on status code
+                status_code = e.response.status_code
+                if status_code in (401, 403):
+                    # Authentication errors (for authenticated Ollama servers)
+                    raise ProviderAuthError(
+                        message=f"Authentication failed: HTTP {status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+                elif status_code == 429:
+                    # Rate limit errors
+                    raise ProviderRateLimitError(
+                        message=f"Rate limit exceeded: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+                else:
+                    # Other HTTP errors
+                    self._provider_logger.logger.error(
+                        f"Ollama HTTP error {status_code}: {error_body}"
+                    )
+                    raise ProviderError(
+                        message=f"HTTP error {status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+            except Exception as e:
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+                raise ProviderError(
+                    message=f"Unexpected error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     async def stream(
         self,
@@ -450,12 +527,17 @@ class OllamaProvider(BaseProvider):
             StreamChunk with incremental content
 
         Raises:
-            ProviderError: If request fails
+            ProviderAuthError: If authentication fails (for authenticated servers)
+            ProviderRateLimitError: If rate limit is exceeded
+            ProviderTimeoutError: If request times out
+            ProviderError: For other errors
         """
         # Check if we've already learned this model doesn't support tools
         effective_tools = tools
         if model in self._models_without_tools and tools:
-            logger.debug(f"Model {model} cached as not supporting tools, skipping tools")
+            self._provider_logger.logger.debug(
+                f"Model {model} cached as not supporting tools, skipping tools"
+            )
             effective_tools = None
 
         async for chunk in self._stream_impl(
@@ -491,26 +573,32 @@ class OllamaProvider(BaseProvider):
                 **kwargs,
             )
             num_tools = len(tools) if tools else 0
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"Streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
             # Debug: log first tool for inspection if tools are provided
             if tools and num_tools > 0:
-                logger.debug(f"First tool schema sample: {payload.get('tools', [{}])[0]}")
+                self._provider_logger.logger.debug(
+                    f"First tool schema sample: {payload.get('tools', [{}])[0]}"
+                )
 
             # Log the endpoint URL being used for connection
             endpoint_url = f"{self.base_url}/api/chat"
-            logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
+            self._provider_logger.logger.debug(
+                f"Connecting to Ollama endpoint: {endpoint_url}"
+            )
 
             async with self.client.stream("POST", "/api/chat", json=payload) as response:
                 # Check for HTTP 400 "does not support tools" error
                 if response.status_code == 400 and tools and retry_without_tools:
                     error_body = await response.aread()
                     error_text = error_body.decode()
-                    logger.debug(f"Ollama error response (400): {error_text}")
+                    self._provider_logger.logger.debug(
+                        f"Ollama error response (400): {error_text}"
+                    )
 
                     if "does not support tools" in error_text.lower():
-                        logger.warning(
+                        self._provider_logger.logger.warning(
                             f"Model {model} doesn't support tools via Ollama API. "
                             "Retrying stream without tools (will use fallback parsing)."
                         )
@@ -531,7 +619,7 @@ class OllamaProvider(BaseProvider):
 
                 if response.status_code >= 400:
                     error_body = await response.aread()
-                    logger.error(
+                    self._provider_logger.logger.error(
                         f"Ollama error response ({response.status_code}): {error_body.decode()}"
                     )
                 response.raise_for_status()
@@ -549,10 +637,14 @@ class OllamaProvider(BaseProvider):
                         yield chunk
 
                         if chunk.is_final:
-                            logger.debug(f"Received final chunk after {line_count} lines")
+                            self._provider_logger.logger.debug(
+                                f"Received final chunk after {line_count} lines"
+                            )
                             break
                     except json.JSONDecodeError:
-                        logger.warning(f"JSON decode error on line: {line[:100]}")
+                        self._provider_logger.logger.warning(
+                            f"JSON decode error on line: {line[:100]}"
+                        )
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -566,14 +658,40 @@ class OllamaProvider(BaseProvider):
                 error_body = e.response.text[:500]
             except Exception:
                 pass
-            logger.error(f"Ollama streaming HTTP error {e.response.status_code}: {error_body}")
-            raise ProviderError(
-                message=f"HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-                raw_error=e,
-            ) from e
+
+            # Convert to specific error types based on status code
+            status_code = e.response.status_code
+            if status_code in (401, 403):
+                # Authentication errors (for authenticated Ollama servers)
+                raise ProviderAuthError(
+                    message=f"Authentication failed: HTTP {status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
+            elif status_code == 429:
+                # Rate limit errors
+                raise ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
+            else:
+                # Other HTTP errors
+                self._provider_logger.logger.error(
+                    f"Ollama streaming HTTP error {status_code}: {error_body}"
+                )
+                raise ProviderError(
+                    message=f"HTTP error {status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
         except Exception as e:
+            # Skip if already a ProviderError to avoid double-wrapping
+            if isinstance(e, ProviderError):
+                raise
             raise ProviderError(
                 message=f"Unexpected error in stream: {str(e)}",
                 provider=self.name,
@@ -739,7 +857,9 @@ class OllamaProvider(BaseProvider):
         if not tool_calls and content:
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
             if parsed_tool_calls:
-                logger.debug(f"Parsed tool call from content (fallback for model: {model})")
+                self._provider_logger.logger.debug(
+                    f"Parsed tool call from content (fallback for model: {model})"
+                )
                 tool_calls = parsed_tool_calls
                 # Clear content since it was a tool call, not actual text response
                 content = ""
@@ -782,9 +902,9 @@ class OllamaProvider(BaseProvider):
         if not tool_calls and content and is_done:
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
             if parsed_tool_calls:
-                model = chunk_data.get("model", "unknown")
-                logger.debug(
-                    f"Parsed tool call from streaming content (fallback for model: {model})"
+                model_name = chunk_data.get("model", "unknown")
+                self._provider_logger.logger.debug(
+                    f"Parsed tool call from streaming content (fallback for model: {model_name})"
                 )
                 tool_calls = parsed_tool_calls
                 # Clear content since it was a tool call, not actual text response

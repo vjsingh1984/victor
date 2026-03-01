@@ -38,11 +38,14 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
+    ProviderAuthError,
     ProviderError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
+from victor.providers.logging import ProviderLogger
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
 logger = logging.getLogger(__name__)
@@ -129,6 +132,7 @@ class LMStudioProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         api_key: str = "lm-studio",
         _skip_discovery: bool = False,
+        non_interactive: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize LMStudio provider.
@@ -138,8 +142,11 @@ class LMStudioProvider(BaseProvider):
             timeout: Request timeout (default: 300s for local models)
             api_key: API key (LMStudio default is "lm-studio")
             _skip_discovery: Skip endpoint discovery (for async factory)
+            non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
+        # Initialize structured logger
+        self._provider_logger = ProviderLogger("lmstudio", __name__)
         if _skip_discovery:
             # Used by async factory, base_url is already resolved
             chosen_base = (
@@ -157,6 +164,14 @@ class LMStudioProvider(BaseProvider):
         self._context_window_cache: Dict[str, int] = {}
         self._current_model: Optional[str] = None  # Track current model for capability detection
         self._model_tool_support_cache: Dict[str, bool] = {}  # Cache tool support per model
+
+        # Log provider initialization
+        self._provider_logger.log_provider_init(
+            model="lmstudio-local",  # Will be set on chat()
+            key_source="Local server (no API key required)",
+            non_interactive=non_interactive if non_interactive is not None else True,
+            config={"base_url": chosen_base, "timeout": timeout, **kwargs},
+        )
 
         # Use httpx directly (not AsyncOpenAI SDK) for consistent behavior with Ollama
         self.client = httpx.AsyncClient(
@@ -234,7 +249,7 @@ class LMStudioProvider(BaseProvider):
         self._model_tool_support_cache[model] = supports
 
         if not supports:
-            logger.debug(f"LMStudio: Model {model} does not support native tool calling")
+            self._provider_logger.logger.debug(f"LMStudio: Model {model} does not support native tool calling")
 
         return supports
 
@@ -337,7 +352,7 @@ class LMStudioProvider(BaseProvider):
                 context_window = self._extract_context_window(match)
 
         except Exception as exc:
-            logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
+            self._provider_logger.logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
 
         from victor.config.config_loaders import get_provider_limits
 
@@ -419,27 +434,27 @@ class LMStudioProvider(BaseProvider):
                     models = data.get("data", [])
                     if models:
                         model_names = [m.get("id", "unknown") for m in models[:3]]
-                        logger.info(
+                        self._provider_logger.logger.info(
                             f"LMStudio base URL selected: {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
                         self._models_available = True
                     else:
-                        logger.warning(
+                        self._provider_logger.logger.warning(
                             f"LMStudio server at {url} has NO MODELS LOADED. "
                             "Please load a model in LMStudio before using this provider."
                         )
                         self._models_available = False
                     return url
             except Exception as exc:
-                logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
+                self._provider_logger.logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
         fallback = (
             base_url
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        logger.error(
+        self._provider_logger.logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback
@@ -497,26 +512,26 @@ class LMStudioProvider(BaseProvider):
                     models = data.get("data", [])
                     if models:
                         model_names = [m.get("id", "unknown") for m in models[:3]]
-                        logger.info(
+                        self._provider_logger.logger.info(
                             f"LMStudio base URL selected (async): {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
                         return url, True
                     else:
-                        logger.warning(
+                        self._provider_logger.logger.warning(
                             f"LMStudio server at {url} has NO MODELS LOADED. "
                             "Please load a model in LMStudio before using this provider."
                         )
                         return url, False
             except Exception as exc:
-                logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
+                self._provider_logger.logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
         fallback = (
             base_url
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        logger.error(
+        self._provider_logger.logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback, None
@@ -561,89 +576,135 @@ class LMStudioProvider(BaseProvider):
         # Filter tools if model doesn't support them
         effective_tools = tools
         if tools and not self._supports_tools_for_model(model):
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"LMStudio: Model {model} doesn't support native tool calling, "
                 "falling back to text-based parsing"
             )
             effective_tools = None
 
-        try:
-            payload = self._build_request_payload(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=effective_tools,
-                stream=False,
-                **kwargs,
-            )
-
-            # Make API call with circuit breaker protection
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return self._parse_response(result, model)
-
-        except httpx.TimeoutException as e:
-            # Enhanced timeout error with helpful suggestions
-            raise ProviderTimeoutError(
-                message=(
-                    f"LMStudio request timed out after {self.timeout}s. "
-                    f"Possible causes:\n"
-                    f"  1. Model '{model}' is still loading (first request takes longer)\n"
-                    f"  2. Model is too large for available VRAM\n"
-                    f"  3. Server is overloaded\n"
-                    f"Try: Increase timeout or wait for model to finish loading."
-                ),
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = ""
+        # Use structured logging context manager
+        with self._provider_logger.log_api_call(
+            endpoint="/chat/completions",
+            model=model,
+            operation="chat",
+            num_messages=len(messages),
+            has_tools=effective_tools is not None,
+        ) as log_success:
             try:
-                error_body = e.response.text[:500]
-            except Exception:
-                pass
-
-            # Enhanced error classification
-            status_code = e.response.status_code
-            if status_code == 503:
-                message = (
-                    f"LMStudio server unavailable (503). "
-                    f"The model may still be loading. "
-                    f"Server: {self.base_url}"
+                payload = self._build_request_payload(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=effective_tools,
+                    stream=False,
+                    **kwargs,
                 )
-            elif status_code == 500 and "out of memory" in error_body.lower():
-                message = (
-                    f"LMStudio out of memory loading model '{model}'. "
-                    f"Try a smaller model or free up VRAM."
-                )
-            else:
-                message = f"LMStudio HTTP error {status_code}: {error_body}"
 
-            raise ProviderError(
-                message=message,
-                provider=self.name,
-                status_code=status_code,
-                raw_error=e,
-            ) from e
-        except httpx.ConnectError as e:
-            raise ProviderError(
-                message=(
-                    f"Cannot connect to LMStudio server at {self.base_url}. "
-                    f"Ensure LMStudio is running and the server is enabled."
-                ),
-                provider=self.name,
-                raw_error=e,
-            ) from e
-        except Exception as e:
-            raise ProviderError(
-                message=f"LMStudio unexpected error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+                # Make API call with circuit breaker protection
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                parsed = self._parse_response(result, model)
+
+                # Log success with usage info
+                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
+                log_success(tokens=tokens)
+                return parsed
+
+            except httpx.TimeoutException as e:
+                # Enhanced timeout error with helpful suggestions
+                raise ProviderTimeoutError(
+                    message=(
+                        f"LMStudio request timed out after {self.timeout}s. "
+                        f"Possible causes:\n"
+                        f"  1. Model '{model}' is still loading (first request takes longer)\n"
+                        f"  2. Model is too large for available VRAM\n"
+                        f"  3. Server is overloaded\n"
+                        f"Try: Increase timeout or wait for model to finish loading."
+                    ),
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = ""
+                try:
+                    error_body = e.response.text[:500]
+                except Exception:
+                    pass
+
+                # Enhanced error classification with type conversion
+                status_code = e.response.status_code
+                if status_code in (401, 403):
+                    # LMStudio can be configured with authentication
+                    raise ProviderAuthError(
+                        message=(
+                            f"LMStudio authentication failed ({status_code}). "
+                            f"If your LMStudio server requires authentication, "
+                            f"provide a valid API key. "
+                            f"Server: {self.base_url}"
+                        ),
+                        provider=self.name,
+                        status_code=status_code,
+                    ) from e
+                elif status_code == 429:
+                    raise ProviderRateLimitError(
+                        message=(
+                            f"LMStudio rate limit exceeded (429). "
+                            f"The server is receiving too many requests. "
+                            f"Try again later."
+                        ),
+                        provider=self.name,
+                        status_code=429,
+                    ) from e
+                elif status_code == 503:
+                    raise ProviderError(
+                        message=(
+                            f"LMStudio server unavailable (503). "
+                            f"The model may still be loading. "
+                            f"Server: {self.base_url}"
+                        ),
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+                elif status_code == 500 and "out of memory" in error_body.lower():
+                    raise ProviderError(
+                        message=(
+                            f"LMStudio out of memory loading model '{model}'. "
+                            f"Try a smaller model or free up VRAM."
+                        ),
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+                else:
+                    raise ProviderError(
+                        message=f"LMStudio HTTP error {status_code}: {error_body}",
+                        provider=self.name,
+                        status_code=status_code,
+                        raw_error=e,
+                    ) from e
+            except httpx.ConnectError as e:
+                raise ProviderError(
+                    message=(
+                        f"Cannot connect to LMStudio server at {self.base_url}. "
+                        f"Ensure LMStudio is running and the server is enabled."
+                    ),
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
+            except Exception as e:
+                # Skip if already a ProviderError to avoid double-wrapping
+                if isinstance(e, ProviderError):
+                    raise
+                raise ProviderError(
+                    message=f"LMStudio unexpected error: {str(e)}",
+                    provider=self.name,
+                    raw_error=e,
+                ) from e
 
     async def stream(
         self,
@@ -685,7 +746,7 @@ class LMStudioProvider(BaseProvider):
         # Filter tools if model doesn't support them
         effective_tools = tools
         if tools and not self._supports_tools_for_model(model):
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"LMStudio: Model {model} doesn't support native tool calling, "
                 "falling back to text-based parsing"
             )
@@ -705,7 +766,7 @@ class LMStudioProvider(BaseProvider):
                 **kwargs,
             )
             num_tools = len(effective_tools) if effective_tools else 0
-            logger.debug(
+            self._provider_logger.logger.debug(
                 f"LMStudio streaming request: model={model}, msgs={len(messages)}, "
                 f"tools={num_tools}, thinking_model={uses_thinking}"
             )
@@ -735,11 +796,11 @@ class LMStudioProvider(BaseProvider):
                                 thinking, _ = _extract_thinking_content(accumulated_content)
                                 if thinking:
                                     final_metadata = {"reasoning_content": thinking}
-                                    logger.debug(
+                                    self._provider_logger.logger.debug(
                                         f"LMStudio: Extracted {len(thinking)} chars of thinking"
                                     )
 
-                            logger.debug(f"LMStudio stream complete after {line_count} lines")
+                            self._provider_logger.logger.debug(f"LMStudio stream complete after {line_count} lines")
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(
@@ -761,7 +822,7 @@ class LMStudioProvider(BaseProvider):
                             yield chunk
 
                         except json.JSONDecodeError:
-                            logger.warning(f"LMStudio JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(f"LMStudio JSON decode error on line: {line[:100]}")
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -778,22 +839,47 @@ class LMStudioProvider(BaseProvider):
             except Exception:
                 pass
 
-            # Enhanced error classification
+            # Enhanced error classification with type conversion
             status_code = e.response.status_code
-            if status_code == 503:
-                message = (
-                    "LMStudio server unavailable (503) during streaming. "
-                    "The model may still be loading."
-                )
+            if status_code in (401, 403):
+                # LMStudio can be configured with authentication
+                raise ProviderAuthError(
+                    message=(
+                        f"LMStudio authentication failed ({status_code}) during streaming. "
+                        f"If your LMStudio server requires authentication, "
+                        f"provide a valid API key. "
+                        f"Server: {self.base_url}"
+                    ),
+                    provider=self.name,
+                    status_code=status_code,
+                ) from e
+            elif status_code == 429:
+                raise ProviderRateLimitError(
+                    message=(
+                        f"LMStudio rate limit exceeded (429) during streaming. "
+                        f"The server is receiving too many requests. "
+                        f"Try again later."
+                    ),
+                    provider=self.name,
+                    status_code=429,
+                ) from e
+            elif status_code == 503:
+                raise ProviderError(
+                    message=(
+                        "LMStudio server unavailable (503) during streaming. "
+                        "The model may still be loading."
+                    ),
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
             else:
-                message = f"LMStudio streaming HTTP error {status_code}: {error_body}"
-
-            raise ProviderError(
-                message=message,
-                provider=self.name,
-                status_code=status_code,
-                raw_error=e,
-            ) from e
+                raise ProviderError(
+                    message=f"LMStudio streaming HTTP error {status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=status_code,
+                    raw_error=e,
+                ) from e
         except httpx.ConnectError as e:
             raise ProviderError(
                 message=(
@@ -804,6 +890,9 @@ class LMStudioProvider(BaseProvider):
                 raw_error=e,
             ) from e
         except Exception as e:
+            # Skip if already a ProviderError to avoid double-wrapping
+            if isinstance(e, ProviderError):
+                raise
             raise ProviderError(
                 message=f"LMStudio stream error: {str(e)}",
                 provider=self.name,
@@ -1026,13 +1115,13 @@ class LMStudioProvider(BaseProvider):
             if thinking:
                 metadata = {"reasoning_content": thinking}
                 content = main_content
-                logger.debug(f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}")
+                self._provider_logger.logger.debug(f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}")
 
         # Fallback: Check if content contains JSON tool call
         if not tool_calls and content:
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
             if parsed_tool_calls:
-                logger.debug(
+                self._provider_logger.logger.debug(
                     f"LMStudio: Parsed tool call from content (fallback for model: {model})"
                 )
                 tool_calls = parsed_tool_calls
