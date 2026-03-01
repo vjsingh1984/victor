@@ -333,16 +333,21 @@ class TestInvalidVerticalRejection:
 
 @pytest.mark.integration
 class TestNameConflictHandling:
-    """Tests for handling name conflicts between external and built-in verticals."""
+    """Tests for handling name conflicts between external and built-in verticals.
 
-    def test_conflict_with_builtin_coding_rejected(self, caplog):
-        """External vertical with name 'coding' should be rejected."""
-        mock_ep = create_mock_entry_point("coding_conflict", ConflictingNameVertical)
+    NOTE: After the 2026-03-01 migration, "coding", "rag", "devops", "dataanalysis",
+    and "research" are now contrib verticals loaded via entry points, not built-in
+    verticals. Built-in verticals are: benchmark, classification, iac, security.
+    """
+
+    def test_conflict_with_builtin_benchmark_rejected(self, caplog):
+        """External vertical with name 'benchmark' should be rejected."""
+        mock_ep = create_mock_entry_point("benchmark_conflict", ConflictingNameVertical)
 
         VerticalRegistry.reset_discovery()
 
-        # Ensure coding is registered (it should be by default)
-        assert VerticalRegistry.get("coding") is not None
+        # Ensure benchmark is registered (it should be by default)
+        assert VerticalRegistry.get("benchmark") is not None
 
         with patch("importlib.metadata.entry_points") as mock_entry_points:
             mock_entry_points.return_value = [mock_ep]
@@ -352,12 +357,12 @@ class TestNameConflictHandling:
 
             # Should not be discovered due to conflict
             assert (
-                "coding" not in discovered
-                or discovered.get("coding") is not ConflictingNameVertical
+                "benchmark" not in discovered
+                or discovered.get("benchmark") is not ConflictingNameVertical
             )
 
-            # Original coding should still be there
-            original = VerticalRegistry.get("coding")
+            # Original benchmark should still be there
+            original = VerticalRegistry.get("benchmark")
             assert original is not None
             assert original is not ConflictingNameVertical
 
@@ -708,7 +713,18 @@ class TestIntegrationWithBuiltinVerticals:
         assert VerticalRegistry.get("research") is research_before
 
     def test_external_verticals_listed_with_builtins(self):
-        """list_all should include both built-in and external verticals."""
+        """list_all should include both built-in and external verticals.
+
+        NOTE: After the 2026-03-01 migration, the following verticals were migrated
+        from external packages to contrib packages loaded via entry points:
+        - victor-coding → victor.verticals.contrib.coding
+        - victor-rag → victor.verticals.contrib.rag
+        - victor-devops → victor.verticals.contrib.devops
+        - victor-dataanalysis → victor.verticals.contrib.dataanalysis
+        - victor-research → victor.verticals.contrib.research
+
+        Built-in verticals are now only: benchmark, classification, iac, security.
+        """
         mock_ep = create_mock_entry_point("external_test", ValidExternalVertical)
 
         VerticalRegistry.reset_discovery()
@@ -719,9 +735,10 @@ class TestIntegrationWithBuiltinVerticals:
 
         names = VerticalRegistry.list_names()
 
-        # Should include built-ins
-        assert "coding" in names
-        assert "research" in names
+        # Should include built-in verticals (benchmark, classification, iac, security)
+        assert "benchmark" in names
+        assert "classification" in names
 
-        # Should include external
+        # Should include external (contrib verticals are loaded via entry points,
+        # but in this test we're mocking entry_points so only the mock shows up)
         assert "external_test" in names
