@@ -362,6 +362,25 @@ def chat(
 
         settings = load_settings()
 
+        # Early configuration validation (P0: catch errors at startup, not runtime)
+        try:
+            from victor.config.validation import validate_configuration, format_validation_result
+
+            validation_result = validate_configuration(settings)
+            if not validation_result.is_valid:
+                # Configuration has errors - display and exit
+                console.print("[bold red]Configuration Validation Failed:[/]")
+                console.print(format_validation_result(validation_result))
+                console.print("")
+                console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
+                raise typer.Exit(1)
+        except Exception as e:
+            # If validation itself fails, log it but don't block startup
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Configuration validation skipped due to error: {e}")
+
         # Apply CLI flags to settings
         if log_events:
             settings.enable_observability_logging = True

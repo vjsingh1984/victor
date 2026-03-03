@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 from victor.config.settings import load_settings
+from victor.config.validation import validate_configuration, format_validation_result
 
 config_app = typer.Typer(name="config", help="Validate configuration files and profiles.")
 console = Console()
@@ -25,16 +26,48 @@ def config_validate(
         "-c",
         help="Test provider connectivity (requires network/services)",
     ),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        "-f",
+        help="Automatically fix common configuration issues",
+    ),
 ) -> None:
-    """Validate configuration files and profiles."""
-    errors: list[str] = []
-    warnings: list[str] = []
-    checks_passed = 0
-    checks_total = 0
+    """Validate configuration files and profiles.
 
-    settings = load_settings()
-    config_dir = settings.get_config_dir()
-    profiles_file = config_dir / "profiles.yaml"
+    Performs comprehensive validation including:
+    - Configuration file syntax and structure
+    - Provider availability and API keys
+    - Tool configuration
+    - Performance optimization settings
+    - Environment variables
+    """
+    console = Console()
+
+    # First, run the comprehensive validation
+    try:
+        settings = load_settings()
+        result = validate_configuration(settings)
+
+        # Display validation results
+        print(format_validation_result(result))
+
+        if not result.is_valid:
+            raise typer.Exit(1)
+
+    except Exception as e:
+        console.print(f"[red]✗ Configuration validation failed:[/] {e}")
+        raise typer.Exit(1)
+
+    # If verbose or --fix, run additional detailed checks
+    if verbose or fix:
+        errors: list[str] = []
+        warnings: list[str] = []
+        checks_passed = 0
+        checks_total = 0
+
+        config_dir = settings.get_config_dir()
+        profiles_file = config_dir / "profiles.yaml"
 
     # Check 1: Config directory exists
     checks_total += 1
