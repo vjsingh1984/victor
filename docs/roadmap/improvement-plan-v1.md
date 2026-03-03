@@ -1,7 +1,12 @@
 # Victor Framework Improvement Plan
 ## Version 1.0 - February 2026
 
-**Document Status**: Draft | **Last Updated**: 2026-02-26
+**Document Status**: Reference Archive (Non-Canonical) | **Last Updated**: 2026-03-03
+
+> Canonical roadmap source: [`/roadmap.md`](../../roadmap.md)
+>
+> This document remains as detailed background strategy. Active priorities,
+> ownership, and milestone state are maintained in the canonical roadmap.
 
 ---
 
