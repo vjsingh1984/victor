@@ -1,6 +1,6 @@
 # Installation Guide
 
-Detailed installation instructions for Victor AI framework.
+Detailed installation instructions for Victor AI framework with troubleshooting help.
 
 ## System Requirements
 
@@ -44,345 +44,233 @@ sudo apt install python3.11
 
 **Windows**: Download from [python.org](https://www.python.org/downloads/)
 
+---
+
 ## Installation Methods
 
-### Method 1: pip Install (Recommended)
+### Method 1: pipx (Recommended for CLI)
 
-Install from PyPI:
-
-```bash
-pip install victor-ai
-```
-
-### Method 2: Install with Extras
-
-Install with development dependencies:
+pipx installs Victor in an isolated environment:
 
 ```bash
-pip install "victor-ai[dev]"
+# Install pipx if needed
+pip install pipx
+pipx ensurepath
+
+# Install Victor
+pipx install victor-ai
+
+# Verify
+victor --version
 ```
 
-Install with all optional dependencies:
+### Method 2: pip (Virtual Environment)
 
-```bash
-pip install "victor-ai[all]"
-```
-
-Available extras:
-- `dev` - Development tools (pytest, black, mypy, etc.)
-- `viz` - Visualization tools (matplotlib, graphviz)
-- `all` - All optional dependencies
-
-### Method 3: Install from Source
-
-For the latest development version:
-
-```bash
-# Clone the repository
-git clone https://github.com/vjsingh1984/victor.git
-cd victor
-
-# Install in editable mode
-pip install -e .
-
-# Or install with development dependencies
-pip install -e ".[dev]"
-```
-
-## Provider Configuration
-
-Victor supports multiple LLM providers. Configure your preferred provider:
-
-### OpenAI
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-Or in `~/.victor/settings.yaml`:
-
-```yaml
-providers:
-  openai:
-    api_key: "sk-..."
-```
-
-### Anthropic Claude
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-### Azure OpenAI
-
-```bash
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-```
-
-In settings.yaml:
-
-```yaml
-providers:
-  azure:
-    api_key: "your-api-key"
-    endpoint: "https://your-resource.openai.azure.com"
-    api_version: "2023-05-15"
-```
-
-### Google AI (Gemini)
-
-```bash
-export GOOGLE_API_KEY="..."
-```
-
-### Cohere
-
-```bash
-export COHERE_API_KEY="..."
-```
-
-### Local Models (Ollama)
-
-```bash
-# Install Ollama first
-curl https://ollama.ai/install.sh | sh
-
-# Pull a model
-ollama pull llama2
-
-# No API key needed!
-```
-
-## Verifying Installation
-
-Test your installation:
-
-```bash
-python -c "import victor; print(victor.__version__)"
-```
-
-Expected output:
-```
-0.5.8
-```
-
-Run the built-in test:
-
-```bash
-python -m victor.tools.cli test
-```
-
-## Upgrading
-
-To upgrade to the latest version:
-
-```bash
-pip install --upgrade victor-ai
-```
-
-To upgrade from source:
-
-```bash
-cd victor
-git pull
-pip install -e .
-```
-
-## Uninstalling
-
-To remove Victor:
-
-```bash
-pip uninstall victor-ai
-```
-
-To also remove configuration files:
-
-```bash
-# Remove config directory
-rm -rf ~/.victor
-
-# Remove virtual environment (if using one)
-rm -rf /path/to/venv
-```
-
-## Platform-Specific Notes
-
-### macOS
-
-#### Using Homebrew Python
-
-If you installed Python via Homebrew, you might need to set the path:
-
-```bash
-export PATH="/opt/homebrew/bin:$PATH"
-```
-
-#### OpenSSL Issues (Apple Silicon)
-
-If you encounter OpenSSL errors:
-
-```bash
-brew install openssl
-export LDFLAGS="-L/opt/homebrew/opt/openssl/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/openssl/include"
-pip install victor-ai
-```
-
-### Linux
-
-#### Ubuntu/Debian Dependencies
-
-```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv build-essential
-```
-
-#### CentOS/RHEL Dependencies
-
-```bash
-sudo yum install python3 python3-pip python3-venv gcc
-```
-
-### Windows
-
-#### Install Visual C++ Build Tools
-
-Some packages require C++ compilation:
-
-<https://visualstudio.microsoft.com/visual-cpp-build-tools/>
-
-#### Use PowerShell for Installation
-
-```powershell
-# Install
-pip install victor-ai
-
-# Set environment variable
-$env:OPENAI_API_KEY="your-key-here"
-
-# Make persistent
-[System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY', 'your-key-here', 'User')
-```
-
-## Virtual Environments (Recommended)
-
-Using a virtual environment keeps your dependencies isolated:
-
-### venv
+For Python projects:
 
 ```bash
 # Create virtual environment
 python -m venv victor-env
-
-# Activate
-source victor-env/bin/activate  # Linux/macOS
-victor-env\Scripts\activate     # Windows
+source victor-env/bin/activate  # Windows: victor-env\Scripts\activate
 
 # Install Victor
 pip install victor-ai
 
-# Deactivate when done
-deactivate
+# Verify
+victor --version
 ```
 
-### conda
+### Method 3: Install with Extras
+
+Install with optional dependencies:
 
 ```bash
-# Create environment
-conda create -n victor python=3.11
+# Development tools (pytest, black, mypy)
+pip install "victor-ai[dev]"
 
-# Activate
-conda activate victor
+# All optional dependencies
+pip install "victor-ai[all]"
 
-# Install Victor
-pip install victor-ai
-
-# Deactivate
-conda deactivate
+# Specific extras
+pip install "victor-ai[api,google,checkpoints]"
 ```
 
-### poetry
+Available extras:
+- `dev` - Development tools
+- `api` - FastAPI HTTP server
+- `google` - Google Gemini provider
+- `checkpoints` - SQLite workflow persistence
+- `native` - Rust extensions (Maturin)
+- `all` - All optional dependencies
+
+### Method 4: Docker
 
 ```bash
-# Create new project
-poetry new my-project
-cd my-project
+# Pull the image
+docker pull ghcr.io/vjsingh1984/victor:latest
 
-# Add Victor
-poetry add victor-ai
-
-# Install dependencies
-poetry install
+# Run interactively
+docker run -it \
+  -v ~/.victor:/root/.victor \
+  -v "$(pwd)":/workspace \
+  -w /workspace \
+  ghcr.io/vjsingh1984/victor:latest chat
 ```
 
-## Docker Installation
+### Method 5: Development Installation
 
-For containerized deployment:
-
-### Dockerfile
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install Victor
-RUN pip install victor-ai
-
-# Copy your application
-COPY . .
-
-# Set API key as environment variable
-ENV OPENAI_API_KEY=""
-
-CMD ["python", "app.py"]
-```
-
-### docker-compose.yml
-
-```yaml
-version: '3.8'
-
-services:
-  victor-app:
-    build: .
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    volumes:
-      - .:/app
-```
-
-Build and run:
+For contributors:
 
 ```bash
-docker-compose up
+# Clone repository
+git clone https://github.com/vjsingh1984/victor.git
+cd victor
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install in editable mode
+pip install -e ".[dev]"
+
+# Install pre-commit hooks
+pre-commit install
+
+# Run tests
+pytest tests/unit -v
 ```
+
+---
+
+## Provider Configuration
+
+Victor needs an LLM provider. Choose **local** (no API key) or **cloud** (API key required).
+
+### Option A: Local Model (Ollama - Free, No API Key)
+
+```bash
+# Install Ollama
+brew install ollama  # macOS
+# OR
+curl -fsSL https://ollama.com/install.sh | sh  # Linux
+
+# Start Ollama
+ollama serve
+
+# Pull a code-focused model
+ollama pull qwen2.5-coder:7b
+
+# Test with Victor
+victor chat --provider ollama --model qwen2.5-coder:7b "Hello!"
+```
+
+### Option B: Cloud Providers (API Key Required)
+
+```bash
+# Anthropic Claude
+export ANTHROPIC_API_KEY=sk-ant-your-key
+
+# OpenAI
+export OPENAI_API_KEY=sk-proj-your-key
+
+# Google Gemini
+export GOOGLE_API_KEY=your-key
+
+# Azure OpenAI
+export AZURE_OPENAI_API_KEY=your-key
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+```
+
+**Secure key storage (recommended)**:
+```bash
+victor keys --set anthropic --keyring
+victor keys --set openai --keyring
+```
+
+---
+
+## Post-Installation Setup
+
+### Initialize Victor
+
+```bash
+victor init
+```
+
+This creates:
+- `~/.victor/profiles.yaml` - Provider and model profiles
+- `~/.victor/config.yaml` - Global settings
+
+### Verify Installation
+
+```bash
+# Check version
+victor --version
+
+# List providers
+victor providers
+
+# List tools
+victor tools
+
+# Run diagnostics
+victor doctor
+```
+
+Expected output:
+```
+Victor AI v0.x.x
+22 providers available
+33 tools available
+```
+
+---
 
 ## Troubleshooting
 
-### "No module named 'victor'"
+### "command not found: victor"
 
-**Cause**: Victor not installed or wrong Python environment
+**Cause**: Victor not in PATH
 
 **Solutions**:
 ```bash
-# Check which Python you're using
+# If using pipx
+pipx ensurepath
+source ~/.bashrc  # or ~/.zshrc
+
+# If using pip
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### "No module named 'victor'"
+
+**Cause**: Wrong Python environment or not installed
+
+**Solutions**:
+```bash
+# Check which Python
 which python
 
 # Install Victor
 pip install victor-ai
 
-# Or verify installation
+# Verify installation
 python -m pip show victor-ai
 ```
 
 ### "Permission denied" when installing
 
-**Solution**: Install to user directory:
+**Solution**: Use pipx or virtual environment:
 ```bash
-pip install --user victor-ai
+# Recommended
+pipx install victor-ai
+
+# Alternative
+python -m venv .venv
+source .venv/bin/activate
+pip install victor-ai
 ```
 
 ### "SSL certificate verification failed"
@@ -392,8 +280,8 @@ pip install --user victor-ai
 # Upgrade pip
 python -m pip install --upgrade pip
 
-# Reinstall with trusted host
-pip install --trusted-host pypi.org --trusted-host pypi.python.org victor-ai
+# Reinstall
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org victor-ai
 ```
 
 ### "Failed building wheel for X"
@@ -408,8 +296,8 @@ sudo apt install build-essential python3-dev
 # macOS
 xcode-select --install
 
-# Windows
-# Install Visual C++ Build Tools
+# Windows: Install Visual C++ Build Tools
+# https://visualstudio.microsoft.com/visual-cpp-build-tools/
 ```
 
 ### "ImportError: cannot import name 'cached_property'"
@@ -421,14 +309,36 @@ xcode-select --install
 python --version  # Should be 3.10+
 ```
 
-### Slow installation
+### Ollama Connection Errors
 
-**Solution**: Use a faster package index:
+**Cause**: Ollama server not running
+
+**Solutions**:
 ```bash
-pip install --index-url https://pypi.org/simple victor-ai
+# Start Ollama server
+ollama serve
+
+# Check if running
+curl http://localhost:11434/api/version
+
+# Pull a model
+ollama pull qwen2.5-coder:7b
+
+# Set custom host if needed
+export OLLAMA_HOST=127.0.0.1:11434
 ```
 
-### Version conflicts
+### OpenSSL Issues (macOS Apple Silicon)
+
+**Solution**:
+```bash
+brew install openssl
+export LDFLAGS="-L/opt/homebrew/opt/openssl/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/openssl/include"
+pip install victor-ai
+```
+
+### Version Conflicts
 
 **Solution**: Use pip-check to find conflicts:
 ```bash
@@ -436,69 +346,168 @@ pip install pip-check
 pip-check
 ```
 
-## Development Installation
+---
 
-For contributing to Victor:
+## Platform-Specific Notes
+
+### macOS
 
 ```bash
-# Clone repository
-git clone https://github.com/vjsingh1984/victor.git
-cd victor
+# Install Python 3.11+ if needed
+brew install python@3.11
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate   # Windows
+# Install pipx
+brew install pipx
+pipx ensurepath
 
-# Install in editable mode with dev dependencies
+# Install Victor
+pipx install victor-ai
+
+# Optional: Ollama for local models
+brew install ollama
+```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+# Install Python 3.11+
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3-pip
+
+# Install pipx
+python3.11 -m pip install --user pipx
+python3.11 -m pipx ensurepath
+
+# Restart terminal, then install Victor
+pipx install victor-ai
+```
+
+### Windows (WSL2 Recommended)
+
+```powershell
+# Install WSL2 (from PowerShell as Administrator)
+wsl --install
+
+# After restart, in Ubuntu terminal:
+sudo apt update && sudo apt upgrade
+sudo apt install python3.11 python3.11-venv python3-pip
+python3.11 -m pip install --user pipx
+python3.11 -m pipx ensurepath
+
+# Restart terminal, then install Victor
+pipx install victor-ai
+```
+
+---
+
+## Virtual Environments
+
+### venv
+
+```bash
+# Create
+python -m venv victor-env
+
+# Activate
+source victor-env/bin/activate  # Linux/macOS
+victor-env\Scripts\activate     # Windows
+
+# Install
+pip install victor-ai
+
+# Deactivate
+deactivate
+```
+
+### conda
+
+```bash
+# Create environment
+conda create -n victor python=3.11
+
+# Activate
+conda activate victor
+
+# Install
+pip install victor-ai
+
+# Deactivate
+conda deactivate
+```
+
+### poetry
+
+```bash
+# Create project
+poetry new my-project
+cd my-project
+
+# Add Victor
+poetry add victor-ai
+
+# Install
+poetry install
+```
+
+---
+
+## Upgrading
+
+### pipx
+```bash
+pipx upgrade victor-ai
+```
+
+### pip
+```bash
+pip install --upgrade victor-ai
+```
+
+### Docker
+```bash
+docker pull ghcr.io/vjsingh1984/victor:latest
+```
+
+### Development
+```bash
+git pull origin main
 pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
-
-# Run tests
-pytest
 ```
 
-## Checking Your Installation
+---
 
-Run the diagnostic command:
+## Uninstalling
 
+### pipx
 ```bash
-victor doctor
+pipx uninstall victor-ai
 ```
 
-This checks:
-- ✅ Python version
-- ✅ Package installation
-- ✅ API key configuration
-- ✅ Provider connectivity
-- ✅ Common issues
-
-Output example:
+### pip
+```bash
+pip uninstall victor-ai
 ```
-Victor Doctor - Installation Diagnostic
-========================================
 
-✅ Python: 3.11.4
-✅ victor-ai: 0.5.8
-✅ OpenAI API key: Configured
-✅ OpenAI connection: Working
-✅ Filesystem permissions: OK
-
-All checks passed! Victor is ready to use.
+### Remove configuration
+```bash
+rm -rf ~/.victor
 ```
+
+---
 
 ## Next Steps
 
 - 📖 [Quick Start Guide](quickstart.md) - Get started in 5 minutes
 - 🤖 [First Agent Guide](first-agent.md) - Build your first agent
 - 🔄 [First Workflow Guide](first-workflow.md) - Create workflows
-- 📚 [API Reference](../api/index.md) - Full API documentation
+- ⚙️ [Configuration Guide](configuration.md) - Customize settings
+
+---
 
 ## Additional Resources
 
 - [PyPI Package](https://pypi.org/project/victor-ai/)
 - [GitHub Repository](https://github.com/vjsingh1984/victor)
 - [Documentation](https://victor-ai.readthedocs.io)
-- [Discord Community](https://discord.gg/victor-ai)
+
+**Need help?** Run `victor doctor` for diagnostics or see [Quick Start](quickstart.md#troubleshooting).
