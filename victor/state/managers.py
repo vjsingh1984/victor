@@ -72,6 +72,7 @@ class WorkflowStateManager:
         self.scope: StateScope = StateScope.WORKFLOW
         self._state: Dict[str, Any] = {}
         self._observers: List[IStateObserver] = []
+        self._lock = asyncio.Lock()
 
         logger.debug("WorkflowStateManager initialized")
 
@@ -85,7 +86,8 @@ class WorkflowStateManager:
         Returns:
             The value associated with key, or default if not found
         """
-        return self._state.get(key, default)
+        async with self._lock:
+            return self._state.get(key, default)
 
     async def set(self, key: str, value: Any, notify: bool = True) -> None:
         """Set a value by key.
@@ -98,16 +100,17 @@ class WorkflowStateManager:
         Performance: Only notifies observers if value actually changed.
         Notifications run in parallel for multiple observers.
         """
-        old_value = self._state.get(key)
+        async with self._lock:
+            old_value = self._state.get(key)
 
-        # Skip notification if value hasn't changed (key exists and same value)
-        if old_value == value and key in self._state:
-            # Value unchanged, skip notification (but still update state)
-            return
+            # Skip notification if value hasn't changed (key exists and same value)
+            if old_value == value and key in self._state:
+                # Value unchanged, skip notification (but still update state)
+                return
 
-        self._state[key] = value
+            self._state[key] = value
 
-        # Notify observers in parallel if requested
+        # Notify observers in parallel if requested (outside lock)
         if notify and self._observers:
             await asyncio.gather(
                 *[
