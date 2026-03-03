@@ -1271,6 +1271,42 @@ try:
 except ImportError:
     _OBSERVABILITY_EXPORTS = []
 
+# Contextual Errors (UX: Context-aware error messages with suggestions)
+try:
+    from victor.framework.contextual_errors import (
+        # Error classes
+        ContextualError,
+        ProviderConnectionError,
+        ToolExecutionError,
+        FileOperationError,
+        ResourceError,
+        # Configuration error is already defined in errors.py
+        # Helper functions
+        create_provider_error,
+        create_tool_error,
+        create_file_error,
+        wrap_error,
+        format_exception_for_user,
+    )
+
+    _CONTEXTUAL_ERRORS_EXPORTS = [
+        # Error classes
+        "ContextualError",
+        "ProviderConnectionError",
+        "ToolExecutionError",
+        "FileOperationError",
+        "ResourceError",
+        # Helper functions
+        "create_provider_error",
+        "create_tool_error",
+        "create_file_error",
+        "wrap_error",
+        "format_exception_for_user",
+    ]
+    __all__ = list(__all__) + _CONTEXTUAL_ERRORS_EXPORTS
+except ImportError:
+    _CONTEXTUAL_ERRORS_EXPORTS = []
+
 # Version sourced from pyproject.toml via importlib.metadata
 try:
     from importlib.metadata import version as _get_version

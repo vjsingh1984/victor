@@ -38,6 +38,14 @@ from victor.workflows.visualization import (
     get_available_backends,
 )
 
+# Contextual error formatting
+try:
+    from victor.framework.contextual_errors import format_exception_for_user
+except ImportError:
+    # Fallback if framework module is not available
+    def format_exception_for_user(e):
+        return str(e)
+
 chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
 console = Console()
 
@@ -1172,11 +1180,17 @@ async def run_workflow_mode(
     except YAMLWorkflowError as e:
         console.print("[bold red]✗[/] Workflow validation failed")
         console.print(f"  [red]{e}[/]")
+        console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
+        # Use contextual error formatting for better UX
+        error_message = format_exception_for_user(e)
+        console.print(f"[bold red]Error:[/]\n{error_message}")
+        console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         import traceback
 
-        console.print(traceback.format_exc())
+        # Still show traceback in debug mode
+        if os.getenv("VICTOR_DEBUG"):
+            console.print(traceback.format_exc())
         raise typer.Exit(1)
