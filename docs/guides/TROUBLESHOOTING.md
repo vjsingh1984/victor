@@ -183,7 +183,7 @@ pip show victor-ai
 victor config validate --verbose
 
 # Check YAML syntax
-python -c "import yaml; yaml.safe_load(open('~/.victor/profiles.yaml'))"
+python -c "from pathlib import Path; import yaml; yaml.safe_load(Path('~/.victor/profiles.yaml').expanduser().read_text())"
 ```
 
 **Solutions**:
@@ -282,7 +282,7 @@ ps aux | grep ollama
 victor profile current
 
 # Test provider connectivity
-victor providers test <provider>
+victor providers check <provider> --connectivity
 ```
 
 **Solutions**:
@@ -321,7 +321,7 @@ victor providers test <provider>
 **Diagnosis**:
 ```bash
 # Check provider status
-victor providers test <provider>
+victor providers check <provider> --connectivity
 ```
 
 **Solutions**:
@@ -459,7 +459,7 @@ top -p $(pgrep -f victor)
 
 2. Clear cache periodically:
    ```bash
-   victor cache clear --all
+   du -sh ~/.victor/cache 2>/dev/null || true
    ```
 
 3. Use lighter models:
@@ -654,7 +654,7 @@ victor doctor
 victor config validate --verbose
 
 # Test provider connectivity
-victor providers test <provider>
+victor providers check <provider> --connectivity
 
 # View current profile
 victor profile current
@@ -708,7 +708,7 @@ When something doesn't work:
 
 1. **Run diagnostics**: `victor doctor`
 2. **Validate configuration**: `victor config validate`
-3. **Check provider**: `victor providers test <provider>`
+3. **Check provider**: `victor providers check <provider> --connectivity`
 4. **Review profile**: `victor profile current`
 5. **Enable debug**: `VICTOR_DEBUG=1 victor chat`
 
@@ -741,12 +741,11 @@ python -c "from victor.core.database import get_database; print(get_database().d
 ### Clear Cache
 
 ```bash
-# Clear all caches
-victor cache clear --all
+# Inspect cache usage
+du -sh ~/.victor/cache 2>/dev/null || true
 
-# Clear specific cache
-victor cache clear --tool-selection
-victor cache clear --embeddings
+# Optional: clear cache files manually
+rm -rf ~/.victor/cache/*
 ```
 
 ### Reset Configuration
@@ -773,7 +772,7 @@ nano ~/.victor/profiles.yaml
 - Check for updates: `pip install --upgrade victor-ai`
 
 **Monthly**:
-- Clear old caches: `victor cache clear --old`
+- Review cache usage: `du -sh ~/.victor/cache`
 - Review logs for errors
 
 **As Needed**:
@@ -797,5 +796,5 @@ victor doctor --verbose | grep -E "memory|disk|cpu"
 
 - **Configuration Guide**: See `victor profile list` for available profiles
 - **Provider Setup**: See provider-specific documentation
-- **API Reference**: See `victor docs --api`
+- **API Reference**: See `docs/api/`
 - **Architecture Guide**: See `docs/architecture/` directory
