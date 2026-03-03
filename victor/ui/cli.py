@@ -23,6 +23,7 @@ from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
 from victor.ui.commands.config import config_app
+from victor.ui.commands.doctor import run_doctor
 from victor.ui.commands.dashboard import dashboard_app
 from victor.ui.commands.docs import docs_app
 from victor.ui.commands.observability import app as observability_app
@@ -59,6 +60,7 @@ app.add_typer(benchmark_app)
 app.add_typer(capabilities_app)
 app.add_typer(chat_app)
 app.add_typer(config_app)
+app.command()(doctor_command)
 app.add_typer(dashboard_app)
 app.add_typer(docs_app)
 app.add_typer(observability_app, name="observability")
@@ -84,6 +86,27 @@ app.add_typer(scheduler_app)
 app.add_typer(sessions_app)
 app.add_typer(vertical_app)
 app.add_typer(workflow_app)
+
+
+@app.command()
+def doctor_command(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic output"),
+    fix: bool = typer.Option(False, "--fix", "-f", help="Automatically fix common issues"),
+) -> None:
+    """Run system diagnostics and troubleshooting.
+
+    Performs comprehensive system checks:
+    - Python version and environment
+    - Dependencies and packages
+    - Provider connectivity and configuration
+    - Tool availability
+    - File permissions
+    - Performance optimizations
+    """
+    import sys
+
+    exit_code = run_doctor(verbose=verbose, fix=fix)
+    raise typer.Exit(exit_code)
 
 console = Console()
 
