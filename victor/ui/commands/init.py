@@ -293,7 +293,7 @@ providers:
             default_include = "."
 
             include_str = Prompt.ask(
-                f"[cyan]Enter comma-separated source directories to include[/]",
+                "[cyan]Enter comma-separated source directories to include[/]",
                 default=default_include,
             )
             # Normalize "." to current working directory path for downstream processing
@@ -333,7 +333,7 @@ providers:
             ]
 
             exclude_str = Prompt.ask(
-                f"[cyan]Enter comma-separated directories to exclude[/]",
+                "[cyan]Enter comma-separated directories to exclude[/]",
                 default=", ".join(default_exclude),
             )
             exclude_dirs = [d.strip() for d in exclude_str.split(",")]
