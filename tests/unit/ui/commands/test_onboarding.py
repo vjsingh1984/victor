@@ -254,9 +254,15 @@ class TestRunOnboarding:
 
         exit_code = run_onboarding()
 
-        # The wizard should handle the exception and return error code
-        # Note: The current implementation has try/except in wizard.run()
-        # but the test expects the run_onboarding entry point to handle it
-        # This is acceptable - the wizard handles exceptions internally
-        # and returns appropriate exit codes
-        assert exit_code in [0, 1]  # Either success or graceful exit
+        assert exit_code == 1
+        mock_run.assert_called_once()
+
+    @patch("victor.ui.commands.onboarding.OnboardingWizard", side_effect=Exception("Init error"))
+    def test_run_onboarding_handles_wizard_init_exception(self, mock_wizard):
+        """run_onboarding handles wizard initialization exceptions."""
+        from victor.ui.commands.onboarding import run_onboarding
+
+        exit_code = run_onboarding()
+
+        assert exit_code == 1
+        mock_wizard.assert_called_once()
