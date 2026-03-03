@@ -40,9 +40,8 @@ Phase 1: Extract ExecutionCoordinator
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Protocol
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from victor.framework.task import TaskComplexity
 from victor.agent.response_completer import ToolFailureContext
 from victor.providers.base import CompletionResponse
 
@@ -136,8 +135,10 @@ class ExecutionCoordinator:
         task_classification = self._provider_context.task_classifier.classify(
             user_message
         )
+        # Ensure at least 1 iteration is always allowed
+        task_iteration_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(
-            task_classification.tool_budget * 2,  # Allow 2x budget for iterations
+            task_iteration_budget,  # Allow 2x budget for iterations; always run at least one model turn
             max_iterations_setting,
             max_iterations,
         )

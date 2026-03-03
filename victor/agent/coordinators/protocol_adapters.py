@@ -339,11 +339,6 @@ class OrchestratorProtocolAdapter:
         """Set tool calls used."""
         self._orchestrator.tool_calls_used = value
 
-    @tool_calls_used.setter
-    def tool_calls_used(self, value: int) -> None:
-        """Set tool calls used."""
-        self._orchestrator.tool_calls_used = value
-
     @property
     def use_semantic_selection(self) -> bool:
         """Get semantic selection flag."""
