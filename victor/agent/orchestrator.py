@@ -1012,6 +1012,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Interaction runtime boundary: lazily materialize chat/tool/session coordinators.
         self._initialize_interaction_runtime()
 
+        # =================================================================
+        # NEW: Sync/Streaming Coordinators for Phase 2 split
+        # These provide separate execution paths for sync and streaming
+        # =================================================================
+        # Initialize new coordinators for sync/streaming split (lazy initialization)
+        self._execution_coordinator: Optional[Any] = None
+        self._sync_chat_coordinator: Optional[Any] = None
+        self._streaming_chat_coordinator: Optional[Any] = None
+        self._unified_chat_coordinator: Optional[Any] = None
+
+        # Protocol adapter for DIP compliance
+        self._protocol_adapter: Optional[Any] = None
+
         # Initialize capability registry for explicit capability discovery
         # This replaces hasattr duck-typing with type-safe protocol conformance
         self.__init_capability_registry__()
@@ -1266,6 +1279,103 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             ContextCompactor instance for proactive context management
         """
         return self._context_compactor
+
+    # =====================================================================
+    # NEW: Phase 1/2 Coordinator Properties
+    # =====================================================================
+
+    @property
+    def protocol_adapter(self) -> Any:
+        """Get the protocol adapter for DIP compliance.
+
+        Returns:
+            OrchestratorProtocolAdapter instance
+        """
+        if self._protocol_adapter is None:
+            from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
+
+            self._protocol_adapter = OrchestratorProtocolAdapter(self)
+        return self._protocol_adapter
+
+    @property
+    def execution_coordinator(self) -> Any:
+        """Get the execution coordinator for agentic loop.
+
+        Returns:
+            ExecutionCoordinator instance for agentic loop execution
+        """
+        if self._execution_coordinator is None:
+            from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+
+            # Execution coordinator depends on protocol adapter
+            self._execution_coordinator = ExecutionCoordinator(
+                chat_context=self.protocol_adapter,
+                tool_context=self.protocol_adapter,
+                provider_context=self.protocol_adapter,
+                execution_provider=self.protocol_adapter,
+            )
+        return self._execution_coordinator
+
+    @property
+    def sync_chat_coordinator(self) -> Any:
+        """Get the sync chat coordinator for non-streaming execution.
+
+        Returns:
+            SyncChatCoordinator instance for optimized non-streaming execution
+        """
+        if self._sync_chat_coordinator is None:
+            from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
+
+            self._sync_chat_coordinator = SyncChatCoordinator(
+                chat_context=self.protocol_adapter,
+                tool_context=self.protocol_adapter,
+                provider_context=self.protocol_adapter,
+                execution_coordinator=self.execution_coordinator,
+                orchestrator=self,
+            )
+        return self._sync_chat_coordinator
+
+    @property
+    def streaming_chat_coordinator(self) -> Any:
+        """Get the streaming chat coordinator for streaming execution.
+
+        Returns:
+            StreamingChatCoordinator instance for optimized streaming execution
+        """
+        if self._streaming_chat_coordinator is None:
+            from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
+
+            self._streaming_chat_coordinator = StreamingChatCoordinator(
+                chat_context=self.protocol_adapter,
+                tool_context=self.protocol_adapter,
+                provider_context=self.protocol_adapter,
+                event_emitter=self.observability,
+            )
+        return self._streaming_chat_coordinator
+
+    @property
+    def unified_chat_coordinator(self) -> Any:
+        """Get the unified chat coordinator facade.
+
+        Returns:
+            UnifiedChatCoordinator instance for sync/streaming execution
+        """
+        if self._unified_chat_coordinator is None:
+            from victor.agent.coordinators.unified_chat_coordinator import (
+                UnifiedChatCoordinator,
+            )
+            from victor.agent.coordinators.protocols import ExecutionMode
+
+            self._unified_chat_coordinator = UnifiedChatCoordinator(
+                sync_coordinator=self.sync_chat_coordinator,
+                streaming_coordinator=self.streaming_chat_coordinator,
+                default_mode=ExecutionMode.SYNC,  # Default to sync for performance
+            )
+        return self._unified_chat_coordinator
+
+    # =====================================================================
+    # End Phase 1/2 Coordinator Properties
+    # =====================================================================
 
     @property
     def tool_output_formatter(self) -> "ToolOutputFormatter":

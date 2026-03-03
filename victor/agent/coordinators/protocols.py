@@ -554,4 +554,195 @@ __all__ = [
     "NoOpCacheProvider",
     "NoOpEventEmitter",
     "DictConfigProvider",
+    # Phase 3: Enhanced protocol-based injection
+    "ExecutionProvider",
+    "ToolExecutor",
+    "MessageStore",
+    "StateManager",
+    "ExecutionMode",
 ]
+
+
+# =============================================================================
+# Phase 3: Enhanced Protocol-Based Injection
+# =============================================================================
+
+
+class ExecutionMode(Enum):
+    """Execution mode for chat operations."""
+
+    SYNC = "sync"
+    STREAMING = "streaming"
+    AUTO = "auto"
+
+
+@runtime_checkable
+class ExecutionProvider(Protocol):
+    """Protocol for execution operations.
+
+    Used by ExecutionCoordinator for executing model turns.
+    This enables coordinators to depend on protocol-based abstractions
+    rather than concrete orchestrator implementations.
+    """
+
+    async def execute_turn(
+        self,
+        messages: List[Any],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[Any]] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Execute a single model turn.
+
+        Args:
+            messages: Conversation history
+            model: Model identifier
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            tools: Optional tool definitions
+            **kwargs: Additional provider-specific parameters
+
+        Returns:
+            CompletionResponse from the model
+        """
+        ...
+
+
+@runtime_checkable
+class ToolExecutor(Protocol):
+    """Protocol for tool execution.
+
+    Used by coordinators for executing tools.
+    This enables loose coupling between coordinators and tool execution logic.
+    """
+
+    async def execute_tool(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute a tool with arguments.
+
+        Args:
+            tool_name: Name of the tool to execute
+            arguments: Tool arguments
+
+        Returns:
+            Dict with tool execution result:
+            - success: bool
+            - result: Any (on success)
+            - error: Optional[str] (on failure)
+        """
+        ...
+
+    async def execute_tool_calls(
+        self,
+        tool_calls: List[Any],
+    ) -> List[Dict[str, Any]]:
+        """Execute multiple tool calls.
+
+        Args:
+            tool_calls: List of tool call objects
+
+        Returns:
+            List of tool execution results
+        """
+        ...
+
+
+@runtime_checkable
+class MessageStore(Protocol):
+    """Protocol for message storage.
+
+    Used by coordinators for conversation history.
+    This enables coordinators to work with any message storage implementation.
+    """
+
+    @property
+    def messages(self) -> List[Any]:
+        """Get current message history."""
+        ...
+
+    def add_message(self, role: str, content: str) -> None:
+        """Add message to history.
+
+        Args:
+            role: Message role (user, assistant, system, tool)
+            content: Message content
+        """
+        ...
+
+    def get_messages(self, limit: Optional[int] = None) -> List[Any]:
+        """Get messages from history.
+
+        Args:
+            limit: Optional limit on number of messages
+
+        Returns:
+            List of messages
+        """
+        ...
+
+    def clear_messages(self) -> None:
+        """Clear message history."""
+        ...
+
+    @property
+    def conversation(self) -> Any:
+        """Get conversation manager."""
+        ...
+
+
+@runtime_checkable
+class StateManager(Protocol):
+    """Protocol for state management.
+
+    Used by coordinators for state tracking.
+    This enables coordinators to work with any state management implementation.
+    """
+
+    def get_state(self, key: str, default: Any = None) -> Any:
+        """Get state value.
+
+        Args:
+            key: State key
+            default: Default value if key not found
+
+        Returns:
+            State value or default
+        """
+        ...
+
+    def set_state(self, key: str, value: Any) -> None:
+        """Set state value.
+
+        Args:
+            key: State key
+            value: State value
+        """
+        ...
+
+    def delete_state(self, key: str) -> bool:
+        """Delete state value.
+
+        Args:
+            key: State key
+
+        Returns:
+            True if key was found and deleted, False otherwise
+        """
+        ...
+
+    def get_all_state(self) -> Dict[str, Any]:
+        """Get all state values.
+
+        Returns:
+            Dictionary of all state key-value pairs
+        """
+        ...
+
+    def clear_state(self) -> None:
+        """Clear all state values."""
+        ...
