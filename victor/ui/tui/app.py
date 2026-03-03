@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from rich.console import Console
+
+logger = logging.getLogger(__name__)
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -735,8 +738,8 @@ class VictorTUI(App):
                 # Call directly without _call_ui since we're in the UI thread
                 try:
                     self._input_widget.focus_input()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to focus input widget: {e}")
 
     async def _process_with_agent(self, message: str) -> None:
         """Process message with the agent."""
@@ -749,8 +752,9 @@ class VictorTUI(App):
             response = await self.agent.chat(message)
             try:
                 self._add_assistant_message(response.content)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to add assistant message: {e}")
+                self._add_error_message("Failed to display response. Please try again.")
 
     async def _stream_response(self, message: str) -> None:
         """Stream response from agent."""
@@ -771,31 +775,31 @@ class VictorTUI(App):
                         if self._conversation_log:
                             try:
                                 self._conversation_log.update_streaming(content_buffer)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning(f"Failed to update streaming content: {e}")
                             # Update jump-to-bottom button visibility during streaming
                             try:
                                 self._update_jump_to_bottom()
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning(f"Failed to update jump button: {e}")
 
                     elif chunk_type == "thinking_start":
                         try:
                             self._show_thinking()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to show thinking panel: {e}")
 
                     elif chunk_type == "thinking":
                         try:
                             self._update_thinking(chunk.content or "")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to update thinking content: {e}")
 
                     elif chunk_type == "thinking_end":
                         try:
                             self._hide_thinking()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to hide thinking panel: {e}")
 
                     elif chunk_type == "tool_start":
                         try:
@@ -803,8 +807,8 @@ class VictorTUI(App):
                                 chunk.tool_name or "unknown",
                                 chunk.arguments or {},
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to show tool call: {e}")
 
                     elif chunk_type == "tool_end":
                         try:
@@ -812,8 +816,8 @@ class VictorTUI(App):
                                 success=chunk.success if hasattr(chunk, "success") else True,
                                 elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to finish tool call: {e}")
 
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
@@ -821,25 +825,25 @@ class VictorTUI(App):
                     if self._conversation_log:
                         try:
                             self._conversation_log.update_streaming(content_buffer)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to update streaming content: {e}")
                         # Update jump-to-bottom button visibility during streaming
                         try:
                             self._update_jump_to_bottom()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to update jump button: {e}")
 
         finally:
             # Finish streaming
             if self._conversation_log:
                 try:
                     self._conversation_log.finish_streaming()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to finish streaming: {e}")
             try:
                 self._hide_thinking()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to hide thinking panel: {e}")
             self._set_status("Idle", "idle")
             if content_buffer.strip():
                 self._record_message("assistant", content_buffer)
@@ -899,8 +903,8 @@ class VictorTUI(App):
             self._tool_widgets.remove(widget)
         try:
             widget.remove()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to remove tool widget: {e}")
         if not self._tool_widgets:
             container = self.query_one("#tool-calls-container")
             container.remove_class("visible")
@@ -914,15 +918,15 @@ class VictorTUI(App):
             widget = self._tool_widgets.pop(0)
             try:
                 widget.remove()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove tool widget during prune: {e}")
         # Hide container if no widgets remain (defensive check)
         if not self._tool_widgets:
             try:
                 container = self.query_one("#tool-calls-container")
                 container.remove_class("visible")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to hide tool calls container: {e}")
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -1219,7 +1223,8 @@ class VictorTUI(App):
             system_prompt = ""
             try:
                 system_prompt = self.agent.conversation.system_prompt
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to get system prompt from agent: {e}")
                 system_prompt = ""
 
             history = MessageHistory(system_prompt=system_prompt)
@@ -1385,8 +1390,8 @@ Slash Commands:
             return
         try:
             self._status_bar.update_status(status, state)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update status bar: {e}")
 
     def _update_jump_to_bottom(self) -> None:
         if not self._jump_button or not self._conversation_log:

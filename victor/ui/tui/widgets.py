@@ -13,10 +13,13 @@ Enhanced widgets include:
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import sqlite3
 import time
 from typing import TYPE_CHECKING, Callable, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from rich.markdown import Markdown
 from rich.syntax import Syntax
@@ -65,8 +68,9 @@ def _get_input_history_from_db(limit: int = 100) -> List[str]:
             # Already in chronological order (oldest first) from ORDER BY timestamp ASC
             messages = [row[0] for row in cursor.fetchall()]
             return messages
-    except Exception:
-        # Silently fail if DB not available
+    except Exception as e:
+        # DB not available - this is expected in some configurations
+        logger.debug(f"Failed to load recent messages from database: {e}")
         return []
 
 
@@ -131,8 +135,8 @@ class StatusBar(Static):
                     " send",
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update idle shortcuts: {e}")
 
     def _update_shortcuts_streaming(self) -> None:
         """Update shortcuts for streaming state."""
@@ -146,8 +150,8 @@ class StatusBar(Static):
                     " toggle details",
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update streaming shortcuts: {e}")
 
     def _update_shortcuts_error(self) -> None:
         """Update shortcuts for error state."""
@@ -161,8 +165,8 @@ class StatusBar(Static):
                     " exit",
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update error shortcuts: {e}")
 
     def update_shortcuts(self, state: str) -> None:
         """Update shortcut hints based on application state.
@@ -343,7 +347,8 @@ class InputWidget(Static):
                 _get_input_history_from_db,
                 limit=InputWidget._max_history,
             )
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to load input history from database: {e}")
             return
 
         if not db_history:
@@ -547,8 +552,8 @@ class ThinkingWidget(Static):
         try:
             content_widget = self.query_one(".thinking-content", Static)
             content_widget.update(content)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update thinking content: {e}")
 
 
 # =============================================================================
@@ -714,8 +719,8 @@ class StreamingMessageBlock(Static):
         try:
             cursor = self.query_one("#cursor")
             cursor.display = streaming
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update streaming cursor: {e}")
 
     def _update_display(self) -> None:
         """Update the message body with current content."""
@@ -726,8 +731,8 @@ class StreamingMessageBlock(Static):
                 body.update(Markdown(self.content))
             else:
                 body.update(self.content)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update message display: {e}")
 
     def append_chunk(self, chunk: str) -> None:
         """Append a streaming chunk to the content."""
@@ -869,24 +874,24 @@ class ToolProgressPanel(Static):
             icon.update(symbol)
             icon.remove_class("pending", "running", "success", "error")
             icon.add_class(css_class)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update tool status icon: {e}")
 
     def watch_elapsed(self, elapsed: float) -> None:
         """Update elapsed time display."""
         try:
             elapsed_label = self.query_one("#elapsed")
             elapsed_label.update(f"{elapsed:.1f}s")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update elapsed time: {e}")
 
     def watch_progress(self, progress: float) -> None:
         """Update progress bar."""
         try:
             bar = self.query_one("#progress-bar", ProgressBar)
             bar.update(progress=progress)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update progress bar: {e}")
 
     def update_output_preview(self, text: str) -> None:
         """Update the output preview text."""
@@ -894,8 +899,8 @@ class ToolProgressPanel(Static):
         try:
             output = self.query_one("#output")
             output.update(self._output_preview)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to update output preview: {e}")
 
     def set_running(self) -> None:
         """Mark tool as running."""
@@ -1108,5 +1113,6 @@ class EnhancedConversationLog(VerticalScroll):
     def _is_at_bottom(self) -> bool:
         try:
             return self.scroll_y >= self.max_scroll_y - 1
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to determine scroll position, assuming at bottom: {e}")
             return True
