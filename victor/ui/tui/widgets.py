@@ -1246,8 +1246,11 @@ class EnhancedConversationLog(VerticalScroll):
 
     def on_update_scroll(self, _event: UpdateScroll) -> None:
         """Update auto-scroll whenever this scroll view moves."""
-        if time.monotonic() < self._ignore_scroll_update_until:
-            return
+        if time.monotonic() < self._ignore_scroll_update_until and self._auto_scroll:
+            # Ignore transient programmatic follow-scroll events while still at bottom.
+            # If user has already scrolled away from bottom, process immediately.
+            if self._is_at_bottom():
+                return
         self.update_auto_scroll_state()
 
     def scroll_to_bottom(self, animate: bool = False) -> None:

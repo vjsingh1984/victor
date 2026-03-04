@@ -145,14 +145,33 @@ def test_update_scroll_ignores_programmatic_guard_window() -> None:
     log = EnhancedConversationLog()
     event = UpdateScroll()
     log._ignore_scroll_update_until = 10.0
+    log._auto_scroll = True
 
     with (
         patch("victor.ui.tui.widgets.time.monotonic", return_value=9.95),
+        patch.object(log, "_is_at_bottom", return_value=True),
         patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
     ):
         log.on_update_scroll(event)
 
     update_auto_scroll_state.assert_not_called()
+
+
+def test_update_scroll_processes_during_guard_when_user_scrolled_away() -> None:
+    """Manual scroll-away should bypass guard and disable follow immediately."""
+    log = EnhancedConversationLog()
+    event = UpdateScroll()
+    log._ignore_scroll_update_until = 10.0
+    log._auto_scroll = True
+
+    with (
+        patch("victor.ui.tui.widgets.time.monotonic", return_value=9.95),
+        patch.object(log, "_is_at_bottom", return_value=False),
+        patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
+    ):
+        log.on_update_scroll(event)
+
+    update_auto_scroll_state.assert_called_once()
 
 
 def test_update_scroll_processes_after_programmatic_guard_window() -> None:
