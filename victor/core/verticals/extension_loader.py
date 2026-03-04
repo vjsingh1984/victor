@@ -129,6 +129,9 @@ class VerticalExtensionLoader(ABC):
     #               "tiered_tools"
     required_extensions: ClassVar[Set[str]] = set()
 
+    # LSP capability for language intelligence
+    _lsp_capability: ClassVar[Optional[Any]] = None
+
     # Extension cache (shared across all verticals)
     _extensions_cache: Dict[str, Any] = {}
     _extensions_cache_lock: ClassVar[threading.RLock] = threading.RLock()
@@ -170,6 +173,27 @@ class VerticalExtensionLoader(ABC):
     def _cache_namespace(cls) -> str:
         """Return namespaced cache prefix for this vertical class."""
         return f"{cls.__name__}:{cls.__module__}:{cls.__qualname__}"
+
+    @classmethod
+    def get_lsp(cls) -> Optional[Any]:
+        """Get the LSP capability for this vertical.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return cls._lsp_capability
+
+    @classmethod
+    def set_lsp(cls, lsp_capability: Any) -> None:
+        """Set the LSP capability for this vertical.
+
+        Enables language intelligence features for extension loading
+        and code-related operations.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        cls._lsp_capability = lsp_capability
 
     @classmethod
     def _get_shared_extension_executor(cls) -> concurrent.futures.ThreadPoolExecutor:

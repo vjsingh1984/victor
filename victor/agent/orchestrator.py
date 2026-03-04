@@ -1772,6 +1772,26 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._vertical_context
 
     @property
+    def lsp(self) -> Optional[Any]:
+        """Get the LSP capability for code intelligence.
+
+        Returns:
+            LSPCapability instance or None if not configured.
+        """
+        return getattr(self, "_lsp", None)
+
+    def set_lsp(self, lsp_capability: Any) -> None:
+        """Set the LSP capability (LSPServiceProtocol/LSPPoolProtocol).
+
+        This enables framework-level language intelligence for all verticals.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        self._lsp = lsp_capability
+        logger.debug("LSP capability registered with orchestrator")
+
+    @property
     def coordination(self) -> Any:
         """Get the mode-workflow-team coordinator (lazy initialization).
 

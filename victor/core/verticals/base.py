@@ -512,6 +512,29 @@ class VerticalBase(
             # Clear extensions cache for this class too
             cls.clear_extension_cache(clear_all=False)
 
+    # Class-level LSP capability storage
+    _lsp_capability: ClassVar[Optional[Any]] = None
+
+    @classmethod
+    def get_lsp(cls) -> Optional[Any]:
+        """Get the LSP capability for this vertical.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return cls._lsp_capability
+
+    @classmethod
+    def set_lsp(cls, lsp_capability: Any) -> None:
+        """Set the LSP capability for this vertical.
+
+        Enables language intelligence features for this vertical.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        cls._lsp_capability = lsp_capability
+
     @classmethod
     def get_tool_set(cls) -> ToolSet:
         """Get the ToolSet for this vertical.

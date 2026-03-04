@@ -181,6 +181,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         self._message_history: List[AgentMessage] = []
         self._shared_context: Dict[str, Any] = {}
 
+        # LSP capability for language intelligence
+        self._lsp: Optional[Any] = None
+
         # Formation strategies (composition over inheritance)
         self._formations: Dict[TeamFormation, BaseFormationStrategy] = {
             TeamFormation.SEQUENTIAL: SequentialFormation(),
@@ -389,6 +392,26 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     def shared_memory(self) -> Dict[str, Any]:
         """Get shared memory context."""
         return self._shared_context
+
+    @property
+    def lsp(self) -> Optional[Any]:
+        """Get the LSP capability for code intelligence in team coordination.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return self._lsp
+
+    def set_lsp(self, lsp_capability: Any) -> None:
+        """Set the LSP capability for team coordination.
+
+        Enables language intelligence features for code-related team
+        operations and member coordination.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        self._lsp = lsp_capability
 
     # =========================================================================
     # Formation Executors

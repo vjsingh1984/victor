@@ -186,6 +186,7 @@ class TeamMessageBus:
         self._subscribers: Dict[MessageType, List[Callable[[AgentMessage], None]]] = {}
         self._lock = RLock()
         self._registered_agents: Set[str] = set()
+        self._lsp: Optional[Any] = None  # Language Server Protocol capability
 
         logger.debug(f"Created message bus for team: {team_id}")
 
@@ -213,6 +214,27 @@ class TeamMessageBus:
             self._registered_agents.discard(agent_id)
             self._queues.pop(agent_id, None)
             logger.debug(f"Unregistered agent '{agent_id}' from bus '{self.team_id}'")
+
+    @property
+    def lsp(self) -> Optional[Any]:
+        """Get the LSP capability for code intelligence in team communication.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return self._lsp
+
+    def set_lsp(self, lsp_capability: Any) -> None:
+        """Set the LSP capability for team communication.
+
+        Enables language intelligence features for code-related messages
+        exchanged between team members.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        self._lsp = lsp_capability
+        logger.debug(f"LSP capability registered for team '{self.team_id}'")
 
     async def send(self, message: AgentMessage) -> None:
         """Send a message to specific agent or broadcast to all.

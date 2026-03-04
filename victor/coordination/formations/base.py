@@ -73,11 +73,13 @@ class TeamContext:
         formation: str,
         shared_state: Optional[Dict[str, Any]] = None,
         state_manager: Optional[Any] = None,
+        lsp_capability: Optional[Any] = None,
         **metadata: Any,
     ):
         self.team_id = team_id
         self.formation = formation
         self.shared_state = shared_state or {}
+        self._lsp = lsp_capability  # Language Server Protocol capability
         self.metadata = metadata
         self._state_manager = state_manager
 
@@ -156,6 +158,26 @@ class TeamContext:
                 pass
 
         self.shared_state.update(updates)
+
+    @property
+    def lsp(self) -> Optional[Any]:
+        """Get the LSP capability for code intelligence in team context.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return self._lsp
+
+    def set_lsp(self, lsp_capability: Any) -> None:
+        """Set the LSP capability for team context.
+
+        Enables language intelligence features for team coordination
+        and code-related operations.
+
+        Args:
+            lsp_capability: LSPCapability instance
+        """
+        self._lsp = lsp_capability
 
 
 class BaseFormationStrategy(ABC):
