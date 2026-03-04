@@ -770,6 +770,7 @@ class VictorTUI(App):
         self._jump_button = self.query_one("#jump-to-bottom", Button)
         self._side_panel = self.query_one("#side-panel", Vertical)
         self._update_side_panel_state()
+        self._setup_tool_event_subscription()
 
         # Initialize slash command handler with TUI console adapter
         if self.settings:
@@ -795,7 +796,6 @@ class VictorTUI(App):
 
         # Focus input
         self._input_widget.focus_input()
-        self._setup_tool_event_subscription()
 
     def on_unmount(self) -> None:
         """Ensure background tasks are cleaned up."""
