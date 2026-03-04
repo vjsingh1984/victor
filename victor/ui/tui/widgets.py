@@ -24,7 +24,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from victor.ui.rendering.markdown import render_markdown_with_hooks
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual import events
 from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
@@ -48,6 +48,158 @@ class ToolPreviewData:
     content: Optional[str] = None
     diff: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class ToolPreviewBlock(Static):
+    """Collapsible tool preview block for transcript display."""
+
+    DEFAULT_CSS = """
+    ToolPreviewBlock {
+        border: round $border-muted;
+        background: $panel;
+        padding: 0 1;
+        margin: 0 0 1 0;
+    }
+
+    ToolPreviewBlock.collapsed #preview-body {
+        display: none;
+    }
+
+    ToolPreviewBlock .preview-header {
+        text-style: bold;
+        color: $primary;
+    }
+
+    ToolPreviewBlock .preview-meta {
+        color: $text-muted;
+    }
+    """
+
+    BINDINGS = [("enter", "toggle", "Toggle preview")]
+
+    def __init__(self, preview: ToolPreviewData, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.preview = preview
+        self._collapsed = True
+        self._body_widget: Optional[Static] = None
+
+    def compose(self) -> ComposeResult:
+        header_text = f"{self.preview.tool_name} · {self.preview.preview_type.title()}"
+        if self.preview.path:
+            header_text += f" · {self.preview.path}"
+        yield Label(header_text, classes="preview-header")
+        if self.preview.metadata:
+            meta_parts = [
+                f"{key}: {value}"
+                for key, value in self.preview.metadata.items()
+                if value is not None
+            ]
+            if meta_parts:
+                yield Label(" · ".join(meta_parts), classes="preview-meta")
+        yield Label("Press Enter or click to expand/collapse", classes="preview-meta")
+        yield Static("", id="preview-body")
+
+    def on_mount(self) -> None:
+        self._body_widget = self.query_one("#preview-body", Static)
+        self._render_body()
+
+    def _render_body(self) -> None:
+        if not self._body_widget:
+            return
+        if self._collapsed:
+            text = self.preview.snippet or "(preview hidden)"
+        else:
+            if self.preview.preview_type == "diff" and self.preview.diff:
+                self._body_widget.update(
+                    Syntax(self.preview.diff, "diff", theme="monokai", word_wrap=True)
+                )
+                return
+            text = self.preview.content or self.preview.snippet or "(no content)"
+        self._body_widget.update(text)
+
+    def action_toggle(self) -> None:
+        self._collapsed = not self._collapsed
+        if self._collapsed:
+            self.add_class("collapsed")
+        else:
+            self.remove_class("collapsed")
+        self._render_body()
+
+    def on_click(self) -> None:
+        self.action_toggle()
+
+
+class ConversationTurn(Vertical):
+    """Container representing a user/assistant exchange."""
+
+    DEFAULT_CSS = """
+    ConversationTurn {
+        padding: 0 0 1 0;
+        margin: 0;
+    }
+
+    ConversationTurn .turn-user {
+        color: $primary;
+        margin-bottom: 0;
+    }
+
+    ConversationTurn .turn-assistant {
+        margin-top: 0;
+    }
+
+    ConversationTurn .turn-tools {
+        margin-top: 0;
+    }
+    """
+
+    def __init__(self, turn_id: str):
+        super().__init__(id=turn_id, classes="conversation-turn")
+        self._assistant_block: Optional[StreamingMessageBlock] = None
+        self._tool_container: Optional[Vertical] = None
+
+    def compose(self) -> ComposeResult:
+        yield Label("", classes="turn-user", id="turn-user")
+        yield Container(id="assistant-area")
+        yield Vertical(id="turn-tools", classes="turn-tools")
+
+    def set_user_message(self, content: Optional[str]) -> None:
+        label = self.query_one("#turn-user", Label)
+        if content:
+            label.update(
+                Text.assemble(
+                    ("You: ", "bold #64b5f6"),
+                    (content, ""),
+                )
+            )
+            label.display = True
+        else:
+            label.display = False
+
+    def ensure_assistant_block(self) -> StreamingMessageBlock:
+        if self._assistant_block is None:
+            self._assistant_block = StreamingMessageBlock(role="assistant", initial_content="")
+            self._assistant_block.add_class("turn-assistant")
+            container = self.query_one("#assistant-area", Container)
+            container.mount(self._assistant_block)
+        return self._assistant_block
+
+    def start_assistant_stream(self) -> StreamingMessageBlock:
+        block = self.ensure_assistant_block()
+        block.is_streaming = True
+        block._update_display()
+        return block
+
+    def set_assistant_message(self, content: str) -> None:
+        block = self.ensure_assistant_block()
+        block.is_streaming = False
+        block.content = content
+        block._update_display()
+
+    def add_tool_preview(self, preview: ToolPreviewData) -> None:
+        if self._tool_container is None:
+            self._tool_container = self.query_one("#turn-tools", Vertical)
+        block = ToolPreviewBlock(preview=preview)
+        self._tool_container.mount(block)
 
 
 def _get_input_history_from_db(limit: int = 100) -> List[str]:
@@ -1103,6 +1255,8 @@ class EnhancedConversationLog(VerticalScroll):
         self._show_unread_separator = show_unread_separator
         self._unread_separator: Optional[Static] = None
         self._unread_boundary_id: Optional[str] = None
+        self._turn_count = 0
+        self._current_turn: Optional[ConversationTurn] = None
 
     @property
     def auto_scroll_enabled(self) -> bool:
@@ -1165,13 +1319,8 @@ class EnhancedConversationLog(VerticalScroll):
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
-        msg = StreamingMessageBlock(
-            role="user",
-            initial_content=content,
-            id=f"msg-{self._message_count}",
-        )
-        self._message_count += 1
-        self.mount(msg)
+        self._mark_unread_boundary()
+        turn = self._begin_new_turn(content)
         if self._sticky_follow_paused:
             self._auto_scroll = False
             return
@@ -1185,13 +1334,8 @@ class EnhancedConversationLog(VerticalScroll):
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
         self._mark_unread_boundary()
-        msg = StreamingMessageBlock(
-            role="assistant",
-            initial_content=content,
-            id=f"msg-{self._message_count}",
-        )
-        self._message_count += 1
-        self.mount(msg)
+        turn = self._current_turn or self._begin_new_turn(None)
+        turn.set_assistant_message(content)
         # Auto-scroll to show assistant response
         self._maybe_scroll_end(mark_unread=True, force=True)
 
@@ -1220,23 +1364,31 @@ class EnhancedConversationLog(VerticalScroll):
 
     def add_tool_preview(self, preview: ToolPreviewData) -> None:
         """Add a tool preview block to the log."""
+        target = self._current_turn
+        if target:
+            target.add_tool_preview(preview)
+            self._maybe_scroll_end(mark_unread=True, force=True)
+            return
         self._mark_unread_boundary()
-        block = ToolPreviewBlock(preview=preview, id=f"msg-{self._message_count}")
+        block = ToolPreviewBlock(preview=preview)
         self._message_count += 1
         self.mount(block)
         self._maybe_scroll_end(mark_unread=True, force=True)
 
+    def _begin_new_turn(self, user_content: Optional[str]) -> ConversationTurn:
+        turn = ConversationTurn(turn_id=f"turn-{self._turn_count}")
+        self._turn_count += 1
+        self._message_count += 1
+        self.mount(turn)
+        turn.set_user_message(user_content)
+        self._current_turn = turn
+        return turn
+
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
         self._mark_unread_boundary()
-        self._streaming_message = StreamingMessageBlock(
-            role="assistant",
-            initial_content="",
-            id=f"msg-{self._message_count}",
-        )
-        self._streaming_message.is_streaming = True
-        self._message_count += 1
-        self.mount(self._streaming_message)
+        turn = self._current_turn or self._begin_new_turn(None)
+        self._streaming_message = turn.start_assistant_stream()
         self._maybe_scroll_end(mark_unread=True, force=True)
         return self._streaming_message
 
