@@ -72,15 +72,13 @@ class TestProtocolImplementation:
                 from victor.providers.base import CompletionResponse
                 return CompletionResponse(
                     content=f"Response to: {user_message}",
-                    finish_reason="stop",
+                    stop_reason="stop",
                     usage={"prompt_tokens": 10, "completion_tokens": 20},
                 )
 
             async def stream_chat(self, user_message: str, **kwargs):
-                async def chunks():
-                    from victor.providers.base import StreamChunk
-                    yield StreamChunk(content=f"Chunk for: {user_message}")
-                return chunks()
+                from victor.providers.base import StreamChunk
+                yield StreamChunk(content=f"Chunk for: {user_message}")
 
             def reset_conversation(self) -> None:
                 self.reset_count += 1

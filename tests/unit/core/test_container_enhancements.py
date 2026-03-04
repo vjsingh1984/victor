@@ -19,6 +19,7 @@ added in Phase 1 of the SOLID refactoring.
 """
 
 import pytest
+from typing import Protocol, runtime_checkable
 
 from victor.core.container import (
     ServiceContainer,
@@ -405,19 +406,27 @@ class TestDecoratorAndHealthChecksIntegration:
             def is_healthy(self) -> bool:
                 return True
 
-        @container.service(IHealthyService, ServiceLifetime.SINGLETON)
-        class Service3(IHealthyService):
+        # Create a different service type for Service3
+        @runtime_checkable
+        class IUnhealthyService(Protocol):
+            def is_healthy(self) -> bool:
+                ...
+
+        @container.service(IUnhealthyService, ServiceLifetime.SINGLETON)
+        class Service3(IUnhealthyService):
             def is_healthy(self) -> bool:
                 return False
 
-        # Note: Service2 will be replaced by Service3
         health_status = container.check_all_health()
 
         # Service1 has no health check method -> healthy
         assert health_status.get(ITestService) is True
 
+        # Service2 is healthy
+        assert health_status.get(IHealthyService) is True
+
         # Service3 is unhealthy
-        assert health_status.get(IHealthyService) is False
+        assert health_status.get(IUnhealthyService) is False
 
     def test_decorator_with_lifetime_and_health(self):
         """Test different lifetimes with health checks."""
