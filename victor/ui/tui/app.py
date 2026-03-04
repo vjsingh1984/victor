@@ -264,7 +264,6 @@ class VictorTUI(App):
         height: 1fr;
         min-height: 0;
         layout: horizontal;
-        gap: 1;
         padding: 0 0 1 0;
     }
 
