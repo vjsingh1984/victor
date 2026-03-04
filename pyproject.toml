@@ -562,6 +562,10 @@ files = ["victor"]
 module = [
     "victor.config.*",
     "victor.storage.cache.*",
+    "victor.telemetry.*",
+    "victor.analytics.*",
+    "victor.profiler.*",
+    "victor.debug.*",
 ]
 disallow_untyped_defs = true
 warn_return_any = true
