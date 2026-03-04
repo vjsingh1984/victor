@@ -411,7 +411,11 @@ def _has_doc_comment_before(
     Returns:
         True if a doc comment was found immediately before the symbol.
     """
-    from victor_coding.languages.base import DocCommentPattern  # noqa: F811
+    try:
+        from victor_coding.languages.base import DocCommentPattern  # noqa: F811
+    except ImportError:
+        # victor-coding not available - can't check non-Python doc comments
+        return False
 
     idx = symbol_line - 2  # Convert to 0-index, then go one line above
     if idx < 0:
@@ -942,13 +946,24 @@ async def docs_coverage(
 
     # Lazy-init tree-sitter extractor only if non-Python files are present
     _extractor = None
+    _extractor_error = None
 
     def _get_extractor():
-        nonlocal _extractor
-        if _extractor is None:
-            from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+        nonlocal _extractor, _extractor_error
+        if _extractor is None and _extractor_error is None:
+            try:
+                from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+                _extractor = TreeSitterExtractor()
+            except ImportError:
+                _extractor_error = "victor-coding package not available. Install with: pip install victor-coding"
+                logger.debug(_extractor_error)
+            except Exception as e:
+                _extractor_error = f"Failed to initialize TreeSitterExtractor: {e}"
+                logger.warning(_extractor_error)
 
-            _extractor = TreeSitterExtractor()
+        if _extractor_error:
+            # Re-raise with informative message
+            raise ImportError(_extractor_error)
         return _extractor
 
     for file_obj in files_to_analyze:
@@ -1015,15 +1030,25 @@ async def docs_coverage(
         if doc_pattern is None:
             continue
 
-        extractor = _get_extractor()
-        (
-            f_total,
-            f_documented,
-            c_total,
-            c_documented,
-            f_missing,
-            f_quality,
-        ) = _analyze_non_python_file(file_obj, extractor, language, doc_pattern, check_quality)
+        try:
+            extractor = _get_extractor()
+        except ImportError as e:
+            # victor-coding not available - skip non-Python files
+            logger.debug(f"Skipping non-Python file: {e}")
+            continue
+
+        try:
+            (
+                f_total,
+                f_documented,
+                c_total,
+                c_documented,
+                f_missing,
+                f_quality,
+            ) = _analyze_non_python_file(file_obj, extractor, language, doc_pattern, check_quality)
+        except Exception as e:
+            logger.warning(f"Error analyzing {file_obj}: {e}")
+            continue
         total_functions += f_total
         documented_functions += f_documented
         total_classes += c_total
