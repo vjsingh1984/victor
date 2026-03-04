@@ -125,6 +125,18 @@ class EditOperation:
     end_line: Optional[int] = None
     allow_multiple: bool = False
 
+    def __post_init__(self) -> None:
+        """Validate edit operation parameters."""
+        if not self.old_str:
+            raise ValueError("old_str cannot be empty")
+
+        if self.start_line is not None and self.start_line < 0:
+            raise ValueError("start_line must be >= 0")
+
+        if self.end_line is not None and self.start_line is not None:
+            if self.end_line < self.start_line:
+                raise ValueError("start_line must be <= end_line")
+
 
 @dataclass
 class EditResult:
@@ -173,6 +185,11 @@ class EditValidationResult:
     match_count: int = 0
     error: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
+
+    @property
+    def is_safe_to_apply(self) -> bool:
+        """Whether the edit is safe to apply (valid and single match)."""
+        return self.valid and (self.match_count == 1 or self.match_count == 0)
 
 
 # =============================================================================

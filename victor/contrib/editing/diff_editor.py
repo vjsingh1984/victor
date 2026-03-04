@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, List
 
 from victor.framework.vertical_protocols import (
     EditOperation,
@@ -141,6 +141,8 @@ class DiffEditor(EditorProtocol):
         edits_applied = 0
         edits_failed = 0
 
+        errors: List[str] = []
+
         for edit in edits:
             try:
                 # Validate edit
@@ -149,10 +151,12 @@ class DiffEditor(EditorProtocol):
                     edit.old_str,
                     edit.new_str,
                     content=content,
+                    allow_multiple=edit.allow_multiple,
                 )
 
                 if not validation.valid:
                     edits_failed += 1
+                    errors.append(validation.error or "Unknown validation error")
                     logger.warning(f"Edit validation failed: {validation.error}")
                     continue
 
@@ -167,16 +171,28 @@ class DiffEditor(EditorProtocol):
 
             except Exception as e:
                 edits_failed += 1
+                errors.append(str(e))
                 logger.error(f"Error applying edit: {e}")
 
         # Write or preview result
         if preview:
             return EditResult(
-                success=True,
+                success=edits_failed == 0,
                 file_path=file_path,
                 edits_applied=edits_applied,
                 edits_failed=edits_failed,
                 preview=content,
+                error="; ".join(errors) if errors else None,
+            )
+
+        # Only write if all edits succeeded (or at least one succeeded)
+        if edits_applied == 0 and errors:
+            return EditResult(
+                success=False,
+                file_path=file_path,
+                edits_applied=0,
+                edits_failed=edits_failed,
+                error="; ".join(errors),
             )
 
         try:
@@ -197,10 +213,11 @@ class DiffEditor(EditorProtocol):
             )
 
         return EditResult(
-            success=True,
+            success=edits_failed == 0,
             file_path=file_path,
             edits_applied=edits_applied,
             edits_failed=edits_failed,
+            error="; ".join(errors) if errors else None,
         )
 
     async def validate_edit(
@@ -213,6 +230,7 @@ class DiffEditor(EditorProtocol):
     ) -> EditValidationResult:
         """Validate an edit operation."""
         from pathlib import Path
+        import re
 
         # Read content if not provided
         if content is None:
@@ -226,17 +244,24 @@ class DiffEditor(EditorProtocol):
                     error=f"Cannot read file: {e}",
                 )
 
-        # Check if old_str exists
-        if old_str not in content:
+        # Check if old_str exists (respect case sensitivity)
+        if self._case_sensitive:
+            old_str_found = old_str in content
+            match_count = content.count(old_str)
+        else:
+            # Case-insensitive check
+            pattern = re.compile(re.escape(old_str), re.IGNORECASE)
+            matches = pattern.findall(content)
+            old_str_found = len(matches) > 0
+            match_count = len(matches)
+
+        if not old_str_found:
             return EditValidationResult(
                 valid=False,
                 file_path=file_path,
                 old_str_found=False,
                 error=f"String not found in file: {old_str[:50]}...",
             )
-
-        # Count occurrences
-        match_count = content.count(old_str)
 
         # Check for multiple occurrences
         allow_multiple = kwargs.get("allow_multiple", False)

@@ -399,6 +399,9 @@ victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 victor-examples = "examples.playground.cli:app"
 
+[project.entry-points."victor.api_routers"]
+coding = "victor.integrations.api.coding_router_provider:get_fastapi_router_provider"
+
 # =============================================================================
 # External Vertical Registration (for third-party packages)
 # =============================================================================

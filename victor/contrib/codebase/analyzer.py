@@ -114,7 +114,7 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
     # Patterns for Python extraction
     CLASS_PATTERN = re.compile(r"^class\s+(\w+)(?:\(([^)]+)\))?:")
     FUNCTION_PATTERN = re.compile(r"^(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)")
-    IMPORT_PATTERN = re.compile(r"^(?:from\s+(\S+)\s+)?import\s+(\S+)")
+    IMPORT_PATTERN = re.compile(r"^(?:from\s+([^\s]+)\s+)?import\s+(\S+)")
     DECORATOR_PATTERN = re.compile(r"^@\s*(\w+)")
 
     def __init__(self) -> None:
@@ -146,18 +146,20 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
         all_dependencies: dict[str, List[str]] = {}
 
         # Find all matching files
+        included_files: set[str] = set()
         for pattern in include_patterns:
             matches = glob.glob(str(root_path / pattern), recursive=True)
-            for match in matches:
-                # Skip excluded patterns
-                if exclude_patterns:
-                    if any(
-                        glob.fnmatch.fnmatch(match, str(root_path / excl))
-                        for excl in exclude_patterns
-                    ):
-                        continue
+            included_files.update(matches)
 
-                files.append(match)
+        # Remove excluded files
+        if exclude_patterns:
+            excluded_files: set[str] = set()
+            for pattern in exclude_patterns:
+                matches = glob.glob(str(root_path / pattern), recursive=True)
+                excluded_files.update(matches)
+            included_files -= excluded_files
+
+        files = sorted(list(included_files))
 
         # Analyze each file
         for file_path_str in files:
@@ -345,14 +347,29 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
             # Check for import
             import_match = self.IMPORT_PATTERN.match(line)
             if import_match:
-                module = import_match.group(1) or ""
-                names = import_match.group(2).split(",")
+                from_module = import_match.group(1)  # None for "import os", "pathlib" for "from pathlib import..."
+                import_names = import_match.group(2).split(",")
+
+                # For "import os": module="os", names=[]
+                # For "from pathlib import Path": module="pathlib", names=["Path"]
+                if from_module:
+                    # "from X import Y" style
+                    module = from_module
+                    names = [n.strip() for n in import_names]
+                    is_from = True
+                else:
+                    # "import X" style - the first name is the module
+                    first_name = import_names[0].strip() if import_names else ""
+                    module = first_name
+                    names = [n.strip() for n in import_names[1:]] if len(import_names) > 1 else []
+                    is_from = False
+
                 imports.append(
                     ImportInfo(
                         module=module,
-                        names=[n.strip() for n in names],
+                        names=names,
                         line_number=line_num,
-                        is_from_import=bool(import_match.group(1)),
+                        is_from_import=is_from,
                     )
                 )
                 continue

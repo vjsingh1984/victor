@@ -1,13 +1,35 @@
 # Vertical Dependency Resolution Architecture
 
-**Status**: Draft
+**Status**: Implemented
 **Version**: 1.0.0
 **Created**: 2026-03-03
+**Updated**: 2026-03-04
 **Author**: Vijaykumar Singh <singhvjd@gmail.com>
 
 ## Executive Summary
 
-This document addresses architectural issues caused by moving verticals to external packages (`victor-coding`, `victor-rag`, etc.). It provides design principles and a migration path to eliminate framework dependencies on external verticals while maintaining clean separation of concerns.
+This document addresses architectural issues caused by moving verticals to external packages (`victor-coding`, `victor-rag`, etc.). It provides design principles and a migration path to eliminate framework dependencies on external verticals while maintaining clean separation of concerns through protocol-based architecture and contrib packages.
+
+## Key Architectural Principle: LSP (Language Server Protocol) Integration
+
+The LSP integration demonstrates the core architectural pattern:
+
+1. **Framework Protocol** (`victor.framework.vertical_protocols.LanguageServerProtocol`):
+   - Defines the interface without any implementation
+   - Zero dependencies on external packages
+   - Provides stub types for LSP operations
+
+2. **Contrib Package** (`victor.contrib.lsp.BasicLSPClient`):
+   - Provides a default stub implementation
+   - Returns empty results when no LSP server is available
+   - Enables graceful degradation without errors
+
+3. **Vertical Enhancement** (`victor-coding`):
+   - Provides full LSP implementation via **Liskov Substitution Principle**
+   - Can completely replace `BasicLSPClient` with advanced features
+   - No framework code changes required
+
+**This eliminates circular dependencies** - the framework never imports `victor-coding`, only protocols and contrib.
 
 ---
 

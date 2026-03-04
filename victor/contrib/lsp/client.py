@@ -191,11 +191,17 @@ class BasicLSPClient(LanguageServerProtocol):
 
     def get_server_info(self) -> dict[str, Any]:
         """Get server metadata."""
+        note = "Full LSP requires victor-coding package. Install with: pip install victor-coding"
         return {
             "name": "BasicLSPClient",
             "version": "1.0.0",
-            "capabilities": ["stub_only"],
-            "note": "Full LSP requires victor-coding package",
+            "capabilities": {
+                "stub_only": True,
+            },
+            "info": {
+                "note": note,
+            },
+            "note": note,
         }
 
 
