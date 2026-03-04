@@ -820,6 +820,21 @@ class VictorTUI(App):
             task.cancel()
         self._background_tasks.clear()
 
+    def _update_side_panel_state(self) -> None:
+        """Collapse side panel when no thinking/tool widgets are visible."""
+        if not self._side_panel:
+            return
+        try:
+            thinking = self.query_one("#thinking-container")
+            tools = self.query_one("#tool-calls-container")
+        except Exception:
+            return
+        is_visible = thinking.has_class("visible") or tools.has_class("visible")
+        if is_visible:
+            self._side_panel.remove_class("collapsed")
+        else:
+            self._side_panel.add_class("collapsed")
+
     def _setup_tool_event_subscription(self) -> None:
         """Subscribe to observability tool events for inline previews."""
         try:
@@ -1821,18 +1836,4 @@ async def run_tui(
         await app.run_async()
     finally:
         # Clean up environment variable
-        os.environ.pop("VICTOR_TUI_MODE", None)
-    def _update_side_panel_state(self) -> None:
-        """Collapse side panel when no thinking/tool widgets are visible."""
-        if not self._side_panel:
-            return
-        try:
-            thinking = self.query_one("#thinking-container")
-            tools = self.query_one("#tool-calls-container")
-        except Exception:
-            return
-        is_visible = thinking.has_class("visible") or tools.has_class("visible")
-        if is_visible:
-            self._side_panel.remove_class("collapsed")
-        else:
-            self._side_panel.add_class("collapsed")
+            os.environ.pop("VICTOR_TUI_MODE", None)
