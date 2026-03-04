@@ -773,7 +773,7 @@ def _create_tool_class(
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
                 sig = inspect.signature(self._fn)
-                if "_exec_ctx" in sig.parameters:
+                if "_exec_ctx" in sig.parameters and "_exec_ctx" not in kwargs:
                     kwargs["_exec_ctx"] = _exec_ctx
 
                 if inspect.iscoroutinefunction(self._fn):
