@@ -258,3 +258,93 @@ class SharedToolRegistry:
 5. Plugin tools supported
 6. Deprecation handling for legacy tools
 7. Migration path documented
+
+---
+
+## Migration Guide
+
+### For Existing Code
+
+#### No Changes Required (Adapters)
+
+Existing code using SharedToolRegistry or ToolRegistry continues to work
+without changes. The adapters handle the migration automatically.
+
+```python
+# This continues to work without changes
+from victor.agent.shared_tool_registry import SharedToolRegistry
+
+registry = SharedToolRegistry.get_instance()
+tools = registry.get_tool_classes()
+```
+
+#### Opt-In Migration (Recommended)
+
+To explicitly use the unified registry:
+
+```python
+from victor.tools.unified import UnifiedToolRegistry
+
+# Get the singleton
+registry = UnifiedToolRegistry.get_instance()
+
+# Discover tools
+await registry.discover()
+
+# Register custom tool
+await registry.register(my_tool)
+
+# Select tools
+tool_names = await registry.select_tools(
+    "Read and edit Python files",
+    max_tools=5,
+)
+```
+
+### For New Code
+
+Use UnifiedToolRegistry directly:
+
+```python
+from victor.tools.unified import UnifiedToolRegistry
+
+async def setup_tools():
+    registry = UnifiedToolRegistry.get_instance()
+
+    # Discover built-in tools
+    await registry.discover()
+
+    # Register custom tools
+    for tool in get_custom_tools():
+        await registry.register(tool)
+
+    return registry
+```
+
+### Testing with Unified Registry
+
+```python
+import pytest
+from victor.tools.unified import UnifiedToolRegistry
+
+@pytest.fixture(autouse=True)
+def reset_registry():
+    """Reset registry between tests."""
+    UnifiedToolRegistry.reset_instance()
+    yield
+    UnifiedToolRegistry.reset_instance()
+
+async def test_tool_selection():
+    registry = UnifiedToolRegistry.get_instance()
+    await registry.discover()
+
+    tools = await registry.select_tools("Read files", max_tools=3)
+    assert len(tools) > 0
+```
+
+### Timeline
+
+- **Phase 1** (Complete): Core implementation + adapters
+- **Phase 2** (Next): Update AgentOrchestrator to use unified registry
+- **Phase 3**: Update coordinators and verticals
+- **Phase 4**: Deprecate old registries

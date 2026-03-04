@@ -54,8 +54,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.framework.tools import ToolCategory
 from victor.tools.base import BaseTool, CostTier, ToolResult
-from victor.tools.enums import ToolCategory
 from victor.tools.selection.protocol import (
     CrossVerticalToolSelectionContext,
     ToolSelectionStrategy,
@@ -104,7 +104,7 @@ class ToolMetadata:
 
     name: str
     description: str = ""
-    category: ToolCategory = ToolCategory.OTHER
+    category: ToolCategory = ToolCategory.CUSTOM
     tier: CostTier = CostTier.MEDIUM
     enabled: bool = True
     deprecated: bool = False
@@ -955,7 +955,7 @@ class UnifiedToolRegistry:
             if any(pattern in name_lower for pattern in patterns):
                 return category
 
-        return ToolCategory.OTHER
+        return ToolCategory.CUSTOM
 
 
 __all__ = [
