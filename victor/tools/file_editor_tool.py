@@ -159,14 +159,78 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 
-# Lazy load FileEditor from external victor-coding package
-# This prevents circular dependency - framework doesn't import from verticals
-try:
-    from victor_coding.editing import FileEditor
-    _FILE_EDITOR_AVAILABLE = True
-except ImportError:
-    _FILE_EDITOR_AVAILABLE = False
-    FileEditor = None
+# =============================================================================
+# EDITOR PROTOCOL + GRACEFUL FALLBACK
+# =============================================================================
+# Framework depends on EditorProtocol (abstraction), not concrete implementations
+# This follows the Dependency Inversion Principle (DIP)
+#
+# Fallback chain:
+# 1. victor-coding (external vertical) - advanced coding-specific editor
+# 2. victor.contrib.editing (contrib package) - default diff editor
+# 3. Error message - no editor available
+# =============================================================================
+
+from victor.framework.vertical_protocols import EditorProtocol
+
+# Editor availability flag and instance
+_EDITOR_AVAILABLE: bool | None = None
+_EDITOR_INSTANCE: EditorProtocol | None = None
+
+
+def _get_editor() -> EditorProtocol | None:
+    """Get editor instance with graceful fallback.
+
+    Tries to load editor from:
+    1. victor-coding (external vertical with advanced features)
+    2. victor.contrib.editing (contrib package with basic diff editor)
+    3. Returns None if no editor available
+
+    Returns:
+        Editor instance or None
+    """
+    global _EDITOR_AVAILABLE, _EDITOR_INSTANCE
+
+    if _EDITOR_INSTANCE is not None:
+        return _EDITOR_INSTANCE
+
+    if _EDITOR_AVAILABLE is False:
+        return None
+
+    # Try external vertical's editor (victor-coding)
+    try:
+        from victor_coding.editing import FileEditor
+
+        _EDITOR_INSTANCE = FileEditor()
+        _EDITOR_AVAILABLE = True
+        import logging
+
+        logging.getLogger(__name__).debug("Using victor-coding FileEditor")
+        return _EDITOR_INSTANCE
+    except ImportError:
+        pass
+
+    # Fall back to contrib editor (victor.contrib.editing)
+    try:
+        from victor.contrib.editing import DiffEditor
+
+        _EDITOR_INSTANCE = DiffEditor()
+        _EDITOR_AVAILABLE = True
+        import logging
+
+        logging.getLogger(__name__).debug("Using victor.contrib.editing DiffEditor")
+        return _EDITOR_INSTANCE
+    except ImportError:
+        pass
+
+    # No editor available
+    _EDITOR_AVAILABLE = False
+    return None
+
+
+def _is_editor_available() -> bool:
+    """Check if any editor is available."""
+    return _get_editor() is not None
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path
 
@@ -235,8 +299,9 @@ async def edit(
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file edits.
     """
-    # Check if FileEditor is available from external victor-coding package
-    if not _FILE_EDITOR_AVAILABLE:
+    # Check if editor is available (via protocol with graceful fallback)
+    editor = _get_editor()
+    if editor is None:
         return {
             "success": False,
             "error": "File editing requires the victor-coding package to be installed. "
