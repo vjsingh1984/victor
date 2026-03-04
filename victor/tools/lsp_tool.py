@@ -24,6 +24,27 @@ from typing import Any, Dict, Optional
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
+# =============================================================================
+# LSP PROTOCOL + GRACEFUL FALLBACK
+# =============================================================================
+# LSP features require victor-coding package. When not available,
+# functions return error messages directing users to install it.
+# =============================================================================
+
+_LSP_AVAILABLE = False
+_LspManager = None
+_LANGUAGE_SERVERS = None
+
+try:
+    from victor_coding.lsp.manager import get_lsp_manager
+    from victor_coding.lsp.config import LANGUAGE_SERVERS
+
+    _LSP_AVAILABLE = True
+    _LspManager = get_lsp_manager
+    _LANGUAGE_SERVERS = LANGUAGE_SERVERS
+except ImportError:
+    pass
+
 # Completion kind mapping
 KIND_NAMES = {
     1: "Text",
@@ -56,15 +77,13 @@ KIND_NAMES = {
 
 async def _do_status() -> Dict[str, Any]:
     """Get LSP status."""
-    try:
-        from victor_coding.lsp.manager import get_lsp_manager
-    except ImportError:
+    if not _LSP_AVAILABLE or _LspManager is None:
         return {
             "success": False,
             "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
         }
 
-    manager = get_lsp_manager()
+    manager = _LspManager()
     status = manager.get_status()
     available = manager.get_available_servers()
 
@@ -94,8 +113,11 @@ async def _do_status() -> Dict[str, Any]:
 
 async def _do_start(language: str) -> Dict[str, Any]:
     """Start a language server."""
-    from victor_coding.lsp.manager import get_lsp_manager
-    from victor_coding.lsp.config import LANGUAGE_SERVERS
+    if not _LSP_AVAILABLE or _LspManager is None or _LANGUAGE_SERVERS is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not language:
         return {"success": False, "error": "Missing required parameter: language"}
@@ -129,7 +151,11 @@ async def _do_start(language: str) -> Dict[str, Any]:
 
 async def _do_stop(language: str) -> Dict[str, Any]:
     """Stop a language server."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not language:
         return {"success": False, "error": "Missing required parameter: language"}
@@ -150,7 +176,11 @@ async def _do_completions(
     max_items: int = 20,
 ) -> Dict[str, Any]:
     """Get code completions."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -180,7 +210,11 @@ async def _do_completions(
 
 async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]:
     """Get hover information."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -201,7 +235,11 @@ async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]
 
 async def _do_definition(file_path: str, line: int, character: int) -> Dict[str, Any]:
     """Go to definition."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -228,7 +266,11 @@ async def _do_references(
     max_results: int = 50,
 ) -> Dict[str, Any]:
     """Find references."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -250,9 +292,13 @@ async def _do_references(
 
 async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
     """Get diagnostics."""
-    import asyncio
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
+    import asyncio
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
 
@@ -275,7 +321,11 @@ async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
 
 async def _do_open(file_path: str) -> Dict[str, Any]:
     """Open a file in LSP."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
@@ -294,7 +344,11 @@ async def _do_open(file_path: str) -> Dict[str, Any]:
 
 async def _do_close(file_path: str) -> Dict[str, Any]:
     """Close a file in LSP."""
-    from victor_coding.lsp.manager import get_lsp_manager
+    if not _LSP_AVAILABLE or _LspManager is None:
+        return {
+            "success": False,
+            "error": "LSP features require the victor-coding package. Install with: pip install victor-coding",
+        }
 
     if not file_path:
         return {"success": False, "error": "Missing required parameter: file_path"}
