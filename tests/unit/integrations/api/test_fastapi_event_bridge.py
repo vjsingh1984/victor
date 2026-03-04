@@ -17,6 +17,7 @@
 TDD tests for real-time event streaming to VS Code and other clients.
 """
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
@@ -136,6 +137,77 @@ class TestEventBridgeIntegration:
         bridge = EventBridge(bus)
 
         assert hasattr(bridge, "_broadcaster")
+
+
+class TestEventBusAdapterCompatibility:
+    """Compatibility tests for sync and async EventBus APIs."""
+
+    @pytest.mark.asyncio
+    async def test_event_bus_adapter_supports_async_subscribe(self):
+        """Adapter should subscribe and unsubscribe using async handles."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class FakeHandle:
+            def __init__(self, pattern: str):
+                self.pattern = pattern
+                self.unsubscribed = False
+
+            async def unsubscribe(self):
+                self.unsubscribed = True
+
+        class FakeAsyncBus:
+            def __init__(self):
+                self.subscriptions = []
+                self.handles = []
+
+            async def subscribe(self, pattern, handler):
+                handle = FakeHandle(pattern)
+                self.subscriptions.append((pattern, handler))
+                self.handles.append(handle)
+                return handle
+
+        event_bus = FakeAsyncBus()
+        adapter = EventBusAdapter()
+
+        adapter.connect(event_bus)
+        await asyncio.sleep(0.01)
+
+        assert len(event_bus.subscriptions) == len(adapter.EVENT_MAPPING)
+        assert len(adapter._subscriptions) == len(adapter.EVENT_MAPPING)
+        assert all(asyncio.iscoroutinefunction(handler) for _, handler in event_bus.subscriptions)
+
+        adapter.disconnect()
+        await asyncio.sleep(0.01)
+
+        assert all(handle.unsubscribed for handle in event_bus.handles)
+
+    def test_event_bus_adapter_supports_legacy_sync_subscribe(self):
+        """Adapter should keep working with legacy sync subscribe/unsubscribe API."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class FakeSyncBus:
+            def __init__(self):
+                self.subscribe_calls = []
+                self.unsubscribe_calls = []
+
+            def subscribe(self, pattern, handler):
+                self.subscribe_calls.append((pattern, handler))
+                return None
+
+            def unsubscribe(self, pattern, handler):
+                self.unsubscribe_calls.append((pattern, handler))
+                return None
+
+        event_bus = FakeSyncBus()
+        adapter = EventBusAdapter()
+
+        adapter.connect(event_bus)
+
+        assert len(event_bus.subscribe_calls) == len(adapter.EVENT_MAPPING)
+        assert all(not asyncio.iscoroutinefunction(h) for _, h in event_bus.subscribe_calls)
+
+        adapter.disconnect()
+        assert len(event_bus.unsubscribe_calls) == len(adapter.EVENT_MAPPING)
 
 
 class TestEventBridgeBroadcaster:
