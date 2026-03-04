@@ -1380,7 +1380,7 @@ Keyboard Shortcuts:
   Ctrl+U       Toggle unread marker
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
-  Ctrl+Home/End Jump to top/bottom
+  Ctrl+Home/End Jump to top/bottom (End resumes follow)
   PgUp/PgDn    Page scroll conversation
   ↑/↓          Navigate input history
   Escape       Focus input

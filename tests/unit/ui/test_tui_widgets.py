@@ -8,6 +8,12 @@ from textual.messages import UpdateScroll
 from victor.ui.tui.widgets import EnhancedConversationLog, StatusBar, StreamingMessageBlock
 
 
+def _static_content_text(widget: object) -> str:
+    """Extract textual content from Textual Static widget for assertions."""
+    content = getattr(widget, "_Static__content", "")
+    return str(content)
+
+
 def test_streaming_does_not_force_scroll_when_auto_scroll_disabled() -> None:
     """Streaming updates should not jump viewport when user scrolled away from bottom."""
     with (
@@ -206,7 +212,7 @@ def test_unread_separator_inserted_once_before_first_unread_message() -> None:
         assert mount.call_count == 3
         separator_widget = mount.call_args_list[0].args[1]
         assert "unread-separator" in separator_widget.classes
-        assert "2 new messages" in str(log._unread_separator.renderable)
+        assert "2 new messages" in _static_content_text(log._unread_separator)
 
 
 def test_unread_separator_disabled_does_not_insert_marker() -> None:
@@ -277,10 +283,10 @@ def test_unread_separator_label_updates_with_count_changes() -> None:
 
         log.add_assistant_message("first unread")
         assert log._unread_separator is not None
-        assert "1 new message" in str(log._unread_separator.renderable)
+        assert "1 new message" in _static_content_text(log._unread_separator)
 
         log.add_assistant_message("second unread")
-        assert "2 new messages" in str(log._unread_separator.renderable)
+        assert "2 new messages" in _static_content_text(log._unread_separator)
 
 
 def test_reenabled_unread_separator_shows_current_backlog_count() -> None:
@@ -299,7 +305,7 @@ def test_reenabled_unread_separator_shows_current_backlog_count() -> None:
         log.set_unread_separator_enabled(True)
 
         assert log._unread_separator is not None
-        assert "2 new messages" in str(log._unread_separator.renderable)
+        assert "2 new messages" in _static_content_text(log._unread_separator)
 
 
 def test_jump_to_unread_separator_scrolls_when_present() -> None:
