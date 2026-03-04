@@ -1681,6 +1681,182 @@ async def write(path: str, content: str) -> str:
 
 @tool(
     category="filesystem",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.WRITE,
+    danger_level=DangerLevel.LOW,
+    progress_params=["path"],
+    stages=["initial", "planning", "writing"],
+    task_types=["edit", "refactor", "create"],
+    execution_category=ExecutionCategory.WRITE,
+    keywords=[
+        "write",
+        "lsp",
+        "validate",
+        "format",
+        "diagnostics",
+        "type-check",
+        "syntax-check",
+    ],
+    use_cases=[
+        "writing code with LSP validation",
+        "formatting code with language formatters",
+        "checking code before writing",
+        "getting diagnostic feedback",
+    ],
+    examples=[
+        "write main.py with validation",
+        "create validated Python file",
+        "write formatted Rust code",
+        "check code before writing",
+    ],
+)
+async def write_lsp(
+    path: str,
+    content: str,
+    validate: bool = True,
+    format_code: bool = True,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Write file with LSP validation and formatting.
+
+    Enhanced write operation that uses Language Server Protocol for:
+    - Syntax validation before writing
+    - Auto-formatting using language-specific formatters
+    - Diagnostic feedback (errors, warnings, hints)
+
+    Supported languages:
+        C/C++ (clangd, clang-format)
+        Python (pyright/pylsp, black)
+        Rust (rust-analyzer, rustfmt)
+        JavaScript/TypeScript (tsserver, prettier)
+        Go (gopls, gofmt)
+        And 15+ more languages
+
+    Args:
+        path: File path to write
+        content: Content to write
+        validate: Validate with LSP before writing (default: True)
+        format_code: Format with language formatter (default: True)
+        dry_run: If True, validate/format without writing (default: False)
+
+    Returns:
+        Dictionary with:
+            success: bool - Whether operation succeeded
+            path: str - File path
+            formatted: bool - Whether content was formatted
+            validated: bool - Whether content was validated
+            diagnostics: list - Diagnostic messages
+            formatter_used: str - Name of formatter used (if any)
+            summary: dict - Summary of diagnostics
+            written_content: str - Content that was/would be written
+            error: str - Error message if failed
+
+    Example:
+        result = await write_lsp("src/main.py", "def hello(): print('hi')")
+        if result["summary"]["errors"] > 0:
+            print("Errors found:", result["diagnostics"])
+
+    Note:
+        Falls back to regular write if LSP is not available for the language.
+        Requires language server to be installed (e.g., pyright, clangd, rust-analyzer).
+    """
+    from victor.agent.change_tracker import ChangeType, get_change_tracker
+    from victor.tools.lsp_write_enhancer import write_with_lsp
+
+    file_path = Path(path).expanduser().resolve()
+
+    # Enforce sandbox restrictions in EXPLORE/PLAN modes
+    enforce_sandbox_path(file_path)
+
+    if file_path.exists() and file_path.is_dir():
+        raise IsADirectoryError(f"Cannot write to directory: {path}")
+
+    # Track the change for undo/redo
+    tracker = get_change_tracker()
+    original_content = None
+    change_type = ChangeType.CREATE
+
+    if file_path.exists():
+        change_type = ChangeType.MODIFY
+        original_content = file_path.read_text()
+
+    # Use LSP enhancer
+    try:
+        result = await write_with_lsp(
+            path=str(file_path),
+            content=content,
+            validate=validate,
+            format_code=format_code,
+            write=not dry_run,  # Only write if not dry_run
+        )
+
+        # Track change if actually written
+        if not dry_run and result.success:
+            tracker.begin_change_group("write_lsp", f"Write to {path}")
+            tracker.record_change(
+                file_path=str(file_path),
+                change_type=change_type,
+                original_content=original_content,
+                new_content=result.written_content,
+                tool_name="write_lsp",
+                tool_args={"path": path, "validate": validate, "format_code": format_code},
+            )
+            tracker.commit_change_group()
+
+            # Invalidate file content cache
+            if is_file_cache_enabled():
+                cache = get_file_content_cache()
+                cache.invalidate(str(file_path))
+
+        return result.to_dict()
+
+    except Exception as e:
+        # If LSP enhancement fails, fall back to regular write
+        logger.warning(f"LSP enhancement failed, falling back to regular write: {e}")
+
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            tracker.begin_change_group("write_file", f"Write to {path}")
+            tracker.record_change(
+                file_path=str(file_path),
+                change_type=change_type,
+                original_content=original_content,
+                new_content=content,
+                tool_name="write_file",
+                tool_args={"path": path},
+            )
+
+            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+                await f.write(content)
+
+            tracker.commit_change_group()
+
+            if is_file_cache_enabled():
+                cache = get_file_content_cache()
+                cache.invalidate(str(file_path))
+
+        return {
+            "success": True,
+            "path": path,
+            "formatted": False,
+            "validated": False,
+            "diagnostics": [],
+            "formatter_used": None,
+            "summary": {
+                "total_diagnostics": 0,
+                "errors": 0,
+                "warnings": 0,
+                "info": 0,
+                "hints": 0,
+            },
+            "written_content": content,
+            "fallback": True,  # Indicate regular write was used
+        }
+
+
+@tool(
+    category="filesystem",
     priority=Priority.CRITICAL,  # Always available for selection
     access_mode=AccessMode.READONLY,  # Only reads directory contents
     danger_level=DangerLevel.SAFE,  # No side effects
