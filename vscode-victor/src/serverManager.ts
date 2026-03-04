@@ -23,7 +23,6 @@ export interface ServerConfig {
     autoStart: boolean;
     pythonPath?: string;
     victorPath?: string;
-    backend?: 'aiohttp' | 'fastapi';
     fallbackPorts?: number[];
 }
 
@@ -264,11 +263,6 @@ export class ServerManager {
             '--port', availablePort.toString(),
             '--log-level', 'INFO'
         ];
-
-        // Add backend flag if configured
-        if (this.config.backend) {
-            args.push('--backend', this.config.backend);
-        }
 
         try {
             // Spawn the server process
@@ -661,16 +655,12 @@ export function createServerManager(): ServerManager {
     const configuredPython = config.get<string>('pythonPath') || undefined;
     const pythonPath = configuredPython || detectedPython;
 
-    // Get backend preference (default to aiohttp for backward compatibility)
-    const backend = config.get<'aiohttp' | 'fastapi'>('serverBackend', 'aiohttp');
-
     return new ServerManager({
         host: '127.0.0.1',
         port: config.get('serverPort', 8765),
         autoStart: config.get('autoStart', false),
         pythonPath,
         victorPath: config.get('victorPath'),
-        backend,
         fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS)
     });
 }
