@@ -41,7 +41,7 @@
                 "no-useless-escape": "off"
             }
         }
-    },
+    ],
     "ignorePatterns": [
         "out",
         "dist",

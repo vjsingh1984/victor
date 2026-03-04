@@ -141,25 +141,28 @@ export class DiffViewProvider {
         // Handle messages from webview
         panel.webview.onDidReceiveMessage(async (message) => {
             switch (message.type) {
-                case 'toggleFile':
+                case 'toggleFile': {
                     const change = session.changes.find(c => c.filePath === message.filePath);
                     if (change) {
                         change.selected = message.selected;
                     }
                     break;
+                }
 
-                case 'toggleAll':
+                case 'toggleAll': {
                     session.changes.forEach(c => c.selected = message.selected);
                     break;
+                }
 
-                case 'showFileDiff':
+                case 'showFileDiff': {
                     const fileChange = session.changes.find(c => c.filePath === message.filePath);
                     if (fileChange) {
                         await this.showDiff(fileChange);
                     }
                     break;
+                }
 
-                case 'applySelected':
+                case 'applySelected': {
                     const selectedChanges = session.changes.filter(c => c.selected);
                     if (selectedChanges.length === 0) {
                         vscode.window.showWarningMessage('No files selected');
@@ -193,11 +196,13 @@ export class DiffViewProvider {
                         this._updateStatusBar();
                     }
                     break;
+                }
 
-                case 'rejectAll':
+                case 'rejectAll': {
                     this.rejectSession(sessionId);
                     panel.dispose();
                     break;
+                }
             }
         });
     }
@@ -544,7 +549,7 @@ export class DiffViewProvider {
 
             switch (change.changeType) {
                 case 'create':
-                case 'modify':
+                case 'modify': {
                     const edit = new vscode.WorkspaceEdit();
                     if (change.changeType === 'create') {
                         edit.createFile(uri, { overwrite: false, ignoreIfExists: false });
@@ -556,6 +561,7 @@ export class DiffViewProvider {
                     );
                     await vscode.workspace.applyEdit(edit);
                     break;
+                }
 
                 case 'delete':
                     await vscode.workspace.fs.delete(uri);
