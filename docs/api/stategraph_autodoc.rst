@@ -3,10 +3,7 @@ StateGraph API Reference
 
 This section documents the StateGraph workflow engine.
 
-StateGraph Class
-----------------
-
-.. autoclass:: victor.framework.StateGraph
+.. autoclass:: victor.framework.graph.StateGraph
    :members:
    :undoc-members:
    :show-inheritance:
@@ -69,32 +66,32 @@ StateGraph Methods
 add_node()
 ^^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.add_node
+.. automethod:: victor.framework.graph.StateGraph.add_node
 
 add_edge()
 ^^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.add_edge
+.. automethod:: victor.framework.graph.StateGraph.add_edge
 
 add_conditional_edges()
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.add_conditional_edges
+.. automethod:: victor.framework.graph.StateGraph.add_conditional_edges
 
 set_entry_point()
 ^^^^^^^^^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.set_entry_point
+.. automethod:: victor.framework.graph.StateGraph.set_entry_point
 
 set_finish_point()
 ^^^^^^^^^^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.set_finish_point
+.. automethod:: victor.framework.graph.StateGraph.set_finish_point
 
 compile()
 ^^^^^^^^^
 
-.. automethod:: victor.framework.StateGraph.compile
+.. automethod:: victor.framework.graph.StateGraph.compile
 
 StateGraph Features
 -------------------
@@ -104,10 +101,13 @@ Checkpointing
 
 .. code-block:: python
 
+   from victor.framework.graph import MemoryCheckpointer
+
    workflow = StateGraph()
 
    # Enable checkpointing
-   workflow.set_checkpointinator(checkpointinator)
+   checkpointer = MemoryCheckpointer()
+   workflow.set_checkpointer(checkpointer)
 
    # Resume from checkpoint
    result = await compiled.ainvoke(

@@ -3,10 +3,7 @@ Agent API Reference
 
 This section documents the Victor Agent API.
 
-Agent Class
------------
-
-.. autoclass:: victor.framework.Agent
+.. autoclass:: victor.framework.agent.Agent
    :members:
    :undoc-members:
    :show-inheritance:
@@ -17,12 +14,15 @@ Creating Agents
 Basic Agent
 ^^^^^^^^^^^
 
+.. autoclass:: victor.framework.agent.Agent
+   :members: create
+
 .. code-block:: python
 
-   from victor import Agent
+   from victor.framework import Agent
 
    # Create agent with defaults
-   agent = Agent.create()
+   agent = await Agent.create()
 
    # Run a query
    result = await agent.run("Your question here")
@@ -34,9 +34,9 @@ Agent with Provider
 .. code-block:: python
 
    # Use specific provider
-   agent = Agent.create(
+   agent = await Agent.create(
        provider="anthropic",
-       model="claude-3-opus-20240229"
+       model="claude-sonnet-4-20250514"
    )
 
 Agent with Tools
@@ -44,9 +44,11 @@ Agent with Tools
 
 .. code-block:: python
 
+   from victor.framework import ToolSet
+
    # Agent with specific tools
-   agent = Agent.create(
-       tools=["read", "write", "ls", "grep"]
+   agent = await Agent.create(
+       tools=ToolSet.default()
    )
 
 Agent with Vertical
@@ -55,9 +57,8 @@ Agent with Vertical
 .. code-block:: python
 
    # Use domain-specific vertical
-   agent = Agent.create(
-       vertical="coding",
-       tools=["read", "write", "edit", "grep"]
+   agent = await Agent.create(
+       vertical="coding"
    )
 
 Agent Methods
@@ -66,32 +67,32 @@ Agent Methods
 run()
 ^^^^^
 
-.. automethod:: victor.framework.Agent.run
+.. automethod:: victor.framework.agent.Agent.run
 
 stream()
 ^^^^^^^
 
-.. automethod:: victor.framework.Agent.stream
+.. automethod:: victor.framework.agent.Agent.stream
 
 chat()
 ^^^^^
 
-.. automethod:: victor.framework.Agent.chat
+.. automethod:: victor.framework.agent.Agent.chat
 
 run_workflow()
 ^^^^^^^^^^^^^
 
-.. automethod:: victor.framework.Agent.run_workflow
+.. automethod:: victor.framework.agent.Agent.run_workflow
 
 stream_workflow()
 ^^^^^^^^^^^^^^^^^
 
-.. automethod:: victor.framework.Agent.stream_workflow
+.. automethod:: victor.framework.agent.Agent.stream_workflow
 
 run_team()
 ^^^^^^^^^^
 
-.. automethod:: victor.framework.Agent.run_team
+.. automethod:: victor.framework.agent.Agent.run_team
 
 Agent Configuration
 -------------------
@@ -103,7 +104,7 @@ provider
    LLM provider to use (e.g., "openai", "anthropic", "ollama")
 
 model
-   Model identifier (e.g., "gpt-4", "claude-3-opus-20240229")
+   Model identifier (e.g., "gpt-4", "claude-sonnet-4-20250514")
 
 temperature
    Sampling temperature (0.0 = focused, 1.0 = creative)
@@ -112,7 +113,7 @@ max_tokens
    Maximum tokens to generate
 
 tools
-   List of tool names or preset ("minimal", "default", "full", "airgapped")
+   List of tool names or ToolSet preset
 
 vertical
    Domain-specific vertical ("coding", "devops", "research", etc.)
@@ -130,14 +131,14 @@ Examples
 --------
 
 Example 1: Streaming Agent
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   agent = Agent.create()
+   agent = await Agent.create()
 
    async for event in agent.stream("Tell me a story"):
-       if event.type == "content":
+       if event.type == EventType.CONTENT:
            print(event.content, end="", flush=True)
 
 Example 2: Multi-turn Conversation
@@ -145,7 +146,7 @@ Example 2: Multi-turn Conversation
 
 .. code-block:: python
 
-   agent = Agent.create()
+   agent = await Agent.create()
 
    response1 = await agent.chat("My name is Alice")
    response2 = await agent.chat("What's my name?")
@@ -156,11 +157,9 @@ Example 3: Code Review Agent
 
 .. code-block:: python
 
-   agent = Agent.create(
+   agent = await Agent.create(
        vertical="coding",
-       tools=["read", "grep"],
-       temperature=0.3,
-       system_prompt="You are a senior code reviewer."
+       temperature=0.3
    )
 
    result = await agent.run(

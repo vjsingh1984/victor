@@ -17,10 +17,12 @@ multi-step workflows, and domain-specific vertical applications.
    guides/first-agent
    guides/first-workflow
    api/agent
-   api/stategraph
+   api/graph
    api/workflows
    api/tools
    api/providers
+   api/agent_autodoc
+   api/stategraph_autodoc
 
 Quick Links
 -----------
