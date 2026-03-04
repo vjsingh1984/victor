@@ -733,7 +733,6 @@ class StreamingMessageBlock(Static):
         overflow-y: auto;
     }
 
-
     StreamingMessageBlock .streaming-indicator {
         color: $text-muted;
         text-style: italic;
