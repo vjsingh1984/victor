@@ -53,20 +53,32 @@ from victor.framework.observability.metrics import (
     GaugeMetric,
     HistogramBucket,
     HistogramMetric,
+    LLMCallMetrics,
     Metric,
     MetricLabel,
     MetricNames,
     MetricSource,
     MetricType,
+    MetricsCollector,
     MetricsCollection,
+    MetricsExporter,
     MetricsSnapshot,
     SummaryMetric,
+    ToolCallMetrics,
+    # Agent metrics
+    AgentMetrics,
 )
 
 from victor.framework.observability.manager import (
     DashboardData,
     ObservabilityConfig,
     ObservabilityManager,
+)
+
+from victor.framework.observability.persistence import (
+    InMemoryMetricsStore,
+    MetricsStore,
+    SQLiteMetricsStore,
 )
 
 __all__ = [
@@ -85,6 +97,17 @@ __all__ = [
     "SummaryMetric",
     "MetricsSnapshot",
     "MetricsCollection",
+    # Agent metrics
+    "AgentMetrics",
+    "ToolCallMetrics",
+    "LLMCallMetrics",
+    # Collector
+    "MetricsCollector",
+    "MetricsExporter",
+    # Persistence
+    "MetricsStore",
+    "SQLiteMetricsStore",
+    "InMemoryMetricsStore",
     # Protocols
     "MetricSource",
     # Constants
