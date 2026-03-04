@@ -140,6 +140,36 @@ def test_update_scroll_event_updates_auto_scroll_state() -> None:
         assert log.auto_scroll_enabled is True
 
 
+def test_update_scroll_ignores_programmatic_guard_window() -> None:
+    """Programmatic scroll updates should not immediately flip follow state."""
+    log = EnhancedConversationLog()
+    event = UpdateScroll()
+    log._ignore_scroll_update_until = 10.0
+
+    with (
+        patch("victor.ui.tui.widgets.time.monotonic", return_value=9.95),
+        patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
+    ):
+        log.on_update_scroll(event)
+
+    update_auto_scroll_state.assert_not_called()
+
+
+def test_update_scroll_processes_after_programmatic_guard_window() -> None:
+    """Scroll updates should resume once guard window expires."""
+    log = EnhancedConversationLog()
+    event = UpdateScroll()
+    log._ignore_scroll_update_until = 10.0
+
+    with (
+        patch("victor.ui.tui.widgets.time.monotonic", return_value=10.05),
+        patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
+    ):
+        log.on_update_scroll(event)
+
+    update_auto_scroll_state.assert_called_once()
+
+
 def test_unread_separator_inserted_once_before_first_unread_message() -> None:
     """Unread separator should be created once before the first unread message."""
     with (
@@ -189,13 +219,14 @@ def test_unread_separator_removed_when_reaching_bottom() -> None:
         log.scroll_to_bottom()
 
         assert log._unread_separator is None
+        assert log._unread_boundary_id is None
         assert log.unread_count == 0
 
 
 def test_enabling_separator_with_existing_unread_inserts_marker() -> None:
-    """Turning separator back on with unread messages should recreate marker."""
+    """Re-enabling marker should place it at the original unread boundary."""
     with (
-        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "mount", autospec=True) as mount,
         patch.object(EnhancedConversationLog, "scroll_end", autospec=True),
     ):
         log = EnhancedConversationLog(show_unread_separator=False)
@@ -203,10 +234,16 @@ def test_enabling_separator_with_existing_unread_inserts_marker() -> None:
         log.add_assistant_message("new message")
         assert log.unread_count == 1
         assert log._unread_separator is None
+        assert log._unread_boundary_id == "msg-0"
 
-        log.set_unread_separator_enabled(True)
+        boundary_target = MagicMock()
+        with patch.object(log, "query_one", return_value=boundary_target):
+            log.set_unread_separator_enabled(True)
 
         assert log._unread_separator is not None
+        assert mount.call_count == 2
+        separator_call = mount.call_args_list[1]
+        assert separator_call.kwargs["before"] is boundary_target
 
 
 def test_jump_to_unread_separator_scrolls_when_present() -> None:
@@ -222,10 +259,27 @@ def test_jump_to_unread_separator_scrolls_when_present() -> None:
     scroll_to_widget.assert_called_once()
 
 
+def test_jump_to_unread_separator_uses_boundary_target_when_marker_hidden() -> None:
+    """Unread jump should still work when marker is disabled but boundary is known."""
+    log = EnhancedConversationLog(show_unread_separator=False)
+    log._unread_boundary_id = "msg-4"
+    boundary_target = MagicMock()
+
+    with (
+        patch.object(log, "query_one", return_value=boundary_target),
+        patch.object(log, "scroll_to_widget", return_value=True) as scroll_to_widget,
+    ):
+        jumped = log.jump_to_unread_separator()
+
+    assert jumped is True
+    scroll_to_widget.assert_called_once()
+
+
 def test_jump_to_unread_separator_returns_false_without_marker() -> None:
     """Unread jump should report false when no unread marker exists."""
     log = EnhancedConversationLog(show_unread_separator=True)
     log._unread_separator = None
+    log._unread_boundary_id = None
 
     assert log.jump_to_unread_separator() is False
 
@@ -281,6 +335,17 @@ def test_update_auto_scroll_state_respects_sticky_pause() -> None:
     assert log.unread_count == 0
 
 
+def test_maybe_scroll_end_sets_programmatic_guard_when_following() -> None:
+    """Programmatic follow scrolls should set a short guard against transient events."""
+    with patch.object(EnhancedConversationLog, "scroll_end", autospec=True):
+        log = EnhancedConversationLog()
+
+        with patch("victor.ui.tui.widgets.time.monotonic", return_value=20.0):
+            log._maybe_scroll_end(force=True)
+
+        assert log._ignore_scroll_update_until > 20.0
+
+
 def test_status_bar_updates_follow_indicator() -> None:
     """Status bar should show explicit Following/Paused indicator text."""
     bar = StatusBar()
@@ -292,3 +357,18 @@ def test_status_bar_updates_follow_indicator() -> None:
 
         bar.update_follow(paused=False)
         label.update.assert_called_with("Following")
+
+
+def test_status_bar_updates_unread_indicator() -> None:
+    """Status bar should show/hide unread badge based on unread count."""
+    bar = StatusBar()
+    label = MagicMock()
+
+    with patch.object(StatusBar, "query_one", return_value=label):
+        bar.update_unread(4)
+        label.update.assert_called_with("4 new")
+        label.add_class.assert_called_with("visible")
+
+        bar.update_unread(0)
+        label.update.assert_called_with("")
+        label.remove_class.assert_called_with("visible")

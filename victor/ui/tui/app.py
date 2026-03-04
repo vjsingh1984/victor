@@ -339,6 +339,18 @@ class VictorTUI(App):
         color: $warning;
     }
 
+    StatusBar .unread-indicator {
+        color: $warning;
+        text-style: bold;
+        width: auto;
+        margin-right: 1;
+        display: none;
+    }
+
+    StatusBar .unread-indicator.visible {
+        display: block;
+    }
+
     StatusBar .provider-info .victor-name {
         color: $primary;
     }
@@ -1355,7 +1367,7 @@ Keyboard Shortcuts:
   Ctrl+R       Resume TUI session
   Ctrl+S       Save session
   Ctrl+E       Export session to markdown
-  Ctrl+N       Jump to unread marker
+  Ctrl+N       Jump to unread boundary
   Ctrl+U       Toggle unread marker
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
@@ -1480,6 +1492,7 @@ Slash Commands:
         if self._status_bar:
             try:
                 self._status_bar.update_follow(follow_paused_display)
+                self._status_bar.update_unread(unread)
             except Exception:
                 pass
         if auto_follow_active:

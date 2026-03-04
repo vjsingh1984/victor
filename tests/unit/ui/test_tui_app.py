@@ -7,6 +7,14 @@ from textual.messages import UpdateScroll
 from victor.ui.tui.app import VictorTUI
 
 
+def test_ctrl_f_binding_maps_to_toggle_follow_mode() -> None:
+    """Ctrl+F should stay wired to follow-mode toggle."""
+    assert any(
+        binding.key == "ctrl+f" and binding.action == "toggle_follow_mode"
+        for binding in VictorTUI.BINDINGS
+    )
+
+
 def test_update_jump_button_label_with_unread_count() -> None:
     """Jump button should show unread count when auto-follow is disabled."""
     app = VictorTUI()
@@ -169,6 +177,7 @@ def test_update_jump_button_shows_resume_follow_when_paused() -> None:
     app._jump_button.add_class.assert_called_once_with("visible")
     assert app._jump_button.label == "Resume follow (2 new)"
     app._status_bar.update_follow.assert_called_once_with(True)
+    app._status_bar.update_unread.assert_called_once_with(2)
 
 
 def test_update_jump_button_marks_paused_when_user_scrolled() -> None:
@@ -185,6 +194,7 @@ def test_update_jump_button_marks_paused_when_user_scrolled() -> None:
     app._update_jump_to_bottom()
 
     app._status_bar.update_follow.assert_called_once_with(True)
+    app._status_bar.update_unread.assert_called_once_with(0)
     assert app._jump_button.label == "Jump to bottom"
 
 
@@ -202,6 +212,7 @@ def test_update_jump_button_marks_following_when_auto_follow_active() -> None:
     app._update_jump_to_bottom()
 
     app._status_bar.update_follow.assert_called_once_with(False)
+    app._status_bar.update_unread.assert_called_once_with(0)
 
 
 def test_action_toggle_follow_mode_pauses_follow() -> None:

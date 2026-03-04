@@ -28,6 +28,7 @@ from textual.message import Message
 from textual.messages import UpdateScroll
 from textual.reactive import reactive
 from textual.binding import Binding
+from textual.widget import Widget
 
 if TYPE_CHECKING:
     pass
@@ -92,6 +93,7 @@ class StatusBar(Static):
         self.status = "Idle"
         self._state = "idle"  # idle, streaming, error
         self._follow_paused = False
+        self._unread_count = 0
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="status-content"):
@@ -111,6 +113,7 @@ class StatusBar(Static):
             follow_label = Label("Following", classes="follow-indicator")
             follow_label.add_class("following")
             yield follow_label
+            yield Label("", classes="unread-indicator", id="unread-indicator")
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -227,6 +230,17 @@ class StatusBar(Static):
         label.update("Paused" if paused else "Following")
         label.remove_class("following", "paused")
         label.add_class("paused" if paused else "following")
+
+    def update_unread(self, unread_count: int) -> None:
+        """Update unread counter badge."""
+        self._unread_count = unread_count
+        label = self.query_one("#unread-indicator", Label)
+        if unread_count > 0:
+            label.update(f"{unread_count} new")
+            label.add_class("visible")
+        else:
+            label.update("")
+            label.remove_class("visible")
 
 
 class SubmitTextArea(TextArea):
@@ -1015,6 +1029,7 @@ class EnhancedConversationLog(VerticalScroll):
     """
 
     _FOLLOW_SCROLL_INTERVAL_SECONDS = 1 / 30
+    _PROGRAMMATIC_SCROLL_GUARD_SECONDS = 0.08
 
     def __init__(self, show_unread_separator: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -1024,9 +1039,11 @@ class EnhancedConversationLog(VerticalScroll):
         self._user_scrolled = False
         self._sticky_follow_paused = False
         self._last_follow_scroll_ts = 0.0
+        self._ignore_scroll_update_until = 0.0
         self._unread_count = 0
         self._show_unread_separator = show_unread_separator
         self._unread_separator: Optional[Static] = None
+        self._unread_boundary_id: Optional[str] = None
 
     @property
     def auto_scroll_enabled(self) -> bool:
@@ -1054,12 +1071,13 @@ class EnhancedConversationLog(VerticalScroll):
             self._ensure_unread_separator()
 
     def jump_to_unread_separator(self) -> bool:
-        """Scroll the transcript to the unread separator marker if present."""
-        if self._unread_separator is None:
+        """Scroll the transcript to unread boundary (marker or first unread message)."""
+        target: Optional[Widget] = self._unread_separator or self._get_unread_boundary_target()
+        if target is None:
             return False
         try:
             self.scroll_to_widget(
-                self._unread_separator,
+                target,
                 animate=False,
                 top=True,
                 immediate=True,
@@ -1081,9 +1099,10 @@ class EnhancedConversationLog(VerticalScroll):
         self._auto_scroll = True
         self._last_follow_scroll_ts = 0.0
         self._unread_count = 0
+        self._unread_boundary_id = None
         self._remove_unread_separator()
         if jump_to_bottom:
-            self.scroll_end(animate=False)
+            self._scroll_end_with_guard(animate=False)
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
@@ -1100,8 +1119,9 @@ class EnhancedConversationLog(VerticalScroll):
         # Always scroll to show user message
         self._auto_scroll = True
         self._unread_count = 0
+        self._unread_boundary_id = None
         self._remove_unread_separator()
-        self.scroll_end(animate=False)
+        self._scroll_end_with_guard(animate=False)
 
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
@@ -1219,20 +1239,26 @@ class EnhancedConversationLog(VerticalScroll):
         self._streaming_message = None
         self._auto_scroll = not self._sticky_follow_paused
         self._last_follow_scroll_ts = 0.0
+        self._ignore_scroll_update_until = 0.0
         self._unread_count = 0
         self._unread_separator = None
+        self._unread_boundary_id = None
 
     def on_update_scroll(self, _event: UpdateScroll) -> None:
         """Update auto-scroll whenever this scroll view moves."""
+        if time.monotonic() < self._ignore_scroll_update_until:
+            return
         self.update_auto_scroll_state()
 
     def scroll_to_bottom(self, animate: bool = False) -> None:
         """Scroll to bottom and re-enable auto-scroll."""
         self._auto_scroll = not self._sticky_follow_paused
         self._last_follow_scroll_ts = 0.0
+        self._ignore_scroll_update_until = 0.0
         self._unread_count = 0
+        self._unread_boundary_id = None
         self._remove_unread_separator()
-        self.scroll_end(animate=animate)
+        self._scroll_end_with_guard(animate=animate)
 
     def disable_auto_scroll(self) -> None:
         """Disable auto-scroll until user returns to bottom."""
@@ -1243,12 +1269,14 @@ class EnhancedConversationLog(VerticalScroll):
         if self._sticky_follow_paused:
             if self._is_at_bottom():
                 self._unread_count = 0
+                self._unread_boundary_id = None
                 self._remove_unread_separator()
             self._auto_scroll = False
             return
         self._auto_scroll = self._is_at_bottom()
         if self._auto_scroll:
             self._unread_count = 0
+            self._unread_boundary_id = None
             self._remove_unread_separator()
 
     def _maybe_scroll_end(self, mark_unread: bool = False, force: bool = False) -> None:
@@ -1261,18 +1289,29 @@ class EnhancedConversationLog(VerticalScroll):
                 ):
                     return
                 self._last_follow_scroll_ts = now
+                self._scroll_end_with_guard(animate=False, now=now)
             else:
-                self._last_follow_scroll_ts = time.monotonic()
-            self.scroll_end(animate=False)
+                now = time.monotonic()
+                self._last_follow_scroll_ts = now
+                self._scroll_end_with_guard(animate=False, now=now)
             return
         if mark_unread:
             self._unread_count += 1
 
+    def _scroll_end_with_guard(self, animate: bool = False, now: float | None = None) -> None:
+        timestamp = now if now is not None else time.monotonic()
+        guard_until = timestamp + self._PROGRAMMATIC_SCROLL_GUARD_SECONDS
+        if guard_until > self._ignore_scroll_update_until:
+            self._ignore_scroll_update_until = guard_until
+        self.scroll_end(animate=animate)
+
     def _mark_unread_boundary(self) -> None:
         """Insert unread separator before first unread message."""
-        if self._auto_scroll or self._unread_count > 0 or not self._show_unread_separator:
+        if self._auto_scroll or self._unread_count > 0:
             return
-        self._ensure_unread_separator()
+        self._unread_boundary_id = f"msg-{self._message_count}"
+        if self._show_unread_separator:
+            self._ensure_unread_separator()
 
     def _ensure_unread_separator(self) -> None:
         if self._unread_separator is not None:
@@ -1282,7 +1321,22 @@ class EnhancedConversationLog(VerticalScroll):
             classes="unread-separator",
         )
         self._unread_separator = separator
-        self.mount(separator)
+        target = self._get_unread_boundary_target()
+        try:
+            if target is not None:
+                self.mount(separator, before=target)
+            else:
+                self.mount(separator)
+        except Exception:
+            self.mount(separator)
+
+    def _get_unread_boundary_target(self) -> Optional[Widget]:
+        if not self._unread_boundary_id:
+            return None
+        try:
+            return self.query_one(f"#{self._unread_boundary_id}")
+        except Exception:
+            return None
 
     def _remove_unread_separator(self) -> None:
         if self._unread_separator is None:

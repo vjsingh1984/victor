@@ -310,6 +310,19 @@ class TestFindTeamForTask:
 # =============================================================================
 
 
+def _has_external_vertical_packages() -> bool:
+    """Check if external vertical packages are installed."""
+    try:
+        import victor_coding.teams  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+@pytest.mark.skipif(
+    not _has_external_vertical_packages(),
+    reason="Requires external vertical packages (victor-coding, etc.) — pending migration to vertical repos",
+)
 class TestAutoRegistration:
     """Tests for auto-registration from verticals.
 

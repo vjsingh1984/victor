@@ -11,7 +11,9 @@ The TUI is built using Textual and provides:
 - Status bar showing provider/model information
 - Real-time streaming with thinking and tool call visualization
 - Unread separator marker when new responses arrive while scrolled up (`Ctrl+U` to toggle)
-- Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary
+- Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary (works even if marker is hidden)
+- Status bar unread badge (e.g., `3 new`) while backlog exists
+- Sticky follow mode (`Ctrl+F`) with explicit `Following` / `Paused` status indicator
 - 40+ slash commands for session management
 
 ## Layout
@@ -69,7 +71,8 @@ victor chat --no-tui
 | `Ctrl+C` | Exit Victor |
 | `Ctrl+L` | Clear conversation |
 | `Ctrl+T` | Toggle thinking panel |
-| `Ctrl+N` | Jump to unread marker |
+| `Ctrl+N` | Jump to unread boundary |
+| `Ctrl+F` | Toggle sticky follow mode |
 | `Ctrl+U` | Toggle unread separator |
 | `Ctrl+S` | Save current session |
 | `Ctrl+/` | Show help overlay |
@@ -94,6 +97,13 @@ victor chat --no-tui
 | `Ctrl+End` | Scroll to bottom |
 | `PgUp` | Scroll up one page |
 | `PgDn` | Scroll down one page |
+
+Follow behavior:
+
+- Scrolling up (mouse wheel or keyboard) pauses auto-follow so new output does not yank the viewport.
+- Status bar shows `Paused` whenever auto-follow is not active, and `Following` when live tailing is active.
+- Use `Ctrl+F` to pause/resume sticky follow mode.
+- When sticky follow is paused, the jump button changes to `Resume follow`.
 
 ---
 
@@ -303,6 +313,9 @@ When streaming is enabled (default), responses appear token by token with:
 - Real-time content updates
 - Thinking panel for reasoning models
 - Tool call visualization with status indicators
+
+Streaming transcript updates are buffered and flushed in small batches to keep the terminal responsive.
+Auto-follow uses guarded programmatic scrolling so streaming updates do not accidentally pause follow mode.
 
 ### Thinking Panel
 

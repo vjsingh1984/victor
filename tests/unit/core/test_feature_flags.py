@@ -404,20 +404,18 @@ class TestFeatureConfigModule:
 
     def test_get_feature_flag_summary(self):
         """Test getting feature flag summary."""
-        with mock.patch.dict(
-            "victor.config.feature_config.DEFAULT_FEATURE_FLAGS",
-            {
-                "use_new_chat_service": True,
-                "use_new_tool_service": False,
-            }
-        ):
-            summary = get_feature_flag_summary()
+        # Pass flags directly to avoid environment variable interference
+        flags = {
+            "use_new_chat_service": True,
+            "use_new_tool_service": False,
+        }
+        summary = get_feature_flag_summary(flags)
 
-            assert "Feature Flags Status:" in summary
-            assert "ENABLED" in summary
-            assert "DISABLED" in summary
-            assert "use_new_chat_service" in summary
-            assert "use_new_tool_service" in summary
+        assert "Feature Flags Status:" in summary
+        assert "ENABLED" in summary
+        assert "DISABLED" in summary
+        assert "use_new_chat_service" in summary
+        assert "use_new_tool_service" in summary
 
 
 class TestThreadSafety:
