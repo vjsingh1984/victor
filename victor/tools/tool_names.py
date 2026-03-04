@@ -221,6 +221,23 @@ TOOL_ALIASES: Dict[str, str] = {
     "bash": ToolNames.SHELL,  # Common alias
     "execute": ToolNames.SHELL,  # Common alias
     "cmd": ToolNames.SHELL,  # Windows-style alias
+    # Container-based runtimes (Claude/DevDay compatibility)
+    "container.exec": ToolNames.SHELL,
+    "container.execute": ToolNames.SHELL,
+    "container.shell": ToolNames.SHELL,
+    "container.run": ToolNames.SHELL,
+    "container.command": ToolNames.SHELL,
+    "container.file.read": ToolNames.READ,
+    "container.file.write": ToolNames.WRITE,
+    "container.file.append": ToolNames.WRITE,
+    "container.file.list": ToolNames.LS,
+    "container.file.delete": ToolNames.WRITE,
+    "repo_browser.read_file": ToolNames.READ,
+    "repo_browser.write_file": ToolNames.WRITE,
+    "repo_browser.list_directory": ToolNames.LS,
+    "tool.read_file": ToolNames.READ,
+    "tool.write_file": ToolNames.WRITE,
+    "tool.list_directory": ToolNames.LS,
     "execute_python_in_sandbox": ToolNames.SANDBOX,
     "upload_files_to_sandbox": ToolNames.SANDBOX_UPLOAD,
     # Search - keyword search
