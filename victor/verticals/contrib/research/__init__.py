@@ -15,11 +15,7 @@ from victor.verticals.contrib.research.mode_config import ResearchModeConfigProv
 from victor.verticals.contrib.research.safety import ResearchSafetyExtension
 from victor.verticals.contrib.research.capabilities import ResearchCapabilityProvider
 
-# Import canonical tool dependency provider instead of deprecated class
-from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-# Create canonical provider for research vertical
-ResearchToolDependencyProvider = create_vertical_tool_dependency_provider("research")
+from victor.verticals.contrib.research.tool_dependencies import get_provider
 
 __all__ = [
     "ResearchAssistant",
@@ -27,7 +23,7 @@ __all__ = [
     "ResearchModeConfigProvider",
     "ResearchSafetyExtension",
     "ResearchCapabilityProvider",  # Capability provider
-    "ResearchToolDependencyProvider",  # Now uses canonical provider
+    "get_provider",  # Tool dependency provider factory
 ]
 
 # Enhanced features with new coordinators

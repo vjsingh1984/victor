@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workflow Compiler** - Infrastructure improvements for reliability
 - **Tool Selection Defaults** - Centralized configuration in settings module
 - **Deprecated Workflow Executor APIs** - Removed legacy execution engine stubs
+- **Vertical Tool Dependency Access** - `research`, `devops`, and `dataanalysis` now expose provider factories only (`get_provider()` + canonical YAML providers)
 
 ### Fixed
 - **Integration Test Blocking** - Resolved issues causing test hangs
@@ -27,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
 - **Backward Compatibility Aliases** - Migrated to canonical names across codebase
+- **Deprecated Tool-Dependency Shims** - Removed legacy constant exports and deprecated wrapper provider classes from:
+  - `victor.verticals.contrib.research.tool_dependencies`
+  - `victor.verticals.contrib.devops.tool_dependencies`
+  - `victor.verticals.contrib.dataanalysis.tool_dependencies`
+
+**Migration guidance**:
+```python
+from victor.verticals.contrib.devops.tool_dependencies import get_provider
+
+provider = get_provider()
+deps = provider.get_dependencies()
+```
 
 ## [0.5.4] - 2026-02-16
 

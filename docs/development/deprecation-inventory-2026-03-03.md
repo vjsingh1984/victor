@@ -24,3 +24,18 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 
 - Entries with explicit source-level targets were kept as-is (`v0.7.0` / `2026-06-30`).
 - Entries without explicit source targets are assigned provisional `v0.8.0` / `2026-12-31` per policy and should be re-validated at each milestone cut.
+
+## M2 Update (2026-03-04)
+
+Removed in `Unreleased` as part of deprecation-shim burn-down:
+
+- `ResearchToolDependencyProvider` + legacy `RESEARCH_*` constants
+- Deprecated DevOps `DEVOPS_*` constant exports + wrapper provider class
+- `DataAnalysisToolDependencyProvider` + legacy `DATA_ANALYSIS_*` constants
+
+Migration path for all three verticals:
+
+```python
+from victor.verticals.contrib.devops.tool_dependencies import get_provider
+provider = get_provider()
+```

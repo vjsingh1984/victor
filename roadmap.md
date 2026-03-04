@@ -21,7 +21,7 @@ Related documents:
 | `E2` | Roadmap governance consolidation | `M1` in progress |
 | `E3` | Type-safety + quality gates | `M1` in progress |
 | `E4` | Event bridge reliability | `M3` completed |
-| `E5` | Legacy compatibility debt reduction | `M1` in progress |
+| `E5` | Legacy compatibility debt reduction | `M2` completed, `M3` in planning |
 | `E6` | Competitive benchmark ground-truth | `M1` in progress |
 
 Milestone targets:

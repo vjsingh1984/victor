@@ -26,7 +26,7 @@ from victor.verticals.contrib.devops.conversation_enhanced import (
     DevOpsContext,
     EnhancedDevOpsConversationManager,
 )
-from victor.verticals.contrib.devops.tool_dependencies import DevOpsToolDependencyProvider
+from victor.verticals.contrib.devops.tool_dependencies import get_provider
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
 
 __all__ = [
@@ -39,7 +39,7 @@ __all__ = [
     "EnhancedDevOpsConversationManager",
     "DevOpsSafetyRules",
     "DevOpsContext",
-    # Other extensions
-    "DevOpsToolDependencyProvider",
+    # Tool dependency provider factory
+    "get_provider",
     "DevOpsCapabilityProvider",
 ]
