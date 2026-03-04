@@ -935,13 +935,12 @@ class StreamingMessageBlock(Static):
 
         with Vertical():
             if self.role != "user":
-                header_row = Horizontal(classes="header-row")
-                header = Label(role_label, classes="message-header")
-                header.add_class(self.role)
-                header_row.mount(header)
-                if self.role == "assistant":
-                    header_row.mount(Button("Copy", id="copy-btn", variant="default"))
-                yield header_row
+                with Horizontal(classes="header-row"):
+                    header = Label(role_label, classes="message-header")
+                    header.add_class(self.role)
+                    yield header
+                    if self.role == "assistant":
+                        yield Button("Copy", id="copy-btn", variant="default")
             yield Static(id="message-body", classes="message-content")
             if self.role == "assistant":
                 yield Label("▌", classes="streaming-indicator", id="cursor")
