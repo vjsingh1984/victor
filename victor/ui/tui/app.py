@@ -259,12 +259,39 @@ class VictorTUI(App):
         min-height: 0;
     }
 
-    #conversation-area {
+    #body-row {
         width: 100%;
         height: 1fr;
         min-height: 0;
-        padding: 0 0 0 0;
+        layout: horizontal;
+        gap: 1;
+        padding: 0 0 1 0;
+    }
+
+    #conversation-area {
+        width: 1fr;
+        height: 1fr;
+        min-height: 0;
+        padding: 0;
         layout: vertical;
+    }
+
+    #side-panel {
+        width: 32;
+        min-width: 28;
+        height: 1fr;
+        min-height: 0;
+        padding: 0;
+        layout: vertical;
+        border-left: solid $border-muted;
+        padding-left: 1;
+    }
+
+    #side-panel.collapsed {
+        width: 0;
+        min-width: 0;
+        padding-left: 0;
+        border-left: none;
     }
 
     EnhancedConversationLog {
@@ -531,17 +558,23 @@ class VictorTUI(App):
     }
 
     /* Containers */
-    #tool-calls-container,
-    #thinking-container {
+    #thinking-container,
+    #tool-calls-container {
         width: 100%;
-        padding: 0 1;
+        padding: 0;
         margin: 0 0 1 0;
         display: none;
     }
 
-    #tool-calls-container.visible,
-    #thinking-container.visible {
+    #thinking-container.visible,
+    #tool-calls-container.visible {
         display: block;
+    }
+
+    #tool-calls-container {
+        height: 1fr;
+        min-height: 0;
+        overflow-y: auto;
     }
 
     #session-picker {
@@ -695,6 +728,7 @@ class VictorTUI(App):
         self._input_widget: InputWidget | None = None
         self._status_bar: StatusBar | None = None
         self._jump_button: Button | None = None
+        self._side_panel: Optional[Vertical] = None
         self._is_processing = False
         self._current_tool_widget: ToolCallWidget | None = None
         self._tool_widgets: list[ToolCallWidget] = []
@@ -711,16 +745,18 @@ class VictorTUI(App):
         """Compose the TUI layout."""
         yield StatusBar(provider=self.provider, model=self.model)
         with Container(id="main-container"):
-            with Vertical(id="conversation-area"):
-                yield EnhancedConversationLog(
-                    id="conversation-log",
-                    show_unread_separator=self.show_unread_separator,
-                )
-                yield Button("Jump to bottom", id="jump-to-bottom", variant="default")
-            with Container(id="thinking-container"):
-                yield ThinkingWidget(id="thinking-widget")
-            with Container(id="tool-calls-container"):
-                pass  # Tool calls added dynamically
+            with Horizontal(id="body-row"):
+                with Vertical(id="conversation-area"):
+                    yield EnhancedConversationLog(
+                        id="conversation-log",
+                        show_unread_separator=self.show_unread_separator,
+                    )
+                    yield Button("Jump to bottom", id="jump-to-bottom", variant="default")
+                with Vertical(id="side-panel"):
+                    with Container(id="thinking-container"):
+                        yield ThinkingWidget(id="thinking-widget")
+                    with Container(id="tool-calls-container"):
+                        pass  # Tool calls added dynamically
             yield InputWidget(id="input-widget")
         yield Footer()
 
@@ -731,6 +767,8 @@ class VictorTUI(App):
         self._thinking_widget = self.query_one("#thinking-widget", ThinkingWidget)
         self._status_bar = self.query_one(StatusBar)
         self._jump_button = self.query_one("#jump-to-bottom", Button)
+        self._side_panel = self.query_one("#side-panel", Vertical)
+        self._update_side_panel_state()
 
         # Initialize slash command handler with TUI console adapter
         if self.settings:
@@ -979,6 +1017,7 @@ class VictorTUI(App):
         container = self.query_one("#thinking-container")
         container.add_class("visible")
         self._thinking_widget.update_content("")
+        self._update_side_panel_state()
 
     def _update_thinking(self, content: str) -> None:
         """Update thinking content."""
@@ -988,11 +1027,13 @@ class VictorTUI(App):
         """Hide thinking panel."""
         container = self.query_one("#thinking-container")
         container.remove_class("visible")
+        self._update_side_panel_state()
 
     def _show_tool_call(self, tool_name: str, arguments: dict) -> None:
         """Show tool call widget."""
         container = self.query_one("#tool-calls-container")
         container.add_class("visible")
+        self._update_side_panel_state()
 
         # Create tool widget
         self._current_tool_widget = ToolCallWidget(
@@ -1034,6 +1075,7 @@ class VictorTUI(App):
         if not self._tool_widgets:
             container = self.query_one("#tool-calls-container")
             container.remove_class("visible")
+            self._update_side_panel_state()
 
     def _prune_tool_widgets(self) -> None:
         """Remove oldest tool widgets if limit exceeded.
@@ -1051,6 +1093,7 @@ class VictorTUI(App):
             try:
                 container = self.query_one("#tool-calls-container")
                 container.remove_class("visible")
+                self._update_side_panel_state()
             except Exception:
                 pass
 
@@ -1714,3 +1757,17 @@ async def run_tui(
     finally:
         # Clean up environment variable
         os.environ.pop("VICTOR_TUI_MODE", None)
+    def _update_side_panel_state(self) -> None:
+        """Collapse side panel when no thinking/tool widgets are visible."""
+        if not self._side_panel:
+            return
+        try:
+            thinking = self.query_one("#thinking-container")
+            tools = self.query_one("#tool-calls-container")
+        except Exception:
+            return
+        is_visible = thinking.has_class("visible") or tools.has_class("visible")
+        if is_visible:
+            self._side_panel.remove_class("collapsed")
+        else:
+            self._side_panel.add_class("collapsed")
