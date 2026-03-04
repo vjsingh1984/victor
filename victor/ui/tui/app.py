@@ -312,13 +312,13 @@ class VictorTUI(App):
 
     StatusBar .provider-info {
         color: $text-muted;
-        text-style: bold;
+        text-style: none;
         width: 1fr;
     }
 
     StatusBar .status-indicator {
         color: $text-muted;
-        text-style: bold;
+        text-style: none;
         text-align: center;
         width: auto;
         margin-right: 1;
@@ -371,6 +371,7 @@ class VictorTUI(App):
         color: $text-muted;
         text-align: right;
         width: 1fr;
+        text-style: none;
     }
 
     /* Messages - more compact */
@@ -406,7 +407,7 @@ class VictorTUI(App):
 
     MessageWidget.error .message-header {
         color: $error;
-        text-style: bold;
+        text-style: none;
     }
 
     MessageWidget.error .message-content {
@@ -416,7 +417,7 @@ class VictorTUI(App):
     MessageWidget .message-header {
         height: 1;
         margin-bottom: 0;
-        text-style: bold;
+        text-style: none;
     }
 
     MessageWidget .message-header.user { color: $success; }
@@ -429,6 +430,7 @@ class VictorTUI(App):
         color: $text;
         max-height: 10;
         overflow-y: auto;
+        text-style: none;
     }
 
     /* Input - compact at bottom */
@@ -453,7 +455,7 @@ class VictorTUI(App):
         width: 2;
         height: 3;
         color: $primary;
-        text-style: bold;
+        text-style: none;
     }
 
     InputWidget SubmitTextArea,
@@ -462,7 +464,7 @@ class VictorTUI(App):
         height: auto;
         min-height: 3;
         max-height: 6;
-        border: thick $primary;
+        border: solid $border-muted;
         background: $background;
         color: $text;
         padding: 1;
@@ -472,9 +474,9 @@ class VictorTUI(App):
 
     InputWidget SubmitTextArea:focus,
     InputWidget TextArea:focus {
-        border: thick $primary;
+        border: solid $primary;
         background: $background;
-        text-style: bold;
+        text-style: none;
     }
 
     InputWidget .input-hint {

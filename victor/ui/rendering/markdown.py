@@ -20,6 +20,11 @@ _TOKEN_PATTERN = re.compile(
 )
 
 
+def _markdown_block(text: str) -> Markdown:
+    """Consistently style markdown output with a lighter base."""
+    return Markdown(text, style="markdown.text", justify="left")
+
+
 def render_markdown_with_hooks(content: str) -> RenderableType:
     """Render markdown content with diagram/image hooks.
 
@@ -28,7 +33,7 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
     - Show textual placeholders for image links (since Rich can't display images)
     """
     if not content.strip():
-        return Markdown("")
+        return _markdown_block("")
 
     parts: List[RenderableType] = []
     cursor = 0
@@ -37,7 +42,7 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
         if start > cursor:
             chunk = content[cursor:start]
             if chunk.strip():
-                parts.append(Markdown(chunk))
+                parts.append(_markdown_block(chunk))
 
         lang = match.group("lang")
         if lang:
@@ -46,7 +51,7 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
             if lang in _DIAGRAM_LANGS:
                 parts.append(_render_diagram(lang, code))
             else:
-                parts.append(Markdown(match.group(0)))
+                parts.append(_markdown_block(match.group(0)))
         else:
             alt = match.group("alt") or "image"
             src = match.group("src") or ""
@@ -56,10 +61,10 @@ def render_markdown_with_hooks(content: str) -> RenderableType:
 
     remaining = content[cursor:]
     if remaining.strip():
-        parts.append(Markdown(remaining))
+        parts.append(_markdown_block(remaining))
 
     if not parts:
-        return Markdown(content)
+        return _markdown_block(content)
     if len(parts) == 1:
         return parts[0]
     return Group(*parts)

@@ -4,20 +4,20 @@ from __future__ import annotations
 
 # Textual CSS variables must be declared at top-level without a selector.
 THEME_CSS = """
-$text: #e6e9f2;
-$text-muted: #9aa3b5;
-$background: #0d1117;
-$surface: #121826;
-$surface-darken-1: #0f1521;
-$panel: #161f2e;
-$panel-alt: #101723;
-$primary: #7cb7ff;
-$primary-darken-2: #4f8fd6;
-$secondary: #9ed0ff;
-$success: #5fd1a2;
-$warning: #f5c169;
-$error: #ff8787;  /* Improved from #ff7a7a for better contrast */
-$error-bg: #3d1515;  /* Dark red background for error messages */
-$border-muted: #243146;
-$border-strong: #32405a;
+$text: #cdd2df;
+$text-muted: #8c96aa;
+$background: #0b1018;
+$surface: #131a24;
+$surface-darken-1: #0f151e;
+$panel: #151c26;
+$panel-alt: #0f151e;
+$primary: #6ea4e3;
+$primary-darken-2: #4675ad;
+$secondary: #8ec3f2;
+$success: #54b88f;
+$warning: #f1bb60;
+$error: #ff8080;
+$error-bg: #351212;
+$border-muted: #202a3b;
+$border-strong: #2a3548;
 """
