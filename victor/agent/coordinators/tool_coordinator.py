@@ -454,7 +454,14 @@ class ToolCoordinator:
         # Use ToolAccessController if available
         if self._tool_access_controller:
             context = self._build_tool_access_context()
-            return self._tool_access_controller.get_allowed_tools(context)
+            allowed = self._tool_access_controller.get_allowed_tools(context)
+
+            # Keep selector + orchestrator tools in sync with controller decisions
+            if allowed != self._enabled_tools:
+                self._enabled_tools = allowed
+                if self._selector and hasattr(self._selector, "set_enabled_tools"):
+                    self._selector.set_enabled_tools(allowed)
+            return allowed
 
         # Check mode controller for BUILD mode (allows all tools)
         if self._mode_controller:
