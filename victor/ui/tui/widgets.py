@@ -768,17 +768,25 @@ class StreamingMessageBlock(Static):
         }.get(self.role, self.role.title())
 
         with Vertical():
-            header = Label(role_label, classes="message-header")
-            header.add_class(self.role)
-            yield header
+            if self.role != "user":
+                header = Label(role_label, classes="message-header")
+                header.add_class(self.role)
+                yield header
             yield Static(id="message-body", classes="message-content")
-            yield Label("▌", classes="streaming-indicator", id="cursor")
+            if self.role == "assistant":
+                yield Label("▌", classes="streaming-indicator", id="cursor")
 
     def on_mount(self) -> None:
         """Hide cursor initially."""
         self._body_widget = self.query_one("#message-body", Static)
-        self._cursor_widget = self.query_one("#cursor", Label)
-        self._cursor_widget.display = self.is_streaming
+        if self.role == "assistant":
+            try:
+                self._cursor_widget = self.query_one("#cursor", Label)
+                self._cursor_widget.display = self.is_streaming
+            except Exception:
+                self._cursor_widget = None
+        else:
+            self._cursor_widget = None
 
     def watch_content(self, content: str) -> None:
         """React to content changes."""
@@ -786,6 +794,8 @@ class StreamingMessageBlock(Static):
 
     def watch_is_streaming(self, streaming: bool) -> None:
         """Show/hide streaming cursor."""
+        if self.role != "assistant":
+            return
         try:
             if self._cursor_widget is None:
                 self._cursor_widget = self.query_one("#cursor", Label)
@@ -809,6 +819,12 @@ class StreamingMessageBlock(Static):
                     body.update(self.content)
                 else:
                     body.update(render_markdown_with_hooks(self.content))
+            elif self.role == "user":
+                text = Text.assemble(
+                    ("You: ", "bold " + "#64b5f6"),
+                    (self.content, ""),
+                )
+                body.update(text)
             else:
                 body.update(self.content)
         except Exception:
