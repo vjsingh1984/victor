@@ -217,7 +217,7 @@ export class QuickActionsProvider implements vscode.Disposable {
     /**
      * Get context-aware actions based on language and selection
      */
-    private _getContextualActions(languageId: string, hasSelection: boolean): QuickAction[] {
+    private _getContextualActions(languageId: string, _hasSelection: boolean): QuickAction[] {
         let actions = [...QUICK_ACTIONS];
 
         // Add language-specific actions
@@ -329,7 +329,7 @@ export class QuickActionsProvider implements vscode.Disposable {
     /**
      * Convert action to quick pick item
      */
-    private _actionToQuickPickItem(action: QuickAction, isRecent = false): ActionQuickPickItem {
+    private _actionToQuickPickItem(action: QuickAction, _isRecent = false): ActionQuickPickItem {
         return {
             label: `${action.icon} ${action.label}`,
             description: action.shortcut ? `(${action.shortcut})` : undefined,

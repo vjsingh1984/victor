@@ -30,7 +30,7 @@ export class VictorCodeActionProvider implements vscode.CodeActionProvider {
         document: vscode.TextDocument,
         range: vscode.Range | vscode.Selection,
         context: vscode.CodeActionContext,
-        token: vscode.CancellationToken
+        _token: vscode.CancellationToken
     ): vscode.CodeAction[] {
         const actions: vscode.CodeAction[] = [];
 
@@ -56,7 +56,7 @@ export class VictorCodeActionProvider implements vscode.CodeActionProvider {
     private _createDiagnosticActions(
         document: vscode.TextDocument,
         diagnostic: vscode.Diagnostic,
-        range: vscode.Range
+        _range: vscode.Range
     ): vscode.CodeAction[] {
         const actions: vscode.CodeAction[] = [];
 
@@ -236,7 +236,6 @@ Please provide the corrected code.`;
         vscode.commands.registerCommand(
             'victor.explainDiagnostic',
             async (document: vscode.TextDocument, diagnostic: vscode.Diagnostic) => {
-                const code = document.getText(diagnostic.range);
                 const contextLines = getContextLines(document, diagnostic.range, 3);
 
                 const prompt = `Explain this ${document.languageId} error:

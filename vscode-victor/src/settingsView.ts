@@ -50,8 +50,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
     resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
-        token: vscode.CancellationToken
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
     ): void {
         this._view = webviewView;
 
@@ -209,7 +209,7 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         });
     }
 
-    private _getHtmlContent(webview: vscode.Webview): string {
+    private _getHtmlContent(_webview: vscode.Webview): string {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>

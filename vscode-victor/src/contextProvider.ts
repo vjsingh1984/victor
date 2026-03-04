@@ -378,7 +378,7 @@ export class MentionCompletionProvider implements vscode.CompletionItemProvider 
     async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-        token: vscode.CancellationToken
+        _token: vscode.CancellationToken
     ): Promise<vscode.CompletionItem[]> {
         const lineText = document.lineAt(position).text;
         const linePrefix = lineText.substring(0, position.character);

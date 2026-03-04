@@ -104,7 +104,7 @@ export class DiffViewProvider {
     /**
      * Show multi-file diff preview panel with selective application
      */
-    async showMultiFileDiffPanel(sessionId: string, context: vscode.ExtensionContext): Promise<void> {
+    async showMultiFileDiffPanel(sessionId: string, _context: vscode.ExtensionContext): Promise<void> {
         const session = this._pendingSessions.get(sessionId);
         if (!session) {
             vscode.window.showErrorMessage('Session not found');
@@ -501,7 +501,7 @@ export class DiffViewProvider {
 
         const items: vscode.QuickPickItem[] = [];
 
-        for (const [sessionId, session] of this._pendingSessions) {
+        for (const session of this._pendingSessions.values()) {
             items.push({
                 label: `$(git-commit) ${session.description}`,
                 description: `${session.changes.length} file(s)`,
