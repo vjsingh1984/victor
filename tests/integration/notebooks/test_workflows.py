@@ -17,18 +17,13 @@
 Tests the StateGraph workflow tutorial with real LLM calls using Ollama.
 """
 
-import os
 import pytest
 import typing
 
-from victor.framework.graph import END, StateGraph
+from victor.framework.graph import END, MemoryCheckpointer, StateGraph
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    not os.getenv("OLLAMA_HOST") and not os.path.exists("/tmp/ollama.pid"),
-    reason="Requires Ollama running on localhost"
-)
 class TestWorkflowsNotebook:
     """Integration tests for the workflows notebook.
 
@@ -38,45 +33,38 @@ class TestWorkflowsNotebook:
     @pytest.mark.asyncio
     async def test_simple_stategraph_workflow(self):
         """Test a simple StateGraph workflow."""
-        # Define state
         class ProcessState(typing.TypedDict):
-            text: str
-            processed: bool
-            result: str
+            input: str
+            analysis: str
+            summary: str
 
-        # Define workflow
-        def analyze(state: ProcessState) -> str:
-            """Analyze the input text."""
-            return "validated" if len(state["text"]) > 0 else "invalid"
+        def analyze(state: ProcessState) -> ProcessState:
+            return {
+                "input": state["input"],
+                "analysis": f"Analyzed: {state['input']}",
+                "summary": state["summary"],
+            }
 
-        def process(state: ProcessState) -> str:
-            """Process the validated text."""
-            if state["processed"]:
-                return END
-            return "processed"
+        def summarize(state: ProcessState) -> ProcessState:
+            return {
+                "input": state["input"],
+                "analysis": state["analysis"],
+                "summary": f"Summary: {state['analysis']}",
+            }
 
-        def format_result(state: ProcessState) -> str:
-            """Format the final result."""
-            return END
-
-        # Create graph
         graph = StateGraph(ProcessState)
         graph.add_node("analyze", analyze)
-        graph.add_node("process", process)
-        graph.add_node("format_result", format_result)
+        graph.add_node("summarize", summarize)
+        graph.add_edge("analyze", "summarize")
+        graph.add_edge("summarize", END)
+        graph.set_entry_point("analyze")
 
-        graph.add_edge("analyze", "process")
-        graph.add_edge("process", "format_result")
-
-        # Compile and run
         app = graph.compile()
+        result = await app.invoke(ProcessState(input="Hello Victor!", analysis="", summary=""))
 
-        # Test execution
-        initial_state = ProcessState(text="Hello", processed=False)
-        result_state = await app.run(initial_state)
-
-        assert result_state["processed"] is True
-        assert result_state["result"] is not None
+        assert result.success is True
+        assert "Analyzed:" in result.state["analysis"]
+        assert "Summary:" in result.state["summary"]
 
     @pytest.mark.asyncio
     async def test_conditional_workflow(self):
@@ -84,32 +72,55 @@ class TestWorkflowsNotebook:
         class ReviewState(typing.TypedDict):
             rating: int
             approved: bool
+            outcome: str
 
-        def should_approve(state: ReviewState) -> str:
-            """Check if rating is high enough."""
+        def decide(state: ReviewState) -> ReviewState:
+            return state
+
+        def route(state: ReviewState) -> str:
             return "approved" if state["rating"] >= 4 else "rejected"
 
-        def send_back(state: ReviewState) -> str:
-            """Send back for revision."""
-            return END
+        def approve(state: ReviewState) -> ReviewState:
+            state["approved"] = True
+            state["outcome"] = "approved"
+            return state
+
+        def reject(state: ReviewState) -> ReviewState:
+            state["approved"] = False
+            state["outcome"] = "rejected"
+            return state
 
         graph = StateGraph(ReviewState)
-        graph.add_node("should_approve", should_approve)
-        graph.add_edge("should_approve", "send_back", condition=lambda s: s["approved"])
+        graph.add_node("decide", decide)
+        graph.add_node("approve", approve)
+        graph.add_node("reject", reject)
+        graph.add_conditional_edge(
+            "decide",
+            route,
+            {
+                "approved": "approve",
+                "rejected": "reject",
+            },
+        )
+        graph.add_edge("approve", END)
+        graph.add_edge("reject", END)
+        graph.set_entry_point("decide")
 
         app = graph.compile()
 
-        # Test with high rating
-        state1 = await app.run(ReviewState(rating=5, approved=False))
-        assert state1["approved"] is True
+        state1 = await app.invoke(ReviewState(rating=5, approved=False, outcome=""))
+        assert state1.success is True
+        assert state1.state["approved"] is True
+        assert state1.state["outcome"] == "approved"
 
-        # Test with low rating
-        state2 = await app.run(ReviewState(rating=2, approved=False))
-        assert state2["approved"] is False
+        state2 = await app.invoke(ReviewState(rating=2, approved=False, outcome=""))
+        assert state2.success is True
+        assert state2.state["approved"] is False
+        assert state2.state["outcome"] == "rejected"
 
     @pytest.mark.asyncio
     async def test_parallel_execution(self):
-        """Test parallel workflow execution."""
+        """Test multi-step workflow execution."""
         import asyncio
 
         class ParallelState(typing.TypedDict):
@@ -117,66 +128,85 @@ class TestWorkflowsNotebook:
             task2_result: str
             task3_result: str
 
-        async def task1(state: ParallelState) -> str:
+        async def task1(state: ParallelState) -> ParallelState:
             await asyncio.sleep(0.01)
             state["task1_result"] = "done1"
-            return "task2"
+            return state
 
-        async def task2(state: ParallelState) -> str:
+        async def task2(state: ParallelState) -> ParallelState:
             await asyncio.sleep(0.01)
             state["task2_result"] = "done2"
-            return "task3"
+            return state
 
-        async def task3(state: ParallelState) -> str:
+        async def task3(state: ParallelState) -> ParallelState:
             state["task3_result"] = "done3"
-            return END
+            return state
 
         graph = StateGraph(ParallelState)
         graph.add_node("task1", task1)
         graph.add_node("task2", task2)
         graph.add_node("task3", task3)
         graph.add_edge("task1", "task2")
-        graph.add_edge("task1", "task3")
+        graph.add_edge("task2", "task3")
+        graph.add_edge("task3", END)
+        graph.set_entry_point("task1")
 
         app = graph.compile()
 
-        result = await app.run(ParallelState(
+        result = await app.invoke(ParallelState(
             task1_result="",
             task2_result="",
             task3_result=""
         ))
 
-        assert result["task1_result"] == "done1"
-        assert result["task2_result"] == "done2"
-        assert result["task3_result"] == "done3"
+        assert result.success is True
+        assert result.state["task1_result"] == "done1"
+        assert result.state["task2_result"] == "done2"
+        assert result.state["task3_result"] == "done3"
 
     @pytest.mark.asyncio
     async def test_workflow_with_checkpointing(self):
         """Test workflow with checkpoint/save functionality."""
         class CounterState(typing.TypedDict):
             count: int
-            doubled: str
+            doubled: int
 
-        def increment(state: CounterState) -> str:
+        def increment(state: CounterState) -> CounterState:
             state["count"] += 1
+            return state
+
+        def should_continue(state: CounterState) -> str:
             return "double" if state["count"] >= 2 else "increment"
 
-        def double(state: CounterState) -> str:
-            state["doubled"] = str(state["count"] * 2)
-            return END
+        def double(state: CounterState) -> CounterState:
+            state["doubled"] = state["count"] * 2
+            return state
 
         graph = StateGraph(CounterState)
         graph.add_node("increment", increment)
         graph.add_node("double", double)
-        graph.add_edge("increment", "increment")
-        graph.add_edge("increment", "double")
+        graph.add_conditional_edge(
+            "increment",
+            should_continue,
+            {
+                "increment": "increment",
+                "double": "double",
+            },
+        )
+        graph.add_edge("double", END)
+        graph.set_entry_point("increment")
 
-        app = graph.compile(checkpointer_id="test_checkpoint")
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
 
-        # Run to completion
-        result = await app.run(CounterState(count=0, doubled=""))
-        assert result["count"] == 2
-        assert result["doubled"] == "4"
+        thread_id = "notebook-checkpoint-test"
+        result = await app.invoke(CounterState(count=0, doubled=0), thread_id=thread_id)
+        assert result.success is True
+        assert result.state["count"] == 2
+        assert result.state["doubled"] == 4
+
+        checkpoints = await checkpointer.list(thread_id)
+        assert len(checkpoints) > 0
 
 
 if __name__ == "__main__":
