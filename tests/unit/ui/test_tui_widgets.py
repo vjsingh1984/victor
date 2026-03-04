@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from rich.markdown import Markdown
 from textual.messages import UpdateScroll
 
-from victor.ui.tui.widgets import EnhancedConversationLog, StreamingMessageBlock
+from victor.ui.tui.widgets import EnhancedConversationLog, StatusBar, StreamingMessageBlock
 
 
 def test_streaming_does_not_force_scroll_when_auto_scroll_disabled() -> None:
@@ -190,3 +190,105 @@ def test_unread_separator_removed_when_reaching_bottom() -> None:
 
         assert log._unread_separator is None
         assert log.unread_count == 0
+
+
+def test_enabling_separator_with_existing_unread_inserts_marker() -> None:
+    """Turning separator back on with unread messages should recreate marker."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True),
+    ):
+        log = EnhancedConversationLog(show_unread_separator=False)
+        log.disable_auto_scroll()
+        log.add_assistant_message("new message")
+        assert log.unread_count == 1
+        assert log._unread_separator is None
+
+        log.set_unread_separator_enabled(True)
+
+        assert log._unread_separator is not None
+
+
+def test_jump_to_unread_separator_scrolls_when_present() -> None:
+    """Unread jump should scroll to separator when marker exists."""
+    log = EnhancedConversationLog(show_unread_separator=True)
+    fake_separator = MagicMock()
+    log._unread_separator = fake_separator
+
+    with patch.object(log, "scroll_to_widget", return_value=True) as scroll_to_widget:
+        jumped = log.jump_to_unread_separator()
+
+    assert jumped is True
+    scroll_to_widget.assert_called_once()
+
+
+def test_jump_to_unread_separator_returns_false_without_marker() -> None:
+    """Unread jump should report false when no unread marker exists."""
+    log = EnhancedConversationLog(show_unread_separator=True)
+    log._unread_separator = None
+
+    assert log.jump_to_unread_separator() is False
+
+
+def test_follow_pause_is_sticky_across_messages() -> None:
+    """Sticky follow pause should prevent auto-follow for new messages."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+    ):
+        log = EnhancedConversationLog()
+        log.set_follow_paused(True)
+
+        log.add_user_message("user message")
+        log.add_assistant_message("assistant message")
+
+        assert log.follow_paused is True
+        assert log.auto_scroll_enabled is False
+        assert log.unread_count == 1
+        assert scroll_end.call_count == 0
+
+
+def test_resuming_follow_clears_unread_and_jumps_to_bottom() -> None:
+    """Resuming follow should clear unread state and jump once when requested."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+    ):
+        log = EnhancedConversationLog()
+        log.set_follow_paused(True)
+        log.add_assistant_message("pending")
+        assert log.unread_count == 1
+
+        log.set_follow_paused(False, jump_to_bottom=True)
+
+        assert log.follow_paused is False
+        assert log.auto_scroll_enabled is True
+        assert log.unread_count == 0
+        assert scroll_end.call_count == 1
+
+
+def test_update_auto_scroll_state_respects_sticky_pause() -> None:
+    """Sticky pause should keep auto-follow off even at bottom."""
+    log = EnhancedConversationLog()
+    log.set_follow_paused(True)
+    log._unread_count = 2
+
+    with patch.object(log, "_is_at_bottom", return_value=True):
+        log.update_auto_scroll_state()
+
+    assert log.follow_paused is True
+    assert log.auto_scroll_enabled is False
+    assert log.unread_count == 0
+
+
+def test_status_bar_updates_follow_indicator() -> None:
+    """Status bar should show explicit Following/Paused indicator text."""
+    bar = StatusBar()
+    label = MagicMock()
+
+    with patch.object(StatusBar, "query_one", return_value=label):
+        bar.update_follow(paused=True)
+        label.update.assert_called_with("Paused")
+
+        bar.update_follow(paused=False)
+        label.update.assert_called_with("Following")

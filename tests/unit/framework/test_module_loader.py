@@ -947,6 +947,80 @@ class TestEntryPointCache:
         assert "test.group" in new_cache._memory_cache
         EntryPointCache.reset_instance()
 
+    def test_load_from_disk_reuses_meta_env_hash_without_full_scan(self, tmp_path):
+        """Warm-start path should skip full env hash computation when meta matches."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        cache_file = cache_dir / "entry_points.json"
+
+        EntryPointCache.reset_instance()
+        temp_cache = EntryPointCache(cache_dir=cache_dir)
+        installation_fingerprint = temp_cache._compute_installation_fingerprint()
+        EntryPointCache.reset_instance()
+
+        cache_data = {
+            "_meta": {
+                "schema_version": 1,
+                "env_hash": "meta_hash",
+                "install_fingerprint": installation_fingerprint,
+            },
+            "test.group": {
+                "group": "test.group",
+                "entries": {"entry1": "mod:Class"},
+                "env_hash": "meta_hash",
+                "timestamp": time.time(),
+                "ttl": 3600.0,
+            },
+        }
+
+        with open(cache_file, "w") as f:
+            json.dump(cache_data, f)
+
+        with patch.object(
+            EntryPointCache,
+            "_compute_env_hash",
+            side_effect=AssertionError("full env hash should not run on warm meta path"),
+        ):
+            EntryPointCache.reset_instance()
+            new_cache = EntryPointCache(cache_dir=cache_dir)
+
+        assert new_cache._env_hash == "meta_hash"
+        assert "test.group" in new_cache._memory_cache
+        EntryPointCache.reset_instance()
+
+    def test_load_from_disk_meta_mismatch_falls_back_to_full_scan(self, tmp_path):
+        """Meta fingerprint mismatch should use full env hash computation fallback."""
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        cache_file = cache_dir / "entry_points.json"
+
+        cache_data = {
+            "_meta": {
+                "schema_version": 1,
+                "env_hash": "stale_hash",
+                "install_fingerprint": "mismatch",
+            },
+            "test.group": {
+                "group": "test.group",
+                "entries": {"entry1": "mod:Class"},
+                "env_hash": "computed_hash",
+                "timestamp": time.time(),
+                "ttl": 3600.0,
+            },
+        }
+
+        with open(cache_file, "w") as f:
+            json.dump(cache_data, f)
+
+        EntryPointCache.reset_instance()
+        with patch.object(EntryPointCache, "_compute_env_hash", return_value="computed_hash") as mock_hash:
+            new_cache = EntryPointCache(cache_dir=cache_dir)
+
+        assert mock_hash.call_count == 1
+        assert new_cache._env_hash == "computed_hash"
+        assert "test.group" in new_cache._memory_cache
+        EntryPointCache.reset_instance()
+
     def test_load_from_disk_ignores_expired_entries(self, tmp_path):
         """Test _load_from_disk ignores expired cache entries."""
         cache_dir = tmp_path / "cache"
@@ -1055,6 +1129,24 @@ class TestEntryPointCache:
         assert cache_dir.exists()
         assert (cache_dir / "entry_points.json").exists()
         EntryPointCache.reset_instance()
+
+    def test_save_to_disk_persists_meta_env_hash(self, entry_point_cache):
+        """Persisted cache should include warm-start metadata when env hash is known."""
+        entry_point_cache._env_hash = "env_hash_for_meta"
+        entry_point_cache._memory_cache["test.group"] = CachedEntryPoints(
+            group="test.group",
+            entries={"entry1": "mod:Class"},
+            env_hash="env_hash_for_meta",
+            timestamp=time.time(),
+        )
+        entry_point_cache._save_to_disk()
+
+        with open(entry_point_cache._cache_file, "r") as f:
+            data = json.load(f)
+
+        assert "_meta" in data
+        assert data["_meta"]["env_hash"] == "env_hash_for_meta"
+        assert "install_fingerprint" in data["_meta"]
 
     def test_save_to_disk_handles_error(self, entry_point_cache, tmp_path):
         """Test _save_to_disk handles write errors gracefully."""

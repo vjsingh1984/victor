@@ -465,8 +465,7 @@ class ChatService:
         Args:
             message: Message content
         """
-        from victor.framework.message import Message
-        msg = Message(role="user", content=message)
+        msg = {"role": "user", "content": message}
         self._context.add_message(msg)
 
     def _add_assistant_message_to_context(
@@ -478,12 +477,12 @@ class ChatService:
         Args:
             response: Response to add
         """
-        from victor.framework.message import Message
-        msg = Message(
-            role="assistant",
-            content=response.content,
-            tool_calls=response.tool_calls,
-        )
+        msg = {
+            "role": "assistant",
+            "content": response.content,
+        }
+        if hasattr(response, "tool_calls") and response.tool_calls:
+            msg["tool_calls"] = response.tool_calls
         self._context.add_message(msg)
 
     def _add_tool_result_to_context(
@@ -497,13 +496,12 @@ class ChatService:
             tool_name: Name of tool that was executed
             result: Tool result
         """
-        from victor.framework.message import Message
         content = str(result.output) if result.output else str(result.error)
-        msg = Message(
-            role="tool",
-            content=content,
-            tool_call_id=tool_name,
-        )
+        msg = {
+            "role": "tool",
+            "content": content,
+            "tool_call_id": tool_name,
+        }
         self._context.add_message(msg)
 
     def _aggregate_chunks(

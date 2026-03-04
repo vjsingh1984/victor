@@ -787,6 +787,38 @@ class EntryPointCache:
 
             return f"time_{int(time.time())}"
 
+    def _compute_installation_fingerprint(self) -> str:
+        """Compute lightweight installation fingerprint for warm-start checks.
+
+        This avoids full package enumeration by hashing a small set of
+        interpreter and site-package directory mtimes.
+        """
+        import hashlib
+        import site
+        import sys
+
+        components = [f"exe:{sys.executable}", f"py:{sys.version_info.major}.{sys.version_info.minor}"]
+        candidate_paths = []
+        try:
+            candidate_paths.extend(site.getsitepackages())
+        except Exception:
+            pass
+
+        user_site = site.getusersitepackages()
+        if isinstance(user_site, str):
+            candidate_paths.append(user_site)
+
+        for raw_path in sorted({p for p in candidate_paths if p}):
+            try:
+                resolved = Path(raw_path).resolve()
+                stat = resolved.stat()
+                components.append(f"path:{resolved}:{stat.st_mtime_ns}:{stat.st_size}")
+            except Exception:
+                components.append(f"path:{raw_path}:missing")
+
+        payload = "|".join(components)
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
     def _get_env_hash(self) -> str:
         """Get cached or compute environment hash.
 
@@ -808,11 +840,32 @@ class EntryPointCache:
             with open(self._cache_file, "r") as f:
                 data = json.load(f)
 
-            # Current env hash for validation
-            current_hash = self._get_env_hash()
+            if not isinstance(data, dict):
+                logger.warning("Entry point cache file has invalid top-level format")
+                return
+
+            # Warm-start fast path: if installation fingerprint matches, reuse persisted env hash
+            # and avoid the expensive full package-distribution scan.
+            current_hash: Optional[str] = None
+            meta = data.get("_meta")
+            if isinstance(meta, dict):
+                cached_env_hash = meta.get("env_hash")
+                cached_fingerprint = meta.get("install_fingerprint")
+                if isinstance(cached_env_hash, str) and isinstance(cached_fingerprint, str):
+                    current_fingerprint = self._compute_installation_fingerprint()
+                    if current_fingerprint == cached_fingerprint:
+                        self._env_hash = cached_env_hash
+                        current_hash = cached_env_hash
+                        logger.debug("Reused cached env hash via installation fingerprint fast path")
+
+            # Fallback for legacy cache files or fingerprint mismatch.
+            if current_hash is None:
+                current_hash = self._get_env_hash()
 
             with self._cache_lock:
                 for group, entry_data in data.items():
+                    if group == "_meta":
+                        continue
                     try:
                         cached = CachedEntryPoints.from_dict(entry_data)
                         # Only load if env hash matches and not expired
@@ -832,12 +885,20 @@ class EntryPointCache:
         """Save cache to disk."""
         try:
             import json
+            import time
 
             # Ensure cache directory exists
             self._cache_dir.mkdir(parents=True, exist_ok=True)
 
             with self._cache_lock:
                 data = {group: cached.to_dict() for group, cached in self._memory_cache.items()}
+                if self._env_hash is not None:
+                    data["_meta"] = {
+                        "schema_version": 1,
+                        "env_hash": self._env_hash,
+                        "install_fingerprint": self._compute_installation_fingerprint(),
+                        "saved_at": time.time(),
+                    }
 
             with open(self._cache_file, "w") as f:
                 json.dump(data, f, indent=2)

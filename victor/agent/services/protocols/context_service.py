@@ -19,10 +19,13 @@ Defines the interface for context and state management operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
+# Message is a dict with 'role' and 'content' keys
 if TYPE_CHECKING:
-    from victor.framework.message import Message
+    Message = Dict[str, Any]
+else:
+    Message = Dict[str, Any]
 
 
 @runtime_checkable

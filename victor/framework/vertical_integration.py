@@ -129,6 +129,7 @@ import logging
 import json
 import threading
 import time
+import warnings
 import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -172,6 +173,20 @@ logger = logging.getLogger(__name__)
 
 _INTEGRATION_PLAN_VERSION = 1
 _INTEGRATION_PLAN_SKIP_REASON = "integration_plan_noop"
+_LEGACY_EXTENSION_REGISTRY_GUIDANCE = (
+    "Legacy extension-registry APIs in victor.framework.vertical_integration are deprecated and "
+    "inactive in the default pipeline. Use StepHandlerRegistry + ExtensionsStepHandler."
+)
+
+
+def _warn_legacy_extension_registry_api(api_name: str) -> None:
+    """Emit deprecation warning for inactive legacy extension-registry APIs."""
+    message = (
+        f"{api_name} is deprecated. {_LEGACY_EXTENSION_REGISTRY_GUIDANCE} "
+        "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry."
+    )
+    warnings.warn(message, DeprecationWarning, stacklevel=3)
+    logger.warning(message)
 
 
 # =============================================================================
@@ -342,16 +357,25 @@ class ExtensionHandlerRegistry:
 _default_extension_registry: Optional[ExtensionHandlerRegistry] = None
 
 
-def get_extension_handler_registry() -> ExtensionHandlerRegistry:
-    """Get the default extension handler registry.
-
-    Returns:
-        The default extension handler registry
-    """
+def _get_legacy_extension_registry_no_warn() -> ExtensionHandlerRegistry:
+    """Get legacy extension registry without emitting deprecation warnings."""
     global _default_extension_registry
     if _default_extension_registry is None:
         _default_extension_registry = ExtensionHandlerRegistry.default()
     return _default_extension_registry
+
+
+def get_extension_handler_registry() -> ExtensionHandlerRegistry:
+    """Get the default extension handler registry.
+
+    Deprecated:
+        This registry is not used by the active step-handler pipeline.
+
+    Returns:
+        The default extension handler registry
+    """
+    _warn_legacy_extension_registry_api("get_extension_handler_registry()")
+    return _get_legacy_extension_registry_no_warn()
 
 
 def register_extension_handler(
@@ -361,6 +385,9 @@ def register_extension_handler(
     order: int = 100,
 ) -> None:
     """Register a new extension handler (OCP extension point).
+
+    Deprecated:
+        Handlers registered here are inactive for the default integration path.
 
     This is a compatibility adapter only. The active integration path uses
     `victor.framework.step_handlers.ExtensionsStepHandler` and its registry.
@@ -385,7 +412,8 @@ def register_extension_handler(
             order=60,
         )
     """
-    registry = get_extension_handler_registry()
+    _warn_legacy_extension_registry_api("register_extension_handler()")
+    registry = _get_legacy_extension_registry_no_warn()
     registry.register(name, attr_name, handler, order)
 
 
@@ -857,10 +885,10 @@ class VerticalIntegrationPipeline:
         # Legacy pipeline-level extension registry is intentionally inactive.
         # Active extension integration lives in step_handlers.ExtensionsStepHandler.
         if extension_registry is not None:
-            logger.debug(
-                "Ignoring legacy extension_registry argument for VerticalIntegrationPipeline; "
-                "use StepHandlerRegistry/ExtensionsStepHandler extension points instead."
+            _warn_legacy_extension_registry_api(
+                "VerticalIntegrationPipeline(extension_registry=...)"
             )
+            logger.debug("Ignoring provided legacy extension_registry in active step-handler path.")
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -961,6 +989,8 @@ class VerticalIntegrationPipeline:
                 "Ensure step handlers are initialized. "
                 "Use create_integration_pipeline() factory for proper setup."
             )
+
+        self._validate_step_handler_dependency_contract(result)
 
         cached_plan: Optional[Dict[str, Any]] = None
         skip_handlers: Set[str] = set()
@@ -1722,6 +1752,8 @@ class VerticalIntegrationPipeline:
             result.add_error("StepHandlerRegistry required for vertical integration")
             return result
 
+        self._validate_step_handler_dependency_contract(result)
+
         cached_plan: Optional[Dict[str, Any]] = None
         skip_handlers: Set[str] = set()
         if cache_hit and cache_key:
@@ -1866,6 +1898,81 @@ class VerticalIntegrationPipeline:
         parallel_safe = bool(getattr(handler, "parallel_safe", False))
         has_side_effects = bool(getattr(handler, "side_effects", True))
         return parallel_safe and not has_side_effects
+
+    def _collect_dependency_contract_violations(self, handlers: List[Any]) -> List[str]:
+        """Collect step-handler dependency contract violations.
+
+        Validates that:
+        - each handler has a unique name in the active registry
+        - each declared dependency points to an active handler name
+        """
+        if not handlers:
+            return []
+
+        known_names: Set[str] = set()
+        duplicate_names: Set[str] = set()
+        violations: List[str] = []
+
+        for index, handler in enumerate(handlers):
+            handler_name = str(getattr(handler, "name", f"handler_{index}"))
+            if handler_name in known_names:
+                duplicate_names.add(handler_name)
+            known_names.add(handler_name)
+
+        if duplicate_names:
+            duplicates = ", ".join(sorted(duplicate_names))
+            violations.append(f"duplicate handler name(s): {duplicates}")
+
+        for index, handler in enumerate(handlers):
+            handler_name = str(getattr(handler, "name", f"handler_{index}"))
+            declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
+            missing_dependencies = sorted(
+                {str(dep) for dep in declared_dependencies if str(dep) not in known_names}
+            )
+            if missing_dependencies:
+                missing_names = ", ".join(missing_dependencies)
+                violations.append(
+                    f"handler '{handler_name}' depends on missing handler(s): {missing_names}"
+                )
+
+        return violations
+
+    def _validate_step_handler_dependency_contract(self, result: IntegrationResult) -> bool:
+        """Validate active step-handler dependency metadata.
+
+        Returns:
+            True when contract is valid, False when violations are recorded.
+        """
+        if self._step_registry is None:
+            return True
+
+        handlers = self._step_registry.get_ordered_handlers()
+        violations = self._collect_dependency_contract_violations(handlers)
+        if not violations:
+            return True
+
+        status = "error" if self._strict_mode else "warning"
+        for violation in violations:
+            message = f"Step-handler dependency contract violation: {violation}"
+            if self._strict_mode:
+                result.add_error(message)
+            else:
+                result.add_warning(message)
+
+        result.record_step_status(
+            "dependency_contract",
+            status,
+            details={
+                "strict_mode": self._strict_mode,
+                "violations": violations,
+            },
+        )
+        logger.warning(
+            "Step-handler dependency contract violations detected (%s): %s",
+            status,
+            "; ".join(violations),
+        )
+        return False
 
     def _build_execution_levels(self, handlers: List[Any]) -> List[List[Any]]:
         """Build deterministic execution levels from metadata dependencies.

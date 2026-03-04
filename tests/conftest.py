@@ -589,3 +589,15 @@ def temp_workflow_context():
         "analysis": None,
         "output": None,
     }
+
+
+@pytest.fixture(params=["coordinator", "service"])
+def delegation_mode(request, monkeypatch):
+    """Parameterized fixture that tests both coordinator and service paths.
+
+    When param is "service", enables the USE_SERVICE_LAYER feature flag
+    so adapter-wrapped services are used instead of direct coordinators.
+    """
+    if request.param == "service":
+        monkeypatch.setenv("VICTOR_USE_SERVICE_LAYER", "true")
+    yield request.param

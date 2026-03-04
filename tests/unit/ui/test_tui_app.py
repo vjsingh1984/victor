@@ -12,6 +12,7 @@ def test_update_jump_button_label_with_unread_count() -> None:
     app = VictorTUI()
     app._conversation_log = MagicMock()
     app._conversation_log.auto_scroll_enabled = False
+    app._conversation_log.follow_paused = False
     app._conversation_log.unread_count = 3
     app._jump_button = MagicMock()
     app._jump_button.label = "Jump to bottom"
@@ -27,6 +28,7 @@ def test_update_jump_button_hides_when_at_bottom() -> None:
     app = VictorTUI()
     app._conversation_log = MagicMock()
     app._conversation_log.auto_scroll_enabled = True
+    app._conversation_log.follow_paused = False
     app._conversation_log.unread_count = 0
     app._jump_button = MagicMock()
     app._jump_button.label = "Jump to bottom (4 new)"
@@ -102,4 +104,145 @@ def test_action_toggle_unread_marker_flips_state_and_announces() -> None:
 
     app._conversation_log.set_unread_separator_enabled.assert_called_once_with(False)
     app._add_system_message.assert_called_once_with("Unread marker hidden")
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_jump_unread_uses_separator_when_present() -> None:
+    """Ctrl+N should jump to unread marker when available."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.jump_to_unread_separator.return_value = True
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_jump_unread()
+
+    app._conversation_log.jump_to_unread_separator.assert_called_once()
+    app._conversation_log.disable_auto_scroll.assert_called_once()
+    app._conversation_log.update_auto_scroll_state.assert_called_once()
+    app._conversation_log.scroll_to_bottom.assert_not_called()
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_jump_unread_falls_back_to_bottom_when_no_marker() -> None:
+    """Ctrl+N should jump to bottom when no unread marker exists."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.jump_to_unread_separator.return_value = False
+    app._conversation_log.follow_paused = False
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_jump_unread()
+
+    app._conversation_log.scroll_to_bottom.assert_called_once_with(animate=False)
+    app._conversation_log.set_follow_paused.assert_not_called()
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_jump_unread_resumes_follow_when_paused_and_no_marker() -> None:
+    """Ctrl+N should resume follow if paused and no unread marker is available."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.jump_to_unread_separator.return_value = False
+    app._conversation_log.follow_paused = True
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_jump_unread()
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.scroll_to_bottom.assert_not_called()
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_update_jump_button_shows_resume_follow_when_paused() -> None:
+    """Paused follow mode should show a resume label."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = False
+    app._conversation_log.follow_paused = True
+    app._conversation_log.unread_count = 2
+    app._jump_button = MagicMock()
+    app._jump_button.label = "Jump to bottom"
+    app._status_bar = MagicMock()
+
+    app._update_jump_to_bottom()
+
+    app._jump_button.add_class.assert_called_once_with("visible")
+    assert app._jump_button.label == "Resume follow (2 new)"
+    app._status_bar.update_follow.assert_called_once_with(True)
+
+
+def test_update_jump_button_marks_paused_when_user_scrolled() -> None:
+    """Indicator should show paused when follow is off due manual scrolling."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = False
+    app._conversation_log.follow_paused = False
+    app._conversation_log.unread_count = 0
+    app._jump_button = MagicMock()
+    app._jump_button.label = "Jump to bottom"
+    app._status_bar = MagicMock()
+
+    app._update_jump_to_bottom()
+
+    app._status_bar.update_follow.assert_called_once_with(True)
+    assert app._jump_button.label == "Jump to bottom"
+
+
+def test_update_jump_button_marks_following_when_auto_follow_active() -> None:
+    """Indicator should show following when auto-follow is active."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = True
+    app._conversation_log.follow_paused = False
+    app._conversation_log.unread_count = 0
+    app._jump_button = MagicMock()
+    app._jump_button.label = "Jump to bottom"
+    app._status_bar = MagicMock()
+
+    app._update_jump_to_bottom()
+
+    app._status_bar.update_follow.assert_called_once_with(False)
+
+
+def test_action_toggle_follow_mode_pauses_follow() -> None:
+    """Ctrl+F action should pause sticky follow mode."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = False
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_toggle_follow_mode()
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(True, jump_to_bottom=False)
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_toggle_follow_mode_resumes_follow() -> None:
+    """Ctrl+F action should resume follow and jump to latest."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = True
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_toggle_follow_mode()
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_jump_button_resumes_follow_when_paused() -> None:
+    """Jump button should resume follow mode when follow is paused."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = True
+    app._update_jump_to_bottom = MagicMock()
+    button = MagicMock()
+    button.id = "jump-to-bottom"
+    event = MagicMock()
+    event.button = button
+
+    app.on_button_pressed(event)
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.scroll_to_bottom.assert_not_called()
     app._update_jump_to_bottom.assert_called_once()

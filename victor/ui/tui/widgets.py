@@ -25,6 +25,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
+from textual.messages import UpdateScroll
 from textual.reactive import reactive
 from textual.binding import Binding
 
@@ -90,6 +91,7 @@ class StatusBar(Static):
         self.model = model
         self.status = "Idle"
         self._state = "idle"  # idle, streaming, error
+        self._follow_paused = False
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="status-content"):
@@ -106,6 +108,9 @@ class StatusBar(Static):
             status_label = Label(self.status, classes="status-indicator")
             status_label.add_class("idle")
             yield status_label
+            follow_label = Label("Following", classes="follow-indicator")
+            follow_label.add_class("following")
+            yield follow_label
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -127,6 +132,8 @@ class StatusBar(Static):
                     " clear  ",
                     ("Ctrl+S", "bold"),
                     " save  ",
+                    ("Ctrl+F", "bold"),
+                    " follow  ",
                     ("Enter", "bold"),
                     " send",
                 )
@@ -142,6 +149,8 @@ class StatusBar(Static):
                 Text.assemble(
                     ("Ctrl+X", "bold"),
                     " cancel  ",
+                    ("Ctrl+F", "bold"),
+                    " follow  ",
                     ("Ctrl+D", "bold"),
                     " toggle details",
                 )
@@ -157,6 +166,8 @@ class StatusBar(Static):
                 Text.assemble(
                     ("Ctrl+L", "bold"),
                     " clear  ",
+                    ("Ctrl+F", "bold"),
+                    " follow  ",
                     ("Ctrl+C", "bold"),
                     " exit",
                 )
@@ -208,6 +219,14 @@ class StatusBar(Static):
         label.add_class(state)
         # Update shortcut hints based on state
         self.update_shortcuts(state)
+
+    def update_follow(self, paused: bool) -> None:
+        """Update follow-mode indicator."""
+        self._follow_paused = paused
+        label = self.query_one(".follow-indicator", Label)
+        label.update("Paused" if paused else "Following")
+        label.remove_class("following", "paused")
+        label.add_class("paused" if paused else "following")
 
 
 class SubmitTextArea(TextArea):
@@ -639,21 +658,23 @@ class StreamingMessageBlock(Static):
 
     DEFAULT_CSS = """
     StreamingMessageBlock {
-        padding: 1;
+        background: transparent;
+        border: none;
+        padding: 0;
         margin: 0 0 1 0;
     }
 
     StreamingMessageBlock.user {
-        background: $surface;
+        background: transparent;
     }
 
     StreamingMessageBlock.assistant {
-        background: $surface-darken-1;
+        background: transparent;
     }
 
     StreamingMessageBlock .message-header {
         text-style: bold;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
 
     StreamingMessageBlock .message-header.user {
@@ -664,14 +685,22 @@ class StreamingMessageBlock(Static):
         color: $primary;
     }
 
+    StreamingMessageBlock .message-content {
+        width: 100%;
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: hidden;
+    }
+
     StreamingMessageBlock .streaming-indicator {
-        color: $warning;
+        color: $text-muted;
         text-style: italic;
     }
     """
 
     content = reactive("")
     is_streaming = reactive(False)
+    _STREAM_RENDER_INTERVAL_SECONDS = 1 / 30
 
     def __init__(
         self,
@@ -684,6 +713,10 @@ class StreamingMessageBlock(Static):
         self.content = initial_content
         self.add_class(role)
         self._code_blocks: List[tuple[str, str]] = []  # (code, language)
+        self._last_stream_render_ts = 0.0
+        self._pending_stream_buffer = ""
+        self._body_widget: Static | None = None
+        self._cursor_widget: Label | None = None
 
     def compose(self) -> ComposeResult:
         role_label = {
@@ -702,8 +735,9 @@ class StreamingMessageBlock(Static):
 
     def on_mount(self) -> None:
         """Hide cursor initially."""
-        cursor = self.query_one("#cursor")
-        cursor.display = self.is_streaming
+        self._body_widget = self.query_one("#message-body", Static)
+        self._cursor_widget = self.query_one("#cursor", Label)
+        self._cursor_widget.display = self.is_streaming
 
     def watch_content(self, content: str) -> None:
         """React to content changes."""
@@ -712,18 +746,28 @@ class StreamingMessageBlock(Static):
     def watch_is_streaming(self, streaming: bool) -> None:
         """Show/hide streaming cursor."""
         try:
-            cursor = self.query_one("#cursor")
-            cursor.display = streaming
+            if self._cursor_widget is None:
+                self._cursor_widget = self.query_one("#cursor", Label)
+            self._cursor_widget.display = streaming
         except Exception:
             pass
+        if streaming:
+            self._last_stream_render_ts = 0.0
+        self._update_display()
 
     def _update_display(self) -> None:
         """Update the message body with current content."""
         try:
-            body = self.query_one("#message-body", Static)
+            if self._body_widget is None:
+                self._body_widget = self.query_one("#message-body", Static)
+            body = self._body_widget
             if self.role == "assistant":
-                # Parse and render markdown, extracting code blocks
-                body.update(Markdown(self.content))
+                # Render plain text while streaming for responsiveness,
+                # then re-render as markdown when complete.
+                if self.is_streaming:
+                    body.update(self.content)
+                else:
+                    body.update(Markdown(self.content))
             else:
                 body.update(self.content)
         except Exception:
@@ -731,11 +775,32 @@ class StreamingMessageBlock(Static):
 
     def append_chunk(self, chunk: str) -> None:
         """Append a streaming chunk to the content."""
-        self.content += chunk
+        if not chunk:
+            return
+        self._pending_stream_buffer += chunk
+        if not self.is_streaming:
+            self._flush_stream_buffer()
+            return
+
+        now = time.monotonic()
+        if (
+            not self._last_stream_render_ts
+            or now - self._last_stream_render_ts >= self._STREAM_RENDER_INTERVAL_SECONDS
+        ):
+            self._flush_stream_buffer(now)
 
     def finish_streaming(self) -> None:
         """Mark streaming as complete."""
+        self._flush_stream_buffer()
         self.is_streaming = False
+        self._update_display()
+
+    def _flush_stream_buffer(self, timestamp: float | None = None) -> None:
+        if not self._pending_stream_buffer:
+            return
+        self.content += self._pending_stream_buffer
+        self._pending_stream_buffer = ""
+        self._last_stream_render_ts = timestamp or time.monotonic()
 
 
 class ToolProgressPanel(Static):
@@ -941,18 +1006,84 @@ class EnhancedConversationLog(VerticalScroll):
     EnhancedConversationLog > StreamingMessageBlock {
         margin: 1 0;
     }
+
+    EnhancedConversationLog .unread-separator {
+        margin: 0 0 1 0;
+        color: $warning;
+        text-style: bold;
+    }
     """
 
-    def __init__(self, **kwargs) -> None:
+    _FOLLOW_SCROLL_INTERVAL_SECONDS = 1 / 30
+
+    def __init__(self, show_unread_separator: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self._streaming_message: Optional[StreamingMessageBlock] = None
         self._message_count = 0
         self._auto_scroll = True
         self._user_scrolled = False
+        self._sticky_follow_paused = False
+        self._last_follow_scroll_ts = 0.0
+        self._unread_count = 0
+        self._show_unread_separator = show_unread_separator
+        self._unread_separator: Optional[Static] = None
 
     @property
     def auto_scroll_enabled(self) -> bool:
         return self._auto_scroll
+
+    @property
+    def unread_count(self) -> int:
+        return self._unread_count
+
+    @property
+    def follow_paused(self) -> bool:
+        return self._sticky_follow_paused
+
+    @property
+    def unread_separator_enabled(self) -> bool:
+        return self._show_unread_separator
+
+    def set_unread_separator_enabled(self, enabled: bool) -> None:
+        """Enable or disable unread separator marker."""
+        self._show_unread_separator = enabled
+        if not enabled:
+            self._remove_unread_separator()
+            return
+        if not self._auto_scroll and self._unread_count > 0:
+            self._ensure_unread_separator()
+
+    def jump_to_unread_separator(self) -> bool:
+        """Scroll the transcript to the unread separator marker if present."""
+        if self._unread_separator is None:
+            return False
+        try:
+            self.scroll_to_widget(
+                self._unread_separator,
+                animate=False,
+                top=True,
+                immediate=True,
+                force=True,
+            )
+            return True
+        except Exception:
+            return False
+
+    def set_follow_paused(self, paused: bool, *, jump_to_bottom: bool = False) -> None:
+        """Set sticky follow mode.
+
+        When paused, auto-follow stays disabled until explicitly resumed.
+        """
+        self._sticky_follow_paused = paused
+        if paused:
+            self._auto_scroll = False
+            return
+        self._auto_scroll = True
+        self._last_follow_scroll_ts = 0.0
+        self._unread_count = 0
+        self._remove_unread_separator()
+        if jump_to_bottom:
+            self.scroll_end(animate=False)
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
@@ -963,11 +1094,18 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
+        if self._sticky_follow_paused:
+            self._auto_scroll = False
+            return
         # Always scroll to show user message
+        self._auto_scroll = True
+        self._unread_count = 0
+        self._remove_unread_separator()
         self.scroll_end(animate=False)
 
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
+        self._mark_unread_boundary()
         msg = StreamingMessageBlock(
             role="assistant",
             initial_content=content,
@@ -976,8 +1114,7 @@ class EnhancedConversationLog(VerticalScroll):
         self._message_count += 1
         self.mount(msg)
         # Auto-scroll to show assistant response
-        if self._auto_scroll:
-            self.scroll_end(animate=False)
+        self._maybe_scroll_end(mark_unread=True, force=True)
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
@@ -992,17 +1129,18 @@ class EnhancedConversationLog(VerticalScroll):
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
+        self._mark_unread_boundary()
         msg = Static(
             Text(f"Error: {content}", style="bold red"),
             id=f"msg-{self._message_count}",
         )
         self._message_count += 1
         self.mount(msg)
-        # Always show errors
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end(mark_unread=True, force=True)
 
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
+        self._mark_unread_boundary()
         self._streaming_message = StreamingMessageBlock(
             role="assistant",
             initial_content="",
@@ -1011,19 +1149,18 @@ class EnhancedConversationLog(VerticalScroll):
         self._streaming_message.is_streaming = True
         self._message_count += 1
         self.mount(self._streaming_message)
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(mark_unread=True, force=True)
         return self._streaming_message
 
     def update_streaming(self, content: str) -> None:
         """Update the current streaming message.
 
         Shows new content as it arrives, like Claude Code.
-        Always scrolls during streaming to show progress.
+        Auto-scrolls only when user is already at bottom.
         """
         if self._streaming_message:
             self._streaming_message.content = content
-            # Always scroll during streaming to show new content
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def append_streaming_chunk(self, chunk: str) -> None:
         """Append a chunk to the current streaming message.
@@ -1032,16 +1169,14 @@ class EnhancedConversationLog(VerticalScroll):
         """
         if self._streaming_message:
             self._streaming_message.append_chunk(chunk)
-            # Always scroll during streaming to show new content
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def finish_streaming(self) -> None:
         """Finish the current streaming response."""
         if self._streaming_message:
             self._streaming_message.finish_streaming()
             self._streaming_message = None
-        # Final scroll to ensure full response is visible
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end(force=True)
 
     def add_tool_progress(
         self,
@@ -1058,7 +1193,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(panel)
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(force=True)
         return panel
 
     def add_code_block(
@@ -1074,7 +1209,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(block)
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(force=True)
 
     def clear(self) -> None:
         """Clear all messages from the log."""
@@ -1082,15 +1217,21 @@ class EnhancedConversationLog(VerticalScroll):
             child.remove()
         self._message_count = 0
         self._streaming_message = None
-        self._auto_scroll = True
+        self._auto_scroll = not self._sticky_follow_paused
+        self._last_follow_scroll_ts = 0.0
+        self._unread_count = 0
+        self._unread_separator = None
 
-    def on_scroll(self, _event) -> None:
-        """Update auto-scroll when the user scrolls."""
+    def on_update_scroll(self, _event: UpdateScroll) -> None:
+        """Update auto-scroll whenever this scroll view moves."""
         self.update_auto_scroll_state()
 
     def scroll_to_bottom(self, animate: bool = False) -> None:
         """Scroll to bottom and re-enable auto-scroll."""
-        self._auto_scroll = True
+        self._auto_scroll = not self._sticky_follow_paused
+        self._last_follow_scroll_ts = 0.0
+        self._unread_count = 0
+        self._remove_unread_separator()
         self.scroll_end(animate=animate)
 
     def disable_auto_scroll(self) -> None:
@@ -1099,11 +1240,58 @@ class EnhancedConversationLog(VerticalScroll):
 
     def update_auto_scroll_state(self) -> None:
         """Update auto-scroll based on scroll position."""
+        if self._sticky_follow_paused:
+            if self._is_at_bottom():
+                self._unread_count = 0
+                self._remove_unread_separator()
+            self._auto_scroll = False
+            return
         self._auto_scroll = self._is_at_bottom()
-
-    def _maybe_scroll_end(self) -> None:
         if self._auto_scroll:
+            self._unread_count = 0
+            self._remove_unread_separator()
+
+    def _maybe_scroll_end(self, mark_unread: bool = False, force: bool = False) -> None:
+        if self._auto_scroll:
+            if not force:
+                now = time.monotonic()
+                if (
+                    self._last_follow_scroll_ts
+                    and now - self._last_follow_scroll_ts < self._FOLLOW_SCROLL_INTERVAL_SECONDS
+                ):
+                    return
+                self._last_follow_scroll_ts = now
+            else:
+                self._last_follow_scroll_ts = time.monotonic()
             self.scroll_end(animate=False)
+            return
+        if mark_unread:
+            self._unread_count += 1
+
+    def _mark_unread_boundary(self) -> None:
+        """Insert unread separator before first unread message."""
+        if self._auto_scroll or self._unread_count > 0 or not self._show_unread_separator:
+            return
+        self._ensure_unread_separator()
+
+    def _ensure_unread_separator(self) -> None:
+        if self._unread_separator is not None:
+            return
+        separator = Static(
+            Text("── New messages ──", style="bold yellow"),
+            classes="unread-separator",
+        )
+        self._unread_separator = separator
+        self.mount(separator)
+
+    def _remove_unread_separator(self) -> None:
+        if self._unread_separator is None:
+            return
+        try:
+            self._unread_separator.remove()
+        except Exception:
+            pass
+        self._unread_separator = None
 
     def _is_at_bottom(self) -> bool:
         try:

@@ -15,6 +15,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
+from textual.messages import UpdateScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
 from victor.ui.tui.session import Message
@@ -308,6 +309,7 @@ class VictorTUI(App):
         text-style: bold;
         text-align: center;
         width: auto;
+        margin-right: 1;
     }
 
     StatusBar .status-indicator.idle {
@@ -319,6 +321,21 @@ class VictorTUI(App):
     }
 
     StatusBar .status-indicator.streaming {
+        color: $warning;
+    }
+
+    StatusBar .follow-indicator {
+        color: $success;
+        text-style: bold;
+        width: auto;
+        margin-right: 1;
+    }
+
+    StatusBar .follow-indicator.following {
+        color: $success;
+    }
+
+    StatusBar .follow-indicator.paused {
         color: $warning;
     }
 
@@ -546,11 +563,16 @@ class VictorTUI(App):
         Binding("ctrl+r", "resume_session", "Resume Session", show=True),
         Binding("ctrl+s", "save_session", "Save Session", show=True),
         Binding("ctrl+e", "export_session", "Export Session", show=True),
+        Binding("ctrl+n", "jump_unread", "Jump Unread", show=True),
+        Binding("ctrl+f", "toggle_follow_mode", "Follow", show=True),
+        Binding("ctrl+u", "toggle_unread_marker", "Unread Marker", show=True),
         Binding("ctrl+slash", "show_help", "Help", show=True),
         Binding("ctrl+up", "scroll_up", "Scroll Up", show=False),
         Binding("ctrl+down", "scroll_down", "Scroll Down", show=False),
         Binding("ctrl+home", "scroll_top", "Scroll Top", show=False),
         Binding("ctrl+end", "scroll_bottom", "Scroll Bottom", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
     ]
 
     def __init__(
@@ -561,6 +583,7 @@ class VictorTUI(App):
         stream: bool = True,
         on_message: Optional[Callable[[str], Any]] = None,
         settings: Optional["Settings"] = None,
+        show_unread_separator: bool = True,
         **kwargs,
     ) -> None:
         """Initialize Victor TUI.
@@ -572,6 +595,7 @@ class VictorTUI(App):
             stream: Whether to stream responses
             on_message: Callback when user sends a message
             settings: Optional Settings instance for slash commands
+            show_unread_separator: Whether to show unread boundary marker
         """
         super().__init__(**kwargs)
         self.agent = agent
@@ -580,6 +604,7 @@ class VictorTUI(App):
         self.stream = stream
         self.on_message = on_message
         self.settings = settings
+        self.show_unread_separator = show_unread_separator
         self._conversation_log: EnhancedConversationLog | None = None
         self._input_widget: InputWidget | None = None
         self._status_bar: StatusBar | None = None
@@ -598,7 +623,10 @@ class VictorTUI(App):
         yield StatusBar(provider=self.provider, model=self.model)
         with Container(id="main-container"):
             with Vertical(id="conversation-area"):
-                yield EnhancedConversationLog(id="conversation-log")
+                yield EnhancedConversationLog(
+                    id="conversation-log",
+                    show_unread_separator=self.show_unread_separator,
+                )
                 yield Button("Jump to bottom", id="jump-to-bottom", variant="default")
             with Container(id="thinking-container"):
                 yield ThinkingWidget(id="thinking-widget")
@@ -754,7 +782,7 @@ class VictorTUI(App):
 
     async def _stream_response(self, message: str) -> None:
         """Stream response from agent."""
-        content_buffer = ""
+        content_chunks: list[str] = []
 
         # Start streaming display
         await self._start_streaming_ui()
@@ -767,17 +795,14 @@ class VictorTUI(App):
                     chunk_type = chunk.type
 
                     if chunk_type == "content":
-                        content_buffer += chunk.content or ""
-                        if self._conversation_log:
-                            try:
-                                self._conversation_log.update_streaming(content_buffer)
-                            except Exception:
-                                pass
-                            # Update jump-to-bottom button visibility during streaming
-                            try:
-                                self._update_jump_to_bottom()
-                            except Exception:
-                                pass
+                        chunk_text = chunk.content or ""
+                        if chunk_text:
+                            content_chunks.append(chunk_text)
+                            if self._conversation_log:
+                                try:
+                                    self._conversation_log.append_streaming_chunk(chunk_text)
+                                except Exception:
+                                    pass
 
                     elif chunk_type == "thinking_start":
                         try:
@@ -817,15 +842,11 @@ class VictorTUI(App):
 
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
-                    content_buffer += chunk.content
+                    chunk_text = chunk.content
+                    content_chunks.append(chunk_text)
                     if self._conversation_log:
                         try:
-                            self._conversation_log.update_streaming(content_buffer)
-                        except Exception:
-                            pass
-                        # Update jump-to-bottom button visibility during streaming
-                        try:
-                            self._update_jump_to_bottom()
+                            self._conversation_log.append_streaming_chunk(chunk_text)
                         except Exception:
                             pass
 
@@ -836,11 +857,13 @@ class VictorTUI(App):
                     self._conversation_log.finish_streaming()
                 except Exception:
                     pass
+            self._update_jump_to_bottom()
             try:
                 self._hide_thinking()
             except Exception:
                 pass
             self._set_status("Idle", "idle")
+            content_buffer = "".join(content_chunks)
             if content_buffer.strip():
                 self._record_message("assistant", content_buffer)
 
@@ -959,6 +982,40 @@ class VictorTUI(App):
         else:
             container.add_class("visible")
             self._add_system_message("Tools panel shown")
+
+    def action_toggle_unread_marker(self) -> None:
+        """Toggle unread separator marker in conversation transcript."""
+        if not self._conversation_log:
+            return
+        enabled = not self._conversation_log.unread_separator_enabled
+        self._conversation_log.set_unread_separator_enabled(enabled)
+        if enabled:
+            self._add_system_message("Unread marker shown")
+        else:
+            self._add_system_message("Unread marker hidden")
+        self._update_jump_to_bottom()
+
+    def action_toggle_follow_mode(self) -> None:
+        """Toggle sticky follow mode for transcript auto-scrolling."""
+        if not self._conversation_log:
+            return
+        paused = not self._conversation_log.follow_paused
+        self._conversation_log.set_follow_paused(paused, jump_to_bottom=not paused)
+        self._update_jump_to_bottom()
+
+    def action_jump_unread(self) -> None:
+        """Jump to unread boundary marker, or fallback to latest message."""
+        if not self._conversation_log:
+            return
+        if self._conversation_log.jump_to_unread_separator():
+            self._conversation_log.disable_auto_scroll()
+            self._conversation_log.update_auto_scroll_state()
+        else:
+            if self._conversation_log.follow_paused:
+                self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            else:
+                self._conversation_log.scroll_to_bottom(animate=False)
+        self._update_jump_to_bottom()
 
     def action_toggle_details(self) -> None:
         """Toggle both thinking and tools panel visibility (details mode)."""
@@ -1287,6 +1344,7 @@ Keyboard Shortcuts:
   Enter        Send message
   Shift+Enter  Add newline
   Ctrl+C       Exit
+  Ctrl+F       Toggle follow mode (following/paused)
   Ctrl+L       Clear conversation
   Ctrl+T       Toggle thinking panel
   Ctrl+Y       Toggle tools panel
@@ -1297,9 +1355,12 @@ Keyboard Shortcuts:
   Ctrl+R       Resume TUI session
   Ctrl+S       Save session
   Ctrl+E       Export session to markdown
+  Ctrl+N       Jump to unread marker
+  Ctrl+U       Toggle unread marker
   Ctrl+/       Show this help
   Ctrl+↑/↓     Scroll conversation
   Ctrl+Home/End Jump to top/bottom
+  PgUp/PgDn    Page scroll conversation
   ↑/↓          Navigate input history
   Escape       Focus input
 
@@ -1345,15 +1406,36 @@ Slash Commands:
         self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
 
-    def on_scroll(self, event) -> None:
-        if event.sender is self._conversation_log:
+    def action_page_up(self) -> None:
+        """Scroll conversation up by one page."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.disable_auto_scroll()
+        self._conversation_log.scroll_page_up(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
+
+    def action_page_down(self) -> None:
+        """Scroll conversation down by one page."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.scroll_page_down(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
+
+    def on_update_scroll(self, event: UpdateScroll) -> None:
+        sender = getattr(event, "_sender", None)
+        if sender is self._conversation_log:
             self._update_jump_to_bottom()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "jump-to-bottom":
             return
         if self._conversation_log:
-            self._conversation_log.scroll_to_bottom(animate=False)
+            if self._conversation_log.follow_paused:
+                self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            else:
+                self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
 
     def add_message(self, content: str, role: str = "assistant") -> None:
@@ -1391,10 +1473,28 @@ Slash Commands:
     def _update_jump_to_bottom(self) -> None:
         if not self._jump_button or not self._conversation_log:
             return
-        if self._conversation_log.auto_scroll_enabled:
+        sticky_follow_paused = self._conversation_log.follow_paused
+        auto_follow_active = self._conversation_log.auto_scroll_enabled and not sticky_follow_paused
+        follow_paused_display = not auto_follow_active
+        unread = self._conversation_log.unread_count
+        if self._status_bar:
+            try:
+                self._status_bar.update_follow(follow_paused_display)
+            except Exception:
+                pass
+        if auto_follow_active:
             self._jump_button.remove_class("visible")
+            self._jump_button.label = "Jump to bottom"
         else:
             self._jump_button.add_class("visible")
+            if sticky_follow_paused and unread > 0:
+                self._jump_button.label = f"Resume follow ({unread} new)"
+            elif sticky_follow_paused:
+                self._jump_button.label = "Resume follow"
+            elif unread > 0:
+                self._jump_button.label = f"Jump to bottom ({unread} new)"
+            else:
+                self._jump_button.label = "Jump to bottom"
 
     async def _start_streaming_ui(self) -> None:
         if not self._conversation_log:
@@ -1403,6 +1503,7 @@ Slash Commands:
 
         def _start() -> None:
             self._conversation_log.start_streaming()
+            self._update_jump_to_bottom()
             started.set()
 
         self._call_ui(_start)
@@ -1416,21 +1517,25 @@ Slash Commands:
     def _add_user_message(self, content: str) -> None:
         if self._conversation_log:
             self._conversation_log.add_user_message(content)
+        self._update_jump_to_bottom()
         self._record_message("user", content)
 
     def _add_assistant_message(self, content: str) -> None:
         if self._conversation_log:
             self._conversation_log.add_assistant_message(content)
+        self._update_jump_to_bottom()
         self._record_message("assistant", content)
 
     def _add_system_message(self, content: str) -> None:
         if self._conversation_log:
             self._conversation_log.add_system_message(content)
+        self._update_jump_to_bottom()
         self._record_message("system", content)
 
     def _add_error_message(self, content: str) -> None:
         if self._conversation_log:
             self._conversation_log.add_error_message(content)
+        self._update_jump_to_bottom()
         self._record_message("error", content)
 
 

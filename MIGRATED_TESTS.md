@@ -45,14 +45,51 @@ All files in `tests/unit/indexers/` directory moved to `victor-coding/tests/inde
 | `tests/unit/indexers/test_codebase_analyzer.py` | `victor-coding/tests/indexers/test_codebase_analyzer.py` | Tests codebase analyzer (victor-coding feature) |
 | `tests/unit/indexers/test_airgapped_codebase_search.py` | `victor-coding/tests/indexers/test_airgapped_codebase_search.py` | Tests airgapped search (victor-coding feature) |
 
+## Category 5 Tests Migrated (Complex Dependencies)
+
+| Original Path | New Path | Reason |
+|----------------|----------|--------|
+| `tests/unit/middleware/test_middleware_chain.py` | `victor-coding/tests/middleware/test_middleware_chain.py` | Tests victor-coding middleware |
+| `tests/unit/protocols/test_rl_config_protocol.py` | `victor-coding/tests/rl/test_rl_config_protocol.py` | Tests victor-coding RL config |
+| `tests/unit/codebase/test_symbol_resolver.py` | `victor-coding/tests/codebase/test_symbol_resolver.py` | Tests victor-coding symbol resolver |
+| `tests/unit/codebase/test_symbol_store.py` | `victor-coding/tests/codebase/test_symbol_store.py` | Tests victor-coding symbol store |
+| `tests/unit/tools/test_tool_dependency_loader.py` | `victor-coding/tests/tools/test_tool_dependency_loader.py` | Tests victor-coding tool dependencies |
+| `tests/unit/framework/test_vertical_integration.py` | `victor-coding/tests/integration/test_vertical_integration.py` | Tests victor-coding vertical integration |
+| `tests/unit/chunker/test_ast_chunker.py` | `victor-coding/tests/chunker/test_ast_chunker.py` | Tests victor-coding AST chunker |
+| `tests/unit/codebase/test_extension_cache.py` | `victor-coding/tests/test_extension_cache.py` | Tests victor-coding extension cache |
+| `tests/unit/chunker/test_chunker.py` | `victor-coding/tests/chunker/test_chunker.py` | Tests victor-coding chunker |
+
+### Protocol Implementation Tests Migrated (from test_vertical_protocols.py)
+
+| Test Class | New Path | Reason |
+|------------|----------|--------|
+| `TestCodingVerticalExtensions` | `victor-coding/tests/protocols/test_vertical_extensions.py` | Tests victor-coding's VerticalExtensions implementation |
+| `TestResearchVerticalExtensions` | `victor-coding/tests/protocols/test_vertical_extensions.py` | Tests victor-research's VerticalExtensions implementation |
+
 ## Tests Remaining in victor
 
 The following tests remain in victor because they test framework functionality:
 
-- `tests/unit/protocols/test_vertical_protocols.py` - Tests framework protocol definitions
-- `tests/unit/framework/test_vertical_integration.py` - Tests vertical integration with framework
+### Framework Protocol Tests
+- `tests/unit/protocols/test_vertical_protocols.py` - Tests framework protocol definitions (cleaned - removed vertical implementation tests)
+
+### Framework Integration Tests (with Graceful Fallback)
+- `tests/unit/framework/test_config.py` - Tests SafetyEnforcer with vertical safety rules (graceful fallback)
+- `tests/unit/framework/test_framework_shim.py` - Tests FrameworkShim vertical lookup (graceful fallback)
+- `tests/unit/framework/test_team_registry.py` - Integration tests (marked `@pytest.mark.integration`)
+- `tests/unit/security/safety/test_infrastructure.py` - Tests InfrastructureScanner with vertical safety extensions (graceful fallback)
+
+### Contrib Package Tests
 - `tests/unit/contrib/` - All contrib package tests (no victor_coding dependencies)
+  - `test_editing.py` - Tests DiffEditor
+  - `test_codebase.py` - Tests BasicCodebaseAnalyzer
+  - `test_lsp.py` - Tests BasicLSPClient stub
+  - `test_embeddings.py` - Tests BasicEmbeddingsProvider
+  - `test_vectorstores.py` - Tests InMemoryVectorStore
+
+### Core Framework Tests
 - `tests/unit/core/` - Core framework tests
+- `tests/unit/framework/` - Framework tests (except integration tests with graceful fallback)
 
 ## Migration Rationale
 

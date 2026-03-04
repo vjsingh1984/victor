@@ -1079,86 +1079,35 @@ class VerticalExtensionLoader(ABC):
         return extensions
 
     @classmethod
-    async def get_extensions_async(
+    def _get_cached_extensions(
+        cls, use_cache: bool
+    ) -> Optional["VerticalExtensions"]:
+        """Return cached VerticalExtensions if available, else None."""
+        if not use_cache:
+            return None
+        cache_key = cls._cache_namespace()
+        with cls._extensions_cache_lock:
+            return cls._extensions_cache.get(cache_key)
+
+    @classmethod
+    def _resolve_strict_mode(cls, strict: Optional[bool]) -> bool:
+        """Resolve effective strict mode from explicit arg or class default."""
+        return strict if strict is not None else cls.strict_extension_loading
+
+    @classmethod
+    async def _submit_extension_tasks(
         cls,
-        *,
-        use_cache: bool = True,
-        strict: Optional[bool] = None,
-    ) -> "VerticalExtensions":
-        """Async version of get_extensions that loads extensions in parallel.
-
-        Uses a thread pool executor to load all extensions concurrently,
-        providing faster initialization when extensions involve I/O.
-
-        Shares the same cache as the synchronous get_extensions() method.
+        load_fn: callable,
+    ) -> Dict[str, Any]:
+        """Submit all extension loads in parallel with bounded concurrency.
 
         Args:
-            use_cache: If True (default), return cached extensions if available.
-            strict: Override the class-level strict_extension_loading setting.
+            load_fn: A callable(extension_type, loader, is_list) that loads
+                     a single extension with error handling.
 
         Returns:
-            VerticalExtensions containing all vertical extensions (never None)
-
-        Raises:
-            ExtensionLoadError: In strict mode or when a required extension fails
+            Dict mapping extension type keys to loaded results.
         """
-        from victor.core.errors import ExtensionLoadError
-        from victor.core.verticals.protocols import VerticalExtensions
-
-        cache_key = cls._cache_namespace()
-
-        # Return cached extensions if available (shared with sync get_extensions)
-        if use_cache:
-            with cls._extensions_cache_lock:
-                cached = cls._extensions_cache.get(cache_key)
-            if cached is not None:
-                return cached
-
-        # Determine strict mode
-        is_strict = strict if strict is not None else cls.strict_extension_loading
-
-        # Collect errors for reporting
-        errors: List[ExtensionLoadError] = []
-        errors_lock = threading.Lock()
-
-        def _load_extension(
-            extension_type: str,
-            loader: callable,
-            is_list: bool = False,
-        ) -> Any:
-            """Load an extension with error handling (runs in thread pool)."""
-            try:
-                return loader()
-            except Exception as e:
-                cls._increment_loader_metric("failed")
-                is_required = extension_type in cls.required_extensions
-                error = ExtensionLoadError(
-                    message=(
-                        f"Failed to load '{extension_type}' extension "
-                        f"for vertical '{cls.name}': {e}"
-                    ),
-                    extension_type=extension_type,
-                    vertical_name=cls.name,
-                    original_error=e,
-                    is_required=is_required,
-                )
-                with errors_lock:
-                    errors.append(error)
-
-                if is_strict or is_required:
-                    logger.error(
-                        f"[{error.correlation_id}] {extension_type} extension failed "
-                        f"for vertical '{cls.name}': {e}",
-                        exc_info=True,
-                    )
-                else:
-                    logger.warning(
-                        f"[{error.correlation_id}] {extension_type} extension failed "
-                        f"for vertical '{cls.name}': {e}"
-                    )
-                return [] if is_list else None
-
-        # Load all extensions in parallel using shared bounded infrastructure (P3).
         loop = asyncio.get_running_loop()
         executor = cls._get_shared_extension_executor()
         semaphore = cls._get_extension_load_semaphore()
@@ -1192,7 +1141,7 @@ class VerticalExtensionLoader(ABC):
 
                 return await loop.run_in_executor(
                     executor,
-                    lambda: _load_extension(extension_type, loader, is_list),
+                    lambda: load_fn(extension_type, loader, is_list),
                 )
             except Exception:
                 cls._increment_loader_metric("failed")
@@ -1243,8 +1192,15 @@ class VerticalExtensionLoader(ABC):
         results = {}
         for key, task in futures.items():
             results[key] = await task
+        return results
 
-        # Check for critical failures
+    @classmethod
+    def _validate_extension_errors(
+        cls,
+        errors: List[Any],
+        is_strict: bool,
+    ) -> None:
+        """Check for critical extension errors and raise or log as appropriate."""
         critical_errors = [e for e in errors if is_strict or e.is_required]
         if critical_errors:
             raise critical_errors[0]
@@ -1255,7 +1211,12 @@ class VerticalExtensionLoader(ABC):
                 f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
             )
 
-        extensions = VerticalExtensions(
+    @classmethod
+    def _assemble_extensions(cls, results: Dict[str, Any]) -> "VerticalExtensions":
+        """Build a VerticalExtensions from a results dict."""
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        return VerticalExtensions(
             middleware=results["middleware"] if results["middleware"] else [],
             safety_extensions=[results["safety"]] if results["safety"] else [],
             prompt_contributors=[results["prompt"]] if results["prompt"] else [],
@@ -1269,9 +1230,89 @@ class VerticalExtensionLoader(ABC):
             tiered_tool_config=results["tiered_tools"],
         )
 
-        # Cache the extensions (shared with sync get_extensions)
+    @classmethod
+    def _cache_extensions(cls, extensions: "VerticalExtensions") -> None:
+        """Store extensions in the shared cache."""
+        cache_key = cls._cache_namespace()
         with cls._extensions_cache_lock:
             cls._extensions_cache[cache_key] = extensions
+
+    @classmethod
+    async def get_extensions_async(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Async version of get_extensions that loads extensions in parallel.
+
+        Uses a thread pool executor to load all extensions concurrently,
+        providing faster initialization when extensions involve I/O.
+
+        Shares the same cache as the synchronous get_extensions() method.
+
+        Args:
+            use_cache: If True (default), return cached extensions if available.
+            strict: Override the class-level strict_extension_loading setting.
+
+        Returns:
+            VerticalExtensions containing all vertical extensions (never None)
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
+        """
+        from victor.core.errors import ExtensionLoadError
+
+        cached = cls._get_cached_extensions(use_cache)
+        if cached is not None:
+            return cached
+
+        is_strict = cls._resolve_strict_mode(strict)
+
+        errors: List[ExtensionLoadError] = []
+        errors_lock = threading.Lock()
+
+        def _load_extension(
+            extension_type: str,
+            loader: callable,
+            is_list: bool = False,
+        ) -> Any:
+            """Load an extension with error handling (runs in thread pool)."""
+            try:
+                return loader()
+            except Exception as e:
+                cls._increment_loader_metric("failed")
+                is_required = extension_type in cls.required_extensions
+                error = ExtensionLoadError(
+                    message=(
+                        f"Failed to load '{extension_type}' extension "
+                        f"for vertical '{cls.name}': {e}"
+                    ),
+                    extension_type=extension_type,
+                    vertical_name=cls.name,
+                    original_error=e,
+                    is_required=is_required,
+                )
+                with errors_lock:
+                    errors.append(error)
+
+                if is_strict or is_required:
+                    logger.error(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}",
+                        exc_info=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}"
+                    )
+                return [] if is_list else None
+
+        results = await cls._submit_extension_tasks(_load_extension)
+        cls._validate_extension_errors(errors, is_strict)
+        extensions = cls._assemble_extensions(results)
+        cls._cache_extensions(extensions)
         return extensions
 
     @classmethod

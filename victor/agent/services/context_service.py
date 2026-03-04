@@ -27,12 +27,12 @@ This service handles:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from victor.framework.message import Message
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Message is a dict with 'role' and 'content' keys
+Message = Dict[str, Any]
 
 
 class ContextServiceConfig:

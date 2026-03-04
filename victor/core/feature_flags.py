@@ -103,6 +103,9 @@ class FeatureFlag(Enum):
     # Phase 5 - Tool Registration
     USE_STRATEGY_BASED_TOOL_REGISTRATION = "use_strategy_based_tool_registration"
 
+    # Phase 6 - Service Layer (Strangler Fig)
+    USE_SERVICE_LAYER = "use_service_layer"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

@@ -10,6 +10,8 @@ The TUI is built using Textual and provides:
 - Scrollable conversation history in the middle
 - Status bar showing provider/model information
 - Real-time streaming with thinking and tool call visualization
+- Unread separator marker when new responses arrive while scrolled up (`Ctrl+U` to toggle)
+- Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary
 - 40+ slash commands for session management
 
 ## Layout
@@ -67,6 +69,8 @@ victor chat --no-tui
 | `Ctrl+C` | Exit Victor |
 | `Ctrl+L` | Clear conversation |
 | `Ctrl+T` | Toggle thinking panel |
+| `Ctrl+N` | Jump to unread marker |
+| `Ctrl+U` | Toggle unread separator |
 | `Ctrl+S` | Save current session |
 | `Ctrl+/` | Show help overlay |
 | `Escape` | Focus input widget |
@@ -88,6 +92,8 @@ victor chat --no-tui
 | `Ctrl+Down` | Scroll conversation down |
 | `Ctrl+Home` | Scroll to top |
 | `Ctrl+End` | Scroll to bottom |
+| `PgUp` | Scroll up one page |
+| `PgDn` | Scroll down one page |
 
 ---
 

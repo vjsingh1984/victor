@@ -729,3 +729,42 @@ class TestCapabilityConfigPersistence:
             "source_verification_config",
             scope_key="session-b",
         ) == {"min_credibility": 0.6}
+
+
+class TestStepHandlerRegistryContract:
+    """Contract tests for default step-handler registry composition."""
+
+    def test_default_registry_execution_order_contract(self):
+        """Default registry should expose deterministic, documented handler order."""
+        from victor.framework.step_handlers import StepHandlerRegistry
+
+        registry = StepHandlerRegistry.default()
+        ordered_names = [handler.name for handler in registry.get_ordered_handlers()]
+
+        assert ordered_names == [
+            "capability_config",
+            "tools",
+            "tiered_config",
+            "prompt",
+            "config",
+            "extensions",
+            "framework",
+            "context",
+        ]
+
+    def test_default_registry_has_no_unresolved_dependencies(self):
+        """All declared default-handler dependencies should resolve within the default registry."""
+        from victor.framework.step_handlers import StepHandlerRegistry
+
+        registry = StepHandlerRegistry.default()
+        handlers = registry.get_ordered_handlers()
+        available = {handler.name for handler in handlers}
+
+        unresolved = {}
+        for handler in handlers:
+            deps = tuple(getattr(handler, "depends_on", ()) or ())
+            missing = [dep for dep in deps if dep not in available]
+            if missing:
+                unresolved[handler.name] = missing
+
+        assert unresolved == {}

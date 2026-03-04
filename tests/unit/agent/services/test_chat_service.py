@@ -129,10 +129,40 @@ class MockStreamingCoordinator:
 
 
 # =============================================================================
+# Base Test Class with Helper Methods
+# =============================================================================
+
+class BaseChatServiceTest:
+    """Base class for ChatService tests with helper methods."""
+
+    def _create_test_service(self, config=None):
+        """Create a test ChatService with mocked dependencies."""
+        if config is None:
+            config = ChatServiceConfig()
+
+        provider = MockProviderService()
+        tools = MockToolService()
+        context = MockContextService()
+        recovery = MockRecoveryService()
+        conversation = MockConversationController()
+        streaming = MockStreamingCoordinator()
+
+        return ChatService(
+            config=config,
+            provider_service=provider,
+            tool_service=tools,
+            context_service=context,
+            recovery_service=recovery,
+            conversation_controller=conversation,
+            streaming_coordinator=streaming,
+        )
+
+
+# =============================================================================
 # Tests
 # =============================================================================
 
-class TestChatServiceConfig:
+class TestChatServiceConfig(BaseChatServiceTest):
     """Tests for ChatServiceConfig."""
 
     def test_default_config(self):
@@ -159,7 +189,7 @@ class TestChatServiceConfig:
         assert config.enable_response_caching is False
 
 
-class TestChatServiceInit:
+class TestChatServiceInit(BaseChatServiceTest):
     """Tests for ChatService initialization."""
 
     def test_initialization(self):
@@ -191,7 +221,7 @@ class TestChatServiceInit:
         assert service._streaming is streaming
 
 
-class TestChatServiceHealth:
+class TestChatServiceHealth(BaseChatServiceTest):
     """Tests for ChatService health checks."""
 
     def test_is_healthy_all_services_healthy(self):
@@ -218,7 +248,7 @@ class TestChatServiceHealth:
         assert service.is_healthy() is False
 
 
-class TestChatServiceChat:
+class TestChatServiceChat(BaseChatServiceTest):
     """Tests for ChatService.chat method."""
 
     @pytest.mark.asyncio
@@ -252,7 +282,7 @@ class TestChatServiceChat:
         assert response.content == "Mock chunk"  # Aggregated from stream
 
 
-class TestChatServiceStreamChat:
+class TestChatServiceStreamChat(BaseChatServiceTest):
     """Tests for ChatService.stream_chat method."""
 
     @pytest.mark.asyncio
@@ -268,7 +298,7 @@ class TestChatServiceStreamChat:
         assert chunks[0].content == "Mock chunk"
 
 
-class TestChatServiceReset:
+class TestChatServiceReset(BaseChatServiceTest):
     """Tests for ChatService.reset_conversation method."""
 
     def test_reset_conversation(self):
@@ -284,7 +314,7 @@ class TestChatServiceReset:
         assert service._conversation.reset_count == 1
 
 
-class TestChatServiceAgenticLoop:
+class TestChatServiceAgenticLoop(BaseChatServiceTest):
     """Tests for the agentic loop logic."""
 
     @pytest.mark.asyncio
@@ -474,28 +504,3 @@ class TestToolService:
         assert stats["success_rate"] == 0.75
 
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-def _create_test_service(config=None):
-    """Create a test ChatService with mocked dependencies."""
-    if config is None:
-        config = ChatServiceConfig()
-
-    provider = MockProviderService()
-    tools = MockToolService()
-    context = MockContextService()
-    recovery = MockRecoveryService()
-    conversation = MockConversationController()
-    streaming = MockStreamingCoordinator()
-
-    return ChatService(
-        config=config,
-        provider_service=provider,
-        tool_service=tools,
-        context_service=context,
-        recovery_service=recovery,
-        conversation_controller=conversation,
-        streaming_coordinator=streaming,
-    )
