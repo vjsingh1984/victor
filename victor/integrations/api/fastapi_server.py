@@ -83,6 +83,7 @@ class StatusResponse(BaseModel):
     provider: str
     model: str
     workspace: str
+    capabilities: List[str] = Field(default_factory=list)
 
 
 class ChatMessage(BaseModel):
@@ -483,6 +484,7 @@ class VictorFastAPIServer:
                     provider=provider_name,
                     model=model_name,
                     workspace=self.workspace_root,
+                    capabilities=self._detect_capabilities(),
                 )
             except Exception as e:
                 logger.warning(f"Status check error: {e}")
@@ -492,6 +494,7 @@ class VictorFastAPIServer:
                     provider="unknown",
                     model="unknown",
                     workspace=self.workspace_root,
+                    capabilities=self._detect_capabilities(),
                 )
 
         # Chat endpoints
@@ -3106,6 +3109,34 @@ Respond with just the command to run."""
                     registration.entry_point_value,
                     exc,
                 )
+
+    def _detect_capabilities(self) -> List[str]:
+        """Detect capabilities from currently mounted API routes."""
+        route_paths = {getattr(route, "path", "") for route in self.app.routes}
+        capabilities: set[str] = set()
+
+        if "/chat" in route_paths:
+            capabilities.add("chat")
+        if "/completions" in route_paths:
+            capabilities.add("completions")
+        if "/search/semantic" in route_paths or "/search/code" in route_paths:
+            capabilities.add("search")
+        if any(path.startswith("/lsp/") for path in route_paths):
+            capabilities.add("lsp")
+        if "/agents/start" in route_paths:
+            capabilities.add("agents")
+        if "/plans" in route_paths:
+            capabilities.add("plans")
+        if "/workflows/execute" in route_paths:
+            capabilities.add("workflows")
+        if "/teams" in route_paths:
+            capabilities.add("teams")
+        if "/tools" in route_paths:
+            capabilities.add("tools")
+        if "/mcp/servers" in route_paths:
+            capabilities.add("mcp")
+
+        return sorted(capabilities)
 
     # =========================================================================
     # HITL (Human-in-the-Loop) Routes

@@ -17,6 +17,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter
+from fastapi.testclient import TestClient
 
 from victor.integrations.api import fastapi_server
 from victor.integrations.api.router_plugins import APIRouterRegistration
@@ -80,6 +81,11 @@ def test_fastapi_server_has_no_lsp_routes_without_router_plugins(
     )
 
     assert "/lsp/completions" not in _route_paths(server.app)
+    with TestClient(server.app) as client:
+        response = client.get("/status")
+    assert response.status_code == 200
+    capabilities = response.json().get("capabilities", [])
+    assert "lsp" not in capabilities
 
 
 def test_fastapi_server_includes_lsp_routes_from_router_plugin(
@@ -107,3 +113,8 @@ def test_fastapi_server_includes_lsp_routes_from_router_plugin(
     )
 
     assert "/lsp/completions" in _route_paths(server.app)
+    with TestClient(server.app) as client:
+        response = client.get("/status")
+    assert response.status_code == 200
+    capabilities = response.json().get("capabilities", [])
+    assert "lsp" in capabilities
