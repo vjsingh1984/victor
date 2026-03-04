@@ -47,6 +47,40 @@ def test_update_jump_button_hides_when_at_bottom() -> None:
     assert app._jump_button.label == "Jump to bottom"
 
 
+def test_update_jump_button_avoids_redundant_visible_updates() -> None:
+    """Repeated refreshes with same state should not thrash jump button visibility."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = False
+    app._conversation_log.follow_paused = False
+    app._conversation_log.unread_count = 2
+    app._jump_button = MagicMock()
+    app._jump_button.label = "Jump to bottom"
+
+    app._update_jump_to_bottom()
+    app._update_jump_to_bottom()
+
+    app._jump_button.add_class.assert_called_once_with("visible")
+    app._jump_button.remove_class.assert_not_called()
+
+
+def test_update_jump_button_avoids_redundant_hidden_updates() -> None:
+    """Repeated refreshes at bottom should not repeatedly remove visibility class."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = True
+    app._conversation_log.follow_paused = False
+    app._conversation_log.unread_count = 0
+    app._jump_button = MagicMock()
+    app._jump_button.label = "Jump to bottom"
+
+    app._update_jump_to_bottom()
+    app._update_jump_to_bottom()
+
+    app._jump_button.remove_class.assert_called_once_with("visible")
+    app._jump_button.add_class.assert_not_called()
+
+
 def test_action_page_up_disables_auto_scroll_and_pages() -> None:
     """Page-up action should disable auto-follow and page up the conversation."""
     app = VictorTUI()
@@ -247,6 +281,7 @@ def test_action_toggle_follow_mode_pauses_follow() -> None:
     """Ctrl+F action should pause sticky follow mode."""
     app = VictorTUI()
     app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = True
     app._conversation_log.follow_paused = False
     app._update_jump_to_bottom = MagicMock()
 
@@ -260,7 +295,22 @@ def test_action_toggle_follow_mode_resumes_follow() -> None:
     """Ctrl+F action should resume follow and jump to latest."""
     app = VictorTUI()
     app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = False
     app._conversation_log.follow_paused = True
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_toggle_follow_mode()
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_toggle_follow_mode_resumes_when_user_scrolled() -> None:
+    """Ctrl+F should resume following when paused by manual scroll-away."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.auto_scroll_enabled = False
+    app._conversation_log.follow_paused = False
     app._update_jump_to_bottom = MagicMock()
 
     app.action_toggle_follow_mode()

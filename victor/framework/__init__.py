@@ -333,11 +333,9 @@ try:
         create_default_health_checker,
         # Provider-Specific Health
         HealthCheckResult,
-        ProviderHealthStatus,
         ProviderHealthChecker,
-        ProviderHealthReport,
-        get_provider_health_checker,
-        reset_provider_health_checker,
+        ProviderHealthResult,
+        check_provider_health,
     )
 
     _HEALTH_EXPORTS = [
@@ -356,11 +354,9 @@ try:
         "create_default_health_checker",
         # Provider-Specific Health
         "HealthCheckResult",
-        "ProviderHealthStatus",
         "ProviderHealthChecker",
-        "ProviderHealthReport",
-        "get_provider_health_checker",
-        "reset_provider_health_checker",
+        "ProviderHealthResult",
+        "check_provider_health",
     ]
 except ImportError:
     _HEALTH_EXPORTS = []

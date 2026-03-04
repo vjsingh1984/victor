@@ -206,6 +206,7 @@ def test_unread_separator_inserted_once_before_first_unread_message() -> None:
         assert mount.call_count == 3
         separator_widget = mount.call_args_list[0].args[1]
         assert "unread-separator" in separator_widget.classes
+        assert "2 new messages" in str(log._unread_separator.renderable)
 
 
 def test_unread_separator_disabled_does_not_insert_marker() -> None:
@@ -263,6 +264,42 @@ def test_enabling_separator_with_existing_unread_inserts_marker() -> None:
         assert mount.call_count == 2
         separator_call = mount.call_args_list[1]
         assert separator_call.kwargs["before"] is boundary_target
+
+
+def test_unread_separator_label_updates_with_count_changes() -> None:
+    """Unread separator label should reflect live unread message count."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True),
+    ):
+        log = EnhancedConversationLog(show_unread_separator=True)
+        log.disable_auto_scroll()
+
+        log.add_assistant_message("first unread")
+        assert log._unread_separator is not None
+        assert "1 new message" in str(log._unread_separator.renderable)
+
+        log.add_assistant_message("second unread")
+        assert "2 new messages" in str(log._unread_separator.renderable)
+
+
+def test_reenabled_unread_separator_shows_current_backlog_count() -> None:
+    """Turning marker back on should display current unread backlog count."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True),
+    ):
+        log = EnhancedConversationLog(show_unread_separator=False)
+        log.disable_auto_scroll()
+        log.add_assistant_message("first unread")
+        log.add_assistant_message("second unread")
+        assert log.unread_count == 2
+        assert log._unread_separator is None
+
+        log.set_unread_separator_enabled(True)
+
+        assert log._unread_separator is not None
+        assert "2 new messages" in str(log._unread_separator.renderable)
 
 
 def test_jump_to_unread_separator_scrolls_when_present() -> None:
@@ -381,6 +418,16 @@ def test_status_bar_updates_follow_indicator() -> None:
         label.update.assert_called_with("Following")
 
 
+def test_status_bar_update_follow_is_noop_when_state_unchanged() -> None:
+    """Follow indicator updates should be skipped when state does not change."""
+    bar = StatusBar()
+
+    with patch.object(StatusBar, "query_one") as query_one:
+        bar.update_follow(paused=False)
+
+    query_one.assert_not_called()
+
+
 def test_status_bar_updates_unread_indicator() -> None:
     """Status bar should show/hide unread badge based on unread count."""
     bar = StatusBar()
@@ -394,6 +441,16 @@ def test_status_bar_updates_unread_indicator() -> None:
         bar.update_unread(0)
         label.update.assert_called_with("")
         label.remove_class.assert_called_with("visible")
+
+
+def test_status_bar_update_unread_is_noop_when_count_unchanged() -> None:
+    """Unread indicator updates should be skipped when count does not change."""
+    bar = StatusBar()
+
+    with patch.object(StatusBar, "query_one") as query_one:
+        bar.update_unread(0)
+
+    query_one.assert_not_called()
 
 
 def test_status_bar_shortcuts_reflect_follow_action_state() -> None:

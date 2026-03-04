@@ -858,6 +858,7 @@ class TestMiddlewareIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.skip(reason="Requires victor_devops external package - pending migration")
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
         from victor_devops.assistant import DevOpsAssistant

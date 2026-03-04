@@ -1309,6 +1309,7 @@ class EnhancedConversationLog(VerticalScroll):
             return
         if mark_unread:
             self._unread_count += 1
+            self._refresh_unread_separator_label()
 
     def _scroll_end_with_guard(self, animate: bool = False, now: float | None = None) -> None:
         timestamp = now if now is not None else time.monotonic()
@@ -1327,9 +1328,10 @@ class EnhancedConversationLog(VerticalScroll):
 
     def _ensure_unread_separator(self) -> None:
         if self._unread_separator is not None:
+            self._refresh_unread_separator_label()
             return
         separator = Static(
-            Text("── New messages ──", style="bold yellow"),
+            self._build_unread_separator_text(),
             classes="unread-separator",
         )
         self._unread_separator = separator
@@ -1341,6 +1343,23 @@ class EnhancedConversationLog(VerticalScroll):
                 self.mount(separator)
         except Exception:
             self.mount(separator)
+
+    def _build_unread_separator_text(self) -> Text:
+        if self._unread_count <= 0:
+            label = "── New messages ──"
+        elif self._unread_count == 1:
+            label = "── 1 new message ──"
+        else:
+            label = f"── {self._unread_count} new messages ──"
+        return Text(label, style="bold yellow")
+
+    def _refresh_unread_separator_label(self) -> None:
+        if self._unread_separator is None:
+            return
+        try:
+            self._unread_separator.update(self._build_unread_separator_text())
+        except Exception:
+            pass
 
     def _get_unread_boundary_target(self) -> Optional[Widget]:
         if not self._unread_boundary_id:

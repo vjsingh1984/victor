@@ -91,13 +91,13 @@ from victor.core.health import (
 # From: victor/providers/health.py
 # =============================================================================
 from victor.providers.health import (
-    HealthCheckResult,
-    HealthStatus as ProviderHealthStatus,  # Renamed to avoid conflict
     ProviderHealthChecker,
-    ProviderHealthReport,
-    get_health_checker as get_provider_health_checker,
-    reset_health_checker as reset_provider_health_checker,
+    ProviderHealthResult,
+    check_provider_health,
 )
+
+# Backward-compatible alias
+HealthCheckResult = ProviderHealthResult
 
 __all__ = [
     # Core Health Check System
@@ -115,9 +115,7 @@ __all__ = [
     "create_default_health_checker",
     # Provider-Specific Health
     "HealthCheckResult",
-    "ProviderHealthStatus",
     "ProviderHealthChecker",
-    "ProviderHealthReport",
-    "get_provider_health_checker",
-    "reset_provider_health_checker",
+    "ProviderHealthResult",
+    "check_provider_health",
 ]

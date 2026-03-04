@@ -576,7 +576,7 @@ class VictorTUI(App):
         Binding("ctrl+s", "save_session", "Save Session", show=True),
         Binding("ctrl+e", "export_session", "Export Session", show=True),
         Binding("ctrl+n", "jump_unread", "Jump Unread", show=True),
-        Binding("ctrl+f", "toggle_follow_mode", "Follow", show=True),
+        Binding("ctrl+f", "toggle_follow_mode", "Toggle Follow", show=True),
         Binding("ctrl+u", "toggle_unread_marker", "Unread Marker", show=True),
         Binding("ctrl+slash", "show_help", "Help", show=True),
         Binding("ctrl+up", "scroll_up", "Scroll Up", show=False),
@@ -629,6 +629,8 @@ class VictorTUI(App):
         self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
         self._session_messages: list[Message] = []
+        self._jump_button_visible: Optional[bool] = None
+        self._jump_button_label: Optional[str] = None
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -1011,8 +1013,15 @@ class VictorTUI(App):
         """Toggle sticky follow mode for transcript auto-scrolling."""
         if not self._conversation_log:
             return
-        paused = not self._conversation_log.follow_paused
-        self._conversation_log.set_follow_paused(paused, jump_to_bottom=not paused)
+        auto_follow_active = (
+            self._conversation_log.auto_scroll_enabled and not self._conversation_log.follow_paused
+        )
+        if auto_follow_active:
+            # Following -> sticky paused
+            self._conversation_log.set_follow_paused(True, jump_to_bottom=False)
+        else:
+            # Any paused state (sticky or manual scroll-away) -> following
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
         self._update_jump_to_bottom()
 
     def action_jump_unread(self) -> None:
@@ -1412,7 +1421,7 @@ Slash Commands:
         self._update_jump_to_bottom()
 
     def action_scroll_bottom(self) -> None:
-        """Scroll to bottom of conversation."""
+        """Scroll to bottom; resume follow when sticky pause is active."""
         if not self._conversation_log:
             return
         if self._conversation_log.follow_paused:
@@ -1498,19 +1507,29 @@ Slash Commands:
                 self._status_bar.update_unread(unread)
             except Exception:
                 pass
+        desired_visible = not auto_follow_active
         if auto_follow_active:
-            self._jump_button.remove_class("visible")
-            self._jump_button.label = "Jump to bottom"
+            desired_label = "Jump to bottom"
         else:
-            self._jump_button.add_class("visible")
             if sticky_follow_paused and unread > 0:
-                self._jump_button.label = f"Resume follow ({unread} new)"
+                desired_label = f"Resume follow ({unread} new)"
             elif sticky_follow_paused:
-                self._jump_button.label = "Resume follow"
+                desired_label = "Resume follow"
             elif unread > 0:
-                self._jump_button.label = f"Jump to bottom ({unread} new)"
+                desired_label = f"Jump to bottom ({unread} new)"
             else:
-                self._jump_button.label = "Jump to bottom"
+                desired_label = "Jump to bottom"
+
+        if desired_visible != self._jump_button_visible:
+            if desired_visible:
+                self._jump_button.add_class("visible")
+            else:
+                self._jump_button.remove_class("visible")
+            self._jump_button_visible = desired_visible
+
+        if desired_label != self._jump_button_label:
+            self._jump_button.label = desired_label
+            self._jump_button_label = desired_label
 
     async def _start_streaming_ui(self) -> None:
         if not self._conversation_log:

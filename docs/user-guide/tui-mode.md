@@ -11,6 +11,7 @@ The TUI is built using Textual and provides:
 - Status bar showing provider/model information
 - Real-time streaming with thinking and tool call visualization
 - Unread separator marker when new responses arrive while scrolled up (`Ctrl+U` to toggle)
+- Unread separator marker includes live backlog count (e.g., `── 3 new messages ──`)
 - Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary (works even if marker is hidden)
 - Status bar unread badge (e.g., `3 new`) while backlog exists
 - Sticky follow mode (`Ctrl+F`) with explicit `Following` / `Paused` status indicator
@@ -102,7 +103,7 @@ Follow behavior:
 
 - Scrolling up (mouse wheel or keyboard) pauses auto-follow so new output does not yank the viewport.
 - Status bar shows `Paused` whenever auto-follow is not active, and `Following` when live tailing is active.
-- Use `Ctrl+F` to pause/resume sticky follow mode.
+- Use `Ctrl+F` to toggle between `Following` and `Paused`; if you are paused by manual scrolling, `Ctrl+F` resumes and jumps to latest output.
 - When sticky follow is paused, the jump button changes to `Resume follow`.
 - `Ctrl+End` also resumes sticky follow mode and jumps to latest output.
 
