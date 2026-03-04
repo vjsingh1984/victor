@@ -583,6 +583,191 @@ class Diagnostic:
 
 
 # =============================================================================
+# Embeddings Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class EmbeddingsProtocol(Protocol):
+    """
+    Protocol for text vectorization (embeddings).
+
+    Embeddings convert text into numerical vectors that capture semantic
+    meaning, enabling semantic search, similarity comparison, and RAG.
+
+    Implementations can be provided by:
+    - victor-rag (advanced embedding models)
+    - victor.contrib.embeddings (basic stub/fallback)
+    - Custom embedding providers
+
+    Example:
+        embeddings: EmbeddingsProtocol = get_embeddings()
+        vector = await embeddings.embed_text("Hello world")
+    """
+
+    async def embed_text(
+        self,
+        text: str,
+        **kwargs: Any,
+    ) -> List[float]:
+        """Embed a single text string into a vector.
+
+        Args:
+            text: Text to embed
+            **kwargs: Additional implementation-specific options
+
+        Returns:
+            List of floats representing the embedding vector
+        """
+        ...
+
+    async def embed_batch(
+        self,
+        texts: List[str],
+        **kwargs: Any,
+    ) -> List[List[float]]:
+        """Embed multiple texts efficiently.
+
+        Args:
+            texts: List of texts to embed
+            **kwargs: Additional implementation-specific options
+
+        Returns:
+            List of embedding vectors
+        """
+        ...
+
+    def get_dimension(self) -> int:
+        """Get the dimension of embeddings produced by this provider."""
+        ...
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get model metadata."""
+        ...
+
+
+@dataclass
+class EmbeddingResult:
+    """Result of embedding operation.
+
+    Attributes:
+        text: Original text that was embedded
+        embedding: Vector representation
+        model: Model name used
+        dimension: Embedding dimension
+        metadata: Additional implementation-specific metadata
+    """
+
+    text: str
+    embedding: List[float]
+    model: str
+    dimension: int
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# =============================================================================
+# Vector Store Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class VectorStoreProtocol(Protocol):
+    """
+    Protocol for vector storage and similarity search.
+
+    Vector stores enable efficient semantic search over large document
+    collections using embedding vectors.
+
+    Implementations can be provided by:
+    - victor-rag (advanced vector stores like FAISS, Chroma)
+    - victor.contrib.vectorstores (basic in-memory implementation)
+    - Custom vector stores
+
+    Example:
+        store: VectorStoreProtocol = get_vector_store()
+        await store.add_documents(documents, embeddings)
+        results = await store.search(query_vector, top_k=5)
+    """
+
+    async def add_documents(
+        self,
+        documents: List[str],
+        embeddings: List[List[float]],
+        metadata: Optional[List[Dict[str, Any]]] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        """Add documents to the vector store.
+
+        Args:
+            documents: List of document texts
+            embeddings: List of embedding vectors
+            metadata: Optional metadata for each document
+            **kwargs: Additional implementation-specific options
+
+        Returns:
+            List of document IDs
+        """
+        ...
+
+    async def search(
+        self,
+        query_embedding: List[float],
+        top_k: int = 10,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> List["VectorSearchResult"]:
+        """Search for similar documents.
+
+        Args:
+            query_embedding: Query vector
+            top_k: Number of results to return
+            filter_metadata: Optional metadata filters
+            **kwargs: Additional implementation-specific options
+
+        Returns:
+            List of search results ranked by similarity
+        """
+        ...
+
+    async def delete(
+        self,
+        document_ids: List[str],
+        **kwargs: Any,
+    ) -> bool:
+        """Delete documents from the store.
+
+        Args:
+            document_ids: List of document IDs to delete
+            **kwargs: Additional implementation-specific options
+
+        Returns:
+            True if successful
+        """
+        ...
+
+    def get_store_info(self) -> Dict[str, Any]:
+        """Get store metadata."""
+        ...
+
+
+@dataclass
+class VectorSearchResult:
+    """Result of vector search operation.
+
+    Attributes:
+        document_id: Document identifier
+        text: Document text
+        score: Similarity score (higher = more similar)
+        metadata: Document metadata
+    """
+
+    document_id: str
+    text: str
+    score: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -608,4 +793,10 @@ __all__ = [
     "Location",
     "HoverInfo",
     "Diagnostic",
+    # Embeddings protocols
+    "EmbeddingsProtocol",
+    "EmbeddingResult",
+    # Vector store protocols
+    "VectorStoreProtocol",
+    "VectorSearchResult",
 ]

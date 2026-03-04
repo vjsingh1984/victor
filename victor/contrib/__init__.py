@@ -48,21 +48,25 @@ __version__ = "0.1.0"
 
 # Import main contrib packages for convenience
 from victor.contrib import (
-    codebase,  # New: Codebase analysis utilities
-    editing,   # New: File editing utilities
-    lsp,       # New: LSP integration
+    codebase,  # Codebase analysis utilities
+    editing,   # File editing utilities
+    embeddings,  # Text embeddings
+    lsp,       # LSP integration
     safety,
     conversation,
+    vectorstores,  # Vector storage
     workflows,
     mode_config,
     testing,
 )
 
 __all__ = [
-    # New packages
+    # Core packages
     "codebase",
     "editing",
+    "embeddings",
     "lsp",
+    "vectorstores",
     # Existing packages
     "safety",
     "conversation",

@@ -201,6 +201,7 @@ docs/security/audit/
 
 # Embeddings cache (generated, contains binary data)
 victor/agent/.embeddings/
+/embeddings/
 
 # Internal roadmap (not for public distribution)
 ROADMAP.md
@@ -230,7 +231,7 @@ docs/PROMOTION_SPECIFICATION.md
 models/
 **/sentence-transformers/
 **/bge-*/
-embeddings/
+/embeddings/  # Only root-level embeddings, not victor/contrib/embeddings
 victor-coding/
 victor-dataanalysis/
 victor-devops/
