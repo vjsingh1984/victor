@@ -400,7 +400,7 @@ class ChatService:
         Returns:
             True if response is complete
         """
-        if response.finish_reason == "stop":
+        if response.stop_reason == "stop":
             return True
 
         if response.content and len(response.content) > 50:
@@ -428,7 +428,7 @@ class ChatService:
         Returns:
             True if continuation is needed
         """
-        return response.finish_reason == "length"
+        return response.stop_reason == "length"
 
     async def _execute_tool_calls(self, tool_calls: List[Any]) -> None:
         """Execute tool calls from response.
@@ -519,14 +519,15 @@ class ChatService:
         from victor.providers.base import CompletionResponse
 
         content = "".join(chunk.content for chunk in chunks)
+        # StreamChunk has optional usage field, handle safely
         total_tokens = sum(
-            chunk.get("usage", {}).get("total_tokens", 0)
+            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0)
             for chunk in chunks
         )
 
         return CompletionResponse(
             content=content,
-            finish_reason="stop",
+            stop_reason="stop",
             usage={"total_tokens": total_tokens},
         )
 

@@ -43,7 +43,7 @@ class MockProviderService:
         from victor.providers.base import CompletionResponse
         return CompletionResponse(
             content="Mock response",
-            finish_reason="stop",
+            stop_reason="stop",
             usage={"prompt_tokens": 10, "completion_tokens": 20},
         )
 
@@ -259,7 +259,7 @@ class TestChatServiceChat(BaseChatServiceTest):
         response = await service.chat("Hello, world!")
 
         assert response.content == "Mock response"
-        assert response.finish_reason == "stop"
+        assert response.stop_reason == "stop"
 
     @pytest.mark.asyncio
     async def test_chat_with_context_overflow(self):
@@ -325,7 +325,7 @@ class TestChatServiceAgenticLoop(BaseChatServiceTest):
         response = await service.chat("Complete this")
 
         assert response is not None
-        assert response.finish_reason == "stop"
+        assert response.stop_reason == "stop"
 
     @pytest.mark.asyncio
     async def test_agentic_loop_with_max_iterations(self):
