@@ -223,10 +223,9 @@ class EventBroadcaster:
         for client_id, client in self._clients.items():
             if client.is_subscribed(event.type.value):
                 try:
-                    await asyncio.wait_for(
-                        asyncio.coroutine(client.send)(event_json),
-                        timeout=5.0,
-                    )
+                    send_result = client.send(event_json)
+                    if inspect.isawaitable(send_result):
+                        await asyncio.wait_for(send_result, timeout=5.0)
                     client.last_activity = time.time()
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
@@ -607,6 +606,10 @@ class EventBridge:
         if self._event_bus:
             self._adapter.connect(self._event_bus)
 
+        self._run_async_operation(
+            self._broadcaster.start(),
+            description="start broadcaster",
+        )
         self._running = True
         logger.info("EventBridge started")
 
@@ -619,6 +622,10 @@ class EventBridge:
             return
 
         self._adapter.disconnect()
+        self._run_async_operation(
+            self._broadcaster.stop(),
+            description="stop broadcaster",
+        )
         self._running = False
         logger.info("EventBridge stopped")
 
@@ -635,3 +642,26 @@ class EventBridge:
         """
         handler = WebSocketEventHandler(self._broadcaster)
         await handler.handle_connection(websocket, client_id)
+
+    def _run_async_operation(self, awaitable: Any, *, description: str) -> None:
+        """Run async broadcaster lifecycle operations from sync APIs."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(awaitable)
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+            return
+
+        task = asyncio.ensure_future(awaitable)
+
+        def _on_done(done_task: asyncio.Task[Any]) -> None:
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                logger.debug(f"Cancelled task while trying to {description}")
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+
+        task.add_done_callback(_on_done)

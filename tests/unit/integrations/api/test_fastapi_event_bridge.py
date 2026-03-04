@@ -210,6 +210,50 @@ class TestEventBusAdapterCompatibility:
         assert len(event_bus.unsubscribe_calls) == len(adapter.EVENT_MAPPING)
 
 
+class TestEventBridgeReliability:
+    """Reliability checks for bridge event delivery."""
+
+    @pytest.mark.asyncio
+    async def test_event_bridge_burst_delivery_has_no_loss_or_reordering(self):
+        """A burst of events should be delivered completely and in-order."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        received = []
+
+        async def send_func(message: str):
+            received.append(json.loads(message))
+
+        async def wait_for(predicate, timeout: float = 2.0):
+            deadline = asyncio.get_running_loop().time() + timeout
+            while asyncio.get_running_loop().time() < deadline:
+                if predicate():
+                    return
+                await asyncio.sleep(0.01)
+            pytest.fail("Timed out waiting for event bridge condition")
+
+        bridge.start()
+        bridge._broadcaster.add_client("event-loss-check", send_func)
+
+        await wait_for(lambda: bridge._broadcaster._running)
+        await wait_for(lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING))
+
+        total_events = 25
+        for idx in range(total_events):
+            await bus.emit("tool.start", {"idx": idx})
+
+        await wait_for(lambda: len(received) >= total_events)
+        assert len(received) == total_events
+        assert [msg["data"]["idx"] for msg in received] == list(range(total_events))
+
+        bridge._broadcaster.remove_client("event-loss-check")
+        bridge.stop()
+        await wait_for(lambda: not bridge._broadcaster._running)
+
+
 class TestEventBridgeBroadcaster:
     """Tests for EventBridge broadcaster functionality."""
 
