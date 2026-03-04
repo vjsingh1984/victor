@@ -49,48 +49,56 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 @runtime_checkable
 class EditorProtocol(Protocol):
     """
-    Protocol for file editing operations.
+    Protocol for transaction-based file editing operations.
 
-    This protocol defines the interface for file editors, allowing the
-    framework to work with multiple implementations without direct
-    dependencies on external vertical packages.
+    This protocol defines the interface for file editors that support
+    transaction-based editing with undo/redo capabilities.
 
-    Implementations can be provided by:
-    - victor.contrib.editing (default diff-based editor)
-    - victor-coding (advanced coding-specific editor)
-    - Custom implementations
+    The protocol supports queuing multiple operations and applying them
+    atomically with automatic backup and rollback support.
 
     Example:
-        class MyEditor:
-            async def edit_file(
-                self,
-                file_path: str,
-                edits: List[EditOperation],
-                preview: bool = False,
-                **kwargs: Any,
-            ) -> EditResult:
-                # Apply edits to file
-                ...
+        editor.start_transaction("Fix bug in auth")
+        editor.add_create("/path/to/new.py", content)
+        editor.add_modify("/path/to/existing.py", new_content)
+        result = await editor.apply()  # Applies all or rolls back on error
+
+    Methods:
+        start_transaction: Begin a new transaction
+        add_create: Queue a file creation
+        add_modify: Queue a file modification
+        add_delete: Queue a file deletion
+        add_rename: Queue a file rename/move
+        add_replace: Queue a string replacement
+        apply: Execute all queued operations
     """
 
-    async def edit_file(
-        self,
-        file_path: str,
-        edits: List["EditOperation"],
-        preview: bool = False,
-        **kwargs: Any,
-    ) -> "EditResult":
-        """Apply edits to a file."""
+    def start_transaction(self, desc: str = "") -> str:
+        """Start a new transaction and return transaction ID."""
         ...
 
-    async def validate_edit(
-        self,
-        file_path: str,
-        old_str: str,
-        new_str: str,
-        **kwargs: Any,
-    ) -> "EditValidationResult":
-        """Validate an edit operation before applying."""
+    def add_create(self, path: str, content: str) -> None:
+        """Add a create operation to the transaction."""
+        ...
+
+    def add_modify(self, path: str, content: str) -> None:
+        """Add a modify operation to the transaction."""
+        ...
+
+    def add_delete(self, path: str) -> None:
+        """Add a delete operation to the transaction."""
+        ...
+
+    def add_rename(self, path: str, new_path: str) -> None:
+        """Add a rename operation to the transaction."""
+        ...
+
+    def add_replace(self, path: str, old_str: str, new_str: str) -> None:
+        """Add a replace operation to the transaction."""
+        ...
+
+    async def apply(self) -> Dict[str, Any]:
+        """Apply all queued operations in the transaction."""
         ...
 
     def get_editor_info(self) -> Dict[str, Any]:
