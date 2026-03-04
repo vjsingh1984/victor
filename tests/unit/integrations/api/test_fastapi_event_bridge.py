@@ -19,7 +19,8 @@ TDD tests for real-time event streaming to VS Code and other clients.
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock
+import time
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -252,6 +253,78 @@ class TestEventBridgeReliability:
         bridge._broadcaster.remove_client("event-loss-check")
         bridge.stop()
         await wait_for(lambda: not bridge._broadcaster._running)
+
+    def _reset_reliability_state(self, bridge) -> None:
+        """Reset singleton broadcaster reliability state between tests."""
+        bridge._broadcaster._clients.clear()
+        bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_success_count = 0
+        bridge._broadcaster._client_send_failure_count = 0
+        bridge._broadcaster._events_dispatched_count = 0
+        bridge._broadcaster._last_slo_breach_log_ts = 0.0
+
+    @pytest.mark.asyncio
+    async def test_reliability_dashboard_defaults_before_delivery(self):
+        """Dashboard should expose healthy defaults before any send attempts."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        self._reset_reliability_state(bridge)
+
+        dashboard = bridge.get_reliability_dashboard_data()
+
+        assert dashboard["events_dispatched"] == 0
+        assert dashboard["total_send_attempts"] == 0
+        assert dashboard["send_successes"] == 0
+        assert dashboard["send_failures"] == 0
+        assert dashboard["delivery_success_rate"] == 1.0
+        assert dashboard["dispatch_latency_p95_ms"] == 0.0
+        assert dashboard["slo_status"]["delivery_success_rate"] is True
+        assert dashboard["slo_status"]["dispatch_latency_p95_ms"] is True
+
+    @pytest.mark.asyncio
+    async def test_reliability_dashboard_tracks_delivery_and_slos(self):
+        """Dashboard should track success/failure counts, p95 latency, and SLO status."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        self._reset_reliability_state(bridge)
+
+        async def successful_send(_message: str) -> None:
+            return None
+
+        async def failing_send(_message: str) -> None:
+            raise RuntimeError("network timeout")
+
+        bridge._broadcaster.add_client("ok-client", successful_send)
+        bridge._broadcaster.add_client("bad-client", failing_send)
+
+        event = BridgeEvent(
+            type=BridgeEventType.TOOL_START,
+            data={"idx": 1},
+            timestamp=time.time() - 0.35,
+        )
+        await bridge._broadcaster._send_to_clients(event)
+
+        dashboard = bridge.get_reliability_dashboard_data()
+
+        assert dashboard["events_dispatched"] == 1
+        assert dashboard["total_send_attempts"] == 2
+        assert dashboard["send_successes"] == 1
+        assert dashboard["send_failures"] == 1
+        assert dashboard["delivery_success_rate"] == 0.5
+        assert dashboard["dispatch_latency_p95_ms"] > 200.0
+        assert dashboard["slo_status"]["delivery_success_rate"] is False
+        assert dashboard["slo_status"]["dispatch_latency_p95_ms"] is False
+
+        # Failing clients are evicted after send errors.
+        assert "bad-client" not in bridge._broadcaster._clients
 
 
 class TestEventBridgeBroadcaster:

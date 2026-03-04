@@ -34,6 +34,7 @@ import json
 import logging
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -140,6 +141,14 @@ class EventBroadcaster:
         self._clients: Dict[str, ClientConnection] = {}
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
         self._broadcast_task: Optional[asyncio.Task] = None
+        self._dispatch_latency_ms_window: deque[float] = deque(maxlen=2000)
+        self._client_send_success_count = 0
+        self._client_send_failure_count = 0
+        self._events_dispatched_count = 0
+        self._delivery_success_slo = 0.999
+        self._dispatch_latency_p95_slo_ms = 200.0
+        self._last_slo_breach_log_ts = 0.0
+        self._slo_breach_log_interval_sec = 30.0
         self._running = False
         self._initialized = True
 
@@ -227,13 +236,90 @@ class EventBroadcaster:
                     if inspect.isawaitable(send_result):
                         await asyncio.wait_for(send_result, timeout=5.0)
                     client.last_activity = time.time()
+                    self._client_send_success_count += 1
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
+                    self._client_send_failure_count += 1
                     disconnected.append(client_id)
 
         # Remove disconnected clients
         for client_id in disconnected:
             self.remove_client(client_id)
+
+        self._events_dispatched_count += 1
+        dispatch_latency_ms = max(0.0, (time.time() - event.timestamp) * 1000.0)
+        self._dispatch_latency_ms_window.append(dispatch_latency_ms)
+        self._maybe_log_slo_breaches()
+
+    def get_reliability_dashboard(self) -> Dict[str, Any]:
+        """Get event-bridge reliability metrics and SLO status."""
+        total_send_attempts = self._client_send_success_count + self._client_send_failure_count
+        delivery_success_rate = (
+            self._client_send_success_count / total_send_attempts if total_send_attempts else 1.0
+        )
+        dispatch_latency_p95_ms = self._percentile(self._dispatch_latency_ms_window, 95.0)
+
+        return {
+            "events_dispatched": self._events_dispatched_count,
+            "total_send_attempts": total_send_attempts,
+            "send_successes": self._client_send_success_count,
+            "send_failures": self._client_send_failure_count,
+            "delivery_success_rate": delivery_success_rate,
+            "dispatch_latency_p95_ms": dispatch_latency_p95_ms,
+            "slo_thresholds": {
+                "delivery_success_rate_min": self._delivery_success_slo,
+                "dispatch_latency_p95_ms_max": self._dispatch_latency_p95_slo_ms,
+            },
+            "slo_status": {
+                "delivery_success_rate": delivery_success_rate >= self._delivery_success_slo,
+                "dispatch_latency_p95_ms": dispatch_latency_p95_ms
+                <= self._dispatch_latency_p95_slo_ms,
+            },
+        }
+
+    @staticmethod
+    def _percentile(values: Any, percentile: float) -> float:
+        """Compute percentile using linear interpolation."""
+        values_list = list(values)
+        if not values_list:
+            return 0.0
+        ordered = sorted(values_list)
+        if len(ordered) == 1:
+            return float(ordered[0])
+
+        rank = (percentile / 100.0) * (len(ordered) - 1)
+        lower = int(rank)
+        upper = min(lower + 1, len(ordered) - 1)
+        weight = rank - lower
+        return float(ordered[lower] * (1.0 - weight) + ordered[upper] * weight)
+
+    def _maybe_log_slo_breaches(self) -> None:
+        """Log reliability SLO breaches with basic throttling."""
+        snapshot = self.get_reliability_dashboard()
+        if snapshot["total_send_attempts"] == 0:
+            return
+
+        breaches = []
+        if not snapshot["slo_status"]["delivery_success_rate"]:
+            breaches.append(
+                "delivery_success_rate "
+                f"{snapshot['delivery_success_rate']:.4f} < "
+                f"{snapshot['slo_thresholds']['delivery_success_rate_min']:.4f}"
+            )
+        if not snapshot["slo_status"]["dispatch_latency_p95_ms"]:
+            breaches.append(
+                "dispatch_latency_p95_ms "
+                f"{snapshot['dispatch_latency_p95_ms']:.2f} > "
+                f"{snapshot['slo_thresholds']['dispatch_latency_p95_ms_max']:.2f}"
+            )
+        if not breaches:
+            return
+
+        now = time.time()
+        if now - self._last_slo_breach_log_ts < self._slo_breach_log_interval_sec:
+            return
+        self._last_slo_breach_log_ts = now
+        logger.warning("EventBridge SLO breach: %s", "; ".join(breaches))
 
 
 class WebSocketEventHandler:
@@ -642,6 +728,10 @@ class EventBridge:
         """
         handler = WebSocketEventHandler(self._broadcaster)
         await handler.handle_connection(websocket, client_id)
+
+    def get_reliability_dashboard_data(self) -> Dict[str, Any]:
+        """Expose reliability metrics and SLO status for dashboards."""
+        return self._broadcaster.get_reliability_dashboard()
 
     def _run_async_operation(self, awaitable: Any, *, description: str) -> None:
         """Run async broadcaster lifecycle operations from sync APIs."""

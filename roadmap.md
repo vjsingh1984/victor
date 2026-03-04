@@ -20,7 +20,7 @@ Related documents:
 | `E1` | Orchestration tech-debt burn-down | `M1` completed, `M2` in planning |
 | `E2` | Roadmap governance consolidation | `M1` in progress |
 | `E3` | Type-safety + quality gates | `M1` in progress |
-| `E4` | Event bridge reliability | `M1` in progress |
+| `E4` | Event bridge reliability | `M3` completed |
 | `E5` | Legacy compatibility debt reduction | `M1` in progress |
 | `E6` | Competitive benchmark ground-truth | `M1` in progress |
 
