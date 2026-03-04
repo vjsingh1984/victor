@@ -7,8 +7,16 @@ with input at the bottom and conversation history in the middle.
 from __future__ import annotations
 
 import asyncio
+
+# Install uvloop for ~20% faster async I/O (if available)
+try:
+    import uvloop
+
+    uvloop.install()
+except ImportError:
+    pass
 import io
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from rich.console import Console
 from textual import work
@@ -234,7 +242,9 @@ class VictorTUI(App):
     └─────────────────────────────────────┘
     """
 
-    CSS = THEME_CSS + """
+    CSS = (
+        THEME_CSS
+        + """
     Screen {
         background: $background;
         color: $text;
@@ -561,7 +571,67 @@ class VictorTUI(App):
         color: $text-muted;
         border-top: solid $border-muted;
     }
+
+    /* Compact overrides to keep more history in view */
+    #main-container {
+        padding: 0 1 0 1;
+    }
+
+    #conversation-area {
+        padding: 0;
+    }
+
+    EnhancedConversationLog {
+        padding: 0;
+        margin: 0;
+    }
+
+    MessageWidget {
+        padding: 0 1 0 0;
+        margin: 0;
+    }
+
+    MessageWidget.user {
+        background: transparent;
+        border: none;
+        border-left: solid $primary;
+        padding-left: 1;
+        margin-bottom: 0;
+    }
+
+    MessageWidget.assistant {
+        background: transparent;
+        border: none;
+        border-left: solid $border-muted;
+        padding-left: 1;
+        margin-top: 0;
+    }
+
+    InputWidget {
+        padding: 0 1 0 1;
+    }
+
+    InputWidget .input-row {
+        margin: 0;
+    }
+
+    InputWidget SubmitTextArea,
+    InputWidget TextArea {
+        height: auto;
+        min-height: 3;
+        max-height: 5;
+        border: solid $border-muted;
+        background: $background;
+        color: $text;
+        padding: 1;
+    }
+
+    InputWidget .input-hint {
+        text-align: left;
+        margin: 0;
+    }
     """
+    )
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Exit", show=True),
@@ -633,6 +703,7 @@ class VictorTUI(App):
         self._session_messages: list[Message] = []
         self._jump_button_visible: Optional[bool] = None
         self._jump_button_label: Optional[str] = None
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -684,6 +755,22 @@ class VictorTUI(App):
         # Focus input
         self._input_widget.focus_input()
 
+    def on_unmount(self) -> None:
+        """Ensure background tasks are cleaned up."""
+        self._cancel_background_tasks()
+
+    def _run_in_background(self, coro: Awaitable[Any]) -> None:
+        """Track background work so the UI stays responsive."""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(lambda t: self._background_tasks.discard(t))
+
+    def _cancel_background_tasks(self) -> None:
+        """Cancel any pending background work."""
+        for task in list(self._background_tasks):
+            task.cancel()
+        self._background_tasks.clear()
+
     async def on_input_widget_submitted(self, event: InputWidget.Submitted) -> None:
         """Handle input submission from the custom InputWidget."""
         message = event.value.strip()
@@ -708,8 +795,8 @@ class VictorTUI(App):
         # Add user message to log
         self._add_user_message(message)
 
-        # Process message directly (not using @work decorator to avoid thread issues)
-        await self._process_message_async(message)
+        # Kick off background processing so the UI stays responsive
+        self._run_in_background(self._process_message_async(message))
 
     async def _handle_command(self, command: str) -> None:
         """Handle slash commands.
@@ -803,7 +890,7 @@ class VictorTUI(App):
         content_chunks: list[str] = []
 
         # Start streaming display
-        await self._start_streaming_ui()
+        self._start_streaming_ui()
         self._set_status("Streaming", "streaming")
 
         try:
@@ -1544,18 +1631,15 @@ Slash Commands:
             self._jump_button.label = desired_label
             self._jump_button_label = desired_label
 
-    async def _start_streaming_ui(self) -> None:
+    def _start_streaming_ui(self) -> None:
         if not self._conversation_log:
             return
-        started = asyncio.Event()
-
-        def _start() -> None:
-            self._conversation_log.start_streaming()
-            self._update_jump_to_bottom()
-            started.set()
-
-        self._call_ui(_start)
-        await started.wait()
+        self._call_ui(
+            lambda: (
+                self._conversation_log.start_streaming(),
+                self._update_jump_to_bottom(),
+            )
+        )
 
     def _record_message(self, role: str, content: str, **metadata: Any) -> None:
         if not content:

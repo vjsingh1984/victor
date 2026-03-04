@@ -364,7 +364,7 @@ class InputWidget(Static):
                     id="message-input",
                 )
             yield Label(
-                "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands",
+                "Enter send | Shift+Enter newline | ↑/↓ history | /help commands",
                 classes="input-hint",
             )
 
@@ -700,7 +700,7 @@ class StreamingMessageBlock(Static):
         background: transparent;
         border: none;
         padding: 0;
-        margin: 0 0 1 0;
+        margin: 0;
     }
 
     StreamingMessageBlock.user {
@@ -1034,16 +1034,16 @@ class EnhancedConversationLog(VerticalScroll):
     DEFAULT_CSS = """
     EnhancedConversationLog {
         background: $background;
-        padding: 1;
+        padding: 0;
         scrollbar-gutter: stable;
     }
 
     EnhancedConversationLog > Static {
-        margin: 1 0;
+        margin: 0;
     }
 
     EnhancedConversationLog > StreamingMessageBlock {
-        margin: 1 0;
+        margin: 0;
     }
 
     EnhancedConversationLog .unread-separator {
