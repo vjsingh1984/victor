@@ -30,6 +30,11 @@ Usage:
 
     # Get tool
     tool = registry.get("read_file")
+
+Migration:
+    from victor.tools.unified.adapters import migrate_to_unified_registry
+
+    migrate_to_unified_registry()
 """
 
 from victor.tools.unified.registry import (
@@ -40,10 +45,21 @@ from victor.tools.unified.registry import (
     UnifiedToolRegistry,
 )
 
+from victor.tools.unified.adapters import (
+    SharedToolRegistryAdapter,
+    ToolRegistryAdapter,
+    migrate_to_unified_registry,
+)
+
 __all__ = [
+    # Core
     "UnifiedToolRegistry",
     "SelectionStrategy",
     "HookPhase",
     "ToolMetadata",
     "ToolMetrics",
+    # Adapters
+    "SharedToolRegistryAdapter",
+    "ToolRegistryAdapter",
+    "migrate_to_unified_registry",
 ]
