@@ -1,0 +1,449 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for the feature flag system."""
+
+import os
+import tempfile
+from pathlib import Path
+from unittest import mock
+
+import pytest
+import yaml
+
+from victor.core.feature_flags import (
+    FeatureFlag,
+    FeatureFlagManager,
+    FeatureFlagConfig,
+    get_feature_flag_manager,
+    reset_feature_flag_manager,
+    is_feature_enabled,
+    enable_feature,
+    disable_feature,
+)
+from victor.config.feature_config import (
+    load_feature_flags_from_settings,
+    load_feature_flags_from_yaml,
+    save_feature_flags_to_yaml,
+    validate_feature_flags,
+    get_feature_flag_summary,
+)
+
+
+class TestFeatureFlagEnum:
+    """Tests for FeatureFlag enum."""
+
+    def test_all_flags_have_env_var_names(self):
+        """Test that all feature flags have valid environment variable names."""
+        for flag in FeatureFlag:
+            env_var = flag.get_env_var_name()
+            assert env_var.startswith("VICTOR_")
+            assert env_var.isupper()
+
+    def test_all_flags_have_yaml_keys(self):
+        """Test that all feature flags have valid YAML keys."""
+        for flag in FeatureFlag:
+            yaml_key = flag.get_yaml_key()
+            assert yaml_key.islower()
+            assert " " not in yaml_key
+
+    def test_flag_values_are_unique(self):
+        """Test that all feature flag values are unique."""
+        values = [flag.value for flag in FeatureFlag]
+        assert len(values) == len(set(values))
+
+
+class TestFeatureFlagManager:
+    """Tests for FeatureFlagManager."""
+
+    def test_default_manager_state(self):
+        """Test that manager initializes with default state."""
+        config = FeatureFlagConfig(default_enabled=False)
+        manager = FeatureFlagManager(config)
+
+        # All flags should be disabled by default
+        for flag in FeatureFlag:
+            assert not manager.is_enabled(flag)
+
+    def test_default_enabled_true(self):
+        """Test manager with default_enabled=True."""
+        config = FeatureFlagConfig(default_enabled=True)
+        manager = FeatureFlagManager(config)
+
+        for flag in FeatureFlag:
+            assert manager.is_enabled(flag)
+
+    def test_enable_flag_at_runtime(self):
+        """Test enabling a flag at runtime."""
+        manager = FeatureFlagManager()
+
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_disable_flag_at_runtime(self):
+        """Test disabling a flag at runtime."""
+        config = FeatureFlagConfig(default_enabled=True)
+        manager = FeatureFlagManager(config)
+
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        manager.disable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_runtime_override_precedence(self):
+        """Test that runtime overrides take precedence over env vars."""
+        manager = FeatureFlagManager()
+
+        # Enable via runtime
+        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        # Set env var to false (should be ignored due to runtime override)
+        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "false"}):
+            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_clear_runtime_override(self):
+        """Test clearing runtime override."""
+        manager = FeatureFlagManager()
+
+        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        manager.clear_runtime_override(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_get_enabled_flags(self):
+        """Test getting all enabled flags."""
+        manager = FeatureFlagManager()
+
+        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        manager.enable(FeatureFlag.USE_NEW_TOOL_SERVICE)
+
+        enabled = manager.get_enabled_flags()
+        assert enabled[FeatureFlag.USE_NEW_CHAT_SERVICE] is True
+        assert enabled[FeatureFlag.USE_NEW_TOOL_SERVICE] is True
+        assert enabled[FeatureFlag.USE_NEW_CONTEXT_SERVICE] is False
+
+    def test_set_convenience_method(self):
+        """Test the set() convenience method."""
+        manager = FeatureFlagManager()
+
+        manager.set(FeatureFlag.USE_NEW_CHAT_SERVICE, True)
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        manager.set(FeatureFlag.USE_NEW_CHAT_SERVICE, False)
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_reload_config(self):
+        """Test reloading configuration."""
+        manager = FeatureFlagManager()
+
+        # Enable via runtime
+        manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        # Reload should clear runtime overrides
+        manager.reload_config()
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+
+class TestEnvironmentVariableLoading:
+    """Tests for environment variable loading."""
+
+    def test_env_var_true(self):
+        """Test loading true from environment variable."""
+        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "true"}):
+            manager = FeatureFlagManager()
+            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_env_var_false(self):
+        """Test loading false from environment variable."""
+        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": "false"}):
+            manager = FeatureFlagManager()
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    @pytest.mark.parametrize("value", ["1", "yes", "on", "YES", "ON"])
+    def test_env_var_truthy_values(self, value):
+        """Test various truthy values for environment variables."""
+        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": value}):
+            manager = FeatureFlagManager()
+            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    @pytest.mark.parametrize("value", ["0", "no", "off", "NO", "OFF", "invalid"])
+    def test_env_var_falsy_values(self, value):
+        """Test various falsy values for environment variables."""
+        with mock.patch.dict(os.environ, {"VICTOR_USE_NEW_CHAT_SERVICE": value}):
+            manager = FeatureFlagManager()
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+
+class TestYamlConfiguration:
+    """Tests for YAML configuration loading."""
+
+    def test_load_from_valid_yaml(self):
+        """Test loading from valid YAML configuration."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump({
+                "features": {
+                    "use_new_chat_service": True,
+                    "use_new_tool_service": False,
+                }
+            }, f)
+            config_path = Path(f.name)
+
+        try:
+            config = FeatureFlagConfig(config_path=config_path)
+            manager = FeatureFlagManager(config)
+
+            assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE)
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE)
+        finally:
+            config_path.unlink()
+
+    def test_load_from_missing_yaml(self):
+        """Test loading from missing YAML file."""
+        config = FeatureFlagConfig(config_path=Path("/nonexistent/path/features.yaml"))
+        manager = FeatureFlagManager(config)
+
+        # Should use defaults
+        assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_load_from_invalid_yaml_strict_mode(self):
+        """Test loading from invalid YAML in strict mode."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("invalid: yaml: content:")
+            config_path = Path(f.name)
+
+        try:
+            config = FeatureFlagConfig(config_path=config_path, strict_mode=True)
+            with pytest.raises(Exception):
+                manager = FeatureFlagManager(config)
+        finally:
+            config_path.unlink()
+
+    def test_load_from_invalid_yaml_lenient_mode(self):
+        """Test loading from invalid YAML in lenient mode."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("invalid: yaml: content:")
+            config_path = Path(f.name)
+
+        try:
+            config = FeatureFlagConfig(config_path=config_path, strict_mode=False)
+            manager = FeatureFlagManager(config)
+
+            # Should use defaults
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        finally:
+            config_path.unlink()
+
+    def test_invalid_feature_flag_value_strict(self):
+        """Test invalid feature flag value in strict mode."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump({
+                "features": {
+                    "use_new_chat_service": "not_a_bool",
+                }
+            }, f)
+            config_path = Path(f.name)
+
+        try:
+            config = FeatureFlagConfig(config_path=config_path, strict_mode=True)
+            with pytest.raises(ValueError):
+                manager = FeatureFlagManager(config)
+        finally:
+            config_path.unlink()
+
+    def test_invalid_feature_flag_value_lenient(self):
+        """Test invalid feature flag value in lenient mode."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump({
+                "features": {
+                    "use_new_chat_service": "not_a_bool",
+                }
+            }, f)
+            config_path = Path(f.name)
+
+        try:
+            config = FeatureFlagConfig(config_path=config_path, strict_mode=False)
+            manager = FeatureFlagManager(config)
+
+            # Should ignore invalid value and use default
+            assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        finally:
+            config_path.unlink()
+
+
+class TestGlobalManager:
+    """Tests for global feature flag manager."""
+
+    def test_get_global_manager_singleton(self):
+        """Test that get_feature_flag_manager returns singleton."""
+        reset_feature_flag_manager()
+
+        manager1 = get_feature_flag_manager()
+        manager2 = get_feature_flag_manager()
+
+        assert manager1 is manager2
+
+    def test_force_reload(self):
+        """Test force_reload parameter."""
+        reset_feature_flag_manager()
+
+        manager1 = get_feature_flag_manager()
+        manager1.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        manager2 = get_feature_flag_manager(force_reload=True)
+
+        # New instance should not have runtime override
+        assert not manager2.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+    def test_convenience_functions(self):
+        """Test convenience functions."""
+        reset_feature_flag_manager()
+
+        assert not is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        enable_feature(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        disable_feature(FeatureFlag.USE_NEW_CHAT_SERVICE)
+        assert not is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+
+class TestFeatureConfigModule:
+    """Tests for victor.config.feature_config module."""
+
+    def test_load_from_settings(self):
+        """Test loading feature flags from settings."""
+        flags = load_feature_flags_from_settings()
+
+        # Should return all expected flags
+        assert "use_new_chat_service" in flags
+        assert "use_new_tool_service" in flags
+        assert "use_new_context_service" in flags
+
+    def test_load_from_yaml_config(self):
+        """Test loading from YAML configuration file."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump({
+                "features": {
+                    "use_new_chat_service": True,
+                    "use_new_tool_service": False,
+                }
+            }, f)
+            config_path = Path(f.name)
+
+        try:
+            flags = load_feature_flags_from_yaml(config_path)
+
+            assert flags["use_new_chat_service"] is True
+            assert flags["use_new_tool_service"] is False
+        finally:
+            config_path.unlink()
+
+    def test_save_to_yaml_config(self):
+        """Test saving to YAML configuration file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "features.yaml"
+
+            flags = {
+                "use_new_chat_service": True,
+                "use_new_tool_service": False,
+                "use_new_context_service": True,
+            }
+
+            save_feature_flags_to_yaml(flags, config_path)
+
+            # Verify file was created
+            assert config_path.exists()
+
+            # Verify contents
+            with open(config_path, "r") as f:
+                data = yaml.safe_load(f)
+
+            assert data["features"]["use_new_chat_service"] is True
+            assert data["features"]["use_new_tool_service"] is False
+            assert data["features"]["use_new_context_service"] is True
+
+    def test_validate_valid_flags(self):
+        """Test validation of valid flags."""
+        flags = {
+            "use_new_chat_service": True,
+            "use_new_tool_service": False,
+        }
+        assert validate_feature_flags(flags) is True
+
+    def test_validate_invalid_flag_name(self):
+        """Test validation rejects invalid flag names."""
+        flags = {
+            "use_new_chat_service": True,
+            "invalid_flag_name": False,
+        }
+        assert validate_feature_flags(flags) is False
+
+    def test_validate_invalid_flag_value(self):
+        """Test validation rejects invalid flag values."""
+        flags = {
+            "use_new_chat_service": "not_a_bool",
+        }
+        assert validate_feature_flags(flags) is False
+
+    def test_get_feature_flag_summary(self):
+        """Test getting feature flag summary."""
+        with mock.patch.dict(
+            "victor.config.feature_config.DEFAULT_FEATURE_FLAGS",
+            {
+                "use_new_chat_service": True,
+                "use_new_tool_service": False,
+            }
+        ):
+            summary = get_feature_flag_summary()
+
+            assert "Feature Flags Status:" in summary
+            assert "ENABLED" in summary
+            assert "DISABLED" in summary
+            assert "use_new_chat_service" in summary
+            assert "use_new_tool_service" in summary
+
+
+class TestThreadSafety:
+    """Tests for thread safety of feature flag manager."""
+
+    def test_concurrent_access(self):
+        """Test concurrent access to feature flag manager."""
+        import threading
+
+        manager = FeatureFlagManager()
+        results = []
+
+        def enable_flag():
+            for _ in range(100):
+                manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+                assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+                manager.disable(FeatureFlag.USE_NEW_CHAT_SERVICE)
+                assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
+
+        threads = [threading.Thread(target=enable_flag) for _ in range(10)]
+
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        # Should complete without errors
+        assert True

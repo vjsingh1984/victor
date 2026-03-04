@@ -1,0 +1,384 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Service bootstrap for SOLID-refactored architecture.
+
+This module provides factory functions to bootstrap the new service-oriented
+architecture when feature flags are enabled. It creates and wires up all the
+new services (ChatService, ToolService, etc.) and registers them with the
+ServiceContainer.
+
+Usage:
+    container = ServiceContainer()
+    bootstrap_new_services(container)
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from victor.core.container import ServiceContainer, ServiceLifetime
+
+if TYPE_CHECKING:
+    from victor.agent.services.chat_service import ChatService
+    from victor.agent.services.context_service import ContextService
+    from victor.agent.services.protocol_registry import ServiceProtocolRegistry
+    from victor.agent.services.provider_service import ProviderService
+    from victor.agent.services.recovery_service import RecoveryService
+    from victor.agent.services.session_service import SessionService
+    from victor.agent.services.tool_service import ToolService
+    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.streaming_coordinator import StreamingCoordinator
+
+logger = logging.getLogger(__name__)
+
+
+def bootstrap_new_services(
+    container: ServiceContainer,
+    conversation_controller: "ConversationController",
+    streaming_coordinator: "StreamingCoordinator",
+    tool_selector: Optional[Any] = None,
+    tool_executor: Optional[Any] = None,
+) -> None:
+    """Bootstrap all new services with the container.
+
+    This function creates and registers all the new service-oriented
+    implementations (ChatService, ToolService, etc.) when their
+    respective feature flags are enabled.
+
+    Args:
+        container: Service container to register services with
+        conversation_controller: Conversation controller for chat operations
+        streaming_coordinator: Streaming coordinator for chat operations
+        tool_selector: Optional tool selector for ToolService
+        tool_executor: Optional tool executor for ToolService
+
+    Example:
+        container = ServiceContainer()
+        bootstrap_new_services(
+            container,
+            conversation_controller=my_conversation,
+            streaming_coordinator=my_streaming,
+        )
+    """
+    # Import feature flags first
+    try:
+        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+    except ImportError:
+        logger.warning("Feature flags not available, skipping service bootstrap")
+        return
+
+    feature_flags = get_feature_flag_manager()
+
+    # Check if any new services should be bootstrapped
+    has_new_services = any([
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE),
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE),
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE),
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE),
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE),
+        feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE),
+    ])
+
+    if not has_new_services:
+        logger.info("No new service feature flags enabled, skipping bootstrap")
+        return
+
+    # Import service protocols and implementations
+    from victor.agent.services.protocols import (
+        ChatServiceProtocol,
+        ToolServiceProtocol,
+        ContextServiceProtocol,
+        ProviderServiceProtocol,
+        RecoveryServiceProtocol,
+        SessionServiceProtocol,
+    )
+
+    # Create service dependencies first (lower-level services)
+    services_created: Dict[str, Any] = {}
+
+    # Bootstrap ContextService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE):
+        context_service = _create_context_service(container)
+        services_created["context"] = context_service
+        container.register(ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped ContextService")
+
+    # Bootstrap ProviderService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE):
+        provider_service = _create_provider_service(container)
+        services_created["provider"] = provider_service
+        container.register(ProviderServiceProtocol, lambda c: provider_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped ProviderService")
+
+    # Bootstrap RecoveryService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE):
+        recovery_service = _create_recovery_service(container)
+        services_created["recovery"] = recovery_service
+        container.register(RecoveryServiceProtocol, lambda c: recovery_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped RecoveryService")
+
+    # Bootstrap ToolService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE):
+        tool_service = _create_tool_service(
+            container,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+        )
+        services_created["tool"] = tool_service
+        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped ToolService")
+
+    # Bootstrap SessionService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE):
+        session_service = _create_session_service(container)
+        services_created["session"] = session_service
+        container.register(SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped SessionService")
+
+    # Bootstrap ChatService if enabled (depends on other services)
+    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
+        chat_service = _create_chat_service(
+            container,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
+            provider_service=services_created.get("provider"),
+            tool_service=services_created.get("tool"),
+            context_service=services_created.get("context"),
+            recovery_service=services_created.get("recovery"),
+        )
+        container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
+        logger.info("Bootstrapped ChatService")
+
+
+def _create_context_service(container: ServiceContainer) -> "ContextService":
+    """Create ContextService instance.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Configured ContextService instance
+    """
+    from victor.agent.services.context_service import ContextService, ContextServiceConfig
+
+    config = ContextServiceConfig(
+        max_tokens=100000,  # Default, can be overridden
+        overflow_threshold=0.9,
+    )
+    return ContextService(config=config)
+
+
+def _create_provider_service(container: ServiceContainer) -> "ProviderService":
+    """Create ProviderService instance.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Configured ProviderService instance
+    """
+    from victor.agent.services.provider_service import ProviderService, ProviderServiceConfig
+
+    # Try to get existing provider from container
+    try:
+        from victor.providers.base import LLMProvider
+        existing_provider = container.get(LLMProvider)
+    except Exception:
+        existing_provider = None
+
+    config = ProviderServiceConfig(
+        default_provider_name="anthropic",  # Default
+        fallback_enabled=True,
+    )
+    return ProviderService(
+        config=config,
+        existing_provider=existing_provider,
+    )
+
+
+def _create_recovery_service(container: ServiceContainer) -> "RecoveryService":
+    """Create RecoveryService instance.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Configured RecoveryService instance
+    """
+    from victor.agent.services.recovery_service import RecoveryService, RecoveryServiceConfig
+
+    config = RecoveryServiceConfig(
+        max_retries=3,
+        retry_delay_ms=1000,
+        backoff_multiplier=2.0,
+    )
+    return RecoveryService(config=config)
+
+
+def _create_tool_service(
+    container: ServiceContainer,
+    tool_selector: Optional[Any] = None,
+    tool_executor: Optional[Any] = None,
+) -> "ToolService":
+    """Create ToolService instance.
+
+    Args:
+        container: Service container
+        tool_selector: Optional tool selector
+        tool_executor: Optional tool executor
+
+    Returns:
+        Configured ToolService instance
+    """
+    from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+
+    config = ToolServiceConfig(
+        default_tool_budget=100,
+        max_iterations=200,
+    )
+
+    # Use provided or create defaults
+    if tool_selector is None:
+        tool_selector = _create_default_tool_selector(container)
+    if tool_executor is None:
+        tool_executor = _create_default_tool_executor(container)
+
+    return ToolService(
+        config=config,
+        selector=tool_selector,
+        executor=tool_executor,
+    )
+
+
+def _create_session_service(container: ServiceContainer) -> "SessionService":
+    """Create SessionService instance.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Configured SessionService instance
+    """
+    from victor.agent.services.session_service import SessionService, SessionServiceConfig
+
+    config = SessionServiceConfig(
+        default_session_ttl_seconds=3600,  # 1 hour
+        max_sessions_per_user=10,
+    )
+    return SessionService(config=config)
+
+
+def _create_chat_service(
+    container: ServiceContainer,
+    conversation_controller: "ConversationController",
+    streaming_coordinator: "StreamingCoordinator",
+    provider_service: Optional["ProviderService"] = None,
+    tool_service: Optional["ToolService"] = None,
+    context_service: Optional["ContextService"] = None,
+    recovery_service: Optional["RecoveryService"] = None,
+) -> "ChatService":
+    """Create ChatService instance with dependencies.
+
+    Args:
+        container: Service container
+        conversation_controller: Conversation controller
+        streaming_coordinator: Streaming coordinator
+        provider_service: Optional provider service
+        tool_service: Optional tool service
+        context_service: Optional context service
+        recovery_service: Optional recovery service
+
+    Returns:
+        Configured ChatService instance
+    """
+    from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+
+    config = ChatServiceConfig(
+        max_iterations=200,
+        stream_chunk_size=100,
+    )
+
+    return ChatService(
+        config=config,
+        provider_service=provider_service,
+        tool_service=tool_service,
+        context_service=context_service,
+        recovery_service=recovery_service,
+        conversation_controller=conversation_controller,
+        streaming_coordinator=streaming_coordinator,
+    )
+
+
+def _create_default_tool_selector(container: ServiceContainer) -> Any:
+    """Create default tool selector.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Default tool selector instance
+    """
+    # Try to get existing tool selector from container
+    try:
+        from victor.agent.tool_selection import ToolSelector
+        return container.get(ToolSelector)
+    except Exception:
+        # Return a simple mock selector
+        return _MockToolSelector()
+
+
+def _create_default_tool_executor(container: ServiceContainer) -> Any:
+    """Create default tool executor.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Default tool executor instance
+    """
+    # Try to get existing tool executor from container
+    try:
+        from victor.agent.tool_execution import ToolExecutor
+        return container.get(ToolExecutor)
+    except Exception:
+        # Return a simple mock executor
+        return _MockToolExecutor()
+
+
+class _MockToolSelector:
+    """Mock tool selector for bootstrap when real selector not available."""
+
+    async def select(self, context: Any, max_tools: int = 10) -> List[str]:
+        """Select tools - returns empty list for mock."""
+        return []
+
+
+class _MockToolExecutor:
+    """Mock tool executor for bootstrap when real executor not available."""
+
+    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+        """Execute tool - returns mock result."""
+        from victor.tools.base import ToolResult
+        return ToolResult(
+            success=False,
+            output=None,
+            error="Mock tool executor - tool not actually executed",
+        )
+
+
+__all__ = [
+    "bootstrap_new_services",
+]

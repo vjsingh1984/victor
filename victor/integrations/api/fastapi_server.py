@@ -55,8 +55,9 @@ from victor.integrations.api.graph_export import (
     get_execution_state,
     WorkflowExecutionState,
 )
+from victor.integrations.api.router_plugins import load_fastapi_router_registrations
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
-from victor.core.events import ObservabilityBus as EventBus, get_observability_bus
+from victor.core.events import get_observability_bus
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
@@ -271,14 +272,6 @@ class ToolApprovalRequest(BaseModel):
     approved: bool = False
 
 
-class LSPRequest(BaseModel):
-    """LSP request payload."""
-
-    file: str
-    line: int = 0
-    character: int = 0
-
-
 class TerminalCommandRequest(BaseModel):
     """Terminal command execution request."""
 
@@ -403,6 +396,7 @@ class VictorFastAPIServer:
 
         # Setup routes
         self._setup_routes()
+        self._setup_router_plugins()
 
         # Setup GraphQL endpoint if enabled
         if self._enable_graphql:
@@ -1009,99 +1003,7 @@ class VictorFastAPIServer:
             )
             return JSONResponse(result)
 
-        # LSP endpoints
-        @app.post("/lsp/completions", tags=["LSP"])
-        async def lsp_completions(request: LSPRequest) -> JSONResponse:
-            """LSP completions."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                completions = await manager.get_completions(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse(
-                    {
-                        "completions": [
-                            {
-                                "label": c.label,
-                                "kind": c.kind,
-                                "detail": c.detail,
-                                "insert_text": c.insert_text,
-                            }
-                            for c in completions
-                        ]
-                    }
-                )
-
-            except Exception as e:
-                logger.exception("LSP completions error")
-                return JSONResponse({"completions": [], "error": str(e)})
-
-        @app.post("/lsp/hover", tags=["LSP"])
-        async def lsp_hover(request: LSPRequest) -> JSONResponse:
-            """LSP hover."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                hover = await manager.get_hover(request.file, request.line, request.character)
-
-                return JSONResponse({"contents": hover.contents if hover else None})
-
-            except Exception as e:
-                logger.exception("LSP hover error")
-                return JSONResponse({"contents": None, "error": str(e)})
-
-        @app.post("/lsp/definition", tags=["LSP"])
-        async def lsp_definition(request: LSPRequest) -> JSONResponse:
-            """LSP definition."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                locations = await manager.get_definition(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse({"locations": locations})
-
-            except Exception as e:
-                logger.exception("LSP definition error")
-                return JSONResponse({"locations": [], "error": str(e)})
-
-        @app.post("/lsp/references", tags=["LSP"])
-        async def lsp_references(request: LSPRequest) -> JSONResponse:
-            """LSP references."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                locations = await manager.get_references(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse({"locations": locations})
-
-            except Exception as e:
-                logger.exception("LSP references error")
-                return JSONResponse({"locations": [], "error": str(e)})
-
-        @app.post("/lsp/diagnostics", tags=["LSP"])
-        async def lsp_diagnostics(request: LSPRequest) -> JSONResponse:
-            """LSP diagnostics."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                diagnostics = manager.get_diagnostics(request.file)
-
-                return JSONResponse({"diagnostics": diagnostics})
-
-            except Exception as e:
-                logger.exception("LSP diagnostics error")
-                return JSONResponse({"diagnostics": [], "error": str(e)})
+        # LSP endpoints are provided by optional vertical router plugins.
 
         # Git integration
         @app.get("/git/status", tags=["Git"])
@@ -3186,6 +3088,23 @@ Respond with just the command to run."""
                 logger.info(
                     f"EventBridge client {client_id} disconnected. "
                     f"Total: {len(self._event_clients)}"
+                )
+
+    def _setup_router_plugins(self) -> None:
+        """Load optional FastAPI routers from vertical packages.
+
+        Routers are discovered via `victor.api_routers` entry points.
+        """
+        registrations = load_fastapi_router_registrations(workspace_root=self.workspace_root)
+        for registration in registrations:
+            try:
+                self.app.include_router(registration.router, prefix=registration.prefix)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to include router from entry point '%s' (%s): %s",
+                    registration.entry_point_name,
+                    registration.entry_point_value,
+                    exc,
                 )
 
     # =========================================================================

@@ -217,6 +217,9 @@ def bootstrap_container(
     # Register orchestrator services (Phase 10 DI Migration)
     _register_orchestrator_services(container, settings)
 
+    # Register SOLID-refactored services (Phase 6 - Feature Flag Controlled)
+    _register_solid_refactored_services(container, settings)
+
     # Register workflow services (SOLID Refactoring)
     _register_workflow_services(container, settings)
 
@@ -541,6 +544,57 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         # Don't fail bootstrap if orchestrator services can't be registered
         # The orchestrator will fall back to direct instantiation
         logger.warning(f"Failed to register orchestrator services: {e}")
+
+
+def _register_solid_refactored_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register SOLID-refactored service architecture (Phase 6).
+
+    This function bootstraps the new service-oriented architecture when
+    feature flags are enabled. It provides a graceful migration path by:
+
+    1. Checking feature flags before bootstrapping new services
+    2. Only registering services that have their flags enabled
+    3. Maintaining backward compatibility when flags are disabled
+
+    Services registered (when flags enabled):
+    - ChatServiceProtocol: Chat flow coordination
+    - ToolServiceProtocol: Tool operations
+    - ContextServiceProtocol: Context management
+    - ProviderServiceProtocol: Provider management
+    - RecoveryServiceProtocol: Error recovery
+    - SessionServiceProtocol: Session lifecycle
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+    """
+    try:
+        # Get conversation and streaming coordinators (required for ChatService)
+        from victor.agent.protocols import (
+            ConversationControllerProtocol,
+            StreamingCoordinatorProtocol,
+        )
+
+        conversation_controller = container.get_optional(ConversationControllerProtocol)
+        streaming_coordinator = container.get_optional(StreamingCoordinatorProtocol)
+
+        # Only bootstrap new services if feature flags are enabled
+        # AND we have the required dependencies
+        if conversation_controller is not None and streaming_coordinator is not None:
+            from victor.core.bootstrap_services import bootstrap_new_services
+
+            bootstrap_new_services(
+                container,
+                conversation_controller=conversation_controller,
+                streaming_coordinator=streaming_coordinator,
+            )
+            logger.debug("Bootstrapped SOLID-refactored services (feature flag controlled)")
+        else:
+            logger.debug("Skipping SOLID-refactored services bootstrap (missing dependencies)")
+    except Exception as e:
+        # Don't fail bootstrap if new services can't be registered
+        # The orchestrator will fall back to existing implementation
+        logger.debug(f"Failed to bootstrap SOLID-refactored services: {e}")
 
 
 def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:

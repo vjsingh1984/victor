@@ -739,6 +739,43 @@ class Settings(BaseSettings):
     stategraph_copy_on_write_enabled: bool = True
 
     # ==========================================================================
+    # Feature Flags (SOLID Refactoring)
+    # ==========================================================================
+    # Feature flags for gradual rollout of new architecture components.
+    # These enable zero-downtime migration and instant rollback if issues arise.
+    #
+    # All flags default to False (disabled) for backward compatibility.
+    # Enable via environment variables: VICTOR_USE_NEW_CHAT_SERVICE=true
+    # Or via YAML config: ~/.victor/features.yaml
+    #
+    # Phase 3 - Service Implementation:
+    #   - Extract orchestrator logic into focused services (ChatService, ToolService, etc.)
+    #   - Each service can be independently enabled/disabled
+    #   - Services implement protocols for ISP compliance
+    #
+    # Phase 4 - Vertical Composition:
+    #   - Use composition over inheritance for vertical capabilities
+    #   - Enables OCP compliance (add capabilities without modifying base)
+    #
+    # Phase 5 - Tool Registration Strategy:
+    #   - Strategy pattern for extensible tool registration
+    #   - Enables OCP compliance (add tool types without modifying registry)
+
+    # Phase 3 - Service Implementation flags
+    use_new_chat_service: bool = False  # Use ChatService instead of orchestrator methods
+    use_new_tool_service: bool = False  # Use ToolService instead of orchestrator methods
+    use_new_context_service: bool = False  # Use ContextService for context management
+    use_new_provider_service: bool = False  # Use ProviderService for provider management
+    use_new_recovery_service: bool = False  # Use RecoveryService for error recovery
+    use_new_session_service: bool = False  # Use SessionService for session management
+
+    # Phase 4 - Vertical Composition flag
+    use_composition_over_inheritance: bool = False  # Use composition-based verticals
+
+    # Phase 5 - Tool Registration Strategy flag
+    use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
+
+    # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
     # ==========================================================================
     # Controls automatic prompt enrichment with contextual information.

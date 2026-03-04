@@ -1,0 +1,185 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Chat service protocol.
+
+Defines the interface for chat operations, handling the core flow
+of processing user messages and generating responses.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, AsyncIterator, Dict, Optional, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from victor.providers.base import CompletionResponse, StreamChunk
+
+
+@runtime_checkable
+class ChatServiceProtocol(Protocol):
+    """Protocol for chat operations service.
+
+    Handles the core chat flow including:
+    - Processing user messages through the agentic loop
+    - Streaming responses for real-time feedback
+    - Managing conversation state and resets
+
+    This protocol follows the Interface Segregation Principle (ISP)
+    by focusing only on chat-related operations.
+
+    Methods:
+        chat: Process a chat message with optional streaming
+        stream_chat: Stream chat response in chunks
+        reset_conversation: Reset conversation history
+
+    Example:
+        class MyChatService(ChatServiceProtocol):
+            def __init__(self, provider, tool_service, context_service):
+                self._provider = provider
+                self._tools = tool_service
+                self._context = context_service
+
+            async def chat(self, user_message: str, **kwargs) -> CompletionResponse:
+                # Process message with agentic loop
+                pass
+
+            async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator[StreamChunk]:
+                # Stream response chunks
+                pass
+
+            def reset_conversation(self) -> None:
+                # Clear conversation history
+                pass
+    """
+
+    async def chat(
+        self,
+        user_message: str,
+        *,
+        stream: bool = False,
+        **kwargs
+    ) -> "CompletionResponse":
+        """Process a chat message with the agentic loop.
+
+        This method handles the core chat flow:
+        1. Analyze the user's request
+        2. Select appropriate tools
+        3. Execute tools as needed
+        4. Generate the final response
+        5. Handle recovery from errors
+
+        Args:
+            user_message: The user's input message
+            stream: If True, return a streaming response
+            **kwargs: Additional options for the chat (temperature, max_tokens, etc.)
+
+        Returns:
+            CompletionResponse with the generated response content
+
+        Raises:
+            ProviderError: If the provider fails to generate a response
+            ToolExecutionError: If tool execution fails critically
+            ContextOverflowError: If context exceeds limits and can't be compacted
+        """
+        ...
+
+    async def stream_chat(
+        self,
+        user_message: str,
+        **kwargs
+    ) -> AsyncIterator["StreamChunk"]:
+        """Stream chat response in chunks for real-time feedback.
+
+        Provides incremental response chunks as they're generated,
+        enabling real-time feedback and better UX for long responses.
+
+        Args:
+            user_message: The user's input message
+            **kwargs: Additional options for the chat
+
+        Yields:
+            StreamChunk objects with incremental response content
+
+        Raises:
+            ProviderError: If the provider fails during streaming
+            ToolExecutionError: If tool execution fails critically
+        """
+        ...
+
+    def reset_conversation(self) -> None:
+        """Reset the conversation history and state.
+
+        Clears all conversation context, effectively starting
+        a new conversation session.
+
+        This is useful for:
+        - Starting fresh conversations
+        - Testing and development
+        - Clearing state after errors
+        """
+        ...
+
+    def is_healthy(self) -> bool:
+        """Check if the chat service is healthy.
+
+        A healthy chat service should:
+        - Have a valid provider connection
+        - Have tool service available
+        - Have context service available
+
+        Returns:
+            True if the service is healthy, False otherwise
+        """
+        ...
+
+
+@runtime_checkable
+class StreamingChatServiceProtocol(Protocol):
+    """Extended protocol for streaming-specific chat operations.
+
+    Provides additional methods for advanced streaming scenarios
+    like chunk aggregation and cancellation.
+
+    This protocol can be implemented by services that need
+    more control over streaming behavior.
+    """
+
+    async def aggregate_chunks(
+        self,
+        chunks: AsyncIterator["StreamChunk"],
+        timeout: Optional[float] = None,
+    ) -> "CompletionResponse":
+        """Aggregate streaming chunks into a complete response.
+
+        Args:
+            chunks: Iterator of stream chunks
+            timeout: Optional timeout for aggregation
+
+        Returns:
+            Aggregated CompletionResponse
+
+        Raises:
+            TimeoutError: If aggregation times out
+        """
+        ...
+
+    def cancel_streaming(self) -> None:
+        """Cancel any active streaming operations.
+
+        Useful for:
+        - User cancellation requests
+        - Timeout scenarios
+        - Error recovery
+        """
+        ...
