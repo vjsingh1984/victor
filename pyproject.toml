@@ -449,8 +449,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=victor",
-    "--cov-report=term-missing",
-    "--cov-report=html",
+    "--cov-report=",
 ]
 asyncio_mode = "auto"
 markers = [
