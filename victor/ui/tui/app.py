@@ -67,9 +67,11 @@ class TUIConsoleAdapter:
             for line in output.split("\n"):
                 line = line.strip()
                 if line:
+                    # Update transcript state first so callback-driven UI refreshes
+                    # observe current unread/follow state.
+                    self._log.add_system_message(line)
                     if self._on_line:
                         self._on_line(line)
-                    self._log.add_system_message(line)
 
     def __getattr__(self, name):
         """Delegate other console methods to the internal console."""
@@ -663,7 +665,7 @@ class VictorTUI(App):
 
             self._console_adapter = TUIConsoleAdapter(
                 self._conversation_log,
-                on_line=lambda line: self._record_message("system", line),
+                on_line=self._handle_console_line,
             )
             self._slash_handler = SlashCommandHandler(
                 console=self._console_adapter,
@@ -699,6 +701,10 @@ class VictorTUI(App):
             await self._handle_command(message)
             return
 
+        # Sending a prompt should always bring the transcript back to live tail.
+        if self._conversation_log and self._conversation_log.follow_paused:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+
         # Add user message to log
         self._add_user_message(message)
 
@@ -720,11 +726,9 @@ class VictorTUI(App):
 
         # Handle /clear in TUI to also clear the visual log
         if cmd in ("/clear", "/reset"):
-            self._conversation_log.clear()
-            if self.agent:
-                self.agent.reset_conversation()
-            self._conversation_log.add_system_message("Conversation cleared")
-            self._input_widget.focus_input()
+            self.action_clear()
+            if self._input_widget:
+                self._input_widget.focus_input()
             return
 
         # Delegate to SlashCommandHandler if available
@@ -1207,10 +1211,13 @@ class VictorTUI(App):
 
         self._session_messages = list(session.messages)
         for i, msg in enumerate(session.messages):
-            self._render_message(msg.role, msg.content)
+            self._render_message(msg.role, msg.content, replay=True)
             # Show progress for large sessions
             if message_count > 50 and (i + 1) % 25 == 0:
                 self._add_system_message(f"Loading... {i + 1}/{message_count}")
+
+        if self._conversation_log:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
 
         self._restore_agent_conversation(session.messages)
         self._add_system_message(
@@ -1254,11 +1261,14 @@ class VictorTUI(App):
                 content = "Tool calls requested."
             if not content:
                 continue
-            self._render_message(role, content)
+            self._render_message(role, content, replay=True)
             self._session_messages.append(Message(role=role, content=content, metadata={}))
             # Show progress for large sessions
             if message_count > 50 and (i + 1) % 25 == 0:
                 self._add_system_message(f"Loading... {i + 1}/{message_count}")
+
+        if self._conversation_log:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
 
         if self.agent:
             self.agent.conversation = history
@@ -1276,8 +1286,11 @@ class VictorTUI(App):
         title = metadata.get("title") or session_id[:8]
         self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
 
-    def _render_message(self, role: str, content: str) -> None:
+    def _render_message(self, role: str, content: str, *, replay: bool = False) -> None:
         if not self._conversation_log:
+            return
+        if replay:
+            self._conversation_log.add_history_message(role, content)
             return
         if role == "user":
             self._conversation_log.add_user_message(content)
@@ -1548,6 +1561,13 @@ Slash Commands:
         if not content:
             return
         self._session_messages.append(Message(role=role, content=content, metadata=metadata))
+
+    def _handle_console_line(self, line: str) -> None:
+        """Handle a system line emitted by console adapter output."""
+        if not line:
+            return
+        self._record_message("system", line)
+        self._update_jump_to_bottom()
 
     def _add_user_message(self, content: str) -> None:
         if self._conversation_log:

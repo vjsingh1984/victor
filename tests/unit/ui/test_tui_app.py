@@ -1,10 +1,11 @@
 """Unit tests for Victor TUI app behavior."""
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 from textual.messages import UpdateScroll
 
-from victor.ui.tui.app import VictorTUI
+from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
 
 
 def test_ctrl_f_binding_maps_to_toggle_follow_mode() -> None:
@@ -13,6 +14,128 @@ def test_ctrl_f_binding_maps_to_toggle_follow_mode() -> None:
         binding.key == "ctrl+f" and binding.action == "toggle_follow_mode"
         for binding in VictorTUI.BINDINGS
     )
+
+
+def test_handle_console_line_records_and_refreshes_ui() -> None:
+    """Console output lines should be recorded and refresh unread/jump affordances."""
+    app = VictorTUI()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    app._handle_console_line("system output")
+
+    app._record_message.assert_called_once_with("system", "system output")
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_handle_console_line_ignores_empty_lines() -> None:
+    """Empty console output lines should be ignored."""
+    app = VictorTUI()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    app._handle_console_line("")
+
+    app._record_message.assert_not_called()
+    app._update_jump_to_bottom.assert_not_called()
+
+
+def test_console_adapter_sends_each_line_to_callback_and_log() -> None:
+    """Console adapter should emit each rendered line to callback and conversation log."""
+    log = MagicMock()
+    on_line = MagicMock()
+    adapter = TUIConsoleAdapter(log, on_line=on_line)
+
+    adapter.print("first\nsecond")
+
+    on_line.assert_any_call("first")
+    on_line.assert_any_call("second")
+    assert on_line.call_count == 2
+    log.add_system_message.assert_any_call("first")
+    log.add_system_message.assert_any_call("second")
+    assert log.add_system_message.call_count == 2
+
+
+def test_console_adapter_invokes_callback_after_log_update() -> None:
+    """Console callback should run after unread state is updated in the log."""
+
+    class FakeLog:
+        def __init__(self) -> None:
+            self.unread_count = 0
+
+        def add_system_message(self, _line: str) -> None:
+            self.unread_count += 1
+
+    log = FakeLog()
+    observed_counts: list[int] = []
+    adapter = TUIConsoleAdapter(
+        log,  # type: ignore[arg-type]
+        on_line=lambda _line: observed_counts.append(log.unread_count),
+    )
+
+    adapter.print("line")
+
+    assert observed_counts == [1]
+
+
+def test_action_clear_clears_session_messages_and_agent_state() -> None:
+    """Clear action should reset transcript state and session history consistently."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._session_messages = [MagicMock(), MagicMock()]
+    app.agent = MagicMock()
+    app._add_system_message = MagicMock()
+
+    app.action_clear()
+
+    app._conversation_log.clear.assert_called_once()
+    app.agent.reset_conversation.assert_called_once()
+    app._add_system_message.assert_called_once_with("Conversation cleared")
+    assert app._session_messages == []
+
+
+def test_handle_command_clear_routes_through_clear_action() -> None:
+    """Slash clear should use the unified clear action and restore input focus."""
+    app = VictorTUI()
+    app.action_clear = MagicMock()
+    app._input_widget = MagicMock()
+
+    asyncio.run(app._handle_command("/clear"))
+
+    app.action_clear.assert_called_once()
+    app._input_widget.focus_input.assert_called_once()
+
+
+def test_render_message_replay_uses_history_path() -> None:
+    """Replay rendering should bypass normal follow/unread behavior paths."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+
+    app._render_message("assistant", "from history", replay=True)
+
+    app._conversation_log.add_history_message.assert_called_once_with("assistant", "from history")
+    app._conversation_log.add_assistant_message.assert_not_called()
+    app._conversation_log.add_user_message.assert_not_called()
+    app._conversation_log.add_system_message.assert_not_called()
+    app._conversation_log.add_error_message.assert_not_called()
+
+
+def test_input_submit_resumes_follow_when_paused() -> None:
+    """Submitting a prompt should resume live follow if sticky pause was active."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = True
+    app._input_widget = MagicMock()
+    app._add_user_message = MagicMock()
+    app._process_message_async = AsyncMock()
+    event = MagicMock()
+    event.value = "hello"
+
+    asyncio.run(app.on_input_widget_submitted(event))
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._add_user_message.assert_called_once_with("hello")
+    app._process_message_async.assert_awaited_once_with("hello")
 
 
 def test_update_jump_button_label_with_unread_count() -> None:

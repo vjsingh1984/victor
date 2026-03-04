@@ -26,8 +26,17 @@ from victor.tools.code_intelligence_tool import (
 )
 from victor.tools.refactor_tool import rename
 
+try:
+    import victor_coding  # noqa: F401
+    _has_victor_coding = True
+except ImportError:
+    _has_victor_coding = False
+
 # Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
+]
 
 
 class TestSymbol:

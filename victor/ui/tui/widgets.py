@@ -23,6 +23,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual import events
 from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
 from textual.messages import UpdateScroll
@@ -129,18 +130,23 @@ class StatusBar(Static):
         """Update shortcuts for idle state."""
         try:
             hints = self.query_one("#shortcut-hints", Label)
-            hints.update(
-                Text.assemble(
-                    ("Ctrl+L", "bold"),
-                    " clear  ",
-                    ("Ctrl+S", "bold"),
-                    " save  ",
-                    ("Ctrl+F", "bold"),
-                    f" {self._follow_action_text()}  ",
-                    ("Enter", "bold"),
-                    " send",
+            parts: list[object] = [
+                ("Ctrl+L", "bold"),
+                " clear  ",
+                ("Ctrl+S", "bold"),
+                " save  ",
+                ("Ctrl+F", "bold"),
+                f" {self._follow_action_text()}  ",
+            ]
+            if self._follow_paused:
+                parts.extend(
+                    [
+                        ("Ctrl+End", "bold"),
+                        " latest  ",
+                    ]
                 )
-            )
+            parts.extend([("Enter", "bold"), " send"])
+            hints.update(Text.assemble(*parts))
         except Exception:
             pass
 
@@ -148,16 +154,21 @@ class StatusBar(Static):
         """Update shortcuts for streaming state."""
         try:
             hints = self.query_one("#shortcut-hints", Label)
-            hints.update(
-                Text.assemble(
-                    ("Ctrl+X", "bold"),
-                    " cancel  ",
-                    ("Ctrl+F", "bold"),
-                    f" {self._follow_action_text()}  ",
-                    ("Ctrl+D", "bold"),
-                    " toggle details",
+            parts: list[object] = [
+                ("Ctrl+X", "bold"),
+                " cancel  ",
+                ("Ctrl+F", "bold"),
+                f" {self._follow_action_text()}  ",
+            ]
+            if self._follow_paused:
+                parts.extend(
+                    [
+                        ("Ctrl+End", "bold"),
+                        " latest  ",
+                    ]
                 )
-            )
+            parts.extend([("Ctrl+D", "bold"), " toggle details"])
+            hints.update(Text.assemble(*parts))
         except Exception:
             pass
 
@@ -165,16 +176,21 @@ class StatusBar(Static):
         """Update shortcuts for error state."""
         try:
             hints = self.query_one("#shortcut-hints", Label)
-            hints.update(
-                Text.assemble(
-                    ("Ctrl+L", "bold"),
-                    " clear  ",
-                    ("Ctrl+F", "bold"),
-                    f" {self._follow_action_text()}  ",
-                    ("Ctrl+C", "bold"),
-                    " exit",
+            parts: list[object] = [
+                ("Ctrl+L", "bold"),
+                " clear  ",
+                ("Ctrl+F", "bold"),
+                f" {self._follow_action_text()}  ",
+            ]
+            if self._follow_paused:
+                parts.extend(
+                    [
+                        ("Ctrl+End", "bold"),
+                        " latest  ",
+                    ]
                 )
-            )
+            parts.extend([("Ctrl+C", "bold"), " exit"])
+            hints.update(Text.assemble(*parts))
         except Exception:
             pass
 
@@ -269,7 +285,7 @@ class SubmitTextArea(TextArea):
             super().__init__()
             self.value = value
 
-    def _on_key(self, event) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         """Handle key events before TextArea processes them."""
         # Ctrl+Enter: Always submit
         if event.key == "ctrl+enter":
@@ -303,7 +319,7 @@ class SubmitTextArea(TextArea):
                 return
 
         # Shift+Enter and all other keys handled normally by parent
-        super()._on_key(event)
+        await super()._on_key(event)
 
 
 class InputWidget(Static):
@@ -1039,6 +1055,7 @@ class EnhancedConversationLog(VerticalScroll):
 
     _FOLLOW_SCROLL_INTERVAL_SECONDS = 1 / 30
     _PROGRAMMATIC_SCROLL_GUARD_SECONDS = 0.08
+    _RESIZE_SCROLL_GUARD_SECONDS = 0.2
 
     def __init__(self, show_unread_separator: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -1049,6 +1066,7 @@ class EnhancedConversationLog(VerticalScroll):
         self._sticky_follow_paused = False
         self._last_follow_scroll_ts = 0.0
         self._ignore_scroll_update_until = 0.0
+        self._ignore_resize_scroll_update_until = 0.0
         self._unread_count = 0
         self._show_unread_separator = show_unread_separator
         self._unread_separator: Optional[Static] = None
@@ -1147,14 +1165,15 @@ class EnhancedConversationLog(VerticalScroll):
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
+        self._mark_unread_boundary()
         msg = Static(
             Text(f"[{content}]", style="dim italic"),
             id=f"msg-{self._message_count}",
         )
         self._message_count += 1
         self.mount(msg)
-        # Don't auto-scroll for system messages to avoid disruption
-        pass
+        # Follow transcript if enabled; otherwise count as unread activity.
+        self._maybe_scroll_end(mark_unread=True)
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
@@ -1240,6 +1259,36 @@ class EnhancedConversationLog(VerticalScroll):
         self.mount(block)
         self._maybe_scroll_end(force=True)
 
+    def add_history_message(self, role: str, content: str) -> None:
+        """Replay an existing message without triggering follow/unread side effects."""
+        widget: Widget | None = None
+        if role == "user":
+            widget = StreamingMessageBlock(
+                role="user",
+                initial_content=content,
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "assistant":
+            widget = StreamingMessageBlock(
+                role="assistant",
+                initial_content=content,
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "system":
+            widget = Static(
+                Text(f"[{content}]", style="dim italic"),
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "error":
+            widget = Static(
+                Text(f"Error: {content}", style="bold red"),
+                id=f"msg-{self._message_count}",
+            )
+        if widget is None:
+            return
+        self._message_count += 1
+        self.mount(widget)
+
     def clear(self) -> None:
         """Clear all messages from the log."""
         for child in list(self.children):
@@ -1249,24 +1298,37 @@ class EnhancedConversationLog(VerticalScroll):
         self._auto_scroll = not self._sticky_follow_paused
         self._last_follow_scroll_ts = 0.0
         self._ignore_scroll_update_until = 0.0
+        self._ignore_resize_scroll_update_until = 0.0
         self._unread_count = 0
         self._unread_separator = None
         self._unread_boundary_id = None
 
     def on_update_scroll(self, _event: UpdateScroll) -> None:
         """Update auto-scroll whenever this scroll view moves."""
-        if time.monotonic() < self._ignore_scroll_update_until and self._auto_scroll:
+        now = time.monotonic()
+        if now < self._ignore_resize_scroll_update_until:
+            return
+        if now < self._ignore_scroll_update_until and self._auto_scroll:
             # Ignore transient programmatic follow-scroll events while still at bottom.
             # If user has already scrolled away from bottom, process immediately.
             if self._is_at_bottom():
                 return
         self.update_auto_scroll_state()
 
+    def on_resize(self, _event: events.Resize) -> None:
+        """Preserve paused/off-bottom state across terminal resize events."""
+        if self._auto_scroll:
+            return
+        guard_until = time.monotonic() + self._RESIZE_SCROLL_GUARD_SECONDS
+        if guard_until > self._ignore_resize_scroll_update_until:
+            self._ignore_resize_scroll_update_until = guard_until
+
     def scroll_to_bottom(self, animate: bool = False) -> None:
         """Scroll to bottom and re-enable auto-scroll."""
         self._auto_scroll = not self._sticky_follow_paused
         self._last_follow_scroll_ts = 0.0
         self._ignore_scroll_update_until = 0.0
+        self._ignore_resize_scroll_update_until = 0.0
         self._unread_count = 0
         self._unread_boundary_id = None
         self._remove_unread_separator()

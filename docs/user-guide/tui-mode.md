@@ -15,7 +15,12 @@ The TUI is built using Textual and provides:
 - Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary (works even if marker is hidden)
 - Status bar unread badge (e.g., `3 new`) while backlog exists
 - Sticky follow mode (`Ctrl+F`) with explicit `Following` / `Paused` status indicator
+- Session restore replays history without per-message viewport jumps, then lands at latest output once
 - 40+ slash commands for session management
+
+Unread counting applies to both assistant responses and system transcript activity (such as slash-command output).
+Unread badge and jump-button labels refresh immediately as slash-command output lines arrive.
+`Ctrl+L`, `/clear`, and `/reset` share the same clear path so transcript, agent context, and in-memory session history reset together.
 
 ## Layout
 
@@ -106,6 +111,7 @@ Follow behavior:
 - Use `Ctrl+F` to toggle between `Following` and `Paused`; if you are paused by manual scrolling, `Ctrl+F` resumes and jumps to latest output.
 - When sticky follow is paused, the jump button changes to `Resume follow`.
 - `Ctrl+End` also resumes sticky follow mode and jumps to latest output.
+- Resizing the terminal while paused/scrolled up will not silently resume follow mode.
 
 ---
 

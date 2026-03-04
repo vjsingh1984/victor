@@ -3,6 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 from rich.markdown import Markdown
+from textual import events
+from textual.geometry import Size
 from textual.messages import UpdateScroll
 
 from victor.ui.tui.widgets import EnhancedConversationLog, StatusBar, StreamingMessageBlock
@@ -65,6 +67,36 @@ def test_user_message_reenables_auto_scroll() -> None:
 
         assert log.auto_scroll_enabled is True
         assert scroll_end.call_count == 1
+
+
+def test_system_message_follows_when_auto_scroll_enabled() -> None:
+    """System messages should follow transcript when auto-follow is active."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch("victor.ui.tui.widgets.time.monotonic", side_effect=[1.0, 1.1]),
+    ):
+        log = EnhancedConversationLog()
+
+        log.add_system_message("status")
+
+        assert scroll_end.call_count == 1
+
+
+def test_system_message_tracks_unread_when_auto_scroll_disabled() -> None:
+    """System messages should contribute to unread backlog when off-bottom."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True),
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True),
+    ):
+        log = EnhancedConversationLog(show_unread_separator=True)
+        log.disable_auto_scroll()
+
+        log.add_system_message("status")
+
+        assert log.unread_count == 1
+        assert log._unread_separator is not None
+        assert "1 new message" in _static_content_text(log._unread_separator)
 
 
 def test_streaming_message_block_renders_text_then_markdown() -> None:
@@ -193,6 +225,94 @@ def test_update_scroll_processes_after_programmatic_guard_window() -> None:
         log.on_update_scroll(event)
 
     update_auto_scroll_state.assert_called_once()
+
+
+def test_resize_sets_guard_while_auto_follow_disabled() -> None:
+    """Resize should temporarily ignore scroll updates when follow is already paused."""
+    log = EnhancedConversationLog()
+    log._auto_scroll = False
+    resize_event = events.Resize(
+        size=Size(100, 40),
+        virtual_size=Size(100, 40),
+    )
+
+    with patch("victor.ui.tui.widgets.time.monotonic", return_value=20.0):
+        log.on_resize(resize_event)
+
+    assert log._ignore_resize_scroll_update_until > 20.0
+
+
+def test_update_scroll_ignores_resize_guard_window() -> None:
+    """Resize-driven transient scroll updates should not recalculate follow state."""
+    log = EnhancedConversationLog()
+    event = UpdateScroll()
+    log._auto_scroll = False
+    log._ignore_resize_scroll_update_until = 10.0
+
+    with (
+        patch("victor.ui.tui.widgets.time.monotonic", return_value=9.95),
+        patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
+    ):
+        log.on_update_scroll(event)
+
+    update_auto_scroll_state.assert_not_called()
+
+
+def test_update_scroll_processes_after_resize_guard_window() -> None:
+    """Once resize guard expires, follow state updates should resume normally."""
+    log = EnhancedConversationLog()
+    event = UpdateScroll()
+    log._auto_scroll = False
+    log._ignore_resize_scroll_update_until = 10.0
+
+    with (
+        patch("victor.ui.tui.widgets.time.monotonic", return_value=10.2),
+        patch.object(log, "update_auto_scroll_state") as update_auto_scroll_state,
+    ):
+        log.on_update_scroll(event)
+
+    update_auto_scroll_state.assert_called_once()
+
+
+def test_resize_does_not_set_guard_when_auto_follow_active() -> None:
+    """Resize guard is unnecessary while auto-follow is active."""
+    log = EnhancedConversationLog()
+    log._auto_scroll = True
+    resize_event = events.Resize(
+        size=Size(120, 45),
+        virtual_size=Size(120, 45),
+    )
+
+    with patch("victor.ui.tui.widgets.time.monotonic", return_value=5.0):
+        log.on_resize(resize_event)
+
+    assert log._ignore_resize_scroll_update_until == 0.0
+
+
+def test_add_history_message_does_not_scroll_or_increment_unread() -> None:
+    """History replay should mount messages without follow/unread side effects."""
+    with (
+        patch.object(EnhancedConversationLog, "mount", autospec=True) as mount,
+        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+    ):
+        log = EnhancedConversationLog(show_unread_separator=True)
+        log.disable_auto_scroll()
+
+        log.add_history_message("assistant", "replayed")
+
+        assert mount.call_count == 1
+        assert scroll_end.call_count == 0
+        assert log.unread_count == 0
+        assert log._unread_separator is None
+
+
+def test_add_history_message_ignores_unknown_role() -> None:
+    """History replay should skip unsupported roles."""
+    with patch.object(EnhancedConversationLog, "mount", autospec=True) as mount:
+        log = EnhancedConversationLog()
+        log.add_history_message("tool", "ignored")
+
+    mount.assert_not_called()
 
 
 def test_unread_separator_inserted_once_before_first_unread_message() -> None:
@@ -469,8 +589,11 @@ def test_status_bar_shortcuts_reflect_follow_action_state() -> None:
         bar._update_shortcuts_idle()
         idle_following_text = hints.update.call_args.args[0]
         assert "pause follow" in idle_following_text.plain
+        assert "Ctrl+End" not in idle_following_text.plain
 
         bar._follow_paused = True
         bar._update_shortcuts_idle()
         idle_paused_text = hints.update.call_args.args[0]
         assert "resume follow" in idle_paused_text.plain
+        assert "Ctrl+End" in idle_paused_text.plain
+        assert "latest" in idle_paused_text.plain
