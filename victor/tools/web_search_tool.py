@@ -516,11 +516,26 @@ async def _summarize_search(
     provider = config.get("provider")
     model = config.get("model")
 
-    if not provider:
-        return {"success": False, "error": "No LLM provider available for summarization"}
-
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
+
+    # If no provider available, fall back to regular search
+    if not provider:
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "No LLM provider configured for AI summarization. "
+            "Falling back to regular web search (no summarization). "
+            "Set provider/model in ToolConfig to enable AI summarization."
+        )
+        # Call the regular web_search without ai_summarize
+        return await web_search(
+            query=query,
+            max_results=max_results,
+            region=region,
+            safe_search=safe_search,
+            ai_summarize=False,  # Disable summarization
+            context=context,
+        )
 
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}

@@ -261,6 +261,7 @@ class TeamMemberSpec:
     goal: str
     name: Optional[str] = None
     tool_budget: Optional[int] = None
+    allowed_tools: Optional[List[str]] = None
     is_manager: bool = False
     priority: int = 0
     # Rich persona attributes (CrewAI-compatible)
@@ -312,6 +313,7 @@ class TeamMemberSpec:
             name=name,
             goal=self.goal,
             tool_budget=tool_budget,
+            allowed_tools=self.allowed_tools,  # Pass through allowed_tools
             is_manager=self.is_manager,
             priority=self.priority if self.priority else index,
             # Pass through all persona attributes
