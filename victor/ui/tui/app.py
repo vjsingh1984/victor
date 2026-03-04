@@ -1415,7 +1415,10 @@ Slash Commands:
         """Scroll to bottom of conversation."""
         if not self._conversation_log:
             return
-        self._conversation_log.scroll_to_bottom(animate=False)
+        if self._conversation_log.follow_paused:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+        else:
+            self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
 
     def action_page_up(self) -> None:
