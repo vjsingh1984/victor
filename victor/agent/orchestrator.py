@@ -897,7 +897,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager = self._factory.create_lifecycle_manager(
             conversation_controller=self._conversation_controller,
             metrics_collector=(
-                self._metrics_coordinator.metrics_collector if hasattr(self, "_metrics_coordinator") else None
+                self._metrics_coordinator.metrics_collector
+                if hasattr(self, "_metrics_coordinator")
+                else None
             ),
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
@@ -920,6 +922,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             argument_normalizer=self.argument_normalizer,
             on_tool_start=self._on_tool_start_callback,
             on_tool_complete=self._on_tool_complete_callback,
+            on_tool_event=self._on_tool_event_callback,
             deduplication_tracker=self._deduplication_tracker,
             middleware_chain=self._middleware_chain,
         )
@@ -1105,6 +1108,39 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if hasattr(self, "_observability") and self._observability:
             tool_id = f"tool-{iteration}"
             self._observability.on_tool_start(tool_name, arguments, tool_id)
+
+    def _on_tool_event_callback(self, topic: str, payload: Dict[str, Any]) -> None:
+        """Forward tool pipeline events to the observability bus."""
+        try:
+            from victor.core.events import get_observability_bus
+        except Exception:
+            return
+
+        bus = get_observability_bus()
+        if not bus:
+            return
+
+        data = dict(payload)
+        data.setdefault("category", "tool")
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        async def _emit() -> None:
+            try:
+                await bus.emit(topic, data)
+            except Exception:
+                logger.debug("Failed to emit tool event", exc_info=True)
+
+        if loop and loop.is_running():
+            loop.create_task(_emit())
+        else:
+            try:
+                asyncio.run(_emit())
+            except RuntimeError:
+                logger.debug("Unable to emit tool event: no running loop", exc_info=True)
 
     def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
         """Callback when tool execution completes (from ToolPipeline).

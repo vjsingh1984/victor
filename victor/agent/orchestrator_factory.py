@@ -1064,7 +1064,8 @@ class OrchestratorFactory(ModeAwareMixin):
         argument_normalizer: Any,
         on_tool_start: Callable,
         on_tool_complete: Callable,
-        deduplication_tracker: Optional[Any],
+        on_tool_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional[Any] = None,
         semantic_cache: Optional[Any] = None,
     ) -> Any:
@@ -1078,6 +1079,7 @@ class OrchestratorFactory(ModeAwareMixin):
             argument_normalizer: Normalizer for tool arguments
             on_tool_start: Callback invoked when tool execution starts
             on_tool_complete: Callback invoked when tool execution completes
+            on_tool_event: Callback invoked when tool events should be emitted
             deduplication_tracker: Optional tracker for preventing duplicate calls
             middleware_chain: Optional middleware chain for processing tool calls
             semantic_cache: Optional FAISS-based semantic cache for tool results
@@ -1101,6 +1103,7 @@ class OrchestratorFactory(ModeAwareMixin):
             argument_normalizer=argument_normalizer,
             on_tool_start=on_tool_start,
             on_tool_complete=on_tool_complete,
+            on_tool_event=on_tool_event,
             deduplication_tracker=deduplication_tracker,
             middleware_chain=middleware_chain,
             semantic_cache=semantic_cache,

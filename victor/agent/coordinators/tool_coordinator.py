@@ -1021,6 +1021,10 @@ class ToolCoordinator:
                         "result_length": len(str(result.result or "")) if result.result else 0,
                         "error": str(result.error) if result.error else None,
                         "category": "tool",
+                        "arguments": self._sanitize_arguments(result.arguments or {}),
+                        "execution_time_ms": getattr(result, "execution_time_ms", None),
+                        "result_excerpt": self._build_result_excerpt(result.result),
+                        "preview": self._build_tool_preview(result),
                     },
                 )
             )
@@ -1131,6 +1135,115 @@ class ToolCoordinator:
                 "remaining": self.get_remaining_budget(),
             },
         }
+
+    # =====================================================================
+    # Preview helpers (UI/observability integration)
+    # =====================================================================
+
+    def _sanitize_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a shallow copy of arguments with large values truncated."""
+
+        def _clean(value: Any, depth: int = 0) -> Any:
+            if depth > 2:
+                return "…"
+            if isinstance(value, str):
+                text = value.strip()
+                return text if len(text) <= 200 else text[:200] + "…"
+            if isinstance(value, dict):
+                return {k: _clean(v, depth + 1) for k, v in list(value.items())[:5]}
+            if isinstance(value, list):
+                return [_clean(v, depth + 1) for v in value[:5]]
+            return value
+
+        try:
+            return {k: _clean(v) for k, v in (arguments or {}).items()}
+        except Exception:
+            return {}
+
+    def _truncate_text(self, text: str, limit: int = 600) -> str:
+        if not text:
+            return ""
+        return text if len(text) <= limit else text[:limit] + "…"
+
+    def _build_result_excerpt(self, result: Any) -> Optional[str]:
+        if result is None:
+            return None
+        if isinstance(result, str):
+            text = result.strip()
+        elif isinstance(result, (dict, list)):
+            try:
+                text = json.dumps(result, ensure_ascii=False)
+            except Exception:
+                text = str(result)
+        else:
+            text = str(result)
+        text = text.strip()
+        if not text:
+            return None
+        return self._truncate_text(text, 400)
+
+    def _extract_text_content(self, payload: Any) -> Optional[str]:
+        if isinstance(payload, str):
+            return payload
+        if isinstance(payload, dict):
+            for key in ("content", "text", "body", "value", "preview"):
+                value = payload.get(key)
+                if isinstance(value, str):
+                    return value
+        return None
+
+    def _looks_like_diff(self, text: str) -> bool:
+        if not text or len(text) < 10:
+            return False
+        lines = text.splitlines()[:40]
+        plus = any(line.startswith("+") for line in lines)
+        minus = any(line.startswith("-") for line in lines)
+        return text.lstrip().startswith("---") or "@@" in text or (plus and minus)
+
+    def _build_tool_preview(self, result: Any) -> Optional[Dict[str, Any]]:
+        """Build a structured preview payload for UI consumption."""
+        tool_name = (result.tool_name or "").lower()
+        arguments = result.arguments or {}
+        content = result.result
+
+        if tool_name in {"read", "read_file"}:
+            text = self._extract_text_content(content)
+            if text:
+                return {
+                    "type": "file_read",
+                    "tool_name": result.tool_name,
+                    "path": arguments.get("path") or arguments.get("file_path"),
+                    "snippet": self._truncate_text(text),
+                    "content": text,
+                }
+
+        diff_text = None
+        metadata: Dict[str, Any] = {}
+        if isinstance(content, dict):
+            if isinstance(content.get("diff"), str):
+                diff_text = content["diff"]
+                metadata = {
+                    "additions": content.get("additions"),
+                    "deletions": content.get("deletions"),
+                }
+            elif isinstance(content.get("preview"), str) and self._looks_like_diff(
+                content["preview"]
+            ):
+                diff_text = content["preview"]
+        elif isinstance(content, str) and self._looks_like_diff(content):
+            diff_text = content
+
+        if diff_text:
+            return {
+                "type": "diff",
+                "tool_name": result.tool_name,
+                "path": arguments.get("path") or arguments.get("file_path"),
+                "snippet": self._truncate_text(diff_text),
+                "diff": diff_text,
+                "metadata": metadata,
+            }
+
+        return None
 
     def clear_selection_history(self) -> None:
         """Clear the selection history."""

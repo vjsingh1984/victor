@@ -22,7 +22,7 @@ from rich.console import Console
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical
+from textual.containers import Container, Vertical, Horizontal
 from textual.messages import UpdateScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
@@ -34,6 +34,7 @@ from victor.ui.tui.widgets import (
     StatusBar,
     ThinkingWidget,
     ToolCallWidget,
+    ToolPreviewData,
 )
 
 if TYPE_CHECKING:
@@ -739,6 +740,7 @@ class VictorTUI(App):
         self._jump_button_visible: Optional[bool] = None
         self._jump_button_label: Optional[str] = None
         self._background_tasks: set[asyncio.Task[Any]] = set()
+        self._tool_event_handle = None
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -793,10 +795,18 @@ class VictorTUI(App):
 
         # Focus input
         self._input_widget.focus_input()
+        self._setup_tool_event_subscription()
 
     def on_unmount(self) -> None:
         """Ensure background tasks are cleaned up."""
         self._cancel_background_tasks()
+        if self._tool_event_handle:
+            handle = self._tool_event_handle
+            self._tool_event_handle = None
+            try:
+                asyncio.create_task(handle.unsubscribe())
+            except Exception:
+                pass
 
     def _run_in_background(self, coro: Awaitable[Any]) -> None:
         """Track background work so the UI stays responsive."""
@@ -809,6 +819,62 @@ class VictorTUI(App):
         for task in list(self._background_tasks):
             task.cancel()
         self._background_tasks.clear()
+
+    def _setup_tool_event_subscription(self) -> None:
+        """Subscribe to observability tool events for inline previews."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._register_tool_event_listener())
+
+    async def _register_tool_event_listener(self) -> None:
+        """Register async listener for tool events."""
+        if self._tool_event_handle is not None:
+            return
+        try:
+            from victor.core.events import get_observability_bus
+        except Exception:
+            return
+
+        bus = get_observability_bus()
+        if not bus or not getattr(bus, "backend", None):
+            return
+
+        async def handler(event: Any) -> None:
+            await self._handle_tool_event(event)
+
+        try:
+            self._tool_event_handle = await bus.backend.subscribe("tool.*", handler)
+        except Exception:
+            self._tool_event_handle = None
+
+    async def _handle_tool_event(self, event: Any) -> None:
+        """Process tool events emitted on the observability bus."""
+        topic = getattr(event, "topic", "")
+        data = getattr(event, "data", {}) or {}
+        if topic != "tool.complete":
+            return
+        preview_payload = data.get("preview")
+        if not preview_payload:
+            return
+        tool_name = data.get("tool_name", "tool")
+
+        def _add_block() -> None:
+            if not self._conversation_log:
+                return
+            preview = ToolPreviewData(
+                tool_name=tool_name,
+                preview_type=preview_payload.get("type", "output"),
+                path=preview_payload.get("path"),
+                snippet=preview_payload.get("snippet"),
+                content=preview_payload.get("content"),
+                diff=preview_payload.get("diff"),
+                metadata=preview_payload.get("metadata") or {},
+            )
+            self._conversation_log.add_tool_preview(preview)
+
+        self._call_ui(_add_block)
 
     async def on_input_widget_submitted(self, event: InputWidget.Submitted) -> None:
         """Handle input submission from the custom InputWidget."""

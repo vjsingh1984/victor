@@ -16,7 +16,8 @@ import asyncio
 import re
 import sqlite3
 import time
-from typing import TYPE_CHECKING, Callable, List, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from rich.markdown import Markdown
 from rich.syntax import Syntax
@@ -34,6 +35,19 @@ from textual.widget import Widget
 
 if TYPE_CHECKING:
     pass
+
+
+@dataclass
+class ToolPreviewData:
+    """Structured preview data for tool outputs."""
+
+    tool_name: str
+    preview_type: str
+    path: Optional[str] = None
+    snippet: Optional[str] = None
+    content: Optional[str] = None
+    diff: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 def _get_input_history_from_db(limit: int = 100) -> List[str]:
@@ -1202,6 +1216,14 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
+        self._maybe_scroll_end(mark_unread=True, force=True)
+
+    def add_tool_preview(self, preview: ToolPreviewData) -> None:
+        """Add a tool preview block to the log."""
+        self._mark_unread_boundary()
+        block = ToolPreviewBlock(preview=preview, id=f"msg-{self._message_count}")
+        self._message_count += 1
+        self.mount(block)
         self._maybe_scroll_end(mark_unread=True, force=True)
 
     def start_streaming(self) -> StreamingMessageBlock:
