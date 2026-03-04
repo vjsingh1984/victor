@@ -733,9 +733,6 @@ class StreamingMessageBlock(Static):
         overflow-y: auto;
     }
 
-    StreamingMessageBlock Vertical {
-        gap: 0;
-    }
 
     StreamingMessageBlock .streaming-indicator {
         color: $text-muted;
