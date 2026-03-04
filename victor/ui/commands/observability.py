@@ -131,22 +131,6 @@ def dashboard_command(
             typer.echo(f"Error: Rich dashboard requires rich library. Install it with: pip install rich", err=True)
             raise typer.Exit(1)
 
-    manager = ObservabilityManager.get_instance()
-
-    Shows aggregated metrics from all registered sources including:
-    - Cache performance (hit rate, size, evictions)
-    - Tool metrics (calls, errors, latency)
-    - Coordinator metrics (operations, errors, latency)
-    - Capability metrics (accesses, errors)
-    - System metrics (memory, CPU)
-    - Alerts and warnings
-
-    Example:
-        victor observability dashboard
-        victor observability dashboard --json
-        victor observability dashboard --watch --interval 10
-    """
-    manager = ObservabilityManager.get_instance()
 
     def print_dashboard() -> None:
         """Print the dashboard."""
