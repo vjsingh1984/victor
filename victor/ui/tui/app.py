@@ -427,7 +427,7 @@ class VictorTUI(App):
     MessageWidget .message-content {
         width: 100%;
         color: $text;
-        max-height: 20;
+        max-height: 10;
         overflow-y: auto;
     }
 

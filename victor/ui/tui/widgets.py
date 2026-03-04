@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from rich.text import Text
+from victor.ui.rendering.markdown import render_markdown_with_hooks
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual import events
@@ -727,8 +728,13 @@ class StreamingMessageBlock(Static):
     StreamingMessageBlock .message-content {
         width: 100%;
         height: auto;
+        max-height: 10;
         overflow-x: hidden;
-        overflow-y: hidden;
+        overflow-y: auto;
+    }
+
+    StreamingMessageBlock Vertical {
+        gap: 0;
     }
 
     StreamingMessageBlock .streaming-indicator {
@@ -802,11 +808,11 @@ class StreamingMessageBlock(Static):
             body = self._body_widget
             if self.role == "assistant":
                 # Render plain text while streaming for responsiveness,
-                # then re-render as markdown when complete.
+                # then re-render with markdown hooks when complete.
                 if self.is_streaming:
                     body.update(self.content)
                 else:
-                    body.update(Markdown(self.content))
+                    body.update(render_markdown_with_hooks(self.content))
             else:
                 body.update(self.content)
         except Exception:
