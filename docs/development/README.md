@@ -22,6 +22,15 @@ make format         # black + ruff --fix
 black victor tests
 ruff check --fix victor tests
 mypy victor
+
+# Strict-package gate (matches CI)
+mypy --strict \
+  victor/config \
+  victor/storage/cache \
+  victor/telemetry \
+  victor/analytics \
+  victor/profiler \
+  victor/debug
 ```
 
 ## Testing

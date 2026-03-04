@@ -189,6 +189,10 @@ files = ["victor"]
 module = [
     "victor.config.*",
     "victor.storage.cache.*",
+    "victor.telemetry.*",
+    "victor.analytics.*",
+    "victor.profiler.*",
+    "victor.debug.*",
 ]
 strict = true
 ```
@@ -198,6 +202,15 @@ strict = true
 ```bash
 # Type check the codebase
 mypy victor
+
+# Run the strict-package gate (same command as CI)
+mypy --strict \
+  victor/config \
+  victor/storage/cache \
+  victor/telemetry \
+  victor/analytics \
+  victor/profiler \
+  victor/debug
 
 # Type check specific file
 mypy victor/agent/orchestrator.py

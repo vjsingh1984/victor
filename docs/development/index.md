@@ -100,6 +100,7 @@ docs/
 | **Format code** | `make format` | Black + ruff |
 | **Lint code** | `make lint` | Check formatting |
 | **Type check** | `mypy victor` | Type validation |
+| **Strict type gate** | `mypy --strict victor/config victor/storage/cache victor/telemetry victor/analytics victor/profiler victor/debug` | Mirrors CI blocking strict-package check |
 
 ## Extension Points
 
