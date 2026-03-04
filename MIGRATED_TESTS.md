@@ -1,11 +1,12 @@
-# Migrated Tests - victor to victor-coding
+# Migrated Tests - victor to vertical repositories
 
-This document tracks tests that have been migrated from the victor (framework) 
-repository to the victor-coding (vertical) repository.
+This document tracks tests that have been migrated from the victor (framework)
+repository to their respective vertical repositories.
 
-## Migration Date
+## Migration Dates
 
-2026-03-04
+- 2026-03-04: victor-coding tests (initial migration)
+- 2026-03-04: All verticals safety tests migration (devops, rag, research, dataanalysis)
 
 ## Tests Moved to victor-coding
 
@@ -66,6 +67,47 @@ All files in `tests/unit/indexers/` directory moved to `victor-coding/tests/inde
 | `TestCodingVerticalExtensions` | `victor-coding/tests/protocols/test_vertical_extensions.py` | Tests victor-coding's VerticalExtensions implementation |
 | `TestResearchVerticalExtensions` | `victor-coding/tests/protocols/test_vertical_extensions.py` | Tests victor-research's VerticalExtensions implementation |
 
+## Safety Tests Migrated (All Verticals)
+
+### victor-coding Safety Tests
+
+| Test Method | New Path | Reason |
+|-------------|----------|--------|
+| `test_create_all_coding_safety_rules` | `victor-coding/tests/safety/test_safety_integration.py` | Tests victor-coding's all safety rules |
+
+### victor-devops Safety Tests
+
+| Test Method | New Path | Reason |
+|-------------|----------|--------|
+| `test_devops_safety_deployment_rules` | `victor-devops/tests/test_safety.py` | Tests DevOps deployment safety rules |
+| `test_devops_safety_container_rules` | `victor-devops/tests/test_safety.py` | Tests DevOps container safety rules |
+| `test_devops_safety_infrastructure_rules` | `victor-devops/tests/test_safety.py` | Tests DevOps infrastructure safety rules |
+| `test_create_all_devops_safety_rules` | `victor-devops/tests/test_safety.py` | Tests all DevOps safety rules |
+
+### victor-rag Safety Tests
+
+| Test Method | New Path | Reason |
+|-------------|----------|--------|
+| `test_rag_safety_deletion_rules` | `victor-rag/tests/test_safety.py` | Tests RAG deletion safety rules |
+| `test_rag_safety_ingestion_rules` | `victor-rag/tests/test_safety.py` | Tests RAG ingestion safety rules |
+| `test_create_all_rag_safety_rules` | `victor-rag/tests/test_safety.py` | Tests all RAG safety rules |
+
+### victor-research Safety Tests
+
+| Test Method | New Path | Reason |
+|-------------|----------|--------|
+| `test_research_safety_source_rules` | `victor-research/tests/test_safety.py` | Tests Research source safety rules |
+| `test_research_safety_content_rules` | `victor-research/tests/test_safety.py` | Tests Research content safety rules |
+| `test_create_all_research_safety_rules` | `victor-research/tests/test_safety.py` | Tests all Research safety rules |
+
+### victor-dataanalysis Safety Tests
+
+| Test Method | New Path | Reason |
+|-------------|----------|--------|
+| `test_dataanalysis_safety_pii_rules` | `victor-dataanalysis/tests/test_safety.py` | Tests DataAnalysis PII safety rules |
+| `test_dataanalysis_safety_export_rules` | `victor-dataanalysis/tests/test_safety.py` | Tests DataAnalysis export safety rules |
+| `test_create_all_dataanalysis_safety_rules` | `victor-dataanalysis/tests/test_safety.py` | Tests all DataAnalysis safety rules |
+
 ## Tests Remaining in victor
 
 The following tests remain in victor because they test framework functionality:
@@ -73,8 +115,12 @@ The following tests remain in victor because they test framework functionality:
 ### Framework Protocol Tests
 - `tests/unit/protocols/test_vertical_protocols.py` - Tests framework protocol definitions (cleaned - removed vertical implementation tests)
 
+### Framework Config Tests
+- `tests/unit/framework/test_config.py` - Tests framework SafetyConfig, StyleConfig, ToolConfig, and SafetyEnforcer (cleaned - removed vertical-specific safety tests)
+  - **Removed:** All vertical-specific safety rule tests (devops, rag, research, dataanalysis, coding-all)
+  - **Kept:** Framework internal tests (coding git/file rules, benchmark safety rules)
+
 ### Framework Integration Tests (with Graceful Fallback)
-- `tests/unit/framework/test_config.py` - Tests SafetyEnforcer with vertical safety rules (graceful fallback)
 - `tests/unit/framework/test_framework_shim.py` - Tests FrameworkShim vertical lookup (graceful fallback)
 - `tests/unit/framework/test_team_registry.py` - Integration tests (marked `@pytest.mark.integration`)
 - `tests/unit/security/safety/test_infrastructure.py` - Tests InfrastructureScanner with vertical safety extensions (graceful fallback)

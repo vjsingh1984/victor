@@ -104,6 +104,7 @@ Follow behavior:
 - Status bar shows `Paused` whenever auto-follow is not active, and `Following` when live tailing is active.
 - Use `Ctrl+F` to pause/resume sticky follow mode.
 - When sticky follow is paused, the jump button changes to `Resume follow`.
+- `Ctrl+End` also resumes sticky follow mode and jumps to latest output.
 
 ---
 

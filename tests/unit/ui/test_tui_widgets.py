@@ -370,7 +370,10 @@ def test_status_bar_updates_follow_indicator() -> None:
     bar = StatusBar()
     label = MagicMock()
 
-    with patch.object(StatusBar, "query_one", return_value=label):
+    with (
+        patch.object(StatusBar, "query_one", return_value=label),
+        patch.object(bar, "update_shortcuts"),
+    ):
         bar.update_follow(paused=True)
         label.update.assert_called_with("Paused")
 
@@ -391,3 +394,20 @@ def test_status_bar_updates_unread_indicator() -> None:
         bar.update_unread(0)
         label.update.assert_called_with("")
         label.remove_class.assert_called_with("visible")
+
+
+def test_status_bar_shortcuts_reflect_follow_action_state() -> None:
+    """Shortcut hints should show pause/resume follow based on current state."""
+    bar = StatusBar()
+    hints = MagicMock()
+
+    with patch.object(StatusBar, "query_one", return_value=hints):
+        bar._follow_paused = False
+        bar._update_shortcuts_idle()
+        idle_following_text = hints.update.call_args.args[0]
+        assert "pause follow" in idle_following_text.plain
+
+        bar._follow_paused = True
+        bar._update_shortcuts_idle()
+        idle_paused_text = hints.update.call_args.args[0]
+        assert "resume follow" in idle_paused_text.plain

@@ -74,6 +74,34 @@ def test_action_page_down_pages_and_updates_state() -> None:
     app._update_jump_to_bottom.assert_called_once()
 
 
+def test_action_scroll_bottom_resumes_follow_when_paused() -> None:
+    """Ctrl+End should resume sticky follow mode when paused."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = True
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_scroll_bottom()
+
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.scroll_to_bottom.assert_not_called()
+    app._update_jump_to_bottom.assert_called_once()
+
+
+def test_action_scroll_bottom_scrolls_when_follow_not_paused() -> None:
+    """Ctrl+End should jump to bottom when sticky follow is not paused."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._conversation_log.follow_paused = False
+    app._update_jump_to_bottom = MagicMock()
+
+    app.action_scroll_bottom()
+
+    app._conversation_log.scroll_to_bottom.assert_called_once_with(animate=False)
+    app._conversation_log.set_follow_paused.assert_not_called()
+    app._update_jump_to_bottom.assert_called_once()
+
+
 def test_on_update_scroll_updates_jump_button_for_conversation_log() -> None:
     """Scroll updates from the conversation log should refresh jump button state."""
     app = VictorTUI()

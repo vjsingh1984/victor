@@ -136,7 +136,7 @@ class StatusBar(Static):
                     ("Ctrl+S", "bold"),
                     " save  ",
                     ("Ctrl+F", "bold"),
-                    " follow  ",
+                    f" {self._follow_action_text()}  ",
                     ("Enter", "bold"),
                     " send",
                 )
@@ -153,7 +153,7 @@ class StatusBar(Static):
                     ("Ctrl+X", "bold"),
                     " cancel  ",
                     ("Ctrl+F", "bold"),
-                    " follow  ",
+                    f" {self._follow_action_text()}  ",
                     ("Ctrl+D", "bold"),
                     " toggle details",
                 )
@@ -170,13 +170,17 @@ class StatusBar(Static):
                     ("Ctrl+L", "bold"),
                     " clear  ",
                     ("Ctrl+F", "bold"),
-                    " follow  ",
+                    f" {self._follow_action_text()}  ",
                     ("Ctrl+C", "bold"),
                     " exit",
                 )
             )
         except Exception:
             pass
+
+    def _follow_action_text(self) -> str:
+        """Return the current follow shortcut action text."""
+        return "resume follow" if self._follow_paused else "pause follow"
 
     def update_shortcuts(self, state: str) -> None:
         """Update shortcut hints based on application state.
@@ -225,14 +229,19 @@ class StatusBar(Static):
 
     def update_follow(self, paused: bool) -> None:
         """Update follow-mode indicator."""
+        if paused == self._follow_paused:
+            return
         self._follow_paused = paused
         label = self.query_one(".follow-indicator", Label)
         label.update("Paused" if paused else "Following")
         label.remove_class("following", "paused")
         label.add_class("paused" if paused else "following")
+        self.update_shortcuts(self._state)
 
     def update_unread(self, unread_count: int) -> None:
         """Update unread counter badge."""
+        if unread_count == self._unread_count:
+            return
         self._unread_count = unread_count
         label = self.query_one("#unread-indicator", Label)
         if unread_count > 0:
