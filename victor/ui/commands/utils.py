@@ -20,8 +20,12 @@ from victor.agent.safety import (
     set_confirmation_callback,
 )
 
-from victor.core.capability_registry import CapabilityRegistry
-from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+from victor.core.container import get_container
+
+try:
+    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+except ImportError:
+    CodebaseIndexFactoryProtocol = None  # type: ignore[misc,assignment]
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 if TYPE_CHECKING:
@@ -389,9 +393,14 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
 
 async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
     """Check codebase index status at startup and reindex if needed."""
-    _registry = CapabilityRegistry.get_instance()
-    _factory = _registry.get(CodebaseIndexFactoryProtocol)
-    if _factory is None or not _registry.is_enhanced(CodebaseIndexFactoryProtocol):
+    if CodebaseIndexFactoryProtocol is None:
+        if not silent:
+            logger.debug("Codebase indexing not available - victor-coding package not installed")
+        return
+
+    _container = get_container()
+    _factory = _container.get_optional(CodebaseIndexFactoryProtocol)
+    if _factory is None:
         if not silent:
             logger.debug("Codebase indexing not available - victor-coding package not installed")
         return
