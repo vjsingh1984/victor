@@ -569,6 +569,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._chat_coordinator = self._interaction_runtime.chat_coordinator
         self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
+        try:
+            self._tool_coordinator.get_enabled_tools()
+        except Exception:
+            logger.debug("Failed to prime tool access state", exc_info=True)
 
     def _initialize_services(self) -> None:
         """Initialize service adapters when USE_SERVICE_LAYER flag is enabled.
@@ -631,17 +635,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             provider_name: Optional provider label from profile (e.g., lmstudio, vllm) to disambiguate OpenAI-compatible providers
             profile_name: Optional profile name (e.g., "groq-fast", "claude-sonnet") for session tracking
         """
-        # Store profile name for session tracking
-        self._profile_name = profile_name
-        # Track active session ID for parallel session support
-        self.active_session_id: Optional[str] = None
-        # Bootstrap DI container - ensures all services are available
-        # This is idempotent and will only bootstrap if not already done
-        self._container = ensure_bootstrapped(settings)
-
-        # Create factory for component initialization (CRITICAL-001)
-        # This enables DI-aware creation with fallback and reduces __init__ complexity
-        self._factory = OrchestratorFactory(
+        self._setup_profile(settings, profile_name)
+        self._initialize_factory(
             settings=settings,
             provider=provider,
             model=model,
@@ -652,7 +647,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_selection=tool_selection,
             thinking=thinking,
         )
-        self._factory._container = self._container  # Share container
 
         self.settings = settings
         self.temperature = temperature
@@ -661,180 +655,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.tool_selection = tool_selection or {}
         self.thinking = thinking
 
-        # Tool calling matrix for managing provider capabilities (via factory)
-        self.tool_calling_models, self.tool_capabilities = (
-            self._factory.create_tool_calling_matrix()
-        )
+        self._initialize_provider_components(provider, model, provider_name)
 
-        # Initialize ProviderManager with tool adapter (via factory)
-        (
-            self._provider_manager,
-            self.provider,
-            self.model,
-            self.provider_name,
-            self.tool_adapter,
-            self.tool_calling_caps,
-        ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
+        self._initialize_system_prompt(model)
 
-        # Provider runtime boundary: coordinator services are created lazily on first use.
-        self._initialize_provider_runtime()
+        self._initialize_session_components()
 
-        # Response sanitizer for cleaning model output (via factory - DI with fallback)
-        self.sanitizer = self._factory.create_sanitizer()
-
-        # System prompt builder with vertical prompt contributors (via factory)
-        self.prompt_builder = self._factory.create_system_prompt_builder(
-            provider_name=self.provider_name,
-            model=model,
-            tool_adapter=self.tool_adapter,
-            tool_calling_caps=self.tool_calling_caps,
-        )
-
-        # Load project context from .victor/init.md (via factory - DI with fallback)
-        self.project_context = self._factory.create_project_context()
-
-        # Build system prompt using adapter hints
-        base_system_prompt = self._build_system_prompt_with_adapter()
-
-        # Inject project context if available
-        if self.project_context.content:
-            self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-            )
-            logger.info(f"Loaded project context from {self.project_context.context_file}")
-        else:
-            self._system_prompt = base_system_prompt
-
-        self._system_added = False
-
-        # Initialize tool call budget (via factory) - uses adapter recommendations with settings override
-        self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
-
-        # Initialize SessionStateManager for consolidated execution state tracking (TD-002)
-        # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
-        # failed_tool_signatures, _read_files_session, _required_files, _required_outputs, etc.
-        self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
-
-        # Gap implementations: Complexity classifier, action authorizer, search router (via factory)
-        self.task_classifier = self._factory.create_complexity_classifier()
-        self.intent_detector = self._factory.create_action_authorizer()
-        self.search_router = self._factory.create_search_router()
-
-        # Presentation adapter for icon/emoji rendering (via factory, DI)
-        # Decouples agent layer from direct UI dependencies
-        self._presentation = self._factory.create_presentation_adapter()
-
-        # Task Completion Detection: Signal-based completion detection
-        # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
-        from victor.agent.task_completion import TaskCompletionDetector
-
-        self._task_completion_detector = TaskCompletionDetector()
-        logger.info("TaskCompletionDetector initialized (signal-based completion)")
-
-        # Context reminder manager for intelligent system message injection (via factory, DI)
-        # Reduces token waste by consolidating reminders and only injecting when context changes
-        self.reminder_manager = self._factory.create_reminder_manager(
-            provider=self.provider_name,
-            task_complexity="medium",  # Will be updated per-task
-            tool_budget=self.tool_budget,
-        )
-
-        # Debug logger for incremental output and conversation tracking (via factory)
-        self.debug_logger = self._factory.create_debug_logger_configured()
-
-        # Metrics/analytics runtime boundary with lazy collector/coordinator loading.
-        self._initialize_metrics_runtime()
-
-        # Cancellation support for streaming
-        self._cancel_event: Optional[asyncio.Event] = None
-        self._is_streaming = False
-
-        # Background task tracking for graceful shutdown
-        self._background_tasks: set[asyncio.Task] = set()
-
-        # Result cache for pure/idempotent tools (via factory)
-        self.tool_cache = self._factory.create_tool_cache()
-        # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
-        # Tool dependencies are registered via ToolRegistrar after it's created
-        self.tool_graph = self._factory.create_tool_dependency_graph()
-
-        # Stateful managers (DI with fallback)
-        # Code execution manager for Docker-based code execution (via factory, DI with fallback)
-        self.code_manager = self._factory.create_code_execution_manager()
-
-        # Workflow runtime boundary (lazy registry + default workflow registration).
-        self._initialize_workflow_runtime()
-
-        # Conversation history (via factory) - MessageHistory for better encapsulation
-        self.conversation = self._factory.create_message_history(self._system_prompt)
-
-        # Memory/session runtime boundary with embedding-store initialization.
-        self._initialize_memory_runtime()
-
-        # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
-        self.conversation_state = self._factory.create_conversation_state_machine()
-
-        # Intent classifier for semantic continuation/completion detection (via factory)
-        self.intent_classifier = self._factory.create_intent_classifier()
-
-        # Intelligent pipeline integration (lazy initialization via factory)
-        # Provides RL-based mode learning, quality scoring, prompt optimization
-        self._intelligent_integration: Optional["OrchestratorIntegration"] = None
-        self._intelligent_integration_config = self._factory.create_integration_config()
-        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
-
-        # Sub-agent orchestration (via factory) - lazy initialization for parallel task delegation
-        self._subagent_orchestrator, self._subagent_orchestration_enabled = (
-            self._factory.setup_subagent_orchestration()
-        )
-
-        # Tool registry (via factory)
-        self.tools = self._factory.create_tool_registry()
-        # Alias for backward compatibility - some code uses tool_registry instead of tools
-        self.tool_registry = self.tools
-
-        # Initialize ToolRegistrar (via factory) - tool registration, plugins, MCP integration
-        self.tool_registrar = self._factory.create_tool_registrar(
-            self.tools, self.tool_graph, provider, model
-        )
-        self.tool_registrar.set_background_task_callback(self._create_background_task)
-
-        # Register tool dependencies for planning (delegates to ToolRegistrar)
-        self.tool_registrar._register_tool_dependencies()
-
-        # Synchronous registration (dynamic tools, configs)
-        self._register_default_tools()  # Delegates to ToolRegistrar
-        self.tool_registrar._load_tool_configurations()  # Delegates to ToolRegistrar
-        self.tools.register_before_hook(self._log_tool_call)
-
-        # Plugin system for extensible tools (via factory, delegates to ToolRegistrar)
-        self.plugin_manager = self._factory.initialize_plugin_system(self.tool_registrar)
-
-        # Argument normalizer for handling malformed tool arguments (via factory, DI with fallback)
-        self.argument_normalizer = self._factory.create_argument_normalizer(provider)
-
-        # Initialize middleware chain from vertical extensions (via factory)
-        # Middleware provides code validation, safety checks, and domain-specific processing
-        self._middleware_chain, self._code_correction_middleware = (
-            self._factory.create_middleware_chain()
-        )
-
-        # Initialize SafetyChecker with vertical patterns (via factory)
-        # Exposes via property for UI layer to set confirmation callback
-        self._safety_checker = self._factory.create_safety_checker()
-
-        # Initialize AutoCommitter for AI-assisted commits (via factory)
-        # Provides conventional commits with co-authorship attribution
-        self._auto_committer = self._factory.create_auto_committer()
-
-        # Tool executor for centralized tool execution with retry, caching, and metrics (via factory)
-        self.tool_executor = self._factory.create_tool_executor(
-            tools=self.tools,
-            argument_normalizer=self.argument_normalizer,
-            tool_cache=self.tool_cache,
-            safety_checker=self._safety_checker,
-            code_correction_middleware=self._code_correction_middleware,
-        )
+        self._initialize_tool_and_plugin_layers(provider, model)
 
         # Parallel tool executor for concurrent independent tool calls (via factory)
         self.parallel_executor = self._factory.create_parallel_executor(self.tool_executor)
@@ -908,6 +735,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             usage_analytics=self._usage_analytics if hasattr(self, "_usage_analytics") else None,
             reminder_manager=self._reminder_manager if hasattr(self, "_reminder_manager") else None,
         )
+
+        # Set callbacks for orchestrator-specific shutdown logic
+        self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
+        self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
 
         # Tool deduplication tracker for preventing redundant calls (via factory)
         self._deduplication_tracker = self._factory.create_tool_deduplication_tracker()
@@ -1071,9 +902,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         # Note: background_tasks is a set, convert to list for lifecycle manager
         self._lifecycle_manager.set_background_tasks(list(self._background_tasks))
-        # Set callbacks for orchestrator-specific shutdown logic
-        self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
-        self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
 
         # Debug-mode conformance assertion for ChatOrchestratorProtocol
         # Placed at end of __init__ so all attributes are initialized
@@ -1095,6 +923,142 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "CapabilityRegistry"
         )
 
+    # ------------------------------------------------------------------
+    # Initialization helper methods
+    # ------------------------------------------------------------------
+
+    def _setup_profile(self, settings: Settings, profile_name: Optional[str]) -> None:
+        self._profile_name = profile_name
+        self.active_session_id = None
+        self._container = ensure_bootstrapped(settings)
+
+    def _initialize_factory(
+        self,
+        *,
+        settings: Settings,
+        provider: BaseProvider,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        provider_name: Optional[str],
+        profile_name: Optional[str],
+        tool_selection: Optional[Dict[str, Any]],
+        thinking: bool,
+    ) -> None:
+        self._factory = OrchestratorFactory(
+            settings=settings,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_name=provider_name,
+            profile_name=profile_name,
+            tool_selection=tool_selection,
+            thinking=thinking,
+        )
+        self._factory._container = self._container
+
+    def _initialize_provider_components(
+        self, provider: BaseProvider, model: str, provider_name: Optional[str]
+    ) -> None:
+        self.tool_calling_models, self.tool_capabilities = (
+            self._factory.create_tool_calling_matrix()
+        )
+        (
+            self._provider_manager,
+            self.provider,
+            self.model,
+            self.provider_name,
+            self.tool_adapter,
+            self.tool_calling_caps,
+        ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
+        self._initialize_provider_runtime()
+        self.sanitizer = self._factory.create_sanitizer()
+
+    def _initialize_system_prompt(self, model: str) -> None:
+        self.prompt_builder = self._factory.create_system_prompt_builder(
+            provider_name=self.provider_name,
+            model=model,
+            tool_adapter=self.tool_adapter,
+            tool_calling_caps=self.tool_calling_caps,
+        )
+        self.project_context = self._factory.create_project_context()
+        base_system_prompt = self._build_system_prompt_with_adapter()
+        if self.project_context.content:
+            self._system_prompt = (
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
+        else:
+            self._system_prompt = base_system_prompt
+        self._system_added = False
+
+    def _initialize_session_components(self) -> None:
+        self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
+        self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
+        self.task_classifier = self._factory.create_complexity_classifier()
+        self.intent_detector = self._factory.create_action_authorizer()
+        self.search_router = self._factory.create_search_router()
+        self._presentation = self._factory.create_presentation_adapter()
+        from victor.agent.task_completion import TaskCompletionDetector
+
+        self._task_completion_detector = TaskCompletionDetector()
+        logger.info("TaskCompletionDetector initialized (signal-based completion)")
+        self.reminder_manager = self._factory.create_reminder_manager(
+            provider=self.provider_name,
+            task_complexity="medium",
+            tool_budget=self.tool_budget,
+        )
+        self.debug_logger = self._factory.create_debug_logger_configured()
+        self._initialize_metrics_runtime()
+        self._cancel_event = None
+        self._is_streaming = False
+        self._background_tasks = set()
+
+    def _initialize_tool_and_plugin_layers(
+        self, provider: BaseProvider, model: str
+    ) -> None:
+        self.tool_cache = self._factory.create_tool_cache()
+        self.tool_graph = self._factory.create_tool_dependency_graph()
+        self.code_manager = self._factory.create_code_execution_manager()
+        self._initialize_workflow_runtime()
+        self.conversation = self._factory.create_message_history(self._system_prompt)
+        self._initialize_memory_runtime()
+        self.conversation_state = self._factory.create_conversation_state_machine()
+        self.intent_classifier = self._factory.create_intent_classifier()
+        self._intelligent_integration = None
+        self._intelligent_integration_config = self._factory.create_integration_config()
+        self._intelligent_pipeline_enabled = getattr(
+            self.settings, "intelligent_pipeline_enabled", True
+        )
+        (
+            self._subagent_orchestrator,
+            self._subagent_orchestration_enabled,
+        ) = self._factory.setup_subagent_orchestration()
+        self.tools = self._factory.create_tool_registry()
+        self.tool_registry = self.tools
+        self.tool_registrar = self._factory.create_tool_registrar(
+            self.tools, self.tool_graph, provider, model
+        )
+        self.tool_registrar.set_background_task_callback(self._create_background_task)
+        self.tool_registrar._register_tool_dependencies()
+        self._register_default_tools()
+        self.tool_registrar._load_tool_configurations()
+        self.tools.register_before_hook(self._log_tool_call)
+        self.plugin_manager = self._factory.initialize_plugin_system(self.tool_registrar)
+        self.argument_normalizer = self._factory.create_argument_normalizer(provider)
+        self._middleware_chain, self._code_correction_middleware = (
+            self._factory.create_middleware_chain()
+        )
+        self._safety_checker = self._factory.create_safety_checker()
+        self._auto_committer = self._factory.create_auto_committer()
+        self.tool_executor = self._factory.create_tool_executor(
+            tools=self.tools,
+            argument_normalizer=self.argument_normalizer,
+            tool_cache=self.tool_cache,
+            safety_checker=self._safety_checker,
+            code_correction_middleware=self._code_correction_middleware,
+        )
     # =====================================================================
     # Callbacks for decomposed components
     # =====================================================================

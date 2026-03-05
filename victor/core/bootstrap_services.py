@@ -83,14 +83,17 @@ def bootstrap_new_services(
     feature_flags = get_feature_flag_manager()
 
     # Check if any new services should be bootstrapped
-    has_new_services = any([
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE),
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE),
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE),
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE),
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE),
-        feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE),
-    ])
+    has_new_services = any(
+        [
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE),
+            feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE),
+        ]
+    )
 
     if not has_new_services:
         logger.info("No new service feature flags enabled, skipping bootstrap")
@@ -113,21 +116,27 @@ def bootstrap_new_services(
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE):
         context_service = _create_context_service(container)
         services_created["context"] = context_service
-        container.register(ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON)
+        container.register(
+            ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped ContextService")
 
     # Bootstrap ProviderService if enabled
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE):
         provider_service = _create_provider_service(container)
         services_created["provider"] = provider_service
-        container.register(ProviderServiceProtocol, lambda c: provider_service, ServiceLifetime.SINGLETON)
+        container.register(
+            ProviderServiceProtocol, lambda c: provider_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped ProviderService")
 
     # Bootstrap RecoveryService if enabled
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE):
         recovery_service = _create_recovery_service(container)
         services_created["recovery"] = recovery_service
-        container.register(RecoveryServiceProtocol, lambda c: recovery_service, ServiceLifetime.SINGLETON)
+        container.register(
+            RecoveryServiceProtocol, lambda c: recovery_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped RecoveryService")
 
     # Bootstrap ToolService if enabled
@@ -145,8 +154,26 @@ def bootstrap_new_services(
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE):
         session_service = _create_session_service(container)
         services_created["session"] = session_service
-        container.register(SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON)
+        container.register(
+            SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped SessionService")
+
+    # Bootstrap LLMDecisionService if enabled
+    if feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+        decision_service = _create_llm_decision_service(container)
+        if decision_service is not None:
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            services_created["llm_decision"] = decision_service
+            container.register(
+                LLMDecisionServiceProtocol,
+                lambda c: decision_service,
+                ServiceLifetime.SINGLETON,
+            )
+            logger.info("Bootstrapped LLMDecisionService")
 
     # Bootstrap ChatService if enabled (depends on other services)
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
@@ -195,6 +222,7 @@ def _create_provider_service(container: ServiceContainer) -> "ProviderService":
     # Try to get provider registry from container or create mock
     try:
         from victor.providers.registry import ProviderRegistry
+
         registry = container.get(ProviderRegistry)
     except Exception:
         registry = _MockProviderRegistry()
@@ -331,6 +359,52 @@ def _create_chat_service(
     )
 
 
+def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
+    """Create LLMDecisionService instance.
+
+    Requires a provider to be available in the container.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Configured LLMDecisionService instance, or None if provider unavailable
+    """
+    try:
+        from victor.agent.services.decision_service import (
+            LLMDecisionService,
+            LLMDecisionServiceConfig,
+        )
+
+        # Get provider from container or existing services
+        provider = None
+        model = None
+        try:
+            from victor.providers.base import BaseProvider
+
+            provider = container.get(BaseProvider)
+        except Exception:
+            pass
+
+        if provider is None:
+            logger.warning("No provider available for LLMDecisionService, skipping")
+            return None
+
+        # Get model name from provider if available
+        model = getattr(provider, "model", None) or getattr(provider, "model_name", None) or ""
+
+        config = LLMDecisionServiceConfig(
+            confidence_threshold=0.7,
+            micro_budget=10,
+            timeout_ms=2000,
+            cache_ttl=60,
+        )
+        return LLMDecisionService(provider=provider, model=model, config=config)
+    except Exception as e:
+        logger.warning("Failed to create LLMDecisionService: %s", e)
+        return None
+
+
 def _create_default_tool_selector(container: ServiceContainer) -> Any:
     """Create default tool selector.
 
@@ -343,6 +417,7 @@ def _create_default_tool_selector(container: ServiceContainer) -> Any:
     # Try to get existing tool selector from container
     try:
         from victor.agent.tool_selection import ToolSelector
+
         return container.get(ToolSelector)
     except Exception:
         # Return a simple mock selector
@@ -361,6 +436,7 @@ def _create_default_tool_executor(container: ServiceContainer) -> Any:
     # Try to get existing tool executor from container
     try:
         from victor.agent.tool_execution import ToolExecutor
+
         return container.get(ToolExecutor)
     except Exception:
         # Return a simple mock executor
@@ -381,6 +457,7 @@ class _MockToolExecutor:
     async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Execute tool - returns mock result."""
         from victor.tools.base import ToolResult
+
         return ToolResult(
             success=False,
             output=None,
