@@ -16,7 +16,7 @@ try:
 except ImportError:
     pass
 import io
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Coroutine, Optional
 
 from rich.console import Console
 from textual import work
@@ -693,6 +693,8 @@ class VictorTUI(App):
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
     ]
+    _ASYNC_REPLAY_THRESHOLD = 400
+    _ASYNC_REPLAY_CHUNK_SIZE = 120
 
     def __init__(
         self,
@@ -737,6 +739,7 @@ class VictorTUI(App):
         self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
         self._session_messages: list[Message] = []
+        self._session_restore_task: asyncio.Task[None] | None = None
         self._jump_button_visible: Optional[bool] = None
         self._jump_button_label: Optional[str] = None
         self._background_tasks: set[asyncio.Task[Any]] = set()
@@ -1380,29 +1383,116 @@ class VictorTUI(App):
             self._add_system_message("Session restore cancelled")
             return
         if session_id.startswith("tui:"):
-            self._load_session(session_id.split(":", 1)[1])
+            resolved_id = session_id.split(":", 1)[1]
         else:
-            self._load_session(session_id)
+            resolved_id = session_id
+        self._start_session_restore(
+            self._load_session_async(resolved_id),
+            fallback=lambda: self._load_session(resolved_id),
+        )
 
     def _handle_project_session_choice(self, session_id: Optional[str]) -> None:
         if not session_id:
             self._add_system_message("Project session restore cancelled")
             return
         if session_id.startswith("project:"):
-            self._load_project_session(session_id.split(":", 1)[1])
+            resolved_id = session_id.split(":", 1)[1]
         else:
-            self._load_project_session(session_id)
+            resolved_id = session_id
+        self._start_session_restore(
+            self._load_project_session_async(resolved_id),
+            fallback=lambda: self._load_project_session(resolved_id),
+        )
 
     def _handle_any_session_choice(self, session_key: Optional[str]) -> None:
         if not session_key:
             self._add_system_message("Session restore cancelled")
             return
         if session_key.startswith("tui:"):
-            self._load_session(session_key.split(":", 1)[1])
+            resolved_id = session_key.split(":", 1)[1]
+            self._start_session_restore(
+                self._load_session_async(resolved_id),
+                fallback=lambda: self._load_session(resolved_id),
+            )
         elif session_key.startswith("project:"):
-            self._load_project_session(session_key.split(":", 1)[1])
+            resolved_id = session_key.split(":", 1)[1]
+            self._start_session_restore(
+                self._load_project_session_async(resolved_id),
+                fallback=lambda: self._load_project_session(resolved_id),
+            )
         else:
-            self._load_session(session_key)
+            self._start_session_restore(
+                self._load_session_async(session_key),
+                fallback=lambda: self._load_session(session_key),
+            )
+
+    def _start_session_restore(
+        self,
+        restore_coro: Coroutine[Any, Any, None],
+        *,
+        fallback: Callable[[], None],
+    ) -> None:
+        """Start restore in background when event loop is active; otherwise run fallback."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            restore_coro.close()
+            fallback()
+            return
+        if self._session_restore_task and not self._session_restore_task.done():
+            self._session_restore_task.cancel()
+
+        async def _runner() -> None:
+            current_task = asyncio.current_task()
+            try:
+                await restore_coro
+            except asyncio.CancelledError:
+                if self._session_restore_task is current_task:
+                    self._set_status("Idle", "idle")
+            except Exception as exc:
+                if self._session_restore_task is current_task:
+                    self._add_error_message(f"Session restore failed: {exc}")
+                    self._set_status("Idle", "idle")
+
+        self._session_restore_task = loop.create_task(_runner())
+
+    def _replay_transcript(self, messages: list[tuple[str, str]]) -> None:
+        """Replay transcript messages in a single batched UI update."""
+        if not self._conversation_log:
+            return
+        with self.batch_update():
+            self._conversation_log.clear()
+            for role, content in messages:
+                self._conversation_log.add_history_message(role, content)
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+
+    async def _replay_transcript_async(
+        self,
+        messages: list[tuple[str, str]],
+        *,
+        status_label: str,
+    ) -> None:
+        """Replay transcript incrementally for very large histories."""
+        if not self._conversation_log:
+            return
+        total = len(messages)
+        if total <= self._ASYNC_REPLAY_THRESHOLD:
+            self._replay_transcript(messages)
+            return
+
+        chunk_size = self._ASYNC_REPLAY_CHUNK_SIZE
+        with self.batch_update():
+            self._conversation_log.clear()
+        for start in range(0, total, chunk_size):
+            end = min(start + chunk_size, total)
+            with self.batch_update():
+                for role, content in messages[start:end]:
+                    self._conversation_log.add_history_message(role, content)
+            self._set_status(f"{status_label} ({end}/{total})...", "busy")
+            if end < total:
+                await asyncio.sleep(0)
+        with self.batch_update():
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
 
     def _load_session(self, session_id: str) -> None:
         """Load a TUI session with progress indication."""
@@ -1415,26 +1505,41 @@ class VictorTUI(App):
             return
 
         message_count = len(session.messages)
-        if message_count > 50:
-            self._add_system_message(f"Loading {message_count} messages...")
+        self._set_status(f"Loading session ({message_count} messages)...", "busy")
+        try:
+            self._session_messages = list(session.messages)
+            self._replay_transcript([(msg.role, msg.content) for msg in session.messages])
+            self._restore_agent_conversation(session.messages)
+            self._add_system_message(
+                f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
+            )
+        finally:
+            self._set_status("Idle", "idle")
 
-        if self._conversation_log:
-            self._conversation_log.clear()
+    async def _load_session_async(self, session_id: str) -> None:
+        """Load a TUI session with non-blocking replay for large transcripts."""
+        from victor.ui.tui.session import SessionManager
 
-        self._session_messages = list(session.messages)
-        for i, msg in enumerate(session.messages):
-            self._render_message(msg.role, msg.content, replay=True)
-            # Show progress for large sessions
-            if message_count > 50 and (i + 1) % 25 == 0:
-                self._add_system_message(f"Loading... {i + 1}/{message_count}")
+        manager = SessionManager()
+        session = manager.load(session_id)
+        if not session:
+            self._add_error_message(f"Session not found: {session_id}")
+            return
 
-        if self._conversation_log:
-            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
-
-        self._restore_agent_conversation(session.messages)
-        self._add_system_message(
-            f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
-        )
+        message_count = len(session.messages)
+        self._set_status(f"Loading session ({message_count} messages)...", "busy")
+        try:
+            self._session_messages = list(session.messages)
+            await self._replay_transcript_async(
+                [(msg.role, msg.content) for msg in session.messages],
+                status_label="Loading session",
+            )
+            self._restore_agent_conversation(session.messages)
+            self._add_system_message(
+                f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
+            )
+        finally:
+            self._set_status("Idle", "idle")
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""
@@ -1453,50 +1558,105 @@ class VictorTUI(App):
         messages = history.messages
 
         message_count = len(messages)
-        if message_count > 50:
-            self._add_system_message(f"Loading {message_count} messages from project session...")
+        self._set_status(f"Loading project session ({message_count} messages)...", "busy")
+        try:
+            replay_messages: list[tuple[str, str]] = []
+            self._session_messages = []
+            for msg in messages:
+                role = msg.role
+                content = msg.content
+                if role == "tool":
+                    role = "system"
+                    if msg.name:
+                        content = f"Tool result ({msg.name}): {content}"
+                    else:
+                        content = f"Tool result: {content}"
+                if not content and getattr(msg, "tool_calls", None):
+                    content = "Tool calls requested."
+                if not content:
+                    continue
+                replay_messages.append((role, content))
+                self._session_messages.append(Message(role=role, content=content, metadata={}))
 
-        if self._conversation_log:
-            self._conversation_log.clear()
+            self._replay_transcript(replay_messages)
 
-        self._session_messages = []
-        for i, msg in enumerate(messages):
-            role = msg.role
-            content = msg.content
-            if role == "tool":
-                role = "system"
-                if msg.name:
-                    content = f"Tool result ({msg.name}): {content}"
-                else:
-                    content = f"Tool result: {content}"
-            if not content and getattr(msg, "tool_calls", None):
-                content = "Tool calls requested."
-            if not content:
-                continue
-            self._render_message(role, content, replay=True)
-            self._session_messages.append(Message(role=role, content=content, metadata={}))
-            # Show progress for large sessions
-            if message_count > 50 and (i + 1) % 25 == 0:
-                self._add_system_message(f"Loading... {i + 1}/{message_count}")
+            if self.agent:
+                self.agent.conversation = history
+                self.agent.active_session_id = session_id
+                conversation_state = session.get("conversation_state")
+                if conversation_state:
+                    try:
+                        self.agent.conversation_state = ConversationStateMachine.from_dict(
+                            conversation_state
+                        )
+                    except Exception as exc:
+                        self._add_error_message(f"Failed to restore conversation state: {exc}")
 
-        if self._conversation_log:
-            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            metadata = session.get("metadata", {})
+            title = metadata.get("title") or session_id[:8]
+            self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
+        finally:
+            self._set_status("Idle", "idle")
 
-        if self.agent:
-            self.agent.conversation = history
-            self.agent.active_session_id = session_id
-            conversation_state = session.get("conversation_state")
-            if conversation_state:
-                try:
-                    self.agent.conversation_state = ConversationStateMachine.from_dict(
-                        conversation_state
-                    )
-                except Exception as exc:
-                    self._add_error_message(f"Failed to restore conversation state: {exc}")
+    async def _load_project_session_async(self, session_id: str) -> None:
+        """Load a project session with non-blocking replay for large transcripts."""
+        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.message_history import MessageHistory
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
-        metadata = session.get("metadata", {})
-        title = metadata.get("title") or session_id[:8]
-        self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
+        persistence = get_sqlite_session_persistence()
+        session = persistence.load_session(session_id)
+        if not session:
+            self._add_error_message(f"Project session not found: {session_id}")
+            return
+
+        conversation = session.get("conversation", {})
+        history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
+        messages = history.messages
+
+        message_count = len(messages)
+        self._set_status(f"Loading project session ({message_count} messages)...", "busy")
+        try:
+            replay_messages: list[tuple[str, str]] = []
+            self._session_messages = []
+            for msg in messages:
+                role = msg.role
+                content = msg.content
+                if role == "tool":
+                    role = "system"
+                    if msg.name:
+                        content = f"Tool result ({msg.name}): {content}"
+                    else:
+                        content = f"Tool result: {content}"
+                if not content and getattr(msg, "tool_calls", None):
+                    content = "Tool calls requested."
+                if not content:
+                    continue
+                replay_messages.append((role, content))
+                self._session_messages.append(Message(role=role, content=content, metadata={}))
+
+            await self._replay_transcript_async(
+                replay_messages,
+                status_label="Loading project session",
+            )
+
+            if self.agent:
+                self.agent.conversation = history
+                self.agent.active_session_id = session_id
+                conversation_state = session.get("conversation_state")
+                if conversation_state:
+                    try:
+                        self.agent.conversation_state = ConversationStateMachine.from_dict(
+                            conversation_state
+                        )
+                    except Exception as exc:
+                        self._add_error_message(f"Failed to restore conversation state: {exc}")
+
+            metadata = session.get("metadata", {})
+            title = metadata.get("title") or session_id[:8]
+            self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
+        finally:
+            self._set_status("Idle", "idle")
 
     def _render_message(self, role: str, content: str, *, replay: bool = False) -> None:
         if not self._conversation_log:

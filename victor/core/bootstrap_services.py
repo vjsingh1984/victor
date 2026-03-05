@@ -176,7 +176,7 @@ def _create_context_service(container: ServiceContainer) -> "ContextService":
 
     config = ContextServiceConfig(
         max_tokens=100000,  # Default, can be overridden
-        overflow_threshold=0.9,
+        overflow_threshold_percent=90.0,
     )
     return ContextService(config=config)
 
@@ -190,23 +190,16 @@ def _create_provider_service(container: ServiceContainer) -> "ProviderService":
     Returns:
         Configured ProviderService instance
     """
-    from victor.agent.services.provider_service import ProviderService, ProviderServiceConfig
+    from victor.agent.services.provider_service import ProviderService
 
-    # Try to get existing provider from container
+    # Try to get provider registry from container or create mock
     try:
-        from victor.providers.base import LLMProvider
-        existing_provider = container.get(LLMProvider)
+        from victor.providers.registry import ProviderRegistry
+        registry = container.get(ProviderRegistry)
     except Exception:
-        existing_provider = None
+        registry = _MockProviderRegistry()
 
-    config = ProviderServiceConfig(
-        default_provider_name="anthropic",  # Default
-        fallback_enabled=True,
-    )
-    return ProviderService(
-        config=config,
-        existing_provider=existing_provider,
-    )
+    return ProviderService(registry=registry)
 
 
 def _create_recovery_service(container: ServiceContainer) -> "RecoveryService":
@@ -218,14 +211,9 @@ def _create_recovery_service(container: ServiceContainer) -> "RecoveryService":
     Returns:
         Configured RecoveryService instance
     """
-    from victor.agent.services.recovery_service import RecoveryService, RecoveryServiceConfig
+    from victor.agent.services.recovery_service import RecoveryService
 
-    config = RecoveryServiceConfig(
-        max_retries=3,
-        retry_delay_ms=1000,
-        backoff_multiplier=2.0,
-    )
-    return RecoveryService(config=config)
+    return RecoveryService()
 
 
 def _create_tool_service(
@@ -246,8 +234,8 @@ def _create_tool_service(
     from victor.agent.services.tool_service import ToolService, ToolServiceConfig
 
     config = ToolServiceConfig(
+        default_max_tools=10,
         default_tool_budget=100,
-        max_iterations=200,
     )
 
     # Use provided or create defaults
@@ -256,11 +244,36 @@ def _create_tool_service(
     if tool_executor is None:
         tool_executor = _create_default_tool_executor(container)
 
+    # Create default tool registrar
+    tool_registrar = _create_default_tool_registrar(container)
+
     return ToolService(
         config=config,
-        selector=tool_selector,
-        executor=tool_executor,
+        tool_selector=tool_selector,
+        tool_executor=tool_executor,
+        tool_registrar=tool_registrar,
     )
+
+
+def _create_default_tool_registrar(container: ServiceContainer) -> Any:
+    """Create default tool registrar.
+
+    Args:
+        container: Service container
+
+    Returns:
+        Default tool registrar instance
+    """
+    # Return a simple mock registrar
+    return _MockToolRegistrar()
+
+
+class _MockToolRegistrar:
+    """Mock tool registrar for bootstrap when real registrar not available."""
+
+    async def register(self, tool: Any, enabled: bool = True) -> None:
+        """Register tool - mock implementation."""
+        pass
 
 
 def _create_session_service(container: ServiceContainer) -> "SessionService":
@@ -272,13 +285,9 @@ def _create_session_service(container: ServiceContainer) -> "SessionService":
     Returns:
         Configured SessionService instance
     """
-    from victor.agent.services.session_service import SessionService, SessionServiceConfig
+    from victor.agent.services.session_service import SessionService
 
-    config = SessionServiceConfig(
-        default_session_ttl_seconds=3600,  # 1 hour
-        max_sessions_per_user=10,
-    )
-    return SessionService(config=config)
+    return SessionService()
 
 
 def _create_chat_service(
@@ -377,6 +386,14 @@ class _MockToolExecutor:
             output=None,
             error="Mock tool executor - tool not actually executed",
         )
+
+
+class _MockProviderRegistry:
+    """Mock provider registry for bootstrap when real registry not available."""
+
+    def get_provider(self, provider_name: str) -> Optional[Any]:
+        """Get provider by name - returns None for mock."""
+        return None
 
 
 __all__ = [

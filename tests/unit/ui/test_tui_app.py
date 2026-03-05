@@ -1,11 +1,13 @@
 """Unit tests for Victor TUI app behavior."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from contextlib import nullcontext
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from textual.messages import UpdateScroll
 
 from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
+from victor.ui.tui.session import Message
 
 
 def test_ctrl_f_binding_maps_to_toggle_follow_mode() -> None:
@@ -118,6 +120,134 @@ def test_render_message_replay_uses_history_path() -> None:
     app._conversation_log.add_user_message.assert_not_called()
     app._conversation_log.add_system_message.assert_not_called()
     app._conversation_log.add_error_message.assert_not_called()
+
+
+def test_replay_transcript_batches_and_reanchors_once() -> None:
+    """Transcript replay should clear, batch-mount history, and jump to latest once."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app.batch_update = MagicMock(return_value=nullcontext())
+
+    app._replay_transcript([("assistant", "one"), ("user", "two")])
+
+    app.batch_update.assert_called_once_with()
+    app._conversation_log.clear.assert_called_once_with()
+    assert app._conversation_log.add_history_message.call_args_list == [
+        call("assistant", "one"),
+        call("user", "two"),
+    ]
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+
+
+def test_replay_transcript_async_uses_sync_path_for_small_histories() -> None:
+    """Small histories should keep using single-pass replay."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._replay_transcript = MagicMock()
+    messages = [("assistant", "short")]
+
+    asyncio.run(app._replay_transcript_async(messages, status_label="Loading session"))
+
+    app._replay_transcript.assert_called_once_with(messages)
+
+
+def test_replay_transcript_async_chunks_large_histories() -> None:
+    """Large histories should replay in async chunks with progress updates."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app.batch_update = MagicMock(return_value=nullcontext())
+    app._set_status = MagicMock()
+    messages = [
+        ("assistant", f"m{i}")
+        for i in range(app._ASYNC_REPLAY_THRESHOLD + app._ASYNC_REPLAY_CHUNK_SIZE)
+    ]
+
+    sleep_mock = AsyncMock()
+    with patch("victor.ui.tui.app.asyncio.sleep", sleep_mock):
+        asyncio.run(app._replay_transcript_async(messages, status_label="Loading session"))
+
+    app._conversation_log.clear.assert_called_once_with()
+    assert app._conversation_log.add_history_message.call_count == len(messages)
+    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    assert app.batch_update.call_count >= 4
+    assert sleep_mock.await_count >= 1
+    assert any(
+        call_args.args
+        and call_args.args[0].startswith("Loading session (")
+        and "/" in call_args.args[0]
+        for call_args in app._set_status.call_args_list
+    )
+
+
+def test_start_session_restore_without_running_loop_uses_fallback() -> None:
+    """Restore starter should run sync fallback when no event loop is active."""
+    app = VictorTUI()
+    fallback = MagicMock()
+
+    async def _noop() -> None:
+        return None
+
+    app._start_session_restore(_noop(), fallback=fallback)
+
+    fallback.assert_called_once_with()
+
+
+def test_load_session_async_uses_async_replay_path() -> None:
+    """Async session loader should use chunk-capable replay helper."""
+    app = VictorTUI()
+    app._replay_transcript_async = AsyncMock()
+    app._restore_agent_conversation = MagicMock()
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+
+    session = MagicMock()
+    session.id = "session-12345678"
+    session.name = "Replay Test"
+    session.messages = [Message(role="assistant", content=f"m{i}") for i in range(3)]
+    manager = MagicMock()
+    manager.load.return_value = session
+
+    with patch("victor.ui.tui.session.SessionManager", return_value=manager):
+        asyncio.run(app._load_session_async("session-12345678"))
+
+    app._replay_transcript_async.assert_awaited_once_with(
+        [(msg.role, msg.content) for msg in session.messages],
+        status_label="Loading session",
+    )
+    app._restore_agent_conversation.assert_called_once_with(session.messages)
+    app._add_system_message.assert_called_once_with("Session loaded: Replay Test (3 messages)")
+
+
+def test_load_session_uses_status_and_single_completion_message() -> None:
+    """Large restore should report progress in status bar, not transcript spam."""
+    app = VictorTUI()
+    app._replay_transcript = MagicMock()
+    app._restore_agent_conversation = MagicMock()
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+
+    session = MagicMock()
+    session.id = "session-12345678"
+    session.name = "Replay Test"
+    session.messages = [Message(role="assistant", content=f"m{i}") for i in range(60)]
+    manager = MagicMock()
+    manager.load.return_value = session
+
+    with patch("victor.ui.tui.session.SessionManager", return_value=manager):
+        app._load_session("session-12345678")
+
+    app._set_status.assert_has_calls(
+        [
+            call("Loading session (60 messages)...", "busy"),
+            call("Idle", "idle"),
+        ]
+    )
+    assert app._set_status.call_count == 2
+    app._restore_agent_conversation.assert_called_once_with(session.messages)
+    app._replay_transcript.assert_called_once_with(
+        [(msg.role, msg.content) for msg in session.messages]
+    )
+    app._add_system_message.assert_called_once_with("Session loaded: Replay Test (60 messages)")
 
 
 def test_input_submit_resumes_follow_when_paused() -> None:

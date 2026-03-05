@@ -16,6 +16,8 @@ The TUI is built using Textual and provides:
 - Status bar unread badge (e.g., `3 new`) while backlog exists
 - Sticky follow mode (`Ctrl+F`) with explicit `Following` / `Paused` status indicator
 - Session restore replays history without per-message viewport jumps, then lands at latest output once
+- Session restore progress uses the status bar (not transcript messages) to avoid replay noise
+- Very large session restores replay in chunks asynchronously so UI input/scroll stays responsive
 - 40+ slash commands for session management
 
 Unread counting applies to both assistant responses and system transcript activity (such as slash-command output).
