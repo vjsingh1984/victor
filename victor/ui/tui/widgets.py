@@ -156,14 +156,29 @@ class ConversationTurn(Vertical):
         super().__init__(id=turn_id, classes="conversation-turn")
         self._assistant_block: Optional[StreamingMessageBlock] = None
         self._tool_container: Optional[Vertical] = None
+        self._pending_user_content: Optional[str] = None
+        self._has_pending_user_content = False
+        self._pending_tool_previews: list[ToolPreviewData] = []
+        self._assistant_started = False
 
     def compose(self) -> ComposeResult:
         yield Label("", classes="turn-user", id="turn-user")
         yield Container(id="assistant-area")
         yield Vertical(id="turn-tools", classes="turn-tools")
 
-    def set_user_message(self, content: Optional[str]) -> None:
-        label = self.query_one("#turn-user", Label)
+    def on_mount(self) -> None:
+        """Apply deferred content once child widgets exist."""
+        if self._has_pending_user_content:
+            self.set_user_message(self._pending_user_content)
+        if self._assistant_block is not None and not self._assistant_block.is_mounted:
+            self.ensure_assistant_block()
+        if self._pending_tool_previews:
+            pending = list(self._pending_tool_previews)
+            self._pending_tool_previews.clear()
+            for preview in pending:
+                self.add_tool_preview(preview)
+
+    def _apply_user_message_to_label(self, label: Label, content: Optional[str]) -> None:
         if content:
             label.update(
                 Text.assemble(
@@ -175,30 +190,70 @@ class ConversationTurn(Vertical):
         else:
             label.display = False
 
+    def set_user_message(self, content: Optional[str]) -> None:
+        self._pending_user_content = content
+        self._has_pending_user_content = True
+        try:
+            label = self.query_one("#turn-user", Label)
+        except Exception:
+            # Turn may be updated before compose/mount completes.
+            return
+        self._apply_user_message_to_label(label, content)
+
     def ensure_assistant_block(self) -> StreamingMessageBlock:
         if self._assistant_block is None:
             self._assistant_block = StreamingMessageBlock(role="assistant", initial_content="")
             self._assistant_block.add_class("turn-assistant")
+        if self._assistant_block.is_mounted:
+            return self._assistant_block
+        # In pre-mount/testing paths we may not yet be attached to the DOM.
+        if not self.is_attached:
+            return self._assistant_block
+        try:
             container = self.query_one("#assistant-area", Container)
             container.mount(self._assistant_block)
+        except Exception:
+            try:
+                self.mount(self._assistant_block)
+            except Exception:
+                pass
         return self._assistant_block
 
     def start_assistant_stream(self) -> StreamingMessageBlock:
         block = self.ensure_assistant_block()
+        self._assistant_started = True
         block.is_streaming = True
         block._update_display()
         return block
 
     def set_assistant_message(self, content: str) -> None:
         block = self.ensure_assistant_block()
+        self._assistant_started = True
         block.is_streaming = False
         block.content = content
         block._update_display()
 
+    def has_assistant_output(self) -> bool:
+        return self._assistant_started
+
     def add_tool_preview(self, preview: ToolPreviewData) -> None:
         if self._tool_container is None:
-            self._tool_container = self.query_one("#turn-tools", Vertical)
+            try:
+                self._tool_container = self.query_one("#turn-tools", Vertical)
+            except Exception:
+                if not self.is_attached:
+                    self._pending_tool_previews.append(preview)
+                    return
+                self._tool_container = Vertical(classes="turn-tools")
+                try:
+                    self.mount(self._tool_container)
+                except Exception:
+                    self._pending_tool_previews.append(preview)
+                    return
         block = ToolPreviewBlock(preview=preview)
+        if not self._tool_container.is_attached:
+            self._pending_tool_previews.append(preview)
+            return
         self._tool_container.mount(block)
 
 
@@ -498,6 +553,8 @@ class InputWidget(Static):
     """
 
     DEFAULT_CSS = ""
+    _IDLE_HINT = "Enter send | Shift+Enter newline | ↑/↓ history | /help commands"
+    _BUSY_HINT = "Sending... | Ctrl+X cancel current response"
 
     class Submitted(Message):
         """Custom message to bubble up when input is submitted."""
@@ -518,6 +575,8 @@ class InputWidget(Static):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._input: SubmitTextArea | None = None
+        self._prompt_label: Label | None = None
+        self._hint_label: Label | None = None
         self._history_index: int = -1  # -1 means not browsing history
         self._draft: str = ""  # Save current draft when browsing history
         self._history_task: asyncio.Task | None = None
@@ -525,14 +584,15 @@ class InputWidget(Static):
     def compose(self) -> ComposeResult:
         with Vertical():
             with Horizontal(classes="input-row"):
-                yield Label("❯", classes="prompt-indicator")
+                yield Label("❯", classes="prompt-indicator", id="prompt-indicator")
                 yield SubmitTextArea(
                     placeholder="Enter your message here...",
                     id="message-input",
                 )
             yield Label(
-                "Enter send | Shift+Enter newline | ↑/↓ history | /help commands",
+                self._IDLE_HINT,
                 classes="input-hint",
+                id="input-hint",
             )
 
     def on_submit_text_area_submit(self, event: SubmitTextArea.Submit) -> None:
@@ -543,7 +603,10 @@ class InputWidget(Static):
     def on_mount(self) -> None:
         """Focus the input on mount and defer history loading."""
         self._input = self.query_one("#message-input", SubmitTextArea)
+        self._prompt_label = self.query_one("#prompt-indicator", Label)
+        self._hint_label = self.query_one("#input-hint", Label)
         self._input.focus()
+        self.set_busy(False)
 
         # Defer history loading until after TUI has rendered (non-blocking)
         # Load persistent history from conversation database (once per session)
@@ -668,6 +731,18 @@ class InputWidget(Static):
         """Focus the input field."""
         if self._input:
             self._input.focus()
+
+    def set_busy(self, busy: bool) -> None:
+        """Set input busy/idle visuals while processing a prompt."""
+        if self._input:
+            self._input.disabled = busy
+        if self._prompt_label:
+            self._prompt_label.update("⋯" if busy else "❯")
+            self._prompt_label.remove_class("busy")
+            if busy:
+                self._prompt_label.add_class("busy")
+        if self._hint_label:
+            self._hint_label.update(self._BUSY_HINT if busy else self._IDLE_HINT)
 
     def add_to_history(self, text: str) -> None:
         """Add message to history (called externally after successful submit)."""
@@ -1323,7 +1398,7 @@ class EnhancedConversationLog(VerticalScroll):
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
         self._mark_unread_boundary()
-        turn = self._begin_new_turn(content)
+        self._begin_new_turn(content)
         if self._sticky_follow_paused:
             self._auto_scroll = False
             return
@@ -1337,7 +1412,9 @@ class EnhancedConversationLog(VerticalScroll):
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
         self._mark_unread_boundary()
-        turn = self._current_turn or self._begin_new_turn(None)
+        turn = self._current_turn
+        if turn is None or turn.has_assistant_output():
+            turn = self._begin_new_turn(None)
         turn.set_assistant_message(content)
         # Auto-scroll to show assistant response
         self._maybe_scroll_end(mark_unread=True, force=True)
@@ -1390,7 +1467,9 @@ class EnhancedConversationLog(VerticalScroll):
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
         self._mark_unread_boundary()
-        turn = self._current_turn or self._begin_new_turn(None)
+        turn = self._current_turn
+        if turn is None or turn.has_assistant_output():
+            turn = self._begin_new_turn(None)
         self._streaming_message = turn.start_assistant_stream()
         self._maybe_scroll_end(mark_unread=True, force=True)
         return self._streaming_message

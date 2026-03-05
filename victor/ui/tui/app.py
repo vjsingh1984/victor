@@ -243,9 +243,7 @@ class VictorTUI(App):
     └─────────────────────────────────────┘
     """
 
-    CSS = (
-        THEME_CSS
-        + """
+    CSS = THEME_CSS + """
     Screen {
         background: $background;
         color: $text;
@@ -485,6 +483,10 @@ class VictorTUI(App):
         text-style: none;
     }
 
+    InputWidget .prompt-indicator.busy {
+        color: $warning;
+    }
+
     InputWidget SubmitTextArea,
     InputWidget TextArea {
         width: 1fr;
@@ -666,7 +668,6 @@ class VictorTUI(App):
         margin: 0;
     }
     """
-    )
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Exit", show=True),
@@ -819,6 +820,9 @@ class VictorTUI(App):
 
     def _cancel_background_tasks(self) -> None:
         """Cancel any pending background work."""
+        if self._session_restore_task and not self._session_restore_task.done():
+            self._session_restore_task.cancel()
+            self._session_restore_task = None
         for task in list(self._background_tasks):
             task.cancel()
         self._background_tasks.clear()
@@ -899,6 +903,10 @@ class VictorTUI(App):
         message = event.value.strip()
         if not message:
             return
+        if self._is_processing:
+            # Keep draft text intact; input stays visibly busy until current run ends.
+            self._set_status("Working", "busy")
+            return
 
         # Add to history before clearing
         self._input_widget.add_to_history(message)
@@ -965,6 +973,11 @@ class VictorTUI(App):
             return
 
         self._is_processing = True
+        if self._input_widget:
+            try:
+                self._input_widget.set_busy(True)
+            except Exception:
+                pass
         self._set_status("Working", "busy")
 
         try:
@@ -990,6 +1003,7 @@ class VictorTUI(App):
             if self._input_widget:
                 # Call directly without _call_ui since we're in the UI thread
                 try:
+                    self._input_widget.set_busy(False)
                     self._input_widget.focus_input()
                 except Exception:
                     pass
@@ -1277,7 +1291,12 @@ class VictorTUI(App):
             self._add_system_message("Details panels shown")
 
     def action_cancel_stream(self) -> None:
-        """Request cancellation of the current stream if active."""
+        """Request cancellation of the active stream or session restore."""
+        if self._session_restore_task and not self._session_restore_task.done():
+            self._session_restore_task.cancel()
+            self._add_system_message("Session restore canceled")
+            self._set_status("Idle", "idle")
+            return
         if not self.agent:
             self._add_system_message("No active agent to cancel")
             return
@@ -1453,6 +1472,9 @@ class VictorTUI(App):
                 if self._session_restore_task is current_task:
                     self._add_error_message(f"Session restore failed: {exc}")
                     self._set_status("Idle", "idle")
+            finally:
+                if self._session_restore_task is current_task:
+                    self._session_restore_task = None
 
         self._session_restore_task = loop.create_task(_runner())
 
@@ -1478,6 +1500,7 @@ class VictorTUI(App):
         total = len(messages)
         if total <= self._ASYNC_REPLAY_THRESHOLD:
             self._replay_transcript(messages)
+            await asyncio.sleep(0)
             return
 
         chunk_size = self._ASYNC_REPLAY_CHUNK_SIZE
@@ -1493,6 +1516,7 @@ class VictorTUI(App):
                 await asyncio.sleep(0)
         with self.batch_update():
             self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+        await asyncio.sleep(0)
 
     def _load_session(self, session_id: str) -> None:
         """Load a TUI session with progress indication."""
@@ -1521,7 +1545,7 @@ class VictorTUI(App):
         from victor.ui.tui.session import SessionManager
 
         manager = SessionManager()
-        session = manager.load(session_id)
+        session = await asyncio.to_thread(manager.load, session_id)
         if not session:
             self._add_error_message(f"Session not found: {session_id}")
             return
@@ -1605,7 +1629,7 @@ class VictorTUI(App):
         from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
         persistence = get_sqlite_session_persistence()
-        session = persistence.load_session(session_id)
+        session = await asyncio.to_thread(persistence.load_session, session_id)
         if not session:
             self._add_error_message(f"Project session not found: {session_id}")
             return
@@ -1755,7 +1779,7 @@ Keyboard Shortcuts:
   Ctrl+T       Toggle thinking panel
   Ctrl+Y       Toggle tools panel
   Ctrl+D       Toggle all details (thinking + tools)
-  Ctrl+X       Cancel streaming
+  Ctrl+X       Cancel stream/restore
   Ctrl+G       Resume any session
   Ctrl+P       Resume project session
   Ctrl+R       Resume TUI session
@@ -1996,4 +2020,4 @@ async def run_tui(
         await app.run_async()
     finally:
         # Clean up environment variable
-            os.environ.pop("VICTOR_TUI_MODE", None)
+        os.environ.pop("VICTOR_TUI_MODE", None)
