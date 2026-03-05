@@ -565,41 +565,44 @@ class ToolCoordinator:
         Returns:
             Canonical tool name
         """
+        from victor.tools.tool_names import get_canonical_name
+
+        canonical = get_canonical_name(tool_name)
+
         # Resolve shell aliases to appropriate enabled variant
         shell_aliases = {
+            ToolNames.SHELL,
+            ToolNames.SHELL_READONLY,
             "run",
             "bash",
             "execute",
             "cmd",
             "execute_bash",
-            "shell_readonly",
-            "shell",
         }
 
-        if tool_name not in shell_aliases:
-            return tool_name
+        if canonical not in shell_aliases and tool_name not in shell_aliases:
+            if canonical != tool_name:
+                logger.debug(f"Resolved '{tool_name}' to canonical '{canonical}'")
+            return canonical
 
         # Check mode controller for BUILD mode (allows all tools including shell)
         if self._mode_controller:
             config = self._mode_controller.config
-            if config.allow_all_tools and "shell" not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
+            if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
+                logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)")
                 return ToolNames.SHELL
 
         # Check if full shell is enabled first
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
             return ToolNames.SHELL_READONLY
 
         # Neither enabled - return canonical name (will fail validation)
-        from victor.tools.tool_names import get_canonical_name
-
-        canonical = get_canonical_name(tool_name)
         logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
