@@ -186,6 +186,17 @@ def chat(
         "-o",
         help="Output file for rendered diagram. Required for svg/png formats.",
     ),
+    auth_mode: Optional[str] = typer.Option(
+        None,
+        "--auth-mode",
+        help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen Coding Plan).",
+        case_sensitive=False,
+    ),
+    coding_plan: bool = typer.Option(
+        False,
+        "--coding-plan",
+        help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
+    ),
     legacy_mode: bool = typer.Option(
         False,
         "--legacy",
@@ -418,6 +429,11 @@ def chat(
                     console.print(
                         "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
                     )
+
+            if auth_mode:
+                extra_fields["auth_mode"] = auth_mode.lower()
+            if coding_plan:
+                extra_fields["coding_plan"] = True
 
             override_profile = ProfileConfig(
                 provider=provider,

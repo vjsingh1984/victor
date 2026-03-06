@@ -37,6 +37,7 @@ from victor.providers.resolution import (
     APIKeyNotFoundError,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.oauth_manager import OAuthTokenManager
 
 
 class OpenAIProvider(BaseProvider):
@@ -56,6 +57,8 @@ class OpenAIProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         non_interactive: Optional[bool] = None,
+        auth_mode: str = "api_key",
+        oauth_tokens: Optional[Any] = None,
         **kwargs: Any,
     ):
         """Initialize OpenAI provider.
@@ -67,41 +70,77 @@ class OpenAIProvider(BaseProvider):
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
+            auth_mode: Authentication mode — "api_key" (default) or "oauth"
+            oauth_tokens: Pre-obtained OAuth tokens (optional, for auth_mode="oauth")
             **kwargs: Additional configuration
         """
         # Initialize structured logger
         self._provider_logger = ProviderLogger("openai", __name__)
 
-        # Resolve API key using unified resolver
-        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
-        key_result = resolver.get_api_key("openai", explicit_key=api_key)
+        # OAuth token manager (None when using api_key mode)
+        self._oauth_manager: Optional[OAuthTokenManager] = None
 
-        # Log API key resolution
-        self._provider_logger.log_api_key_resolution(key_result)
+        if auth_mode == "oauth":
+            self._oauth_manager = OAuthTokenManager("openai")
+            # Use pre-obtained tokens or load cached
+            if oauth_tokens is not None:
+                resolved_key = oauth_tokens.access_token
+            else:
+                cached = self._oauth_manager._load_cached()
+                if cached is not None and not cached.is_expired:
+                    resolved_key = cached.access_token
+                else:
+                    import asyncio
 
-        if key_result.key is None:
-            # Raise detailed error with actionable suggestions
-            raise APIKeyNotFoundError(
-                provider="openai",
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
+                    tokens = asyncio.get_event_loop().run_until_complete(
+                        self._oauth_manager.get_valid_token()
+                    )
+                    resolved_key = tokens
+
+            self._api_key = resolved_key
+
+            self._provider_logger.log_provider_init(
+                model="gpt",
+                key_source="oauth",
+                non_interactive=False,
+                config={
+                    "base_url": base_url,
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    "organization": organization,
+                    "auth_mode": "oauth",
+                    **kwargs,
+                },
             )
+        else:
+            # Resolve API key using unified resolver (existing path)
+            resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+            key_result = resolver.get_api_key("openai", explicit_key=api_key)
 
-        self._api_key = key_result.key
+            # Log API key resolution
+            self._provider_logger.log_api_key_resolution(key_result)
 
-        # Log provider initialization
-        self._provider_logger.log_provider_init(
-            model="gpt",  # Will be set on chat()
-            key_source=key_result.source_detail,
-            non_interactive=key_result.non_interactive,
-            config={
-                "base_url": base_url,
-                "timeout": timeout,
-                "max_retries": max_retries,
-                "organization": organization,
-                **kwargs,
-            },
-        )
+            if key_result.key is None:
+                raise APIKeyNotFoundError(
+                    provider="openai",
+                    sources_attempted=key_result.sources_attempted,
+                    non_interactive=key_result.non_interactive,
+                )
+
+            self._api_key = key_result.key
+
+            self._provider_logger.log_provider_init(
+                model="gpt",
+                key_source=key_result.source_detail,
+                non_interactive=key_result.non_interactive,
+                config={
+                    "base_url": base_url,
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                    "organization": organization,
+                    **kwargs,
+                },
+            )
 
         super().__init__(
             api_key=self._api_key,
@@ -117,6 +156,15 @@ class OpenAIProvider(BaseProvider):
             timeout=timeout,
             max_retries=max_retries,
         )
+
+    async def _ensure_valid_token(self) -> None:
+        """Refresh OAuth token if needed. No-op for api_key mode."""
+        if self._oauth_manager is None:
+            return
+        token = await self._oauth_manager.get_valid_token()
+        if token != self.client.api_key:
+            self.client.api_key = token
+            self._api_key = token
 
     def _is_o_series_model(self, model: str) -> bool:
         """Check if model is an O-series reasoning model.
@@ -176,6 +224,9 @@ class OpenAIProvider(BaseProvider):
             ProviderRateLimitError: If rate limit is exceeded
             ProviderError: For other errors
         """
+        # Refresh OAuth token if needed
+        await self._ensure_valid_token()
+
         # Use structured logging context manager
         with self._provider_logger.log_api_call(
             endpoint="/chat/completions",
@@ -285,6 +336,9 @@ class OpenAIProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
+            # Refresh OAuth token if needed
+            await self._ensure_valid_token()
+
             # Convert messages
             openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 

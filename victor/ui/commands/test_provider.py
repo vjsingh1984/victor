@@ -17,14 +17,41 @@ logger = logging.getLogger(__name__)
 def test_provider(
     ctx: typer.Context,
     provider: str = typer.Argument(..., help="Provider name to test"),
+    auth_mode: str = typer.Option(
+        "api_key",
+        "--auth-mode",
+        help="Authentication mode: 'api_key' or 'oauth' (OpenAI Codex, Qwen Coding Plan).",
+    ),
+    coding_plan: bool = typer.Option(
+        False,
+        "--coding-plan",
+        help="Use Z.AI coding plan endpoint.",
+    ),
+    endpoint: str = typer.Option(
+        None,
+        "--endpoint",
+        help="Z.AI endpoint variant: standard, coding, china, anthropic.",
+    ),
 ):
     """Test if a provider is working correctly."""
     if ctx.invoked_subcommand is None:
         console.print(f"Testing provider: [cyan]{provider}[/]")
-        asyncio.run(test_provider_async(provider))
+        asyncio.run(
+            test_provider_async(
+                provider,
+                auth_mode=auth_mode,
+                coding_plan=coding_plan,
+                endpoint=endpoint,
+            )
+        )
 
 
-async def test_provider_async(provider: str) -> None:
+async def test_provider_async(
+    provider: str,
+    auth_mode: str = "api_key",
+    coding_plan: bool = False,
+    endpoint: str = None,
+) -> None:
     """Async function to test provider."""
     settings = load_settings()
 
@@ -40,12 +67,19 @@ async def test_provider_async(provider: str) -> None:
         # Get provider settings
         provider_settings = settings.get_provider_settings(provider)
 
-        # Check API key for cloud providers
-        if provider in ["anthropic", "openai", "google", "xai", "grok"]:
+        # Check API key for cloud providers (skip for OAuth mode)
+        if auth_mode == "api_key" and provider in [
+            "anthropic", "openai", "google", "xai", "grok", "zai", "qwen",
+        ]:
             api_key = provider_settings.get("api_key")
             if not api_key:
                 console.print(f"[red]✗[/] No API key configured for {provider}")
-                console.print(f"\nSet environment variable: [bold]{provider.upper()}_API_KEY[/]")
+                env_var = f"{provider.upper()}_API_KEY"
+                if provider == "zai":
+                    env_var = "ZAI_API_KEY or ZHIPUAI_API_KEY"
+                elif provider == "qwen":
+                    env_var = "QWEN_API_KEY or DASHSCOPE_API_KEY"
+                console.print(f"\nSet environment variable: [bold]{env_var}[/]")
                 return
             console.print("[green]✓[/] API key configured")
 
@@ -55,9 +89,13 @@ async def test_provider_async(provider: str) -> None:
         elif provider == "anthropic":
             await _test_anthropic(provider_settings)
         elif provider == "openai":
-            await _test_openai(provider_settings)
+            await _test_openai(provider_settings, auth_mode=auth_mode)
         elif provider == "google":
             await _test_google(provider_settings)
+        elif provider in ("zai", "zai-coding-plan", "zai-coding", "zhipuai", "zhipu"):
+            await _test_zai(provider_settings, coding_plan=coding_plan, endpoint=endpoint)
+        elif provider in ("qwen", "alibaba", "dashscope"):
+            await _test_qwen(provider_settings, auth_mode=auth_mode)
         else:
             console.print(f"\n[green]✓[/] Provider {provider} is ready to use!")
 
@@ -118,9 +156,13 @@ async def _test_anthropic(provider_settings: dict) -> None:
         await anthropic.close()
 
 
-async def _test_openai(provider_settings: dict) -> None:
+async def _test_openai(provider_settings: dict, auth_mode: str = "api_key") -> None:
     """Test OpenAI API connectivity."""
     from victor.providers.openai_provider import OpenAIProvider
+
+    if auth_mode == "oauth":
+        console.print("[cyan]Using OAuth authentication (Codex subscription)[/]")
+        provider_settings["auth_mode"] = "oauth"
 
     openai = OpenAIProvider(**provider_settings)
     try:
@@ -128,18 +170,24 @@ async def _test_openai(provider_settings: dict) -> None:
 
         # List models to verify API key
         models = await openai.list_models()
-        console.print(f"[green]✓[/] OpenAI API key is valid")
+        auth_label = "OAuth token" if auth_mode == "oauth" else "API key"
+        console.print(f"[green]✓[/] OpenAI {auth_label} is valid")
         console.print(f"[green]✓[/] {len(models)} chat-capable models available")
         console.print(f"\n[green]✓[/] Provider openai is ready to use!")
 
     except Exception as e:
         error_msg = str(e).lower()
         if "authentication" in error_msg or "api_key" in error_msg or "401" in error_msg:
-            console.print(f"[red]✗[/] Invalid API key: {e}")
-            console.print("\nGet your API key from: [bold]https://platform.openai.com/api-keys[/]")
+            console.print(f"[red]✗[/] Invalid credentials: {e}")
+            if auth_mode == "oauth":
+                console.print("\nTry re-authenticating: [bold]victor providers auth login openai[/]")
+            else:
+                console.print(
+                    "\nGet your API key from: [bold]https://platform.openai.com/api-keys[/]"
+                )
         elif "rate_limit" in error_msg or "429" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
-            console.print("[green]✓[/] API key is valid (rate limited)")
+            console.print("[green]✓[/] Credentials are valid (rate limited)")
             console.print(f"\n[green]✓[/] Provider openai is ready to use!")
         else:
             console.print(f"[red]✗[/] Connection error: {e}")
@@ -185,3 +233,100 @@ async def _test_google(provider_settings: dict) -> None:
             console.print(f"[red]✗[/] Connection error: {e}")
     finally:
         await google.close()
+
+
+async def _test_zai(
+    provider_settings: dict,
+    coding_plan: bool = False,
+    endpoint: str = None,
+) -> None:
+    """Test Z.AI GLM API connectivity."""
+    from victor.providers.zai_provider import ZAIProvider, ZAI_BASE_URLS
+
+    if coding_plan:
+        provider_settings["coding_plan"] = True
+    if endpoint:
+        provider_settings["endpoint"] = endpoint
+
+    zai = ZAIProvider(**provider_settings)
+    base_url = str(zai.client.base_url)
+
+    try:
+        console.print(f"[dim]Endpoint: {base_url}[/]")
+        console.print("[dim]Testing API connectivity...[/]")
+
+        models = await zai.list_models()
+        console.print(f"[green]✓[/] Z.AI API key is valid")
+        console.print(f"[green]✓[/] {len(models)} models available")
+
+        if coding_plan or (endpoint and endpoint == "coding"):
+            console.print("[green]✓[/] Coding Plan endpoint active")
+
+        console.print(f"\n[green]✓[/] Provider zai is ready to use!")
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "auth" in error_msg or "401" in error_msg:
+            console.print(f"[red]✗[/] Invalid API key: {e}")
+            console.print(
+                "\nSet: [bold]export ZAI_API_KEY=your-key[/]"
+            )
+            console.print("Get key from: [bold]https://open.bigmodel.cn/usercenter/apikeys[/]")
+        elif "429" in error_msg or "rate" in error_msg:
+            console.print(f"[yellow]⚠[/] Rate limited: {e}")
+            console.print("[green]✓[/] API key is valid (rate limited)")
+        else:
+            console.print(f"[red]✗[/] Connection error: {e}")
+    finally:
+        await zai.close()
+
+
+async def _test_qwen(provider_settings: dict, auth_mode: str = "api_key") -> None:
+    """Test Qwen API connectivity."""
+    from victor.providers.qwen_provider import QwenProvider
+    from victor.providers.base import Message
+
+    if auth_mode == "oauth":
+        console.print("[cyan]Using OAuth authentication (Qwen Coding Plan)[/]")
+        provider_settings["auth_mode"] = "oauth"
+
+    qwen = QwenProvider(**provider_settings)
+    base_url = str(qwen.client.base_url)
+
+    try:
+        console.print(f"[dim]Endpoint: {base_url}[/]")
+        console.print("[dim]Testing API connectivity...[/]")
+
+        # Qwen doesn't have a list_models endpoint; send a minimal chat request
+        response = await qwen.chat(
+            messages=[Message(role="user", content="Hi, reply with just 'ok'")],
+            model="qwen-turbo-latest",
+            max_tokens=10,
+        )
+        auth_label = "OAuth token" if auth_mode == "oauth" else "API key"
+        console.print(f"[green]✓[/] Qwen {auth_label} is valid")
+        console.print(f"[green]✓[/] Response: {response.content[:50]}")
+        console.print(f"\n[green]✓[/] Provider qwen is ready to use!")
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "auth" in error_msg or "401" in error_msg:
+            console.print(f"[red]✗[/] Invalid credentials: {e}")
+            if auth_mode == "oauth":
+                console.print(
+                    "\nTry re-authenticating: [bold]victor providers auth login qwen[/]"
+                )
+            else:
+                console.print(
+                    "\nSet: [bold]export QWEN_API_KEY=your-key[/]"
+                )
+                console.print(
+                    "Get key from: [bold]https://dashscope.console.aliyun.com/apiKey[/]"
+                )
+        elif "429" in error_msg or "rate" in error_msg:
+            console.print(f"[yellow]⚠[/] Rate limited: {e}")
+            console.print("[green]✓[/] Credentials are valid (rate limited)")
+        else:
+            console.print(f"[red]✗[/] Connection error: {e}")
+    finally:
+        await qwen.close()

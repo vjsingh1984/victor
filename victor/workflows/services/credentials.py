@@ -705,6 +705,9 @@ class SSOProvider(Enum):
     KEYCLOAK = "keycloak"
     GENERIC_OIDC = "oidc"
     GENERIC_SAML = "saml"
+    # LLM provider subscription OAuth (FEP-0004)
+    OPENAI_CODEX = "openai_codex"
+    QWEN = "qwen"
 
 
 @dataclass
@@ -780,6 +783,35 @@ class SSOConfig:
             issuer_url="https://accounts.google.com",
             client_id=client_id,
             client_secret=client_secret,
+        )
+
+    @classmethod
+    def for_openai_codex(cls) -> "SSOConfig":
+        """Create OpenAI Codex subscription OAuth configuration.
+
+        Uses OpenAI's public OAuth client for ChatGPT Plus/Pro/Enterprise
+        subscription-based access. See FEP-0004.
+        """
+        return cls(
+            provider=SSOProvider.OPENAI_CODEX,
+            issuer_url="https://auth.openai.com",
+            client_id="app_EMoamEEZ73f0CkXaXp7hrann",
+            scopes=["openid", "profile", "email", "offline_access"],
+            use_pkce=True,
+        )
+
+    @classmethod
+    def for_qwen(cls) -> "SSOConfig":
+        """Create Qwen (Alibaba) subscription OAuth configuration.
+
+        Uses Qwen's OAuth for Coding Plan subscription access. See FEP-0004.
+        """
+        return cls(
+            provider=SSOProvider.QWEN,
+            issuer_url="https://chat.qwen.ai",
+            client_id="qwen-code",
+            scopes=["openid", "profile", "email", "offline_access"],
+            use_pkce=True,
         )
 
     def to_dict(self) -> Dict[str, Any]:

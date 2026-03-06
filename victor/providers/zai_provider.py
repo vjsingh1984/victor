@@ -49,6 +49,15 @@ from victor.providers.resolution import (
 )
 from victor.providers.logging import ProviderLogger
 
+# Z.AI endpoint URLs for different access tiers
+# Reference: https://docs.z.ai/api-reference/introduction
+ZAI_BASE_URLS = {
+    "standard": "https://api.z.ai/api/paas/v4/",
+    "coding": "https://api.z.ai/api/coding/paas/v4/",
+    "china": "https://open.bigmodel.cn/api/paas/v4/",
+    "anthropic": "https://api.z.ai/api/anthropic/v1/",
+}
+
 # Available zhipuAI GLM models
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
@@ -171,22 +180,34 @@ class ZAIProvider(BaseProvider):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        base_url: str = "https://open.bigmodel.cn/api/paas/v4/",
+        base_url: Optional[str] = None,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         non_interactive: Optional[bool] = None,
+        coding_plan: bool = False,
+        endpoint: Optional[str] = None,
         **kwargs: Any,
     ):
         """Initialize ZhipuAI provider.
 
         Args:
             api_key: ZhipuAI API key (or set ZAI_API_KEY env var, or use keyring)
-            base_url: ZhipuAI API base URL (default: https://open.bigmodel.cn/api/paas/v4/)
+            base_url: ZhipuAI API base URL (overrides endpoint/coding_plan)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
+            coding_plan: Use GLM Coding Plan endpoint (shortcut for endpoint="coding")
+            endpoint: Named endpoint — "standard", "coding", "china", "anthropic"
             **kwargs: Additional configuration
         """
+        # Resolve base URL: explicit > endpoint param > coding_plan flag > default
+        if base_url is None:
+            if endpoint is not None:
+                base_url = ZAI_BASE_URLS.get(endpoint, ZAI_BASE_URLS["standard"])
+            elif coding_plan:
+                base_url = ZAI_BASE_URLS["coding"]
+            else:
+                base_url = ZAI_BASE_URLS["standard"]
         # Initialize structured logger
         self._provider_logger = ProviderLogger("zai", __name__)
 
