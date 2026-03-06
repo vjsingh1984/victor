@@ -37,9 +37,12 @@ References:
 """
 
 import json
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from victor.providers.base import (
     BaseProvider,

@@ -38,12 +38,14 @@ Performance:
 """
 
 import hashlib
+import json
 import logging
 import re
 
-from victor.core.json_utils import json_dumps, json_loads
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from victor.core.json_utils import json_dumps, json_loads
 
 import numpy as np
 
