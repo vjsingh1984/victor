@@ -131,10 +131,19 @@ class OpenAIConfig(ProviderConfigStrategy):
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
-        api_key = settings.openai_api_key or get_api_key("openai")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.openai.com/v1")
+        auth_mode = base_settings.get("auth_mode", "api_key")
+
+        if auth_mode == "oauth":
+            # OAuth mode: use ChatGPT subscription
+            result["auth_mode"] = "oauth"
+            result.setdefault("base_url", "https://chatgpt.com/backend-api/codex/v1")
+        else:
+            # API key mode
+            api_key = settings.openai_api_key or get_api_key("openai")
+            if api_key:
+                result["api_key"] = api_key
+            result.setdefault("base_url", "https://api.openai.com/v1")
+
         return result
 
 
