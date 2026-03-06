@@ -215,7 +215,7 @@ class ProviderAccount:
 
 
 @dataclass
- class ConfigDefaults:
+class ConfigDefaults:
     """Default configuration settings."""
 
     account: str = "default"  # Default account to use

@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
- class ResolutionContext:
+class ResolutionContext:
     """Context for provider configuration resolution.
 
     This captures all the inputs that influence resolution:
