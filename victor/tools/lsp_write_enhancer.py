@@ -41,7 +41,10 @@ import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from victor.framework.protocols import LanguageRegistryProtocol, LSPPoolProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -124,32 +127,57 @@ class WriteResult:
 class LSPWriteEnhancer:
     """Enhances write operations with LSP validation and formatting."""
 
-    def __init__(self, workspace_root: Optional[str] = None):
+    def __init__(
+        self,
+        workspace_root: Optional[str] = None,
+        lsp_pool: Optional["LSPPoolProtocol"] = None,
+        language_registry: Optional["LanguageRegistryProtocol"] = None,
+    ):
         """Initialize the LSP write enhancer.
 
         Args:
             workspace_root: Root directory for LSP operations
+            lsp_pool: Optional pre-configured LSP pool (avoids vertical dependency)
+            language_registry: Optional pre-configured language registry
         """
         self._workspace_root = workspace_root or str(Path.cwd())
-        self._lsp_pool = None
-        self._language_registry = None
+        self._lsp_pool: Optional["LSPPoolProtocol"] = lsp_pool
+        self._language_registry: Optional["LanguageRegistryProtocol"] = language_registry
 
-    async def _get_lsp_pool(self):
-        """Get or create LSP connection pool."""
+    async def _get_lsp_pool(self) -> "LSPPoolProtocol":
+        """Get or create LSP connection pool.
+
+        Uses injected pool if available, otherwise falls back to coding vertical.
+        """
         if self._lsp_pool is None:
-            from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool
+            try:
+                from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool
 
-            self._lsp_pool = LSPConnectionPool(self._workspace_root)
+                self._lsp_pool = LSPConnectionPool(self._workspace_root)
+            except ImportError:
+                raise ImportError(
+                    "LSP support requires the coding vertical. "
+                    "Install it or inject an LSPPoolProtocol instance."
+                )
         return self._lsp_pool
 
-    def _get_language_registry(self):
-        """Get or create language registry."""
-        if self._language_registry is None:
-            from victor.verticals.contrib.coding.languages.registry import (
-                get_language_registry,
-            )
+    def _get_language_registry(self) -> "LanguageRegistryProtocol":
+        """Get or create language registry.
 
-            self._language_registry = get_language_registry()
+        Uses injected registry if available, otherwise falls back to coding vertical.
+        """
+        if self._language_registry is None:
+            try:
+                from victor.verticals.contrib.coding.languages.registry import (
+                    get_language_registry,
+                )
+
+                self._language_registry = get_language_registry()
+            except ImportError:
+                raise ImportError(
+                    "Language registry requires the coding vertical. "
+                    "Install it or inject a LanguageRegistryProtocol instance."
+                )
         return self._language_registry
 
     async def validate_with_lsp(self, path: str, content: str) -> List[Diagnostic]:
