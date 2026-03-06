@@ -132,6 +132,8 @@ import time
 import warnings
 import weakref
 from dataclasses import dataclass, field
+
+from victor.framework.integration_registry import IntegrationPlanRegistry
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -874,6 +876,8 @@ class VerticalIntegrationPipeline:
         self._applied_plan_by_orchestrator: "weakref.WeakKeyDictionary[Any, Dict[str, Any]]" = (
             weakref.WeakKeyDictionary()
         )
+        # Persistent plan registry (survives GC, replaces WeakKeyDictionary for lookups)
+        self._plan_registry = IntegrationPlanRegistry.get_instance()
         self._integration_plan_metrics: Dict[str, int] = {
             "compiled": 0,
             "reused": 0,
@@ -1295,6 +1299,7 @@ class VerticalIntegrationPipeline:
             for key in list(self._integration_plan_metrics.keys()):
                 self._integration_plan_metrics[key] = 0
         self._applied_plan_by_orchestrator = weakref.WeakKeyDictionary()
+        self._plan_registry.clear()
 
     def _hash_plan_payload(self, payload: Any) -> str:
         """Create a deterministic fingerprint for plan payloads."""
@@ -1456,6 +1461,12 @@ class VerticalIntegrationPipeline:
 
     def _get_applied_plan_for_orchestrator(self, orchestrator: Any) -> Optional[Dict[str, Any]]:
         """Get previously applied plan metadata for this orchestrator."""
+        # Check persistent registry first (survives GC)
+        registry_plan = self._plan_registry.get_plan(orchestrator)
+        if registry_plan is not None:
+            return registry_plan
+
+        # Fallback to WeakKeyDictionary (legacy, kept for backward compat)
         try:
             cached = self._applied_plan_by_orchestrator.get(orchestrator)
         except TypeError:
@@ -1482,6 +1493,9 @@ class VerticalIntegrationPipeline:
 
     def _set_applied_plan_for_orchestrator(self, orchestrator: Any, plan: Dict[str, Any]) -> None:
         """Store applied plan metadata for orchestrator delta/no-op checks."""
+        # Write to persistent registry (primary)
+        self._plan_registry.set_plan(orchestrator, plan)
+        # Also write to WeakKeyDictionary (legacy, kept for backward compat)
         try:
             self._applied_plan_by_orchestrator[orchestrator] = copy.deepcopy(plan)
         except TypeError:

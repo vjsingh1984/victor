@@ -144,6 +144,16 @@ class SubAgentContext(Protocol):
         """
         ...
 
+    @property
+    def vertical_context(self) -> Any:
+        """Get the vertical context.
+
+        Returns:
+            VerticalContext instance, or None if not available.
+            Used by sub-agents to inherit parent vertical config.
+        """
+        ...
+
 
 class SubAgentContextAdapter:
     """Adapter to create SubAgentContext from AgentOrchestrator.
@@ -230,6 +240,15 @@ class SubAgentContextAdapter:
             Temperature value from the wrapped orchestrator
         """
         return self._orchestrator.temperature
+
+    @property
+    def vertical_context(self) -> Any:
+        """Get vertical context from orchestrator.
+
+        Returns:
+            VerticalContext from the wrapped orchestrator, or None
+        """
+        return getattr(self._orchestrator, "_vertical_context", None)
 
 
 @runtime_checkable

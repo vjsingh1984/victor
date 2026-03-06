@@ -318,6 +318,14 @@ class SubAgent(IAgent):
             # In production, we might want isolated scoped containers
         )
 
+        # Inherit parent's vertical context via flyweight pattern
+        parent_vc = self._context.vertical_context
+        if parent_vc is not None and hasattr(parent_vc, "create_child_context"):
+            child_vc = parent_vc.create_child_context(
+                enabled_tools=set(self.config.allowed_tools),
+            )
+            orchestrator._vertical_context = child_vc
+
         # Set disable_embeddings flag for workflow service mode
         if self.config.disable_embeddings:
             gear_icon = self._presentation.icon("gear", with_color=False)

@@ -1200,8 +1200,11 @@ class FrameworkStepHandler(BaseStepHandler):
             if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
                 rl_config = rl_provider.get_rl_config()
 
-        # Fallback: check if vertical implements RLConfigProviderProtocol directly
-        if rl_config is None and isinstance(vertical, RLConfigProviderProtocol):
+        # Fallback: check if vertical (class) implements get_rl_config directly.
+        # Note: verticals are passed as classes, so isinstance() against Protocol
+        # won't work (Protocol isinstance checks target instances). Use hasattr
+        # for this class-level duck-type check.
+        if rl_config is None and hasattr(vertical, "get_rl_config"):
             rl_config = vertical.get_rl_config()
 
         if rl_config is None:
@@ -1276,8 +1279,11 @@ class FrameworkStepHandler(BaseStepHandler):
             if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
                 team_specs = team_provider.get_team_specs()
 
-        # Fallback: check if vertical implements TeamSpecProviderProtocol directly
-        if team_specs is None and isinstance(vertical, TeamSpecProviderProtocol):
+        # Fallback: check if vertical (class) implements get_team_specs directly.
+        # Note: verticals are passed as classes, so isinstance() against Protocol
+        # won't work (Protocol isinstance checks target instances). Use hasattr
+        # for this class-level duck-type check.
+        if team_specs is None and hasattr(vertical, "get_team_specs"):
             team_specs = vertical.get_team_specs()
 
         if not team_specs:
