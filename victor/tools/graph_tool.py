@@ -44,12 +44,14 @@ create_graph_store = None
 try:
     from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
     from victor.storage.graph.registry import create_graph_store
+
     _GRAPH_AVAILABLE = True
 except ImportError:
     # Fall back to victor-coding external package
     try:
         from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
         from victor_coding.codebase.graph.registry import create_graph_store
+
         _GRAPH_AVAILABLE = True
     except ImportError:
         pass  # Leave all as None
@@ -78,6 +80,11 @@ GraphMode = Literal[
     "module_pagerank",  # PageRank at file/package level
     "module_centrality",  # Most connected modules
     "call_flow",  # Inter-module call flow analysis
+    # Module-level metrics (WS-1: SQLite-backed analysis)
+    "coupling",  # Module coupling metrics (Ca, Ce, instability)
+    "cohesion",  # Module cohesion (LCOM4)
+    "hotspots",  # Composite hotspot ranking
+    "tdd_priority",  # TDD test-writing priority ranking
 ]
 
 EdgeType = Literal[
@@ -1957,6 +1964,39 @@ async def graph(
                 edge_types=edge_types,
                 depth=depth,
             )
+
+        # Module-level metrics modes (WS-1: SQLite-backed analysis)
+        elif mode in ("coupling", "cohesion", "hotspots", "tdd_priority"):
+            try:
+                from victor.analysis.module_analyzer import ModuleAnalyzer
+
+                analyzer_mod = ModuleAnalyzer(project_path=Path.cwd())
+                order_map = {
+                    "coupling": "instability",
+                    "cohesion": "cohesion_lcom4",
+                    "hotspots": "hotspot_score",
+                    "tdd_priority": "tdd_priority",
+                }
+                order_by = order_map.get(mode, "hotspot_score")
+
+                if not analyzer_mod.has_cached_metrics():
+                    metrics = analyzer_mod.compute_all()
+                    if metrics:
+                        analyzer_mod.persist(metrics)
+
+                results = analyzer_mod.get_cached(order_by=order_by, limit=top_k)
+                return {
+                    "mode": mode,
+                    "description": f"Module-level {mode} analysis",
+                    "results": results,
+                    "count": len(results),
+                }
+            except Exception as mod_err:
+                logger.warning(f"Module analysis failed: {mod_err}")
+                return {
+                    "error": f"Module analysis ({mode}) failed: {mod_err}",
+                    "hint": "Ensure the graph is indexed with 'victor index' first.",
+                }
 
         else:
             return {"error": f"Unknown mode: {mode}"}

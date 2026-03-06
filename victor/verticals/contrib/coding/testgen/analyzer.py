@@ -276,6 +276,49 @@ class TestTargetAnalyzer:
 
         return values
 
+    def prioritize_targets(
+        self,
+        file_paths: list[Path],
+        tdd_metrics: Optional[dict[str, float]] = None,
+    ) -> list[tuple[Path, float, list[FunctionSignature]]]:
+        """Sort files by TDD priority and extract testable functions.
+
+        Args:
+            file_paths: List of Python file paths to analyze.
+            tdd_metrics: Optional dict of {module_path: tdd_priority_score}.
+                If None, falls back to uniform priority.
+
+        Returns:
+            List of (file_path, priority_score, testable_functions) tuples,
+            sorted by priority descending.
+        """
+        results = []
+        for path in file_paths:
+            functions, classes = self.analyze_file(path)
+            # Flatten class methods into function list
+            all_funcs = list(functions)
+            for cls in classes:
+                all_funcs.extend(cls.methods)
+
+            if not all_funcs:
+                continue
+
+            # Get TDD priority score
+            priority = 0.5  # default
+            if tdd_metrics:
+                # Match by file path suffix
+                path_str = str(path)
+                for mod_path, score in tdd_metrics.items():
+                    if path_str.endswith(mod_path) or mod_path in path_str:
+                        priority = score
+                        break
+
+            results.append((path, priority, all_funcs))
+
+        # Sort by priority descending
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
+
     def detect_error_conditions(
         self,
         func_sig: FunctionSignature,
