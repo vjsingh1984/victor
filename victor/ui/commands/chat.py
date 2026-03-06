@@ -55,7 +55,13 @@ def chat(
     ctx: typer.Context,
     message: Optional[str] = typer.Argument(
         None,
-        help="Message to send to the agent (starts interactive mode if not provided)",
+        help="Message to send (put BEFORE options, or use -m instead). Interactive mode if omitted.",
+    ),
+    message_opt: Optional[str] = typer.Option(
+        None,
+        "--message",
+        "-m",
+        help="Message to send (alternative to positional arg, works anywhere in command).",
     ),
     profile: str = typer.Option(
         "default",
@@ -373,8 +379,11 @@ def chat(
             stream=stream and not json_output,
         )
 
+        # --message / -m option takes precedence over positional argument
+        effective_message = message_opt or message
+
         actual_message = InputReader.read_message(
-            argument=message,
+            argument=effective_message,
             from_stdin=stdin,
             input_file=input_file,
         )
