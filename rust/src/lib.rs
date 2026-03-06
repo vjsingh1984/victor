@@ -38,6 +38,7 @@
 //! - `yaml_loader`: Fast YAML parsing for workflow definitions (v0.4.0)
 //! - `ast_indexer`: Fast stdlib detection and identifier extraction (v0.4.0)
 //! - `arg_normalizer`: Fast JSON repair and type coercion (v0.4.0)
+//! - `graph_algo`: Graph algorithm accelerators for module-level analysis (WS-2)
 
 use pyo3::prelude::*;
 
@@ -48,6 +49,7 @@ mod classifier;
 mod dedup;
 mod embeddings;
 mod extractor;
+mod graph_algo;
 mod hashing;
 mod json_repair;
 mod pattern_match;
@@ -226,6 +228,13 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(arg_normalizer::repair_quotes, m)?)?;
     m.add_function(wrap_pyfunction!(arg_normalizer::is_valid_json, m)?)?;
     m.add_function(wrap_pyfunction!(arg_normalizer::get_json_type, m)?)?;
+
+    // Graph algorithm functions (WS-2 - module-level analysis acceleration)
+    m.add_function(wrap_pyfunction!(graph_algo::pagerank, m)?)?;
+    m.add_function(wrap_pyfunction!(graph_algo::weighted_pagerank, m)?)?;
+    m.add_function(wrap_pyfunction!(graph_algo::betweenness_centrality, m)?)?;
+    m.add_function(wrap_pyfunction!(graph_algo::connected_components, m)?)?;
+    m.add_function(wrap_pyfunction!(graph_algo::detect_cycles, m)?)?;
 
     Ok(())
 }
