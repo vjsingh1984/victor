@@ -40,7 +40,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, List, Type
 
-from victor.core.service_specs import VERTICAL_EXTENSION_SPECS
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
 if TYPE_CHECKING:
