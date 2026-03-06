@@ -60,6 +60,7 @@ class ResultType(Enum):
     ANALYSIS = "analysis"
     SEARCH = "search"
     CODE_ACTION = "code_action"
+    TOOL_SELECTION = "tool_selection"
     OTHER = "other"
 
 
@@ -119,6 +120,65 @@ def _create_cache_key(
         except Exception:
             params_str = str(params)
         key_parts.append(params_str)
+    key_string = ":".join(key_parts)
+    return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
+
+
+def _create_tool_selection_cache_key(
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    conversation_depth: int = 0,
+    stage: Optional[str] = None,
+    use_semantic: bool = True,
+) -> str:
+    """Create a stable cache key for tool selection results.
+
+    Tool selection is expensive due to embedding computation. This creates
+    a deterministic cache key based on all factors that affect selection:
+    - User message content
+    - Last 2 conversation messages (for context)
+    - Conversation depth (affects adaptive thresholds)
+    - Current stage (affects tool filtering)
+    - Selection method (semantic vs keyword)
+
+    Args:
+        user_message: The user's input message
+        conversation_history: Optional conversation history for context
+        conversation_depth: Number of messages in conversation
+        stage: Current conversation stage (e.g., "EXPLORATION", "EXECUTION")
+        use_semantic: Whether semantic selection was used
+
+    Returns:
+        Stable hash key for caching tool selection results
+    """
+    # For conversation history, only use last 2 messages for context
+    # Too much history makes cache keys too specific
+    history_context = ""
+    if conversation_history and len(conversation_history) > 0:
+        # Take last 2 messages max
+        recent_history = conversation_history[-2:] if len(conversation_history) > 2 else conversation_history
+        # Create a normalized string representation
+        history_parts = []
+        for msg in recent_history:
+            if isinstance(msg, dict):
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")[:100]  # Truncate long messages
+                history_parts.append(f"{role}:{content}")
+        history_context = "|".join(history_parts)
+
+    # Normalize message (lowercase, strip extra whitespace)
+    normalized_message = " ".join(user_message.lower().strip().split())
+
+    # Build key parts
+    key_parts = [
+        ResultType.TOOL_SELECTION.value,
+        normalized_message,
+        history_context,
+        str(conversation_depth),
+        stage or "none",
+        "semantic" if use_semantic else "keyword",
+    ]
+
     key_string = ":".join(key_parts)
     return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
 

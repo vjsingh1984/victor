@@ -314,6 +314,91 @@ class DeepSeekConfig(ProviderConfigStrategy):
         return result
 
 
+class ZAIConfig(ProviderConfigStrategy):
+    """Configuration strategy for Z.AI (ZhipuAI)."""
+
+    @property
+    def provider_name(self) -> str:
+        return "zai"
+
+    @property
+    def aliases(self) -> List[str]:
+        return ["zhipuai", "zhipu"]
+
+    def get_settings(
+        self,
+        settings: "Settings",
+        base_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from victor.config.api_keys import get_api_key
+
+        result = dict(base_settings)
+        api_key = get_api_key("zai")
+        if api_key:
+            result["api_key"] = api_key
+        result.setdefault("base_url", "https://api.z.ai/api/paas/v4/")
+        return result
+
+
+class ZAICodingPlanConfig(ProviderConfigStrategy):
+    """Configuration strategy for Z.AI GLM Coding Plan."""
+
+    @property
+    def provider_name(self) -> str:
+        return "zai-coding-plan"
+
+    @property
+    def aliases(self) -> List[str]:
+        return ["zai-coding", "glm-coding"]
+
+    def get_settings(
+        self,
+        settings: "Settings",
+        base_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from victor.config.api_keys import get_api_key
+
+        result = dict(base_settings)
+        api_key = get_api_key("zai")
+        if api_key:
+            result["api_key"] = api_key
+        result.setdefault("base_url", "https://api.z.ai/api/coding/paas/v4/")
+        return result
+
+
+class QwenConfig(ProviderConfigStrategy):
+    """Configuration strategy for Qwen (Alibaba Cloud)."""
+
+    @property
+    def provider_name(self) -> str:
+        return "qwen"
+
+    @property
+    def aliases(self) -> List[str]:
+        return ["alibaba", "dashscope"]
+
+    def get_settings(
+        self,
+        settings: "Settings",
+        base_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from victor.config.api_keys import get_api_key
+
+        result = dict(base_settings)
+        auth_mode = base_settings.get("auth_mode", "api_key")
+        if auth_mode == "oauth":
+            result["auth_mode"] = "oauth"
+            result.setdefault("base_url", "https://portal.qwen.ai/v1/")
+        else:
+            api_key = get_api_key("qwen")
+            if api_key:
+                result["api_key"] = api_key
+            result.setdefault(
+                "base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+            )
+        return result
+
+
 class GroqCloudConfig(ProviderConfigStrategy):
     """Configuration strategy for Groq Cloud."""
 
@@ -450,6 +535,9 @@ def _register_builtin_providers(registry: ProviderConfigRegistry) -> None:
         MoonshotConfig(),
         DeepSeekConfig(),
         GroqCloudConfig(),
+        ZAIConfig(),
+        ZAICodingPlanConfig(),
+        QwenConfig(),
     ]
 
     for strategy in builtin_strategies:
@@ -493,4 +581,7 @@ __all__ = [
     "MoonshotConfig",
     "DeepSeekConfig",
     "GroqCloudConfig",
+    "ZAIConfig",
+    "ZAICodingPlanConfig",
+    "QwenConfig",
 ]

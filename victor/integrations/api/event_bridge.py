@@ -29,10 +29,12 @@ Architecture:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -139,6 +141,14 @@ class EventBroadcaster:
         self._clients: Dict[str, ClientConnection] = {}
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
         self._broadcast_task: Optional[asyncio.Task] = None
+        self._dispatch_latency_ms_window: deque[float] = deque(maxlen=2000)
+        self._client_send_success_count = 0
+        self._client_send_failure_count = 0
+        self._events_dispatched_count = 0
+        self._delivery_success_slo = 0.999
+        self._dispatch_latency_p95_slo_ms = 200.0
+        self._last_slo_breach_log_ts = 0.0
+        self._slo_breach_log_interval_sec = 30.0
         self._running = False
         self._initialized = True
 
@@ -222,18 +232,94 @@ class EventBroadcaster:
         for client_id, client in self._clients.items():
             if client.is_subscribed(event.type.value):
                 try:
-                    await asyncio.wait_for(
-                        asyncio.coroutine(client.send)(event_json),
-                        timeout=5.0,
-                    )
+                    send_result = client.send(event_json)
+                    if inspect.isawaitable(send_result):
+                        await asyncio.wait_for(send_result, timeout=5.0)
                     client.last_activity = time.time()
+                    self._client_send_success_count += 1
                 except Exception as e:
                     logger.warning(f"Failed to send to {client_id}: {e}")
+                    self._client_send_failure_count += 1
                     disconnected.append(client_id)
 
         # Remove disconnected clients
         for client_id in disconnected:
             self.remove_client(client_id)
+
+        self._events_dispatched_count += 1
+        dispatch_latency_ms = max(0.0, (time.time() - event.timestamp) * 1000.0)
+        self._dispatch_latency_ms_window.append(dispatch_latency_ms)
+        self._maybe_log_slo_breaches()
+
+    def get_reliability_dashboard(self) -> Dict[str, Any]:
+        """Get event-bridge reliability metrics and SLO status."""
+        total_send_attempts = self._client_send_success_count + self._client_send_failure_count
+        delivery_success_rate = (
+            self._client_send_success_count / total_send_attempts if total_send_attempts else 1.0
+        )
+        dispatch_latency_p95_ms = self._percentile(self._dispatch_latency_ms_window, 95.0)
+
+        return {
+            "events_dispatched": self._events_dispatched_count,
+            "total_send_attempts": total_send_attempts,
+            "send_successes": self._client_send_success_count,
+            "send_failures": self._client_send_failure_count,
+            "delivery_success_rate": delivery_success_rate,
+            "dispatch_latency_p95_ms": dispatch_latency_p95_ms,
+            "slo_thresholds": {
+                "delivery_success_rate_min": self._delivery_success_slo,
+                "dispatch_latency_p95_ms_max": self._dispatch_latency_p95_slo_ms,
+            },
+            "slo_status": {
+                "delivery_success_rate": delivery_success_rate >= self._delivery_success_slo,
+                "dispatch_latency_p95_ms": dispatch_latency_p95_ms
+                <= self._dispatch_latency_p95_slo_ms,
+            },
+        }
+
+    @staticmethod
+    def _percentile(values: Any, percentile: float) -> float:
+        """Compute percentile using linear interpolation."""
+        values_list = list(values)
+        if not values_list:
+            return 0.0
+        ordered = sorted(values_list)
+        if len(ordered) == 1:
+            return float(ordered[0])
+
+        rank = (percentile / 100.0) * (len(ordered) - 1)
+        lower = int(rank)
+        upper = min(lower + 1, len(ordered) - 1)
+        weight = rank - lower
+        return float(ordered[lower] * (1.0 - weight) + ordered[upper] * weight)
+
+    def _maybe_log_slo_breaches(self) -> None:
+        """Log reliability SLO breaches with basic throttling."""
+        snapshot = self.get_reliability_dashboard()
+        if snapshot["total_send_attempts"] == 0:
+            return
+
+        breaches = []
+        if not snapshot["slo_status"]["delivery_success_rate"]:
+            breaches.append(
+                "delivery_success_rate "
+                f"{snapshot['delivery_success_rate']:.4f} < "
+                f"{snapshot['slo_thresholds']['delivery_success_rate_min']:.4f}"
+            )
+        if not snapshot["slo_status"]["dispatch_latency_p95_ms"]:
+            breaches.append(
+                "dispatch_latency_p95_ms "
+                f"{snapshot['dispatch_latency_p95_ms']:.2f} > "
+                f"{snapshot['slo_thresholds']['dispatch_latency_p95_ms_max']:.2f}"
+            )
+        if not breaches:
+            return
+
+        now = time.time()
+        if now - self._last_slo_breach_log_ts < self._slo_breach_log_interval_sec:
+            return
+        self._last_slo_breach_log_ts = now
+        logger.warning("EventBridge SLO breach: %s", "; ".join(breaches))
 
 
 class WebSocketEventHandler:
@@ -332,29 +418,44 @@ class EventBusAdapter:
         self._event_bus = event_bus
         self._broadcaster = broadcaster or EventBroadcaster()
         self._subscriptions: List[str] = []
+        self._subscription_handles: List[Any] = []
+        self._pending_async_tasks: Set[asyncio.Task[Any]] = set()
+        self._disconnect_requested = False
 
     def connect(self, event_bus: EventBus) -> None:
         """Connect to an EventBus and subscribe to events."""
         self._event_bus = event_bus
+        self._disconnect_requested = False
 
-        # TODO: Update to use async subscribe with new event system
-        # The new ObservabilityBus uses async subscribe(pattern, handler)
-        # For now, we'll skip subscription to avoid blocking issues
+        subscribe = getattr(event_bus, "subscribe", None)
+        if not callable(subscribe):
+            logger.warning("EventBusAdapter connect failed: event bus has no subscribe() method")
+            return
+
         try:
-            # Try old sync API first (won't work but won't break if method exists)
             for internal_type in self.EVENT_MAPPING.keys():
                 try:
-                    if hasattr(event_bus, "subscribe"):
-                        # Check if it's the old sync API or new async API
-                        import inspect
-
-                        if inspect.iscoroutinefunction(event_bus.subscribe):
-                            # New async API - skip for now, would need asyncio
-                            logger.debug(f"Skipping async subscribe to {internal_type}")
-                        else:
-                            # Old sync API
-                            event_bus.subscribe(internal_type, self._on_event)
-                            self._subscriptions.append(internal_type)
+                    # New async APIs require async handlers; legacy APIs expect sync handlers.
+                    use_async_handler = inspect.iscoroutinefunction(subscribe)
+                    handler: Callable[[MessagingEvent], Any] = (
+                        self._on_event_async if use_async_handler else self._on_event
+                    )
+                    result = subscribe(internal_type, handler)
+                    if inspect.isawaitable(result):
+                        # If API reports awaitable despite sync detection, retry with async handler.
+                        if not use_async_handler:
+                            close_result = getattr(result, "close", None)
+                            if callable(close_result):
+                                close_result()
+                            result = subscribe(internal_type, self._on_event_async)
+                        self._subscriptions.append(internal_type)
+                        self._run_async_operation(
+                            result,
+                            description=f"subscribe to {internal_type}",
+                            on_success=self._track_subscription_handle,
+                        )
+                    else:
+                        self._track_subscription(internal_type)
                 except Exception as e:
                     logger.debug(f"Failed to subscribe to {internal_type}: {e}")
         except Exception as e:
@@ -365,11 +466,37 @@ class EventBusAdapter:
     def disconnect(self) -> None:
         """Disconnect from the EventBus."""
         if self._event_bus:
-            for event_type in self._subscriptions:
+            self._disconnect_requested = True
+
+            had_async_handles = bool(self._subscription_handles)
+            for handle in list(self._subscription_handles):
+                unsubscribe = getattr(handle, "unsubscribe", None)
+                if not callable(unsubscribe):
+                    continue
                 try:
-                    self._event_bus.unsubscribe(event_type, self._on_event)
+                    result = unsubscribe()
+                    if inspect.isawaitable(result):
+                        pattern = getattr(handle, "pattern", "unknown")
+                        self._run_async_operation(
+                            result,
+                            description=f"unsubscribe handle for {pattern}",
+                        )
                 except Exception:
                     pass
+            self._subscription_handles.clear()
+
+            # Legacy sync API fallback: unsubscribe(topic, handler)
+            subscribe_fn = getattr(self._event_bus, "subscribe", None)
+            uses_async_subscribe = callable(subscribe_fn) and inspect.iscoroutinefunction(subscribe_fn)
+            has_pending_subscribes = bool(self._pending_async_tasks)
+            if not had_async_handles and not uses_async_subscribe and not has_pending_subscribes:
+                unsubscribe_fn = getattr(self._event_bus, "unsubscribe", None)
+                if callable(unsubscribe_fn):
+                    for event_type in self._subscriptions:
+                        try:
+                            unsubscribe_fn(event_type, self._on_event)
+                        except Exception:
+                            pass
             self._subscriptions.clear()
 
     def _on_event(self, event: MessagingEvent) -> None:
@@ -385,6 +512,72 @@ class EventBusAdapter:
         )
 
         self._broadcaster.broadcast_sync(bridge_event)
+
+    async def _on_event_async(self, event: MessagingEvent) -> None:
+        """Async wrapper for event backends that require awaitable handlers."""
+        self._on_event(event)
+
+    def _track_subscription(self, topic: str, handle: Any = None) -> None:
+        """Track subscribed topics and optional async subscription handles."""
+        self._subscriptions.append(topic)
+        if handle is not None:
+            self._subscription_handles.append(handle)
+
+    def _track_subscription_handle(self, handle: Any) -> None:
+        """Track an async subscription handle once subscribe() resolves."""
+        if handle is None:
+            return
+
+        if self._disconnect_requested:
+            unsubscribe = getattr(handle, "unsubscribe", None)
+            if callable(unsubscribe):
+                try:
+                    result = unsubscribe()
+                    if inspect.isawaitable(result):
+                        self._run_async_operation(
+                            result,
+                            description="unsubscribe handle after disconnect",
+                        )
+                except Exception:
+                    pass
+            return
+
+        self._subscription_handles.append(handle)
+
+    def _run_async_operation(
+        self,
+        awaitable: Any,
+        *,
+        description: str,
+        on_success: Optional[Callable[[Any], None]] = None,
+    ) -> None:
+        """Run an async operation from a sync code path."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                result = asyncio.run(awaitable)
+                if on_success:
+                    on_success(result)
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+            return
+
+        task = asyncio.ensure_future(awaitable)
+        self._pending_async_tasks.add(task)
+
+        def _on_done(done_task: asyncio.Task[Any]) -> None:
+            self._pending_async_tasks.discard(done_task)
+            try:
+                result = done_task.result()
+                if on_success:
+                    on_success(result)
+            except asyncio.CancelledError:
+                logger.debug(f"Cancelled task while trying to {description}")
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+
+        task.add_done_callback(_on_done)
 
 
 # Convenience functions for common events
@@ -499,6 +692,10 @@ class EventBridge:
         if self._event_bus:
             self._adapter.connect(self._event_bus)
 
+        self._run_async_operation(
+            self._broadcaster.start(),
+            description="start broadcaster",
+        )
         self._running = True
         logger.info("EventBridge started")
 
@@ -511,6 +708,10 @@ class EventBridge:
             return
 
         self._adapter.disconnect()
+        self._run_async_operation(
+            self._broadcaster.stop(),
+            description="stop broadcaster",
+        )
         self._running = False
         logger.info("EventBridge stopped")
 
@@ -527,3 +728,30 @@ class EventBridge:
         """
         handler = WebSocketEventHandler(self._broadcaster)
         await handler.handle_connection(websocket, client_id)
+
+    def get_reliability_dashboard_data(self) -> Dict[str, Any]:
+        """Expose reliability metrics and SLO status for dashboards."""
+        return self._broadcaster.get_reliability_dashboard()
+
+    def _run_async_operation(self, awaitable: Any, *, description: str) -> None:
+        """Run async broadcaster lifecycle operations from sync APIs."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(awaitable)
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+            return
+
+        task = asyncio.ensure_future(awaitable)
+
+        def _on_done(done_task: asyncio.Task[Any]) -> None:
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                logger.debug(f"Cancelled task while trying to {description}")
+            except Exception as e:
+                logger.debug(f"Failed to {description}: {e}")
+
+        task.add_done_callback(_on_done)

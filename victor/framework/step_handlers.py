@@ -129,6 +129,8 @@ from victor.core.verticals.protocols import (
     RLConfigProviderProtocol,
     TaskTypeHint,
     TeamSpecProviderProtocol,
+    VerticalRLProviderProtocol,
+    VerticalTeamProviderProtocol,
 )
 
 # Import PromptContributorAdapter for hint normalization
@@ -1192,14 +1194,14 @@ class FrameworkStepHandler(BaseStepHandler):
         rl_config = None
         rl_provider = None
 
-        # Check for RL config provider method
-        if hasattr(vertical, "get_rl_config_provider"):
+        # Check for RL config provider method (protocol-based)
+        if isinstance(vertical, VerticalRLProviderProtocol):
             rl_provider = vertical.get_rl_config_provider()
             if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
                 rl_config = rl_provider.get_rl_config()
 
         # Fallback: check if vertical implements RLConfigProviderProtocol directly
-        if rl_config is None and hasattr(vertical, "get_rl_config"):
+        if rl_config is None and isinstance(vertical, RLConfigProviderProtocol):
             rl_config = vertical.get_rl_config()
 
         if rl_config is None:
@@ -1268,14 +1270,14 @@ class FrameworkStepHandler(BaseStepHandler):
         team_specs = None
         team_provider = None
 
-        # Check for team spec provider method
-        if hasattr(vertical, "get_team_spec_provider"):
+        # Check for team spec provider method (protocol-based)
+        if isinstance(vertical, VerticalTeamProviderProtocol):
             team_provider = vertical.get_team_spec_provider()
             if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
                 team_specs = team_provider.get_team_specs()
 
         # Fallback: check if vertical implements TeamSpecProviderProtocol directly
-        if team_specs is None and hasattr(vertical, "get_team_specs"):
+        if team_specs is None and isinstance(vertical, TeamSpecProviderProtocol):
             team_specs = vertical.get_team_specs()
 
         if not team_specs:

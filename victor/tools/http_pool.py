@@ -62,6 +62,44 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Contextual errors for better error messages
+try:
+    from victor.framework.contextual_errors import (
+        ContextualError,
+        ResourceError,
+        ToolExecutionError,
+    )
+except ImportError:
+    # Fallback if framework module is not available
+    class ContextualError(RuntimeError):  # type: ignore
+        def __init__(self, message, operation=None, suggestion=None, error_code=None, details=None):
+            full_message = message
+            if operation:
+                full_message = f"[{operation}] {message}"
+            if suggestion:
+                full_message += f"\n\n💡 Suggestion: {suggestion}"
+            if error_code:
+                full_message += f"\n\nError Code: {error_code}"
+            if details:
+                full_message += "\n\nDetails:"
+                for key, value in details.items():
+                    full_message += f"\n  • {key}: {value}"
+            super().__init__(full_message)
+
+    class ResourceError(ContextualError):  # type: ignore
+        def __init__(self, resource_type, error=None, suggestion=None):
+            message = f"Insufficient {resource_type}"
+            if error:
+                message += f": {error}"
+            if not suggestion:
+                suggestion = f"Check {resource_type} availability"
+            super().__init__(message=message, suggestion=suggestion)
+
+    class ToolExecutionError(ContextualError):  # type: ignore
+        def __init__(self, tool_name, operation, suggestion=None, **kwargs):
+            message = f"Tool '{tool_name}' failed during {operation}"
+            super().__init__(message=message, suggestion=suggestion)
+
 
 @dataclass
 class ConnectionPoolConfig:
@@ -279,13 +317,22 @@ class HttpConnectionPool:
                     data = await response.text()
         """
         if self._closed:
-            raise RuntimeError("HttpConnectionPool has been closed")
+            raise ContextualError(
+                message="HttpConnectionPool has been closed",
+                operation="HTTP Session Acquisition",
+                suggestion="Create a new pool instance using HttpConnectionPool.get_instance()",
+            )
 
         if not self._initialized:
             await self.initialize()
 
         if self._session is None:
-            raise RuntimeError("Session not initialized")
+            raise ContextualError(
+                message="HTTP session not initialized",
+                operation="HTTP Session Acquisition",
+                suggestion="Ensure the pool has been initialized. "
+                "Try: await pool.initialize() before using session()",
+            )
 
         return self._session
 

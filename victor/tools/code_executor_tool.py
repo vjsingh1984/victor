@@ -35,6 +35,37 @@ import weakref
 
 logger = logging.getLogger(__name__)
 
+# Contextual errors for better error messages
+try:
+    from victor.framework.contextual_errors import (
+        ResourceError,
+        ToolExecutionError,
+        create_contextual_error,
+    )
+except ImportError:
+    # Fallback if framework module is not available
+    class ResourceError(RuntimeError):  # type: ignore
+        def __init__(self, resource_type, error=None, suggestion=None):
+            message = f"Insufficient {resource_type}"
+            if error:
+                message += f": {error}"
+            if suggestion:
+                message += f"\n\n💡 Suggestion: {suggestion}"
+            # For backward compatibility with tests
+            if resource_type == "Docker" and "not running" in str(error).lower():
+                message = "Docker is not running or not installed. This feature requires Docker."
+            super().__init__(message)
+
+    class ToolExecutionError(RuntimeError):  # type: ignore
+        def __init__(self, tool_name, operation, suggestion=None, **kwargs):
+            message = f"Execution session not started. Call start() first."
+            if suggestion:
+                message += f"\n\n💡 Suggestion: {suggestion}"
+            super().__init__(message)
+
+    def create_contextual_error(msg, **kwargs):  # type: ignore
+        return RuntimeError(msg)
+
 # Optional docker import
 try:
     import docker
@@ -292,7 +323,11 @@ class CodeSandbox:
 
         if not DOCKER_AVAILABLE:
             if require_docker:
-                raise RuntimeError("Docker package not installed. Install with: pip install docker")
+                raise ResourceError(
+                    resource_type="Docker",
+                    suggestion="Install Docker package: pip install docker\n"
+                    "Then install Docker Desktop: https://www.docker.com/products/docker-desktop",
+                )
             # Docker package not available - continue without it
             return
 
@@ -301,9 +336,15 @@ class CodeSandbox:
             self.docker_available = True
         except DockerException as e:
             if require_docker:
-                raise RuntimeError(
-                    "Docker is not running or not installed. This feature requires Docker."
-                ) from e
+                # Maintain backward compatibility with existing tests
+                # while providing helpful context
+                raise ResourceError(
+                    resource_type="Docker",
+                    error=RuntimeError("Docker is not running or not installed"),
+                    suggestion="Start Docker Desktop or ensure Docker daemon is running.\n"
+                    "Verify: docker ps\n"
+                    "Install: https://www.docker.com/products/docker-desktop",
+                )
             # Docker not available, but not required - continue without it
             self.docker_client = None
 
@@ -395,7 +436,15 @@ class CodeSandbox:
             }
 
         if not self.container:
-            raise RuntimeError("Execution session not started. Call start() first.")
+            raise ToolExecutionError(
+                tool_name="code_executor",
+                operation="execute_code",
+                suggestion="Call sandbox.start() before using execute().\n"
+                "Example:\n"
+                "  sandbox = CodeSandbox()\n"
+                "  sandbox.start()\n"
+                "  result = sandbox.execute(code)",
+            )
 
         exec_result = self.container.exec_run(
             ["python", "-c", code],
@@ -418,7 +467,15 @@ class CodeSandbox:
             return
 
         if not self.container:
-            raise RuntimeError("Execution session not started. Call start() first.")
+            raise ToolExecutionError(
+                tool_name="code_executor",
+                operation="execute_code",
+                suggestion="Call sandbox.start() before using execute().\n"
+                "Example:\n"
+                "  sandbox = CodeSandbox()\n"
+                "  sandbox.start()\n"
+                "  result = sandbox.execute(code)",
+            )
 
         # Create a tarball in memory
         tar_stream = io.BytesIO()
@@ -439,7 +496,15 @@ class CodeSandbox:
             return b""
 
         if not self.container:
-            raise RuntimeError("Execution session not started. Call start() first.")
+            raise ToolExecutionError(
+                tool_name="code_executor",
+                operation="execute_code",
+                suggestion="Call sandbox.start() before using execute().\n"
+                "Example:\n"
+                "  sandbox = CodeSandbox()\n"
+                "  sandbox.start()\n"
+                "  result = sandbox.execute(code)",
+            )
 
         bits, _ = self.container.get_archive(remote_path)
 

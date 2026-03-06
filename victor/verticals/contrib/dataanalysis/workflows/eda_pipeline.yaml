@@ -1,0 +1,814 @@
+# EDA Pipeline Demo Workflow
+# ============================
+# Showcases 80% of regular agentic AI workflow patterns:
+# 1. Sequential tool chaining
+# 2. Parallel execution (fan-out/fan-in)
+# 3. Conditional branching (decision nodes)
+# 4. Agent loops (retry, refinement)
+# 5. Human-in-the-loop gates
+# 6. Error recovery paths
+# 7. Hybrid ComputeNode + AgentNode execution
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python with pandas/numpy/matplotlib/seaborn)           │
+# │ Supported: in-process, subprocess, docker                                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - pandas, numpy for data operations                                       │
+# │   - matplotlib, seaborn, plotly for visualizations                          │
+# │   - scipy for statistical tests                                             │
+# │   - scikit-learn for anomaly detection (isolation_forest)                   │
+# │                                                                              │
+# │ Docker execution:                                                            │
+# │   - Image: victor-dataanalysis:latest                                       │
+# │   - Build: docker build -f docker/Dockerfile.dataanalysis -t victor-da .    │
+# │   - Useful for: Large datasets, reproducibility, GPU acceleration           │
+# │                                                                              │
+# │ Subprocess execution:                                                        │
+# │   - For visualization nodes to isolate matplotlib backend                   │
+# │   - Prevents memory leaks from repeated plot generation                     │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ quality_threshold: 0.8 (data quality score to skip cleanup)                 │
+# │ cleanup_attempts_max: 3 (retry limit for data cleanup loop)                 │
+# │ correlation_method: pearson (alternative: spearman, kendall)                │
+# │ histogram_bins: 50 (default binning for distributions)                      │
+# │ anomaly_contamination: 0.05 (expected outlier ratio)                        │
+# │ revision_limit: 3 (max human revision cycles)                               │
+# │ hitl_timeout: 900s (15 min human review timeout)                            │
+# │ output_format: png (alternative: svg, pdf, html)                            │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - load_data: File I/O (pd.read_csv/parquet/json)                          │
+# │   - validate: Boolean checks (isna, duplicated, dtypes)                     │
+# │   - basic_stats: df.describe(), df.info()                                   │
+# │   - correlations: df.corr() - Pearson/Spearman matrix                       │
+# │   - distributions: np.histogram(), kernel density estimation                 │
+# │   - anomaly_detection: IsolationForest.fit_predict()                        │
+# │   - visualization: matplotlib/seaborn render operations                      │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - data_cleanup: Deciding WHICH imputation strategy to use                 │
+# │   - analyze: Interpreting what correlations MEAN                            │
+# │   - deep_dive: Investigating WHY patterns exist                             │
+# │   - refine_analysis: Incorporating human domain knowledge                   │
+# │   - revision_loop: Understanding revision feedback                           │
+# │   - report: Writing coherent narrative from statistics                       │
+# └─────────────────────────────────────────────────────────────────────────────┘
+
+workflows:
+  eda_pipeline:
+    description: "Full EDA pipeline demonstrating core agentic patterns"
+
+    metadata:
+      version: "2.0"
+      author: "victor"
+      vertical: dataanalysis
+
+    # =========================================================================
+    # SERVICE DEFINITIONS
+    # =========================================================================
+    services:
+      # Project database for tracking analysis history
+      project_db:
+        type: sqlite
+        config:
+          path: $ctx.project_dir/.victor/project.db
+          journal_mode: WAL
+        lifecycle:
+          start: auto
+          cleanup: preserve
+
+      # Temporary output directory for charts/visualizations
+      output_workspace:
+        type: filesystem
+        config:
+          path: $ctx.output_dir
+          auto_cleanup: false        # Preserve outputs for review
+          max_size_gb: 5
+        lifecycle:
+          start: auto
+          cleanup: preserve          # Keep visualizations
+
+    batch_config:
+      batch_size: 5
+      max_concurrent: 3
+      retry_strategy: end_of_batch
+      max_retries: 2
+
+    temporal_context:
+      as_of_date: $ctx.analysis_date
+      lookback_periods: 4
+      period_type: quarters
+
+    nodes:
+      # =====================================================================
+      # PATTERN 1: Sequential Tool Chaining
+      # Load -> Validate -> Process
+      # =====================================================================
+      # COMPUTE: File I/O is deterministic parsing
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pandas file readers (read_csv, read_parquet, read_json)
+      # Format auto-detection based on extension or explicit format param.
+      #
+      # WHY NOT AGENT: File parsing is mechanical - no judgment about WHAT
+      # to load or HOW to interpret it. Schema inference is algorithmic.
+      #
+      # Execution: in-process (pandas)
+      # Constraints: Filesystem read only, no network
+      - id: load_data
+        type: compute
+        name: "Load Dataset"
+        tools: [read, shell]
+        inputs:
+          file_path: $ctx.data_file
+          format: $ctx.file_format
+        output: raw_data
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read input file
+          network_allowed: false       # No remote data sources
+          write_allowed: false         # Read-only operation
+          max_cost_tier: FREE
+          timeout: 30
+        next: [validate]
+
+      # COMPUTE: Validation is boolean checks with clear pass/fail
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: pandas type/null checks:
+      #   - check_dtypes: pd.api.types.is_*_dtype() per column
+      #   - check_missing: df.isna().sum() with threshold
+      #   - check_duplicates: df.duplicated().sum()
+      #
+      # WHY NOT AGENT: All checks return True/False based on configured
+      # thresholds. No interpretation needed - just arithmetic comparisons.
+      #
+      # Execution: in-process (pure pandas, no external deps)
+      # Constraints: Operates on in-memory data, no I/O
+      - id: validate
+        type: compute
+        name: "Validate Data Quality"
+        handler: data_transform
+        inputs:
+          data: $ctx.raw_data
+          validations:
+            - check_dtypes
+            - check_missing
+            - check_duplicates
+        output: validation_result
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
+          max_cost_tier: FREE
+          timeout: 60
+        next: [check_quality]
+
+      # =====================================================================
+      # PATTERN 2: Conditional Branching
+      # Route based on data quality score
+      # =====================================================================
+      - id: check_quality
+        type: condition
+        name: "Check Data Quality"
+        condition: "quality_score >= 0.8"
+        branches:
+          "true": parallel_stats       # Good quality -> proceed
+          "false": data_cleanup        # Poor quality -> cleanup first
+          "default": parallel_stats
+        next: []
+
+      - id: data_cleanup
+        type: agent
+        name: "Clean Data Issues"
+        role: executor
+        goal: |
+          Fix data quality issues identified in the validation:
+          - Handle missing values (impute or drop)
+          - Remove duplicates
+          - Fix data type issues
+          - Normalize outliers if needed
+        tool_budget: 20
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-sonnet
+        input_mapping:
+          issues: validation_result
+          data: raw_data
+        output: cleaned_data
+        next: [validate_cleanup]
+
+      # =====================================================================
+      # PATTERN 3: Agent Loop (Retry with Refinement)
+      # Re-validate after cleanup, loop back if still failing
+      # =====================================================================
+      # COMPUTE: Re-validation uses same algorithms as initial validation
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Same pandas checks as validate node
+      # Used to determine if cleanup was successful - pure comparison.
+      #
+      # WHY NOT AGENT: Checking if cleanup worked is arithmetic:
+      #   old_missing_count > new_missing_count? True/False.
+      # No judgment about WHAT to do next (that's the condition node).
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory only
+      - id: validate_cleanup
+        type: compute
+        name: "Re-validate Cleaned Data"
+        handler: data_transform
+        inputs:
+          data: $ctx.cleaned_data
+          validations:
+            - check_dtypes
+            - check_missing
+        output: cleanup_validation
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
+          timeout: 30
+        next: [cleanup_loop_check]
+
+      - id: cleanup_loop_check
+        type: condition
+        name: "Check Cleanup Success"
+        condition: "cleanup_attempts < 3 and cleanup_quality < 0.7"
+        branches:
+          "true": data_cleanup          # Loop back for more cleanup
+          "false": parallel_stats       # Proceed with analysis
+          "default": parallel_stats
+
+      # =====================================================================
+      # PATTERN 4: Parallel Execution (Fan-out)
+      # Multiple independent computations in parallel
+      # =====================================================================
+      - id: parallel_stats
+        type: parallel
+        name: "Compute Statistics in Parallel"
+        parallel_nodes: [basic_stats, correlations, distributions, anomaly_detection]
+        join_strategy: all
+        next: [aggregate_stats]
+
+      # COMPUTE: Basic statistics are aggregation formulas
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.describe() which computes:
+      #   count, mean, std, min, 25%, 50%, 75%, max per numeric column
+      # Plus: df.nunique(), df.mode() for categoricals
+      #
+      # WHY NOT AGENT: These are mathematical definitions, not interpretations.
+      # Mean is sum/count - no judgment involved.
+      #
+      # Execution: in-process (pure numpy/pandas)
+      # Constraints: Pure computation, no I/O
+      - id: basic_stats
+        type: compute
+        name: "Basic Statistics"
+        tools: [shell]
+        inputs:
+          data: $ctx.raw_data
+        output: statistics
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
+          max_cost_tier: FREE
+          timeout: 60
+
+      # COMPUTE: Correlation is a mathematical formula
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.corr(method='pearson|spearman|kendall')
+      #   Pearson: cov(X,Y) / (std(X) * std(Y))
+      #   Spearman: Pearson on ranked values
+      #   Kendall: Concordant/discordant pair ratio
+      #
+      # WHY NOT AGENT: Computing correlation coefficients is pure math.
+      # INTERPRETING what r=0.85 means requires an agent.
+      #
+      # Execution: in-process (numpy linear algebra)
+      # Constraints: CPU-bound, may benefit from threading for large matrices
+      - id: correlations
+        type: compute
+        name: "Correlation Matrix"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          data: $ctx.raw_data
+          method: pearson
+        output: correlation_matrix
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
+          timeout: 60
+
+      # COMPUTE: Distributions are histogram binning algorithms
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: np.histogram(data, bins) per numeric column
+      # Plus: scipy.stats.gaussian_kde() for density estimation
+      # Bin edges determined by Sturges/Freedman-Diaconis/fixed count
+      #
+      # WHY NOT AGENT: Counting values in bins is arithmetic.
+      # DESCRIBING the distribution shape requires an agent.
+      #
+      # Execution: in-process (numpy/scipy)
+      # Constraints: Pure computation
+      - id: distributions
+        type: compute
+        name: "Distribution Analysis"
+        tools: [shell]
+        inputs:
+          data: $ctx.raw_data
+          bins: 50
+        output: distribution_data
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure math
+          write_allowed: false         # No outputs
+          timeout: 60
+
+      # COMPUTE: Anomaly detection is unsupervised ML algorithm
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: IsolationForest from scikit-learn
+      #   Builds ensemble of random trees
+      #   Anomaly score = average path length to isolate point
+      #   Points isolated quickly (short paths) are anomalies
+      #   contamination param sets expected outlier fraction
+      #
+      # WHY NOT AGENT: Algorithm outputs anomaly scores mathematically.
+      # DECIDING what to do with anomalies requires an agent.
+      #
+      # Execution: in-process (scikit-learn)
+      #   For large datasets (>1M rows), consider subprocess or docker
+      #   to isolate memory and enable early termination
+      #
+      # Constraints: CPU-intensive, benefits from multi-core
+      - id: anomaly_detection
+        type: compute
+        name: "Detect Anomalies"
+        tools: [shell]
+        inputs:
+          data: $ctx.raw_data
+          method: isolation_forest
+          contamination: 0.05
+        output: anomalies
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # In-memory data
+          network_allowed: false       # Pure ML computation
+          write_allowed: false         # No outputs
+          timeout: 120
+
+      # =====================================================================
+      # PATTERN 5: Fan-in (Aggregate parallel results)
+      # =====================================================================
+      - id: aggregate_stats
+        type: transform
+        name: "Aggregate Results"
+        transform: |
+          analysis_results = merge(
+            statistics,
+            correlation_matrix,
+            distribution_data,
+            anomalies
+          )
+        next: [analyze]
+
+      # =====================================================================
+      # PATTERN 6: LLM Agent Analysis with Tool Use
+      # Agent decides what additional analysis is needed
+      # =====================================================================
+      - id: analyze
+        type: agent
+        name: "AI-Powered Analysis"
+        role: analyst
+        goal: |
+          Analyze the computed statistics and:
+          1. Identify key patterns and trends
+          2. Flag potential data quality concerns
+          3. Highlight interesting correlations
+          4. Explain anomalies detected
+          5. Recommend follow-up analyses
+
+          Use tools to explore specific aspects if needed.
+        tool_budget: 25
+        tools: [shell, read, grep]
+        llm_config:
+          temperature: 0.4
+          model_hint: claude-3-sonnet
+        input_mapping:
+          stats: statistics
+          corr: correlation_matrix
+          dist: distribution_data
+          anomalies: anomalies
+        output: insights
+        next: [check_confidence]
+
+      # =====================================================================
+      # PATTERN 7: Confidence-Based Branching
+      # Route based on analysis confidence
+      # =====================================================================
+      - id: check_confidence
+        type: condition
+        name: "Check Analysis Confidence"
+        condition: "analysis_confidence"
+        branches:
+          "high": visualize
+          "medium": deep_dive
+          "low": human_assist
+          "default": visualize
+
+      - id: deep_dive
+        type: agent
+        name: "Deep Dive Analysis"
+        role: researcher
+        goal: |
+          Perform deeper analysis on areas of uncertainty:
+          - Investigate unclear correlations
+          - Analyze edge cases
+          - Validate hypotheses with statistical tests
+        tool_budget: 30
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          previous_analysis: insights
+          data: raw_data
+        output: deep_insights
+        next: [merge_insights]
+
+      - id: human_assist
+        type: hitl
+        name: "Request Human Guidance"
+        hitl_type: input
+        prompt: |
+          The AI analysis has low confidence on several aspects:
+
+          **Uncertain Areas:**
+          {uncertainty_areas}
+
+          Please provide guidance on:
+          1. Domain-specific context that might explain patterns
+          2. Known data issues to consider
+          3. Priority areas to focus on
+
+          Enter your guidance:
+        context_keys:
+          - uncertainty_areas
+          - insights
+        timeout: 1800
+        fallback: continue
+        next: [refine_analysis]
+
+      - id: refine_analysis
+        type: agent
+        name: "Refine with Human Input"
+        role: analyst
+        goal: |
+          Refine the analysis using human-provided guidance:
+          {human_guidance}
+
+          Update insights considering this domain knowledge.
+        tool_budget: 15
+        input_mapping:
+          original_insights: insights
+          guidance: human_guidance
+        output: refined_insights
+        next: [merge_insights]
+
+      - id: merge_insights
+        type: transform
+        name: "Merge All Insights"
+        transform: |
+          final_insights = merge(insights, deep_insights, refined_insights)
+        next: [visualize]
+
+      # =====================================================================
+      # PATTERN 8: Parallel Visualization Generation
+      # =====================================================================
+      - id: visualize
+        type: parallel
+        name: "Generate Visualizations"
+        parallel_nodes: [summary_charts, correlation_heatmap, anomaly_plots]
+        join_strategy: all
+        next: [review]
+
+      # COMPUTE: Chart generation is deterministic rendering
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: matplotlib/seaborn rendering with fixed parameters:
+      #   - Box plots: plt.boxplot() with IQR whiskers
+      #   - Histograms: plt.hist() with configured bins
+      #   - Bar charts: plt.bar() for categorical summaries
+      #   - Scatter: plt.scatter() for numeric relationships
+      #
+      # WHY NOT AGENT: Chart rendering is mechanical - given data and
+      # chart type, output is deterministic. CHOOSING which charts
+      # to create might need an agent, but rendering doesn't.
+      #
+      # Execution: subprocess RECOMMENDED to isolate matplotlib backend
+      #   Prevents memory leaks from repeated figure creation
+      #   Also allows parallel rendering without GIL contention
+      #
+      # Constraints: Write to output directory
+      - id: summary_charts
+        type: compute
+        name: "Summary Charts"
+        tools: [shell]
+        inputs:
+          data: $ctx.raw_data
+          stats: $ctx.statistics
+          output_dir: $ctx.output_dir
+        output: chart_paths
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Write output files
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG files
+          timeout: 120
+
+      # COMPUTE: Heatmap is a matrix colormap render
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: seaborn.heatmap(corr_matrix)
+      #   Color scale: diverging (blue-white-red) centered at 0
+      #   Annotations: correlation values in cells
+      #   Clustering: optional hierarchical for reordering
+      #
+      # WHY NOT AGENT: Heatmap rendering from a matrix is deterministic.
+      # The correlation matrix is already computed - this just draws it.
+      #
+      # Execution: subprocess (same matplotlib isolation reasoning)
+      # Constraints: Write output file
+      - id: correlation_heatmap
+        type: compute
+        name: "Correlation Heatmap"
+        tools: [shell]
+        inputs:
+          correlations: $ctx.correlation_matrix
+          output_path: $ctx.output_dir
+        output: heatmap_path
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Write output file
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG file
+          timeout: 60
+
+      # COMPUTE: Anomaly visualization is scatter plot rendering
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: plt.scatter() with color coding:
+      #   - Normal points: one color
+      #   - Anomalies: highlighted color/marker
+      #   - May include decision boundary for IsolationForest
+      #
+      # WHY NOT AGENT: Given anomaly labels and data, rendering is
+      # deterministic. No judgment about WHICH points are anomalies -
+      # that was already computed by the anomaly_detection node.
+      #
+      # Execution: subprocess (matplotlib isolation)
+      # Constraints: Write output files
+      - id: anomaly_plots
+        type: compute
+        name: "Anomaly Visualizations"
+        tools: [shell]
+        inputs:
+          anomalies: $ctx.anomalies
+          data: $ctx.raw_data
+          output_dir: $ctx.output_dir
+        output: anomaly_chart_paths
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Write output files
+          network_allowed: false       # Local rendering
+          write_allowed: true          # Save PNG/SVG files
+          timeout: 90
+
+      # =====================================================================
+      # PATTERN 9: Human-in-the-Loop Approval Gate
+      # =====================================================================
+      - id: review
+        type: hitl
+        name: "Human Review"
+        hitl_type: approval
+        prompt: |
+          ## EDA Analysis Complete
+
+          **Key Insights:**
+          {final_insights}
+
+          **Visualizations Generated:**
+          - Summary Charts: {chart_paths}
+          - Correlation Heatmap: {heatmap_path}
+          - Anomaly Plots: {anomaly_chart_paths}
+
+          Do you approve generating the final report?
+        context_keys:
+          - final_insights
+          - chart_paths
+          - heatmap_path
+          - anomaly_chart_paths
+        choices:
+          - "Approve and generate report"
+          - "Request revisions"
+          - "Skip report generation"
+        timeout: 900
+        fallback: continue
+        next: [check_approval]
+
+      - id: check_approval
+        type: condition
+        name: "Check Approval Decision"
+        condition: "approval_decision"
+        branches:
+          "approve": report
+          "revisions": revision_loop
+          "skip": end
+          "default": report
+
+      # =====================================================================
+      # PATTERN 10: Revision Loop (Iterative Refinement)
+      # =====================================================================
+      - id: revision_loop
+        type: agent
+        name: "Apply Revisions"
+        role: executor
+        goal: |
+          Apply the requested revisions:
+          {revision_feedback}
+
+          Update the analysis and visualizations accordingly.
+        tool_budget: 20
+        tools: [shell, write]
+        input_mapping:
+          feedback: revision_feedback
+          current_insights: final_insights
+        output: revised_insights
+        next: [increment_revision]
+
+      - id: increment_revision
+        type: transform
+        name: "Track Revision Count"
+        transform: "revision_count = revision_count + 1"
+        next: [revision_limit_check]
+
+      - id: revision_limit_check
+        type: condition
+        name: "Check Revision Limit"
+        condition: "revision_count < 3"
+        branches:
+          "true": review           # Loop back for re-review
+          "false": report          # Max revisions, proceed to report
+          "default": report
+
+      # =====================================================================
+      # PATTERN 11: Final Report Generation
+      # =====================================================================
+      - id: report
+        type: agent
+        name: "Generate Final Report"
+        role: writer
+        goal: |
+          Generate a comprehensive EDA report including:
+          1. Executive summary
+          2. Data quality assessment
+          3. Key findings and insights
+          4. Visualization descriptions
+          5. Recommendations for next steps
+          6. Appendix with technical details
+
+          Format as professional markdown document.
+        tool_budget: 15
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+          max_tokens: 8000
+        input_mapping:
+          insights: final_insights
+          stats: statistics
+          validation: validation_result
+          charts: chart_paths
+        output: final_report
+        next: [end]
+
+      - id: end
+        type: transform
+        name: "Workflow Complete"
+        transform: |
+          workflow_status = "completed"
+          completion_time = current_timestamp()
+
+
+  # =========================================================================
+  # Lightweight EDA - Quick Analysis Mode
+  # =========================================================================
+  # Fast-path workflow for initial data exploration.
+  # Execution: in-process only (no docker overhead)
+  # Use case: CI pipelines, quick checks, prototyping
+  eda_quick:
+    description: "Quick EDA with minimal LLM usage"
+
+    metadata:
+      vertical: dataanalysis
+
+    nodes:
+      # COMPUTE: Quick stats runs minimal pandas operations
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.describe() + df.shape + df.dtypes
+      # Much lighter than full EDA - no anomaly detection, no correlations
+      #
+      # WHY NOT AGENT: describe() is a fixed statistical summary.
+      #
+      # Execution: in-process (pandas only)
+      # Constraints: Read file, pure computation
+      - id: quick_stats
+        type: compute
+        name: "Quick Statistics"
+        handler: parallel_tools
+        tools: [shell]
+        inputs:
+          file_path: $ctx.data_file
+        output: stats
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: true     # Read data file
+          network_allowed: false       # Local only
+          write_allowed: false         # No outputs
+          max_cost_tier: FREE
+          timeout: 45
+        next: [quick_check]
+
+      - id: quick_check
+        type: condition
+        name: "Data Size Check"
+        condition: "row_count > 10000"
+        branches:
+          "true": sample_analysis
+          "false": full_quick_analysis
+
+      # COMPUTE: Sampling is random selection algorithm
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: df.sample(n=sample_size, random_state=42)
+      # Deterministic with fixed seed, then runs describe() on sample
+      #
+      # WHY NOT AGENT: Random sampling is algorithmic (RNG with seed).
+      # Deciding WHETHER to sample is the condition node's job.
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory operation
+      - id: sample_analysis
+        type: compute
+        name: "Sample-based Analysis"
+        tools: [shell]
+        inputs:
+          sample_size: 5000
+        output: sampled_stats
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
+          timeout: 30
+        next: [quick_insights]
+
+      # COMPUTE: Full analysis on small datasets
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Same as quick_stats but on full data (no sampling)
+      # Used when row_count <= 10000 (manageable size)
+      #
+      # Execution: in-process (pandas)
+      # Constraints: In-memory operation
+      - id: full_quick_analysis
+        type: compute
+        name: "Full Quick Analysis"
+        tools: [shell]
+        output: full_stats
+        constraints:
+          llm_allowed: false
+          filesystem_allowed: false    # Operates on ctx data
+          network_allowed: false       # Pure computation
+          write_allowed: false         # No outputs
+          timeout: 60
+        next: [quick_insights]
+
+      - id: quick_insights
+        type: agent
+        name: "Quick Insights"
+        role: analyst
+        goal: "Provide 5 key insights from the statistics. Be concise."
+        tool_budget: 5
+        llm_config:
+          temperature: 0.2
+          model_hint: claude-3-haiku
+        output: insights

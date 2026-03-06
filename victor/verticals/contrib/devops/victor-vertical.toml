@@ -1,0 +1,58 @@
+[vertical]
+name = "devops"
+version = "0.5.1"
+description = "DevOps vertical for infrastructure, CI/CD, and container management"
+authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
+license = "Apache-2.0"
+requires_victor = ">=0.5.0"
+
+python_package = "victor-ai"
+homepage = "https://github.com/vijay-singh/codingagent"
+repository = "https://github.com/vijay-singh/codingagent"
+documentation = "https://docs.victor.dev"
+issues = "https://github.com/vijay-singh/codingagent/issues"
+
+category = "devops"
+tags = ["devops", "docker", "kubernetes", "ci-cd", "infrastructure", "terraform"]
+
+[vertical.class]
+module = "victor.devops.devops_assistant"
+class_name = "DevOpsAssistant"
+provides_tools = [
+    "docker_build",
+    "docker_run",
+    "kubectl",
+    "terraform_apply",
+    "terraform_plan",
+    "ci_status",
+]
+provides_workflows = [
+    "deploy_infrastructure",
+    "container_setup",
+    "cicd",
+    "monitoring_setup",
+]
+provides_capabilities = [
+    "container_management",
+    "infrastructure_as_code",
+    "ci_cd_integration",
+]
+
+[vertical.dependencies]
+python = ["docker>=6.0.0", "kubernetes>=28.0.0"]
+verticals = ["coding"]
+
+[vertical.compatibility]
+requires_tool_calling = true
+preferred_providers = ["anthropic", "openai"]
+min_context_window = 100000
+python_version = ">=3.10"
+
+[vertical.security]
+signed = false
+verified_author = false
+permissions = ["filesystem:read", "filesystem:write", "network", "shell"]
+
+[vertical.installation]
+install_command = "pip install victor-ai"
+extras = ["devops"]

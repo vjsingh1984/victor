@@ -940,3 +940,34 @@ def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[st
                 missing.append(attr)
 
     return len(missing) == 0, missing
+
+
+# =============================================================================
+# LSP & Language Registry Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class LSPPoolProtocol(Protocol):
+    """Protocol for LSP connection pool.
+
+    Framework-level abstraction so tools don't depend on the coding vertical's
+    concrete LSPConnectionPool. Implementations live in verticals.
+    """
+
+    def _path_to_uri(self, path: str) -> str: ...
+    def open_document(self, uri: str, content: str) -> None: ...
+    def get_diagnostics(self, path: str) -> List[Dict[str, Any]]: ...
+    def close_document(self, path: str) -> None: ...
+
+
+@runtime_checkable
+class LanguageRegistryProtocol(Protocol):
+    """Protocol for language registry.
+
+    Framework-level abstraction for language detection and plugin lookup.
+    Implementations live in verticals.
+    """
+
+    def detect_language(self, path: Any) -> Optional[str]: ...
+    def get(self, language: str) -> Any: ...

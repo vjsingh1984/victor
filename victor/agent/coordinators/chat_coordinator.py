@@ -100,9 +100,36 @@ class ChatCoordinator:
         """Inject a pre-built streaming pipeline (used by orchestrator factory)."""
         self._streaming_pipeline = pipeline
 
+        # NEW: Execution coordinator for agentic loop (Phase 1)
+        self._execution_coordinator: Optional[Any] = None
+
     # =====================================================================
     # Public API
     # =====================================================================
+
+    @property
+    def execution_coordinator(self) -> Any:
+        """Get the execution coordinator for agentic loop.
+
+        Returns:
+            ExecutionCoordinator instance (lazy initialized)
+        """
+        if self._execution_coordinator is None:
+            from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+
+            # Create protocol adapter for orchestrator
+            from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
+
+            adapter = OrchestratorProtocolAdapter(self._orchestrator)
+
+            # Initialize execution coordinator with protocol-based dependencies
+            self._execution_coordinator = ExecutionCoordinator(
+                chat_context=adapter,
+                tool_context=adapter,
+                provider_context=adapter,
+                execution_provider=adapter,
+            )
+        return self._execution_coordinator
 
     async def chat(
         self,
@@ -113,10 +140,8 @@ class ChatCoordinator:
 
         This method implements a proper agentic loop that:
         1. Optionally uses structured planning for complex tasks
-        2. Gets model response
-        3. Executes any tool calls
-        4. Continues until model provides a final response (no tool calls)
-        5. Ensures non-empty response on tool failures
+        2. Delegates to execution coordinator for agentic loop
+        3. Ensures non-empty response on tool failures
 
         Args:
             user_message: User's message
@@ -129,8 +154,8 @@ class ChatCoordinator:
         if use_planning and self._should_use_planning(user_message):
             return await self._chat_with_planning(user_message)
 
-        # Use standard agentic loop
-        return await self._chat_with_agentic_loop(user_message)
+        # NEW: Delegate to execution coordinator for agentic loop
+        return await self.execution_coordinator.execute_agentic_loop(user_message)
 
     def _should_use_planning(self, user_message: str) -> bool:
         """Determine if planning should be used for this task.
@@ -235,8 +260,11 @@ class ChatCoordinator:
 
         return response
 
-    async def _chat_with_agentic_loop(self, user_message: str) -> CompletionResponse:
-        """Send a chat message and get response with full agentic loop.
+    # NOTE: Legacy implementation retained temporarily as migration fallback.
+    # Primary path uses ExecutionCoordinator via `chat()`.
+
+    async def _chat_with_agentic_loop_legacy(self, user_message: str) -> CompletionResponse:
+        """Legacy agentic loop implementation used as fallback during migration.
 
         This method implements a proper agentic loop that:
         1. Gets model response

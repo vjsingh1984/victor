@@ -1,0 +1,238 @@
+workflows:
+  team_node_demo:
+    description: "Demonstration of TeamNode for hybrid orchestration"
+
+    metadata:
+      version: "3.1.0"
+      vertical: "coding"
+      author: "Victor AI"
+
+    nodes:
+      # Initial agent to analyze task
+      - id: analyze_task
+        type: agent
+        name: "Task Analyzer"
+        role: planner
+        goal: |
+          Analyze the user task: {{user_task}}
+
+          Provide:
+          1. Task complexity assessment (simple/medium/complex)
+          2. Required skills (research, implementation, testing, review)
+          3. Estimated team size needed
+          4. Potential risks
+        tool_budget: 5
+        tools: [read, grep, overview]
+        output: task_analysis
+        next: [decide_approach]
+
+      # Conditional routing based on complexity
+      - id: decide_approach
+        type: condition
+        condition: complexity_check
+        branches:
+          "simple": single_agent
+          "medium": small_team
+          "complex": large_team
+
+      # Simple task: single agent
+      - id: single_agent
+        type: agent
+        name: "Solo Executor"
+        role: executor
+        goal: "Implement: {{user_task}}"
+        tool_budget: 20
+        tools: [read, write, grep]
+        output: result
+        next: [finalize]
+
+      # Medium task: small team with 2 members
+      - id: small_team
+        type: team
+        name: "Small Implementation Team"
+        goal: |
+          Implement the feature: {{user_task}}
+
+          Task Analysis: {{task_analysis}}
+
+          Work together to:
+          1. Understand requirements
+          2. Design solution
+          3. Implement code
+          4. Write tests
+        team_formation: sequential
+        timeout_seconds: 300
+        merge_strategy: dict
+        merge_mode: team_wins
+        output_key: team_result
+        continue_on_error: true
+        max_iterations: 30
+        total_tool_budget: 50
+        members:
+          - id: researcher
+            role: researcher
+            name: "Code Researcher"
+            goal: |
+              Research the codebase to understand:
+              1. Existing patterns and conventions
+              2. Similar implementations to reference
+              3. Files that need modification
+              4. Potential dependencies
+            tool_budget: 15
+            tools: [read, grep, code_search, overview]
+            backstory: |
+              Experienced code researcher with deep knowledge
+              of software architecture and design patterns.
+            expertise: ["code-analysis", "architecture", "design-patterns"]
+            personality: "methodical and thorough"
+
+          - id: implementer
+            role: executor
+            name: "Feature Implementer"
+            goal: |
+              Implement the feature based on research findings.
+
+              Ensure:
+              1. Code follows existing patterns
+              2. Proper error handling
+              3. Clear documentation
+              4. Test coverage
+            tool_budget: 25
+            tools: [read, write, grep]
+            backstory: |
+              Skilled developer focused on clean, maintainable code.
+              Known for implementing robust solutions.
+            expertise: ["implementation", "testing", "documentation"]
+            personality: "pragmatic and detail-oriented"
+        next: [finalize]
+
+      # Complex task: large team with 4 members
+      - id: large_team
+        type: team
+        name: "Large Feature Team"
+        goal: |
+          Implement complex feature: {{user_task}}
+
+          Task Analysis: {{task_analysis}}
+
+          Coordinate as a team to deliver:
+          1. Thorough research and planning
+          2. Well-architected solution
+          3. High-quality implementation
+          4. Comprehensive testing
+          5. Code review and optimization
+        team_formation: pipeline
+        timeout_seconds: 600
+        merge_strategy: dict
+        merge_mode: team_wins
+        output_key: team_result
+        continue_on_error: true
+        max_iterations: 50
+        total_tool_budget: 100
+        members:
+          - id: architect
+            role: planner
+            name: "Solution Architect"
+            goal: |
+              Design the solution architecture:
+              1. Analyze requirements thoroughly
+              2. Design system architecture
+              3. Identify components and interfaces
+              4. Plan integration points
+              5. Document design decisions
+            tool_budget: 20
+            tools: [read, grep, overview, code_search]
+            backstory: |
+              Senior architect with 15 years experience in
+              large-scale system design.
+            expertise: ["architecture", "design-patterns", "scalability", "security"]
+            personality: "strategic and thorough"
+
+          - id: researcher
+            role: researcher
+            name: "Codebase Researcher"
+            goal: |
+              Research existing code to understand:
+              1. Current architecture and patterns
+              2. Similar features to reference
+              3. Integration points
+              4. Potential technical debt
+            tool_budget: 15
+            tools: [read, grep, code_search, overview]
+            backstory: |
+              Expert code researcher with deep knowledge of
+              software archaeology and legacy systems.
+            expertise: ["code-analysis", "refactoring", "legacy-migration"]
+            personality: "analytical and systematic"
+
+          - id: implementer
+            role: executor
+            name: "Feature Developer"
+            goal: |
+              Implement the solution following architecture:
+              1. Implement core components
+              2. Write comprehensive tests
+              3. Add error handling
+              4. Document code
+            tool_budget: 40
+            tools: [read, write, grep]
+            backstory: |
+              Full-stack developer focused on quality and
+              maintainability.
+            expertise: ["implementation", "testing", "debugging"]
+            personality: "quality-focused and collaborative"
+
+          - id: reviewer
+            role: reviewer
+            name: "Code Reviewer"
+            goal: |
+              Review the implementation:
+              1. Check for bugs and issues
+              2. Verify best practices
+              3. Suggest optimizations
+              4. Ensure test coverage
+              5. Validate documentation
+            tool_budget: 15
+            tools: [read, grep]
+            backstory: |
+              Senior reviewer with eye for detail and passion
+              for code quality.
+            expertise: ["code-review", "testing", "optimization"]
+            personality: "constructive and thorough"
+        next: [finalize]
+
+      # Finalize and present results
+      - id: finalize
+        type: agent
+        name: "Result Finalizer"
+        role: writer
+        goal: |
+          Prepare final report based on results:
+          {% if single_agent %}{{result}}{% endif %}
+          {% if small_team %}{{team_result}}{% endif %}
+          {% if large_team %}{{team_result}}{% endif %}
+
+          Create a comprehensive summary including:
+          1. What was accomplished
+          2. Key changes made
+          3. Files modified
+          4. Testing performed
+          5. Any remaining work or recommendations
+        tool_budget: 10
+        tools: [read, grep]
+        output: final_report
+        next: []
+
+    execution:
+      max_timeout_seconds: 900
+      default_node_timeout: 300
+      max_iterations: 100
+
+    error_handling:
+      retry_policy:
+        max_retries: 2
+        backoff: exponential
+        initial_delay: 1.0
+      on_failure:
+        - log_error
+        - continue_to_next

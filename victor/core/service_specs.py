@@ -12,7 +12,7 @@ from victor.agent.protocols import (
     ActionAuthorizerProtocol,
     ArgumentNormalizerProtocol,
     AutoCommitterProtocol,
-    BudgetManagerProtocol,
+    IBudgetManager,
     ChunkGeneratorProtocol,
     CodeExecutionManagerProtocol,
     ComplexityClassifierProtocol,
@@ -21,6 +21,7 @@ from victor.agent.protocols import (
     ConversationStateMachineProtocol,
     DebugLoggerProtocol,
     IntentClassifierProtocol,
+    IToolAccessController,
     MCPBridgeProtocol,
     MetricsCollectorProtocol,
     ModeControllerProtocol,
@@ -43,7 +44,6 @@ from victor.agent.protocols import (
     TaskCoordinatorProtocol,
     TaskTrackerProtocol,
     TaskTypeHinterProtocol,
-    ToolAccessControllerProtocol,
     ToolCacheProtocol,
     ToolCoordinatorProtocol,
     ToolDeduplicationTrackerProtocol,
@@ -59,6 +59,10 @@ from victor.agent.protocols import (
     UsageLoggerProtocol,
     WorkflowRegistryProtocol,
 )
+
+# Backward-compatible aliases for renamed protocols
+ToolAccessControllerProtocol = IToolAccessController
+BudgetManagerProtocol = IBudgetManager
 
 # Workflow protocols / implementations
 from victor.workflows.compiler_protocols import (
@@ -152,6 +156,8 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ),
 ]
 
+# Vertical extension specs — used by BaseVerticalServiceProvider
+VERTICAL_EXTENSION_SPECS: List[ServiceSpec] = []
 
 WORKFLOW_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(NodeExecutorFactoryProtocol, "_create_node_executor_factory"),
@@ -168,7 +174,11 @@ WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
 ]
 
 WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
-    ServiceSpec(WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
-    ServiceSpec(WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
+    ServiceSpec(
+        WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
+    ),
+    ServiceSpec(
+        WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
+    ),
     ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
 ]

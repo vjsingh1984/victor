@@ -123,6 +123,9 @@ from victor.tools.base import (
     ExecutionCategory,
     Priority,
 )
+from victor.tools.keyword_matcher import KeywordMatcher
+from victor.tools.tool_category_resolver import ToolCategoryResolver
+from victor.tools.tool_schema_cache import ToolSchemaCache
 
 logger = logging.getLogger(__name__)
 
@@ -462,6 +465,11 @@ class ToolMetadataRegistry:
             ec: set() for ec in ExecutionCategory
         }
 
+        # Composed extracted classes
+        self._category_resolver = ToolCategoryResolver()
+        self._keyword_matcher = KeywordMatcher()
+        self._schema_cache = ToolSchemaCache()
+
     def register(self, tool: BaseTool) -> None:
         """Register a tool in the metadata registry.
 
@@ -511,6 +519,23 @@ class ToolMetadataRegistry:
 
         # NEW: Index execution category
         self._by_execution_category[entry.execution_category].add(entry.name)
+
+        # Wire composed extracted classes
+        if entry.category:
+            self._category_resolver.register(entry.name, entry.category)
+        if entry.keywords or entry.mandatory_keywords:
+            self._keyword_matcher.index_tool(
+                name=entry.name,
+                keywords=list(entry.keywords),
+                mandatory_keywords=list(entry.mandatory_keywords) if entry.mandatory_keywords else None,
+            )
+        schema = getattr(tool, "parameters", None)
+        if schema:
+            self._schema_cache.register(entry.name, schema)
+
+    def get_tool_schema(self, tool_name: str) -> Optional[dict]:
+        """Get cached schema for a tool by name."""
+        return self._schema_cache.get_schema(tool_name)
 
     def register_all(self, tools: List[BaseTool]) -> None:
         """Register multiple tools.

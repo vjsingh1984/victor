@@ -1615,21 +1615,43 @@ async def read(
         "Use for creating new files or completely replacing file content",
         "For surgical edits to existing files, use edit with 'replace' operation instead",
         "Supports undo via /undo command",
+        "Automatically uses LSP validation/formatting when available for the language",
     ],
 )
-async def write(path: str, content: str) -> str:
+async def write(
+    path: str,
+    content: str,
+    *,
+    use_lsp: bool = True
+) -> str:
     """Write file. Creates parent dirs. Use edit_files for partial edits.
+
+    Automatically uses LSP (Language Server Protocol) enhancement when available:
+    - Validates code syntax before writing
+    - Formats code using language-specific formatters
+    - Returns diagnostic information (errors, warnings)
+
+    Supported languages: C/C++, Python, Rust, JavaScript/TypeScript, Go, Java, and 15+ more.
 
     Args:
         path: File path (creates dirs)
         content: Full content (overwrites)
+        use_lsp: Enable LSP validation and formatting when available (default: True)
 
     Returns:
-        Success message.
+        Success message with LSP enhancement information if applicable.
+
+    Examples:
+        # Write with automatic LSP enhancement
+        await write("main.py", "def hello(): print('hi')")
+
+        # Write without LSP enhancement
+        await write("data.txt", "some data", use_lsp=False)
 
     Note:
         In EXPLORE/PLAN modes, writes are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file writes.
+        Falls back to regular write if LSP is not available for the file type.
     """
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
@@ -1641,6 +1663,76 @@ async def write(path: str, content: str) -> str:
     if file_path.exists() and file_path.is_dir():
         raise IsADirectoryError(f"Cannot write to directory: {path}")
 
+    # Try LSP-enhanced write first if requested
+    if use_lsp:
+        # Check if language has LSP support by file extension
+        lsp_supported_extensions = {
+            # Programming languages
+            '.py', '.pyi', '.pyx',        # Python
+            '.c', '.h', '.cpp', '.hpp', '.cc', '.cxx',  # C/C++
+            '.rs',                        # Rust
+            '.ts', '.tsx', '.js', '.jsx', # JavaScript/TypeScript
+            '.go',                        # Go
+            '.java',                      # Java
+            '.kt', '.kts',                # Kotlin
+            '.swift',                     # Swift
+            '.scala',                     # Scala
+            '.cs',                        # C#
+            '.php',                       # PHP
+            '.rb',                        # Ruby
+            '.lua',                       # Lua
+            '.ex', '.exs',                # Elixir
+            '.hs',                        # Haskell
+            '.r', '.R',                    # R
+            # Config files
+            '.json', '.jsonc',            # JSON
+            '.yaml', '.yml',              # YAML
+            '.toml',                      # TOML
+            '.xml',                       # XML
+            '.html', '.htm',              # HTML
+            '.css', '.scss', '.less',     # CSS
+            '.sh', '.bash', '.zsh',        # Shell
+            '.sql',                       # SQL
+            '.md', '.markdown',           # Markdown
+        }
+
+        if file_path.suffix.lower() in lsp_supported_extensions:
+            try:
+                from victor.tools.lsp_write_enhancer import write_with_lsp
+
+                result = await write_with_lsp(
+                    path=str(file_path),
+                    content=content,
+                    validate=True,
+                    format_code=True,
+                    write=True,
+                )
+
+                if result.success:
+                    # Build success message with LSP info
+                    action = "created" if result.original_content is None else "modified"
+                    lsp_info = []
+
+                    if result.formatted:
+                        lsp_info.append(f"formatted with {result.formatter_used}")
+
+                    if result.validated:
+                        error_count = sum(1 for d in result.diagnostics if d.severity == "error")
+                        warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+
+                        if error_count > 0 or warning_count > 0:
+                            lsp_info.append(f"{error_count} errors, {warning_count} warnings")
+                        else:
+                            lsp_info.append("validation passed")
+
+                    lsp_suffix = f" ({', '.join(lsp_info)})" if lsp_info else ""
+                    return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
+
+            except Exception as lsp_error:
+                # LSP enhancement failed, fall back to regular write
+                logger.debug(f"LSP enhancement failed, falling back to regular write: {lsp_error}")
+
+    # Regular write (fallback or when use_lsp=False)
     # Track the change for undo/redo
     tracker = get_change_tracker()
     original_content = None
@@ -1662,7 +1754,7 @@ async def write(path: str, content: str) -> str:
         original_content=original_content,
         new_content=content,
         tool_name="write_file",
-        tool_args={"path": path},
+        tool_args={"path": path, "use_lsp": use_lsp},
     )
 
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
@@ -1676,7 +1768,184 @@ async def write(path: str, content: str) -> str:
         cache.invalidate(str(file_path))
 
     action = "created" if change_type == ChangeType.CREATE else "modified"
-    return f"Successfully {action} {path} ({len(content)} characters). Use /undo to revert."
+    lsp_suffix = " (LSP unavailable for this file type)" if use_lsp else ""
+    return f"Successfully {action} {path} ({len(content)} characters){lsp_suffix}. Use /undo to revert."
+
+
+@tool(
+    category="filesystem",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.WRITE,
+    danger_level=DangerLevel.LOW,
+    progress_params=["path"],
+    stages=["initial", "planning", "writing"],
+    task_types=["edit", "refactor", "create"],
+    execution_category=ExecutionCategory.WRITE,
+    keywords=[
+        "write",
+        "lsp",
+        "validate",
+        "format",
+        "diagnostics",
+        "type-check",
+        "syntax-check",
+    ],
+    use_cases=[
+        "writing code with LSP validation",
+        "formatting code with language formatters",
+        "checking code before writing",
+        "getting diagnostic feedback",
+    ],
+    examples=[
+        "write main.py with validation",
+        "create validated Python file",
+        "write formatted Rust code",
+        "check code before writing",
+    ],
+)
+async def write_lsp(
+    path: str,
+    content: str,
+    validate: bool = True,
+    format_code: bool = True,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Write file with LSP validation and formatting.
+
+    Enhanced write operation that uses Language Server Protocol for:
+    - Syntax validation before writing
+    - Auto-formatting using language-specific formatters
+    - Diagnostic feedback (errors, warnings, hints)
+
+    Supported languages:
+        C/C++ (clangd, clang-format)
+        Python (pyright/pylsp, black)
+        Rust (rust-analyzer, rustfmt)
+        JavaScript/TypeScript (tsserver, prettier)
+        Go (gopls, gofmt)
+        And 15+ more languages
+
+    Args:
+        path: File path to write
+        content: Content to write
+        validate: Validate with LSP before writing (default: True)
+        format_code: Format with language formatter (default: True)
+        dry_run: If True, validate/format without writing (default: False)
+
+    Returns:
+        Dictionary with:
+            success: bool - Whether operation succeeded
+            path: str - File path
+            formatted: bool - Whether content was formatted
+            validated: bool - Whether content was validated
+            diagnostics: list - Diagnostic messages
+            formatter_used: str - Name of formatter used (if any)
+            summary: dict - Summary of diagnostics
+            written_content: str - Content that was/would be written
+            error: str - Error message if failed
+
+    Example:
+        result = await write_lsp("src/main.py", "def hello(): print('hi')")
+        if result["summary"]["errors"] > 0:
+            print("Errors found:", result["diagnostics"])
+
+    Note:
+        Falls back to regular write if LSP is not available for the language.
+        Requires language server to be installed (e.g., pyright, clangd, rust-analyzer).
+    """
+    from victor.agent.change_tracker import ChangeType, get_change_tracker
+    from victor.tools.lsp_write_enhancer import write_with_lsp
+
+    file_path = Path(path).expanduser().resolve()
+
+    # Enforce sandbox restrictions in EXPLORE/PLAN modes
+    enforce_sandbox_path(file_path)
+
+    if file_path.exists() and file_path.is_dir():
+        raise IsADirectoryError(f"Cannot write to directory: {path}")
+
+    # Track the change for undo/redo
+    tracker = get_change_tracker()
+    original_content = None
+    change_type = ChangeType.CREATE
+
+    if file_path.exists():
+        change_type = ChangeType.MODIFY
+        original_content = file_path.read_text()
+
+    # Use LSP enhancer
+    try:
+        result = await write_with_lsp(
+            path=str(file_path),
+            content=content,
+            validate=validate,
+            format_code=format_code,
+            write=not dry_run,  # Only write if not dry_run
+        )
+
+        # Track change if actually written
+        if not dry_run and result.success:
+            tracker.begin_change_group("write_lsp", f"Write to {path}")
+            tracker.record_change(
+                file_path=str(file_path),
+                change_type=change_type,
+                original_content=original_content,
+                new_content=result.written_content,
+                tool_name="write_lsp",
+                tool_args={"path": path, "validate": validate, "format_code": format_code},
+            )
+            tracker.commit_change_group()
+
+            # Invalidate file content cache
+            if is_file_cache_enabled():
+                cache = get_file_content_cache()
+                cache.invalidate(str(file_path))
+
+        return result.to_dict()
+
+    except Exception as e:
+        # If LSP enhancement fails, fall back to regular write
+        logger.warning(f"LSP enhancement failed, falling back to regular write: {e}")
+
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            tracker.begin_change_group("write_file", f"Write to {path}")
+            tracker.record_change(
+                file_path=str(file_path),
+                change_type=change_type,
+                original_content=original_content,
+                new_content=content,
+                tool_name="write_file",
+                tool_args={"path": path},
+            )
+
+            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+                await f.write(content)
+
+            tracker.commit_change_group()
+
+            if is_file_cache_enabled():
+                cache = get_file_content_cache()
+                cache.invalidate(str(file_path))
+
+        return {
+            "success": True,
+            "path": path,
+            "formatted": False,
+            "validated": False,
+            "diagnostics": [],
+            "formatter_used": None,
+            "summary": {
+                "total_diagnostics": 0,
+                "errors": 0,
+                "warnings": 0,
+                "info": 0,
+                "hints": 0,
+            },
+            "written_content": content,
+            "fallback": True,  # Indicate regular write was used
+        }
 
 
 @tool(

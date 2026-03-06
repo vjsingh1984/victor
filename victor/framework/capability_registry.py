@@ -48,6 +48,8 @@ CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
     # Enrichment capabilities
     "enrichment_strategy": "set_enrichment_strategy",
     "enrichment_service": "enrichment_service",
+    # LSP capabilities
+    "lsp": "set_lsp",
 }
 
 

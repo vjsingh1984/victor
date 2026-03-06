@@ -1,0 +1,448 @@
+# Feature Implementation Workflow
+# ===============================
+# End-to-end feature development with:
+# - Codebase analysis and planning
+# - Implementation with tests
+# - Code review and iteration
+# - Documentation generation
+
+workflows:
+  feature_implementation:
+    description: "Complete feature implementation with tests and review"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: coding
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Understand Requirements
+      # =====================================================================
+      - id: analyze_request
+        type: agent
+        name: "Analyze Feature Request"
+        role: researcher
+        goal: |
+          Analyze the feature request and gather context:
+          1. Understand the user's requirements
+          2. Identify affected files and components
+          3. Find similar patterns in the codebase
+          4. Note any potential challenges or dependencies
+        tool_budget: 25
+        tools: [read, grep, code_search, overview]
+        llm_config:
+          temperature: 0.3
+        output: analysis
+        next: [check_complexity]
+
+      - id: check_complexity
+        type: condition
+        name: "Assess Complexity"
+        condition: "estimated_changes > 5"
+        branches:
+          "true": create_plan
+          "false": quick_implement
+
+      # =====================================================================
+      # Stage 2A: Quick Implementation (Simple Features)
+      # =====================================================================
+      - id: quick_implement
+        type: agent
+        name: "Quick Implementation"
+        role: executor
+        goal: |
+          Implement the simple feature directly:
+          - Make minimal, focused changes
+          - Follow existing code patterns
+          - Add basic tests if appropriate
+        tool_budget: 30
+        tools: [read, edit, write, shell]
+        llm_config:
+          temperature: 0.2
+        output: implementation
+        next: [run_tests]
+
+      # =====================================================================
+      # Stage 2B: Planned Implementation (Complex Features)
+      # =====================================================================
+      - id: create_plan
+        type: agent
+        name: "Create Implementation Plan"
+        role: planner
+        goal: |
+          Create a detailed implementation plan:
+          1. Break down into subtasks
+          2. Identify file changes needed
+          3. Define testing strategy
+          4. Estimate risks and mitigations
+        tool_budget: 15
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.3
+        output: plan
+        next: [review_plan]
+
+      - id: review_plan
+        type: hitl
+        name: "Review Implementation Plan"
+        hitl_type: approval
+        prompt: |
+          ## Implementation Plan
+
+          **Feature:** {feature_description}
+
+          **Proposed Changes:**
+          {plan}
+
+          **Estimated Complexity:** {estimated_changes} files
+
+          Do you approve this plan?
+        context_keys:
+          - feature_description
+          - plan
+          - estimated_changes
+        choices:
+          - "Approve"
+          - "Modify plan"
+          - "Cancel"
+        timeout: 900
+        fallback: continue
+        next: [handle_plan_review]
+
+      - id: handle_plan_review
+        type: condition
+        name: "Handle Plan Review"
+        condition: "plan_approval"
+        branches:
+          "Approve": implement_feature
+          "Modify plan": revise_plan
+          "Cancel": abort
+
+      - id: revise_plan
+        type: agent
+        name: "Revise Plan"
+        role: planner
+        goal: |
+          Revise the implementation plan based on feedback:
+          {plan_feedback}
+        tool_budget: 10
+        input_mapping:
+          feedback: plan_feedback
+          original_plan: plan
+        output: revised_plan
+        next: [review_plan]
+
+      - id: implement_feature
+        type: agent
+        name: "Implement Feature"
+        role: executor
+        goal: |
+          Implement the feature according to the plan:
+          {plan}
+
+          Guidelines:
+          - Follow existing code patterns
+          - Add appropriate error handling
+          - Write clean, maintainable code
+          - Add comments for complex logic
+        tool_budget: 50
+        tools: [read, edit, write, shell, grep]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          implementation_plan: plan
+        output: implementation
+        next: [run_tests]
+
+      # =====================================================================
+      # Stage 3: Testing
+      # =====================================================================
+      - id: run_tests
+        type: compute
+        name: "Run Test Suite"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+          coverage: true
+        output: test_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_tests]
+
+      - id: check_tests
+        type: condition
+        name: "Check Test Results"
+        condition: "tests_passed"
+        branches:
+          "true": generate_tests
+          "false": fix_tests
+
+      - id: fix_tests
+        type: agent
+        name: "Fix Failing Tests"
+        role: executor
+        goal: |
+          Fix the failing tests:
+          {test_failures}
+
+          Either fix the implementation or update the tests as appropriate.
+        tool_budget: 30
+        tools: [read, edit, shell]
+        llm_config:
+          temperature: 0.1
+        input_mapping:
+          failures: test_failures
+        output: fixes
+        next: [run_tests_retry]
+
+      - id: run_tests_retry
+        type: compute
+        name: "Re-run Tests"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: retry_test_results
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_retry]
+
+      - id: check_retry
+        type: condition
+        name: "Check Retry Results"
+        condition: "retry_attempts < 3 and not tests_passed"
+        branches:
+          "true": fix_tests
+          "false": generate_tests
+
+      - id: generate_tests
+        type: agent
+        name: "Generate Additional Tests"
+        role: executor
+        goal: |
+          Generate additional tests for the new feature:
+          - Unit tests for new functions
+          - Integration tests if applicable
+          - Edge case coverage
+        tool_budget: 20
+        tools: [read, write, shell]
+        llm_config:
+          temperature: 0.3
+        output: new_tests
+        next: [code_review]
+
+      # =====================================================================
+      # Stage 4: Code Review
+      # =====================================================================
+      - id: code_review
+        type: agent
+        name: "Automated Code Review"
+        role: reviewer
+        goal: |
+          Review the implementation for:
+          1. Code quality and readability
+          2. Potential bugs or edge cases
+          3. Performance considerations
+          4. Security vulnerabilities
+          5. Adherence to coding standards
+        tool_budget: 20
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.4
+        output: review
+        next: [check_review]
+
+      - id: check_review
+        type: condition
+        name: "Check Review Severity"
+        condition: "has_critical_issues"
+        branches:
+          "true": address_issues
+          "false": human_review
+
+      - id: address_issues
+        type: agent
+        name: "Address Review Issues"
+        role: executor
+        goal: |
+          Address the critical issues found in code review:
+          {critical_issues}
+        tool_budget: 25
+        tools: [read, edit]
+        input_mapping:
+          issues: review
+        output: fixes
+        next: [code_review]
+
+      - id: human_review
+        type: hitl
+        name: "Human Code Review"
+        hitl_type: approval
+        prompt: |
+          ## Code Review Complete
+
+          **Implementation Summary:**
+          {implementation_summary}
+
+          **AI Review Findings:**
+          {review}
+
+          **Test Results:**
+          - All tests passing: {tests_passed}
+          - Coverage: {coverage_percent}%
+
+          Please review the changes and approve.
+        context_keys:
+          - implementation_summary
+          - review
+          - tests_passed
+          - coverage_percent
+        timeout: 1800
+        fallback: continue
+        next: [finalize]
+
+      # =====================================================================
+      # Stage 5: Finalize
+      # =====================================================================
+      - id: finalize
+        type: parallel
+        name: "Finalize Feature"
+        parallel_nodes: [update_docs, format_code]
+        join_strategy: all
+        next: [complete]
+
+      - id: update_docs
+        type: agent
+        name: "Update Documentation"
+        role: writer
+        goal: |
+          Update documentation for the new feature:
+          - Add/update docstrings
+          - Update README if needed
+          - Add usage examples
+        tool_budget: 15
+        tools: [read, edit, write]
+        output: docs
+
+      - id: format_code
+        type: compute
+        name: "Format Code"
+        tools: [shell]
+        inputs:
+          command: $ctx.format_command
+        constraints:
+          llm_allowed: false
+          timeout: 60
+
+      - id: complete
+        type: transform
+        name: "Feature Complete"
+        transform: |
+          status = "completed"
+          completion_time = current_timestamp()
+
+      - id: abort
+        type: transform
+        name: "Feature Aborted"
+        transform: |
+          status = "aborted"
+
+
+  # =========================================================================
+  # Bugfix Workflow
+  # =========================================================================
+  bugfix:
+    description: "Bug investigation and fix with tests"
+
+    metadata:
+      vertical: coding
+
+    nodes:
+      - id: investigate
+        type: agent
+        name: "Investigate Bug"
+        role: researcher
+        goal: |
+          Investigate the reported bug:
+          1. Understand the bug report/error
+          2. Find the root cause
+          3. Identify affected code
+          4. Determine the fix strategy
+        tool_budget: 30
+        tools: [read, grep, code_search, shell]
+        llm_config:
+          temperature: 0.3
+        output: investigation
+        next: [confirm_cause]
+
+      - id: confirm_cause
+        type: hitl
+        name: "Confirm Root Cause"
+        hitl_type: approval
+        prompt: |
+          ## Bug Investigation Complete
+
+          **Root Cause:**
+          {root_cause}
+
+          **Affected Files:**
+          {affected_files}
+
+          **Proposed Fix:**
+          {proposed_fix}
+
+          Proceed with fix?
+        context_keys:
+          - root_cause
+          - affected_files
+          - proposed_fix
+        timeout: 600
+        fallback: continue
+        next: [implement_fix]
+
+      - id: implement_fix
+        type: agent
+        name: "Implement Fix"
+        role: executor
+        goal: |
+          Implement the bug fix:
+          {proposed_fix}
+
+          - Make minimal changes
+          - Add regression test
+          - Verify fix doesn't break existing functionality
+        tool_budget: 25
+        tools: [read, edit, write, shell]
+        llm_config:
+          temperature: 0.1
+        output: fix
+        next: [verify_fix]
+
+      - id: verify_fix
+        type: compute
+        name: "Verify Fix"
+        tools: [shell]
+        inputs:
+          command: $ctx.test_command
+        output: verification
+        constraints:
+          llm_allowed: false
+          timeout: 300
+        next: [check_verification]
+
+      - id: check_verification
+        type: condition
+        name: "Check Verification"
+        condition: "fix_verified"
+        branches:
+          "true": complete
+          "false": investigate
+
+      - id: complete
+        type: transform
+        name: "Bug Fixed"
+        transform: |
+          status = "fixed"
+          resolution_time = current_timestamp()

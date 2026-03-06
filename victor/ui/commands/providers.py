@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -67,6 +68,16 @@ def _list_providers_impl() -> None:
         "together": ("⚠️ Untested", "Together AI, $25 free credits", None),
         "openrouter": ("✅ Ready", "Unified gateway, 350+ models, Free tier", None),
         "fireworks": ("✅ Ready", "Fast inference, $1 free credits, Tool calling", None),
+        "zai": (
+            "✅ Ready",
+            "GLM-5/4.7, Coding Plan, Thinking mode, OpenAI-compat",
+            "zhipuai, zhipu",
+        ),
+        "qwen": (
+            "✅ Ready",
+            "Qwen3.5, OAuth + API-key, Coding Plan, OpenAI-compat",
+            "alibaba, dashscope",
+        ),
         "huggingface": ("⚠️ Untested", "HuggingFace Inference API", "hf"),
         "replicate": ("⚠️ Untested", "Replicate, Open models", None),
         # Enterprise providers (require setup)
@@ -249,3 +260,155 @@ def verify_provider(
                 console.print(f"  • {issue}")
 
     asyncio.run(run_verify())
+
+
+# ---------------------------------------------------------------------------
+# victor providers auth login / logout / status
+# ---------------------------------------------------------------------------
+
+auth_app = typer.Typer(name="auth", help="Manage OAuth authentication for providers.")
+providers_app.add_typer(auth_app)
+
+OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen"]
+
+
+@auth_app.command("login")
+def auth_login(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to authenticate ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force re-authentication even if token is cached"
+    ),
+) -> None:
+    """Log in to a provider via OAuth (opens browser).
+
+    Example:
+        victor providers auth login openai
+        victor providers auth login qwen --force
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+        console.print(
+            f"[red]✗[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    async def _login():
+        mgr = OAuthTokenManager(provider)
+
+        if not force:
+            cached = mgr._load_cached()
+            if cached is not None and not cached.is_expired:
+                console.print(f"[green]✓[/] Already authenticated with {provider}")
+                console.print(
+                    f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
+                )
+                console.print("[dim]Use --force to re-authenticate[/]")
+                return
+
+        console.print(f"[cyan]Opening browser for {provider} OAuth login...[/]")
+        try:
+            token = await mgr.get_valid_token()
+            if token:
+                console.print(f"[green]✓[/] Successfully authenticated with {provider}")
+                console.print(
+                    f"  Token saved to ~/.victor/oauth_tokens.yaml"
+                )
+            else:
+                console.print(f"[red]✗[/] Authentication failed for {provider}")
+                raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[red]✗[/] OAuth login failed: {e}")
+            raise typer.Exit(1)
+
+    asyncio.run(_login())
+
+
+@auth_app.command("logout")
+def auth_logout(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to log out from ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+    ),
+) -> None:
+    """Remove cached OAuth tokens for a provider.
+
+    Example:
+        victor providers auth logout openai
+        victor providers auth logout qwen
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+        console.print(
+            f"[red]✗[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    mgr = OAuthTokenManager(provider)
+    mgr._clear_cached()
+    console.print(f"[green]✓[/] Logged out from {provider} (tokens cleared)")
+
+
+@auth_app.command("status")
+def auth_status(
+    provider: Optional[str] = typer.Argument(
+        None, help="Check specific provider (or all if omitted)"
+    ),
+) -> None:
+    """Show OAuth authentication status for providers.
+
+    Example:
+        victor providers auth status
+        victor providers auth status openai
+    """
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    providers_to_check = (
+        [provider.lower()] if provider else OAUTH_SUPPORTED_PROVIDERS
+    )
+
+    table = Table(title="OAuth Authentication Status", show_header=True)
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status")
+    table.add_column("Expires")
+    table.add_column("Token Preview", style="dim")
+
+    for prov in providers_to_check:
+        if prov not in OAUTH_SUPPORTED_PROVIDERS:
+            table.add_row(prov, "[red]Not supported[/]", "", "")
+            continue
+
+        mgr = OAuthTokenManager(prov)
+        cached = mgr._load_cached()
+
+        if cached is None:
+            table.add_row(prov, "[dim]Not authenticated[/]", "", "")
+        elif cached.is_expired:
+            table.add_row(
+                prov,
+                "[yellow]Expired[/]",
+                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                "",
+            )
+        else:
+            preview = cached.access_token[:8] + "..." if cached.access_token else ""
+            table.add_row(
+                prov,
+                "[green]✓ Active[/]",
+                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                preview,
+            )
+
+    console.print(table)
+    console.print(
+        "\n[dim]Login:  victor providers auth login <provider>[/]"
+    )
+    console.print(
+        "[dim]Logout: victor providers auth logout <provider>[/]"
+    )

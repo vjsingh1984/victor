@@ -46,6 +46,7 @@ Escape Hatch:
     # Now you have access to all 27+ internal components
 """
 
+# === CORE: Always imported (the 5 concepts + errors + protocols) ===
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
 from victor.framework.protocols import (
@@ -89,21 +90,72 @@ from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
 
-# CQRS integration (optional - lazy loaded)
-try:
-    from victor.framework.cqrs_bridge import (
-        CQRSBridge,
-        FrameworkEventAdapter,
-        ObservabilityToCQRSBridge,
-        create_cqrs_bridge,
-        create_event_adapter,
-        cqrs_event_to_framework,
-        framework_event_to_cqrs,
-        framework_event_to_observability,
-        observability_event_to_framework,
-    )
+# Core names always available
+_CORE_NAMES = [
+    # Core classes (the 5 concepts)
+    "Agent",
+    "Task",
+    "Tools",
+    "State",
+    "AgentExecutionEvent",
+    # Agent
+    "ChatSession",
+    # Task
+    "TaskResult",
+    "FrameworkTaskType",
+    # Tools
+    "ToolSet",
+    "ToolCategory",
+    "ToolsInput",
+    # State
+    "Stage",
+    "StateHooks",
+    "StateObserver",
+    # Protocols
+    "OrchestratorProtocol",
+    "ConversationStateProtocol",
+    "ProviderProtocol",
+    "ToolsProtocol",
+    "SystemPromptProtocol",
+    "MessagesProtocol",
+    "StreamingProtocol",
+    "OrchestratorStreamChunk",
+    "ChunkType",
+    "verify_protocol_conformance",
+    # Events
+    "EventType",
+    "content_event",
+    "thinking_event",
+    "tool_call_event",
+    "tool_result_event",
+    "tool_error_event",
+    "stage_change_event",
+    "stream_start_event",
+    "stream_end_event",
+    "error_event",
+    "progress_event",
+    "milestone_event",
+    # Config
+    "AgentConfig",
+    # Shim
+    "FrameworkShim",
+    "get_vertical",
+    "list_verticals",
+    # Errors
+    "AgentError",
+    "ProviderError",
+    "ToolError",
+    "ConfigurationError",
+    "BudgetExhaustedError",
+    "CancellationError",
+    "StateTransitionError",
+    # Discovery
+    "discover",
+]
 
-    _CQRS_EXPORTS = [
+# === LAZY: Feature groups loaded on demand via PEP 562 ===
+_LAZY_IMPORTS: dict[str, list[str]] = {
+    "victor.framework.cqrs_bridge": [
         "CQRSBridge",
         "FrameworkEventAdapter",
         "ObservabilityToCQRSBridge",
@@ -113,25 +165,8 @@ try:
         "framework_event_to_cqrs",
         "framework_event_to_observability",
         "observability_event_to_framework",
-    ]
-except ImportError:
-    _CQRS_EXPORTS = []
-
-# Event Registry (Phase 7.3 - Unified event conversion)
-try:
-    from victor.framework.event_registry import (
-        BaseEventConverter,
-        EventConverterProtocol,
-        EventRegistry,
-        EventTarget,
-        convert_from_cqrs,
-        convert_from_observability,
-        convert_to_cqrs,
-        convert_to_observability,
-        get_event_registry,
-    )
-
-    _EVENT_REGISTRY_EXPORTS = [
+    ],
+    "victor.framework.event_registry": [
         "BaseEventConverter",
         "EventConverterProtocol",
         "EventRegistry",
@@ -141,30 +176,8 @@ try:
         "convert_to_cqrs",
         "convert_to_observability",
         "get_event_registry",
-    ]
-except ImportError:
-    _EVENT_REGISTRY_EXPORTS = []
-
-# Agent Components (Phase 7.4 - Builder/Session/Bridge decomposition)
-# Phase 8.3 - Added SessionLifecycleHooks, SessionMetrics for lifecycle management
-try:
-    from victor.framework.agent_components import (
-        AgentBridge,
-        AgentBuilder,
-        AgentBuildOptions,
-        AgentSession,
-        BridgeConfiguration,
-        BuilderPreset,
-        SessionContext,
-        SessionLifecycleHooks,
-        SessionMetrics,
-        SessionState,
-        create_bridge,
-        create_builder,
-        create_session,
-    )
-
-    _AGENT_COMPONENTS_EXPORTS = [
+    ],
+    "victor.framework.agent_components": [
         "AgentBridge",
         "AgentBuilder",
         "AgentBuildOptions",
@@ -178,30 +191,8 @@ try:
         "create_bridge",
         "create_builder",
         "create_session",
-    ]
-except ImportError:
-    _AGENT_COMPONENTS_EXPORTS = []
-
-# Tool Configuration (Phase 7.5 - Externalized tool configuration)
-try:
-    from victor.framework.tool_config import (
-        AirgappedFilter,
-        CostTierFilter,
-        SecurityFilter,
-        ToolConfig,
-        ToolConfigBuilder,
-        ToolConfigEntry,
-        ToolConfigMode,
-        ToolConfigResult,
-        ToolConfigurator,
-        ToolFilterProtocol,
-        configure_tools,
-        configure_tools_from_toolset,
-        get_tool_configurator,
-    )
-
-    # Note: ToolCategory is already exported from tools.py
-    _TOOL_CONFIG_EXPORTS = [
+    ],
+    "victor.framework.tool_config": [
         "AirgappedFilter",
         "CostTierFilter",
         "SecurityFilter",
@@ -215,25 +206,8 @@ try:
         "configure_tools",
         "configure_tools_from_toolset",
         "get_tool_configurator",
-    ]
-except ImportError:
-    _TOOL_CONFIG_EXPORTS = []
-
-# Service Provider (Phase 8 - DI Container Integration)
-try:
-    from victor.framework.service_provider import (
-        AgentBuilderService,
-        AgentSessionService,
-        EventRegistryService,
-        FrameworkScope,
-        FrameworkServiceProvider,
-        ToolConfiguratorService,
-        configure_framework_services,
-        create_builder,
-        create_framework_scope,
-    )
-
-    _SERVICE_PROVIDER_EXPORTS = [
+    ],
+    "victor.framework.service_provider": [
         "AgentBuilderService",
         "AgentSessionService",
         "EventRegistryService",
@@ -241,53 +215,13 @@ try:
         "FrameworkServiceProvider",
         "ToolConfiguratorService",
         "configure_framework_services",
-        "create_builder",
         "create_framework_scope",
-    ]
-except ImportError:
-    _SERVICE_PROVIDER_EXPORTS = []
-
-# Resilience Facade (Phase 9.1 - Re-exports from providers/core modules)
-try:
-    from victor.framework.resilience import (
-        # Circuit Breaker (Standalone)
-        CircuitBreaker,
-        CircuitBreakerError,
-        CircuitBreakerRegistry,
-        CircuitState,
-        # Resilient Provider
-        CircuitBreakerConfig,
-        CircuitBreakerState,
-        CircuitOpenError,
-        ProviderUnavailableError,
-        ResilientProvider,
-        ProviderRetryConfig,
-        RetryExhaustedError,
-        ProviderRetryStrategy,
-        # Unified Retry Strategies
-        ExponentialBackoffStrategy,
-        FixedDelayStrategy,
-        LinearBackoffStrategy,
-        NoRetryStrategy,
-        RetryContext,
-        RetryExecutor,
-        RetryOutcome,
-        RetryResult,
-        BaseRetryStrategy,
-        connection_retry_strategy,
-        provider_retry_strategy,
-        tool_retry_strategy,
-        with_retry,
-        with_retry_sync,
-    )
-
-    _RESILIENCE_EXPORTS = [
-        # Circuit Breaker (Standalone)
+    ],
+    "victor.framework.resilience": [
         "CircuitBreaker",
         "CircuitBreakerError",
         "CircuitBreakerRegistry",
         "CircuitState",
-        # Resilient Provider
         "CircuitBreakerConfig",
         "CircuitBreakerState",
         "CircuitOpenError",
@@ -296,7 +230,6 @@ try:
         "ProviderRetryConfig",
         "RetryExhaustedError",
         "ProviderRetryStrategy",
-        # Unified Retry Strategies
         "ExponentialBackoffStrategy",
         "FixedDelayStrategy",
         "LinearBackoffStrategy",
@@ -311,35 +244,8 @@ try:
         "tool_retry_strategy",
         "with_retry",
         "with_retry_sync",
-    ]
-except ImportError:
-    _RESILIENCE_EXPORTS = []
-
-# Health Facade (Phase 9.2 - Re-exports from core/providers modules)
-try:
-    from victor.framework.health import (
-        # Core Health Check System
-        BaseHealthCheck,
-        CacheHealthCheck,
-        CallableHealthCheck,
-        ComponentHealth,
-        HealthCheckProtocol,
-        HealthChecker,
-        HealthReport,
-        HealthStatus,
-        MemoryHealthCheck,
-        ProviderHealthCheck,
-        ToolHealthCheck,
-        create_default_health_checker,
-        # Provider-Specific Health
-        HealthCheckResult,
-        ProviderHealthChecker,
-        ProviderHealthResult,
-        check_provider_health,
-    )
-
-    _HEALTH_EXPORTS = [
-        # Core Health Check System
+    ],
+    "victor.framework.health": [
         "BaseHealthCheck",
         "CacheHealthCheck",
         "CallableHealthCheck",
@@ -352,37 +258,14 @@ try:
         "ProviderHealthCheck",
         "ToolHealthCheck",
         "create_default_health_checker",
-        # Provider-Specific Health
         "HealthCheckResult",
+        "ProviderHealthStatus",
         "ProviderHealthChecker",
-        "ProviderHealthResult",
-        "check_provider_health",
-    ]
-except ImportError:
-    _HEALTH_EXPORTS = []
-
-# Metrics Facade (Phase 9.3 - Re-exports from observability/telemetry modules)
-try:
-    from victor.framework.metrics import (
-        # Metrics System
-        Counter,
-        Gauge,
-        Histogram,
-        Metric,
-        MetricLabels,
-        MetricsCollector,
-        MetricsRegistry,
-        Timer,
-        TimerContext,
-        # Telemetry
-        get_meter,
-        get_tracer,
-        is_telemetry_enabled,
-        setup_opentelemetry,
-    )
-
-    _METRICS_EXPORTS = [
-        # Metrics System
+        "ProviderHealthReport",
+        "get_provider_health_checker",
+        "reset_provider_health_checker",
+    ],
+    "victor.framework.metrics": [
         "Counter",
         "Gauge",
         "Histogram",
@@ -392,75 +275,31 @@ try:
         "MetricsRegistry",
         "Timer",
         "TimerContext",
-        # Telemetry
         "get_meter",
         "get_tracer",
         "is_telemetry_enabled",
         "setup_opentelemetry",
-    ]
-except ImportError:
-    _METRICS_EXPORTS = []
-
-# Teams (Phase 4 - Multi-Agent Teams Exposure)
-# NOTE: Canonical team types (TeamFormation, MemberResult, TeamResult, etc.)
-# are now imported from victor.teams. Framework-specific types remain in
-# victor.framework.teams.
-try:
-    from victor.teams import (
-        MemberResult,
-        TeamFormation,
-        TeamResult,
-    )
-    from victor.framework.teams import (
-        AgentTeam,
-        TeamEvent,
-        TeamEventType,
-        TeamMemberSpec,
-        member_complete_event,
-        member_start_event,
-        team_complete_event,
-        team_start_event,
-    )
-    from victor.teams.types import (
-        TeamConfig,
-        TeamMember,
-    )
-
-    _TEAMS_EXPORTS = [
+    ],
+    "victor.framework.teams": [
         "AgentTeam",
-        "MemberResult",
-        "TeamConfig",
         "TeamEvent",
         "TeamEventType",
-        "TeamFormation",
-        "TeamMember",
         "TeamMemberSpec",
-        "TeamResult",
         "member_complete_event",
         "member_start_event",
         "team_complete_event",
         "team_start_event",
-    ]
-except ImportError:
-    _TEAMS_EXPORTS = []
-
-# Reinforcement Learning (Phase 5 - RL + Capability Registry)
-try:
-    from victor.framework.rl import (
-        BaseLearner,
-        LearnerStats,
-        LearnerType,
-        RLCoordinator,
-        RLManager,
-        RLOutcome,
-        RLRecommendation,
-        RLStats,
-        create_outcome,
-        get_rl_coordinator,
-        record_tool_success,
-    )
-
-    _RL_EXPORTS = [
+    ],
+    "victor.teams": [
+        "MemberResult",
+        "TeamFormation",
+        "TeamResult",
+    ],
+    "victor.teams.types": [
+        "TeamConfig",
+        "TeamMember",
+    ],
+    "victor.framework.rl": [
         "BaseLearner",
         "LearnerStats",
         "LearnerType",
@@ -472,54 +311,15 @@ try:
         "create_outcome",
         "get_rl_coordinator",
         "record_tool_success",
-    ]
-except ImportError:
-    _RL_EXPORTS = []
-
-# Team Registry (Framework-level team spec management)
-try:
-    from victor.framework.team_registry import (
-        TeamSpecRegistry,
-        TeamSpecEntry,
-        get_team_registry,
-        register_team_spec,
-        get_team_spec,
-    )
-
-    _TEAM_REGISTRY_EXPORTS = [
+    ],
+    "victor.framework.team_registry": [
         "TeamSpecRegistry",
         "TeamSpecEntry",
         "get_team_registry",
         "register_team_spec",
         "get_team_spec",
-    ]
-except ImportError:
-    _TEAM_REGISTRY_EXPORTS = []
-
-# Graph Workflow Engine (LangGraph-compatible StateGraph)
-try:
-    from victor.framework.graph import (
-        StateGraph,
-        CompiledGraph,
-        Node,
-        Edge,
-        EdgeType,
-        FrameworkNodeStatus,
-        GraphExecutionResult,
-        GraphConfig,
-        WorkflowCheckpoint,
-        CheckpointerProtocol,
-        MemoryCheckpointer,
-        RLCheckpointerAdapter,
-        StateProtocol,
-        NodeFunctionProtocol,
-        ConditionFunctionProtocol,
-        END,
-        START,
-        create_graph,
-    )
-
-    _GRAPH_EXPORTS = [
+    ],
+    "victor.framework.graph": [
         "StateGraph",
         "CompiledGraph",
         "Node",
@@ -531,103 +331,38 @@ try:
         "WorkflowCheckpoint",
         "CheckpointerProtocol",
         "MemoryCheckpointer",
-        "RLCheckpointerAdapter",  # Integrates with existing RL CheckpointStore
+        "RLCheckpointerAdapter",
         "StateProtocol",
         "NodeFunctionProtocol",
         "ConditionFunctionProtocol",
         "END",
         "START",
         "create_graph",
-    ]
-except ImportError:
-    _GRAPH_EXPORTS = []
-
-# Module Loader (Shared infrastructure for dynamic module loading)
-try:
-    from victor.framework.module_loader import (
-        CachedEntryPoints,
-        DebouncedReloadTimer,
-        DynamicModuleLoader,
-        EntryPointCache,
-        get_entry_point_cache,
-    )
-
-    _MODULE_LOADER_EXPORTS = [
+    ],
+    "victor.framework.module_loader": [
         "CachedEntryPoints",
         "DebouncedReloadTimer",
         "DynamicModuleLoader",
         "EntryPointCache",
         "get_entry_point_cache",
-    ]
-except ImportError:
-    _MODULE_LOADER_EXPORTS = []
-
-# Entry Point Loader (Phase 3 - Dynamic loading of vertical capabilities)
-try:
-    from victor.framework.entry_point_loader import (
-        load_safety_rules_from_entry_points,
-        load_tool_dependency_provider_from_entry_points,
-        load_rl_config_from_entry_points,
-        register_escape_hatches_from_entry_points,
-        register_commands_from_entry_points,
-        list_installed_verticals,
-    )
-
-    _ENTRY_POINT_LOADER_EXPORTS = [
+    ],
+    "victor.framework.entry_point_loader": [
         "load_safety_rules_from_entry_points",
         "load_tool_dependency_provider_from_entry_points",
         "load_rl_config_from_entry_points",
         "register_escape_hatches_from_entry_points",
         "register_commands_from_entry_points",
         "list_installed_verticals",
-    ]
-except ImportError:
-    _ENTRY_POINT_LOADER_EXPORTS = []
-
-# Capability Loader (Phase 4.4 - Dynamic capability loading for plugins)
-try:
-    from victor.framework.capability_loader import (
-        CapabilityLoader,
-        CapabilityEntry,
-        CapabilityLoadError,
-        capability,
-        create_capability_loader,
-        get_default_capability_loader,
-    )
-
-    _CAPABILITY_LOADER_EXPORTS = [
+    ],
+    "victor.framework.capability_loader": [
         "CapabilityLoader",
         "CapabilityEntry",
         "CapabilityLoadError",
         "capability",
         "create_capability_loader",
         "get_default_capability_loader",
-    ]
-except ImportError:
-    _CAPABILITY_LOADER_EXPORTS = []
-
-# Tool Naming (Canonical tool name enforcement)
-try:
-    from victor.framework.tool_naming import (
-        CANONICAL_TO_ALIASES,
-        TOOL_ALIASES,
-        ToolNameEntry,
-        ToolNames,
-        canonicalize_dependencies,
-        canonicalize_tool_dict,
-        canonicalize_tool_list,
-        canonicalize_tool_set,
-        canonicalize_transitions,
-        get_aliases,
-        get_all_canonical_names,
-        get_canonical_name,
-        get_legacy_names_report,
-        get_name_mapping,
-        is_valid_tool_name,
-        validate_tool_names,
-    )
-
-    _TOOL_NAMING_EXPORTS = [
+    ],
+    "victor.framework.tool_naming": [
         "CANONICAL_TO_ALIASES",
         "TOOL_ALIASES",
         "ToolNameEntry",
@@ -644,48 +379,15 @@ try:
         "get_name_mapping",
         "is_valid_tool_name",
         "validate_tool_names",
-    ]
-except ImportError:
-    _TOOL_NAMING_EXPORTS = []
-
-# Framework Middleware (common middleware for all verticals)
-try:
-    from victor.framework.middleware import (
-        GitSafetyMiddleware,
-        LoggingMiddleware,
-        MetricsMiddleware,
-        SecretMaskingMiddleware,
-        ToolMetrics,
-    )
-
-    _MIDDLEWARE_EXPORTS = [
+    ],
+    "victor.framework.middleware": [
         "GitSafetyMiddleware",
         "LoggingMiddleware",
         "MetricsMiddleware",
         "SecretMaskingMiddleware",
         "ToolMetrics",
-    ]
-except ImportError:
-    _MIDDLEWARE_EXPORTS = []
-
-# Task Type Registry (Unified task type definitions with hints/budgets)
-try:
-    from victor.framework.task_types import (
-        TaskCategory,
-        TaskTypeDefinition,
-        TaskTypeRegistry,
-        get_task_budget,
-        get_task_hint,
-        get_task_type_registry,
-        register_vertical_task_type,
-        register_coding_task_types,
-        register_data_analysis_task_types,
-        register_devops_task_types,
-        register_research_task_types,
-        setup_vertical_task_types,
-    )
-
-    _TASK_TYPES_EXPORTS = [
+    ],
+    "victor.framework.task_types": [
         "TaskCategory",
         "TaskTypeDefinition",
         "TaskTypeRegistry",
@@ -698,102 +400,214 @@ try:
         "register_devops_task_types",
         "register_research_task_types",
         "setup_vertical_task_types",
-    ]
-except ImportError:
-    _TASK_TYPES_EXPORTS = []
+    ],
+    "victor.framework.vertical_integration": [
+        "IntegrationResult",
+        "OrchestratorVerticalProtocol",
+        "VerticalIntegrationPipeline",
+        "apply_vertical",
+        "create_integration_pipeline",
+        "create_integration_pipeline_with_handlers",
+    ],
+    "victor.framework.vertical_cache_policy": [
+        "InMemoryLRUVerticalIntegrationCachePolicy",
+        "VerticalIntegrationCachePolicy",
+    ],
+    "victor.framework.step_handlers": [
+        "BaseStepHandler",
+        "ConfigStepHandler",
+        "ContextStepHandler",
+        "ExtensionsStepHandler",
+        "FrameworkStepHandler",
+        "MiddlewareStepHandler",
+        "PromptStepHandler",
+        "SafetyStepHandler",
+        "StepHandlerProtocol",
+        "StepHandlerRegistry",
+        "ToolStepHandler",
+    ],
+    "victor.framework.hitl": [
+        "ApprovalHandler",
+        "ApprovalRequest",
+        "ApprovalStatus",
+        "HITLCheckpoint",
+        "HITLController",
+    ],
+    "victor.framework.personas": [
+        "Persona",
+        "PERSONA_REGISTRY",
+        "get_persona",
+        "register_persona",
+        "list_personas",
+    ],
+    "victor.framework.agent_protocols": [
+        "AgentCapability",
+        "AgentMessage",
+        "IAgentPersona",
+        "IAgentRole",
+        "ITeamCoordinator",
+        "ITeamMember",
+        "MessageType",
+    ],
+    "victor.framework.agent_roles": [
+        "ExecutorRole",
+        "ManagerRole",
+        "ResearcherRole",
+        "ReviewerRole",
+        "ROLE_REGISTRY",
+        "get_role",
+    ],
+    "victor.framework.chain_registry": [
+        "ChainMetadata",
+        "ChainRegistry",
+        "get_chain",
+        "get_chain_registry",
+        "register_chain",
+    ],
+    "victor.framework.persona_registry": [
+        "PersonaRegistry",
+        "PersonaSpec",
+        "get_persona_registry",
+        "get_persona_spec",
+        "register_persona_spec",
+    ],
+    "victor.framework.prompt_builder": [
+        "PromptBuilder",
+        "PromptSection",
+        "ToolHint",
+        "create_coding_prompt_builder",
+        "create_data_analysis_prompt_builder",
+        "create_devops_prompt_builder",
+        "create_research_prompt_builder",
+    ],
+    "victor.framework.prompt_sections": [
+        "GROUNDING_RULES_EXTENDED",
+        "GROUNDING_RULES_MINIMAL",
+        "PARALLEL_READ_GUIDANCE",
+        "CODING_GUIDELINES",
+        "CODING_IDENTITY",
+        "CODING_TOOL_USAGE",
+        "DEVOPS_COMMON_PITFALLS",
+        "DEVOPS_GROUNDING",
+        "DEVOPS_IDENTITY",
+        "DEVOPS_SECURITY_CHECKLIST",
+        "RESEARCH_GROUNDING",
+        "RESEARCH_IDENTITY",
+        "RESEARCH_QUALITY_CHECKLIST",
+        "RESEARCH_SOURCE_HIERARCHY",
+        "DATA_ANALYSIS_GROUNDING",
+        "DATA_ANALYSIS_IDENTITY",
+        "DATA_ANALYSIS_LIBRARIES",
+        "DATA_ANALYSIS_OPERATIONS",
+    ],
+    "victor.framework.stage_manager": [
+        "StageDefinition",
+        "StageManager",
+        "StageManagerConfig",
+        "StageManagerProtocol",
+        "StageTransition",
+        "create_stage_manager",
+        "get_coding_stages",
+        "get_data_analysis_stages",
+        "get_research_stages",
+    ],
+    "victor.framework.lsp_protocols": [
+        "LSPCompletionItem",
+        "LSPDiagnostic",
+        "LSPHoverInfo",
+        "LSPLocation",
+        "LSPPoolProtocol",
+        "LSPPosition",
+        "LSPRange",
+        "LSPServiceProtocol",
+        "LSPSymbol",
+    ],
+    "victor.framework.workflow_engine": [
+        "WorkflowExecutionResult",
+        "WorkflowEngine",
+        "WorkflowEngineConfig",
+        "WorkflowEngineProtocol",
+        "WorkflowEvent",
+        "create_workflow_engine",
+        "run_graph_workflow",
+        "run_yaml_workflow",
+    ],
+    "victor.framework.observability": [
+        "ObservabilityManager",
+        "ObservabilityConfig",
+        "DashboardData",
+        "MetricType",
+        "MetricLabel",
+        "CounterMetric",
+        "GaugeMetric",
+        "HistogramBucket",
+        "HistogramMetric",
+        "SummaryMetric",
+        "MetricsSnapshot",
+        "MetricsCollection",
+        "MetricSource",
+        "MetricNames",
+    ],
+    "victor.framework.contextual_errors": [
+        "ContextualError",
+        "ProviderConnectionError",
+        "ToolExecutionError",
+        "FileOperationError",
+        "ResourceError",
+        "create_provider_error",
+        "create_tool_error",
+        "create_file_error",
+        "wrap_error",
+        "format_exception_for_user",
+    ],
+}
 
-# Checkpointing is handled by victor.agent.rl.checkpoint_store.CheckpointStore
-# which provides versioning, rollback, and diff capabilities.
-# WorkflowExecutor and StateGraph integrate with it via optional parameters.
-_CHECKPOINTER_EXPORTS = []
+# Aliased imports: name -> (module, real_name)
+_ALIASED_IMPORTS: dict[str, tuple[str, str]] = {
+    "AgentTeamFormation": ("victor.framework.agent_protocols", "TeamFormation"),
+    "CoordinatorMemberResult": ("victor.teams", "MemberResult"),
+    "CoordinatorTeamResult": ("victor.teams", "TeamResult"),
+    # create_builder exists in both agent_components and service_provider;
+    # keep the service_provider version as the canonical lazy target since
+    # agent_components also defines it (first-wins in _NAME_TO_MODULE)
+}
 
-# Multi-agent teams are handled by AgentTeam with extended TeamMember
-# supporting backstory, memory, cache attributes (CrewAI-compatible features).
-# Use victor.framework.teams.AgentTeam instead of a separate Crew class.
-_CREW_EXPORTS = []
+# Build reverse lookup: name -> module path
+_NAME_TO_MODULE: dict[str, str] = {}
+for _mod, _names in _LAZY_IMPORTS.items():
+    for _name in _names:
+        if _name not in _NAME_TO_MODULE:
+            _NAME_TO_MODULE[_name] = _mod
 
-__all__ = (
-    [
-        # Core classes (the 5 concepts)
-        "Agent",
-        "Task",
-        "Tools",
-        "State",
-        "AgentExecutionEvent",
-        # Agent
-        "ChatSession",
-        # Task
-        "TaskResult",
-        "FrameworkTaskType",
-        # Tools
-        "ToolSet",
-        "ToolCategory",
-        "ToolsInput",
-        # State
-        "Stage",
-        "StateHooks",
-        "StateObserver",
-        # Protocols (Phase 7 - Framework-Orchestrator Interface)
-        "OrchestratorProtocol",
-        "ConversationStateProtocol",
-        "ProviderProtocol",
-        "ToolsProtocol",
-        "SystemPromptProtocol",
-        "MessagesProtocol",
-        "StreamingProtocol",
-        "OrchestratorStreamChunk",
-        "ChunkType",
-        "verify_protocol_conformance",
-        # Events
-        "EventType",
-        "content_event",
-        "thinking_event",
-        "tool_call_event",
-        "tool_result_event",
-        "tool_error_event",
-        "stage_change_event",
-        "stream_start_event",
-        "stream_end_event",
-        "error_event",
-        "progress_event",
-        "milestone_event",
-        # Config
-        "AgentConfig",
-        # Shim (backward compatibility)
-        "FrameworkShim",
-        "get_vertical",
-        "list_verticals",
-        # Errors
-        "AgentError",
-        "ProviderError",
-        "ToolError",
-        "ConfigurationError",
-        "BudgetExhaustedError",
-        "CancellationError",
-        "StateTransitionError",
-    ]
-    + _CQRS_EXPORTS
-    + _EVENT_REGISTRY_EXPORTS
-    + _AGENT_COMPONENTS_EXPORTS
-    + _TOOL_CONFIG_EXPORTS
-    + _SERVICE_PROVIDER_EXPORTS
-    + _RESILIENCE_EXPORTS
-    + _HEALTH_EXPORTS
-    + _METRICS_EXPORTS
-    + _TEAMS_EXPORTS
-    + _RL_EXPORTS
-    + _TEAM_REGISTRY_EXPORTS
-    + _GRAPH_EXPORTS
-    + _CHECKPOINTER_EXPORTS
-    + _CREW_EXPORTS
-    + _MODULE_LOADER_EXPORTS
-    + _CAPABILITY_LOADER_EXPORTS
-    + _ENTRY_POINT_LOADER_EXPORTS
-    + _TOOL_NAMING_EXPORTS
-    + _MIDDLEWARE_EXPORTS
-    + _TASK_TYPES_EXPORTS
-    + ["discover"]  # Capability discovery function
-)
+
+def __getattr__(name: str):
+    # Check aliased imports first
+    if name in _ALIASED_IMPORTS:
+        import importlib
+
+        mod_path, real_name = _ALIASED_IMPORTS[name]
+        mod = importlib.import_module(mod_path)
+        value = getattr(mod, real_name)
+        globals()[name] = value
+        return value
+
+    # Check lazy imports
+    if name in _NAME_TO_MODULE:
+        import importlib
+
+        mod = importlib.import_module(_NAME_TO_MODULE[name])
+        value = getattr(mod, name)
+        globals()[name] = value
+        return value
+
+    raise AttributeError(f"module 'victor.framework' has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(_CORE_NAMES) | set(_NAME_TO_MODULE.keys()) | set(_ALIASED_IMPORTS.keys()))
+
+
+__all__ = list(__dir__())
 
 
 def discover() -> dict:
@@ -829,443 +643,6 @@ def discover() -> dict:
     manifest = discovery.discover_all()
     return manifest.to_dict()
 
-
-# Vertical Integration (Phase 3.1 - Step Handlers)
-try:
-    from victor.framework.vertical_integration import (
-        IntegrationResult,
-        OrchestratorVerticalProtocol,
-        VerticalIntegrationPipeline,
-        apply_vertical,
-        create_integration_pipeline,
-        create_integration_pipeline_with_handlers,
-    )
-    from victor.framework.vertical_cache_policy import (
-        InMemoryLRUVerticalIntegrationCachePolicy,
-        VerticalIntegrationCachePolicy,
-    )
-    from victor.framework.step_handlers import (
-        BaseStepHandler,
-        ConfigStepHandler,
-        ContextStepHandler,
-        ExtensionsStepHandler,
-        FrameworkStepHandler,
-        MiddlewareStepHandler,
-        PromptStepHandler,
-        SafetyStepHandler,
-        StepHandlerProtocol,
-        StepHandlerRegistry,
-        ToolStepHandler,
-    )
-
-    _VERTICAL_INTEGRATION_EXPORTS = [
-        # Integration pipeline
-        "IntegrationResult",
-        "OrchestratorVerticalProtocol",
-        "VerticalIntegrationPipeline",
-        "apply_vertical",
-        "create_integration_pipeline",
-        "create_integration_pipeline_with_handlers",
-        "VerticalIntegrationCachePolicy",
-        "InMemoryLRUVerticalIntegrationCachePolicy",
-        # Step handlers (Phase 3.1)
-        "BaseStepHandler",
-        "ConfigStepHandler",
-        "ContextStepHandler",
-        "ExtensionsStepHandler",
-        "FrameworkStepHandler",
-        "MiddlewareStepHandler",
-        "PromptStepHandler",
-        "SafetyStepHandler",
-        "StepHandlerProtocol",
-        "StepHandlerRegistry",
-        "ToolStepHandler",
-    ]
-
-    __all__ = list(__all__) + _VERTICAL_INTEGRATION_EXPORTS
-except ImportError:
-    pass
-
-# HITL Protocol (Human-in-the-Loop)
-try:
-    from victor.framework.hitl import (
-        ApprovalHandler,
-        ApprovalRequest,
-        ApprovalStatus,
-        HITLCheckpoint,
-        HITLController,
-    )
-
-    _HITL_EXPORTS = [
-        "ApprovalHandler",
-        "ApprovalRequest",
-        "ApprovalStatus",
-        "HITLCheckpoint",
-        "HITLController",
-    ]
-
-    __all__ = list(__all__) + _HITL_EXPORTS
-except ImportError:
-    pass
-
-# Persona System
-try:
-    from victor.framework.personas import (
-        Persona,
-        PERSONA_REGISTRY,
-        get_persona,
-        register_persona,
-        list_personas,
-    )
-
-    _PERSONA_EXPORTS = [
-        "Persona",
-        "PERSONA_REGISTRY",
-        "get_persona",
-        "register_persona",
-        "list_personas",
-    ]
-
-    __all__ = list(__all__) + _PERSONA_EXPORTS
-except ImportError:
-    pass
-
-# Agent Protocols (Multi-Agent Orchestration)
-try:
-    from victor.framework.agent_protocols import (
-        AgentCapability,
-        AgentMessage,
-        IAgentPersona,
-        IAgentRole,
-        ITeamCoordinator,
-        ITeamMember,
-        MessageType,
-        TeamFormation as AgentTeamFormation,  # Alias to avoid conflict with teams.py
-    )
-
-    _AGENT_PROTOCOLS_EXPORTS = [
-        "AgentCapability",
-        "AgentMessage",
-        "IAgentPersona",
-        "IAgentRole",
-        "ITeamCoordinator",
-        "ITeamMember",
-        "MessageType",
-        "AgentTeamFormation",
-    ]
-
-    __all__ = list(__all__) + _AGENT_PROTOCOLS_EXPORTS
-except ImportError:
-    pass
-
-# Agent Roles (Built-in role definitions)
-try:
-    from victor.framework.agent_roles import (
-        ExecutorRole,
-        ManagerRole,
-        ResearcherRole,
-        ReviewerRole,
-        ROLE_REGISTRY,
-        get_role,
-    )
-
-    _AGENT_ROLES_EXPORTS = [
-        "ExecutorRole",
-        "ManagerRole",
-        "ResearcherRole",
-        "ReviewerRole",
-        "ROLE_REGISTRY",
-        "get_role",
-    ]
-
-    __all__ = list(__all__) + _AGENT_ROLES_EXPORTS
-except ImportError:
-    pass
-
-# Team Coordinator (Multi-Agent Coordination)
-# NOTE: FrameworkTeamCoordinator has been removed.
-# Use victor.teams.create_coordinator() instead.
-# See victor/teams/MIGRATION_GUIDE.md for migration instructions.
-try:
-    from victor.teams import (
-        MemberResult as CoordinatorMemberResult,  # Alias to avoid conflict
-        TeamResult as CoordinatorTeamResult,  # Alias to avoid conflict
-    )
-
-    _TEAM_COORDINATOR_EXPORTS = [
-        "CoordinatorMemberResult",
-        "CoordinatorTeamResult",
-    ]
-
-    __all__ = list(__all__) + _TEAM_COORDINATOR_EXPORTS
-except ImportError:
-    pass
-
-# Chain Registry (Cross-vertical chain discovery)
-try:
-    from victor.framework.chain_registry import (
-        ChainMetadata,
-        ChainRegistry,
-        get_chain,
-        get_chain_registry,
-        register_chain,
-    )
-
-    _CHAIN_REGISTRY_EXPORTS = [
-        "ChainMetadata",
-        "ChainRegistry",
-        "get_chain",
-        "get_chain_registry",
-        "register_chain",
-    ]
-
-    __all__ = list(__all__) + _CHAIN_REGISTRY_EXPORTS
-except ImportError:
-    pass
-
-# Persona Registry (Cross-vertical persona discovery)
-try:
-    from victor.framework.persona_registry import (
-        PersonaRegistry,
-        PersonaSpec,
-        get_persona_registry,
-        get_persona_spec,
-        register_persona_spec,
-    )
-
-    _PERSONA_REGISTRY_EXPORTS = [
-        "PersonaRegistry",
-        "PersonaSpec",
-        "get_persona_registry",
-        "get_persona_spec",
-        "register_persona_spec",
-    ]
-
-    __all__ = list(__all__) + _PERSONA_REGISTRY_EXPORTS
-except ImportError:
-    pass
-
-# Prompt Builder (WS-B - Consolidated prompt building)
-try:
-    from victor.framework.prompt_builder import (
-        PromptBuilder,
-        PromptSection,
-        ToolHint,
-        create_coding_prompt_builder,
-        create_data_analysis_prompt_builder,
-        create_devops_prompt_builder,
-        create_research_prompt_builder,
-    )
-
-    _PROMPT_BUILDER_EXPORTS = [
-        "PromptBuilder",
-        "PromptSection",
-        "ToolHint",
-        "create_coding_prompt_builder",
-        "create_data_analysis_prompt_builder",
-        "create_devops_prompt_builder",
-        "create_research_prompt_builder",
-    ]
-
-    __all__ = list(__all__) + _PROMPT_BUILDER_EXPORTS
-except ImportError:
-    pass
-
-# Prompt Sections (WS-B - Reusable prompt templates)
-try:
-    from victor.framework.prompt_sections import (
-        # Grounding
-        GROUNDING_RULES_EXTENDED,
-        GROUNDING_RULES_MINIMAL,
-        PARALLEL_READ_GUIDANCE,
-        # Coding
-        CODING_GUIDELINES,
-        CODING_IDENTITY,
-        CODING_TOOL_USAGE,
-        # DevOps
-        DEVOPS_COMMON_PITFALLS,
-        DEVOPS_GROUNDING,
-        DEVOPS_IDENTITY,
-        DEVOPS_SECURITY_CHECKLIST,
-        # Research
-        RESEARCH_GROUNDING,
-        RESEARCH_IDENTITY,
-        RESEARCH_QUALITY_CHECKLIST,
-        RESEARCH_SOURCE_HIERARCHY,
-        # Data Analysis
-        DATA_ANALYSIS_GROUNDING,
-        DATA_ANALYSIS_IDENTITY,
-        DATA_ANALYSIS_LIBRARIES,
-        DATA_ANALYSIS_OPERATIONS,
-    )
-
-    _PROMPT_SECTIONS_EXPORTS = [
-        # Grounding
-        "GROUNDING_RULES_EXTENDED",
-        "GROUNDING_RULES_MINIMAL",
-        "PARALLEL_READ_GUIDANCE",
-        # Coding
-        "CODING_GUIDELINES",
-        "CODING_IDENTITY",
-        "CODING_TOOL_USAGE",
-        # DevOps
-        "DEVOPS_COMMON_PITFALLS",
-        "DEVOPS_GROUNDING",
-        "DEVOPS_IDENTITY",
-        "DEVOPS_SECURITY_CHECKLIST",
-        # Research
-        "RESEARCH_GROUNDING",
-        "RESEARCH_IDENTITY",
-        "RESEARCH_QUALITY_CHECKLIST",
-        "RESEARCH_SOURCE_HIERARCHY",
-        # Data Analysis
-        "DATA_ANALYSIS_GROUNDING",
-        "DATA_ANALYSIS_IDENTITY",
-        "DATA_ANALYSIS_LIBRARIES",
-        "DATA_ANALYSIS_OPERATIONS",
-    ]
-
-    __all__ = list(__all__) + _PROMPT_SECTIONS_EXPORTS
-except ImportError:
-    pass
-
-# Stage Manager (Framework-level stage management)
-try:
-    from victor.framework.stage_manager import (
-        StageDefinition,
-        StageManager,
-        StageManagerConfig,
-        StageManagerProtocol,
-        StageTransition,
-        create_stage_manager,
-        get_coding_stages,
-        get_data_analysis_stages,
-        get_research_stages,
-    )
-
-    _STAGE_MANAGER_EXPORTS = [
-        "StageDefinition",
-        "StageManager",
-        "StageManagerConfig",
-        "StageManagerProtocol",
-        "StageTransition",
-        "create_stage_manager",
-        "get_coding_stages",
-        "get_data_analysis_stages",
-        "get_research_stages",
-    ]
-except ImportError:
-    _STAGE_MANAGER_EXPORTS = []
-
-# LSP Protocols (Cross-vertical language intelligence)
-try:
-    from victor.framework.lsp_protocols import (
-        LSPCompletionItem,
-        LSPDiagnostic,
-        LSPHoverInfo,
-        LSPLocation,
-        LSPPoolProtocol,
-        LSPPosition,
-        LSPRange,
-        LSPServiceProtocol,
-        LSPSymbol,
-    )
-
-    _LSP_PROTOCOLS_EXPORTS = [
-        "LSPCompletionItem",
-        "LSPDiagnostic",
-        "LSPHoverInfo",
-        "LSPLocation",
-        "LSPPoolProtocol",
-        "LSPPosition",
-        "LSPRange",
-        "LSPServiceProtocol",
-        "LSPSymbol",
-    ]
-
-    __all__ = list(__all__) + _LSP_PROTOCOLS_EXPORTS
-except ImportError:
-    pass
-
-# Add Stage Manager exports
-if _STAGE_MANAGER_EXPORTS:
-    __all__ = list(__all__) + _STAGE_MANAGER_EXPORTS
-
-# Workflow Engine (High-level workflow execution facade)
-try:
-    from victor.framework.workflow_engine import (
-        WorkflowExecutionResult,
-        WorkflowEngine,
-        WorkflowEngineConfig,
-        WorkflowEngineProtocol,
-        WorkflowEvent,
-        create_workflow_engine,
-        run_graph_workflow,
-        run_yaml_workflow,
-    )
-
-    _WORKFLOW_ENGINE_EXPORTS = [
-        "WorkflowExecutionResult",
-        "WorkflowEngine",
-        "WorkflowEngineConfig",
-        "WorkflowEngineProtocol",
-        "WorkflowEvent",
-        "create_workflow_engine",
-        "run_graph_workflow",
-        "run_yaml_workflow",
-    ]
-    __all__ = list(__all__) + _WORKFLOW_ENGINE_EXPORTS
-except ImportError:
-    _WORKFLOW_ENGINE_EXPORTS = []
-
-# Observability (Phase 4 - Unified metrics and dashboard)
-try:
-    from victor.framework.observability import (
-        # Manager
-        ObservabilityManager,
-        ObservabilityConfig,
-        DashboardData,
-        # Metrics
-        Metric,
-        MetricType,
-        MetricLabel,
-        CounterMetric,
-        GaugeMetric,
-        HistogramBucket,
-        HistogramMetric,
-        SummaryMetric,
-        MetricsSnapshot,
-        MetricsCollection,
-        # Protocols
-        MetricSource,
-        # Constants
-        MetricNames,
-    )
-
-    _OBSERVABILITY_EXPORTS = [
-        # Manager
-        "ObservabilityManager",
-        "ObservabilityConfig",
-        "DashboardData",
-        # Metrics
-        "Metric",
-        "MetricType",
-        "MetricLabel",
-        "CounterMetric",
-        "GaugeMetric",
-        "HistogramBucket",
-        "HistogramMetric",
-        "SummaryMetric",
-        "MetricsSnapshot",
-        "MetricsCollection",
-        # Protocols
-        "MetricSource",
-        # Constants
-        "MetricNames",
-    ]
-    __all__ = list(__all__) + _OBSERVABILITY_EXPORTS
-except ImportError:
-    _OBSERVABILITY_EXPORTS = []
 
 # Version sourced from pyproject.toml via importlib.metadata
 try:

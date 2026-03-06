@@ -151,6 +151,10 @@ class Tables:
     GRAPH_EDGE = "graph_edge"  # References, calls, imports between nodes
     GRAPH_FILE_MTIME = "graph_file_mtime"  # File modification times for staleness
 
+    # Module-level metrics (WS-1: graph analysis)
+    GRAPH_MODULE_METRIC = "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
+    GRAPH_MODULE_METRIC_HISTORY = "graph_module_metric_history"  # Historical metric snapshots
+
     # ===========================================
     # UI DOMAIN (ui_)
     # ===========================================
@@ -592,6 +596,43 @@ class Schema:
             ON {Tables.GRAPH_FILE_MTIME}(mtime);
     """
 
+    # Module-level metrics (WS-1)
+    GRAPH_MODULE_METRIC = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_MODULE_METRIC} (
+            module_path       TEXT PRIMARY KEY,
+            pagerank_score    REAL DEFAULT 0.0,
+            betweenness       REAL DEFAULT 0.0,
+            afferent_coupling INTEGER DEFAULT 0,
+            efferent_coupling INTEGER DEFAULT 0,
+            instability       REAL DEFAULT 0.0,
+            abstractness      REAL DEFAULT 0.0,
+            distance_main_seq REAL DEFAULT 0.0,
+            cohesion_lcom4    REAL DEFAULT 0.0,
+            hotspot_score     REAL DEFAULT 0.0,
+            symbol_count      INTEGER DEFAULT 0,
+            change_frequency  INTEGER DEFAULT 0,
+            tdd_priority      REAL DEFAULT 0.0,
+            computed_at       TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    GRAPH_MODULE_METRIC_HISTORY = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.GRAPH_MODULE_METRIC_HISTORY} (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            module_path   TEXT NOT NULL,
+            hotspot_score REAL,
+            tdd_priority  REAL,
+            computed_at   TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    GRAPH_MODULE_METRIC_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_gmm_hotspot
+            ON {Tables.GRAPH_MODULE_METRIC}(hotspot_score DESC);
+        CREATE INDEX IF NOT EXISTS idx_gmm_tdd
+            ON {Tables.GRAPH_MODULE_METRIC}(tdd_priority DESC);
+    """
+
     # ===========================================
     # CONVERSATION TABLES (project-level)
     # ===========================================
@@ -810,6 +851,8 @@ class Schema:
             cls.GRAPH_NODE,
             cls.GRAPH_EDGE,
             cls.GRAPH_FILE_MTIME,
+            cls.GRAPH_MODULE_METRIC,
+            cls.GRAPH_MODULE_METRIC_HISTORY,
             # Conversation
             cls.CONV_MESSAGE,
             cls.CONV_SESSION,
@@ -832,6 +875,7 @@ class Schema:
         """Get index definitions for project-level tables."""
         return [
             cls.GRAPH_INDEXES,
+            cls.GRAPH_MODULE_METRIC_INDEXES,
             cls.CONV_INDEXES,
             cls.MODE_INDEXES,
             cls.PROFILE_INDEXES,
@@ -840,7 +884,7 @@ class Schema:
 
 
 # Schema version for migrations
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -881,6 +925,12 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             # Rename UI tables
             f"ALTER TABLE sessions RENAME TO {Tables.UI_SESSION}",
             f"ALTER TABLE failed_signatures RENAME TO {Tables.UI_FAILED_CALL}",
+        ],
+        # Version 2 -> 3: Add module-level graph metrics tables
+        3: [
+            Schema.GRAPH_MODULE_METRIC,
+            Schema.GRAPH_MODULE_METRIC_HISTORY,
+            Schema.GRAPH_MODULE_METRIC_INDEXES,
         ],
     }
 

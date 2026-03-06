@@ -351,15 +351,21 @@ class SubAgent(IAgent):
         orchestrator.tool_registry.clear()
 
         # Register only allowed tools from parent context
+        missing_tools = []
         for tool_name in self.config.allowed_tools:
             tool = self._context.tool_registry.get(tool_name)
             if tool:
                 orchestrator.tool_registry.register(tool)
             else:
-                logger.warning(
-                    f"Allowed tool '{tool_name}' not found in parent registry "
-                    f"for {self.config.role.value} sub-agent"
-                )
+                missing_tools.append(tool_name)
+
+        # Log missing tools at debug level (tools are optional/role-based)
+        if missing_tools:
+            logger.debug(
+                f"Tools not found in parent registry for {self.config.role.value} sub-agent: "
+                f"{', '.join(missing_tools[:5])}"
+                f"{'...' if len(missing_tools) > 5 else ''}"
+            )
 
     def _get_role_prompt(self) -> str:
         """Get system prompt for this role.

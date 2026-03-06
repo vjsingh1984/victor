@@ -96,6 +96,7 @@ def dashboard_command(
     interval: float = typer.Option(
         5.0, "--interval", "-i", help="Update interval in seconds (for --watch)"
     ),
+    rich: bool = typer.Option(False, "--rich", "-r", help="Use rich terminal dashboard (requires rich library)"),
 ) -> None:
     """Display observability dashboard data.
 
@@ -111,8 +112,25 @@ def dashboard_command(
         victor observability dashboard
         victor observability dashboard --json
         victor observability dashboard --watch --interval 10
+        victor observability dashboard --rich
     """
-    manager = ObservabilityManager.get_instance()
+    # Use rich dashboard if requested
+    if rich:
+        try:
+            from victor.ui.dashboard.display import MetricsDashboard
+
+            dashboard = MetricsDashboard()
+
+            if watch:
+                dashboard.run(refresh_interval=interval)
+            else:
+                dashboard.display()
+
+            return
+        except ImportError as e:
+            typer.echo(f"Error: Rich dashboard requires rich library. Install it with: pip install rich", err=True)
+            raise typer.Exit(1)
+
 
     def print_dashboard() -> None:
         """Print the dashboard."""

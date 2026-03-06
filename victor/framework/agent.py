@@ -107,6 +107,8 @@ class Agent:
         self._cqrs_bridge: Optional["CQRSBridge"] = None
         self._cqrs_session_id: Optional[str] = None
         self._cqrs_adapter: Optional["FrameworkEventAdapter"] = None
+        # LSP capability (language intelligence)
+        self._lsp: Optional[Any] = None
 
     @classmethod
     async def create(
@@ -393,45 +395,46 @@ class Agent:
                 context={"file": "auth.py", "error": "IndexError"}
             )
         """
-        from victor.framework._internal import collect_tool_calls, format_context_message
+        from victor.framework._internal import format_context_message
+        from victor.providers.base import CompletionResponse
 
-        # Collect all events
-        events: List[AgentExecutionEvent] = []
-        content_parts: List[str] = []
-        final_success = True
-        final_error: Optional[str] = None
+        # Apply context to prompt for one-shot runs.
+        if context:
+            context_message = format_context_message(context)
+            if context_message:
+                prompt = f"{context_message}\n\n{prompt}"
 
         try:
-            async for event in self.stream(prompt, context=context):
-                events.append(event)
-
-                if event.type == EventType.CONTENT:
-                    content_parts.append(event.content)
-                elif event.type == EventType.ERROR:
-                    final_success = False
-                    final_error = event.error
-                elif event.type == EventType.STREAM_END:
-                    if not event.success:
-                        final_success = False
-                        final_error = event.error
+            response: CompletionResponse = await self._orchestrator.chat(prompt)
+            return TaskResult(
+                content=response.content or "",
+                tool_calls=response.tool_calls or [],
+                success=True,
+                error=None,
+                metadata={
+                    "stage": self._state.stage.value,
+                    "model": response.model,
+                    "usage": response.usage,
+                    "stop_reason": response.stop_reason,
+                },
+            )
 
         except CancellationError:
-            final_success = False
-            final_error = "Operation cancelled"
+            return TaskResult(
+                content="",
+                tool_calls=[],
+                success=False,
+                error="Operation cancelled",
+                metadata={"stage": self._state.stage.value},
+            )
         except Exception as e:
-            final_success = False
-            final_error = str(e)
-
-        return TaskResult(
-            content="".join(content_parts),
-            tool_calls=collect_tool_calls(events),
-            success=final_success,
-            error=final_error,
-            metadata={
-                "event_count": len(events),
-                "stage": self._state.stage.value,
-            },
-        )
+            return TaskResult(
+                content="",
+                tool_calls=[],
+                success=False,
+                error=str(e),
+                metadata={"stage": self._state.stage.value},
+            )
 
     async def stream(
         self,
@@ -672,6 +675,31 @@ class Agent:
             ObservabilityIntegration instance, or None if disabled
         """
         return getattr(self._orchestrator, "observability", None)
+
+    @property
+    def lsp(self) -> Optional[Any]:
+        """Get the LSP capability for code intelligence.
+
+        Returns:
+            LSPCapability instance or None
+        """
+        return self._lsp
+
+    def set_lsp(self, lsp_capability: Any) -> None:
+        """Set the LSP capability for language intelligence.
+
+        Enables features like hover information, go-to-definition,
+        completions, and diagnostics for code operations.
+
+        Args:
+            lsp_capability: LSPCapability instance
+
+        Example:
+            from victor.framework.capabilities import LSPCapability
+
+            agent.set_lsp(LSPCapability())
+        """
+        self._lsp = lsp_capability
 
     def subscribe_to_events(
         self,

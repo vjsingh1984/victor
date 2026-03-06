@@ -1,0 +1,281 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# DevOps Tool Dependencies - YAML Configuration
+#
+# This file defines tool relationships for infrastructure workflows.
+# Migrated from hand-coded Python to YAML-based configuration.
+#
+# Tool names use canonical (short) names from victor.tools.tool_names:
+#   - read (read_file)
+#   - write (write_file)
+#   - edit (edit_files)
+#   - shell (execute_bash)
+#   - grep (code_search)
+#   - git (unified git operations)
+#   - docker (container operations)
+#   - web_search, web_fetch (documentation lookup)
+#   - code_search (semantic code search)
+#   - overview (codebase overview)
+#   - ls (list_directory)
+
+version: "1.0"
+vertical: devops
+
+# Tool transition probabilities: tool -> list of (next_tool, weight)
+# Higher weight = more likely useful transition
+transitions:
+  # Reading leads to more analysis or writing
+  read:
+    - tool: shell
+      weight: 0.3
+    - tool: edit
+      weight: 0.3
+    - tool: grep
+      weight: 0.2
+    - tool: write
+      weight: 0.2
+
+  # Code search for finding configurations
+  grep:
+    - tool: read
+      weight: 0.5
+    - tool: code_search
+      weight: 0.2
+    - tool: grep
+      weight: 0.2
+    - tool: overview
+      weight: 0.1
+
+  # Shell for infrastructure commands
+  shell:
+    - tool: read
+      weight: 0.3
+    - tool: shell
+      weight: 0.3
+    - tool: write
+      weight: 0.2
+    - tool: git
+      weight: 0.2
+
+  # Writing configurations
+  write:
+    - tool: shell
+      weight: 0.4
+    - tool: read
+      weight: 0.3
+    - tool: git
+      weight: 0.2
+    - tool: edit
+      weight: 0.1
+
+  # Editing configurations
+  edit:
+    - tool: shell
+      weight: 0.4
+    - tool: read
+      weight: 0.3
+    - tool: git
+      weight: 0.3
+
+  # Git operations (unified)
+  git:
+    - tool: read
+      weight: 0.4
+    - tool: edit
+      weight: 0.3
+    - tool: shell
+      weight: 0.3
+
+  # Web for documentation
+  web_search:
+    - tool: web_fetch
+      weight: 0.6
+    - tool: web_search
+      weight: 0.2
+    - tool: read
+      weight: 0.1
+    - tool: write
+      weight: 0.1
+
+  web_fetch:
+    - tool: write
+      weight: 0.3
+    - tool: web_search
+      weight: 0.3
+    - tool: web_fetch
+      weight: 0.2
+    - tool: edit
+      weight: 0.2
+
+  # Docker operations
+  docker:
+    - tool: shell
+      weight: 0.4
+    - tool: read
+      weight: 0.3
+    - tool: write
+      weight: 0.2
+    - tool: git
+      weight: 0.1
+
+# Tool clusters: groups of tools that work well together
+clusters:
+  file_operations:
+    - read
+    - write
+    - edit
+    - ls
+
+  git_operations:
+    - git
+
+  code_exploration:
+    - grep
+    - code_search
+    - overview
+
+  infrastructure:
+    - shell
+    - read
+    - write
+    - docker
+
+  documentation:
+    - web_search
+    - web_fetch
+
+  container_ops:
+    - docker
+    - shell
+    - read
+    - write
+
+# Recommended sequences for common DevOps tasks
+sequences:
+  dockerfile_create:
+    - read
+    - write
+    - shell
+
+  ci_cd_setup:
+    - ls
+    - grep
+    - read
+    - write
+    - shell
+
+  kubernetes_deploy:
+    - read
+    - write
+    - shell
+    - shell
+
+  terraform_apply:
+    - read
+    - shell
+    - shell
+    - git
+
+  config_update:
+    - read
+    - edit
+    - shell
+    - git
+
+  docker_build:
+    - read
+    - write
+    - docker
+    - shell
+
+  monitoring_setup:
+    - read
+    - write
+    - edit
+    - shell
+
+  security_scan:
+    - shell
+    - read
+    - write
+    - git
+
+# Tool dependencies: depends_on/enables relationships
+dependencies:
+  - tool: shell
+    depends_on:
+      - read
+    enables:
+      - write
+      - git
+    weight: 0.6
+
+  - tool: edit
+    depends_on:
+      - read
+    enables:
+      - shell
+      - git
+    weight: 0.5
+
+  - tool: git
+    depends_on: []
+    enables: []
+    weight: 0.4
+
+  - tool: write
+    depends_on:
+      - read
+    enables:
+      - shell
+      - git
+    weight: 0.5
+
+  - tool: docker
+    depends_on:
+      - read
+    enables:
+      - shell
+      - write
+    weight: 0.6
+
+# Required tools for DevOps vertical
+required_tools:
+  - read
+  - write
+  - edit
+  - shell
+
+# Optional tools that enhance DevOps workflows
+# Note: code_search is the semantic/AI-powered search tool
+optional_tools:
+  - grep
+  - code_search
+  - git
+  - web_search
+  - web_fetch
+  - docker
+
+# Default sequence when task type is unknown
+default_sequence:
+  - read
+  - write
+  - shell
+
+# Metadata for extensibility
+metadata:
+  description: "Tool dependencies for DevOps vertical (infrastructure automation)"
+  migrated_from: "tool_dependencies.py"
+  composed_patterns_in_python: true

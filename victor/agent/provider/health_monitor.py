@@ -90,12 +90,17 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
 
                 self._health_checker = ProviderHealthChecker()
 
-            # Infer provider name from provider object
+            # Infer provider name and model from provider object
             provider_name = getattr(provider, "name", "unknown")
+            provider_model = getattr(provider, "model", "default")
 
             # Register and check
             self._health_checker.register_provider(provider_name, provider)
-            result = await self._health_checker.check_provider(provider_name)
+            result = await self._health_checker.check_provider(
+                provider_name,
+                provider_model,
+                check_connectivity=False,  # Skip connectivity for faster checks
+            )
 
             from victor.providers.health import HealthStatus
 
@@ -105,7 +110,7 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
             logger.debug("Health checker not available, skipping health check")
             return True
         except Exception as e:
-            logger.warning(f"Health check failed: {e}")
+            logger.debug(f"Health check failed: {e}")
             return True  # Assume healthy on error
 
     async def start_health_checks(

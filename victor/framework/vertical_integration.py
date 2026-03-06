@@ -1693,10 +1693,11 @@ class VerticalIntegrationPipeline:
         orchestrator: Any,
         vertical: Union[Type["VerticalBase"], str],
     ) -> IntegrationResult:
-        """Apply vertical integration asynchronously (Phase 2.1).
+        """Apply vertical integration asynchronously.
 
-        This async method provides the foundation for parallel step execution.
-        Currently executes sequentially, but can be extended for parallel execution.
+        Uses parallel step execution when parallel_enabled=True (default via
+        vertical_service). Parallel-safe handlers run concurrently within
+        dependency levels; others run sequentially.
 
         Args:
             orchestrator: Orchestrator instance

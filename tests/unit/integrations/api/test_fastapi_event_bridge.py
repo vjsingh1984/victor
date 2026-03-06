@@ -17,8 +17,10 @@
 TDD tests for real-time event streaming to VS Code and other clients.
 """
 
+import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock
+import time
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -136,6 +138,193 @@ class TestEventBridgeIntegration:
         bridge = EventBridge(bus)
 
         assert hasattr(bridge, "_broadcaster")
+
+
+class TestEventBusAdapterCompatibility:
+    """Compatibility tests for sync and async EventBus APIs."""
+
+    @pytest.mark.asyncio
+    async def test_event_bus_adapter_supports_async_subscribe(self):
+        """Adapter should subscribe and unsubscribe using async handles."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class FakeHandle:
+            def __init__(self, pattern: str):
+                self.pattern = pattern
+                self.unsubscribed = False
+
+            async def unsubscribe(self):
+                self.unsubscribed = True
+
+        class FakeAsyncBus:
+            def __init__(self):
+                self.subscriptions = []
+                self.handles = []
+
+            async def subscribe(self, pattern, handler):
+                handle = FakeHandle(pattern)
+                self.subscriptions.append((pattern, handler))
+                self.handles.append(handle)
+                return handle
+
+        event_bus = FakeAsyncBus()
+        adapter = EventBusAdapter()
+
+        adapter.connect(event_bus)
+        await asyncio.sleep(0.01)
+
+        assert len(event_bus.subscriptions) == len(adapter.EVENT_MAPPING)
+        assert len(adapter._subscriptions) == len(adapter.EVENT_MAPPING)
+        assert all(asyncio.iscoroutinefunction(handler) for _, handler in event_bus.subscriptions)
+
+        adapter.disconnect()
+        await asyncio.sleep(0.01)
+
+        assert all(handle.unsubscribed for handle in event_bus.handles)
+
+    def test_event_bus_adapter_supports_legacy_sync_subscribe(self):
+        """Adapter should keep working with legacy sync subscribe/unsubscribe API."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class FakeSyncBus:
+            def __init__(self):
+                self.subscribe_calls = []
+                self.unsubscribe_calls = []
+
+            def subscribe(self, pattern, handler):
+                self.subscribe_calls.append((pattern, handler))
+                return None
+
+            def unsubscribe(self, pattern, handler):
+                self.unsubscribe_calls.append((pattern, handler))
+                return None
+
+        event_bus = FakeSyncBus()
+        adapter = EventBusAdapter()
+
+        adapter.connect(event_bus)
+
+        assert len(event_bus.subscribe_calls) == len(adapter.EVENT_MAPPING)
+        assert all(not asyncio.iscoroutinefunction(h) for _, h in event_bus.subscribe_calls)
+
+        adapter.disconnect()
+        assert len(event_bus.unsubscribe_calls) == len(adapter.EVENT_MAPPING)
+
+
+class TestEventBridgeReliability:
+    """Reliability checks for bridge event delivery."""
+
+    @pytest.mark.asyncio
+    async def test_event_bridge_burst_delivery_has_no_loss_or_reordering(self):
+        """A burst of events should be delivered completely and in-order."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        received = []
+
+        async def send_func(message: str):
+            received.append(json.loads(message))
+
+        async def wait_for(predicate, timeout: float = 2.0):
+            deadline = asyncio.get_running_loop().time() + timeout
+            while asyncio.get_running_loop().time() < deadline:
+                if predicate():
+                    return
+                await asyncio.sleep(0.01)
+            pytest.fail("Timed out waiting for event bridge condition")
+
+        bridge.start()
+        bridge._broadcaster.add_client("event-loss-check", send_func)
+
+        await wait_for(lambda: bridge._broadcaster._running)
+        await wait_for(lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING))
+
+        total_events = 25
+        for idx in range(total_events):
+            await bus.emit("tool.start", {"idx": idx})
+
+        await wait_for(lambda: len(received) >= total_events)
+        assert len(received) == total_events
+        assert [msg["data"]["idx"] for msg in received] == list(range(total_events))
+
+        bridge._broadcaster.remove_client("event-loss-check")
+        bridge.stop()
+        await wait_for(lambda: not bridge._broadcaster._running)
+
+    def _reset_reliability_state(self, bridge) -> None:
+        """Reset singleton broadcaster reliability state between tests."""
+        bridge._broadcaster._clients.clear()
+        bridge._broadcaster._dispatch_latency_ms_window.clear()
+        bridge._broadcaster._client_send_success_count = 0
+        bridge._broadcaster._client_send_failure_count = 0
+        bridge._broadcaster._events_dispatched_count = 0
+        bridge._broadcaster._last_slo_breach_log_ts = 0.0
+
+    @pytest.mark.asyncio
+    async def test_reliability_dashboard_defaults_before_delivery(self):
+        """Dashboard should expose healthy defaults before any send attempts."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        self._reset_reliability_state(bridge)
+
+        dashboard = bridge.get_reliability_dashboard_data()
+
+        assert dashboard["events_dispatched"] == 0
+        assert dashboard["total_send_attempts"] == 0
+        assert dashboard["send_successes"] == 0
+        assert dashboard["send_failures"] == 0
+        assert dashboard["delivery_success_rate"] == 1.0
+        assert dashboard["dispatch_latency_p95_ms"] == 0.0
+        assert dashboard["slo_status"]["delivery_success_rate"] is True
+        assert dashboard["slo_status"]["dispatch_latency_p95_ms"] is True
+
+    @pytest.mark.asyncio
+    async def test_reliability_dashboard_tracks_delivery_and_slos(self):
+        """Dashboard should track success/failure counts, p95 latency, and SLO status."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+        self._reset_reliability_state(bridge)
+
+        async def successful_send(_message: str) -> None:
+            return None
+
+        async def failing_send(_message: str) -> None:
+            raise RuntimeError("network timeout")
+
+        bridge._broadcaster.add_client("ok-client", successful_send)
+        bridge._broadcaster.add_client("bad-client", failing_send)
+
+        event = BridgeEvent(
+            type=BridgeEventType.TOOL_START,
+            data={"idx": 1},
+            timestamp=time.time() - 0.35,
+        )
+        await bridge._broadcaster._send_to_clients(event)
+
+        dashboard = bridge.get_reliability_dashboard_data()
+
+        assert dashboard["events_dispatched"] == 1
+        assert dashboard["total_send_attempts"] == 2
+        assert dashboard["send_successes"] == 1
+        assert dashboard["send_failures"] == 1
+        assert dashboard["delivery_success_rate"] == 0.5
+        assert dashboard["dispatch_latency_p95_ms"] > 200.0
+        assert dashboard["slo_status"]["delivery_success_rate"] is False
+        assert dashboard["slo_status"]["dispatch_latency_p95_ms"] is False
+
+        # Failing clients are evicted after send errors.
+        assert "bad-client" not in bridge._broadcaster._clients
 
 
 class TestEventBridgeBroadcaster:

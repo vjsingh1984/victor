@@ -1,0 +1,62 @@
+[vertical]
+name = "dataanalysis"
+version = "0.5.1"
+description = "Data Analysis vertical for pandas, visualization, and statistical analysis"
+authors = [{name = "Vijaykumar Singh", email = "singhvjd@gmail.com"}]
+license = "Apache-2.0"
+requires_victor = ">=0.5.0"
+
+python_package = "victor-ai"
+homepage = "https://github.com/vijay-singh/codingagent"
+repository = "https://github.com/vijay-singh/codingagent"
+documentation = "https://docs.victor.dev"
+issues = "https://github.com/vijay-singh/codingagent/issues"
+
+category = "data"
+tags = ["data-analysis", "pandas", "visualization", "statistics", "ml"]
+
+[vertical.class]
+module = "victor.dataanalysis.data_assistant"
+class_name = "DataAnalysisAssistant"
+provides_tools = [
+    "read_csv",
+    "analyze_data",
+    "visualize",
+    "statistics",
+    "ml_train",
+    "data_profile",
+]
+provides_workflows = [
+    "eda_workflow",
+    "data_cleaning",
+    "ml_pipeline",
+    "visualization_workflow",
+    "statistical_analysis",
+    "feature_engineering",
+    "model_evaluation",
+]
+provides_capabilities = [
+    "data_manipulation",
+    "statistical_analysis",
+    "visualization",
+    "machine_learning",
+]
+
+[vertical.dependencies]
+python = ["pandas>=2.0.0", "matplotlib>=3.7.0", "scikit-learn>=1.3.0"]
+verticals = []
+
+[vertical.compatibility]
+requires_tool_calling = true
+preferred_providers = ["anthropic", "openai"]
+min_context_window = 100000
+python_version = ">=3.10"
+
+[vertical.security]
+signed = false
+verified_author = false
+permissions = ["filesystem:read", "filesystem:write"]
+
+[vertical.installation]
+install_command = "pip install victor-ai[dataanalysis]"
+extras = ["dataanalysis"]

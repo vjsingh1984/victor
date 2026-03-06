@@ -45,6 +45,22 @@ def mock_orchestrator():
     orchestrator.reset_conversation = MagicMock()
     orchestrator.stream_chat = AsyncMock(return_value=AsyncMock())
 
+    # NEW: Add chat method for direct sync execution (Phase 2 refactoring)
+    from victor.providers.base import CompletionResponse
+
+    def mock_chat_response(content="Hello World", tool_calls=None):
+        """Create a mock CompletionResponse."""
+        return CompletionResponse(
+            content=content,
+            role="assistant",
+            tool_calls=tool_calls,
+            stop_reason="stop",
+            usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+            model="test-model",  # Include model in response
+        )
+
+    orchestrator.chat = AsyncMock(return_value=mock_chat_response())
+
     # Add protocol methods for State wrapper
     orchestrator.get_stage = MagicMock(return_value=MagicMock(value="INITIAL"))
     orchestrator.get_tool_calls_count = MagicMock(return_value=0)
@@ -189,63 +205,53 @@ class TestAgentRun:
 
     @pytest.mark.asyncio
     async def test_run_basic(self, mock_orchestrator):
-        """run should collect events and return TaskResult."""
+        """run should call orchestrator.chat and return TaskResult."""
         from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
-
-        # Setup mock stream
-        async def mock_stream(*args, **kwargs):
-            yield AgentExecutionEvent(type=EventType.CONTENT, content="Hello ")
-            yield AgentExecutionEvent(type=EventType.CONTENT, content="World")
-            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
 
         agent = Agent(mock_orchestrator)
 
-        with patch.object(agent, "stream", mock_stream):
-            result = await agent.run("test prompt")
+        result = await agent.run("test prompt")
 
+        # Verify chat was called
+        mock_orchestrator.chat.assert_called_once_with("test prompt")
+
+        # Verify result
         assert result.content == "Hello World"
         assert result.success is True
         assert result.error is None
+        assert result.metadata["model"] == "test-model"
 
     @pytest.mark.asyncio
     async def test_run_with_error_event(self, mock_orchestrator):
-        """run should handle ERROR events and set success=False."""
+        """run should handle exceptions from orchestrator.chat."""
         from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
 
-        async def mock_stream(*args, **kwargs):
-            yield AgentExecutionEvent(type=EventType.ERROR, error="Something went wrong")
-            yield AgentExecutionEvent(
-                type=EventType.STREAM_END, success=False, error="Something went wrong"
-            )
+        # Make chat raise an exception
+        mock_orchestrator.chat.side_effect = Exception("Something went wrong")
 
         agent = Agent(mock_orchestrator)
-
-        with patch.object(agent, "stream", mock_stream):
-            result = await agent.run("test prompt")
+        result = await agent.run("test prompt")
 
         assert result.success is False
         assert result.error == "Something went wrong"
 
     @pytest.mark.asyncio
     async def test_run_with_stream_end_failure(self, mock_orchestrator):
-        """run should handle STREAM_END with success=False."""
+        """run should handle empty response from orchestrator."""
         from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
+        from victor.providers.base import CompletionResponse
 
-        async def mock_stream(*args, **kwargs):
-            yield AgentExecutionEvent(type=EventType.CONTENT, content="partial")
-            yield AgentExecutionEvent(type=EventType.STREAM_END, success=False, error="Timeout")
+        # Return empty response
+        mock_orchestrator.chat.return_value = CompletionResponse(
+            content="", role="assistant", tool_calls=None
+        )
 
         agent = Agent(mock_orchestrator)
+        result = await agent.run("test prompt")
 
-        with patch.object(agent, "stream", mock_stream):
-            result = await agent.run("test prompt")
-
-        assert result.content == "partial"
-        assert result.success is False
-        assert result.error == "Timeout"
+        # Empty content should still be returned (but success=True since no exception)
+        assert result.content == ""
+        assert result.success is True
 
     @pytest.mark.asyncio
     async def test_run_with_cancellation_error(self, mock_orchestrator):
@@ -253,14 +259,11 @@ class TestAgentRun:
         from victor.framework.agent import Agent
         from victor.framework.errors import CancellationError
 
-        async def mock_stream(*args, **kwargs):
-            raise CancellationError("User cancelled")
-            yield  # pragma: no cover
+        # Make chat raise CancellationError
+        mock_orchestrator.chat.side_effect = CancellationError("User cancelled")
 
         agent = Agent(mock_orchestrator)
-
-        with patch.object(agent, "stream", mock_stream):
-            result = await agent.run("test prompt")
+        result = await agent.run("test prompt")
 
         assert result.success is False
         assert result.error == "Operation cancelled"
@@ -270,37 +273,34 @@ class TestAgentRun:
         """run should handle generic exceptions."""
         from victor.framework.agent import Agent
 
-        async def mock_stream(*args, **kwargs):
-            raise RuntimeError("Unexpected error")
-            yield  # pragma: no cover
+        # Make chat raise an exception
+        mock_orchestrator.chat.side_effect = RuntimeError("Unexpected error")
 
         agent = Agent(mock_orchestrator)
-
-        with patch.object(agent, "stream", mock_stream):
-            result = await agent.run("test prompt")
+        result = await agent.run("test prompt")
 
         assert result.success is False
         assert result.error == "Unexpected error"
 
     @pytest.mark.asyncio
     async def test_run_with_context(self, mock_orchestrator):
-        """run should pass context to stream."""
+        """run should format context into prompt."""
         from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
-
-        captured_context = {}
-
-        async def mock_stream(prompt, context=None):
-            captured_context["context"] = context
-            yield AgentExecutionEvent(type=EventType.STREAM_END, success=True)
+        from victor.providers.base import CompletionResponse
 
         agent = Agent(mock_orchestrator)
         context = {"file": "test.py", "error": "SyntaxError"}
 
-        with patch.object(agent, "stream", mock_stream):
-            await agent.run("fix bug", context=context)
+        result = await agent.run("fix bug", context=context)
 
-        assert captured_context["context"] == context
+        # Verify chat was called with context-formatted prompt
+        # The context should be prepended to the prompt
+        mock_orchestrator.chat.assert_called_once()
+        call_args = mock_orchestrator.chat.call_args
+        prompt_arg = call_args[0][0] if call_args[0] else call_args[1].get("prompt", "")
+        assert "File: test.py" in prompt_arg or "file" in prompt_arg
+
+        assert result.success is True
 
 
 # =============================================================================

@@ -387,9 +387,14 @@ def _register_default_providers() -> None:
         class_name="XAIProvider",
     )
     _register_lazy_provider(
-        ["zai", "zhipuai", "zhipu"],
+        ["zai", "zhipuai", "zhipu", "zai-coding-plan", "zai-coding", "glm-coding"],
         module_path="victor.providers.zai_provider",
         class_name="ZAIProvider",
+    )
+    _register_lazy_provider(
+        ["qwen", "alibaba", "dashscope"],
+        module_path="victor.providers.qwen_provider",
+        class_name="QwenProvider",
     )
     _register_lazy_provider(
         ["lmstudio"],

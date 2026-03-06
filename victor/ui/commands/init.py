@@ -124,8 +124,17 @@ def init(
     airgapped: bool = typer.Option(
         False, "--airgapped", help="Enable air-gapped mode for this repo"
     ),
+    wizard: bool = typer.Option(
+        False, "--wizard", "-w", help="Run interactive setup wizard for first-time users"
+    ),
 ):
     """Initialize project context and configuration."""
+    # If wizard mode is requested, run the onboarding wizard instead
+    if wizard:
+        from victor.ui.commands.onboarding import run_onboarding
+
+        exit_code = run_onboarding()
+        raise typer.Exit(exit_code)
     if ctx.invoked_subcommand is None:
         paths = get_project_paths()
 
@@ -284,7 +293,7 @@ providers:
             default_include = "."
 
             include_str = Prompt.ask(
-                f"[cyan]Enter comma-separated source directories to include[/]",
+                "[cyan]Enter comma-separated source directories to include[/]",
                 default=default_include,
             )
             # Normalize "." to current working directory path for downstream processing
@@ -324,7 +333,7 @@ providers:
             ]
 
             exclude_str = Prompt.ask(
-                f"[cyan]Enter comma-separated directories to exclude[/]",
+                "[cyan]Enter comma-separated directories to exclude[/]",
                 default=", ".join(default_exclude),
             )
             exclude_dirs = [d.strip() for d in exclude_str.split(",")]

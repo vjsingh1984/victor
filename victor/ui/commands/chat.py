@@ -38,6 +38,14 @@ from victor.workflows.visualization import (
     get_available_backends,
 )
 
+# Contextual error formatting
+try:
+    from victor.framework.contextual_errors import format_exception_for_user
+except ImportError:
+    # Fallback if framework module is not available
+    def format_exception_for_user(e):
+        return str(e)
+
 chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
 console = Console()
 
@@ -47,7 +55,13 @@ def chat(
     ctx: typer.Context,
     message: Optional[str] = typer.Argument(
         None,
-        help="Message to send to the agent (starts interactive mode if not provided)",
+        help="Message to send (put BEFORE options, or use -m instead). Interactive mode if omitted.",
+    ),
+    message_opt: Optional[str] = typer.Option(
+        None,
+        "--message",
+        "-m",
+        help="Message to send (alternative to positional arg, works anywhere in command).",
     ),
     profile: str = typer.Option(
         "default",
@@ -177,6 +191,17 @@ def chat(
         "--render-output",
         "-o",
         help="Output file for rendered diagram. Required for svg/png formats.",
+    ),
+    auth_mode: Optional[str] = typer.Option(
+        None,
+        "--auth-mode",
+        help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen Coding Plan).",
+        case_sensitive=False,
+    ),
+    coding_plan: bool = typer.Option(
+        False,
+        "--coding-plan",
+        help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
     ),
     legacy_mode: bool = typer.Option(
         False,
@@ -354,13 +379,35 @@ def chat(
             stream=stream and not json_output,
         )
 
+        # --message / -m option takes precedence over positional argument
+        effective_message = message_opt or message
+
         actual_message = InputReader.read_message(
-            argument=message,
+            argument=effective_message,
             from_stdin=stdin,
             input_file=input_file,
         )
 
         settings = load_settings()
+
+        # Early configuration validation (P0: catch errors at startup, not runtime)
+        try:
+            from victor.config.validation import validate_configuration, format_validation_result
+
+            validation_result = validate_configuration(settings)
+            if not validation_result.is_valid:
+                # Configuration has errors - display and exit
+                console.print("[bold red]Configuration Validation Failed:[/]")
+                console.print(format_validation_result(validation_result))
+                console.print("")
+                console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
+                raise typer.Exit(1)
+        except Exception as e:
+            # If validation itself fails, log it but don't block startup
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Configuration validation skipped due to error: {e}")
 
         # Apply CLI flags to settings
         if log_events:
@@ -391,6 +438,11 @@ def chat(
                     console.print(
                         "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
                     )
+
+            if auth_mode:
+                extra_fields["auth_mode"] = auth_mode.lower()
+            if coding_plan:
+                extra_fields["coding_plan"] = True
 
             override_profile = ProfileConfig(
                 provider=provider,
@@ -1153,11 +1205,17 @@ async def run_workflow_mode(
     except YAMLWorkflowError as e:
         console.print("[bold red]✗[/] Workflow validation failed")
         console.print(f"  [red]{e}[/]")
+        console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
+        # Use contextual error formatting for better UX
+        error_message = format_exception_for_user(e)
+        console.print(f"[bold red]Error:[/]\n{error_message}")
+        console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         import traceback
 
-        console.print(traceback.format_exc())
+        # Still show traceback in debug mode
+        if os.getenv("VICTOR_DEBUG"):
+            console.print(traceback.format_exc())
         raise typer.Exit(1)

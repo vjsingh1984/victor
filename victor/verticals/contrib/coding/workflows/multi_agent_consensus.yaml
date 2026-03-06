@@ -1,0 +1,244 @@
+workflows:
+  multi_agent_consensus_planning:
+    description: "Multi-agent consensus planning with 3 specialized perspectives"
+    metadata:
+      version: "2.0"
+      vertical: "coding"
+      author: "Victor AI"
+      project_root: "/Users/vijaysingh/code/codingagent"
+
+      # LanceSQL Pattern: Workflow-level services initialized ONCE
+      # and shared across all agents (read-only access)
+      services:
+        # SQLite: Code graph, symbols, relationships (structured data)
+        - name: codebase_graph
+          service_type: sqlite
+          config:
+            db_path: ".victor/project.db"
+            enable_wal: true
+          required: true
+          access_mode: read_only
+
+        # LanceDB: Vector embeddings for semantic search
+        - name: codebase_embeddings
+          service_type: lancedb
+          config:
+            persist_directory: ".victor/embeddings"
+            embedding_model: "BAAI/bge-small-en-v1.5"
+            table_name: "codebase"
+          required: true
+          access_mode: read_only
+
+    nodes:
+      # Agent 1: Senior Architect (uses OpenAI cheapest model)
+      - id: architect_analysis
+        type: agent
+        name: "Senior Architect Analysis"
+        role: senior_architect
+        profile: gpt-mini  # OpenAI gpt-4o-mini - cheapest, good for architecture
+        disable_embeddings: true  # Use workflow-level services, don't load per-agent
+        goal: |
+          **Task**: {{user_task}}
+
+          You are a **Senior Software Architect** with 15 years of experience in large-scale system design.
+
+          Analyze the task and provide architectural recommendations focusing on:
+          1. **System Architecture**: Overall design, patterns, and structure
+          2. **Scalability**: How the solution will handle growth
+          3. **Security**: Security considerations and best practices
+          4. **Technology Stack**: Recommended technologies and frameworks
+
+          Provide a comprehensive architectural analysis with:
+          - High-level architecture overview
+          - Key design decisions with rationale
+          - Potential risks and mitigation strategies
+          - Recommended technology choices
+        tool_budget: 5
+        tools: [read, grep, code_search, overview]
+        llm_config:
+          temperature: 0.7
+        output: architect_result
+        next: [practical_analysis]
+
+      # Agent 2: Practical Engineer (uses xAI cheapest model)
+      - id: practical_analysis
+        type: agent
+        name: "Practical Engineer Analysis"
+        role: practical_engineer
+        profile: grok-mini  # xAI grok-beta - cheapest, good for practical feedback
+        disable_embeddings: true  # Use workflow-level services, don't load per-agent
+        goal: |
+          **Task**: {{user_task}}
+
+          **Architect's Analysis**:
+          {{architect_result}}
+
+          You are a **Practical Software Engineer** focused on implementation reality.
+
+          Review the architect's analysis from a practical perspective focusing on:
+          1. **Implementation Feasibility**: Can this actually be built?
+          2. **Code Maintainability**: Will this be maintainable long-term?
+          3. **Development Velocity**: How fast can we ship this?
+          4. **Real-world Constraints**: Time, budget, team skills
+
+          Provide practical feedback including:
+          - Implementation concerns or challenges
+          - Alternative, simpler approaches
+          - Estimated effort and timeline
+          - Tool and library recommendations
+        tool_budget: 5
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.6
+        output: practical_result
+        next: [code_specialist_analysis]
+
+      # Agent 3: Code Optimization Specialist (uses DeepSeek cheapest model)
+      - id: code_specialist_analysis
+        type: agent
+        name: "Code Specialist Analysis"
+        role: code_specialist
+        profile: deepseek  # DeepSeek coder - cheapest, excellent for code analysis
+        disable_embeddings: true  # Use workflow-level services, don't load per-agent
+        goal: |
+          **Task**: {{user_task}}
+
+          **Architect's Analysis**:
+          {{architect_result}}
+
+          **Practical Engineer's Analysis**:
+          {{practical_result}}
+
+          You are a **Code Optimization Specialist** focused on code quality and performance.
+
+          Review both analyses and add your perspective focusing on:
+          1. **Code Efficiency**: Performance optimization opportunities
+          2. **Algorithm Selection**: Best algorithms for the problem
+          3. **Resource Utilization**: Memory, CPU, I/O considerations
+          4. **Testing Strategy**: How to test and validate the solution
+
+          Provide code-level recommendations:
+          - Performance optimization suggestions
+          - Testing and validation approach
+          - Code structure and organization
+          - Benchmarking and monitoring strategy
+        tool_budget: 5
+        tools: [read, grep]
+        llm_config:
+          temperature: 0.5
+        output: specialist_result
+        next: [consensus_formation]
+
+      # Consensus Formation (uses OpenAI for synthesis)
+      - id: consensus_formation
+        type: agent
+        name: "Consensus Formation"
+        role: consensus_facilitator
+        profile: gpt-mini  # OpenAI for synthesis and consensus building
+        disable_embeddings: true  # Use workflow-level services, don't load per-agent
+        goal: |
+          **Original Task**: {{user_task}}
+
+          **📐 Senior Architect Analysis**:
+          {{architect_result}}
+
+          **🔧 Practical Engineer Analysis**:
+          {{practical_result}}
+
+          **⚡ Code Specialist Analysis**:
+          {{specialist_result}}
+
+          You are a **Consensus Facilitator**. Your job is to synthesize all three perspectives into a unified, actionable plan.
+
+          **Your Process**:
+          1. **Identify Agreement**: Where do all three experts agree?
+          2. **Resolve Conflicts**: When experts disagree, choose the best recommendation
+          3. **Synthesize**: Create a coherent plan incorporating all insights
+          4. **Document Trade-offs**: What compromises were made?
+
+          **Provide a Structured Consensus Plan**:
+
+          ## 📋 Executive Summary
+          - Brief overview of the task
+          - Key decision points
+          - Overall approach
+
+          ## 🏗️ Architecture & Design
+          (From Senior Architect + Code Specialist)
+          - System architecture
+          - Design patterns
+          - Technology stack
+          - Security considerations
+
+          ## 🛠️ Implementation Strategy
+          (From Practical Engineer + Code Specialist)
+          - Phased implementation plan
+          - Development steps
+          - Risk mitigation
+          - Timeline estimate
+
+          ## ✅ Consensus Decisions
+          - **Where all agreed**: [list]
+          - **Conflict resolutions**: [how you resolved them]
+          - **Rationale**: [why you chose each path]
+
+          ## ⚠️ Considerations & Trade-offs
+          - Acknowledged trade-offs
+          - Questions for human review
+          - Alternative options rejected (and why)
+
+          **Be specific, actionable, and show clear reasoning.**
+        tool_budget: 15
+        tools: [read, write]
+        llm_config:
+          temperature: 0.6
+        output: consensus_plan
+        next: [final_review]
+
+      # Final Review (uses DeepSeek for quality check)
+      - id: final_review
+        type: agent
+        name: "Final Quality Review"
+        role: lead_reviewer
+        profile: deepseek  # DeepSeek for thorough review
+        disable_embeddings: true  # Use workflow-level services, don't load per-agent
+        goal: |
+          **Consensus Plan**:
+          {{consensus_plan}}
+
+          You are a **Lead Technical Reviewer**. Your job is to verify the consensus plan is ready for implementation.
+
+          **Review Checklist**:
+          1. ✓ Does the plan address all aspects of the original task?
+          2. ✓ Are technical decisions sound and justified?
+          3. ✓ Are implementation steps clear and actionable?
+          4. ✓ Did we properly consider all three expert perspectives?
+          5. ✓ Are risks properly identified and mitigated?
+
+          **Provide**:
+          - **Overall Quality Assessment** (1-10 scale)
+          - **Approval Status**: ✅ APPROVED or ⚠️ NEEDS REVISION
+          - **Specific Concerns** (if any): What needs to be addressed
+          - **Recommendations**: How to improve the plan
+
+          If approved, the plan is ready for implementation. If not, provide specific, actionable feedback.
+        tool_budget: 3
+        tools: []
+        llm_config:
+          temperature: 0.4
+        output: final_result
+        next: []
+
+    execution:
+      max_timeout_seconds: 600
+      default_node_timeout: 120
+      max_iterations: 15
+
+    error_handling:
+      retry_policy:
+        max_retries: 2
+        backoff: exponential
+        initial_delay: 1.0
+      on_failure:
+        - log_error
+        - continue_to_next

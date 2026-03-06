@@ -744,6 +744,8 @@ class ProjectDatabaseManager:
         "graph_edge",
         "graph_file_mtime",
         "graph_node_fts",
+        "graph_module_metric",
+        "graph_module_metric_history",
         # Conversation tables
         "messages",
         "sessions",

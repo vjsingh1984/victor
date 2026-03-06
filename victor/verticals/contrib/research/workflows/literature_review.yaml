@@ -1,0 +1,488 @@
+# Literature Review Workflow
+# ==========================
+# Systematic academic literature review with:
+# - Scope definition and search strategy
+# - Paper discovery and screening
+# - Data extraction and synthesis
+# - Professional review output
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ EXECUTION ENVIRONMENT                                                        │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ Default: in-process (Python) + LLM API calls                                │
+# │ Supported: in-process only (no subprocess/docker needed)                    │
+# │                                                                              │
+# │ Requirements:                                                                │
+# │   - LLM provider API access (for agent nodes)                               │
+# │   - Network access (for academic database searches)                         │
+# │   - Write access (for literature review output)                             │
+# │                                                                              │
+# │ Network requirements:                                                        │
+# │   - search_general: Google Scholar, Semantic Scholar, CrossRef APIs         │
+# │   - search_preprints: arXiv, bioRxiv/medRxiv, SSRN access                   │
+# │   - search_grey_lit: Thesis repositories, conference proceedings            │
+# │   - web_fetch: PDF downloads and content extraction                         │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DEFAULT VALUES                                                               │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ min_papers_threshold: 10 (minimum for comprehensive review)                 │
+# │ citation_style: APA (default for academic work)                             │
+# │ date_range: last 10 years (adjustable via requirements)                     │
+# │ quality_threshold: 0.6 (minimum methodological rigor score)                 │
+# │ hitl_timeout: 600s (10 min for search expansion decisions)                  │
+# │ review_max_tokens: 10000 (comprehensive literature review length)           │
+# │ duplicate_threshold: 0.85 (title similarity for deduplication)              │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ COMPUTE vs AGENT NODE RATIONALE                                              │
+# ├─────────────────────────────────────────────────────────────────────────────┤
+# │ COMPUTE nodes (no LLM reasoning):                                            │
+# │   - format_citations: Template-based bibliography formatting                 │
+# │     (Rules: Apply citation style patterns to metadata fields)               │
+# │   - deduplicate_results: String similarity on titles/DOIs                   │
+# │     (Algorithm: Fuzzy matching, exact DOI comparison)                       │
+# │                                                                              │
+# │ AGENT nodes (require LLM reasoning):                                         │
+# │   - define_scope: DESIGNING research methodology and criteria               │
+# │   - search_*: INTERPRETING search results for relevance                     │
+# │   - title_abstract_screening: JUDGING paper inclusion/exclusion             │
+# │   - full_text_review: EVALUATING methodology and quality                    │
+# │   - data_extraction: EXTRACTING key findings with interpretation            │
+# │   - synthesis: INTEGRATING themes across multiple papers                    │
+# │   - generate_review: WRITING academic prose with proper structure           │
+# │                                                                              │
+# │ Literature review is expert analysis - most steps require LLM:              │
+# │   - Defining research questions and inclusion criteria                      │
+# │   - Screening papers for relevance (beyond keyword matching)                │
+# │   - Evaluating methodological quality of studies                            │
+# │   - Synthesizing findings into coherent thematic analysis                   │
+# └─────────────────────────────────────────────────────────────────────────────┘
+
+workflows:
+  literature_review:
+    description: "Systematic academic literature review"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: research
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Scope Definition
+      # =====================================================================
+      - id: define_scope
+        type: agent
+        name: "Define Review Scope"
+        role: planner
+        goal: |
+          Define the scope and methodology for the literature review:
+
+          1. **Research Question**
+             - Clarify the main research question
+             - Identify sub-questions
+             - Define PICO elements if applicable
+
+          2. **Inclusion/Exclusion Criteria**
+             - Date range (e.g., last 10 years)
+             - Publication types (journals, conferences)
+             - Language requirements
+             - Quality thresholds
+
+          3. **Search Strategy**
+             - Key terms and synonyms
+             - Boolean operators
+             - Database selection
+             - Search strings for each database
+
+          4. **Quality Assessment Criteria**
+             - Methodology rigor
+             - Sample size considerations
+             - Bias assessment framework
+
+          Output a detailed review protocol.
+        tool_budget: 15
+        tools: [read]
+        llm_config:
+          temperature: 0.3
+        input_mapping:
+          topic: research_topic
+          requirements: review_requirements
+        output: review_protocol
+        next: [parallel_database_search]
+
+      # =====================================================================
+      # Stage 2: Literature Search (Parallel)
+      # =====================================================================
+      - id: parallel_database_search
+        type: parallel
+        name: "Search Academic Databases"
+        parallel_nodes: [search_general, search_preprints, search_grey_lit]
+        join_strategy: all
+        next: [deduplicate_results]
+
+      - id: search_general
+        type: agent
+        name: "Search General Academic Sources"
+        role: researcher
+        goal: |
+          Search major academic databases:
+          - Google Scholar
+          - Semantic Scholar
+          - CrossRef
+
+          For each result, capture:
+          - Title, authors, year
+          - Abstract
+          - Citation count
+          - DOI/URL
+          - Publication venue
+        tool_budget: 35
+        tools: [web_search, web_fetch]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          protocol: review_protocol
+        output: general_papers
+
+      - id: search_preprints
+        type: agent
+        name: "Search Preprint Servers"
+        role: researcher
+        goal: |
+          Search preprint servers for recent work:
+          - arXiv
+          - bioRxiv/medRxiv
+          - SSRN
+
+          Note: Preprints are not peer-reviewed.
+          Flag for quality screening.
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        input_mapping:
+          protocol: review_protocol
+        output: preprint_papers
+
+      - id: search_grey_lit
+        type: agent
+        name: "Search Grey Literature"
+        role: researcher
+        goal: |
+          Search for relevant grey literature:
+          - Technical reports
+          - Working papers
+          - Dissertations and theses
+          - Conference proceedings
+
+          These may contain valuable findings not in journals.
+        tool_budget: 20
+        tools: [web_search, web_fetch]
+        input_mapping:
+          protocol: review_protocol
+        output: grey_lit
+
+      # TRANSFORM: Deduplication uses deterministic string matching
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Fuzzy title matching (Levenshtein) + exact DOI comparison
+      # Threshold: 0.85 similarity for title matches
+      # Priority: Keep paper with most complete metadata when duplicates found
+      #
+      # WHY TRANSFORM (not agent): Pure algorithmic operation:
+      #   - String comparison doesn't need semantic understanding
+      #   - DOI matching is exact equality check
+      #   - No judgment on "which paper is better" (just dedup)
+      - id: deduplicate_results
+        type: transform
+        name: "Deduplicate Results"
+        transform: |
+          all_papers = merge(general_papers, preprint_papers, grey_lit)
+          unique_papers = deduplicate(all_papers, by="title")
+          paper_count = len(unique_papers)
+        next: [title_abstract_screening]
+
+      # =====================================================================
+      # Stage 3: Screening
+      # =====================================================================
+      - id: title_abstract_screening
+        type: agent
+        name: "Title/Abstract Screening"
+        role: analyst
+        goal: |
+          Screen papers based on title and abstract:
+
+          For each paper, determine:
+          - INCLUDE: Clearly meets criteria
+          - EXCLUDE: Clearly doesn't meet criteria
+          - MAYBE: Needs full-text review
+
+          Apply exclusion criteria from protocol:
+          - Topic relevance
+          - Date range
+          - Study type
+          - Language
+
+          Document reason for each exclusion.
+        tool_budget: 25
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          papers: unique_papers
+          protocol: review_protocol
+        output: screened_papers
+        next: [check_inclusion_rate]
+
+      - id: check_inclusion_rate
+        type: condition
+        name: "Check Inclusion Rate"
+        condition: "included_count >= 10"
+        branches:
+          "true": full_text_review
+          "false": expand_search
+
+      - id: expand_search
+        type: hitl
+        name: "Few Papers Found"
+        hitl_type: choice
+        prompt: |
+          ## Low Paper Count After Screening
+
+          Only {included_count} papers passed title/abstract screening.
+          This may not be sufficient for a comprehensive review.
+
+          **Options:**
+          1. Broaden search terms
+          2. Relax inclusion criteria
+          3. Proceed with current papers
+          4. Add citation tracking (find papers citing/cited by included ones)
+        context_keys:
+          - included_count
+          - excluded_count
+          - exclusion_reasons
+        choices:
+          - "Broaden search"
+          - "Relax criteria"
+          - "Proceed"
+          - "Citation tracking"
+        timeout: 600
+        fallback: continue
+        next: [full_text_review]
+
+      - id: full_text_review
+        type: agent
+        name: "Full-Text Review"
+        role: reviewer
+        goal: |
+          Conduct full-text review of included papers:
+
+          1. **Confirm Inclusion**
+             - Verify meets all criteria after full read
+             - Check methodology quality
+             - Assess potential bias
+
+          2. **Quality Assessment**
+             - Use appropriate quality tool
+             - Score each paper
+             - Note limitations
+
+          3. **Extract Key Data**
+             - Study characteristics
+             - Main findings
+             - Methodology details
+             - Limitations noted
+
+          Flag any papers for exclusion with reasons.
+        tool_budget: 30
+        tools: [web_fetch, read]
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          papers: screened_papers
+          protocol: review_protocol
+        output: reviewed_papers
+        next: [data_extraction]
+
+      # =====================================================================
+      # Stage 4: Data Extraction
+      # =====================================================================
+      - id: data_extraction
+        type: agent
+        name: "Extract Data from Papers"
+        role: analyst
+        goal: |
+          Systematically extract data from each paper:
+
+          **Extraction Template:**
+          - Author(s), Year, Title
+          - Study design/methodology
+          - Sample/population
+          - Key variables/measures
+          - Main findings/results
+          - Effect sizes (if applicable)
+          - Limitations
+          - Relevance to research question
+
+          Create structured extraction table.
+        tool_budget: 25
+        llm_config:
+          temperature: 0.2
+        input_mapping:
+          papers: reviewed_papers
+          protocol: review_protocol
+        output: extracted_data
+        next: [synthesis]
+
+      # =====================================================================
+      # Stage 5: Synthesis
+      # =====================================================================
+      - id: synthesis
+        type: agent
+        name: "Synthesize Findings"
+        role: analyst
+        goal: |
+          Synthesize extracted data:
+
+          1. **Identify Themes**
+             - Group findings by theme
+             - Note convergent findings
+             - Identify contradictions
+
+          2. **Analyze Patterns**
+             - Trends over time
+             - Methodological patterns
+             - Geographic/demographic patterns
+
+          3. **Evaluate Evidence**
+             - Strength of evidence for each theme
+             - Quality of supporting studies
+             - Gaps in the literature
+
+          4. **Draw Conclusions**
+             - What does evidence show?
+             - What remains uncertain?
+             - What's needed for future research?
+        tool_budget: 25
+        llm_config:
+          temperature: 0.4
+        input_mapping:
+          data: extracted_data
+          papers: reviewed_papers
+        output: synthesis
+        next: [format_citations]
+
+      # COMPUTE: Citation formatting is deterministic template application
+      # ─────────────────────────────────────────────────────────────────────
+      # Algorithm: Map paper metadata to citation style templates
+      # Styles supported: APA, MLA, Chicago, Harvard, IEEE, Vancouver
+      # Input: Reviewed papers with full bibliographic metadata
+      # Output: Formatted bibliography ready for inclusion
+      #
+      # WHY COMPUTE: No interpretation needed - mechanical text formatting:
+      #   - Author name order: Last, First vs. First Last
+      #   - Date placement: after author vs. at end
+      #   - Italics/quotes: for titles based on style rules
+      #   - All rules are codified, no judgment required
+      #
+      # Execution: in-process (Python string templates)
+      # BLOCKED: [llm, write] - read-only formatting operation
+      - id: format_citations
+        type: compute
+        name: "Format Citations"
+        handler: citation_formatter
+        inputs:
+          references: $ctx.reviewed_papers
+          style: $ctx.citation_style
+        output: bibliography
+        constraints: [llm, write]
+        timeout: 60
+        next: [review_synthesis]
+
+      - id: review_synthesis
+        type: hitl
+        name: "Review Synthesis"
+        hitl_type: approval
+        prompt: |
+          ## Literature Review Synthesis Complete
+
+          **Papers Included:** {paper_count}
+          **Themes Identified:** {theme_count}
+
+          **Key Themes:**
+          {theme_summary}
+
+          **Main Conclusions:**
+          {conclusions}
+
+          Approve for final report?
+        context_keys:
+          - paper_count
+          - theme_count
+          - theme_summary
+          - conclusions
+        timeout: 900
+        fallback: continue
+        next: [generate_review]
+
+      # =====================================================================
+      # Stage 6: Report Generation
+      # =====================================================================
+      - id: generate_review
+        type: agent
+        name: "Generate Literature Review"
+        role: writer
+        goal: |
+          Generate a comprehensive literature review:
+
+          ## Structure
+
+          1. **Introduction**
+             - Background and rationale
+             - Research question
+             - Objectives
+
+          2. **Methods**
+             - Search strategy
+             - Inclusion/exclusion criteria
+             - Quality assessment approach
+             - Data extraction process
+
+          3. **Results**
+             - Search results (PRISMA flow)
+             - Study characteristics
+             - Quality assessment results
+             - Findings by theme
+
+          4. **Discussion**
+             - Summary of evidence
+             - Comparison with existing reviews
+             - Implications
+             - Limitations
+
+          5. **Conclusion**
+             - Key takeaways
+             - Future research directions
+
+          6. **References**
+             - Full bibliography
+
+          Use academic writing style.
+        tool_budget: 30
+        tools: [write]
+        llm_config:
+          temperature: 0.5
+          max_tokens: 10000
+        input_mapping:
+          synthesis: synthesis
+          bibliography: bibliography
+          protocol: review_protocol
+        output: literature_review
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Review Complete"
+        transform: |
+          workflow_status = "completed"
+          output_files = [literature_review, bibliography]

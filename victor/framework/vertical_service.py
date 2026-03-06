@@ -45,7 +45,7 @@ def get_vertical_integration_pipeline(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional[Any] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> "VerticalIntegrationPipeline":
     """Get shared VerticalIntegrationPipeline singleton.
 

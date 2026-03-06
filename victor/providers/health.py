@@ -54,6 +54,15 @@ from victor.providers.resolution import (
 logger = logging.getLogger(__name__)
 
 
+class HealthStatus:
+    """Health status enumeration for providers."""
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
+
+
 @dataclass
 class ProviderHealthResult:
     """Result of provider health check."""
@@ -64,6 +73,12 @@ class ProviderHealthResult:
     issues: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     info: Dict[str, Any] = field(default_factory=dict)
+    status: str = HealthStatus.UNKNOWN
+
+    def __post_init__(self):
+        """Set status based on healthy flag."""
+        if self.status == HealthStatus.UNKNOWN:
+            self.status = HealthStatus.HEALTHY if self.healthy else HealthStatus.UNHEALTHY
 
     @property
     def error_message(self) -> str:
@@ -81,7 +96,7 @@ class ProviderHealthResult:
             "issues": self.issues,
             "warnings": self.warnings,
             "info": self.info,
-            "status": "HEALTHY" if self.healthy else "UNHEALTHY",
+            "status": self.status.upper(),  # Convert to uppercase for API compatibility
         }
 
 
@@ -128,6 +143,8 @@ class ProviderHealthChecker:
             non_interactive: Force non-interactive mode for resolver
         """
         self.resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+        self._registered_providers: Dict[str, Any] = {}
+        self._provider_health: Dict[str, ProviderHealthResult] = {}
 
     async def check_provider(
         self,
@@ -228,7 +245,7 @@ class ProviderHealthChecker:
                     f"Set {self._get_env_var(provider)} environment variable instead."
                 )
 
-        return ProviderHealthResult(
+        result = ProviderHealthResult(
             healthy=len(issues) == 0,
             provider=provider,
             model=model,
@@ -236,6 +253,11 @@ class ProviderHealthChecker:
             warnings=warnings,
             info=info,
         )
+
+        # Cache the result
+        self._provider_health[provider] = result
+
+        return result
 
     def _check_provider_registered(self, provider: str) -> bool:
         """Check if provider is registered."""
@@ -345,6 +367,50 @@ class ProviderHealthChecker:
 
         except Exception as e:
             return {"success": False, "error": f"Failed to create provider: {e}"}
+
+    def register_provider(self, provider_name: str, provider_instance: Any) -> None:
+        """Register a provider instance for health tracking.
+
+        Args:
+            provider_name: Name of the provider
+            provider_instance: Provider instance to track
+        """
+        self._registered_providers[provider_name] = provider_instance
+        logger.debug(f"Registered provider '{provider_name}' for health monitoring")
+
+    def unregister_provider(self, provider_name: str) -> None:
+        """Unregister a provider from health tracking.
+
+        Args:
+            provider_name: Name of the provider to unregister
+        """
+        self._registered_providers.pop(provider_name, None)
+        self._provider_health.pop(provider_name, None)
+        logger.debug(f"Unregistered provider '{provider_name}' from health monitoring")
+
+    def get_healthy_providers(self) -> List[str]:
+        """Get list of healthy providers.
+
+        Returns:
+            List of provider names that are currently healthy
+        """
+        healthy = [
+            name
+            for name, result in self._provider_health.items()
+            if result.healthy or result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+        ]
+        return healthy
+
+    def get_provider_health(self, provider_name: str) -> Optional[ProviderHealthResult]:
+        """Get cached health result for a provider.
+
+        Args:
+            provider_name: Name of the provider
+
+        Returns:
+            ProviderHealthResult if available, None otherwise
+        """
+        return self._provider_health.get(provider_name)
 
 
 async def check_provider_health(
