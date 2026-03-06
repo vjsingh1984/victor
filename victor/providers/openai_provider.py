@@ -81,9 +81,10 @@ class OpenAIProvider(BaseProvider):
         self._oauth_manager: Optional[OAuthTokenManager] = None
 
         if auth_mode == "oauth":
-            # OAuth mode uses ChatGPT subscription via Codex API endpoint
+            # OAuth mode uses ChatGPT subscription via Codex API.
+            # The /v1/chat/completions path is bridged to the Responses API.
             if base_url is None:
-                base_url = "https://chatgpt.com/backend-api/codex"
+                base_url = "https://chatgpt.com/backend-api/codex/v1"
 
             self._oauth_manager = OAuthTokenManager("openai")
             # Use pre-obtained tokens or load cached (sync-safe)
@@ -150,12 +151,26 @@ class OpenAIProvider(BaseProvider):
             max_retries=max_retries,
             **kwargs,
         )
+
+        # Build extra headers for OAuth / Codex backend
+        default_headers = None
+        if auth_mode == "oauth":
+            import platform
+
+            from victor import __version__
+
+            default_headers = {
+                "originator": "victor",
+                "User-Agent": f"victor/{__version__} ({platform.system()})",
+            }
+
         self.client = AsyncOpenAI(
             api_key=self._api_key,
             organization=organization,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
+            default_headers=default_headers,
         )
 
     async def _ensure_valid_token(self) -> None:
