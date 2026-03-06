@@ -251,8 +251,7 @@ class PromptTemplateLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Style posteriors table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_STYLE} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -263,12 +262,10 @@ class PromptTemplateLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (task_type, provider, style)
             )
-            """
-        )
+            """)
 
         # Element posteriors table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_ELEMENT} (
                 task_type TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -279,12 +276,10 @@ class PromptTemplateLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (task_type, provider, element)
             )
-            """
-        )
+            """)
 
         # Learning history
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_type TEXT NOT NULL,
@@ -294,12 +289,10 @@ class PromptTemplateLearner(BaseLearner):
                 success REAL NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Enrichment tracking table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS agent_enrichment_stats (
                 vertical TEXT NOT NULL,
                 enrichment_type TEXT NOT NULL,
@@ -311,12 +304,10 @@ class PromptTemplateLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (vertical, enrichment_type, task_type)
             )
-            """
-        )
+            """)
 
         # Enrichment history table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS agent_enrichment_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 vertical TEXT NOT NULL,
@@ -327,28 +318,21 @@ class PromptTemplateLearner(BaseLearner):
                 quality_improvement REAL NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_agent_prompt_style_context
             ON {Tables.AGENT_PROMPT_STYLE}(task_type, provider)
-            """
-        )
-        cursor.execute(
-            f"""
+            """)
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_agent_prompt_element_context
             ON {Tables.AGENT_PROMPT_ELEMENT}(task_type, provider)
-            """
-        )
-        cursor.execute(
-            """
+            """)
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_agent_enrichment_stats_vertical
             ON agent_enrichment_stats(vertical, enrichment_type)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: prompt_template tables ensured")

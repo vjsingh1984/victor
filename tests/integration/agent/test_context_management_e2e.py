@@ -67,7 +67,9 @@ class TestContextManagementPipeline:
         messages.append(_msg("user", tool_output))
 
         # Update ledger from tool result
-        ledger.update_from_tool_result("read", {"path": "/src/config.py"}, file_content, turn_index=2)
+        ledger.update_from_tool_result(
+            "read", {"path": "/src/config.py"}, file_content, turn_index=2
+        )
 
         # Turn 2: Assistant responds with recommendation
         assistant_response = "I recommend refactoring the config module into smaller files."
@@ -85,9 +87,7 @@ class TestContextManagementPipeline:
 
         # Deduplication should stub the older read
         if deduplicator.should_deduplicate("read", {"path": "/src/config.py"}):
-            count = deduplicator.deduplicate_in_place(
-                messages, "read", {"path": "/src/config.py"}
-            )
+            count = deduplicator.deduplicate_in_place(messages, "read", {"path": "/src/config.py"})
             assert count == 1  # First read stubbed
             assert "Previously read" in messages[2].content
 

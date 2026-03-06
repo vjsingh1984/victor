@@ -367,9 +367,7 @@ def migrate_to_unified_registry() -> None:
     from victor.agent import shared_tool_registry
 
     shared_tool_registry.SharedToolRegistry = SharedToolRegistryAdapter
-    shared_tool_registry.SharedToolRegistry.get_instance = (
-        SharedToolRegistryAdapter.get_instance
-    )
+    shared_tool_registry.SharedToolRegistry.get_instance = SharedToolRegistryAdapter.get_instance
 
     # Note: ToolRegistry is typically instantiated per-session,
     # so we update it via __init__ instead

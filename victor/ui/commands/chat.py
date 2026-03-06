@@ -46,6 +46,7 @@ except ImportError:
     def format_exception_for_user(e):
         return str(e)
 
+
 chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
 console = Console()
 

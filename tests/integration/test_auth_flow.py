@@ -142,9 +142,7 @@ class TestAccountManagementIntegration:
         assert "zai" in providers
 
         # Find by provider
-        anthropic_accounts = [
-            a for a in all_accounts if a.provider == "anthropic"
-        ]
+        anthropic_accounts = [a for a in all_accounts if a.provider == "anthropic"]
         assert len(anthropic_accounts) == 1
 
     def test_default_account_resolution(self, clean_account_manager):
@@ -200,9 +198,7 @@ class TestAccountManagementIntegration:
         clean_account_manager.save_account(account2)
 
         # Resolve by provider + model
-        account = clean_account_manager.get_account(
-            provider="anthropic", model="claude-sonnet-4-5"
-        )
+        account = clean_account_manager.get_account(provider="anthropic", model="claude-sonnet-4-5")
         assert account is not None
         assert account.name == "claude-default"
 
@@ -224,13 +220,14 @@ class TestConnectionValidationIntegration:
 
         # Mock local provider detection
         with patch.object(
-            validator, "_test_local_provider",
+            validator,
+            "_test_local_provider",
             return_value=ConnectionTestResult(
                 success=True,
                 account_name="ollama-test",
                 provider="ollama",
                 model="llama3",
-            )
+            ),
         ):
             result = await validator.test_account(account)
 
@@ -252,23 +249,26 @@ class TestConnectionValidationIntegration:
 
         # Mock auth validation
         with patch.object(
-            validator, "_validate_auth",
+            validator,
+            "_validate_auth",
             return_value=ValidationResult(
                 status=ValidationStatus.SUCCESS, message="API key is valid"
-            )
+            ),
         ):
             # Mock endpoint test
             with patch.object(
-                validator, "_test_endpoint",
+                validator,
+                "_test_endpoint",
                 return_value=ValidationResult(
                     status=ValidationStatus.SUCCESS, message="Endpoint reachable"
-                )
+                ),
             ):
                 result = await validator.test_account(account)
 
                 # Should have successful auth validation
                 auth_validations = [
-                    v for v in result.validations
+                    v
+                    for v in result.validations
                     if "auth" in str(v.message).lower() or "api key" in str(v.message).lower()
                 ]
                 assert len(auth_validations) > 0
@@ -286,21 +286,21 @@ class TestConnectionValidationIntegration:
         validator = ConnectionValidator()
 
         # Mock OAuth client_id retrieval
-        with patch.object(
-            validator, "_get_oauth_client_id", return_value="test-client-id"
-        ):
+        with patch.object(validator, "_get_oauth_client_id", return_value="test-client-id"):
             # Mock auth validation which internally calls _get_oauth_client_id
             with patch.object(
-                validator, "_validate_auth",
+                validator,
+                "_validate_auth",
                 return_value=ValidationResult(
                     status=ValidationStatus.SUCCESS, message="OAuth client_id configured"
-                )
+                ),
             ):
                 result = await validator.test_account(account)
 
                 # Should have OAuth validation
                 oauth_validations = [
-                    v for v in result.validations
+                    v
+                    for v in result.validations
                     if "oauth" in str(v.message).lower() or "client_id" in str(v.message).lower()
                 ]
                 assert len(oauth_validations) > 0
@@ -541,8 +541,7 @@ class TestAccountResolutionIntegration:
 
         # Mock keyring retrieval
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring",
-            return_value="sk-ant-keyring-key"
+            clean_account_manager, "_get_api_key_from_keyring", return_value="sk-ant-keyring-key"
         ):
             config = clean_account_manager.resolve_provider_config(account)
 
@@ -565,8 +564,7 @@ class TestModelSuffixIntegration:
 
         # Resolve provider config
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring",
-            return_value="test-key"
+            clean_account_manager, "_get_api_key_from_keyring", return_value="test-key"
         ):
             config = clean_account_manager.resolve_provider_config(account)
 
@@ -587,8 +585,7 @@ class TestModelSuffixIntegration:
 
         # Resolve provider config
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring",
-            return_value="test-key"
+            clean_account_manager, "_get_api_key_from_keyring", return_value="test-key"
         ):
             config = clean_account_manager.resolve_provider_config(account)
 

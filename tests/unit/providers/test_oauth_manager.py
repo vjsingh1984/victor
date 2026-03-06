@@ -29,7 +29,6 @@ from victor.providers.oauth_manager import (
 )
 from victor.workflows.services.credentials import SSOConfig, SSOProvider, SSOTokens
 
-
 # ---------------------------------------------------------------------------
 # OAuthProviderConfig registry tests
 # ---------------------------------------------------------------------------

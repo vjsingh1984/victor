@@ -81,14 +81,16 @@ class ResolutionContext:
 
     def has_cli_overrides(self) -> bool:
         """Check if any CLI overrides are set."""
-        return any([
-            self.cli_provider,
-            self.cli_model,
-            self.cli_account,
-            self.cli_endpoint,
-            self.cli_api_key,
-            self.cli_auth_mode,
-        ])
+        return any(
+            [
+                self.cli_provider,
+                self.cli_model,
+                self.cli_account,
+                self.cli_endpoint,
+                self.cli_api_key,
+                self.cli_auth_mode,
+            ]
+        )
 
     def get_overrides(self) -> Dict[str, Any]:
         """Get all CLI overrides as a dict."""

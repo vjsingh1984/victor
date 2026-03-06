@@ -345,9 +345,7 @@ class TestSyncDecide:
 
     def test_sync_with_running_loop_returns_heuristic(self):
         """When called from within a running event loop, returns heuristic fallback."""
-        provider = _make_provider(
-            {"is_complete": True, "confidence": 0.9, "phase": "done"}
-        )
+        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
         service = LLMDecisionService(provider=provider, model="test")
 
         async def _inner():
@@ -365,18 +363,18 @@ class TestSyncDecide:
 
     def test_sync_cache_works(self):
         """Cache is shared between sync and async paths."""
-        provider = _make_provider(
-            {"is_complete": True, "confidence": 0.9, "phase": "done"}
-        )
+        provider = _make_provider({"is_complete": True, "confidence": 0.9, "phase": "done"})
         service = LLMDecisionService(provider=provider, model="test")
 
         # Run an async decide to populate cache
         context = {"response_tail": "cache_test", "deliverable_count": 0, "signal_count": 0}
-        asyncio.run(service.decide(
-            DecisionType.TASK_COMPLETION,
-            context=context,
-            heuristic_confidence=0.1,
-        ))
+        asyncio.run(
+            service.decide(
+                DecisionType.TASK_COMPLETION,
+                context=context,
+                heuristic_confidence=0.1,
+            )
+        )
 
         # Sync call should hit cache even from running loop
         async def _check_cache():

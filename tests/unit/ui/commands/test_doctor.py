@@ -94,7 +94,7 @@ class TestDoctorChecks:
         """Python version check passes for 3.10+."""
         doctor = DoctorChecks()
         doctor.check_python_version()
-        
+
         if sys.version_info >= (3, 10):
             # Should have a success check
             has_success = any(
@@ -107,11 +107,10 @@ class TestDoctorChecks:
         """Check dependencies finds required packages."""
         doctor = DoctorChecks()
         doctor.check_dependencies()
-        
+
         # Should have checks for dependencies
         has_checks = any(
-            "Dependency:" in check.name or "Optional:" in check.name
-            for check in doctor.checks
+            "Dependency:" in check.name or "Optional:" in check.name for check in doctor.checks
         )
         assert has_checks
 
@@ -119,10 +118,10 @@ class TestDoctorChecks:
         """Running all checks executes all check methods."""
         doctor = DoctorChecks()
         checks = doctor.run_all_checks()
-        
+
         # Should have multiple checks
         assert len(checks) > 0
-        
+
         # Should have at least: Python Version, Dependencies, API Keys
         check_names = [check.name for check in checks]
         assert "Python Version" in check_names
@@ -136,10 +135,10 @@ class TestDoctorChecks:
             severity=Severity.SUCCESS,
             message="Passed",
         )
-        
+
         exit_code = doctor.print_results()
         captured = capsys.readouterr()
-        
+
         # Should have summary
         assert "Summary:" in captured.out or "summary" in captured.out.lower()
         assert exit_code == 0

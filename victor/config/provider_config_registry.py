@@ -429,6 +429,7 @@ class ZAIConfig(ProviderConfigStrategy):
 #   Use model="glm-4.6:coding" instead of provider="zai-coding-plan"
 # The ZAIProvider automatically detects the :coding suffix and uses the coding endpoint.
 
+
 class QwenConfig(ProviderConfigStrategy):
     """Configuration strategy for Qwen (Alibaba Cloud)."""
 
@@ -456,9 +457,7 @@ class QwenConfig(ProviderConfigStrategy):
             api_key = get_api_key("qwen")
             if api_key:
                 result["api_key"] = api_key
-            result.setdefault(
-                "base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/"
-            )
+            result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
         return result
 
 

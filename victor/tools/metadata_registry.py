@@ -527,7 +527,9 @@ class ToolMetadataRegistry:
             self._keyword_matcher.index_tool(
                 name=entry.name,
                 keywords=list(entry.keywords),
-                mandatory_keywords=list(entry.mandatory_keywords) if entry.mandatory_keywords else None,
+                mandatory_keywords=(
+                    list(entry.mandatory_keywords) if entry.mandatory_keywords else None
+                ),
             )
         schema = getattr(tool, "parameters", None)
         if schema:

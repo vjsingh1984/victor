@@ -73,12 +73,16 @@ class EnhancedRAGSafetyExtension(SafetyExtensionProtocol):
         self._coordinator = SafetyCoordinator(strict_mode=strict_mode)
         for rule in RAGSafetyRules.get_all_rules():
             self._coordinator.register_rule(rule)
-        logger.info(f"EnhancedRAGSafetyExtension initialized")
+        logger.info("EnhancedRAGSafetyExtension initialized")
 
-    def check_operation(self, tool_name: str, args: List[str], context: Optional[Dict[str, Any]] = None) -> Any:
+    def check_operation(
+        self, tool_name: str, args: List[str], context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         return self._coordinator.check_safety(tool_name, args, context)
 
-    def is_operation_safe(self, tool_name: str, args: List[str], context: Optional[Dict[str, Any]] = None) -> bool:
+    def is_operation_safe(
+        self, tool_name: str, args: List[str], context: Optional[Dict[str, Any]] = None
+    ) -> bool:
         return self._coordinator.is_operation_safe(tool_name, args, context)
 
     def get_bash_patterns(self) -> List[SafetyPattern]:

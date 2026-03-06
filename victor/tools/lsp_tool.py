@@ -31,6 +31,7 @@ from victor.tools.decorators import tool
 # functions return error messages directing users to install it.
 # =============================================================================
 
+
 def _get_lsp_capability():
     """Get LSP manager and language servers from capability registry."""
     from victor.core.capability_registry import CapabilityRegistry
@@ -40,6 +41,7 @@ def _get_lsp_capability():
     if provider is None:
         return None, None
     return provider.get_lsp_manager(), provider.get_language_servers()
+
 
 # Completion kind mapping
 KIND_NAMES = {

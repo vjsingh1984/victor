@@ -60,9 +60,7 @@ class TestAllDecisionTypes:
     """Verify each decision type can be called end-to-end."""
 
     async def test_task_completion_e2e(self):
-        provider = _provider_returning(
-            {"is_complete": True, "confidence": 0.95, "phase": "done"}
-        )
+        provider = _provider_returning({"is_complete": True, "confidence": 0.95, "phase": "done"})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -81,9 +79,7 @@ class TestAllDecisionTypes:
         assert result.result.phase == "done"
 
     async def test_intent_classification_e2e(self):
-        provider = _provider_returning(
-            {"intent": "continuation", "confidence": 0.85}
-        )
+        provider = _provider_returning({"intent": "continuation", "confidence": 0.85})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -100,9 +96,7 @@ class TestAllDecisionTypes:
         assert result.result.intent == "continuation"
 
     async def test_task_type_classification_e2e(self):
-        provider = _provider_returning(
-            {"task_type": "analysis", "confidence": 0.9}
-        )
+        provider = _provider_returning({"task_type": "analysis", "confidence": 0.9})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -115,9 +109,7 @@ class TestAllDecisionTypes:
         assert result.result.task_type == "analysis"
 
     async def test_question_classification_e2e(self):
-        provider = _provider_returning(
-            {"question_type": "rhetorical", "confidence": 0.8}
-        )
+        provider = _provider_returning({"question_type": "rhetorical", "confidence": 0.8})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -130,9 +122,7 @@ class TestAllDecisionTypes:
         assert result.result.question_type == "rhetorical"
 
     async def test_loop_detection_e2e(self):
-        provider = _provider_returning(
-            {"is_loop": True, "loop_type": "stalling"}
-        )
+        provider = _provider_returning({"is_loop": True, "loop_type": "stalling"})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -149,9 +139,7 @@ class TestAllDecisionTypes:
         assert result.result.loop_type == "stalling"
 
     async def test_error_classification_e2e(self):
-        provider = _provider_returning(
-            {"error_type": "transient", "confidence": 0.85}
-        )
+        provider = _provider_returning({"error_type": "transient", "confidence": 0.85})
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -223,9 +211,7 @@ class TestFullPipelineWithTaskCompletion:
 
     def test_detector_with_service_full_flow(self):
         """Simulate a complete flow: ambiguous response -> LLM augments -> completion detected."""
-        provider = _provider_returning(
-            {"is_complete": True, "confidence": 0.9, "phase": "done"}
-        )
+        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
         service = LLMDecisionService(provider=provider, model="test")
         detector = TaskCompletionDetector(decision_service=service)
 
@@ -246,9 +232,7 @@ class TestFullPipelineWithTaskCompletion:
 
     async def test_service_budget_across_multiple_detectors(self):
         """Budget is shared when the same service instance is used."""
-        provider = _provider_returning(
-            {"is_complete": True, "confidence": 0.9, "phase": "done"}
-        )
+        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
         config = LLMDecisionServiceConfig(micro_budget=2)
         service = LLMDecisionService(provider=provider, model="test", config=config)
 
@@ -283,16 +267,20 @@ class TestFullPipelineWithTaskCompletion:
         service = LLMDecisionService(provider=provider, model="test", config=config)
 
         # Exhaust budget
-        asyncio.run(service.decide(
-            DecisionType.TASK_COMPLETION,
-            context={"response_tail": "a", "deliverable_count": 0, "signal_count": 0},
-            heuristic_confidence=0.1,
-        ))
-        asyncio.run(service.decide(
-            DecisionType.TASK_COMPLETION,
-            context={"response_tail": "b", "deliverable_count": 0, "signal_count": 0},
-            heuristic_confidence=0.1,
-        ))
+        asyncio.run(
+            service.decide(
+                DecisionType.TASK_COMPLETION,
+                context={"response_tail": "a", "deliverable_count": 0, "signal_count": 0},
+                heuristic_confidence=0.1,
+            )
+        )
+        asyncio.run(
+            service.decide(
+                DecisionType.TASK_COMPLETION,
+                context={"response_tail": "b", "deliverable_count": 0, "signal_count": 0},
+                heuristic_confidence=0.1,
+            )
+        )
         assert service.budget_remaining == 0
 
         # Simulate new turn

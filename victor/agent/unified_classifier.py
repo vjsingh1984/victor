@@ -771,12 +771,10 @@ class UnifiedTaskClassifier:
                         result = ClassificationResult(
                             task_type=llm_type,
                             confidence=decision.confidence,
-                            is_action_task=llm_type in (
-                                ClassifierTaskType.ACTION, ClassifierTaskType.GENERATION
-                            ),
-                            is_analysis_task=llm_type in (
-                                ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH
-                            ),
+                            is_action_task=llm_type
+                            in (ClassifierTaskType.ACTION, ClassifierTaskType.GENERATION),
+                            is_analysis_task=llm_type
+                            in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH),
                             is_generation_task=llm_type == ClassifierTaskType.GENERATION,
                             needs_execution=has_execution,
                             source="llm",

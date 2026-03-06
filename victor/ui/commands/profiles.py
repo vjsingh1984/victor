@@ -104,7 +104,9 @@ def profile_list(
 
 @profiles_app.command("show")
 def profile_show(
-    name: str = typer.Argument(..., help="Profile name (basic, advanced, expert, coding, research)"),
+    name: str = typer.Argument(
+        ..., help="Profile name (basic, advanced, expert, coding, research)"
+    ),
     export_yaml: bool = typer.Option(False, "--yaml", "-y", help="Export as YAML"),
 ) -> None:
     """Show details for a specific profile."""
@@ -185,7 +187,9 @@ def profile_apply(
 
     # Apply the profile
     try:
-        profiles_path = install_profile(profile, config_dir=config_path, provider_override=provider, model_override=model)
+        profiles_path = install_profile(
+            profile, config_dir=config_path, provider_override=provider, model_override=model
+        )
 
         console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")
         console.print(f"[dim]Config written to: {profiles_path}[/]")

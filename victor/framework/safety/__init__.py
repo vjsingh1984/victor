@@ -43,7 +43,9 @@ def __getattr__(name: str):
             raise ImportError(f"Cannot find victor.framework.safety.py at {safety_py_path}")
 
         # Load the module
-        spec = importlib.util.spec_from_file_location("victor.framework.safety_rules", safety_py_path)
+        spec = importlib.util.spec_from_file_location(
+            "victor.framework.safety_rules", safety_py_path
+        )
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot load module from {safety_py_path}")
 

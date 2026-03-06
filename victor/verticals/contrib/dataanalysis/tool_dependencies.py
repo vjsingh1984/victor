@@ -26,7 +26,6 @@ from victor.core.tool_dependency_loader import YAMLToolDependencyProvider
 _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
 
-
 def get_provider() -> YAMLToolDependencyProvider:
     """Entry-point provider factory for the dataanalysis vertical."""
     return YAMLToolDependencyProvider(

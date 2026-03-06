@@ -207,8 +207,7 @@ class CheckpointStore:
 
         cursor = self.db.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS policy_checkpoints (
                 checkpoint_id TEXT PRIMARY KEY,
                 learner_name TEXT NOT NULL,
@@ -221,15 +220,12 @@ class CheckpointStore:
                 state_hash TEXT NOT NULL,
                 UNIQUE(learner_name, version)
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_checkpoints_learner
             ON policy_checkpoints(learner_name, timestamp DESC)
-            """
-        )
+            """)
 
         self.db.commit()
 

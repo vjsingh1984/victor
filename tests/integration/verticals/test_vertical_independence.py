@@ -31,9 +31,7 @@ class TestResearchVerticalIndependence:
         """ResearchAssistant can be imported without coding module."""
         # Temporarily make coding module raise ImportError
         coding_modules = [
-            key
-            for key in sys.modules.keys()
-            if "victor_coding" in key or "victor.coding" in key
+            key for key in sys.modules.keys() if "victor_coding" in key or "victor.coding" in key
         ]
 
         # Store original modules

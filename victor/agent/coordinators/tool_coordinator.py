@@ -603,7 +603,9 @@ class ToolCoordinator:
         if self._mode_controller:
             config = self._mode_controller.config
             if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)")
+                logger.debug(
+                    f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)"
+                )
                 return ToolNames.SHELL
 
         # Check if full shell is enabled first
@@ -1407,9 +1409,7 @@ class ToolCoordinator:
                 canonical, tool_call.get("arguments", {})
             )
             if not schema_result.valid:
-                logger.warning(
-                    f"Schema validation: {canonical}: {schema_result.errors}"
-                )
+                logger.warning(f"Schema validation: {canonical}: {schema_result.errors}")
 
         return ToolCallValidation(
             valid=True,

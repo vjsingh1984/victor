@@ -110,17 +110,14 @@ class LocalCVECache:
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self.cache_path) as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS cves (
                     cve_id TEXT PRIMARY KEY,
                     data TEXT NOT NULL,
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS package_cves (
                     package_name TEXT,
                     ecosystem TEXT,
@@ -130,14 +127,11 @@ class LocalCVECache:
                     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (package_name, ecosystem, cve_id)
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_package_lookup
                 ON package_cves (package_name, ecosystem)
-            """
-            )
+            """)
             conn.commit()
 
     def get_cve(self, cve_id: str, max_age_hours: int = 24) -> Optional[CVE]:

@@ -114,7 +114,7 @@ class SystemPromptPolicy:
     def _render_operating_preamble(self, context: Optional["TaskContext"]) -> str:
         """Create an operating mode section tailored to context."""
         task_type = (context.task_type if context else "general").upper()
-        stage = (context.stage if context and context.stage else "global")
+        stage = context.stage if context and context.stage else "global"
         model = context.model if context and context.model else "unspecified"
         provider = context.provider if context and context.provider else "unspecified"
         return self._config.fallback_operating_template.format(

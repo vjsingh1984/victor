@@ -39,7 +39,6 @@ import os
 import sys
 from typing import Any
 
-
 # =============================================================================
 # Contextual Error Classes
 # =============================================================================
@@ -479,18 +478,12 @@ def format_exception_for_user(error: Exception) -> str:
     # Permission errors
     if "permission" in str(error).lower():
         return (
-            f"{error}\n\n"
-            "💡 Suggestion: Check file/directory permissions.\n"
-            "Try: ls -la <path>"
+            f"{error}\n\n" "💡 Suggestion: Check file/directory permissions.\n" "Try: ls -la <path>"
         )
 
     # File not found
     if "not found" in str(error).lower():
-        return (
-            f"{error}\n\n"
-            "💡 Suggestion: Verify the file/path exists.\n"
-            "Try: ls <path>"
-        )
+        return f"{error}\n\n" "💡 Suggestion: Verify the file/path exists.\n" "Try: ls <path>"
 
     # Generic error with system info
     return (

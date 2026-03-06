@@ -546,9 +546,7 @@ class TestOrchestratorSubAgentIntegration:
 
         # Fields may be in __init__ or in extracted helper methods
         init_source = inspect.getsource(AgentOrchestrator.__init__)
-        tool_layer_source = inspect.getsource(
-            AgentOrchestrator._initialize_tool_and_plugin_layers
-        )
+        tool_layer_source = inspect.getsource(AgentOrchestrator._initialize_tool_and_plugin_layers)
         combined = init_source + tool_layer_source
         assert "_subagent_orchestrator" in combined
         assert "_subagent_orchestration_enabled" in combined

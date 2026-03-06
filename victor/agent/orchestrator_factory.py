@@ -2309,9 +2309,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ToolResultDeduplicator created")
         return ToolResultDeduplicator()
 
-    def create_context_assembler(
-        self, ledger: Any = None, controller: Any = None
-    ) -> Any:
+    def create_context_assembler(self, ledger: Any = None, controller: Any = None) -> Any:
         """Create TurnBoundaryContextAssembler for context selection.
 
         Args:

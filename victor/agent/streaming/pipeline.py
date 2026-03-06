@@ -24,7 +24,6 @@ class StreamingChatPipeline:
         coord = self._coordinator
         orch = coord._orchestrator
 
-
         # Initialize and prepare using StreamingChatContext
         stream_ctx = await coord._create_stream_context(user_message)
 
@@ -185,7 +184,9 @@ class StreamingChatPipeline:
                 logger.info("Setting force_completion due to garbage detection")
 
             # Parse, validate, and normalize tool calls
-            tool_calls, full_content = coord._parse_and_validate_tool_calls(tool_calls, full_content)
+            tool_calls, full_content = coord._parse_and_validate_tool_calls(
+                tool_calls, full_content
+            )
 
             # Task Completion Detection Enhancement
             if orch._task_completion_detector and full_content:

@@ -467,7 +467,9 @@ def _set_oauth_client_id(provider: str):
             console.print()
             console.print("[yellow]Important:[/]")
             console.print(f"  This client_id must be registered with {provider.upper()}")
-            console.print(f"  You can now use: victor chat --provider {provider} --auth-mode oauth \"Your message\"")
+            console.print(
+                f'  You can now use: victor chat --provider {provider} --auth-mode oauth "Your message"'
+            )
         else:
             console.print("[red]Failed to save OAuth client_id")
             raise typer.Exit(1)

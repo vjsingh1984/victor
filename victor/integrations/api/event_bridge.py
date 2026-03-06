@@ -487,7 +487,9 @@ class EventBusAdapter:
 
             # Legacy sync API fallback: unsubscribe(topic, handler)
             subscribe_fn = getattr(self._event_bus, "subscribe", None)
-            uses_async_subscribe = callable(subscribe_fn) and inspect.iscoroutinefunction(subscribe_fn)
+            uses_async_subscribe = callable(subscribe_fn) and inspect.iscoroutinefunction(
+                subscribe_fn
+            )
             has_pending_subscribes = bool(self._pending_async_tasks)
             if not had_async_handles and not uses_async_subscribe and not has_pending_subscribes:
                 unsubscribe_fn = getattr(self._event_bus, "unsubscribe", None)

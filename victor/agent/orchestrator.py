@@ -864,7 +864,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager = self._factory.create_lifecycle_manager(
             conversation_controller=self._conversation_controller,
             metrics_collector=(
-                self._metrics_coordinator.metrics_collector if hasattr(self, "_metrics_coordinator") else None
+                self._metrics_coordinator.metrics_collector
+                if hasattr(self, "_metrics_coordinator")
+                else None
             ),
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
@@ -1344,7 +1346,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             StreamingChatCoordinator instance for optimized streaming execution
         """
         if self._streaming_chat_coordinator is None:
-            from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
+            from victor.agent.coordinators.streaming_chat_coordinator import (
+                StreamingChatCoordinator,
+            )
 
             self._streaming_chat_coordinator = StreamingChatCoordinator(
                 chat_context=self.protocol_adapter,
@@ -4352,7 +4356,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Get provider-level settings
         # Pass profile extras to get_settings so strategies can see them (e.g., auth_mode)
-        profile_extras = profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
+        profile_extras = (
+            profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
+        )
         provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
 
         # Note: profile_extras are already merged by get_provider_settings for strategy decisions

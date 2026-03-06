@@ -1618,12 +1618,7 @@ async def read(
         "Automatically uses LSP validation/formatting when available for the language",
     ],
 )
-async def write(
-    path: str,
-    content: str,
-    *,
-    use_lsp: bool = True
-) -> str:
+async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
     """Write file. Creates parent dirs. Use edit_files for partial edits.
 
     Automatically uses LSP (Language Server Protocol) enhancement when available:
@@ -1668,32 +1663,53 @@ async def write(
         # Check if language has LSP support by file extension
         lsp_supported_extensions = {
             # Programming languages
-            '.py', '.pyi', '.pyx',        # Python
-            '.c', '.h', '.cpp', '.hpp', '.cc', '.cxx',  # C/C++
-            '.rs',                        # Rust
-            '.ts', '.tsx', '.js', '.jsx', # JavaScript/TypeScript
-            '.go',                        # Go
-            '.java',                      # Java
-            '.kt', '.kts',                # Kotlin
-            '.swift',                     # Swift
-            '.scala',                     # Scala
-            '.cs',                        # C#
-            '.php',                       # PHP
-            '.rb',                        # Ruby
-            '.lua',                       # Lua
-            '.ex', '.exs',                # Elixir
-            '.hs',                        # Haskell
-            '.r', '.R',                    # R
+            ".py",
+            ".pyi",
+            ".pyx",  # Python
+            ".c",
+            ".h",
+            ".cpp",
+            ".hpp",
+            ".cc",
+            ".cxx",  # C/C++
+            ".rs",  # Rust
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",  # JavaScript/TypeScript
+            ".go",  # Go
+            ".java",  # Java
+            ".kt",
+            ".kts",  # Kotlin
+            ".swift",  # Swift
+            ".scala",  # Scala
+            ".cs",  # C#
+            ".php",  # PHP
+            ".rb",  # Ruby
+            ".lua",  # Lua
+            ".ex",
+            ".exs",  # Elixir
+            ".hs",  # Haskell
+            ".r",
+            ".R",  # R
             # Config files
-            '.json', '.jsonc',            # JSON
-            '.yaml', '.yml',              # YAML
-            '.toml',                      # TOML
-            '.xml',                       # XML
-            '.html', '.htm',              # HTML
-            '.css', '.scss', '.less',     # CSS
-            '.sh', '.bash', '.zsh',        # Shell
-            '.sql',                       # SQL
-            '.md', '.markdown',           # Markdown
+            ".json",
+            ".jsonc",  # JSON
+            ".yaml",
+            ".yml",  # YAML
+            ".toml",  # TOML
+            ".xml",  # XML
+            ".html",
+            ".htm",  # HTML
+            ".css",
+            ".scss",
+            ".less",  # CSS
+            ".sh",
+            ".bash",
+            ".zsh",  # Shell
+            ".sql",  # SQL
+            ".md",
+            ".markdown",  # Markdown
         }
 
         if file_path.suffix.lower() in lsp_supported_extensions:
@@ -1718,7 +1734,9 @@ async def write(
 
                     if result.validated:
                         error_count = sum(1 for d in result.diagnostics if d.severity == "error")
-                        warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+                        warning_count = sum(
+                            1 for d in result.diagnostics if d.severity == "warning"
+                        )
 
                         if error_count > 0 or warning_count > 0:
                             lsp_info.append(f"{error_count} errors, {warning_count} warnings")

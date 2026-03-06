@@ -30,7 +30,6 @@ from victor.providers.base import Message
 from victor.workflows.services.credentials import SSOConfig, SSOProvider, SSOTokens
 from victor.providers.oauth_manager import OAuthTokenManager, OAUTH_PROVIDERS
 
-
 # ---------------------------------------------------------------------------
 # Qwen constants
 # ---------------------------------------------------------------------------

@@ -123,7 +123,10 @@ class TestProviderAccount:
 
         # Cloud provider
         assert not ProviderAccount(
-            name="anthropic", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="anthropic",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         ).is_local()
 
     def test_provider_account_oauth_enabled(self):
@@ -132,7 +135,10 @@ class TestProviderAccount:
             name="openai", provider="openai", model="gpt-4", auth=AuthConfig(method="oauth")
         ).is_oauth_enabled()
         assert not ProviderAccount(
-            name="anthropic", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
+            name="anthropic",
+            provider="anthropic",
+            model="claude",
+            auth=AuthConfig(method="api_key"),
         ).is_oauth_enabled()
 
     def test_provider_account_get_endpoint_variant(self):
@@ -144,7 +150,10 @@ class TestProviderAccount:
 
         # No variant
         account2 = ProviderAccount(
-            name="anthropic", provider="anthropic", model="claude-sonnet-4-5", auth=AuthConfig(method="api_key")
+            name="anthropic",
+            provider="anthropic",
+            model="claude-sonnet-4-5",
+            auth=AuthConfig(method="api_key"),
         )
         assert account2.get_endpoint_variant() is None
 
@@ -157,7 +166,10 @@ class TestProviderAccount:
 
         # No suffix
         account2 = ProviderAccount(
-            name="anthropic", provider="anthropic", model="claude-sonnet-4-5", auth=AuthConfig(method="api_key")
+            name="anthropic",
+            provider="anthropic",
+            model="claude-sonnet-4-5",
+            auth=AuthConfig(method="api_key"),
         )
         assert account2.get_base_model() == "claude-sonnet-4-5"
 
@@ -333,13 +345,13 @@ class TestAccountManager:
         assert account is not None
         assert account.name == "test-account"
 
-    def test_account_manager_get_account_by_provider_model(self, mock_account_manager, sample_account):
+    def test_account_manager_get_account_by_provider_model(
+        self, mock_account_manager, sample_account
+    ):
         """Test getting account by provider and model."""
         mock_account_manager.save_account(sample_account)
 
-        account = mock_account_manager.get_account(
-            provider="anthropic", model="claude-sonnet-4-5"
-        )
+        account = mock_account_manager.get_account(provider="anthropic", model="claude-sonnet-4-5")
         assert account is not None
         assert account.provider == "anthropic"
 
@@ -371,7 +383,10 @@ class TestAccountManager:
             name="test1", provider="anthropic", model="claude", auth=AuthConfig(method="api_key")
         )
         account2 = ProviderAccount(
-            name="test2", provider="anthropic", model="claude-opus", auth=AuthConfig(method="api_key")
+            name="test2",
+            provider="anthropic",
+            model="claude-opus",
+            auth=AuthConfig(method="api_key"),
         )
         account3 = ProviderAccount(
             name="test3", provider="openai", model="gpt-4", auth=AuthConfig(method="api_key")

@@ -41,7 +41,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Optional, Protocol, runtime_checkable
 
-
 # =============================================================================
 # File Editing Protocols
 # =============================================================================

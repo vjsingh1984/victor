@@ -101,9 +101,7 @@ class TestMigrationResult:
 
     def test_migration_result_creation(self):
         """Test creating MigrationResult."""
-        result = MigrationResult(
-            success=True, migrated_accounts=2, migrated_keys=2
-        )
+        result = MigrationResult(success=True, migrated_accounts=2, migrated_keys=2)
         assert result.success
         assert result.migrated_accounts == 2
         assert result.migrated_keys == 2

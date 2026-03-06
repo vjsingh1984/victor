@@ -143,12 +143,18 @@ def auth_setup() -> None:
 
 @auth_app.command("add")
 def auth_add(
-    provider: str = typer.Option(..., "--provider", "-p", help="Provider name (e.g., anthropic, openai)"),
+    provider: str = typer.Option(
+        ..., "--provider", "-p", help="Provider name (e.g., anthropic, openai)"
+    ),
     model: str = typer.Option(..., "--model", "-m", help="Model name (e.g., claude-sonnet-4-5)"),
     name: str = typer.Option("default", "--name", "-n", help="Account name"),
-    auth_method: str = typer.Option("api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"),
+    auth_method: str = typer.Option(
+        "api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"
+    ),
     endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Custom endpoint URL"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", help="API key (will prompt if not provided)"),
+    api_key: Optional[str] = typer.Option(
+        None, "--api-key", help="API key (will prompt if not provided)"
+    ),
     tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
 ) -> None:
     """Quick add a provider account.
@@ -682,9 +688,7 @@ class AuthSetupWizard:
             self.state["selected_model"] = Prompt.ask("Enter model name")
 
         self.console.print()
-        self.console.print(
-            f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}"
-        )
+        self.console.print(f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}")
         return True
 
     def _configure_authentication(self) -> bool:

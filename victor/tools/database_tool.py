@@ -383,14 +383,12 @@ async def _do_describe(
             ]
 
         elif connection_id.startswith("postgresql"):
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT column_name, data_type, is_nullable
                 FROM information_schema.columns
                 WHERE table_name = '{table}'
                 ORDER BY ordinal_position
-                """
-            )
+                """)
             rows = cursor.fetchall()
             columns = [
                 {"name": row[0], "type": row[1], "nullable": row[2] == "YES"} for row in rows

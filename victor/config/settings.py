@@ -674,7 +674,9 @@ class Settings(BaseSettings):
     http_connection_pool_total_timeout: int = 60  # seconds
 
     # Startup/runtime preloading coordinator for warm-path dependencies.
-    framework_preload_enabled: bool = True  # Enable preloading by default for 50-70% first-request latency reduction
+    framework_preload_enabled: bool = (
+        True  # Enable preloading by default for 50-70% first-request latency reduction
+    )
     framework_preload_parallel: bool = True
 
     # Strict mode for blocking private attribute fallbacks in framework integration.
@@ -1423,7 +1425,9 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load tool config: {e}")
             return {}
 
-    def get_provider_settings(self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_provider_settings(
+        self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
         This method now uses the new AccountManager for configuration while maintaining
@@ -1461,8 +1465,11 @@ class Settings(BaseSettings):
         except Exception as e:
             # Fall back to old system if new system fails
             import logging
+
             logger = logging.getLogger(__name__)
-            logger.debug(f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry")
+            logger.debug(
+                f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry"
+            )
 
         # Fall back to old ProviderConfigRegistry for backward compatibility
         from victor.config.provider_config_registry import get_provider_config_registry

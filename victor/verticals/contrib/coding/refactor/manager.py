@@ -40,7 +40,10 @@ from victor.verticals.contrib.coding.refactor.transforms.extract import (
     ExtractFunctionTransform,
     ExtractVariableTransform,
 )
-from victor.verticals.contrib.coding.refactor.transforms.rename import RenameFileTransform, RenameSymbolTransform
+from victor.verticals.contrib.coding.refactor.transforms.rename import (
+    RenameFileTransform,
+    RenameSymbolTransform,
+)
 
 logger = logging.getLogger(__name__)
 

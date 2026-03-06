@@ -27,7 +27,6 @@ from victor.core.container import (
     ServiceAlreadyRegisteredError,
 )
 
-
 # =============================================================================
 # Test Protocols and Classes
 # =============================================================================

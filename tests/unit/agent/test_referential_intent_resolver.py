@@ -92,7 +92,7 @@ class TestEnrichWithLedger:
         resolver = ReferentialIntentResolver(config=config, session_ledger=ledger)
         result = resolver.enrich("do it")
         # The enrichment portion should be limited
-        enrichment = result[len("do it"):]
+        enrichment = result[len("do it") :]
         assert len(enrichment) <= 210  # Allow small overshoot
 
 

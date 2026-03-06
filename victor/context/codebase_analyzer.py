@@ -39,19 +39,32 @@ try:
         is_hidden_path,
         should_ignore_path,
     )
+
     _IGNORE_PATTERNS_AVAILABLE = True
 except ImportError:
     _IGNORE_PATTERNS_AVAILABLE = False
-    DEFAULT_SKIP_DIRS = frozenset({
-        ".git", ".venv", "venv", "__pycache__", "*.pyc",
-        "node_modules", ".pytest_cache", ".mypy_cache",
-        "dist", "build", "*.egg-info",
-    })
+    DEFAULT_SKIP_DIRS = frozenset(
+        {
+            ".git",
+            ".venv",
+            "venv",
+            "__pycache__",
+            "*.pyc",
+            "node_modules",
+            ".pytest_cache",
+            ".mypy_cache",
+            "dist",
+            "build",
+            "*.egg-info",
+        }
+    )
 
     def is_hidden_path(path: Path) -> bool:
         return path.name.startswith(".")
 
-    def should_ignore_path(path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None) -> bool:
+    def should_ignore_path(
+        path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None
+    ) -> bool:
         """Fallback implementation when victor-coding is not available."""
         # Simple fallback: check if path is hidden or in skip_dirs
         if path.name.startswith("."):
@@ -59,6 +72,7 @@ except ImportError:
         if extra_skip_dirs and any(part in extra_skip_dirs for part in path.parts):
             return True
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
+
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor.core.utils.ast_helpers import (
@@ -1065,7 +1079,9 @@ def generate_smart_victor_md(
         )
 
     builder = VictorMDBuilder()
-    readme_desc = _extract_readme_description(analysis.root_path) or "[Add project description here]"
+    readme_desc = (
+        _extract_readme_description(analysis.root_path) or "[Add project description here]"
+    )
     builder.start_document(analysis.project_name, readme_desc)
     sections = builder.sections
 
@@ -1084,7 +1100,9 @@ def generate_smart_victor_md(
     if (analysis.root_path / "docs").is_dir():
         layout_rows.append(["`docs/`", "Active", "Documentation"])
 
-    builder.add_package_layout(layout_rows, note="**IMPORTANT**: Use the correct directory paths:\n")
+    builder.add_package_layout(
+        layout_rows, note="**IMPORTANT**: Use the correct directory paths:\n"
+    )
 
     # Key Components
     if analysis.key_components:
@@ -2195,7 +2213,6 @@ async def generate_victor_md_from_index(
     return generate_smart_victor_md(
         root_path=root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
     )
-
 
 
 async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:

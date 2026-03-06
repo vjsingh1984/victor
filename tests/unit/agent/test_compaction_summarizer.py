@@ -31,11 +31,13 @@ def _make_messages(roles_contents):
 class TestKeywordCompactionSummarizer:
     def test_basic_summary(self):
         summarizer = KeywordCompactionSummarizer()
-        msgs = _make_messages([
-            ("user", "Please read the config file"),
-            ("assistant", "Here is the ConfigManager class"),
-            ("user", "Now update the test_config module"),
-        ])
+        msgs = _make_messages(
+            [
+                ("user", "Please read the config file"),
+                ("assistant", "Here is the ConfigManager class"),
+                ("user", "Now update the test_config module"),
+            ]
+        )
         result = summarizer.summarize(msgs)
         assert "2 user messages" in result
         assert "Earlier conversation" in result
@@ -46,10 +48,12 @@ class TestKeywordCompactionSummarizer:
 
     def test_matches_existing_output_format(self):
         summarizer = KeywordCompactionSummarizer()
-        msgs = _make_messages([
-            ("user", "hello"),
-            ("tool", "tool output here"),
-        ])
+        msgs = _make_messages(
+            [
+                ("user", "hello"),
+                ("tool", "tool output here"),
+            ]
+        )
         result = summarizer.summarize(msgs)
         assert result.startswith("[Earlier conversation:")
         assert result.endswith("]")
@@ -63,11 +67,13 @@ class TestLedgerAwareCompactionSummarizer:
         ledger.record_pending_action("Write unit tests", turn_index=3)
 
         summarizer = LedgerAwareCompactionSummarizer()
-        msgs = _make_messages([
-            ("user", "Read main.py"),
-            ("assistant", "I will use the factory pattern"),
-            ("user", "Sounds good"),
-        ])
+        msgs = _make_messages(
+            [
+                ("user", "Read main.py"),
+                ("assistant", "I will use the factory pattern"),
+                ("user", "Sounds good"),
+            ]
+        )
         result = summarizer.summarize(msgs, ledger=ledger)
         assert "Compacted context" in result
         assert "/src/main.py" in result or "1 file" in result

@@ -283,7 +283,9 @@ class TestBootstrapServices:
             tool_service = container.get(ToolServiceProtocol)
             assert tool_service is not None
 
-    @pytest.mark.skip(reason="ImportError testing requires module reload which interferes with other tests")
+    @pytest.mark.skip(
+        reason="ImportError testing requires module reload which interferes with other tests"
+    )
     def test_bootstrap_returns_early_without_feature_flags_module(self):
         """Test that bootstrap returns early when feature flags module is not available."""
         # This test is skipped because it requires modifying sys.modules
@@ -402,4 +404,3 @@ class TestMockToolComponents:
 
         assert result.success is False
         assert result.error == "Mock tool executor - tool not actually executed"
-

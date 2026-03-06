@@ -43,7 +43,6 @@ from typing import Any, Dict, Optional
 
 from victor.providers.resolution import APIKeyResult
 
-
 logger = logging.getLogger(__name__)
 
 

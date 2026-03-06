@@ -44,6 +44,7 @@ def reset_enhancer():
     """Reset LSP write enhancer between tests."""
     global _enhancer
     import victor.tools.lsp_write_enhancer as enhancer_module
+
     enhancer_module._enhancer = None
     yield
     enhancer_module._enhancer = None
@@ -109,9 +110,7 @@ class TestWriteResult:
 
         # Add error diagnostic
         result.diagnostics.append(
-            Diagnostic(
-                line=1, column=0, severity=DiagnosticSeverity.ERROR, message="Error"
-            )
+            Diagnostic(line=1, column=0, severity=DiagnosticSeverity.ERROR, message="Error")
         )
         assert result.has_errors is True
 
@@ -124,9 +123,7 @@ class TestWriteResult:
 
         # Add warning diagnostic
         result.diagnostics.append(
-            Diagnostic(
-                line=1, column=0, severity=DiagnosticSeverity.WARNING, message="Warning"
-            )
+            Diagnostic(line=1, column=0, severity=DiagnosticSeverity.WARNING, message="Warning")
         )
         assert result.has_warnings is True
 
@@ -220,9 +217,7 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Unknown file extension
-        content, formatter_name = enhancer.format_with_formatter(
-            "test.unknown_ext", "some content"
-        )
+        content, formatter_name = enhancer.format_with_formatter("test.unknown_ext", "some content")
 
         # Should return content unchanged
         assert content == "some content"
@@ -234,9 +229,7 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Python file but formatter might not be installed
-        content, formatter_name = enhancer.format_with_formatter(
-            "test.py", "def hello(): pass"
-        )
+        content, formatter_name = enhancer.format_with_formatter("test.py", "def hello(): pass")
 
         # Should return content (possibly formatted or unchanged)
         assert isinstance(content, str)
@@ -280,9 +273,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods to avoid actual LSP calls
-            enhancer.format_with_formatter = MagicMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             result = await enhancer.write_with_lsp(
@@ -311,9 +302,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock validation to return errors
-            enhancer.format_with_formatter = MagicMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(
                 return_value=[
                     Diagnostic(
@@ -347,9 +336,7 @@ class TestLSPWriteEnhancer:
             enhancer = LSPWriteEnhancer(workspace_root=tmpdir)
 
             # Mock methods
-            enhancer.format_with_formatter = MagicMock(
-                return_value=("formatted content", "black")
-            )
+            enhancer.format_with_formatter = MagicMock(return_value=("formatted content", "black"))
             enhancer.validate_with_lsp = AsyncMock(return_value=[])
 
             # Use full path in tmpdir
@@ -727,9 +714,7 @@ class TestConvenienceFunctions:
                 )
                 mock_get.return_value = enhancer
 
-                result = await write_with_lsp(
-                    "test.py", "content", workspace_root=tmpdir
-                )
+                result = await write_with_lsp("test.py", "content", workspace_root=tmpdir)
 
                 assert result.success is True
                 assert result.path == "test.py"
@@ -813,9 +798,7 @@ class TestAllSupportedLanguages:
         ]
 
         for lang in core_languages:
-            assert registry.has(
-                lang
-            ), f"Language '{lang}' should be registered"
+            assert registry.has(lang), f"Language '{lang}' should be registered"
 
     def test_all_config_languages_registered(self):
         """Test all config file languages are registered."""
@@ -855,9 +838,7 @@ class TestAllSupportedLanguages:
         ]
 
         for lang in additional_languages:
-            assert registry.has(
-                lang
-            ), f"Additional language '{lang}' should be registered"
+            assert registry.has(lang), f"Additional language '{lang}' should be registered"
 
     def test_total_registered_languages(self):
         """Test total number of registered languages."""

@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import FrozenSet, List, Optional
 
-
 DEFAULT_SKIP_DIRS = frozenset(
     {
         ".git",

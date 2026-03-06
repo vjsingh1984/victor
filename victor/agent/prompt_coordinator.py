@@ -264,7 +264,7 @@ class PromptCoordinator:
                             break
                         chunk_length = len(chunk)
                         if chunk_length > remaining_budget:
-                            chunk = chunk[: remaining_budget]
+                            chunk = chunk[:remaining_budget]
                             remaining_budget = 0
                         else:
                             remaining_budget -= chunk_length

@@ -191,7 +191,9 @@ When presenting analysis:
         Returns:
             DataAnalysisCapabilityProvider instance
         """
-        from victor.verticals.contrib.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+        from victor.verticals.contrib.dataanalysis.capabilities import (
+            DataAnalysisCapabilityProvider,
+        )
 
         return DataAnalysisCapabilityProvider()
 

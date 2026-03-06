@@ -254,8 +254,7 @@ class ProfileLearningStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS profile_metrics (
                     profile_name TEXT PRIMARY KEY,
                     provider TEXT NOT NULL,
@@ -263,11 +262,9 @@ class ProfileLearningStore:
                     metrics_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS interaction_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     profile_name TEXT NOT NULL,
@@ -280,15 +277,12 @@ class ProfileLearningStore:
                     grounded INTEGER NOT NULL,
                     timestamp TEXT NOT NULL
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_interaction_profile
                 ON interaction_history(profile_name, timestamp)
-            """
-            )
+            """)
 
         self._initialized = True
 

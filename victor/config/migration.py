@@ -207,12 +207,12 @@ class ConfigMigrator:
         # Backup profiles.yaml
         if self.old_profiles_file.exists():
             shutil.copy2(self.old_profiles_file, backup_path / "profiles.yaml")
-            logger.info(f"Backed up profiles.yaml")
+            logger.info("Backed up profiles.yaml")
 
         # Backup api_keys.yaml
         if self.old_api_keys_file.exists():
             shutil.copy2(self.old_api_keys_file, backup_path / "api_keys.yaml")
-            logger.info(f"Backed up api_keys.yaml")
+            logger.info("Backed up api_keys.yaml")
 
         return backup_path
 
@@ -319,18 +319,18 @@ class ConfigMigrator:
             profiles_backup = backup_path / "profiles.yaml"
             if profiles_backup.exists():
                 shutil.copy2(profiles_backup, self.old_profiles_file)
-                logger.info(f"Restored profiles.yaml")
+                logger.info("Restored profiles.yaml")
 
             # Restore api_keys.yaml
             keys_backup = backup_path / "api_keys.yaml"
             if keys_backup.exists():
                 shutil.copy2(keys_backup, self.old_api_keys_file)
-                logger.info(f"Restored api_keys.yaml")
+                logger.info("Restored api_keys.yaml")
 
             # Remove new config
             if self.new_config_file.exists():
                 self.new_config_file.unlink()
-                logger.info(f"Removed new config.yaml")
+                logger.info("Removed new config.yaml")
 
             return True
         except Exception as e:

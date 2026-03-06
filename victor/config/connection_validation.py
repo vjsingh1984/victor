@@ -278,7 +278,7 @@ class ConnectionValidator:
             return ValidationResult(
                 status=ValidationStatus.FAILED,
                 message="API key not found",
-                details=f"Checked keyring and environment variables",
+                details="Checked keyring and environment variables",
             )
 
         # Validate API key format
@@ -328,7 +328,7 @@ class ConnectionValidator:
                         # 200 = success, 401/403 = endpoint reachable but auth failed
                         return ValidationResult(
                             status=ValidationStatus.SUCCESS,
-                            message=f"Endpoint reachable",
+                            message="Endpoint reachable",
                             latency_ms=latency,
                         )
                     else:

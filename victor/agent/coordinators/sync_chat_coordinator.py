@@ -172,9 +172,7 @@ class SyncChatCoordinator:
             return True
 
         # Check task complexity
-        task_classification = self._provider_context.task_classifier.classify(
-            user_message
-        )
+        task_classification = self._provider_context.task_classifier.classify(user_message)
         return task_classification.complexity in (
             TaskComplexity.MEDIUM,
             TaskComplexity.COMPLEX,

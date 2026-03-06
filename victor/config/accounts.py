@@ -499,9 +499,7 @@ class AccountManager:
             )
 
         if account is None:
-            raise ValueError(
-                "No account found. Please run 'victor auth setup' to configure."
-            )
+            raise ValueError("No account found. Please run 'victor auth setup' to configure.")
 
         # Build config dict
         config = {
@@ -668,10 +666,9 @@ class AccountManager:
 
     def _check_migration_needed(self) -> bool:
         """Check if old configuration exists and migration is needed."""
-        old_config_exists = (
-            (Path.home() / ".victor" / "profiles.yaml").exists()
-            or (Path.home() / ".victor" / "api_keys.yaml").exists()
-        )
+        old_config_exists = (Path.home() / ".victor" / "profiles.yaml").exists() or (
+            Path.home() / ".victor" / "api_keys.yaml"
+        ).exists()
         new_config_exists = self._config_path.exists()
         return old_config_exists and not new_config_exists
 

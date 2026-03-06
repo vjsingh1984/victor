@@ -50,7 +50,6 @@ from victor.providers.resolution import (
     APIKeyResult,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -55,7 +55,6 @@ from victor.config.api_keys import (
     is_keyring_available,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

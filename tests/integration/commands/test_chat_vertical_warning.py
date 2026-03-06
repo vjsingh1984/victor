@@ -91,14 +91,16 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
 
     monkeypatch.setattr(VerticalLoader, "discover_verticals", discover_without_coding)
     loader = get_vertical_loader()
-    setattr(loader, "_discovered_verticals", None)
+    loader._discovered_verticals = None
 
     VerticalRegistry.unregister("coding")
     bootstrap_module._REPORTED_MISSING_VERTICALS.clear()
     reported_verticals: List[str | None] = []
     original_report = bootstrap_module._report_capability_health
 
-    def tracking_report(vertical_name: str | None, container: ServiceContainer | None = None) -> None:
+    def tracking_report(
+        vertical_name: str | None, container: ServiceContainer | None = None
+    ) -> None:
         reported_verticals.append(vertical_name)
         original_report(vertical_name, container)
 
@@ -124,7 +126,9 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
     assert "coding" in reported_verticals
     assert "service extension failed to load" not in result.stdout
 
-    assert any(event == "missing_vertical" for event, _ in usage_events), "Usage metric not recorded"
+    assert any(
+        event == "missing_vertical" for event, _ in usage_events
+    ), "Usage metric not recorded"
 
     assert emitted_events and emitted_events[0][0] == "capabilities.vertical.missing"
 

@@ -21,7 +21,6 @@ import pytest
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 
-
 # =============================================================================
 # Mock Dependencies
 # =============================================================================

@@ -129,13 +129,11 @@ class TestRename:
     async def test_rename_single_file_success(self, tmp_path):
         """Test successful rename in a single file."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """def old_func():
+        test_file.write_text("""def old_func():
     return True
 
 result = old_func()
-"""
-        )
+""")
 
         result = await rename(
             old_name="old_func",
@@ -319,13 +317,11 @@ result = old_func()
     async def test_rename_word_boundary_safety(self, tmp_path):
         """Test that rename uses word boundaries to avoid partial matches."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """def get_user(): pass
+        test_file.write_text("""def get_user(): pass
 def get_username(): pass  # Should NOT be renamed
 user = get_user()
 username = get_username()  # Should NOT be renamed
-"""
-        )
+""")
 
         result = await rename(
             old_name="get_user",
@@ -346,16 +342,14 @@ username = get_username()  # Should NOT be renamed
     async def test_rename_class(self, tmp_path):
         """Test renaming a class."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """class OldClass:
+        test_file.write_text("""class OldClass:
     def __init__(self):
         self.value = 0
 
 def use_class():
     obj = OldClass()
     return obj
-"""
-        )
+""")
 
         result = await rename(
             old_name="OldClass",
@@ -419,16 +413,14 @@ class TestExtract:
     async def test_extract_success_preview(self, tmp_path):
         """Test successful function extraction in preview mode."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def main():
     x = 5
     y = 10
     result = x + y
     print(result)
     return result
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -485,15 +477,13 @@ class TestInline:
     async def test_inline_success_preview(self, tmp_path):
         """Test successful variable inlining in preview mode."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def calculate():
     result = 5
     x = result * 2
     y = result + 3
     return x + y
-"""
-        )
+""")
 
         result = await inline(file=str(test_file), variable_name="result", preview=True)
 
@@ -542,12 +532,10 @@ class TestOrganizeImports:
     async def test_organize_imports_no_imports(self, tmp_path):
         """Test organizing file with no imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file))
 
@@ -558,8 +546,7 @@ def hello():
     async def test_organize_imports_already_organized(self, tmp_path):
         """Test organizing already well-organized imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 import sys
 
@@ -568,8 +555,7 @@ from typing import Dict
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file))
 
@@ -579,8 +565,7 @@ def hello():
     async def test_organize_imports_preview_mode(self, tmp_path):
         """Test organize imports in preview mode."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 from typing import Dict
 import sys
 import os
@@ -588,8 +573,7 @@ from pathlib import Path
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file), preview=True)
 
@@ -618,16 +602,14 @@ def hello():
     async def test_organize_imports_with_duplicates(self, tmp_path):
         """Test organizing imports with duplicates."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 import sys
 import os
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file))
 
@@ -641,11 +623,9 @@ class TestHelperFunctions:
     async def test_find_symbol_variable(self, tmp_path):
         """Test symbol lookup finds variables."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """my_var = 10
+        test_file.write_text("""my_var = 10
 other = my_var + 5
-"""
-        )
+""")
 
         result = await rename(
             old_name="my_var",
@@ -663,16 +643,14 @@ other = my_var + 5
     async def test_analyze_variables_in_extract(self, tmp_path):
         """Test variable analysis during extraction."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def main():
     a = 1
     b = 2
     c = a + b
     d = c * 2
     return d
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -689,12 +667,10 @@ def main():
     async def test_find_function_insert_point_empty(self, tmp_path):
         """Test function insert point when file has only imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """import os
+        test_file.write_text("""import os
 import sys
 from pathlib import Path
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -842,15 +818,13 @@ class TestExtractEdgeCases:
     async def test_extract_with_return_values(self, tmp_path):
         """Test extraction that might have return values."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def main():
     a = 5
     b = 10
     result = a + b
     return result
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -883,13 +857,11 @@ def main():
     async def test_extract_with_syntax_error_block(self, tmp_path):
         """Test extraction handles syntax errors in block gracefully."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def main():
     x = (1 +
     # incomplete expression
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -907,14 +879,12 @@ def main():
     async def test_extract_apply_changes(self, tmp_path):
         """Test extraction actually writes the file."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def main():
     x = 5
     y = 10
     return x + y
-"""
-        )
+""")
 
         result = await extract(
             file=str(test_file),
@@ -959,14 +929,12 @@ class TestInlineEdgeCases:
     async def test_inline_complex_value(self, tmp_path):
         """Test inlining a complex expression."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def func():
     computed = 1 + 2 * 3
     result = computed + 10
     return result
-"""
-        )
+""")
 
         result = await inline(file=str(test_file), variable_name="computed", preview=False)
 
@@ -993,15 +961,13 @@ class TestOrganizeImportsEdgeCases:
     async def test_organize_imports_with_alias(self, tmp_path):
         """Test organizing imports with aliases."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """import numpy as np
+        test_file.write_text("""import numpy as np
 import os as operating_system
 from pathlib import Path as P
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file), preview=True)
 
@@ -1011,16 +977,14 @@ def hello():
     async def test_organize_imports_relative(self, tmp_path):
         """Test organizing relative imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """import os
+        test_file.write_text("""import os
 from . import utils
 from ..core import base
 from .helpers import func
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file))
 
@@ -1031,16 +995,14 @@ def hello():
     async def test_organize_imports_third_party(self, tmp_path):
         """Test organizing third-party imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """import requests
+        test_file.write_text("""import requests
 import numpy
 from flask import Flask
 import os
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file))
 
@@ -1051,8 +1013,7 @@ def hello():
     async def test_organize_imports_with_docstring(self, tmp_path):
         """Test organizing imports preserves module docstring."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            '''"""This is a module docstring.
+        test_file.write_text('''"""This is a module docstring.
 
 Multi-line docstring.
 """
@@ -1061,8 +1022,7 @@ import os
 
 def hello():
     pass
-'''
-        )
+''')
 
         result = await organize_imports(file=str(test_file), preview=False)
 
@@ -1074,16 +1034,14 @@ def hello():
     async def test_organize_imports_with_comments(self, tmp_path):
         """Test organizing imports preserves leading comments."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """# -*- coding: utf-8 -*-
+        test_file.write_text("""# -*- coding: utf-8 -*-
 # Copyright notice
 import sys
 import os
 
 def hello():
     pass
-"""
-        )
+""")
 
         result = await organize_imports(file=str(test_file), preview=False)
 

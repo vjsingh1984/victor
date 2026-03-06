@@ -123,8 +123,7 @@ def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
             else _TOOL_MENTION_TEMPLATES
         )
         _TOOL_MENTION_PATTERN_CACHE[tool_name] = [
-            re.compile(template.format(tool=escaped_name), re.IGNORECASE)
-            for template in templates
+            re.compile(template.format(tool=escaped_name), re.IGNORECASE) for template in templates
         ]
     return _TOOL_MENTION_PATTERN_CACHE[tool_name]
 
@@ -911,8 +910,10 @@ class ContinuationStrategy:
                     context={
                         "response_excerpt": response_excerpt,
                         "continuation_prompts": str(continuation_prompts),
-                        "task_type": "analysis" if is_analysis_task else (
-                            "action" if is_action_task else "default"
+                        "task_type": (
+                            "analysis"
+                            if is_analysis_task
+                            else ("action" if is_action_task else "default")
                         ),
                     },
                     heuristic_confidence=0.5,

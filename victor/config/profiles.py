@@ -44,9 +44,10 @@ from typing import Any, Dict, List, Optional
 
 class ProfileLevel(Enum):
     """Profile complexity levels."""
-    BASIC = "basic"      # Beginners - simple defaults
+
+    BASIC = "basic"  # Beginners - simple defaults
     ADVANCED = "advanced"  # Experienced users - customizable
-    EXPERT = "expert"      # Power users - full control
+    EXPERT = "expert"  # Power users - full control
 
 
 @dataclass
@@ -61,6 +62,7 @@ class ProfileTemplate:
         settings: Default settings for this profile
         provider_settings: Provider-specific defaults
     """
+
     name: str
     display_name: str
     description: str
@@ -88,15 +90,12 @@ BASIC_PROFILE = ProfileTemplate(
         "default_model": "qwen2.5-coder:7b",
         "default_temperature": 0.7,
         "default_max_tokens": 4096,
-
         # Conservative tool budget
         "fallback_max_tools": 5,
-
         # Enable safety features
         "framework_preload_enabled": True,
         "http_connection_pool_enabled": True,
         "tool_selection_cache_enabled": True,
-
         # Tool selection preset (small model)
         "tool_selection": {
             "model_size_tier": "small",
@@ -126,22 +125,18 @@ ADVANCED_PROFILE = ProfileTemplate(
         "default_model": "auto",
         "default_temperature": 0.7,
         "default_max_tokens": 8192,
-
         # Higher tool budget for complex tasks
         "fallback_max_tools": 10,
-
         # All performance optimizations enabled
         "framework_preload_enabled": True,
         "http_connection_pool_enabled": True,
         "tool_selection_cache_enabled": True,
-
         # Advanced tool selection
         "tool_selection": {
             "model_size_tier": "medium",
             "base_threshold": 0.70,
             "base_max_tools": 10,
         },
-
         # Loop detection
         "loop_repeat_threshold": 3,
         "max_continuation_prompts": 2,
@@ -176,16 +171,13 @@ EXPERT_PROFILE = ProfileTemplate(
         "default_model": "auto",
         "default_temperature": 0.7,
         "default_max_tokens": 16384,
-
         # Maximum flexibility
         "fallback_max_tools": 20,
-
         # All optimizations
         "framework_preload_enabled": True,
         "http_connection_pool_enabled": True,
         "tool_selection_cache_enabled": True,
         "tool_deduplication_enabled": True,
-
         # Expert tool selection
         "tool_selection": {
             "model_size_tier": "large",
@@ -193,14 +185,12 @@ EXPERT_PROFILE = ProfileTemplate(
             "base_max_tools": 20,
             "adaptive": True,
         },
-
         # Full control over thresholds
         "loop_repeat_threshold": 4,
         "max_continuation_prompts": 3,
         "quality_threshold": 0.7,
         "grounding_threshold": 0.8,
         "max_tool_calls_per_turn": 15,
-
         # Timeouts
         "timeout": 120,
         "session_idle_timeout": 3600,
@@ -239,13 +229,11 @@ CODING_PROFILE = ProfileTemplate(
         "default_temperature": 0.3,  # Lower temp for code
         "default_max_tokens": 8192,
         "fallback_max_tools": 15,  # More tools for coding
-
         "tool_selection": {
             "model_size_tier": "large",
             "base_threshold": 0.65,
             "base_max_tools": 15,
         },
-
         "framework_preload_enabled": True,
         "http_connection_pool_enabled": True,
         "tool_selection_cache_enabled": True,
@@ -271,13 +259,11 @@ RESEARCH_PROFILE = ProfileTemplate(
         "default_temperature": 0.8,  # Higher temp for creative thinking
         "default_max_tokens": 16384,  # Large context
         "fallback_max_tools": 10,
-
         "tool_selection": {
             "model_size_tier": "cloud",
             "base_threshold": 0.70,
             "base_max_tools": 10,
         },
-
         "framework_preload_enabled": True,
         "http_connection_pool_enabled": True,
         "tool_selection_cache_enabled": True,
@@ -302,6 +288,7 @@ PROFILES: Dict[str, ProfileTemplate] = {
 # =============================================================================
 # Profile Management Functions
 # =============================================================================
+
 
 def list_profiles() -> List[ProfileTemplate]:
     """List all available profiles.
@@ -402,8 +389,12 @@ def generate_profile_yaml(
             "default_provider": provider,
             "fallback_max_tools": profile.settings.get("fallback_max_tools", 10),
             "framework_preload_enabled": profile.settings.get("framework_preload_enabled", True),
-            "http_connection_pool_enabled": profile.settings.get("http_connection_pool_enabled", True),
-            "tool_selection_cache_enabled": profile.settings.get("tool_selection_cache_enabled", True),
+            "http_connection_pool_enabled": profile.settings.get(
+                "http_connection_pool_enabled", True
+            ),
+            "tool_selection_cache_enabled": profile.settings.get(
+                "tool_selection_cache_enabled", True
+            ),
         },
     }
 
@@ -434,6 +425,7 @@ def generate_profile_yaml(
 # =============================================================================
 # Detection Helpers
 # =============================================================================
+
 
 def _check_ollama_available() -> bool:
     """Check if Ollama is available and running.
@@ -510,6 +502,7 @@ def _detect_model_for_provider(provider: str) -> str:
 # =============================================================================
 # Profile Installation
 # =============================================================================
+
 
 def install_profile(
     profile: ProfileTemplate,

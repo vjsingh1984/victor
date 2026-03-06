@@ -190,7 +190,7 @@ def _normalize_mermaid_node(token: str) -> str:
     # Strip identifier prefix like A or node1
     ident = re.match(r"[A-Za-z0-9_]+", token)
     if ident:
-        remainder = token[ident.end():].strip()
+        remainder = token[ident.end() :].strip()
         if remainder.startswith("[") and "]" in remainder:
             inner = remainder[1 : remainder.find("]")]
             if inner.strip():

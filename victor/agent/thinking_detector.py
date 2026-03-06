@@ -518,9 +518,7 @@ class ThinkingPatternDetector:
                             1,
                             pattern.category,
                         )
-                        logger.debug(
-                            "LLM detected loop: %s", decision.result.loop_type
-                        )
+                        logger.debug("LLM detected loop: %s", decision.result.loop_type)
                         return True, guidance
             except Exception:
                 logger.debug("LLM loop detection failed", exc_info=True)

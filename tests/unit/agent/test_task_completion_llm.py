@@ -22,9 +22,7 @@ def _make_decision_service(
     service = MagicMock()
     result = DecisionResult(
         decision_type=DecisionType.TASK_COMPLETION,
-        result=TaskCompletionDecision(
-            is_complete=is_complete, confidence=confidence, phase=phase
-        ),
+        result=TaskCompletionDecision(is_complete=is_complete, confidence=confidence, phase=phase),
         source=source,
         confidence=confidence,
     )

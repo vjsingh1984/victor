@@ -37,7 +37,6 @@ from victor.storage.embeddings.intent_classifier import (
 )
 from victor.storage.embeddings.service import EmbeddingService
 
-
 # ============================================================================
 # EmbeddingService Tests
 # ============================================================================

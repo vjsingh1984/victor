@@ -44,7 +44,10 @@ from tree_sitter import Query
 
 from victor.verticals.contrib.coding.codebase.graph.protocol import GraphEdge, GraphNode
 from victor.verticals.contrib.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
-from victor.verticals.contrib.coding.codebase.unified_extractor import UnifiedSymbolExtractor, EnrichedSymbol
+from victor.verticals.contrib.coding.codebase.unified_extractor import (
+    UnifiedSymbolExtractor,
+    EnrichedSymbol,
+)
 from victor.verticals.contrib.coding.languages.registry import get_language_registry
 from victor.verticals.contrib.coding.languages.tiers import get_tier, LanguageTier
 from victor.verticals.contrib.coding.codebase.graph.registry import create_graph_store
@@ -283,7 +286,9 @@ def _process_file_parallel(
             if not query_defs:
                 # Try language plugin for symbol queries
                 try:
-                    from victor.verticals.contrib.coding.languages.registry import get_language_registry
+                    from victor.verticals.contrib.coding.languages.registry import (
+                        get_language_registry,
+                    )
 
                     _reg = get_language_registry()
                     if not _reg._plugins:
@@ -2960,7 +2965,10 @@ class CodebaseIndex:
             config: Embedding configuration dict (overrides settings if provided)
         """
         try:
-            from victor.verticals.contrib.coding.codebase.embeddings import EmbeddingConfig, EmbeddingRegistry
+            from victor.verticals.contrib.coding.codebase.embeddings import (
+                EmbeddingConfig,
+                EmbeddingRegistry,
+            )
 
             # Create config with defaults from settings
             if not config:
@@ -3041,7 +3049,9 @@ class CodebaseIndex:
         # Query expansion to improve recall (fix false negatives)
         queries_to_search = [query]
         if expand_query:
-            from victor.verticals.contrib.coding.codebase.query_expander import expand_query as expand_fn
+            from victor.verticals.contrib.coding.codebase.query_expander import (
+                expand_query as expand_fn,
+            )
 
             queries_to_search = expand_fn(query, max_expansions=5)
             if len(queries_to_search) > 1:

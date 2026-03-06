@@ -224,12 +224,10 @@ class RLMetricsExporter:
                 cursor = self._coordinator.db.cursor()
 
                 # Total outcomes and success rate
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT COUNT(*), SUM(success), AVG(quality_score)
                     FROM rl_outcome
-                    """
-                )
+                    """)
                 row = cursor.fetchone()
                 if row and row[0]:
                     metrics.total_outcomes = row[0]
@@ -238,12 +236,10 @@ class RLMetricsExporter:
                     metrics.overall_quality = row[2] or 0.5
 
                 # Get active learners (those with outcomes)
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT DISTINCT learner_name
                     FROM rl_outcome
-                    """
-                )
+                    """)
                 active = {row[0] for row in cursor.fetchall()}
                 metrics.active_learners = list(active)
                 metrics.inactive_learners = [

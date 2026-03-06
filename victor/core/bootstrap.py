@@ -490,10 +490,10 @@ def bootstrap_capabilities() -> None:
     from victor.contrib.prompts.task_hints import NullTaskTypeHinter
 
     registry.register(TreeSitterParserProtocol, NullTreeSitterParser(), CapabilityStatus.STUB)
+    registry.register(TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB)
     registry.register(
-        TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB
+        CodebaseIndexFactoryProtocol, NullCodebaseIndexFactory(), CapabilityStatus.STUB
     )
-    registry.register(CodebaseIndexFactoryProtocol, NullCodebaseIndexFactory(), CapabilityStatus.STUB)
     registry.register(SymbolStoreFactoryProtocol, NullSymbolStore(), CapabilityStatus.STUB)
     registry.register(IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB)
     registry.register(LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB)

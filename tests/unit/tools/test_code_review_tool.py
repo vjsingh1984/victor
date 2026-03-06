@@ -58,8 +58,7 @@ class TestCodeReviewBasic:
     async def test_review_clean_python_file(self, tmp_path):
         """Test reviewing clean Python file."""
         test_file = tmp_path / "clean.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def calculate(x: int, y: int) -> int:
     \"\"\"Calculate sum of two numbers.\"\"\"
     return x + y
@@ -70,8 +69,7 @@ def process_data(data: list) -> dict:
     for item in data:
         result[item] = item * 2
     return result
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file))
 
@@ -108,13 +106,11 @@ class TestCodeReviewSecurity:
     async def test_review_security_clean_file(self, tmp_path):
         """Test security review of clean file."""
         test_file = tmp_path / "clean.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def safe_function(data):
     result = process(data)
     return result
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["security"])
 
@@ -125,8 +121,7 @@ def safe_function(data):
     async def test_review_security_with_issues(self, tmp_path):
         """Test security review with security issues."""
         test_file = tmp_path / "insecure.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 
 password = "hardcoded_password"
@@ -135,8 +130,7 @@ api_key = "sk_test_12345678901234567890"
 def execute(cmd):
     os.system(cmd)
     eval(cmd)
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["security"])
 
@@ -148,12 +142,10 @@ def execute(cmd):
     async def test_review_security_with_severity_filter(self, tmp_path):
         """Test security review with severity filter."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 os.system("ls")
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["security"], severity="high")
 
@@ -167,16 +159,14 @@ class TestCodeReviewComplexity:
     async def test_review_complexity_simple_file(self, tmp_path):
         """Test complexity review of simple file."""
         test_file = tmp_path / "simple.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def simple():
     return True
 
 def another():
     x = 1
     return x
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["complexity"])
 
@@ -187,8 +177,7 @@ def another():
     async def test_review_complexity_complex_file(self, tmp_path):
         """Test complexity review of complex file."""
         test_file = tmp_path / "complex.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def very_complex(a, b, c, d, e):
     if a:
         if b:
@@ -201,8 +190,7 @@ def very_complex(a, b, c, d, e):
             return 4
         return 5
     return 6
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["complexity"])
 
@@ -216,8 +204,7 @@ class TestCodeReviewBestPractices:
     async def test_review_best_practices_good_file(self, tmp_path):
         """Test best practices review of well-written file."""
         test_file = tmp_path / "good.py"
-        test_file.write_text(
-            '''
+        test_file.write_text('''
 """Module docstring."""
 
 def well_named_function(parameter: int) -> int:
@@ -231,8 +218,7 @@ class WellNamedClass:
     def __init__(self):
         """Initialize instance."""
         self.value = 0
-'''
-        )
+''')
 
         result = await code_review(path=str(test_file), aspects=["best_practices"])
 
@@ -243,8 +229,7 @@ class WellNamedClass:
     async def test_review_best_practices_issues(self, tmp_path):
         """Test best practices review with issues."""
         test_file = tmp_path / "bad.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def x():
     a=1
     b=2
@@ -252,8 +237,7 @@ def x():
 
 def VeryLongFunctionNameThatViolatesNamingConventionsAndIsWayTooLong():
     pass
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["best_practices"])
 
@@ -267,15 +251,13 @@ class TestCodeReviewDocumentation:
     async def test_review_documentation_with_docs(self, tmp_path):
         """Test documentation review of well-documented file."""
         test_file = tmp_path / "documented.py"
-        test_file.write_text(
-            '''
+        test_file.write_text('''
 """Module with documentation."""
 
 def documented_function():
     """This function is documented."""
     pass
-'''
-        )
+''')
 
         result = await code_review(path=str(test_file), aspects=["documentation"])
 
@@ -286,8 +268,7 @@ def documented_function():
     async def test_review_documentation_missing(self, tmp_path):
         """Test documentation review with missing docstrings."""
         test_file = tmp_path / "nodocs.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def function1():
     pass
 
@@ -297,8 +278,7 @@ def function2():
 class MyClass:
     def method(self):
         pass
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["documentation"])
 
@@ -364,8 +344,7 @@ class TestCodeReviewComprehensive:
     async def test_review_all_aspects(self, tmp_path):
         """Test comprehensive review with all aspects."""
         test_file = tmp_path / "comprehensive.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 
 def insecure_function(cmd):
@@ -379,8 +358,7 @@ def complex_function(a, b, c):
             return 2
         return 3
     return 4
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["all"])
 
@@ -451,8 +429,7 @@ class TestCodeReviewEdgeCases:
     async def test_review_very_high_complexity(self, tmp_path):
         """Test reviewing file with very high complexity."""
         test_file = tmp_path / "very_complex.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def extremely_complex(a, b, c, d, e, f, g, h):
     if a:
         if b:
@@ -471,8 +448,7 @@ def extremely_complex(a, b, c, d, e, f, g, h):
             return 7
         return 8
     return 9
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["complexity"])
 
@@ -482,8 +458,7 @@ def extremely_complex(a, b, c, d, e, f, g, h):
     async def test_review_multiple_security_issues(self, tmp_path):
         """Test security review detecting multiple issue types."""
         test_file = tmp_path / "multiple_security.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 import os
 
 API_KEY = "sk_live_1234567890abcdef"
@@ -497,8 +472,7 @@ def execute_command(cmd):
 def sql_injection(user_input):
     query = f"SELECT * FROM users WHERE id = {user_input}"
     return query
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["security"])
 
@@ -770,15 +744,13 @@ class TestCodeReviewMultiLanguage:
     async def test_review_java_file(self, tmp_path):
         """Test review of Java file."""
         test_file = tmp_path / "Test.java"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 public class Test {
     public void test() {
         System.out.println("debug");
     }
 }
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True
@@ -788,8 +760,7 @@ public class Test {
     async def test_review_go_file(self, tmp_path):
         """Test review of Go file."""
         test_file = tmp_path / "main.go"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 package main
 
 import "fmt"
@@ -797,8 +768,7 @@ import "fmt"
 func main() {
     fmt.Println("hello")
 }
-"""
-        )
+""")
 
         result = await code_review(path=str(test_file), aspects=["all"])
         assert result["success"] is True

@@ -10,7 +10,6 @@ from typing import Dict, Optional
 
 from victor.core.vertical_types import TaskTypeHint
 
-
 COMMON_HINTS: dict[str, TaskTypeHint] = {
     "exploration": TaskTypeHint(
         task_type="exploration",

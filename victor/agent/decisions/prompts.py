@@ -68,8 +68,7 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     ),
     DecisionType.TASK_TYPE_CLASSIFICATION: DecisionPrompt(
         system=(
-            "You are a task type classifier. "
-            "Respond ONLY with a JSON object, no other text."
+            "You are a task type classifier. " "Respond ONLY with a JSON object, no other text."
         ),
         user_template=(
             "Classify this task message:\n\n"
@@ -83,8 +82,7 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     ),
     DecisionType.QUESTION_CLASSIFICATION: DecisionPrompt(
         system=(
-            "You are a question type classifier. "
-            "Respond ONLY with a JSON object, no other text."
+            "You are a question type classifier. " "Respond ONLY with a JSON object, no other text."
         ),
         user_template=(
             "Classify this question from an AI assistant:\n\n"
@@ -112,10 +110,7 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         max_tokens=20,
     ),
     DecisionType.ERROR_CLASSIFICATION: DecisionPrompt(
-        system=(
-            "You are an error classifier. "
-            "Respond ONLY with a JSON object, no other text."
-        ),
+        system=("You are an error classifier. " "Respond ONLY with a JSON object, no other text."),
         user_template=(
             "Classify this error:\n\n"
             "{error_message}\n\n"

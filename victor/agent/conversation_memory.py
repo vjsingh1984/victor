@@ -612,14 +612,12 @@ class ConversationStore:
             conn.execute("PRAGMA foreign_keys = ON")
 
             # Create schema version tracking table (stores semver strings)
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS schema_version (
                     version TEXT PRIMARY KEY,
                     applied_at TIMESTAMP NOT NULL
                 )
-                """
-            )
+                """)
 
             # Check if current schema version is applied
             cursor = conn.execute(
@@ -665,8 +663,7 @@ class ConversationStore:
         - context_summaries: Compaction summaries
         """
         # Create lookup tables
-        conn.executescript(
-            """
+        conn.executescript("""
             -- Model family lookup (llama, qwen, claude, gpt, etc.)
             CREATE TABLE IF NOT EXISTS model_families (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -819,8 +816,7 @@ class ConversationStore:
             CREATE INDEX IF NOT EXISTS idx_messages_exchange
             ON messages(session_id, role, timestamp)
             WHERE role IN ('user', 'assistant');
-            """
-        )
+            """)
 
         # Populate lookup tables with enum values
         self._populate_lookup_tables(conn)
@@ -1487,8 +1483,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     mf.name AS family_name,
                     COUNT(s.session_id) AS session_count,
@@ -1500,8 +1495,7 @@ class ConversationStore:
                 WHERE mf.name IS NOT NULL
                 GROUP BY mf.id
                 ORDER BY session_count DESC
-                """
-            ).fetchall()
+                """).fetchall()
 
             result = {}
             for row in rows:
@@ -1521,8 +1515,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     p.name AS provider_name,
                     COUNT(s.session_id) AS session_count,
@@ -1534,8 +1527,7 @@ class ConversationStore:
                 WHERE p.name IS NOT NULL
                 GROUP BY p.id
                 ORDER BY session_count DESC
-                """
-            ).fetchall()
+                """).fetchall()
 
             result = {}
             for row in rows:
@@ -1555,8 +1547,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     ms.name AS size_name,
                     COUNT(s.session_id) AS session_count,
@@ -1568,8 +1559,7 @@ class ConversationStore:
                 WHERE ms.name IS NOT NULL
                 GROUP BY ms.id
                 ORDER BY ms.id
-                """
-            ).fetchall()
+                """).fetchall()
 
             result = {}
             for row in rows:
@@ -2475,12 +2465,10 @@ class ConversationStore:
             else:
                 # Full rebuild - delete all then reinsert
                 conn.execute("DELETE FROM messages_fts")
-                cursor = conn.execute(
-                    """
+                cursor = conn.execute("""
                     INSERT INTO messages_fts(rowid, content, message_id, session_id)
                     SELECT rowid, content, id, session_id FROM messages
-                    """
-                )
+                    """)
 
             count = cursor.rowcount
             conn.commit()
@@ -2504,8 +2492,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     p.name AS provider,
                     COUNT(DISTINCT s.session_id) AS session_count,
@@ -2518,8 +2505,7 @@ class ConversationStore:
                 WHERE p.name IS NOT NULL
                 GROUP BY p.name
                 ORDER BY session_count DESC
-                """
-            ).fetchall()
+                """).fetchall()
 
             return [dict(row) for row in rows]
 
@@ -2535,8 +2521,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     mf.name AS model_family,
                     COUNT(DISTINCT s.session_id) AS session_count,
@@ -2551,8 +2536,7 @@ class ConversationStore:
                 WHERE mf.name IS NOT NULL
                 GROUP BY mf.name
                 ORDER BY session_count DESC
-                """
-            ).fetchall()
+                """).fetchall()
 
             return [dict(row) for row in rows]
 
@@ -2568,8 +2552,7 @@ class ConversationStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT
                     ms.name AS model_size,
                     COUNT(DISTINCT s.session_id) AS session_count,
@@ -2590,8 +2573,7 @@ class ConversationStore:
                         WHEN 'xlarge' THEN 5
                         WHEN 'xxlarge' THEN 6
                     END
-                """
-            ).fetchall()
+                """).fetchall()
 
             return [dict(row) for row in rows]
 
@@ -2671,38 +2653,32 @@ class ConversationStore:
             message_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
             # Provider breakdown
-            provider_counts = conn.execute(
-                """
+            provider_counts = conn.execute("""
                 SELECT p.name, COUNT(*) AS count
                 FROM sessions s
                 JOIN providers p ON s.provider_id = p.id
                 GROUP BY p.name
                 ORDER BY count DESC
                 LIMIT 5
-                """
-            ).fetchall()
+                """).fetchall()
 
             # Model family breakdown
-            family_counts = conn.execute(
-                """
+            family_counts = conn.execute("""
                 SELECT mf.name, COUNT(*) AS count
                 FROM sessions s
                 JOIN model_families mf ON s.model_family_id = mf.id
                 GROUP BY mf.name
                 ORDER BY count DESC
                 LIMIT 5
-                """
-            ).fetchall()
+                """).fetchall()
 
             # Tool capability stats
-            tool_stats = conn.execute(
-                """
+            tool_stats = conn.execute("""
                 SELECT
                     SUM(CASE WHEN tool_capable = 1 THEN 1 ELSE 0 END) AS tool_capable,
                     SUM(CASE WHEN tool_capable = 0 THEN 1 ELSE 0 END) AS not_tool_capable
                 FROM sessions
-                """
-            ).fetchone()
+                """).fetchone()
 
             return {
                 "total_sessions": session_count,

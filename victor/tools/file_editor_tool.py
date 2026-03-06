@@ -174,6 +174,7 @@ from victor.tools.base import AccessMode, DangerLevel, Priority
 # - Error message (no editor available)
 # =============================================================================
 
+
 def _create_file_editor(backup_dir: str):
     """Create a FileEditor instance via capability registry."""
     from victor.core.capability_registry import CapabilityRegistry
@@ -193,6 +194,8 @@ def _is_file_editor_available() -> bool:
     from victor.framework.vertical_protocols import EditorProtocol
 
     return CapabilityRegistry.get_instance().is_enhanced(EditorProtocol)
+
+
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path
 

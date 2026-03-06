@@ -27,6 +27,7 @@ Usage:
 
 from __future__ import annotations
 
+
 class EmojiPresentationAdapter:
     """Presentation adapter that delegates to victor.ui.emoji module.
 

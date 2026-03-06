@@ -38,6 +38,7 @@ from typing import List, Optional
 
 class Severity(Enum):
     """Severity level for diagnostic issues."""
+
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -70,13 +71,15 @@ class DoctorChecks:
         suggestion: str | None = None,
     ) -> None:
         """Add a diagnostic check result."""
-        self.checks.append(DiagnosticCheck(
-            name=name,
-            severity=severity,
-            message=message,
-            suggestion=suggestion,
-            passed=(severity == Severity.SUCCESS),
-        ))
+        self.checks.append(
+            DiagnosticCheck(
+                name=name,
+                severity=severity,
+                message=message,
+                suggestion=suggestion,
+                passed=(severity == Severity.SUCCESS),
+            )
+        )
 
     def check_python_version(self) -> None:
         """Check Python version compatibility."""
@@ -263,7 +266,10 @@ class DoctorChecks:
             settings = Settings()
 
             # Check framework preloading
-            if hasattr(settings, 'framework_preload_enabled') and settings.framework_preload_enabled:
+            if (
+                hasattr(settings, "framework_preload_enabled")
+                and settings.framework_preload_enabled
+            ):
                 self.add_check(
                     name="Performance: Preloading",
                     severity=Severity.SUCCESS,
@@ -278,7 +284,10 @@ class DoctorChecks:
                 )
 
             # Check HTTP connection pooling
-            if hasattr(settings, 'http_connection_pool_enabled') and settings.http_connection_pool_enabled:
+            if (
+                hasattr(settings, "http_connection_pool_enabled")
+                and settings.http_connection_pool_enabled
+            ):
                 self.add_check(
                     name="Performance: HTTP Pooling",
                     severity=Severity.SUCCESS,
@@ -293,7 +302,10 @@ class DoctorChecks:
                 )
 
             # Check tool selection cache
-            if hasattr(settings, 'tool_selection_cache_enabled') and settings.tool_selection_cache_enabled:
+            if (
+                hasattr(settings, "tool_selection_cache_enabled")
+                and settings.tool_selection_cache_enabled
+            ):
                 self.add_check(
                     name="Performance: Tool Cache",
                     severity=Severity.SUCCESS,
@@ -397,17 +409,23 @@ class DoctorChecks:
 
         # Print summary
         console.print("\n" + "─" * 50)
-        console.print(f"[bold]Summary:[/] {successes} success, {warnings} warnings, {infos} info, {errors} errors")
+        console.print(
+            f"[bold]Summary:[/] {successes} success, {warnings} warnings, {infos} info, {errors} errors"
+        )
 
         if errors == 0 and warnings <= 2:
             console.print("\n[green]✓ Your system is ready to use Victor![/]")
             return 0
         elif errors > 0:
             console.print("\n[red]✗ Found {errors} error(s) that should be fixed[/]")
-            console.print("[yellow]Run 'victor config validate' for detailed configuration validation[/]")
+            console.print(
+                "[yellow]Run 'victor config validate' for detailed configuration validation[/]"
+            )
             return 1
         else:
-            console.print(f"\n[yellow]⚠ Found {warnings} warning(s) - Victor will work but may be suboptimal[/]")
+            console.print(
+                f"\n[yellow]⚠ Found {warnings} warning(s) - Victor will work but may be suboptimal[/]"
+            )
             return 0
 
 
