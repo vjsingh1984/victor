@@ -968,7 +968,15 @@ class SSOAuthenticator:
             auth_params["codex_cli_simplified_flow"] = "true"
             auth_params["originator"] = "victor"
 
-        auth_url = f"{self.config.issuer_url}/authorize?{urllib.parse.urlencode(auth_params)}"
+        # Standard OIDC uses /authorize; OpenAI uses /oauth/authorize
+        if self.config.provider == SSOProvider.OPENAI_CODEX:
+            authorize_path = "/oauth/authorize"
+        elif self.config.provider == SSOProvider.OKTA:
+            authorize_path = "/oauth2/v1/authorize"
+        else:
+            authorize_path = "/authorize"
+
+        auth_url = f"{self.config.issuer_url}{authorize_path}?{urllib.parse.urlencode(auth_params)}"
 
         # Start local callback server
         callback_result: Dict[str, Any] = {}
