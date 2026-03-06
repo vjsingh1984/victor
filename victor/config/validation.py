@@ -24,7 +24,10 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
+
+if TYPE_CHECKING:
+    from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

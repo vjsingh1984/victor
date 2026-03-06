@@ -22,9 +22,13 @@ SOLID Principles:
 - OCP: New error patterns can be added without modifying classification logic
 """
 
+import logging
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, FrozenSet, Set
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorType(Enum):
