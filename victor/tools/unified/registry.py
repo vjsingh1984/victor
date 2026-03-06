@@ -40,6 +40,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
@@ -53,6 +54,10 @@ from typing import (
     Union,
     runtime_checkable,
 )
+
+if TYPE_CHECKING:
+    from victor.tools.base import ToolDefinition
+    from victor.tools.selection.protocol import ToolSelectionContext
 
 from victor.framework.tools import ToolCategory
 from victor.tools.base import BaseTool, CostTier, ToolResult

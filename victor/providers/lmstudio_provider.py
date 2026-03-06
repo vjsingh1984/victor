@@ -460,7 +460,7 @@ class LMStudioProvider(BaseProvider):
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        self._provider_logger.logger.error(
+        logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback
@@ -518,19 +518,19 @@ class LMStudioProvider(BaseProvider):
                     models = data.get("data", [])
                     if models:
                         model_names = [m.get("id", "unknown") for m in models[:3]]
-                        self._provider_logger.logger.info(
+                        logger.info(
                             f"LMStudio base URL selected (async): {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
                         return url, True
                     else:
-                        self._provider_logger.logger.warning(
+                        logger.warning(
                             f"LMStudio server at {url} has NO MODELS LOADED. "
                             "Please load a model in LMStudio before using this provider."
                         )
                         return url, False
             except Exception as exc:
-                self._provider_logger.logger.warning(
+                logger.warning(
                     f"LMStudio endpoint {url} not reachable ({exc}); trying next."
                 )
 
@@ -539,7 +539,7 @@ class LMStudioProvider(BaseProvider):
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        self._provider_logger.logger.error(
+        logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback, None

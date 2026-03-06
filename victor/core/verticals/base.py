@@ -48,6 +48,10 @@ from __future__ import annotations
 import logging
 import time
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
@@ -252,7 +256,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def compose(cls) -> "victor.core.verticals.composition.CapabilityComposer":
+    def compose(cls) -> "CapabilityComposer":
         """Create a composer for this vertical.
 
         Provides a fluent builder API for composing vertical capabilities
@@ -288,7 +292,7 @@ class VerticalBase(
         return CapabilityComposer(cls)
 
     @classmethod
-    def get_composer(cls) -> Optional["victor.core.verticals.composition.CapabilityComposer"]:
+    def get_composer(cls) -> Optional["CapabilityComposer"]:
         """Get the composer if using composition mode.
 
         Returns:

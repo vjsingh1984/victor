@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 import logging
 
 if TYPE_CHECKING:
+    from victor.framework.vertical_protocols import DocCommentPattern
     from victor.framework.vertical_protocols import DocCommentPatternProtocol
 
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory

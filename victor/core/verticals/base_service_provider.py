@@ -44,7 +44,15 @@ from victor.core.verticals.protocols import ServiceProviderProtocol
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
+    from victor.core.di import ServiceRegistrationSpec
+    from victor.core.verticals.protocols import (
+        ModeConfigProviderProtocol,
+        ToolDependencyProviderProtocol,
+        VerticalPromptProtocol,
+        VerticalSafetyProtocol,
+    )
     from victor.config.settings import Settings
+    from victor.core.di import register_services_from_specs
 
 logger = logging.getLogger(__name__)
 

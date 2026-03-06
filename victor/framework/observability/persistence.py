@@ -43,6 +43,8 @@ from victor.framework.observability.metrics import (
     AgentMetrics,
     Metric,
     MetricType,
+    ToolCallMetrics,
+    LLMCallMetrics,
 )
 
 

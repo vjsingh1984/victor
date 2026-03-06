@@ -15,10 +15,14 @@
 """Tool registry for managing available tools."""
 
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
+
+if TYPE_CHECKING:
+    from victor.tools.registration.strategies import ToolRegistrationStrategy
+    from victor.tools.registration.registry import ToolRegistrationStrategyRegistry
 
 
 class HookError(Exception):
