@@ -4351,15 +4351,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             raise ValueError(error_msg)
 
         # Get provider-level settings
-        provider_settings = settings.get_provider_settings(profile.provider)
+        # Pass profile extras to get_settings so strategies can see them (e.g., auth_mode)
+        profile_extras = profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
+        provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
 
-        # Merge profile-level overrides (base_url, timeout, api_key, etc.)
-        # ProfileConfig uses extra="allow" so extra fields are in __pydantic_extra__
-        if hasattr(profile, "__pydantic_extra__") and profile.__pydantic_extra__:
-            # Profile-level settings override provider-level settings
-            provider_settings.update(profile.__pydantic_extra__)
+        # Note: profile_extras are already merged by get_provider_settings for strategy decisions
+        # The debug log below shows what was passed (for transparency)
+        if profile_extras:
             logger.debug(
-                f"Profile '{profile_name}' overrides: {list(profile.__pydantic_extra__.keys())}"
+                f"Profile '{profile_name}' extras passed to provider config: {list(profile_extras.keys())}"
             )
 
         # Apply timeout multiplier from model capabilities

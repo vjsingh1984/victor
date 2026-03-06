@@ -471,12 +471,14 @@ class ProviderConfigRegistry:
         self,
         provider: str,
         settings: "Settings",
+        profile_overrides: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Get settings for a provider.
 
         Args:
             provider: Provider name (or alias)
             settings: Settings instance
+            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig.__pydantic_extra__)
 
         Returns:
             Provider settings dictionary
@@ -490,6 +492,11 @@ class ProviderConfigRegistry:
             provider_config = settings.load_provider_config(resolved)
             if provider_config:
                 base_settings.update(provider_config.model_dump(exclude_none=True))
+
+            # Apply profile overrides BEFORE calling strategy
+            # This allows the strategy to see auth_mode and make decisions
+            if profile_overrides:
+                base_settings.update(profile_overrides)
 
             # Get strategy
             strategy = self._strategies.get(resolved)

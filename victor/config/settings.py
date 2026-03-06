@@ -1423,7 +1423,7 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load tool config: {e}")
             return {}
 
-    def get_provider_settings(self, provider: str) -> Dict[str, Any]:
+    def get_provider_settings(self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
         Uses the ProviderConfigRegistry for OCP-compliant provider configuration.
@@ -1432,6 +1432,7 @@ class Settings(BaseSettings):
 
         Args:
             provider: Provider name (or alias like 'gemini' for 'google')
+            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig)
 
         Returns:
             Dictionary of provider settings
@@ -1439,7 +1440,7 @@ class Settings(BaseSettings):
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
-        return registry.get_settings(provider, self)
+        return registry.get_settings(provider, self, profile_overrides)
 
 
 def load_settings() -> Settings:
