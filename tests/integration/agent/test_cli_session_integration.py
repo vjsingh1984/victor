@@ -92,6 +92,7 @@ class TestCLISessionInitialization:
     @pytest.mark.integration
     async def test_session_with_vertical_integration(self, session_config):
         """Test session with vertical integration."""
+        pytest.importorskip("victor_coding")
         from victor_coding.assistant import CodingAssistant
 
         session_config.vertical = "coding"

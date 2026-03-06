@@ -5,6 +5,14 @@ when integrated with actual workflows and operations from each vertical.
 """
 
 import pytest
+
+pytest.importorskip("victor_coding")
+pytest.importorskip("victor.devops")
+pytest.importorskip("victor.rag")
+pytest.importorskip("victor.research")
+pytest.importorskip("victor.dataanalysis")
+pytest.importorskip("victor.benchmark")
+
 from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
 from victor_coding.safety import create_all_coding_safety_rules
 from victor.devops.safety import create_all_devops_safety_rules

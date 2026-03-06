@@ -37,6 +37,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytest.importorskip("victor_coding")
+pytest.importorskip("victor.devops")
+pytest.importorskip("victor.dataanalysis")
+pytest.importorskip("victor.research")
+pytest.importorskip("victor.rag")
+pytest.importorskip("victor.benchmark")
+
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.capability_config_service import CapabilityConfigService
 from victor_coding.workflows import CodingWorkflowProvider

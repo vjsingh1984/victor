@@ -58,13 +58,16 @@ def _load_profiles_yaml(profiles_file: Path) -> Dict[str, Any]:
         profiles_file: Path to profiles.yaml file
 
     Returns:
-        Dictionary containing profiles data, or empty dict if file doesn't exist
+        Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
     """
     if not profiles_file.exists():
         return {"profiles": {}}
 
-    with open(profiles_file) as f:
-        return yaml.safe_load(f) or {"profiles": {}}
+    try:
+        with open(profiles_file) as f:
+            return yaml.safe_load(f) or {"profiles": {}}
+    except (yaml.YAMLError, IOError, OSError):
+        return {"profiles": {}}
 
 
 def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:

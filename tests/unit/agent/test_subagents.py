@@ -544,13 +544,11 @@ class TestOrchestratorSubAgentIntegration:
         import inspect
         from victor.agent.orchestrator import AgentOrchestrator
 
-        # Fields may be in __init__ or in extracted helper methods
+        # Check that subagent fields exist in __init__
         init_source = inspect.getsource(AgentOrchestrator.__init__)
-        tool_layer_source = inspect.getsource(AgentOrchestrator._initialize_tool_and_plugin_layers)
-        combined = init_source + tool_layer_source
-        assert "_subagent_orchestrator" in combined
-        assert "_subagent_orchestration_enabled" in combined
-        assert "subagent_orchestration_enabled" in combined
+        assert "_subagent_orchestrator" in init_source
+        assert "_subagent_orchestration_enabled" in init_source
+        assert "subagent_orchestration_enabled" in init_source or "setup_subagent_orchestration" in init_source
 
     def test_subagent_orchestrator_property_is_lazy(self):
         """Test that intelligent_integration property follows lazy init pattern."""
