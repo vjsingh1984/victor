@@ -46,9 +46,10 @@ Escape Hatch:
     # Now you have access to all 27+ internal components
 """
 
-# === CORE: Always imported (the 5 concepts + errors + protocols) ===
+# === CORE: Always imported (the 5 concepts + errors + protocols + safety) ===
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
+from victor.framework.safety import create_git_safety_rules, create_file_safety_rules
 from victor.framework.protocols import (
     ChunkType,
     ConversationStateProtocol,
@@ -94,6 +95,9 @@ from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
 _CORE_NAMES = [
     # Core classes (the 5 concepts)
     "Agent",
+    # Safety rules
+    "create_git_safety_rules",
+    "create_file_safety_rules",
     "Task",
     "Tools",
     "State",

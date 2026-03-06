@@ -158,6 +158,8 @@ class OrchestratorServiceProvider:
         self._register_unified_memory_coordinator(container)
         # PresentationAdapter - singleton for icon/formatting concerns
         self._register_presentation_adapter(container)
+        # TaskAnalyzer - singleton for task analysis and classification
+        self._register_task_analyzer(container)
 
         logger.debug("Registered singleton orchestrator services")
 
