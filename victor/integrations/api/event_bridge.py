@@ -555,7 +555,7 @@ class EventBusAdapter:
     ) -> None:
         """Run an async operation from a sync code path."""
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()  # Check if loop is running
         except RuntimeError:
             try:
                 result = asyncio.run(awaitable)

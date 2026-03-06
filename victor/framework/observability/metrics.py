@@ -1351,7 +1351,7 @@ class MetricsExporter:
 
         # Rows
         for metric in metrics:
-            labels_str = ",".join(f"{l.key}={l.value}" for l in metric.labels)
+            labels_str = ",".join(f"{label.key}={label.value}" for label in metric.labels)
             value_str = _format_metric_value(metric)
 
             writer.writerow(
@@ -1394,7 +1394,7 @@ class MetricsExporter:
 
         for metric in metrics:
             # Create metric name and labels
-            labels_str = "{" + ",".join(f'{l.key}="{l.value}"' for l in metric.labels) + "}"
+            labels_str = "{" + ",".join(f'{label.key}="{label.value}"' for label in metric.labels) + "}"
             if len(metric.labels) == 0:
                 labels_str = ""
 
@@ -1435,7 +1435,7 @@ def _metric_to_dict(metric: Metric) -> Dict[str, Any]:
         "name": metric.name,
         "description": metric.description,
         "type": metric.metric_type.value,
-        "labels": {l.key: l.value for l in metric.labels},
+        "labels": {label.key: label.value for label in metric.labels},
         "timestamp": metric.timestamp,
         "datetime": datetime.fromtimestamp(metric.timestamp).isoformat(),
         "value": _extract_metric_value(metric),

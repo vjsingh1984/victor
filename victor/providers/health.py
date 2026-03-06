@@ -345,7 +345,7 @@ class ProviderHealthChecker:
             # Try to make a simple call (most providers will fail or succeed quickly)
             try:
                 with asyncio.timeout(timeout):
-                    response = await provider_instance.chat(
+                    await provider_instance.chat(
                         messages=[test_message],
                         model=model,
                         max_tokens=1,
