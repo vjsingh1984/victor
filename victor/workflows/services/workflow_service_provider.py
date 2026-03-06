@@ -137,9 +137,15 @@ class WorkflowServiceProvider:
         for spec in WORKFLOW_SINGLETON_SPECS:
             factory = getattr(self, spec.factory_attr)
             if spec.pass_container:
-                factory_fn = lambda c, method=factory: method(c)
+
+                def factory_fn(c, method=factory):
+                    return method(c)
+
             else:
-                factory_fn = lambda c, method=factory: method()
+
+                def factory_fn(c, method=factory):
+                    return method()
+
             specs.append(
                 ServiceRegistrationSpec(
                     spec.protocol,
@@ -165,9 +171,15 @@ class WorkflowServiceProvider:
         for spec in WORKFLOW_SCOPED_SPECS:
             factory = getattr(self, spec.factory_attr)
             if spec.pass_container:
-                factory_fn = lambda c, method=factory: method(c)
+
+                def factory_fn(c, method=factory):
+                    return method(c)
+
             else:
-                factory_fn = lambda c, method=factory: method()
+
+                def factory_fn(c, method=factory):
+                    return method()
+
             scoped_specs.append(
                 ServiceRegistrationSpec(
                     spec.protocol,
@@ -198,9 +210,15 @@ class WorkflowServiceProvider:
         for spec in WORKFLOW_TRANSIENT_SPECS:
             factory = getattr(self, spec.factory_attr)
             if spec.pass_container:
-                factory_fn = lambda c, method=factory: method(c)
+
+                def factory_fn(c, method=factory):
+                    return method(c)
+
             else:
-                factory_fn = lambda c, method=factory: method()
+
+                def factory_fn(c, method=factory):
+                    return method()
+
             transient_specs.append(
                 ServiceRegistrationSpec(
                     spec.protocol,

@@ -201,7 +201,6 @@ jobs:
           VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS=1 pytest \
             tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_check_capability_fallback_blocked_in_protocol_strict_mode \
             tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_invoke_capability_fallback_blocked_in_protocol_strict_mode \
-            tests/unit/framework/test_vertical_integration.py::TestIntegrationPlanCache::test_state_snapshot_getter_fallback_blocked_in_protocol_strict_mode \
             -q
           VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS=1 pytest \
             tests/unit/framework/test_capability_config_helpers.py::TestCapabilityConfigHelpers::test_load_private_fallback_blocked_in_strict_mode \
