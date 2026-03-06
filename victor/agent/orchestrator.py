@@ -555,6 +555,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
+            factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
