@@ -153,14 +153,9 @@ class TestModeAwareMixinNoController:
         """Test that mode_controller can be set to None manually."""
         component = TestComponent()
 
-        # Patch the import location in the current module (test_mode_aware_mixin)
-        with patch(
-            "test_mode_aware_mixin.ModeAwareMixin.mode_controller",
-            new_callable=lambda: property(lambda self: None),
-        ):
-            # Mock the cached_property to return None
-            component.__dict__["mode_controller"] = None
-            assert component.mode_controller is None
+        # Set mode_controller to None directly (it's a cached property)
+        component.__dict__["mode_controller"] = None
+        assert component.mode_controller is None
 
     def test_current_mode_name_defaults_to_build(self):
         """Test current_mode_name returns BUILD when controller unavailable."""
