@@ -1042,6 +1042,18 @@ class SSOAuthenticator:
         finally:
             await runner.cleanup()
 
+    @staticmethod
+    def _get_ssl_context():
+        """Create SSL context using certifi certs (fixes macOS venv SSL errors)."""
+        import ssl
+
+        try:
+            import certifi
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            return None  # Fall back to system default
+
     async def _exchange_code(
         self,
         code: str,
@@ -1069,7 +1081,9 @@ class SSOAuthenticator:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
 
-        async with aiohttp.ClientSession() as session:
+        ssl_ctx = self._get_ssl_context()
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(token_url, data=data) as response:
                 if response.status != 200:
                     error = await response.text()
@@ -1109,7 +1123,9 @@ class SSOAuthenticator:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
 
-        async with aiohttp.ClientSession() as session:
+        ssl_ctx = self._get_ssl_context()
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(token_url, data=data) as response:
                 if response.status != 200:
                     error = await response.text()
