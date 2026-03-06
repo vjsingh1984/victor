@@ -48,6 +48,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from victor.integrations.search_types import CodeSearchResult
+
 from victor.integrations.api.change_tracker_ops import (
     apply_patch_request,
     change_history,

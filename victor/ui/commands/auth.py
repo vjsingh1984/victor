@@ -196,7 +196,7 @@ def auth_add(
             from victor.config.api_keys import _set_key_in_keyring
 
             _set_key_in_keyring(provider, api_key)
-            console.print(f"[green]✓[/] API key saved to keyring")
+            console.print("[green]✓[/] API key saved to keyring")
         except Exception as e:
             console.print(f"[yellow]⚠[/] Could not save to keyring: {e}")
             console.print("[dim]API key stored in config file instead[/]")
@@ -269,7 +269,7 @@ def auth_remove(
         console.print(f"[red]✗[/] Account '{name}' not found")
         raise typer.Exit(1)
 
-    console.print(f"[yellow]Removing account:[/]")
+    console.print("[yellow]Removing account:[/]")
     console.print(f"  Name: {account.name}")
     console.print(f"  Provider: {account.provider}")
     console.print(f"  Model: {account.model}")
@@ -282,7 +282,7 @@ def auth_remove(
     if manager.remove_account(name):
         console.print(f"[green]✓[/] Account '{name}' removed")
     else:
-        console.print(f"[red]✗[/] Failed to remove account")
+        console.print("[red]✗[/] Failed to remove account")
         raise typer.Exit(1)
 
 
@@ -342,7 +342,7 @@ def auth_migrate(
     result = run_migration(prompt=False, force=force)
 
     if result.success:
-        console.print(f"[green]✓[/] Migration successful!")
+        console.print("[green]✓[/] Migration successful!")
         console.print(f"[dim]Accounts migrated: {result.migrated_accounts}[/]")
         console.print(f"[dim]API keys migrated: {result.migrated_keys}[/]")
         console.print(f"[dim]Backup: {result.backup_path}[/]")
@@ -413,7 +413,7 @@ def auth_test(
 
     # Display results
     if result.success:
-        console.print(f"[green]✓[/] Connection successful!")
+        console.print("[green]✓[/] Connection successful!")
         console.print()
 
         # Show validation details
@@ -429,7 +429,7 @@ def auth_test(
             console.print()
             console.print(f"[dim]Latency: {result.latency_ms}ms[/]")
     else:
-        console.print(f"[red]✗[/] Connection failed")
+        console.print("[red]✗[/] Connection failed")
         console.print()
 
         if result.error:

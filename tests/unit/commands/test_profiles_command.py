@@ -25,12 +25,6 @@ import typer
 
 from victor.ui.commands.profiles import (
     profiles_app,
-    list_profiles,
-    create_profile,
-    edit_profile,
-    delete_profile,
-    show_profile,
-    set_default_profile,
     _load_profiles_yaml,
     _save_profiles_yaml,
 )
