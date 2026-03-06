@@ -18,6 +18,11 @@ Manages the OAuth 2.0 PKCE token lifecycle (login, persist, refresh) for
 providers that support subscription-based OAuth access (OpenAI Codex, Qwen).
 
 See FEP-0004 for design details.
+
+Security:
+- OAuth client_id is loaded from environment variables or keychain
+- Never hardcoded in source code to prevent git leaks
+- Resolution order: env var > keychain > error
 """
 
 import logging
@@ -42,6 +47,105 @@ logger = logging.getLogger(__name__)
 # Grace period: refresh token if it expires within this window
 REFRESH_GRACE_MINUTES = 5
 
+# OAuth client ID environment variables (highest priority)
+OAUTH_CLIENT_ID_ENV_VARS = {
+    "openai": "VICTOR_OPENAI_OAUTH_CLIENT_ID",
+    "qwen": "VICTOR_QWEN_OAUTH_CLIENT_ID",
+}
+
+# OAuth client ID keychain service names
+KEYRING_SERVICE = "victor"
+KEYRING_OAUTH_CLIENT_ID_PREFIX = "oauth_client_id_"
+
+
+def _get_oauth_client_id_from_keyring(provider: str) -> Optional[str]:
+    """Get OAuth client_id from system keyring.
+
+    Args:
+        provider: Provider name (e.g., "openai", "qwen")
+
+    Returns:
+        OAuth client_id if found, None otherwise
+    """
+    try:
+        import keyring
+
+        key = keyring.get_password(KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}")
+        return key
+    except ImportError:
+        logger.debug("Keyring not available for OAuth client_id retrieval")
+        return None
+    except Exception as e:
+        logger.debug(f"Keyring access failed for OAuth client_id {provider}: {e}")
+        return None
+
+
+def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
+    """Store OAuth client_id in system keyring.
+
+    Args:
+        provider: Provider name
+        client_id: OAuth client_id to store
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import keyring
+
+        keyring.set_password(KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}", client_id)
+        logger.info(f"OAuth client_id for {provider} stored in system keyring")
+        return True
+    except ImportError:
+        logger.warning("Keyring not available. Install 'keyring' package for secure storage.")
+        return False
+    except Exception as e:
+        logger.warning(f"Failed to store OAuth client_id in keyring: {e}")
+        return False
+
+
+def _get_oauth_client_id(provider: str) -> str:
+    """Get OAuth client_id for a provider.
+
+    Resolution order:
+    1. Environment variable (highest priority)
+    2. System keyring (secure encrypted storage)
+    3. Error (no default - must be explicitly configured)
+
+    Args:
+        provider: Provider name (e.g., "openai", "qwen")
+
+    Returns:
+        OAuth client_id
+
+    Raises:
+        ValueError: If client_id is not configured
+    """
+    # Priority 1: Environment variable
+    env_var = OAUTH_CLIENT_ID_ENV_VARS.get(provider)
+    if env_var:
+        client_id = os.environ.get(env_var)
+        if client_id:
+            logger.debug(f"OAuth client_id for {provider} loaded from environment variable {env_var}")
+            return client_id
+
+    # Priority 2: System keyring
+    keyring_client_id = _get_oauth_client_id_from_keyring(provider)
+    if keyring_client_id:
+        logger.debug(f"OAuth client_id for {provider} loaded from keyring")
+        return keyring_client_id
+
+    # No client_id found
+    raise ValueError(
+        f"OAuth client_id for '{provider}' is not configured.\n"
+        f"Set it using one of these methods:\n"
+        f"  1. Environment variable: export {env_var or f'VICTOR_{provider.upper()}_OAUTH_CLIENT_ID'}=<your-client-id>\n"
+        f"  2. Keyring: victor keys --set-oauth-client-id {provider}\n"
+        f"\n"
+        f"Note: You must register an OAuth application with {provider.upper()} to get a client_id.\n"
+        f"The placeholder in the code is not a real registered application."
+    )
+
 
 @dataclass
 class OAuthProviderConfig:
@@ -50,17 +154,30 @@ class OAuthProviderConfig:
     provider_name: str
     sso_provider: SSOProvider
     issuer_url: str
-    client_id: str
+    # client_id is now loaded dynamically via get_client_id() method
     scopes: List[str] = field(default_factory=lambda: ["openid", "profile", "email"])
     token_endpoint: str = "/oauth/token"
     redirect_port: int = 8400
+
+    def get_client_id(self) -> str:
+        """Get the OAuth client_id for this provider.
+
+        Loads from environment variable or keychain.
+
+        Returns:
+            OAuth client_id
+
+        Raises:
+            ValueError: If client_id is not configured
+        """
+        return _get_oauth_client_id(self.provider_name)
 
     def to_sso_config(self) -> SSOConfig:
         """Convert to SSOConfig for use with SSOAuthenticator."""
         return SSOConfig(
             provider=self.sso_provider,
             issuer_url=self.issuer_url,
-            client_id=self.client_id,
+            client_id=self.get_client_id(),
             scopes=self.scopes,
             redirect_uri=f"http://localhost:{self.redirect_port}/callback",
             use_pkce=True,
@@ -76,7 +193,7 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
         provider_name="openai",
         sso_provider=SSOProvider.OPENAI_CODEX,
         issuer_url="https://auth.openai.com",
-        client_id="app_EMoamEEZ73f0CkXaXp7hrann",
+        # client_id loaded from environment variable or keychain
         scopes=["openid", "profile", "email", "offline_access"],
         token_endpoint="/oauth/token",
     ),
@@ -84,7 +201,7 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
         provider_name="qwen",
         sso_provider=SSOProvider.QWEN,
         issuer_url="https://chat.qwen.ai",
-        client_id="qwen-code",  # built-in client; override via QWEN_OAUTH_CLIENT_ID
+        # client_id loaded from environment variable or keychain
         scopes=["openid", "profile", "email", "offline_access"],
         token_endpoint="/oauth/token",
     ),
