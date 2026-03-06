@@ -159,11 +159,9 @@ class QwenProvider(BaseProvider):
                 if cached is not None and not cached.is_expired:
                     resolved_key = cached.access_token
                 else:
-                    import asyncio
-
-                    resolved_key = asyncio.get_event_loop().run_until_complete(
-                        self._oauth_manager.get_valid_token()
-                    )
+                    # Placeholder — actual login deferred to _ensure_valid_token()
+                    # which runs inside the async context (chat/stream)
+                    resolved_key = "oauth-pending"
 
             self._api_key = resolved_key
 

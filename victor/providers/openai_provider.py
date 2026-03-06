@@ -82,7 +82,7 @@ class OpenAIProvider(BaseProvider):
 
         if auth_mode == "oauth":
             self._oauth_manager = OAuthTokenManager("openai")
-            # Use pre-obtained tokens or load cached
+            # Use pre-obtained tokens or load cached (sync-safe)
             if oauth_tokens is not None:
                 resolved_key = oauth_tokens.access_token
             else:
@@ -90,12 +90,9 @@ class OpenAIProvider(BaseProvider):
                 if cached is not None and not cached.is_expired:
                     resolved_key = cached.access_token
                 else:
-                    import asyncio
-
-                    tokens = asyncio.get_event_loop().run_until_complete(
-                        self._oauth_manager.get_valid_token()
-                    )
-                    resolved_key = tokens
+                    # Placeholder — actual login deferred to _ensure_valid_token()
+                    # which runs inside the async context (chat/stream)
+                    resolved_key = "oauth-pending"
 
             self._api_key = resolved_key
 
