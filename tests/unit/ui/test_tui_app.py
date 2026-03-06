@@ -192,6 +192,24 @@ def test_start_session_restore_without_running_loop_uses_fallback() -> None:
     fallback.assert_called_once_with()
 
 
+def test_action_cancel_stream_cancels_active_session_restore() -> None:
+    """Ctrl+X should cancel restore tasks before checking stream state."""
+    app = VictorTUI()
+    restore_task = MagicMock()
+    restore_task.done.return_value = False
+    app._session_restore_task = restore_task
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+    app.agent = MagicMock()
+
+    app.action_cancel_stream()
+
+    restore_task.cancel.assert_called_once_with()
+    app._add_system_message.assert_called_once_with("Session restore canceled")
+    app._set_status.assert_called_once_with("Idle", "idle")
+    app.agent.request_cancellation.assert_not_called()
+
+
 def test_load_session_async_uses_async_replay_path() -> None:
     """Async session loader should use chunk-capable replay helper."""
     app = VictorTUI()
@@ -205,17 +223,52 @@ def test_load_session_async_uses_async_replay_path() -> None:
     session.name = "Replay Test"
     session.messages = [Message(role="assistant", content=f"m{i}") for i in range(3)]
     manager = MagicMock()
-    manager.load.return_value = session
-
-    with patch("victor.ui.tui.session.SessionManager", return_value=manager):
+    with (
+        patch("victor.ui.tui.session.SessionManager", return_value=manager),
+        patch("victor.ui.tui.app.asyncio.to_thread", AsyncMock(return_value=session)) as to_thread,
+    ):
         asyncio.run(app._load_session_async("session-12345678"))
 
+    to_thread.assert_awaited_once_with(manager.load, "session-12345678")
     app._replay_transcript_async.assert_awaited_once_with(
         [(msg.role, msg.content) for msg in session.messages],
         status_label="Loading session",
     )
     app._restore_agent_conversation.assert_called_once_with(session.messages)
     app._add_system_message.assert_called_once_with("Session loaded: Replay Test (3 messages)")
+
+
+def test_load_project_session_async_uses_to_thread() -> None:
+    """Project async loader should fetch session data via background thread."""
+    app = VictorTUI()
+    app._replay_transcript_async = AsyncMock()
+    app._add_system_message = MagicMock()
+    app._set_status = MagicMock()
+    app.agent = None
+
+    history = MagicMock()
+    history.messages = [MagicMock(role="assistant", content="a1")]
+    persistence = MagicMock()
+    persistence.load_session = MagicMock()
+
+    with (
+        patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ),
+        patch("victor.agent.message_history.MessageHistory.from_dict", return_value=history),
+        patch(
+            "victor.ui.tui.app.asyncio.to_thread",
+            AsyncMock(return_value={"conversation": {"messages": []}, "metadata": {"title": "P"}}),
+        ) as to_thread,
+    ):
+        asyncio.run(app._load_project_session_async("project-session-1"))
+
+    to_thread.assert_awaited_once_with(persistence.load_session, "project-session-1")
+    app._replay_transcript_async.assert_awaited_once_with(
+        [("assistant", "a1")],
+        status_label="Loading project session",
+    )
 
 
 def test_load_session_uses_status_and_single_completion_message() -> None:
@@ -266,6 +319,38 @@ def test_input_submit_resumes_follow_when_paused() -> None:
     app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
     app._add_user_message.assert_called_once_with("hello")
     app._process_message_async.assert_awaited_once_with("hello")
+
+
+def test_input_submit_ignored_while_processing_keeps_draft() -> None:
+    """Submitting while busy should not clear input or enqueue a second send."""
+    app = VictorTUI()
+    app._is_processing = True
+    app._input_widget = MagicMock()
+    app._add_user_message = MagicMock()
+    app._process_message_async = AsyncMock()
+    app._set_status = MagicMock()
+    event = MagicMock()
+    event.value = "hello"
+
+    asyncio.run(app.on_input_widget_submitted(event))
+
+    app._input_widget.add_to_history.assert_not_called()
+    app._input_widget.clear.assert_not_called()
+    app._add_user_message.assert_not_called()
+    app._process_message_async.assert_not_awaited()
+    app._set_status.assert_called_once_with("Working", "busy")
+
+
+def test_process_message_async_toggles_input_busy_state() -> None:
+    """Processing lifecycle should set input busy true then false."""
+    app = VictorTUI()
+    app._input_widget = MagicMock()
+
+    asyncio.run(app._process_message_async("hello"))
+
+    app._input_widget.set_busy.assert_any_call(True)
+    app._input_widget.set_busy.assert_any_call(False)
+    app._input_widget.focus_input.assert_called_once()
 
 
 def test_update_jump_button_label_with_unread_count() -> None:

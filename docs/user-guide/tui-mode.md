@@ -78,6 +78,7 @@ victor chat --no-tui
 |----------|--------|
 | `Ctrl+C` | Exit Victor |
 | `Ctrl+L` | Clear conversation |
+| `Ctrl+X` | Cancel active stream/session restore |
 | `Ctrl+T` | Toggle thinking panel |
 | `Ctrl+N` | Jump to unread boundary |
 | `Ctrl+F` | Toggle sticky follow mode |

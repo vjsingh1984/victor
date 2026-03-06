@@ -148,6 +148,8 @@ class OrchestratorServiceProvider:
 
         register_services_from_specs(container, spec_entries)
 
+        # ToolRegistry and ToolRegistrar - core tool management
+        self._register_tool_registry(container)
         # RecoveryHandler - model failure recovery with Q-learning
         self._register_recovery_handler(container)
         # ToolCacheManager - singleton for internal tool state (indexes, connections)

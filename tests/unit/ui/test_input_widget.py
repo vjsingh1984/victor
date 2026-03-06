@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import warnings
+from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
 
@@ -61,3 +62,28 @@ def test_enter_mid_line_inserts_newline_then_ctrl_enter_submits() -> None:
         assert app.submissions == ["h\ni"]
 
     asyncio.run(_run())
+
+
+def test_set_busy_updates_prompt_hint_and_input_disable_state() -> None:
+    """Busy state should visually acknowledge Enter and disable editing while running."""
+    widget = InputWidget()
+    widget._input = MagicMock()
+    widget._prompt_label = MagicMock()
+    widget._hint_label = MagicMock()
+
+    widget.set_busy(True)
+
+    assert widget._input.disabled is True
+    widget._prompt_label.update.assert_called_with("⋯")
+    widget._prompt_label.add_class.assert_called_with("busy")
+    widget._hint_label.update.assert_called_with(widget._BUSY_HINT)
+
+    widget._prompt_label.reset_mock()
+    widget._hint_label.reset_mock()
+
+    widget.set_busy(False)
+
+    assert widget._input.disabled is False
+    widget._prompt_label.update.assert_called_with("❯")
+    widget._prompt_label.remove_class.assert_called_with("busy")
+    widget._hint_label.update.assert_called_with(widget._IDLE_HINT)
