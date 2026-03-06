@@ -553,10 +553,15 @@ class AccountManager:
             elif not account.is_local():
                 logger.warning(f"No API key found for {account.provider}")
 
-        # Add generation parameters
-        if account.temperature is not None:
+        # Add generation parameters (kwargs override account values)
+        if "temperature" in kwargs:
+            config["temperature"] = kwargs["temperature"]
+        elif account.temperature is not None:
             config["temperature"] = account.temperature
-        if account.max_tokens is not None:
+
+        if "max_tokens" in kwargs:
+            config["max_tokens"] = kwargs["max_tokens"]
+        elif account.max_tokens is not None:
             config["max_tokens"] = account.max_tokens
 
         # Add extra params

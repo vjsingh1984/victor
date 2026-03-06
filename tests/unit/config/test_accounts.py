@@ -178,8 +178,8 @@ class TestProviderAccount:
         assert result["name"] == "test"
         assert result["tags"] == ["test"]
         assert result["temperature"] == 0.7
-        assert result["auth"]["method"] == "api_key"
-        assert result["auth"]["source"] == "keyring"
+        # Default auth (api_key + keyring) is not serialized
+        assert "auth" not in result
 
     def test_provider_account_from_dict(self):
         """Test ProviderAccount.from_dict()."""

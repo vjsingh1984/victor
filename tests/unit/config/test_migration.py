@@ -232,12 +232,14 @@ class TestConfigMigrator:
         assert result.success
         assert migrator.new_config_file.exists()
 
-    def test_migrate_dry_run(self, migrator, old_profiles_file, old_api_keys_file):
+    def test_migrate_dry_run(self, migrator, old_profiles_file, old_api_keys_file, temp_victor_dir):
         """Test dry run migration."""
-        result = migrator.migrate(prompt=False, dry_run=True)
+        # Create migrator with dry_run=True
+        dry_run_migrator = ConfigMigrator(victor_dir=temp_victor_dir, dry_run=True)
+        result = dry_run_migrator.migrate(prompt=False)
 
         assert result.success
-        assert not migrator.new_config_file.exists()  # Should not create file
+        assert not dry_run_migrator.new_config_file.exists()  # Should not create file
 
     def test_rollback_migration(self, migrator, old_profiles_file, old_api_keys_file):
         """Test rolling back migration."""
