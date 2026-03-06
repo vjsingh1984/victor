@@ -37,7 +37,7 @@ from victor.ui.commands.keys import keys_app
 from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
-from victor.ui.commands.providers import providers_app
+from victor.ui.commands.providers import providers_app, auth_app
 from victor.ui.commands.rag import rag_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
@@ -47,6 +47,7 @@ from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.sessions import sessions_app
 from victor.ui.commands.vertical import vertical_app
+from victor.ui.commands.analyze import app as analyze_app
 from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
@@ -55,12 +56,38 @@ app = typer.Typer(
     add_completion=False,
 )
 
+console = Console()
+
+
+# Define doctor_command BEFORE registering it
+@app.command("doctor")
+def doctor_command(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic output"),
+    fix: bool = typer.Option(False, "--fix", "-f", help="Automatically fix common issues"),
+) -> None:
+    """Run system diagnostics and troubleshooting.
+
+    Performs comprehensive system checks:
+    - Python version and environment
+    - Dependencies and packages
+    - Provider connectivity and configuration
+    - Tool availability
+    - File permissions
+    - Performance optimizations
+    """
+    import sys
+
+    exit_code = run_doctor(verbose=verbose, fix=fix)
+    raise typer.Exit(exit_code)
+
+
 # Register all the subcommands
+app.add_typer(analyze_app)
+app.add_typer(auth_app, name="auth", help="Manage OAuth authentication (shortcut for 'providers auth').")
 app.add_typer(benchmark_app)
 app.add_typer(capabilities_app)
 app.add_typer(chat_app)
 app.add_typer(config_app)
-app.command()(doctor_command)
 app.add_typer(dashboard_app)
 app.add_typer(docs_app)
 app.add_typer(observability_app, name="observability")
@@ -86,29 +113,6 @@ app.add_typer(scheduler_app)
 app.add_typer(sessions_app)
 app.add_typer(vertical_app)
 app.add_typer(workflow_app)
-
-
-@app.command()
-def doctor_command(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic output"),
-    fix: bool = typer.Option(False, "--fix", "-f", help="Automatically fix common issues"),
-) -> None:
-    """Run system diagnostics and troubleshooting.
-
-    Performs comprehensive system checks:
-    - Python version and environment
-    - Dependencies and packages
-    - Provider connectivity and configuration
-    - Tool availability
-    - File permissions
-    - Performance optimizations
-    """
-    import sys
-
-    exit_code = run_doctor(verbose=verbose, fix=fix)
-    raise typer.Exit(exit_code)
-
-console = Console()
 
 
 def version_callback(value: bool) -> None:
