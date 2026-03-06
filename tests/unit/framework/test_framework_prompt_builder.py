@@ -154,6 +154,45 @@ class TestPromptBuilder:
 
         assert first_idx < middle_idx < last_idx
 
+    def test_ensure_section_adds_missing(self):
+        """Ensure section helper adds fallback content."""
+        builder = PromptBuilder()
+        builder.ensure_section("identity", "Fallback identity", priority=10, header="")
+
+        assert builder.has_section("identity")
+        section = builder.get_section("identity")
+        assert section is not None
+        assert section.content == "Fallback identity"
+        assert section.priority == 10
+
+    def test_trim_sections_by_priority(self):
+        """Trim sections when prompt exceeds character budget."""
+        builder = PromptBuilder()
+        builder.add_section("identity", "ID", priority=10)
+        builder.add_section(
+            "context_a",
+            "A" * 100,
+            priority=PromptBuilder.PRIORITY_CONTEXT,
+        )
+        builder.add_section(
+            "context_b",
+            "B" * 120,
+            priority=PromptBuilder.PRIORITY_CONTEXT + 1,
+        )
+
+        builder.trim_sections_by_priority(
+            max_total_chars=150,
+            protected_sections=("identity",),
+            min_priority=PromptBuilder.PRIORITY_CONTEXT,
+        )
+
+        assert builder.has_section("identity")
+        # Only one context section should remain after trimming
+        remaining_context = [
+            name for name in ("context_a", "context_b") if builder.has_section(name)
+        ]
+        assert len(remaining_context) == 1
+
     def test_add_section_with_custom_header(self):
         """Test adding section with custom header."""
         builder = PromptBuilder()
