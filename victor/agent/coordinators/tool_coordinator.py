@@ -68,6 +68,9 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.tools.budget_controller import BudgetController
+from victor.tools.tool_call_parser import ToolCallParser
+from victor.tools.tool_call_validator import ToolCallValidator
 from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
@@ -247,6 +250,7 @@ class ToolCoordinator:
         self._on_tool_complete = on_tool_complete
 
         # Internal state
+        self._budget_controller = BudgetController(budget=self._config.default_budget)
         self._budget_used: int = 0
         self._total_budget: int = self._config.default_budget
         self._selection_history: List[Tuple[str, int]] = []  # (method, count)
@@ -254,6 +258,10 @@ class ToolCoordinator:
         self._executed_tools: List[str] = []
         self._failed_tool_signatures: Set[Tuple[str, str]] = set()
         self._enabled_tools: Optional[Set[str]] = None
+
+        # Composed extracted classes
+        self._tool_call_parser = ToolCallParser()
+        self._tool_call_validator = ToolCallValidator()
 
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
@@ -296,7 +304,7 @@ class ToolCoordinator:
         """
         if self._budget_manager:
             return self._budget_manager.get_remaining_tool_calls()
-        return max(0, self._total_budget - self._budget_used)
+        return self._budget_controller.get_remaining()
 
     def consume_budget(self, amount: int = 1) -> None:
         """Consume tool call budget.
@@ -305,6 +313,7 @@ class ToolCoordinator:
             amount: Number of budget units to consume
         """
         self._budget_used += amount
+        self._budget_controller.consume("_coordinator", amount)
 
         if self._budget_manager:
             self._budget_manager.consume_tool_call(amount)
@@ -330,6 +339,9 @@ class ToolCoordinator:
         else:
             self._total_budget = self._config.default_budget
 
+        self._budget_controller.reset()
+        self._budget_controller.budget = self._total_budget
+
         if self._budget_manager:
             self._budget_manager.reset(new_budget or self._config.default_budget)
 
@@ -353,7 +365,9 @@ class ToolCoordinator:
         Returns:
             True if no budget remaining
         """
-        return self.get_remaining_budget() <= 0
+        if self._budget_manager:
+            return self.get_remaining_budget() <= 0
+        return self._budget_controller.is_exhausted()
 
     # =====================================================================
     # Tool Selection
@@ -946,6 +960,12 @@ class ToolCoordinator:
                             tc["arguments"] = {"value": args}
                 elif args is None:
                     tc["arguments"] = {}
+                # Normalize boolean strings and nested JSON via ToolCallParser
+                parsed_args = tc.get("arguments")
+                if isinstance(parsed_args, dict):
+                    tc["arguments"] = self._tool_call_parser.normalize_args(
+                        tc.get("name", ""), parsed_args
+                    )
 
         return tool_calls, full_content
 
@@ -1257,6 +1277,16 @@ class ToolCoordinator:
                     ),
                 },
             )
+
+        # Supplementary schema validation via ToolCallValidator (log-only)
+        if canonical in self._tool_call_validator._tool_schemas:
+            schema_result = self._tool_call_validator.validate(
+                canonical, tool_call.get("arguments", {})
+            )
+            if not schema_result.valid:
+                logger.warning(
+                    f"Schema validation: {canonical}: {schema_result.errors}"
+                )
 
         return ToolCallValidation(
             valid=True,
