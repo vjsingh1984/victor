@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Unified Configuration System** - Streamlined configuration with `~/.victor/config.yaml`
+  - Single config file replaces `profiles.yaml` + `api_keys.yaml`
+  - `ProviderAccount` abstraction unifies provider, model, auth, and settings
+  - `AccountManager` for simplified account management and resolution
+  - Model suffix support (e.g., `glm-4.6:coding` for GLM coding endpoint)
+  - Interactive setup wizard with `victor auth setup`
+  - Automatic migration from old configuration format
+  - Connection testing with `victor auth test`
+  - Support for OAuth authentication (OpenAI, Qwen)
+- **New Auth Command** (`victor auth`) - Comprehensive account management
+  - `victor auth setup` - Interactive setup wizard
+  - `victor auth add` - Quick add provider accounts
+  - `victor auth list` - List configured accounts
+  - `victor auth remove` - Remove accounts
+  - `victor auth test` - Test provider connections
+  - `victor auth migrate` - Migrate from old configuration
+- **Connection Validation** - `ConnectionValidator` for testing provider connections
+- **DefaultProviderConfig** - Simplified strategy for simple API key providers
+- **Model Suffix Parsing** - ZAI provider now supports model suffixes for endpoint selection
+- **Example Configuration** - `examples/config.yaml` with common provider setups
 - **Presentation Abstraction Layer** - Decouples UI concerns from core logic with `PresentationAdapter` protocol
 - **Registry Base Classes** - Centralized registry infrastructure in `victor/core/registry_base.py`
 - **Tool Selector Protocol** - Unified `IToolSelector` protocol for tool selection strategies

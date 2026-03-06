@@ -1426,9 +1426,13 @@ class Settings(BaseSettings):
     def get_provider_settings(self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
-        Uses the ProviderConfigRegistry for OCP-compliant provider configuration.
-        Each provider has a dedicated strategy class that handles its specific
-        settings (API keys, base URLs, etc.).
+        This method now uses the new AccountManager for configuration while maintaining
+        backward compatibility with the old ProviderConfigRegistry.
+
+        Priority order:
+        1. AccountManager (config.yaml) - new unified configuration
+        2. ProviderConfigRegistry (profiles.yaml) - legacy configuration
+        3. Environment variables - CI/CD support
 
         Args:
             provider: Provider name (or alias like 'gemini' for 'google')
@@ -1437,6 +1441,30 @@ class Settings(BaseSettings):
         Returns:
             Dictionary of provider settings
         """
+        # Try new AccountManager first
+        try:
+            from victor.config.accounts import get_account_manager
+            from victor.config.resolution import get_provider_resolver
+
+            account_manager = get_account_manager()
+            resolver = get_provider_resolver()
+
+            # Check if new config exists
+            if account_manager.config_path.exists():
+                # Use new unified configuration system
+                config = resolver.resolve_quick(
+                    provider=provider,
+                    model=self.default_model,
+                )
+                return config
+
+        except Exception as e:
+            # Fall back to old system if new system fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry")
+
+        # Fall back to old ProviderConfigRegistry for backward compatibility
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()

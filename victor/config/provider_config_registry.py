@@ -21,6 +21,12 @@ Design Goals:
 - Open for extension: Add new providers by registering a strategy
 - Closed for modification: No changes to core logic needed
 - Single Responsibility: Each strategy handles one provider
+- Simplified: DefaultProviderConfig handles most simple API key providers
+
+Migration Notes:
+- Simple API key providers now use DefaultProviderConfig
+- Complex providers (OAuth, multiple endpoints) use dedicated strategies
+- Legacy strategy classes are deprecated but kept for backward compatibility
 
 Usage:
     from victor.config.provider_config_registry import (
@@ -93,9 +99,90 @@ class ProviderConfigStrategy(ABC):
 # Built-in Provider Strategies
 # =============================================================================
 
+# Default endpoints for simple API key providers
+# These providers use API key auth with a single endpoint
+DEFAULT_PROVIDER_ENDPOINTS = {
+    "anthropic": "https://api.anthropic.com",
+    "google": "https://generativelanguage.googleapis.com/v1beta",
+    "xai": "https://api.x.ai/v1",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "zai": "https://api.z.ai/api/paas/v4/",
+    "groqcloud": "https://api.groq.com/openai/v1",
+    "cerebras": "https://api.cerebras.ai/v1",
+    "mistral": "https://api.mistral.ai/v1",
+    "together": "https://api.together.xyz/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "fireworks": "https://api.fireworks.ai/inference/v1",
+    "huggingface": "https://api-inference.huggingface.co",
+    "replicate": "https://api.replicate.com/v1",
+}
+
+
+class DefaultProviderConfig(ProviderConfigStrategy):
+    """Default configuration strategy for simple API key providers.
+
+    This strategy handles providers that:
+    - Use API key authentication
+    - Have a single endpoint
+    - Don't require special configuration
+
+    This eliminates the need for individual strategy classes for each provider.
+    """
+
+    def __init__(self, provider_name: str, base_url: Optional[str] = None):
+        """Initialize default provider config.
+
+        Args:
+            provider_name: The provider name
+            base_url: Optional base URL (uses default if not specified)
+        """
+        self._provider_name = provider_name
+        self._base_url = base_url or DEFAULT_PROVIDER_ENDPOINTS.get(provider_name)
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider_name
+
+    def get_settings(
+        self,
+        settings: "Settings",
+        base_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Get provider settings using default resolution."""
+        from victor.config.api_keys import get_api_key
+
+        result = dict(base_settings)
+
+        # Try to get API key from settings attribute first (for backwards compat)
+        settings_attr = f"{self._provider_name}_api_key"
+        api_key = getattr(settings, settings_attr, None) or get_api_key(self._provider_name)
+
+        if api_key:
+            result["api_key"] = api_key
+
+        # Set base URL if available
+        if self._base_url:
+            result.setdefault("base_url", self._base_url)
+
+        return result
+
+
+# =============================================================================
+# Complex Provider Strategies (OAuth, Multiple Endpoints, URL Detection)
+# =============================================================================
+
+# NOTE: Simple provider strategies below are deprecated.
+# Use DefaultProviderConfig instead for new providers.
+# Existing strategies kept for backward compatibility.
+
 
 class AnthropicConfig(ProviderConfigStrategy):
-    """Configuration strategy for Anthropic Claude."""
+    """Configuration strategy for Anthropic Claude.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -106,14 +193,8 @@ class AnthropicConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = settings.anthropic_api_key or get_api_key("anthropic")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.anthropic.com")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("anthropic").get_settings(settings, base_settings)
 
 
 class OpenAIConfig(ProviderConfigStrategy):
@@ -148,7 +229,11 @@ class OpenAIConfig(ProviderConfigStrategy):
 
 
 class GoogleConfig(ProviderConfigStrategy):
-    """Configuration strategy for Google/Gemini."""
+    """Configuration strategy for Google/Gemini.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -163,17 +248,16 @@ class GoogleConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = settings.google_api_key or get_api_key("google")
-        if api_key:
-            result["api_key"] = api_key
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("google").get_settings(settings, base_settings)
 
 
 class XAIConfig(ProviderConfigStrategy):
-    """Configuration strategy for xAI/Grok."""
+    """Configuration strategy for xAI/Grok.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -188,14 +272,8 @@ class XAIConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = getattr(settings, "xai_api_key", None) or get_api_key("xai")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.x.ai/v1")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("xai").get_settings(settings, base_settings)
 
 
 class OllamaConfig(ProviderConfigStrategy):
@@ -276,7 +354,11 @@ class VLLMConfig(ProviderConfigStrategy):
 
 
 class MoonshotConfig(ProviderConfigStrategy):
-    """Configuration strategy for Moonshot/Kimi."""
+    """Configuration strategy for Moonshot/Kimi.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -291,18 +373,16 @@ class MoonshotConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = get_api_key("moonshot")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.moonshot.cn/v1")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("moonshot").get_settings(settings, base_settings)
 
 
 class DeepSeekConfig(ProviderConfigStrategy):
-    """Configuration strategy for DeepSeek."""
+    """Configuration strategy for DeepSeek.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -313,18 +393,19 @@ class DeepSeekConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = get_api_key("deepseek")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.deepseek.com/v1")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("deepseek").get_settings(settings, base_settings)
 
 
 class ZAIConfig(ProviderConfigStrategy):
-    """Configuration strategy for Z.AI (ZhipuAI)."""
+    """Configuration strategy for Z.AI (ZhipuAI).
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+
+    Note: For GLM Coding Plan endpoint, use model suffix "glm-4.6:coding".
+    The ZAIProvider automatically detects the :coding suffix and uses the coding endpoint.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -339,41 +420,14 @@ class ZAIConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = get_api_key("zai")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.z.ai/api/paas/v4/")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("zai").get_settings(settings, base_settings)
 
 
-class ZAICodingPlanConfig(ProviderConfigStrategy):
-    """Configuration strategy for Z.AI GLM Coding Plan."""
-
-    @property
-    def provider_name(self) -> str:
-        return "zai-coding-plan"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["zai-coding", "glm-coding"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = get_api_key("zai")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.z.ai/api/coding/paas/v4/")
-        return result
-
+# NOTE: ZAICodingPlanConfig has been removed.
+# GLM Coding Plan endpoint should now be accessed via model suffix:
+#   Use model="glm-4.6:coding" instead of provider="zai-coding-plan"
+# The ZAIProvider automatically detects the :coding suffix and uses the coding endpoint.
 
 class QwenConfig(ProviderConfigStrategy):
     """Configuration strategy for Qwen (Alibaba Cloud)."""
@@ -409,7 +463,11 @@ class QwenConfig(ProviderConfigStrategy):
 
 
 class GroqCloudConfig(ProviderConfigStrategy):
-    """Configuration strategy for Groq Cloud."""
+    """Configuration strategy for Groq Cloud.
+
+    DEPRECATED: Use DefaultProviderConfig instead.
+    This strategy is kept for backward compatibility.
+    """
 
     @property
     def provider_name(self) -> str:
@@ -424,14 +482,8 @@ class GroqCloudConfig(ProviderConfigStrategy):
         settings: "Settings",
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
-        from victor.config.api_keys import get_api_key
-
-        result = dict(base_settings)
-        api_key = get_api_key("groqcloud")
-        if api_key:
-            result["api_key"] = api_key
-        result.setdefault("base_url", "https://api.groq.com/openai/v1")
-        return result
+        # Delegate to default strategy
+        return DefaultProviderConfig("groqcloud").get_settings(settings, base_settings)
 
 
 # =============================================================================
@@ -503,7 +555,12 @@ class ProviderConfigRegistry:
             if strategy:
                 return strategy.get_settings(settings, base_settings)
 
-            # Fallback: return base settings if no strategy
+            # Fallback to DefaultProviderConfig for simple API key providers
+            if provider in DEFAULT_PROVIDER_ENDPOINTS:
+                logger.debug(f"Using default config strategy for provider '{provider}'")
+                return DefaultProviderConfig(provider).get_settings(settings, base_settings)
+
+            # Last resort: return base settings if no strategy
             logger.debug(f"No config strategy for provider '{provider}', using base settings")
             return base_settings
 
@@ -552,7 +609,7 @@ def _register_builtin_providers(registry: ProviderConfigRegistry) -> None:
         DeepSeekConfig(),
         GroqCloudConfig(),
         ZAIConfig(),
-        ZAICodingPlanConfig(),
+        # NOTE: ZAICodingPlanConfig removed - use model suffix "glm-4.6:coding" instead
         QwenConfig(),
     ]
 
@@ -586,7 +643,11 @@ __all__ = [
     "ProviderConfigRegistry",
     "get_provider_config_registry",
     "register_provider_config",
+    # Default strategy (handles most simple API key providers)
+    "DefaultProviderConfig",
+    "DEFAULT_PROVIDER_ENDPOINTS",
     # Built-in strategies (for testing/extension)
+    # NOTE: Simple provider strategies below are deprecated - use DefaultProviderConfig
     "AnthropicConfig",
     "OpenAIConfig",
     "GoogleConfig",
@@ -598,6 +659,6 @@ __all__ = [
     "DeepSeekConfig",
     "GroqCloudConfig",
     "ZAIConfig",
-    "ZAICodingPlanConfig",
+    # NOTE: ZAICodingPlanConfig removed - use model suffix "glm-4.6:coding" instead
     "QwenConfig",
 ]

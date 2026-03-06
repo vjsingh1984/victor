@@ -37,7 +37,7 @@ from victor.ui.commands.keys import keys_app
 from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
-from victor.ui.commands.providers import providers_app, auth_app
+from victor.ui.commands.providers import providers_app
 from victor.ui.commands.rag import rag_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
@@ -49,6 +49,9 @@ from victor.ui.commands.sessions import sessions_app
 from victor.ui.commands.vertical import vertical_app
 from victor.ui.commands.analyze import app as analyze_app
 from victor.ui.commands.workflow import workflow_app
+
+# Import new unified auth command
+from victor.ui.commands.auth import auth_app
 
 app = typer.Typer(
     name="victor",
@@ -83,7 +86,8 @@ def doctor_command(
 
 # Register all the subcommands
 app.add_typer(analyze_app)
-app.add_typer(auth_app, name="auth", help="Manage OAuth authentication (shortcut for 'providers auth').")
+# Register unified auth command (comprehensive account management)
+app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
 app.add_typer(benchmark_app)
 app.add_typer(capabilities_app)
 app.add_typer(chat_app)

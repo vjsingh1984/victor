@@ -80,8 +80,21 @@ def keys(
         None, "--delete-oauth-client-id", help="Delete OAuth client_id from keyring"
     ),
 ):
-    """Manage API keys for cloud providers and external services."""
+    """Manage API keys for cloud providers and external services.
+
+    [yellow]Deprecated:[/] Use 'victor auth' instead for a more unified experience.
+    This command continues to work for backward compatibility.
+    """
     if ctx.invoked_subcommand is None:
+        # Show deprecation notice
+        console.print("[yellow]Note:[/] 'victor keys' is deprecated. Use 'victor auth' instead.")
+        console.print("[dim]New command features:[/]")
+        console.print("  • victor auth setup - Interactive setup wizard")
+        console.print("  • victor auth add - Quick add provider account")
+        console.print("  • victor auth list - List configured accounts")
+        console.print("  • victor auth test - Test provider connection")
+        console.print("[dim]Run: victor auth --help[/]")
+        console.print()
         if setup:
             _setup()
         elif delete_keyring:
