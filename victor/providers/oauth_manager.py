@@ -93,7 +93,9 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
     try:
         import keyring
 
-        keyring.set_password(KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}", client_id)
+        keyring.set_password(
+            KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}", client_id
+        )
         logger.info(f"OAuth client_id for {provider} stored in system keyring")
         return True
     except ImportError:
@@ -104,13 +106,22 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
         return False
 
 
+# Well-known public OAuth client IDs (shared by the ecosystem).
+# These are public clients (no secret) used by Codex CLI, Cline, Roo Code, etc.
+# See: https://github.com/openai/codex (codex-rs/core/src/auth.rs)
+_PUBLIC_OAUTH_CLIENT_IDS: Dict[str, str] = {
+    "openai": "app_EMoamEEZ73f0CkXaXp7hrann",
+}
+
+
 def _get_oauth_client_id(provider: str) -> str:
     """Get OAuth client_id for a provider.
 
     Resolution order:
     1. Environment variable (highest priority)
     2. System keyring (secure encrypted storage)
-    3. Error (no default - must be explicitly configured)
+    3. Well-known public client_id (OpenAI only — shared by Codex ecosystem)
+    4. Error (must be explicitly configured)
 
     Args:
         provider: Provider name (e.g., "openai", "qwen")
@@ -126,7 +137,9 @@ def _get_oauth_client_id(provider: str) -> str:
     if env_var:
         client_id = os.environ.get(env_var)
         if client_id:
-            logger.debug(f"OAuth client_id for {provider} loaded from environment variable {env_var}")
+            logger.debug(
+                f"OAuth client_id for {provider} loaded from environment variable {env_var}"
+            )
             return client_id
 
     # Priority 2: System keyring
@@ -135,15 +148,18 @@ def _get_oauth_client_id(provider: str) -> str:
         logger.debug(f"OAuth client_id for {provider} loaded from keyring")
         return keyring_client_id
 
+    # Priority 3: Well-known public client_id (OpenAI ecosystem)
+    public_id = _PUBLIC_OAUTH_CLIENT_IDS.get(provider)
+    if public_id:
+        logger.debug(f"OAuth client_id for {provider} using well-known public client_id")
+        return public_id
+
     # No client_id found
     raise ValueError(
         f"OAuth client_id for '{provider}' is not configured.\n"
         f"Set it using one of these methods:\n"
         f"  1. Environment variable: export {env_var or f'VICTOR_{provider.upper()}_OAUTH_CLIENT_ID'}=<your-client-id>\n"
         f"  2. Keyring: victor keys --set-oauth-client-id {provider}\n"
-        f"\n"
-        f"Note: You must register an OAuth application with {provider.upper()} to get a client_id.\n"
-        f"The placeholder in the code is not a real registered application."
     )
 
 
@@ -174,12 +190,18 @@ class OAuthProviderConfig:
 
     def to_sso_config(self) -> SSOConfig:
         """Convert to SSOConfig for use with SSOAuthenticator."""
+        # OpenAI uses /auth/callback (matching Codex CLI), others use /callback
+        if self.sso_provider == SSOProvider.OPENAI_CODEX:
+            redirect_uri = f"http://localhost:{self.redirect_port}/auth/callback"
+        else:
+            redirect_uri = f"http://localhost:{self.redirect_port}/callback"
+
         return SSOConfig(
             provider=self.sso_provider,
             issuer_url=self.issuer_url,
             client_id=self.get_client_id(),
             scopes=self.scopes,
-            redirect_uri=f"http://localhost:{self.redirect_port}/callback",
+            redirect_uri=redirect_uri,
             use_pkce=True,
         )
 
@@ -193,15 +215,21 @@ OAUTH_PROVIDERS: Dict[str, OAuthProviderConfig] = {
         provider_name="openai",
         sso_provider=SSOProvider.OPENAI_CODEX,
         issuer_url="https://auth.openai.com",
-        # client_id loaded from environment variable or keychain
-        scopes=["openid", "profile", "email", "offline_access"],
+        scopes=[
+            "openid",
+            "profile",
+            "email",
+            "offline_access",
+            "api.connectors.read",
+            "api.connectors.invoke",
+        ],
         token_endpoint="/oauth/token",
+        redirect_port=1455,
     ),
     "qwen": OAuthProviderConfig(
         provider_name="qwen",
         sso_provider=SSOProvider.QWEN,
         issuer_url="https://chat.qwen.ai",
-        # client_id loaded from environment variable or keychain
         scopes=["openid", "profile", "email", "offline_access"],
         token_endpoint="/oauth/token",
     ),
@@ -305,9 +333,7 @@ class OAuthTokenManager:
             "refresh_token": tokens.refresh_token,
             "id_token": tokens.id_token,
             "token_type": tokens.token_type,
-            "expires_at": (
-                tokens.expires_at.isoformat() if tokens.expires_at else None
-            ),
+            "expires_at": (tokens.expires_at.isoformat() if tokens.expires_at else None),
             "scopes": tokens.scopes,
         }
         self._write_all(all_tokens)

@@ -46,9 +46,12 @@ class TestOAuthProviderRegistry:
         assert cfg.provider_name == "openai"
         assert cfg.sso_provider == SSOProvider.OPENAI_CODEX
         assert cfg.issuer_url == "https://auth.openai.com"
-        assert cfg.client_id == "app_EMoamEEZ73f0CkXaXp7hrann"
+        assert cfg.get_client_id() == "app_EMoamEEZ73f0CkXaXp7hrann"
         assert "offline_access" in cfg.scopes
+        assert "api.connectors.read" in cfg.scopes
+        assert "api.connectors.invoke" in cfg.scopes
         assert cfg.token_endpoint == "/oauth/token"
+        assert cfg.redirect_port == 1455
 
     def test_qwen_registered(self):
         assert "qwen" in OAUTH_PROVIDERS
@@ -95,6 +98,9 @@ class TestSSOProviderExtensions:
         assert cfg.client_id == "app_EMoamEEZ73f0CkXaXp7hrann"
         assert cfg.use_pkce is True
         assert "offline_access" in cfg.scopes
+        assert "api.connectors.read" in cfg.scopes
+        assert "api.connectors.invoke" in cfg.scopes
+        assert cfg.redirect_uri == "http://localhost:1455/auth/callback"
 
     def test_for_qwen_factory(self):
         cfg = SSOConfig.for_qwen()
@@ -210,9 +216,7 @@ class TestOAuthTokenManagerLogin:
             refresh_token="new_refresh",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.login = AsyncMock(return_value=mock_tokens)
             tokens = await manager.login()
 
@@ -226,9 +230,7 @@ class TestOAuthTokenManagerLogin:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.login = AsyncMock(return_value=mock_tokens)
             await manager.login()
 
@@ -263,9 +265,7 @@ class TestOAuthTokenManagerRefresh:
             refresh_token="ref_tok",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.refresh = AsyncMock(return_value=new_tokens)
             result = await manager.refresh()
 
@@ -281,9 +281,7 @@ class TestOAuthTokenManagerRefresh:
             refresh_token="ref_tok",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.refresh = AsyncMock(return_value=new_tokens)
             await manager.refresh()
 
@@ -329,9 +327,7 @@ class TestOAuthTokenManagerGetValidToken:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.refresh = AsyncMock(return_value=refreshed)
             result = await manager.get_valid_token()
 
@@ -344,9 +340,7 @@ class TestOAuthTokenManagerGetValidToken:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
             MockAuth.return_value.login = AsyncMock(return_value=new_tokens)
             result = await manager.get_valid_token()
 
@@ -367,12 +361,8 @@ class TestOAuthTokenManagerGetValidToken:
             refresh_token="new_ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.oauth_manager.SSOAuthenticator"
-        ) as MockAuth:
-            MockAuth.return_value.refresh = AsyncMock(
-                side_effect=ValueError("refresh failed")
-            )
+        with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
+            MockAuth.return_value.refresh = AsyncMock(side_effect=ValueError("refresh failed"))
             MockAuth.return_value.login = AsyncMock(return_value=new_tokens)
             result = await manager.get_valid_token()
 
@@ -394,13 +384,9 @@ class TestOpenAIProviderOAuth:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.openai_provider.OAuthTokenManager"
-        ) as MockMgr:
+        with patch("victor.providers.openai_provider.OAuthTokenManager") as MockMgr:
             mock_instance = MagicMock()
-            mock_instance.get_valid_token = AsyncMock(
-                return_value="oauth_access_token"
-            )
+            mock_instance.get_valid_token = AsyncMock(return_value="oauth_access_token")
             mock_instance._load_cached = MagicMock(return_value=tokens)
             MockMgr.return_value = mock_instance
 
@@ -425,9 +411,7 @@ class TestOpenAIProviderOAuth:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.openai_provider.OAuthTokenManager"
-        ) as MockMgr:
+        with patch("victor.providers.openai_provider.OAuthTokenManager") as MockMgr:
             mock_instance = MagicMock()
             mock_instance.get_valid_token = AsyncMock(return_value="refreshed_tok")
             mock_instance._load_cached = MagicMock(return_value=tokens)

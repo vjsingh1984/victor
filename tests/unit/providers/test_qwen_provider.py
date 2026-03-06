@@ -14,6 +14,8 @@
 
 """TDD tests for Qwen provider with OAuth and API-key support."""
 
+import os
+
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -100,9 +102,7 @@ class TestQwenProviderOAuth:
             refresh_token="qwen_refresh",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.qwen_provider.OAuthTokenManager"
-        ) as MockMgr:
+        with patch("victor.providers.qwen_provider.OAuthTokenManager") as MockMgr:
             mock_instance = MagicMock()
             mock_instance.get_valid_token = AsyncMock(return_value="qwen_oauth_token")
             mock_instance._load_cached = MagicMock(return_value=tokens)
@@ -119,9 +119,7 @@ class TestQwenProviderOAuth:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.qwen_provider.OAuthTokenManager"
-        ) as MockMgr:
+        with patch("victor.providers.qwen_provider.OAuthTokenManager") as MockMgr:
             mock_instance = MagicMock()
             mock_instance.get_valid_token = AsyncMock(return_value="qwen_tok")
             mock_instance._load_cached = MagicMock(return_value=tokens)
@@ -138,9 +136,7 @@ class TestQwenProviderOAuth:
             refresh_token="ref",
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        with patch(
-            "victor.providers.qwen_provider.OAuthTokenManager"
-        ) as MockMgr:
+        with patch("victor.providers.qwen_provider.OAuthTokenManager") as MockMgr:
             mock_instance = MagicMock()
             mock_instance.get_valid_token = AsyncMock(return_value="initial")
             mock_instance._load_cached = MagicMock(return_value=tokens)
@@ -172,10 +168,12 @@ class TestQwenOAuthRegistry:
 
     def test_qwen_to_sso_config(self):
         cfg = OAUTH_PROVIDERS["qwen"]
-        sso = cfg.to_sso_config()
+        with patch.dict(os.environ, {"VICTOR_QWEN_OAUTH_CLIENT_ID": "test-qwen-id"}):
+            sso = cfg.to_sso_config()
         assert isinstance(sso, SSOConfig)
         assert sso.provider == SSOProvider.QWEN
         assert sso.use_pkce is True
+        assert sso.client_id == "test-qwen-id"
 
 
 # ---------------------------------------------------------------------------
@@ -381,9 +379,7 @@ class TestQwenStream:
     async def test_stream_error(self, provider):
         from victor.providers.base import ProviderError
 
-        provider.client.chat.completions.create = AsyncMock(
-            side_effect=Exception("stream failed")
-        )
+        provider.client.chat.completions.create = AsyncMock(side_effect=Exception("stream failed"))
         messages = [Message(role="user", content="Hi")]
         with pytest.raises(ProviderError):
             async for _ in provider.stream(messages=messages):
@@ -403,9 +399,7 @@ class TestQwenStream:
         provider.client.chat.completions.create = AsyncMock(return_value=mock_stream())
         messages = [Message(role="user", content="Do it")]
         tools = [
-            ToolDefinition(
-                name="test_tool", description="Test", parameters={"type": "object"}
-            )
+            ToolDefinition(name="test_tool", description="Test", parameters={"type": "object"})
         ]
         chunks = []
         async for c in provider.stream(messages=messages, tools=tools):

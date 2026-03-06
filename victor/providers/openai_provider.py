@@ -81,6 +81,10 @@ class OpenAIProvider(BaseProvider):
         self._oauth_manager: Optional[OAuthTokenManager] = None
 
         if auth_mode == "oauth":
+            # OAuth mode uses ChatGPT subscription via Codex API endpoint
+            if base_url is None:
+                base_url = "https://chatgpt.com/backend-api/codex"
+
             self._oauth_manager = OAuthTokenManager("openai")
             # Use pre-obtained tokens or load cached (sync-safe)
             if oauth_tokens is not None:

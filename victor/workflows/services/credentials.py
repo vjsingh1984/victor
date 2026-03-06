@@ -791,12 +791,22 @@ class SSOConfig:
 
         Uses OpenAI's public OAuth client for ChatGPT Plus/Pro/Enterprise
         subscription-based access. See FEP-0004.
+
+        Scopes and endpoints sourced from openai/codex (codex-rs/login/src/server.rs).
         """
         return cls(
             provider=SSOProvider.OPENAI_CODEX,
             issuer_url="https://auth.openai.com",
             client_id="app_EMoamEEZ73f0CkXaXp7hrann",
-            scopes=["openid", "profile", "email", "offline_access"],
+            scopes=[
+                "openid",
+                "profile",
+                "email",
+                "offline_access",
+                "api.connectors.read",
+                "api.connectors.invoke",
+            ],
+            redirect_uri="http://localhost:1455/auth/callback",
             use_pkce=True,
         )
 
@@ -953,6 +963,11 @@ class SSOAuthenticator:
         if self.config.audience:
             auth_params["audience"] = self.config.audience
 
+        # OpenAI Codex-specific params (from openai/codex server.rs)
+        if self.config.provider == SSOProvider.OPENAI_CODEX:
+            auth_params["codex_cli_simplified_flow"] = "true"
+            auth_params["originator"] = "victor"
+
         auth_url = f"{self.config.issuer_url}/authorize?{urllib.parse.urlencode(auth_params)}"
 
         # Start local callback server
@@ -985,9 +1000,10 @@ class SSOAuthenticator:
         from aiohttp import web
 
         app = web.Application()
-        app.router.add_get("/callback", handle_callback)
-
         parsed_redirect = urllib.parse.urlparse(self.config.redirect_uri)
+        callback_path = parsed_redirect.path or "/callback"
+        app.router.add_get(callback_path, handle_callback)
+
         port = parsed_redirect.port or 8400
 
         runner = web.AppRunner(app)
