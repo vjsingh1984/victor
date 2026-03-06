@@ -98,7 +98,8 @@ class SerializationMetricsCollector:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with self._get_connection() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS serialization_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -118,21 +119,28 @@ class SerializationMetricsCollector:
                     analysis_time_ms REAL,
                     encoding_time_ms REAL
                 )
-            """)
+            """
+            )
 
             # Create indices for common queries
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_metrics_tool
                 ON serialization_metrics(tool_name)
-            """)
-            conn.execute("""
+            """
+            )
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_metrics_format
                 ON serialization_metrics(format_selected)
-            """)
-            conn.execute("""
+            """
+            )
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_metrics_timestamp
                 ON serialization_metrics(timestamp)
-            """)
+            """
+            )
 
             conn.commit()
 
@@ -255,7 +263,8 @@ class SerializationMetricsCollector:
 
         try:
             with self._get_connection() as conn:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT
                         format_selected,
                         COUNT(*) as usage_count,
@@ -264,7 +273,8 @@ class SerializationMetricsCollector:
                     FROM serialization_metrics
                     GROUP BY format_selected
                     ORDER BY usage_count DESC
-                    """)
+                    """
+                )
 
                 return [
                     {
@@ -290,7 +300,8 @@ class SerializationMetricsCollector:
 
         try:
             with self._get_connection() as conn:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT
                         COUNT(*) as total_serializations,
                         AVG(token_savings_percent) as avg_savings,
@@ -298,7 +309,8 @@ class SerializationMetricsCollector:
                         SUM(serialized_tokens) as total_serialized_tokens,
                         SUM(original_tokens - serialized_tokens) as total_tokens_saved
                     FROM serialization_metrics
-                    """)
+                    """
+                )
                 row = cursor.fetchone()
 
                 if row and row["total_serializations"] > 0:

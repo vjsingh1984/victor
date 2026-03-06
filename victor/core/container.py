@@ -441,6 +441,7 @@ class ServiceContainer:
         Raises:
             ServiceAlreadyRegisteredError: If service type already registered
         """
+
         def decorator(cls: Type[T]) -> Type[T]:
             with self._lock:
                 if service_type in self._descriptors:
@@ -496,9 +497,7 @@ class ServiceContainer:
                 try:
                     return bool(instance.is_healthy())
                 except Exception as e:
-                    logger.warning(
-                        f"Health check for {service_type.__name__} failed: {e}"
-                    )
+                    logger.warning(f"Health check for {service_type.__name__} failed: {e}")
                     return False
 
             # No is_healthy method, consider service healthy if it exists

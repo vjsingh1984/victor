@@ -48,7 +48,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from victor.integrations.search_types import CodeSearchResult
+from victor.integrations.api.change_tracker_ops import (
+    apply_patch_request,
+    change_history,
+    create_patch_request,
+    redo_last_change,
+    undo_last_change,
+)
 from victor.integrations.api.event_bridge import EventBridge
 from victor.integrations.api.graph_export import (
     export_graph_schema,
@@ -357,6 +363,12 @@ class VictorFastAPIServer:
         self.hitl_auth_token = hitl_auth_token
         self.hitl_persistent = hitl_persistent
         self._enable_graphql = enable_graphql
+
+        from victor.config.settings import load_settings
+        from victor.core.bootstrap import ensure_bootstrapped
+
+        self._settings = load_settings()
+        self._container = ensure_bootstrapped(self._settings)
 
         self._orchestrator = None
         self._ws_clients: List[WebSocket] = []
@@ -960,48 +972,29 @@ class VictorFastAPIServer:
         @app.post("/undo", tags=["History"])
         async def undo() -> JSONResponse:
             """Undo last change."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.undo()
-
-            return JSONResponse({"success": success, "message": message, "files": files})
+            return JSONResponse(undo_last_change())
 
         @app.post("/redo", tags=["History"])
         async def redo() -> JSONResponse:
             """Redo last undone change."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.redo()
-
-            return JSONResponse({"success": success, "message": message, "files": files})
+            return JSONResponse(redo_last_change())
 
         @app.get("/history", tags=["History"])
         async def history(limit: int = Query(10, ge=1, le=100)) -> JSONResponse:
             """Get change history."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            hist = tracker.get_history(limit=limit)
-
-            return JSONResponse({"history": hist})
+            return JSONResponse(change_history(limit))
 
         # Patch operations
         @app.post("/patch/apply", tags=["Patch"])
         async def apply_patch(request: PatchApplyRequest) -> JSONResponse:
             """Apply a patch."""
-            from victor.tools import patch_tool
-
-            result = await patch_tool.apply_patch(patch=request.patch, dry_run=request.dry_run)
+            result = await apply_patch_request(patch=request.patch, dry_run=request.dry_run)
             return JSONResponse(result)
 
         @app.post("/patch/create", tags=["Patch"])
         async def create_patch(request: PatchCreateRequest) -> JSONResponse:
             """Create a patch."""
-            from victor.tools import patch_tool
-
-            result = await patch_tool.create_patch(
+            result = await create_patch_request(
                 file_path=request.file_path, new_content=request.new_content
             )
             return JSONResponse(result)
@@ -3199,9 +3192,8 @@ Respond with just the command to run."""
         """Get or create the orchestrator."""
         if self._orchestrator is None:
             from victor.agent.orchestrator import AgentOrchestrator
-            from victor.config.settings import load_settings
 
-            settings = load_settings()
+            settings = self._settings
             self._orchestrator = await AgentOrchestrator.from_settings(settings)
 
         return self._orchestrator

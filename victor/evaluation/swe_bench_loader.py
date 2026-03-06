@@ -656,9 +656,13 @@ class SWEBenchWorkspaceManager:
 
         try:
             # Run indexer on the repo with embeddings enabled for semantic search
-            from victor_coding.codebase.indexer import CodebaseIndex
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
-            indexer = CodebaseIndex(cache_path, use_embeddings=True)
+            factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+            if factory is None:
+                raise ImportError("Codebase indexing not available")
+            indexer = factory.create(root_path=str(cache_path), use_embeddings=True)
             await indexer.index_codebase()
 
             # Mark as indexed

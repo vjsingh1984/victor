@@ -6,7 +6,7 @@ when integrated with actual workflows and operations from each vertical.
 
 import pytest
 from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-from victor.coding.safety import create_all_coding_safety_rules
+from victor_coding.safety import create_all_coding_safety_rules
 from victor.devops.safety import create_all_devops_safety_rules
 from victor.rag.safety import create_all_rag_safety_rules
 from victor.research.safety import create_all_research_safety_rules

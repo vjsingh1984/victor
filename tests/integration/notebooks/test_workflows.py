@@ -33,6 +33,7 @@ class TestWorkflowsNotebook:
     @pytest.mark.asyncio
     async def test_simple_stategraph_workflow(self):
         """Test a simple StateGraph workflow."""
+
         class ProcessState(typing.TypedDict):
             input: str
             analysis: str
@@ -69,6 +70,7 @@ class TestWorkflowsNotebook:
     @pytest.mark.asyncio
     async def test_conditional_workflow(self):
         """Test a workflow with conditional logic."""
+
         class ReviewState(typing.TypedDict):
             rating: int
             approved: bool
@@ -153,11 +155,7 @@ class TestWorkflowsNotebook:
 
         app = graph.compile()
 
-        result = await app.invoke(ParallelState(
-            task1_result="",
-            task2_result="",
-            task3_result=""
-        ))
+        result = await app.invoke(ParallelState(task1_result="", task2_result="", task3_result=""))
 
         assert result.success is True
         assert result.state["task1_result"] == "done1"
@@ -167,6 +165,7 @@ class TestWorkflowsNotebook:
     @pytest.mark.asyncio
     async def test_workflow_with_checkpointing(self):
         """Test workflow with checkpoint/save functionality."""
+
         class CounterState(typing.TypedDict):
             count: int
             doubled: int

@@ -385,9 +385,7 @@ class SafetyCoordinator:
         """
         return self._rule_index.get(rule_id)
 
-    def list_rules(
-        self, category: Optional[SafetyCategory] = None
-    ) -> List[SafetyRule]:
+    def list_rules(self, category: Optional[SafetyCategory] = None) -> List[SafetyRule]:
         """List registered safety rules.
 
         Args:
@@ -439,9 +437,7 @@ class SafetyCoordinator:
                 matched_rules.append(rule)
 
                 # Update stats
-                self._stats.rule_hits[rule.rule_id] = (
-                    self._stats.rule_hits.get(rule.rule_id, 0) + 1
-                )
+                self._stats.rule_hits[rule.rule_id] = self._stats.rule_hits.get(rule.rule_id, 0) + 1
 
                 # Collect warnings
                 if rule.action == SafetyAction.WARN:

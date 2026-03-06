@@ -26,6 +26,7 @@ from victor.tools.file_editor_tool import edit
 
 try:
     import victor_coding  # noqa: F401
+
     _has_victor_coding = True
 except ImportError:
     _has_victor_coding = False

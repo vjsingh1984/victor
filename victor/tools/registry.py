@@ -104,10 +104,14 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._strategy_registry: Optional["ToolRegistrationStrategyRegistry"] = None
         try:
             from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
             if get_feature_flag_manager().is_enabled(
                 FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
             ):
-                from victor.tools.registration.registry import get_tool_registration_strategy_registry
+                from victor.tools.registration.registry import (
+                    get_tool_registration_strategy_registry,
+                )
+
                 self._strategy_registry = get_tool_registration_strategy_registry()
         except ImportError:
             pass  # Feature flags not available
@@ -252,9 +256,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         strategy = self._strategy_registry.get_strategy_for(tool)
         if strategy is None:
-            raise TypeError(
-                f"No registration strategy found for tool type: {type(tool)}"
-            )
+            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
 
         strategy.register(self, tool, enabled)
         self._invalidate_schema_cache()

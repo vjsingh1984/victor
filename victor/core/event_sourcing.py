@@ -623,7 +623,8 @@ class SQLiteEventStore(EventStore):
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self._db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS events (
                     global_position INTEGER PRIMARY KEY AUTOINCREMENT,
                     stream_id TEXT NOT NULL,
@@ -634,19 +635,24 @@ class SQLiteEventStore(EventStore):
                     stored_at TEXT NOT NULL,
                     UNIQUE(stream_id, stream_version)
                 )
-                """)
-            conn.execute("""
+                """
+            )
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_events_stream
                 ON events(stream_id, stream_version)
-                """)
-            conn.execute("""
+                """
+            )
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS snapshots (
                     stream_id TEXT PRIMARY KEY,
                     version INTEGER NOT NULL,
                     snapshot_data TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 )
-                """)
+                """
+            )
             conn.commit()
 
     async def append(

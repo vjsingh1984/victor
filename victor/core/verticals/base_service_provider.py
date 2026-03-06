@@ -40,6 +40,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, List, Type
 
+from victor.core.service_specs import VERTICAL_EXTENSION_SPECS
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
 if TYPE_CHECKING:
@@ -128,23 +129,45 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             container: DI container to register services in
             settings: Application settings
         """
-        from victor.core.container import ServiceLifetime
-        from victor.core.verticals.protocols import (
-            ModeConfigProviderProtocol,
-            ToolDependencyProviderProtocol,
-        )
+        specs: List[ServiceRegistrationSpec] = []
 
-        # Register mode config provider if vertical has one
-        self._register_mode_config(container, settings)
+        mode_config_provider = self._get_mode_config_provider()
+        if mode_config_provider is not None:
+            specs.append(
+                ServiceRegistrationSpec(
+                    protocol=ModeConfigProviderProtocol,
+                    factory=lambda _: mode_config_provider,
+                )
+            )
 
-        # Register tool dependency provider if vertical has one
-        self._register_tool_dependencies(container, settings)
+        tool_dep_provider = self._get_tool_dependency_provider()
+        if tool_dep_provider is not None:
+            specs.append(
+                ServiceRegistrationSpec(
+                    protocol=ToolDependencyProviderProtocol,
+                    factory=lambda _: tool_dep_provider,
+                )
+            )
 
-        # Register prompt contributor if vertical has one
-        self._register_prompts(container, settings)
+        prompt_contributor = self._get_prompt_contributor()
+        if prompt_contributor is not None:
+            specs.append(
+                ServiceRegistrationSpec(
+                    protocol=VerticalPromptProtocol,
+                    factory=lambda _: prompt_contributor,
+                )
+            )
 
-        # Register safety extension if vertical has one
-        self._register_safety(container, settings)
+        safety_extension = self._get_safety_extension()
+        if safety_extension is not None:
+            specs.append(
+                ServiceRegistrationSpec(
+                    protocol=VerticalSafetyProtocol,
+                    factory=lambda _: safety_extension,
+                )
+            )
+
+        register_services_from_specs(container, specs)
 
         logger.info("Registered %s vertical services", self.vertical_name)
 

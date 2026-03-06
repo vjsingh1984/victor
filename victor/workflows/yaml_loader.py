@@ -104,6 +104,8 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHE
 
 import yaml
 
+from victor.core.yaml_utils import safe_load as yaml_safe_load
+
 # =============================================================================
 # Enums for controlled values (code maintenance)
 # =============================================================================
@@ -692,7 +694,7 @@ def _resolve_ref(
 
         try:
             content = full_path.read_text()
-            ref_cache[cache_key] = yaml.safe_load(content)
+            ref_cache[cache_key] = yaml_safe_load(content)
         except yaml.YAMLError as e:
             raise YAMLWorkflowError(f"Invalid YAML in referenced file {full_path}: {e}")
 
@@ -1430,7 +1432,7 @@ def load_workflow_from_yaml(
         otherwise Dict of all workflows
     """
     try:
-        data = yaml.safe_load(yaml_content)
+        data = yaml_safe_load(yaml_content)
     except yaml.YAMLError as e:
         raise YAMLWorkflowError(f"Invalid YAML: {e}")
 

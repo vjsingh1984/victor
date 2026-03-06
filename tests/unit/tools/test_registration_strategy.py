@@ -60,11 +60,7 @@ class TestFunctionDecoratorStrategy:
 
         strategy.register(registry, mock_tool)
 
-        registry._register_direct.assert_called_once_with(
-            "test_tool",
-            mock_tool.Tool,
-            True
-        )
+        registry._register_direct.assert_called_once_with("test_tool", mock_tool.Tool, True)
 
     def test_priority(self):
         """Test strategy priority."""
@@ -84,9 +80,10 @@ class TestBaseToolSubclassStrategy:
         mock_tool.name = "test_tool"
 
         # Mock the import check
-        with mock.patch.dict('sys.modules', {'victor.tools.base': mock.Mock()}):
+        with mock.patch.dict("sys.modules", {"victor.tools.base": mock.Mock()}):
             from victor.tools.base import BaseTool as MockBaseTool
-            MockBaseTool = type('BaseTool', (object,), {})
+
+            MockBaseTool = type("BaseTool", (object,), {})
             mock_tool.__class__ = MockBaseTool
 
         # For testing, we'll just check the structure
@@ -102,11 +99,7 @@ class TestBaseToolSubclassStrategy:
 
         strategy.register(registry, mock_tool)
 
-        registry._register_direct.assert_called_once_with(
-            "test_tool",
-            mock_tool,
-            True
-        )
+        registry._register_direct.assert_called_once_with("test_tool", mock_tool, True)
 
     def test_priority(self):
         """Test strategy priority."""
@@ -121,11 +114,7 @@ class TestMCPDictStrategy:
         """Test identifying MCP dictionary tools."""
         strategy = MCPDictStrategy()
 
-        tool_dict = {
-            "name": "test_tool",
-            "description": "Test description",
-            "parameters": {}
-        }
+        tool_dict = {"name": "test_tool", "description": "Test description", "parameters": {}}
 
         assert strategy.can_handle(tool_dict) is True
 
@@ -175,7 +164,9 @@ class TestToolRegistrationStrategyRegistry:
         registry2 = ToolRegistrationStrategyRegistry.get_instance()
 
         # get_instance should return the same instance
-        assert registry2 is registry1 or registry2 is ToolRegistrationStrategyRegistry.get_instance()
+        assert (
+            registry2 is registry1 or registry2 is ToolRegistrationStrategyRegistry.get_instance()
+        )
 
     def test_default_strategies_registered(self):
         """Test that default strategies are registered."""

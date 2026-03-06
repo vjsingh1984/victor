@@ -266,9 +266,7 @@ class CapabilityComposer(BaseComposer):
         # Inject stages capability if present
         stages = self.get_capability("stages")
         if isinstance(stages, StagesCapability):
-            ComposedVertical.get_stages = classmethod(
-                lambda cls: stages.stages
-            )
+            ComposedVertical.get_stages = classmethod(lambda cls: stages.stages)
 
         # Inject extensions capability if present
         extensions = self.get_capability("extensions")

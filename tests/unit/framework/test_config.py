@@ -478,7 +478,9 @@ class TestVerticalSafetyIntegration:
     # - victor-dataanalysis: tests/test_safety.py (PII, export rules)
     # - victor-coding: tests/safety/test_safety_integration.py (all coding rules)
 
-    @pytest.mark.skip(reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class")
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_repository_rules(self):
         """Benchmark repository safety rules should block operations outside workspace."""
         from victor.benchmark.safety import create_benchmark_repository_safety_rules
@@ -505,7 +507,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "git" in reason.lower() or "blocked" in reason.lower()
 
-    @pytest.mark.skip(reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class")
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_resource_rules(self):
         """Benchmark resource safety rules should block excessive resource usage."""
         from victor.benchmark.safety import create_benchmark_resource_safety_rules
@@ -523,7 +527,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "budget" in reason.lower() or "blocked" in reason.lower()
 
-    @pytest.mark.skip(reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class")
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_test_rules(self):
         """Benchmark test safety rules should block production test runs."""
         from victor.benchmark.safety import create_benchmark_test_safety_rules
@@ -550,7 +556,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "destructive" in reason.lower() or "blocked" in reason.lower()
 
-    @pytest.mark.skip(reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class")
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_data_rules(self):
         """Benchmark data safety rules should block external data uploads."""
         from victor.benchmark.safety import create_benchmark_data_safety_rules
@@ -586,7 +594,9 @@ class TestVerticalSafetyIntegration:
             or "blocked" in reason.lower()
         )
 
-    @pytest.mark.skip(reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class")
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_create_all_benchmark_safety_rules(self):
         """create_all_benchmark_safety_rules should register all benchmark rules."""
         from victor.benchmark.safety import create_all_benchmark_safety_rules

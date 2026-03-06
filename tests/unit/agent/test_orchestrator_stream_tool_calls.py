@@ -99,12 +99,15 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     )
 
     dummy_tool = DummyTool()
-    orch.tools = ToolRegistry()
     orch.tools.register(dummy_tool)
     # Update all components that reference the tools registry
     orch.tool_executor.tools = orch.tools
     orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
     orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
+    # Ensure is_tool_enabled returns True for our test tool
+    orch.is_tool_enabled = lambda name: name == "dummy_tool" or name in {
+        t.name for t in orch.tools.list_tools()
+    }
 
     # Bypass heavy semantic selector; return just our dummy tool definition
     orch._select_tools = lambda *args, **kwargs: [

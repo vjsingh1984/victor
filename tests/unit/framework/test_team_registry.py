@@ -314,6 +314,7 @@ def _has_external_vertical_packages() -> bool:
     """Check if external vertical packages are installed."""
     try:
         import victor_coding.teams  # noqa: F401
+
         return True
     except ImportError:
         return False

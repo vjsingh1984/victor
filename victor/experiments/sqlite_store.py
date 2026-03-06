@@ -82,7 +82,8 @@ class SQLiteStorage:
         cursor = conn.cursor()
 
         # Experiments table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS experiments (
                 experiment_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -103,10 +104,12 @@ class SQLiteStorage:
                 completed_at TEXT,
                 FOREIGN KEY (parent_id) REFERENCES experiments(experiment_id)
             )
-        """)
+        """
+        )
 
         # Runs table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS runs (
                 run_id TEXT PRIMARY KEY,
                 experiment_id TEXT NOT NULL,
@@ -128,10 +131,12 @@ class SQLiteStorage:
                 artifact_size_bytes INTEGER DEFAULT 0,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         # Metrics table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
@@ -141,10 +146,12 @@ class SQLiteStorage:
                 step INTEGER,
                 FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         # Artifacts table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS artifacts (
                 artifact_id TEXT PRIMARY KEY,
                 run_id TEXT NOT NULL,
@@ -156,7 +163,8 @@ class SQLiteStorage:
                 metadata TEXT,
                 FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         # Create indexes for performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_experiments_status ON experiments(status)")

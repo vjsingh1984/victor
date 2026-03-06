@@ -22,9 +22,9 @@ class TestFeatureFlagIntegration:
     def test_flag_env_var_name(self):
         assert FeatureFlag.USE_SERVICE_LAYER.get_env_var_name() == "VICTOR_USE_SERVICE_LAYER"
 
-    def test_flag_disabled_by_default(self):
+    def test_flag_enabled_by_default(self):
         manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is False
+        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is True
 
     def test_flag_enabled_via_env(self, monkeypatch):
         monkeypatch.setenv("VICTOR_USE_SERVICE_LAYER", "true")
@@ -47,18 +47,22 @@ class TestAdapterImports:
 
     def test_import_chat_adapter(self):
         from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
+
         assert ChatServiceAdapter is not None
 
     def test_import_tool_adapter(self):
         from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
+
         assert ToolServiceAdapter is not None
 
     def test_import_context_adapter(self):
         from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
         assert ContextServiceAdapter is not None
 
     def test_import_session_adapter(self):
         from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
+
         assert SessionServiceAdapter is not None
 
     def test_import_all_from_package(self):
@@ -68,12 +72,15 @@ class TestAdapterImports:
             ContextServiceAdapter,
             SessionServiceAdapter,
         )
-        assert all([
-            ChatServiceAdapter,
-            ToolServiceAdapter,
-            ContextServiceAdapter,
-            SessionServiceAdapter,
-        ])
+
+        assert all(
+            [
+                ChatServiceAdapter,
+                ToolServiceAdapter,
+                ContextServiceAdapter,
+                SessionServiceAdapter,
+            ]
+        )
 
 
 class TestAdapterProtocolConformance:
@@ -81,6 +88,7 @@ class TestAdapterProtocolConformance:
 
     def test_chat_adapter_has_required_methods(self):
         from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
+
         adapter = ChatServiceAdapter(MagicMock())
         assert callable(getattr(adapter, "chat", None))
         assert callable(getattr(adapter, "stream_chat", None))
@@ -90,6 +98,7 @@ class TestAdapterProtocolConformance:
 
     def test_tool_adapter_has_required_methods(self):
         from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
+
         adapter = ToolServiceAdapter(MagicMock())
         assert callable(getattr(adapter, "get_available_tools", None))
         assert callable(getattr(adapter, "get_enabled_tools", None))
@@ -101,6 +110,7 @@ class TestAdapterProtocolConformance:
 
     def test_session_adapter_has_required_methods(self):
         from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
+
         adapter = SessionServiceAdapter(MagicMock())
         assert callable(getattr(adapter, "get_recent_sessions", None))
         assert callable(getattr(adapter, "recover_session", None))
@@ -111,6 +121,7 @@ class TestAdapterProtocolConformance:
 
     def test_context_adapter_has_required_methods(self):
         from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
+
         adapter = ContextServiceAdapter(MagicMock())
         assert callable(getattr(adapter, "get_context_metrics", None))
         assert callable(getattr(adapter, "compact_context", None))

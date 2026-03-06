@@ -14,6 +14,7 @@ serve_app = typer.Typer(
 console = Console()
 logger = logging.getLogger(__name__)
 
+
 @serve_app.callback(invoke_without_command=True)
 def serve(
     ctx: typer.Context,
@@ -273,12 +274,17 @@ async def _run_hitl_server(
     """Run the HITL API server."""
     try:
         import uvicorn
+        from victor.config.settings import load_settings
+        from victor.core.bootstrap import ensure_bootstrapped
 
         from victor.workflows.hitl_api import (
             HITLStore,
             SQLiteHITLStore,
             create_hitl_app,
         )
+
+        settings = load_settings()
+        ensure_bootstrapped(settings)
 
         # Create appropriate store
         if persistent:

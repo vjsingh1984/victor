@@ -93,9 +93,11 @@ class FunctionDecoratorStrategy:
             tool: Tool object to check
 
         Returns:
-            True if tool has _is_victor_tool attribute
+            True if tool has _is_victor_tool or Tool attribute (from @tool decorator)
         """
-        return callable(tool) and hasattr(tool, "_is_victor_tool")
+        return callable(tool) and (
+            hasattr(tool, "_is_victor_tool") or hasattr(tool, "Tool")
+        )
 
     def register(
         self,
@@ -147,6 +149,7 @@ class BaseToolSubclassStrategy:
         """
         try:
             from victor.tools.base import BaseTool
+
             return isinstance(tool, BaseTool)
         except ImportError:
             return False

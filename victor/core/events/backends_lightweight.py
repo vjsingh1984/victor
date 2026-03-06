@@ -46,9 +46,10 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import sqlite3
+
+from victor.core.json_utils import json_dumps, json_loads
 import threading
 import time
 import uuid
@@ -158,16 +159,18 @@ class SQLiteEventBackend:
         if self._is_connected:
             return
 
-        # Create connection (SQLite is sync, but we wrap it)
+        # Create connection with WAL mode for concurrent reads + writes
         self._conn = sqlite3.connect(
             self._db_path,
             check_same_thread=False,
-            isolation_level=None,  # Autocommit mode
         )
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
 
         # Create schema
-        self._conn.execute("""
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id TEXT UNIQUE NOT NULL,
@@ -181,16 +184,22 @@ class SQLiteEventBackend:
                 delivery_guarantee TEXT,
                 created_at REAL DEFAULT (strftime('%s', 'now'))
             )
-        """)
-        self._conn.execute("""
+        """
+        )
+        self._conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_events_topic ON events(topic)
-        """)
-        self._conn.execute("""
+        """
+        )
+        self._conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at)
-        """)
+        """
+        )
 
         # Create delivery tracking table
-        self._conn.execute("""
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS event_deliveries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id INTEGER NOT NULL,
@@ -200,7 +209,8 @@ class SQLiteEventBackend:
                 FOREIGN KEY (event_id) REFERENCES events(id),
                 UNIQUE(event_id, subscription_id)
             )
-        """)
+        """
+        )
 
         self._is_connected = True
 
@@ -242,6 +252,27 @@ class SQLiteEventBackend:
         except Exception:
             return False
 
+    def _event_row(self, event: MessagingEvent) -> tuple:
+        """Build a parameter tuple for an INSERT."""
+        return (
+            event.id,
+            event.topic,
+            json_dumps(event.data),
+            event.timestamp,
+            event.source,
+            event.correlation_id,
+            event.partition_key,
+            json_dumps(event.headers),
+            event.delivery_guarantee.value,
+        )
+
+    _INSERT_SQL = """
+        INSERT INTO events (
+            event_id, topic, data, timestamp, source,
+            correlation_id, partition_key, headers, delivery_guarantee
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+
     async def publish(self, event: MessagingEvent) -> bool:
         """Publish event to database.
 
@@ -255,25 +286,8 @@ class SQLiteEventBackend:
             raise EventPublishError(event, "Backend not connected", retryable=True)
 
         try:
-            self._conn.execute(
-                """
-                INSERT INTO events (
-                    event_id, topic, data, timestamp, source,
-                    correlation_id, partition_key, headers, delivery_guarantee
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event.id,
-                    event.topic,
-                    json.dumps(event.data),
-                    event.timestamp,
-                    event.source,
-                    event.correlation_id,
-                    event.partition_key,
-                    json.dumps(event.headers),
-                    event.delivery_guarantee.value,
-                ),
-            )
+            self._conn.execute(self._INSERT_SQL, self._event_row(event))
+            self._conn.commit()
             return True
         except sqlite3.IntegrityError:
             # Duplicate event ID
@@ -283,15 +297,38 @@ class SQLiteEventBackend:
             raise EventPublishError(event, str(e), retryable=True)
 
     async def publish_batch(self, events: List[MessagingEvent]) -> int:
-        """Publish multiple events."""
-        success_count = 0
+        """Publish multiple events in a single transaction."""
+        if not self._is_connected or not self._conn:
+            return 0
+
+        rows = []
         for event in events:
             try:
-                if await self.publish(event):
-                    success_count += 1
-            except EventPublishError:
+                rows.append(self._event_row(event))
+            except Exception:
                 continue
-        return success_count
+
+        if not rows:
+            return 0
+
+        try:
+            self._conn.executemany(self._INSERT_SQL, rows)
+            self._conn.commit()
+            return len(rows)
+        except sqlite3.IntegrityError:
+            # Fall back to one-by-one for partial success on duplicates
+            success_count = 0
+            for row in rows:
+                try:
+                    self._conn.execute(self._INSERT_SQL, row)
+                    self._conn.commit()
+                    success_count += 1
+                except sqlite3.IntegrityError:
+                    continue
+            return success_count
+        except Exception as e:
+            logger.error(f"Batch publish failed: {e}")
+            return 0
 
     async def subscribe(
         self,
@@ -402,12 +439,12 @@ class SQLiteEventBackend:
                 event = MessagingEvent(
                     id=row["event_id"],
                     topic=row["topic"],
-                    data=json.loads(row["data"]),
+                    data=json_loads(row["data"]),
                     timestamp=row["timestamp"],
                     source=row["source"],
                     correlation_id=row["correlation_id"],
                     partition_key=row["partition_key"],
-                    headers=json.loads(row["headers"] or "{}"),
+                    headers=json_loads(row["headers"] or "{}"),
                     delivery_guarantee=DeliveryGuarantee(row["delivery_guarantee"]),
                 )
 

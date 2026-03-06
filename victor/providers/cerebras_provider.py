@@ -562,7 +562,17 @@ class CerebrasProvider(BaseProvider):
                     raise
 
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                if any(
+                    term in error_str
+                    for term in [
+                        "auth",
+                        "unauthorized",
+                        "invalid key",
+                        "invalid api",
+                        "api_key",
+                        "401",
+                    ]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,
@@ -880,13 +890,22 @@ class CerebrasProvider(BaseProvider):
                 provider=self.name,
                 raw_error=error,
             )
-        elif "invalid api" in error_msg.lower() or "invalid key" in error_msg.lower() or "api_key" in error_msg.lower():
+        elif (
+            "invalid api" in error_msg.lower()
+            or "invalid key" in error_msg.lower()
+            or "api_key" in error_msg.lower()
+        ):
             raise ProviderAuthError(
                 message=f"Authentication failed: {error_msg}",
                 provider=self.name,
                 raw_error=error,
             )
-        elif "rate limit" in error_msg.lower() or "rate_limit" in error_msg.lower() or "429" in error_msg or "too many requests" in error_msg.lower():
+        elif (
+            "rate limit" in error_msg.lower()
+            or "rate_limit" in error_msg.lower()
+            or "429" in error_msg
+            or "too many requests" in error_msg.lower()
+        ):
             raise ProviderRateLimitError(
                 message=f"Rate limit exceeded: {error_msg}",
                 provider=self.name,

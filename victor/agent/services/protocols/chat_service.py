@@ -64,11 +64,7 @@ class ChatServiceProtocol(Protocol):
     """
 
     async def chat(
-        self,
-        user_message: str,
-        *,
-        stream: bool = False,
-        **kwargs
+        self, user_message: str, *, stream: bool = False, **kwargs
     ) -> "CompletionResponse":
         """Process a chat message with the agentic loop.
 
@@ -94,11 +90,7 @@ class ChatServiceProtocol(Protocol):
         """
         ...
 
-    async def stream_chat(
-        self,
-        user_message: str,
-        **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream chat response in chunks for real-time feedback.
 
         Provides incremental response chunks as they're generated,

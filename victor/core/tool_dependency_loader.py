@@ -59,6 +59,8 @@ from importlib.metadata import entry_points
 
 import yaml
 
+from victor.core.yaml_utils import safe_load as yaml_safe_load
+
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_dependency_schema import ToolDependencySpec
 from victor.core.tool_types import ToolDependency
@@ -169,7 +171,7 @@ class ToolDependencyLoader:
             ToolDependencyLoadError: If parsing or validation fails.
         """
         try:
-            data = yaml.safe_load(yaml_content)
+            data = yaml_safe_load(yaml_content)
             spec = ToolDependencySpec.model_validate(data)
             return self._convert_to_config(spec)
         except yaml.YAMLError as e:
@@ -209,7 +211,7 @@ class ToolDependencyLoader:
 
         try:
             with open(yaml_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+                data = yaml_safe_load(f)
         except yaml.YAMLError as e:
             raise ToolDependencyLoadError(
                 yaml_path,
@@ -717,11 +719,13 @@ def create_vertical_tool_dependency_provider(
         if canonicalize is None:
             canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
         from victor.core.tool_dependency_base import YAMLToolDependencyProvider
+
         return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)
     else:
-        logger.warning(f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}")
+        logger.debug(f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}")
         # Return an LSP-compliant empty provider (Null Object pattern)
         from victor.core.tool_types import EmptyToolDependencyProvider
+
         return EmptyToolDependencyProvider(vertical)
 
 

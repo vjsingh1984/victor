@@ -48,7 +48,7 @@ Victor has TWO distinct vertical integration mechanisms that serve different pur
 
    Example::
        from victor.framework.vertical_integration import VerticalIntegrationPipeline
-       from victor.coding import CodingAssistant
+       from victor_coding import CodingAssistant
 
        pipeline = VerticalIntegrationPipeline()
        result = pipeline.apply(orchestrator, CodingAssistant)

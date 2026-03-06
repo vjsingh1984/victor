@@ -187,9 +187,7 @@ class ProviderLogger:
                 call_id, endpoint, model, start_time, **kwargs
             )
         except Exception as e:
-            self._log_api_call_error(
-                call_id, endpoint, model, start_time, e, **extra_context
-            )
+            self._log_api_call_error(call_id, endpoint, model, start_time, e, **extra_context)
             raise
 
     def _log_api_call_success(
@@ -280,9 +278,15 @@ class ProviderLogger:
         """
         sanitized = {}
         sensitive_keys = {
-            "api_key", "apikey", "api-key",
-            "token", "authorization", "auth",
-            "password", "secret", "credential",
+            "api_key",
+            "apikey",
+            "api-key",
+            "token",
+            "authorization",
+            "auth",
+            "password",
+            "secret",
+            "credential",
         }
 
         for key, value in config.items():

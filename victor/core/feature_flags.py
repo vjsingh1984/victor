@@ -61,7 +61,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import yaml
+from victor.core.yaml_utils import safe_load as yaml_safe_load
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,9 @@ class FeatureFlag(Enum):
     # Phase 6 - Service Layer (Strangler Fig)
     USE_SERVICE_LAYER = "use_service_layer"
 
+    # Phase 7 - LLM Decision Service
+    USE_LLM_DECISION_SERVICE = "use_llm_decision_service"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 
@@ -136,7 +139,7 @@ class FeatureFlagConfig:
 
     config_path: Optional[Path] = None
     env_prefix: str = "VICTOR_"
-    default_enabled: bool = False
+    default_enabled: bool = True
     strict_mode: bool = False
 
 
@@ -302,7 +305,7 @@ class FeatureFlagManager:
         """
         try:
             with open(self._config.config_path, "r") as f:
-                data = yaml.safe_load(f)
+                data = yaml_safe_load(f)
 
             if not data or not isinstance(data, dict):
                 logger.warning(f"Invalid feature flag config: {self._config.config_path}")

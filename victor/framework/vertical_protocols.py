@@ -39,7 +39,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, FrozenSet, List, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -768,6 +768,224 @@ class VectorSearchResult:
 
 
 # =============================================================================
+# Tree-sitter Parsing Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class TreeSitterParserProtocol(Protocol):
+    """Protocol for tree-sitter parser access.
+
+    Provides language-specific tree-sitter parsers for syntax analysis.
+    """
+
+    def get_parser(self, language: str) -> Any:
+        """Get a tree-sitter parser for the given language.
+
+        Returns None if the language is not supported.
+        """
+        ...
+
+    def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages."""
+        ...
+
+
+@runtime_checkable
+class TreeSitterExtractorProtocol(Protocol):
+    """Protocol for tree-sitter symbol extraction.
+
+    Extracts symbols (functions, classes, etc.) from source code using tree-sitter.
+    """
+
+    def extract_symbols(self, content: str, language: str) -> List[Dict[str, Any]]:
+        """Extract symbols from source code.
+
+        Returns list of dicts with keys like 'name', 'type', 'line', etc.
+        """
+        ...
+
+
+# =============================================================================
+# Codebase Indexing Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class CodebaseIndexFactoryProtocol(Protocol):
+    """Protocol for creating codebase index instances.
+
+    Provides a factory to create CodebaseIndex objects with different parameters.
+    The created index objects support search, staleness checks, and indexing.
+    """
+
+    def create(self, root_path: str, **kwargs: Any) -> Any:
+        """Create a codebase index instance for the given root path.
+
+        Args:
+            root_path: Root directory to index
+            **kwargs: Additional configuration (use_embeddings, embedding_config, etc.)
+
+        Returns:
+            A codebase index instance
+        """
+        ...
+
+
+@runtime_checkable
+class SymbolStoreFactoryProtocol(Protocol):
+    """Protocol for creating symbol store instances.
+
+    Provides a factory to create SymbolStore objects for codebase symbol analysis.
+    """
+
+    def create(
+        self,
+        root: str,
+        include_dirs: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ) -> Any:
+        """Create a symbol store instance.
+
+        Returns an object with index_codebase(), get_stats(), find_key_components(), etc.
+        """
+        ...
+
+
+# =============================================================================
+# Language Registry Protocols
+# =============================================================================
+
+
+@runtime_checkable
+class LanguageRegistryProtocol(Protocol):
+    """Protocol for language plugin registry.
+
+    Discovers and provides access to language-specific plugins.
+    """
+
+    def discover_plugins(self) -> int:
+        """Discover available language plugins. Returns count discovered."""
+        ...
+
+    def get(self, language: str) -> Any:
+        """Get a language plugin by name. Raises KeyError if not found."""
+        ...
+
+    def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages."""
+        ...
+
+
+@runtime_checkable
+class DocCommentPatternProtocol(Protocol):
+    """Protocol for documentation comment patterns."""
+
+    @property
+    def pattern(self) -> str:
+        """Regex pattern for matching doc comments."""
+        ...
+
+    @property
+    def style(self) -> str:
+        """Comment style identifier (e.g., 'javadoc', 'docstring')."""
+        ...
+
+
+# =============================================================================
+# Task Type Hints Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class TaskTypeHintProtocol(Protocol):
+    """Protocol for task-type-specific prompt hints.
+
+    Provides additional context/hints for prompt building based on task type.
+    """
+
+    def get_hint(self, task_type: str) -> str:
+        """Get a prompt hint for the given task type. Returns empty string if none."""
+        ...
+
+
+# =============================================================================
+# Ignore Patterns Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class IgnorePatternsProtocol(Protocol):
+    """Protocol for codebase ignore/skip patterns.
+
+    Provides directory/file filtering for codebase analysis.
+    """
+
+    def get_default_skip_dirs(self) -> FrozenSet[str]:
+        """Get the default set of directories to skip."""
+        ...
+
+    def is_hidden_path(self, path: str) -> bool:
+        """Check if a path is hidden (starts with dot)."""
+        ...
+
+    def should_ignore_path(
+        self,
+        path: str,
+        skip_dirs: Optional[FrozenSet[str]] = None,
+        extra_patterns: Optional[List[str]] = None,
+    ) -> bool:
+        """Check if a path should be ignored."""
+        ...
+
+
+# =============================================================================
+# LSP Manager Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class LSPManagerProtocol(Protocol):
+    """Protocol for LSP manager access.
+
+    Provides access to language server process management.
+    """
+
+    def get_lsp_manager(self) -> Any:
+        """Get the LSP manager instance."""
+        ...
+
+    def get_language_servers(self) -> Dict[str, Any]:
+        """Get configured language server definitions."""
+        ...
+
+
+# =============================================================================
+# Embedding Model Factory Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class EmbeddingModelFactoryProtocol(Protocol):
+    """Protocol for creating embedding models.
+
+    Provides factory for embedding model instances used by storage backends.
+    """
+
+    def create_model(self, model_type: str, model_name: str) -> Any:
+        """Create an embedding model instance.
+
+        Args:
+            model_type: Type of embedding model (e.g., 'sentence_transformer')
+            model_name: Model name/path
+
+        Returns:
+            An embedding model instance with an initialize() method
+        """
+        ...
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -799,4 +1017,21 @@ __all__ = [
     # Vector store protocols
     "VectorStoreProtocol",
     "VectorSearchResult",
+    # Tree-sitter protocols
+    "TreeSitterParserProtocol",
+    "TreeSitterExtractorProtocol",
+    # Codebase indexing protocols
+    "CodebaseIndexFactoryProtocol",
+    "SymbolStoreFactoryProtocol",
+    # Language registry protocols
+    "LanguageRegistryProtocol",
+    "DocCommentPatternProtocol",
+    # Task type hints
+    "TaskTypeHintProtocol",
+    # Ignore patterns
+    "IgnorePatternsProtocol",
+    # LSP manager
+    "LSPManagerProtocol",
+    # Embedding model factory
+    "EmbeddingModelFactoryProtocol",
 ]

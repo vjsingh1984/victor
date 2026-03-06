@@ -301,7 +301,17 @@ class MistralProvider(BaseProvider):
                     raise
                 # Convert to specific provider error types based on error message
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                if any(
+                    term in error_str
+                    for term in [
+                        "auth",
+                        "unauthorized",
+                        "invalid key",
+                        "invalid api",
+                        "api_key",
+                        "401",
+                    ]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,

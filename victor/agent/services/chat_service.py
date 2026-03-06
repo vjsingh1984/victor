@@ -127,11 +127,7 @@ class ChatService:
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
 
     async def chat(
-        self,
-        user_message: str,
-        *,
-        stream: bool = False,
-        **kwargs
+        self, user_message: str, *, stream: bool = False, **kwargs
     ) -> "CompletionResponse":
         """Process chat message with agentic loop.
 
@@ -196,11 +192,7 @@ class ChatService:
             # Recovery failed, re-raise
             raise
 
-    async def stream_chat(
-        self,
-        user_message: str,
-        **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream chat response in chunks.
 
         Provides incremental response chunks as they're generated,
@@ -277,11 +269,7 @@ class ChatService:
     # Private Methods
     # ==========================================================================
 
-    async def _run_agentic_loop(
-        self,
-        user_message: str,
-        **kwargs
-    ) -> "CompletionResponse":
+    async def _run_agentic_loop(self, user_message: str, **kwargs) -> "CompletionResponse":
         """Run the agentic loop for chat processing.
 
         The agentic loop handles tool execution and response generation
@@ -343,9 +331,7 @@ class ChatService:
         return response
 
     async def _run_agentic_loop_streaming(
-        self,
-        user_message: str,
-        **kwargs
+        self, user_message: str, **kwargs
     ) -> AsyncIterator["StreamChunk"]:
         """Run the agentic loop with streaming support.
 
@@ -369,11 +355,7 @@ class ChatService:
         async for chunk in stream:
             yield chunk
 
-    async def _get_completion(
-        self,
-        messages: List[Any],
-        **kwargs
-    ) -> "CompletionResponse":
+    async def _get_completion(self, messages: List[Any], **kwargs) -> "CompletionResponse":
         """Get completion from provider.
 
         Args:
@@ -445,10 +427,7 @@ class ChatService:
             # Add tool result to context
             self._add_tool_result_to_context(tool_name, result)
 
-    async def _create_continuation_prompt(
-        self,
-        response: "CompletionResponse"
-    ) -> str:
+    async def _create_continuation_prompt(self, response: "CompletionResponse") -> str:
         """Create continuation prompt for incomplete response.
 
         Args:
@@ -468,10 +447,7 @@ class ChatService:
         msg = {"role": "user", "content": message}
         self._context.add_message(msg)
 
-    def _add_assistant_message_to_context(
-        self,
-        response: "CompletionResponse"
-    ) -> None:
+    def _add_assistant_message_to_context(self, response: "CompletionResponse") -> None:
         """Add assistant message to context.
 
         Args:
@@ -485,11 +461,7 @@ class ChatService:
             msg["tool_calls"] = response.tool_calls
         self._context.add_message(msg)
 
-    def _add_tool_result_to_context(
-        self,
-        tool_name: str,
-        result: Any
-    ) -> None:
+    def _add_tool_result_to_context(self, tool_name: str, result: Any) -> None:
         """Add tool result to context.
 
         Args:
@@ -504,10 +476,7 @@ class ChatService:
         }
         self._context.add_message(msg)
 
-    def _aggregate_chunks(
-        self,
-        chunks: List["StreamChunk"]
-    ) -> "CompletionResponse":
+    def _aggregate_chunks(self, chunks: List["StreamChunk"]) -> "CompletionResponse":
         """Aggregate stream chunks into completion response.
 
         Args:
@@ -521,8 +490,7 @@ class ChatService:
         content = "".join(chunk.content for chunk in chunks)
         # StreamChunk has optional usage field, handle safely
         total_tokens = sum(
-            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0)
-            for chunk in chunks
+            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0) for chunk in chunks
         )
 
         return CompletionResponse(

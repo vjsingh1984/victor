@@ -284,10 +284,7 @@ class ToolService:
                 return await self.execute_tool(tool_name, arguments)
 
         # Execute all tools in parallel
-        tasks = [
-            execute_with_limit(name, args)
-            for name, args in tool_calls
-        ]
+        tasks = [execute_with_limit(name, args) for name, args in tool_calls]
 
         for task in asyncio.as_completed(tasks):
             result = await task
@@ -325,8 +322,7 @@ class ToolService:
         """
         total_calls = sum(self._usage_stats.values())
         successful_calls = sum(
-            count for tool, count in self._usage_stats.items()
-            if not tool.startswith("error:")
+            count for tool, count in self._usage_stats.items() if not tool.startswith("error:")
         )
 
         return {
@@ -355,9 +351,9 @@ class ToolService:
             True if the service is healthy
         """
         return (
-            self._selector is not None and
-            self._executor is not None and
-            not self._budget_manager.is_exhausted()
+            self._selector is not None
+            and self._executor is not None
+            and not self._budget_manager.is_exhausted()
         )
 
     # ==========================================================================

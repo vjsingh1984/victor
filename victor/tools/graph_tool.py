@@ -40,19 +40,14 @@ GraphNode = None
 GraphStoreProtocol = None
 create_graph_store = None
 
-# Try main framework's graph protocol first
+# Try main framework's graph protocol
 try:
     from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
     from victor.storage.graph.registry import create_graph_store
+
     _GRAPH_AVAILABLE = True
 except ImportError:
-    # Fall back to victor-coding external package
-    try:
-        from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-        from victor_coding.codebase.graph.registry import create_graph_store
-        _GRAPH_AVAILABLE = True
-    except ImportError:
-        pass  # Leave all as None
+    pass  # Leave all as None
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -1356,11 +1351,16 @@ async def graph(
         if not analyzer.nodes:
             logger.info("Graph is empty, triggering lazy indexing...")
             try:
-                from victor_coding.codebase.indexer import CodebaseIndex
+                from victor.core.capability_registry import CapabilityRegistry
+                from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+                factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+                if factory is None:
+                    raise ImportError("Codebase indexing not available")
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()
-                indexer = CodebaseIndex(project_root)
+                indexer = factory.create(root_path=str(project_root))
 
                 # Check if we should do full or incremental index
                 if not indexer._is_indexed:

@@ -26,6 +26,7 @@ from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 # Mock Dependencies
 # =============================================================================
 
+
 class MockProviderService:
     """Mock provider service."""
 
@@ -41,6 +42,7 @@ class MockProviderService:
 
     async def chat_completion(self, messages, **kwargs):
         from victor.providers.base import CompletionResponse
+
         return CompletionResponse(
             content="Mock response",
             stop_reason="stop",
@@ -49,6 +51,7 @@ class MockProviderService:
 
     async def stream_completion(self, messages, **kwargs):
         from victor.providers.base import StreamChunk
+
         yield StreamChunk(content="Mock chunk")
 
     async def check_provider_health(self, provider=None):
@@ -67,6 +70,7 @@ class MockToolService:
 
     async def execute_tool(self, tool_name, arguments):
         from victor.tools.base import ToolResult
+
         self.tools_executed.append((tool_name, arguments))
         return ToolResult(success=True, output=f"Executed {tool_name}")
 
@@ -132,6 +136,7 @@ class MockStreamingCoordinator:
 # Base Test Class with Helper Methods
 # =============================================================================
 
+
 class BaseChatServiceTest:
     """Base class for ChatService tests with helper methods."""
 
@@ -161,6 +166,7 @@ class BaseChatServiceTest:
 # =============================================================================
 # Tests
 # =============================================================================
+
 
 class TestChatServiceConfig(BaseChatServiceTest):
     """Tests for ChatServiceConfig."""
@@ -343,6 +349,7 @@ class TestChatServiceAgenticLoop(BaseChatServiceTest):
 # Test Helpers
 # =============================================================================
 
+
 def test_chat_service_integration_with_feature_flags():
     """Test that ChatService works with feature flags."""
     from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
@@ -412,9 +419,7 @@ class TestToolService:
         config = ToolServiceConfig()
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(
@@ -443,9 +448,7 @@ class TestToolService:
         config = ToolServiceConfig(default_tool_budget=2)
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(
@@ -502,5 +505,3 @@ class TestToolService:
         assert stats["successful_calls"] == 3
         assert stats["failed_calls"] == 1
         assert stats["success_rate"] == 0.75
-
-

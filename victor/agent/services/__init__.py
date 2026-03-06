@@ -25,26 +25,34 @@ Services:
     ProviderService: Provider management and switching
     RecoveryService: Error recovery and resilience
     SessionService: Session lifecycle management
+    LLMDecisionService: LLM-assisted decision making fallback
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
-from victor.agent.services.tool_service import ToolService, ToolServiceConfig, ToolBudgetExceededError
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
+from victor.agent.services.decision_service import LLMDecisionService, LLMDecisionServiceConfig
 from victor.agent.services.provider_service import ProviderService
 from victor.agent.services.recovery_service import RecoveryService, RecoveryContextImpl
 from victor.agent.services.session_service import SessionService, SessionInfoImpl
+from victor.agent.services.tool_service import (
+    ToolBudgetExceededError,
+    ToolService,
+    ToolServiceConfig,
+)
 
 __all__ = [
     "ChatService",
     "ChatServiceConfig",
-    "ToolService",
-    "ToolServiceConfig",
-    "ToolBudgetExceededError",
     "ContextService",
     "ContextServiceConfig",
+    "LLMDecisionService",
+    "LLMDecisionServiceConfig",
     "ProviderService",
     "RecoveryService",
     "RecoveryContextImpl",
     "SessionService",
     "SessionInfoImpl",
+    "ToolBudgetExceededError",
+    "ToolService",
+    "ToolServiceConfig",
 ]

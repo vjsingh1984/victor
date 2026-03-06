@@ -135,7 +135,9 @@ class TestOpenRouterProviderInitialization:
             mock_result.source_detail = "System keyring"
             mock_result.sources_attempted = [
                 KeySource(source="explicit", description="Explicit parameter", found=False),
-                KeySource(source="environment", description="OPENROUTER_API_KEY env var", found=False),
+                KeySource(
+                    source="environment", description="OPENROUTER_API_KEY env var", found=False
+                ),
                 KeySource(source="keyring", description="System keyring", found=True),
             ]
             mock_result.non_interactive = False

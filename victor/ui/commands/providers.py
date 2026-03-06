@@ -103,7 +103,9 @@ def _list_providers_impl() -> None:
 def check_provider(
     provider: str = typer.Argument(..., help="Provider name (e.g., deepseek, anthropic, ollama)"),
     model: str = typer.Option("deepseek-chat", help="Model to check"),
-    connectivity: bool = typer.Option(False, "--connectivity", "-c", help="Perform connectivity test (slower)"),
+    connectivity: bool = typer.Option(
+        False, "--connectivity", "-c", help="Perform connectivity test (slower)"
+    ),
     timeout: float = typer.Option(5.0, help="Timeout for connectivity check (seconds)"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
@@ -114,6 +116,7 @@ def check_provider(
         victor providers check anthropic --connectivity
         victor providers check ollama
     """
+
     async def run_check():
         checker = ProviderHealthChecker()
         result = await checker.check_provider(
@@ -125,6 +128,7 @@ def check_provider(
 
         if json_output:
             import json
+
             console.print(json.dumps(result.to_dict(), indent=2))
             return
 

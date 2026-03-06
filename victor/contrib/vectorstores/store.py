@@ -148,10 +148,7 @@ class InMemoryVectorStore(VectorStoreProtocol):
             # Apply metadata filter if specified
             if filter_metadata:
                 doc_meta = self._metadata.get(doc_id, {})
-                if not all(
-                    doc_meta.get(k) == v
-                    for k, v in filter_metadata.items()
-                ):
+                if not all(doc_meta.get(k) == v for k, v in filter_metadata.items()):
                     continue
 
             # Cosine similarity: dot product of normalized vectors

@@ -97,8 +97,8 @@ class BasicEmbeddingsProvider(EmbeddingsProtocol):
             List of floats representing the embedding vector
         """
         logger.debug(
-            f"Using hash-based embeddings (not semantic). "
-            f"Install victor-rag for proper embeddings."
+            "Using hash-based embeddings (not semantic). "
+            "Install victor-rag for proper embeddings."
         )
 
         # Generate deterministic hash-based vector

@@ -54,10 +54,8 @@ DEFAULT_FEATURE_FLAGS = {
     "use_new_provider_service": False,
     "use_new_recovery_service": False,
     "use_new_session_service": False,
-
     # Phase 4 - Vertical Composition (disabled by default)
     "use_composition_over_inheritance": False,
-
     # Phase 5 - Tool Registration Strategy (disabled by default)
     "use_strategy_based_tool_registration": False,
 }
@@ -81,6 +79,7 @@ def load_feature_flags_from_settings(
     """
     if settings is None:
         from victor.config.settings import load_settings
+
         settings = load_settings()
 
     flags = DEFAULT_FEATURE_FLAGS.copy()
@@ -120,6 +119,7 @@ def load_feature_flags_from_yaml(
     """
     if config_path is None:
         from victor.config.settings import GLOBAL_VICTOR_DIR
+
         config_path = GLOBAL_VICTOR_DIR / "features.yaml"
 
     if not config_path.exists():
@@ -172,6 +172,7 @@ def save_feature_flags_to_yaml(
     """
     if config_path is None:
         from victor.config.settings import GLOBAL_VICTOR_DIR
+
         config_path = GLOBAL_VICTOR_DIR / "features.yaml"
 
     # Create parent directory if it doesn't exist
@@ -179,10 +180,7 @@ def save_feature_flags_to_yaml(
 
     # Prepare YAML data
     data = {
-        "features": {
-            key: value for key, value in flags.items()
-            if key in DEFAULT_FEATURE_FLAGS
-        }
+        "features": {key: value for key, value in flags.items() if key in DEFAULT_FEATURE_FLAGS}
     }
 
     try:
@@ -253,10 +251,7 @@ def create_feature_flag_config_file(
     if enabled_flags is None:
         flags = load_feature_flags_from_settings()
     else:
-        flags = {
-            key: key in enabled_flags
-            for key in DEFAULT_FEATURE_FLAGS.keys()
-        }
+        flags = {key: key in enabled_flags for key in DEFAULT_FEATURE_FLAGS.keys()}
 
     save_feature_flags_to_yaml(flags, config_path)
     logger.info(f"Created feature flag config at: {config_path}")

@@ -797,7 +797,10 @@ class EntryPointCache:
         import site
         import sys
 
-        components = [f"exe:{sys.executable}", f"py:{sys.version_info.major}.{sys.version_info.minor}"]
+        components = [
+            f"exe:{sys.executable}",
+            f"py:{sys.version_info.major}.{sys.version_info.minor}",
+        ]
         candidate_paths = []
         try:
             candidate_paths.extend(site.getsitepackages())
@@ -856,7 +859,9 @@ class EntryPointCache:
                     if current_fingerprint == cached_fingerprint:
                         self._env_hash = cached_env_hash
                         current_hash = cached_env_hash
-                        logger.debug("Reused cached env hash via installation fingerprint fast path")
+                        logger.debug(
+                            "Reused cached env hash via installation fingerprint fast path"
+                        )
 
             # Fallback for legacy cache files or fingerprint mismatch.
             if current_hash is None:

@@ -26,6 +26,7 @@ from victor.tools.file_editor_tool import edit
 
 try:
     import victor_coding  # noqa: F401
+
     _has_victor_coding = True
 except ImportError:
     _has_victor_coding = False
@@ -522,12 +523,12 @@ class TestEditErrorHandling:
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        # Patch _FileEditor since that's what the code uses
-        with patch("victor.tools.file_editor_tool._FileEditor") as mock_editor_class:
+        # Patch _create_file_editor since that's what the code uses
+        with patch("victor.tools.file_editor_tool._create_file_editor") as mock_factory:
             mock_editor = MagicMock()
             mock_editor.start_transaction.return_value = "txn123"
             mock_editor.add_modify.side_effect = Exception("Queue failed")
-            mock_editor_class.return_value = mock_editor
+            mock_factory.return_value = mock_editor
 
             result = await edit(ops=[{"type": "modify", "path": str(test_file), "content": "new"}])
 

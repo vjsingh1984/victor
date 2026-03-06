@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
+
+from victor.core.json_utils import json_dumps, json_loads
 from typing import Any, Dict, Iterable, List, Optional
 
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
@@ -33,7 +34,8 @@ class DuckDBGraphStore(GraphStoreProtocol):
     def _ensure_schema(self) -> None:
         conn = self._connect()
         try:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS nodes (
                     node_id TEXT PRIMARY KEY,
                     type TEXT,
@@ -56,7 +58,8 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 CREATE INDEX IF NOT EXISTS idx_nodes_file ON nodes(file);
                 CREATE INDEX IF NOT EXISTS idx_edges_src_type ON edges(src, type);
                 CREATE INDEX IF NOT EXISTS idx_edges_dst_type ON edges(dst, type);
-                """)
+                """
+            )
         finally:
             conn.close()
 
@@ -70,7 +73,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 n.line,
                 n.lang,
                 n.embedding_ref,
-                json.dumps(n.metadata),
+                json_dumps(n.metadata),
             )
             for n in nodes
         ]
@@ -104,7 +107,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 e.dst,
                 e.type,
                 e.weight,
-                json.dumps(e.metadata),
+                json_dumps(e.metadata),
             )
             for e in edges
         ]
@@ -146,7 +149,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
                         dst=row[1],
                         type=row[2],
                         weight=row[3],
-                        metadata=json.loads(row[4]) if row[4] else {},
+                        metadata=json_loads(row[4]) if row[4] else {},
                     )
                     for row in cur.fetchall()
                 ]
@@ -182,7 +185,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
                         line=row[4],
                         lang=row[5],
                         embedding_ref=row[6],
-                        metadata=json.loads(row[7]) if row[7] else {},
+                        metadata=json_loads(row[7]) if row[7] else {},
                     )
                     for row in cur.fetchall()
                 ]

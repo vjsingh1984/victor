@@ -554,6 +554,52 @@ class VictorSettings(BaseSettings):
     )
 
     # ==========================================================================
+    # System Prompt Policy
+    # ==========================================================================
+
+    prompt_policy_enforce_identity: bool = Field(
+        default=True,
+        description="Ensure the system prompt always includes an identity section (fallbacks if missing)",
+    )
+    prompt_policy_enforce_guidelines: bool = Field(
+        default=True,
+        description="Ensure the system prompt always includes a guidelines section",
+    )
+    prompt_policy_enforce_operating_preamble: bool = Field(
+        default=True,
+        description="Ensure the system prompt includes operating mode metadata (stage/task/model)",
+    )
+    prompt_policy_enforce_unique_sections: bool = Field(
+        default=True,
+        description="Deduplicate sections with identical content to keep prompts concise",
+    )
+    prompt_policy_protected_sections: List[str] = Field(
+        default_factory=lambda: ["identity", "guidelines", "operating_mode"],
+        description="Sections that should never be trimmed when enforcing character budgets",
+    )
+    prompt_policy_max_section_chars: int = Field(
+        default=18000,
+        ge=1000,
+        description="Maximum characters allocated to structured sections before trimming low-priority ones",
+    )
+    prompt_policy_identity: Optional[str] = Field(
+        default=None,
+        description="Custom fallback identity content injected when no identity section is provided",
+    )
+    prompt_policy_guidelines: Optional[str] = Field(
+        default=None,
+        description="Custom fallback guidelines injected when none are provided",
+    )
+    prompt_policy_operating_template: Optional[str] = Field(
+        default=None,
+        description="Template for the operating-mode preamble (supports {stage}, {task_type}, {model}, {provider})",
+    )
+    prompt_policy_fallback_template: Optional[str] = Field(
+        default=None,
+        description="Template used when prompt assembly fails (supports {task_type} and {message})",
+    )
+
+    # ==========================================================================
     # Provider Resilience
     # ==========================================================================
 

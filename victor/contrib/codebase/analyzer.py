@@ -347,7 +347,9 @@ class BasicCodebaseAnalyzer(CodebaseAnalyzerProtocol):
             # Check for import
             import_match = self.IMPORT_PATTERN.match(line)
             if import_match:
-                from_module = import_match.group(1)  # None for "import os", "pathlib" for "from pathlib import..."
+                from_module = import_match.group(
+                    1
+                )  # None for "import os", "pathlib" for "from pathlib import..."
                 import_names = import_match.group(2).split(",")
 
                 # For "import os": module="os", names=[]

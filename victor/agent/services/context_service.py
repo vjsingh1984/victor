@@ -126,15 +126,10 @@ class ContextService:
         Returns:
             ContextMetrics with current context information
         """
-        total_tokens = sum(
-            self._estimate_tokens(getattr(m, "content", ""))
-            for m in self._messages
-        )
+        total_tokens = sum(self._estimate_tokens(getattr(m, "content", "")) for m in self._messages)
 
         user_count = sum(1 for m in self._messages if getattr(m, "role", "") == "user")
-        assistant_count = sum(
-            1 for m in self._messages if getattr(m, "role", "") == "assistant"
-        )
+        assistant_count = sum(1 for m in self._messages if getattr(m, "role", "") == "assistant")
         tool_count = sum(1 for m in self._messages if getattr(m, "role", "") == "tool")
 
         system_tokens = self._estimate_tokens(
@@ -234,9 +229,7 @@ class ContextService:
             retain_system: If True, retain system prompt
         """
         if retain_system:
-            system_messages = [
-                m for m in self._messages if getattr(m, "role", "") == "system"
-            ]
+            system_messages = [m for m in self._messages if getattr(m, "role", "") == "system"]
             self._messages = system_messages
         else:
             self._messages.clear()

@@ -86,7 +86,8 @@ class TestFeatureFlagManager:
 
     def test_enable_flag_at_runtime(self):
         """Test enabling a flag at runtime."""
-        manager = FeatureFlagManager()
+        config = FeatureFlagConfig(default_enabled=False)
+        manager = FeatureFlagManager(config)
 
         assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
 
@@ -117,7 +118,8 @@ class TestFeatureFlagManager:
 
     def test_clear_runtime_override(self):
         """Test clearing runtime override."""
-        manager = FeatureFlagManager()
+        config = FeatureFlagConfig(default_enabled=False)
+        manager = FeatureFlagManager(config)
 
         manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
         assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
@@ -127,7 +129,8 @@ class TestFeatureFlagManager:
 
     def test_get_enabled_flags(self):
         """Test getting all enabled flags."""
-        manager = FeatureFlagManager()
+        config = FeatureFlagConfig(default_enabled=False)
+        manager = FeatureFlagManager(config)
 
         manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
         manager.enable(FeatureFlag.USE_NEW_TOOL_SERVICE)
@@ -149,7 +152,8 @@ class TestFeatureFlagManager:
 
     def test_reload_config(self):
         """Test reloading configuration."""
-        manager = FeatureFlagManager()
+        config = FeatureFlagConfig(default_enabled=False)
+        manager = FeatureFlagManager(config)
 
         # Enable via runtime
         manager.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
@@ -196,12 +200,15 @@ class TestYamlConfiguration:
     def test_load_from_valid_yaml(self):
         """Test loading from valid YAML configuration."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({
-                "features": {
-                    "use_new_chat_service": True,
-                    "use_new_tool_service": False,
-                }
-            }, f)
+            yaml.dump(
+                {
+                    "features": {
+                        "use_new_chat_service": True,
+                        "use_new_tool_service": False,
+                    }
+                },
+                f,
+            )
             config_path = Path(f.name)
 
         try:
@@ -210,16 +217,19 @@ class TestYamlConfiguration:
 
             assert manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
             assert not manager.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE)
-            assert not manager.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE)
+            # Flags not in YAML fall back to default_enabled (True)
+            assert manager.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE)
         finally:
             config_path.unlink()
 
     def test_load_from_missing_yaml(self):
         """Test loading from missing YAML file."""
-        config = FeatureFlagConfig(config_path=Path("/nonexistent/path/features.yaml"))
+        config = FeatureFlagConfig(
+            config_path=Path("/nonexistent/path/features.yaml"), default_enabled=False
+        )
         manager = FeatureFlagManager(config)
 
-        # Should use defaults
+        # Should use defaults (False)
         assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
 
     def test_load_from_invalid_yaml_strict_mode(self):
@@ -242,10 +252,12 @@ class TestYamlConfiguration:
             config_path = Path(f.name)
 
         try:
-            config = FeatureFlagConfig(config_path=config_path, strict_mode=False)
+            config = FeatureFlagConfig(
+                config_path=config_path, strict_mode=False, default_enabled=False
+            )
             manager = FeatureFlagManager(config)
 
-            # Should use defaults
+            # Should use defaults (False)
             assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
         finally:
             config_path.unlink()
@@ -253,11 +265,14 @@ class TestYamlConfiguration:
     def test_invalid_feature_flag_value_strict(self):
         """Test invalid feature flag value in strict mode."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({
-                "features": {
-                    "use_new_chat_service": "not_a_bool",
-                }
-            }, f)
+            yaml.dump(
+                {
+                    "features": {
+                        "use_new_chat_service": "not_a_bool",
+                    }
+                },
+                f,
+            )
             config_path = Path(f.name)
 
         try:
@@ -270,18 +285,23 @@ class TestYamlConfiguration:
     def test_invalid_feature_flag_value_lenient(self):
         """Test invalid feature flag value in lenient mode."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({
-                "features": {
-                    "use_new_chat_service": "not_a_bool",
-                }
-            }, f)
+            yaml.dump(
+                {
+                    "features": {
+                        "use_new_chat_service": "not_a_bool",
+                    }
+                },
+                f,
+            )
             config_path = Path(f.name)
 
         try:
-            config = FeatureFlagConfig(config_path=config_path, strict_mode=False)
+            config = FeatureFlagConfig(
+                config_path=config_path, strict_mode=False, default_enabled=False
+            )
             manager = FeatureFlagManager(config)
 
-            # Should ignore invalid value and use default
+            # Should ignore invalid value and use default (False)
             assert not manager.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
         finally:
             config_path.unlink()
@@ -303,10 +323,11 @@ class TestGlobalManager:
         """Test force_reload parameter."""
         reset_feature_flag_manager()
 
-        manager1 = get_feature_flag_manager()
+        config = FeatureFlagConfig(default_enabled=False)
+        manager1 = get_feature_flag_manager(config=config)
         manager1.enable(FeatureFlag.USE_NEW_CHAT_SERVICE)
 
-        manager2 = get_feature_flag_manager(force_reload=True)
+        manager2 = get_feature_flag_manager(config=config, force_reload=True)
 
         # New instance should not have runtime override
         assert not manager2.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
@@ -314,6 +335,10 @@ class TestGlobalManager:
     def test_convenience_functions(self):
         """Test convenience functions."""
         reset_feature_flag_manager()
+
+        # Default is now enabled, so test enable/disable cycle
+        config = FeatureFlagConfig(default_enabled=False)
+        get_feature_flag_manager(config=config, force_reload=True)
 
         assert not is_feature_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE)
 
@@ -339,12 +364,15 @@ class TestFeatureConfigModule:
     def test_load_from_yaml_config(self):
         """Test loading from YAML configuration file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({
-                "features": {
-                    "use_new_chat_service": True,
-                    "use_new_tool_service": False,
-                }
-            }, f)
+            yaml.dump(
+                {
+                    "features": {
+                        "use_new_chat_service": True,
+                        "use_new_tool_service": False,
+                    }
+                },
+                f,
+            )
             config_path = Path(f.name)
 
         try:

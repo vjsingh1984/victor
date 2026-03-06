@@ -555,6 +555,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
+            factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
@@ -801,6 +802,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._context_compactor = self._factory.create_context_compactor(
             conversation_controller=self._conversation_controller,
             pruning_learner=pruning_learner,
+        )
+
+        # SessionLedger: Structured session state tracking (survives compaction)
+        self._session_ledger = self._factory.create_session_ledger()
+
+        # Wire compaction summarizer to conversation controller (ledger-aware summaries)
+        _compaction_summarizer = self._factory.create_compaction_summarizer(self._session_ledger)
+        if self._conversation_controller and _compaction_summarizer:
+            self._conversation_controller._compaction_summarizer = _compaction_summarizer
+
+        # ToolResultDeduplicator: File read deduplication
+        self._tool_result_deduplicator = self._factory.create_tool_result_deduplicator()
+
+        # ReferentialIntentResolver: Anaphoric reference resolution ("do it" -> concrete context)
+        self._referential_intent_resolver = self._factory.create_referential_intent_resolver(
+            self._session_ledger
+        )
+
+        # TurnBoundaryContextAssembler: Context selection per LLM call
+        self._context_assembler = self._factory.create_context_assembler(
+            self._session_ledger, self._conversation_controller
         )
 
         # ContextManager: Centralized context window management (TD-002 refactoring)
@@ -3745,6 +3767,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 logger.debug(f"Tool '{tool_name}' actual output:\n{output_preview}")
 
                 self.add_message("user", formatted_output)
+
+                # Update session ledger and deduplicate file reads
+                if self._session_ledger:
+                    self._session_ledger.update_from_tool_result(
+                        tool_name, normalized_args, str(output), turn_index=len(self.messages)
+                    )
+                if (
+                    self._tool_result_deduplicator
+                    and self._tool_result_deduplicator.should_deduplicate(tool_name, normalized_args)
+                ):
+                    self._tool_result_deduplicator.deduplicate_in_place(
+                        self.conversation.messages, tool_name, normalized_args
+                    )
+
                 results.append(
                     {
                         "name": tool_name,

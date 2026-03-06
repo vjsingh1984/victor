@@ -137,6 +137,7 @@ class ConversationController:
         conversation_store: Optional["ConversationStore"] = None,
         session_id: Optional[str] = None,
         prompt_normalizer: Optional[PromptNormalizer] = None,
+        compaction_summarizer: Optional[Any] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -147,6 +148,7 @@ class ConversationController:
         self._system_prompt: Optional[str] = None
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
+        self._compaction_summarizer = compaction_summarizer
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
         # PromptNormalizer for input deduplication (DIP compliance)
@@ -566,8 +568,8 @@ class ConversationController:
     def _generate_compaction_summary(self, removed_messages: List[Message]) -> str:
         """Generate a summary of removed messages for context preservation.
 
-        Creates a brief summary of what was discussed in removed messages
-        so the AI retains awareness of earlier conversation topics.
+        Delegates to compaction summarizer strategy if available, otherwise
+        falls back to keyword-based extraction.
 
         Args:
             removed_messages: Messages being removed
@@ -578,11 +580,17 @@ class ConversationController:
         if not removed_messages:
             return ""
 
-        # Count message types
+        # Delegate to strategy if available
+        if self._compaction_summarizer:
+            try:
+                return self._compaction_summarizer.summarize(removed_messages)
+            except Exception as e:
+                logger.warning(f"Compaction summarizer failed, using fallback: {e}")
+
+        # Fallback: keyword extraction
         user_msgs = [m for m in removed_messages if m.role == "user"]
         tool_msgs = [m for m in removed_messages if m.role == "tool"]
 
-        # Extract key topics (simple keyword extraction)
         all_content = " ".join(m.content[:200] for m in removed_messages[:10])
         topics = self._extract_key_topics(all_content)
 

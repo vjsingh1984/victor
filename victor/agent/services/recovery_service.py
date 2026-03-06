@@ -291,10 +291,11 @@ class RecoveryService:
         Returns:
             Delay in seconds
         """
-        delay = self._base_retry_delay * (2 ** attempt)
+        delay = self._base_retry_delay * (2**attempt)
         return min(delay, self._max_retry_delay)
 
 
 class AuthError(Exception):
     """Authentication error."""
+
     pass

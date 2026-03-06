@@ -353,7 +353,11 @@ class TestStreamWithEvents:
             chunk.content = "hello"
             chunk.metadata = {
                 "reasoning_content": "thinking...",
-                "tool_start": {"name": "read", "id": "call_start", "arguments": {"path": "/tmp/a.py"}},
+                "tool_start": {
+                    "name": "read",
+                    "id": "call_start",
+                    "arguments": {"path": "/tmp/a.py"},
+                },
                 "tool_result": {
                     "name": "read",
                     "id": "call_start",
@@ -392,7 +396,8 @@ class TestStreamWithEvents:
             "tool_call",
         ]
         assert all(
-            call.args[2] == EventTarget.STREAM_CHUNK for call in proxy_registry.from_external.call_args_list
+            call.args[2] == EventTarget.STREAM_CHUNK
+            for call in proxy_registry.from_external.call_args_list
         )
 
         event_types = [event.type for event in events]

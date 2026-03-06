@@ -303,7 +303,7 @@ class TestVerticalProviderIntegration:
     def test_coding_provider_has_get_compiler(self):
         """Test that CodingWorkflowProvider has get_compiler method."""
         try:
-            from victor.coding.workflows.provider import CodingWorkflowProvider
+            from victor_coding.workflows.provider import CodingWorkflowProvider
 
             provider = CodingWorkflowProvider()
             assert hasattr(provider, "get_compiler")

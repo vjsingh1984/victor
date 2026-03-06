@@ -218,15 +218,22 @@ class HybridSearchEngine:
         """
         query_terms = query.lower().split()
 
+        # Single-pass scoring: join terms into one alternation regex
+        # so we scan each document once instead of len(terms) times.
+        import re
+
+        if query_terms:
+            term_pattern = re.compile("|".join(re.escape(t) for t in query_terms))
+        else:
+            return []
+
         scores = []
         for doc in documents:
             content = doc.get("content", "").lower()
             file_path = doc.get("file_path", "")
 
-            # Calculate term frequency score
-            score = 0.0
-            for term in query_terms:
-                score += content.count(term)
+            # Single regex pass counts all term matches
+            score = float(len(term_pattern.findall(content)))
 
             if score > 0:
                 scores.append(

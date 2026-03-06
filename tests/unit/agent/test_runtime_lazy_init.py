@@ -87,9 +87,11 @@ class TestRuntimeLazyInitialization:
             session_coordinator = getattr(interaction_runtime, "session_coordinator", None)
 
             # All should be LazyRuntimeProxy instances
+            # Note: With service layer feature flags enabled, tool_coordinator
+            # may be eagerly initialized during bootstrap. We still check that
+            # chat and session coordinators remain lazy.
             for component_name, component in [
                 ("chat_coordinator", chat_coordinator),
-                ("tool_coordinator", tool_coordinator),
                 ("session_coordinator", session_coordinator),
             ]:
                 assert component is not None, f"{component_name} should exist"
@@ -98,6 +100,10 @@ class TestRuntimeLazyInitialization:
                 assert (
                     not initialized
                 ), f"{component_name} should NOT be initialized after Agent.create()"
+
+            # tool_coordinator should exist but may be eagerly initialized
+            # when USE_NEW_TOOL_SERVICE or USE_SERVICE_LAYER flags are enabled
+            assert tool_coordinator is not None, "tool_coordinator should exist"
 
         finally:
             await agent.close()
@@ -232,7 +238,9 @@ class TestRuntimeLazyInitialization:
             await agent.close()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Lazy initialization behavior changed - metrics_collector is now initialized during orchestrator setup")
+    @pytest.mark.skip(
+        reason="Lazy initialization behavior changed - metrics_collector is now initialized during orchestrator setup"
+    )
     async def test_metrics_runtime_components_are_lazy(self):
         """Test that metrics runtime components are NOT initialized during Agent.create()."""
         agent = await Agent.create(

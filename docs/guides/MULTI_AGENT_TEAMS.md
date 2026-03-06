@@ -200,7 +200,7 @@ Victor includes pre-configured teams in `victor/coding/teams/specs.py`:
 ### Feature Implementation Team
 
 ```python
-from victor.coding.teams import FEATURE_IMPLEMENTATION_TEAM
+from victor_coding.teams import FEATURE_IMPLEMENTATION_TEAM
 
 team = FEATURE_IMPLEMENTATION_TEAM
 # Pipeline: Researcher → Planner → Implementer → Reviewer
@@ -209,7 +209,7 @@ team = FEATURE_IMPLEMENTATION_TEAM
 ### Bug Fix Team
 
 ```python
-from victor.coding.teams import BUG_FIX_TEAM
+from victor_coding.teams import BUG_FIX_TEAM
 
 # Pipeline: Investigator → Fixer → Verifier
 ```
@@ -217,7 +217,7 @@ from victor.coding.teams import BUG_FIX_TEAM
 ### Code Review Team
 
 ```python
-from victor.coding.teams import CODE_REVIEW_TEAM
+from victor_coding.teams import CODE_REVIEW_TEAM
 
 # Parallel: Security + Style + Logic + Synthesizer
 ```
@@ -225,7 +225,7 @@ from victor.coding.teams import CODE_REVIEW_TEAM
 ### Refactoring Team
 
 ```python
-from victor.coding.teams import REFACTORING_TEAM
+from victor_coding.teams import REFACTORING_TEAM
 
 # Hierarchical: Manager → Executors → Quality Verifier
 ```

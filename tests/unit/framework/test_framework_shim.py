@@ -565,6 +565,7 @@ class TestListVerticalsFunction:
         # Try importing from external vertical packages, skip if not available
         try:
             from victor_coding.assistant import CodingAssistant
+
             if not VerticalRegistry.get("coding"):
                 VerticalRegistry.register(CodingAssistant)
         except ImportError:
@@ -572,6 +573,7 @@ class TestListVerticalsFunction:
 
         try:
             from victor_devops.assistant import DevOpsAssistant
+
             if not VerticalRegistry.get("devops"):
                 VerticalRegistry.register(DevOpsAssistant)
         except ImportError:
@@ -579,6 +581,7 @@ class TestListVerticalsFunction:
 
         try:
             from victor_research.assistant import ResearchAssistant
+
             if not VerticalRegistry.get("research"):
                 VerticalRegistry.register(ResearchAssistant)
         except ImportError:
@@ -594,7 +597,9 @@ class TestListVerticalsFunction:
         names = list_verticals()
         assert "test_vertical" in names
 
-    @pytest.mark.skip(reason="Requires external vertical packages (victor_coding) - pending migration")
+    @pytest.mark.skip(
+        reason="Requires external vertical packages (victor_coding) - pending migration"
+    )
     def test_list_verticals_includes_builtins(self):
         """Test that list_verticals includes built-in verticals."""
         names = list_verticals()

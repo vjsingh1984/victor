@@ -461,6 +461,9 @@ def _create_tool_class(
     properties = {}
     required = []
     for name, param in sig.parameters.items():
+        if name == "_exec_ctx":
+            continue  # Framework-internal, not exposed to LLM
+
         if param.kind not in (
             inspect.Parameter.POSITIONAL_OR_KEYWORD,
             inspect.Parameter.KEYWORD_ONLY,

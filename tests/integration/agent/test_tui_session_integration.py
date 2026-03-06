@@ -203,7 +203,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_coding_vertical(self):
         """Test TUI with coding vertical integration."""
-        from victor.coding.assistant import CodingAssistant
+        from victor_coding.assistant import CodingAssistant
 
         config = SessionConfig(
             mode=SessionMode.TUI,

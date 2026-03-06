@@ -92,7 +92,7 @@ class TestCLISessionInitialization:
     @pytest.mark.integration
     async def test_session_with_vertical_integration(self, session_config):
         """Test session with vertical integration."""
-        from victor.coding.assistant import CodingAssistant
+        from victor_coding.assistant import CodingAssistant
 
         session_config.vertical = "coding"
 

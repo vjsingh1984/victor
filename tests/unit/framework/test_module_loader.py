@@ -1013,7 +1013,9 @@ class TestEntryPointCache:
             json.dump(cache_data, f)
 
         EntryPointCache.reset_instance()
-        with patch.object(EntryPointCache, "_compute_env_hash", return_value="computed_hash") as mock_hash:
+        with patch.object(
+            EntryPointCache, "_compute_env_hash", return_value="computed_hash"
+        ) as mock_hash:
             new_cache = EntryPointCache(cache_dir=cache_dir)
 
         assert mock_hash.call_count == 1

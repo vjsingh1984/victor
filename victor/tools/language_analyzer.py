@@ -1554,9 +1554,12 @@ class BaseLanguageAnalyzer(ABC):
         """Lazy-load tree-sitter parser for this language."""
         if self._parser is None:
             try:
-                from victor_coding.codebase.tree_sitter_manager import get_parser
+                from victor.core.capability_registry import CapabilityRegistry
+                from victor.framework.vertical_protocols import TreeSitterParserProtocol
 
-                self._parser = get_parser(self.language)
+                provider = CapabilityRegistry.get_instance().get(TreeSitterParserProtocol)
+                if provider is not None:
+                    self._parser = provider.get_parser(self.language)
             except (ImportError, ValueError) as e:
                 logger.warning(
                     f"Tree-sitter not available for {self.language}: {e}. "

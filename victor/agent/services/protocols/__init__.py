@@ -27,6 +27,7 @@ Architecture:
     - ProviderServiceProtocol: Provider management and switching
     - RecoveryServiceProtocol: Error recovery and resilience
     - SessionServiceProtocol: Session lifecycle management
+    - LLMDecisionServiceProtocol: LLM-assisted decision making
 
 These protocols enable:
 1. SRP compliance: Each service has a single responsibility
@@ -45,17 +46,21 @@ Example:
 """
 
 from victor.agent.services.protocols.chat_service import ChatServiceProtocol
-from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 from victor.agent.services.protocols.context_service import ContextServiceProtocol
+from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 from victor.agent.services.protocols.provider_service import ProviderServiceProtocol
 from victor.agent.services.protocols.recovery_service import RecoveryServiceProtocol
 from victor.agent.services.protocols.session_service import SessionServiceProtocol
+from victor.agent.services.protocols.session_ledger import SessionLedgerProtocol
+from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 
 __all__ = [
     "ChatServiceProtocol",
-    "ToolServiceProtocol",
     "ContextServiceProtocol",
+    "LLMDecisionServiceProtocol",
     "ProviderServiceProtocol",
     "RecoveryServiceProtocol",
+    "SessionLedgerProtocol",
     "SessionServiceProtocol",
+    "ToolServiceProtocol",
 ]

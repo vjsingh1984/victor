@@ -1,0 +1,174 @@
+"""Shared service specification metadata used by DI providers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List
+
+from victor.core.container import ServiceLifetime
+
+# Agent protocols
+from victor.agent.protocols import (
+    ActionAuthorizerProtocol,
+    ArgumentNormalizerProtocol,
+    AutoCommitterProtocol,
+    BudgetManagerProtocol,
+    ChunkGeneratorProtocol,
+    CodeExecutionManagerProtocol,
+    ComplexityClassifierProtocol,
+    ConversationEmbeddingStoreProtocol,
+    ContextCompactorProtocol,
+    ConversationStateMachineProtocol,
+    DebugLoggerProtocol,
+    IntentClassifierProtocol,
+    MCPBridgeProtocol,
+    MetricsCollectorProtocol,
+    ModeControllerProtocol,
+    ParallelExecutorProtocol,
+    PromptCoordinatorProtocol,
+    ProjectContextProtocol,
+    ProviderRegistryProtocol,
+    ReminderManagerProtocol,
+    ResponseCompleterProtocol,
+    ResponseSanitizerProtocol,
+    RLCoordinatorProtocol,
+    SafetyCheckerProtocol,
+    SearchRouterProtocol,
+    SemanticToolSelectorProtocol,
+    StateCoordinatorProtocol,
+    StreamingHandlerProtocol,
+    StreamingMetricsCollectorProtocol,
+    StreamingRecoveryCoordinatorProtocol,
+    SystemPromptBuilderProtocol,
+    TaskCoordinatorProtocol,
+    TaskTrackerProtocol,
+    TaskTypeHinterProtocol,
+    ToolAccessControllerProtocol,
+    ToolCacheProtocol,
+    ToolCoordinatorProtocol,
+    ToolDeduplicationTrackerProtocol,
+    ToolExecutorProtocol,
+    ToolOutputFormatterProtocol,
+    ToolPlannerProtocol,
+    ToolSelectorProtocol,
+    ToolSequenceTrackerProtocol,
+    ToolDependencyGraphProtocol,
+    ToolPluginRegistryProtocol,
+    UnifiedMemoryCoordinatorProtocol,
+    UsageAnalyticsProtocol,
+    UsageLoggerProtocol,
+    WorkflowRegistryProtocol,
+)
+
+# Workflow protocols / implementations
+from victor.workflows.compiler_protocols import (
+    ExecutionContextProtocol,
+    NodeExecutorFactoryProtocol,
+    WorkflowCompilerProtocol,
+)
+from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+from victor.workflows.compiled_executor import WorkflowExecutor
+from victor.workflows.execution_context import ExecutionContext
+from victor.workflows.orchestrator_pool import OrchestratorPool
+from victor.workflows.validator import WorkflowValidator
+
+
+@dataclass(frozen=True)
+class ServiceSpec:
+    protocol: type
+    factory_attr: str
+    lifetime: ServiceLifetime = ServiceLifetime.SINGLETON
+    pass_container: bool = False
+
+
+AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
+    ServiceSpec(ComplexityClassifierProtocol, "_create_complexity_classifier"),
+    ServiceSpec(ActionAuthorizerProtocol, "_create_action_authorizer"),
+    ServiceSpec(SearchRouterProtocol, "_create_search_router"),
+    ServiceSpec(ResponseSanitizerProtocol, "_create_response_sanitizer"),
+    ServiceSpec(ArgumentNormalizerProtocol, "_create_argument_normalizer"),
+    ServiceSpec(ProjectContextProtocol, "_create_project_context"),
+    ServiceSpec(CodeExecutionManagerProtocol, "_create_code_execution_manager"),
+    ServiceSpec(WorkflowRegistryProtocol, "_create_workflow_registry"),
+    ServiceSpec(UsageAnalyticsProtocol, "_create_usage_analytics"),
+    ServiceSpec(ToolSequenceTrackerProtocol, "_create_tool_sequence_tracker"),
+    ServiceSpec(ContextCompactorProtocol, "_create_context_compactor"),
+    ServiceSpec(ModeControllerProtocol, "_create_mode_controller"),
+    ServiceSpec(ToolDeduplicationTrackerProtocol, "_create_tool_deduplication_tracker"),
+    ServiceSpec(DebugLoggerProtocol, "_create_debug_logger"),
+    ServiceSpec(TaskTypeHinterProtocol, "_create_task_type_hinter"),
+    ServiceSpec(
+        ReminderManagerProtocol,
+        "_create_reminder_manager",
+        ServiceLifetime.SCOPED,
+    ),
+    ServiceSpec(RLCoordinatorProtocol, "_create_rl_coordinator"),
+    ServiceSpec(SafetyCheckerProtocol, "_create_safety_checker"),
+    ServiceSpec(AutoCommitterProtocol, "_create_auto_committer"),
+    ServiceSpec(MCPBridgeProtocol, "_create_mcp_bridge"),
+    ServiceSpec(ToolDependencyGraphProtocol, "_create_tool_dependency_graph"),
+    ServiceSpec(ToolPluginRegistryProtocol, "_create_tool_plugin_registry"),
+    ServiceSpec(SemanticToolSelectorProtocol, "_create_semantic_tool_selector"),
+    ServiceSpec(ProviderRegistryProtocol, "_create_provider_registry"),
+    ServiceSpec(ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"),
+    ServiceSpec(MetricsCollectorProtocol, "_create_metrics_collector"),
+    ServiceSpec(ToolCacheProtocol, "_create_tool_cache"),
+    ServiceSpec(UsageLoggerProtocol, "_create_usage_logger"),
+    ServiceSpec(
+        StreamingMetricsCollectorProtocol,
+        "_create_streaming_metrics_collector",
+        ServiceLifetime.SCOPED,
+    ),
+    ServiceSpec(IntentClassifierProtocol, "_create_intent_classifier"),
+    ServiceSpec(SystemPromptBuilderProtocol, "_create_system_prompt_builder"),
+    ServiceSpec(ToolSelectorProtocol, "_create_tool_selector"),
+    ServiceSpec(ToolExecutorProtocol, "_create_tool_executor"),
+    ServiceSpec(ToolOutputFormatterProtocol, "_create_tool_output_formatter"),
+    ServiceSpec(ParallelExecutorProtocol, "_create_parallel_executor"),
+    ServiceSpec(ResponseCompleterProtocol, "_create_response_completer"),
+    ServiceSpec(
+        StreamingHandlerProtocol,
+        "_create_streaming_handler",
+        ServiceLifetime.SCOPED,
+    ),
+    ServiceSpec(StreamingRecoveryCoordinatorProtocol, "_create_recovery_coordinator"),
+    ServiceSpec(ChunkGeneratorProtocol, "_create_chunk_generator"),
+    ServiceSpec(ToolPlannerProtocol, "_create_tool_planner"),
+    ServiceSpec(TaskCoordinatorProtocol, "_create_task_coordinator"),
+    ServiceSpec(
+        ToolCoordinatorProtocol,
+        "_create_tool_coordinator",
+        ServiceLifetime.SCOPED,
+    ),
+    ServiceSpec(
+        StateCoordinatorProtocol,
+        "_create_state_coordinator",
+        ServiceLifetime.SCOPED,
+    ),
+    ServiceSpec(
+        PromptCoordinatorProtocol,
+        "_create_prompt_coordinator",
+        ServiceLifetime.SCOPED,
+    ),
+]
+
+
+WORKFLOW_SINGLETON_SPECS: List[ServiceSpec] = [
+    ServiceSpec(NodeExecutorFactoryProtocol, "_create_node_executor_factory"),
+    ServiceSpec(WorkflowValidator, "_create_workflow_validator"),
+    ServiceSpec(OrchestratorPool, "_create_orchestrator_pool"),
+]
+
+WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
+    ServiceSpec(
+        ExecutionContextProtocol,
+        "_create_execution_context",
+        ServiceLifetime.SCOPED,
+    ),
+]
+
+WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
+    ServiceSpec(WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
+    ServiceSpec(WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
+    ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
+]

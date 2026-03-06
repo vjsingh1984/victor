@@ -210,7 +210,11 @@ class ReplicateProvider(BaseProvider):
 
                 # Create prediction
                 prediction = await self._create_prediction(
-                    model=model, prompt=prompt, temperature=temperature, max_tokens=max_tokens, **kwargs
+                    model=model,
+                    prompt=prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
                 )
 
                 # Wait for completion
@@ -279,7 +283,9 @@ class ReplicateProvider(BaseProvider):
                     raise
 
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid token", "401"]):
+                if any(
+                    term in error_str for term in ["auth", "unauthorized", "invalid token", "401"]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,

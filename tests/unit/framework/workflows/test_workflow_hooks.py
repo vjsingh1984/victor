@@ -164,7 +164,9 @@ class TestGetCapabilityProviderMethod:
         assert result is None
 
     @pytest.mark.integration
-    @pytest.mark.skip(reason="Requires external victor_research package — pending migration to vertical repos")
+    @pytest.mark.skip(
+        reason="Requires external victor_research package — pending migration to vertical repos"
+    )
     def test_returns_capability_provider_for_research(self):
         """get_capability_provider should return ResearchCapabilityProvider."""
         provider = ResearchWorkflowProviderWithCapability()
@@ -174,7 +176,9 @@ class TestGetCapabilityProviderMethod:
         assert isinstance(result, BaseCapabilityProvider)
 
     @pytest.mark.integration
-    @pytest.mark.skip(reason="Requires external victor_devops package — pending migration to vertical repos")
+    @pytest.mark.skip(
+        reason="Requires external victor_devops package — pending migration to vertical repos"
+    )
     def test_returns_capability_provider_for_devops(self):
         """get_capability_provider should return DevOpsCapabilityProvider."""
         provider = DevOpsWorkflowProviderWithCapability()
@@ -184,7 +188,9 @@ class TestGetCapabilityProviderMethod:
         assert isinstance(result, BaseCapabilityProvider)
 
     @pytest.mark.integration
-    @pytest.mark.skip(reason="Requires external victor_dataanalysis package — pending migration to vertical repos")
+    @pytest.mark.skip(
+        reason="Requires external victor_dataanalysis package — pending migration to vertical repos"
+    )
     def test_returns_capability_provider_for_dataanalysis(self):
         """get_capability_provider should return DataAnalysisCapabilityProvider."""
         provider = DataAnalysisWorkflowProviderWithCapability()

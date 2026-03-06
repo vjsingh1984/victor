@@ -70,6 +70,7 @@ class SessionState(Protocol):
 
     Represents the current state of a session.
     """
+
     ACTIVE = "active"
     IDLE = "idle"
     SUSPENDED = "suspended"

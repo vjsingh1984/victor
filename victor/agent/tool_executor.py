@@ -834,7 +834,8 @@ class ToolExecutor:
                 # Run before hooks - critical hooks can block execution
                 self._run_before_hooks(tool.name, arguments)
 
-                # Execute the tool
+                # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
+                arguments.pop("_exec_ctx", None)
                 result = await tool.execute(_exec_ctx=context, **arguments)
 
                 # Run after hooks - critical hooks can raise errors

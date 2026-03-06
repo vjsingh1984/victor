@@ -84,6 +84,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import importlib.util
 import logging
 import threading
 import time
@@ -165,6 +166,10 @@ class VerticalExtensionLoader(ABC):
     _extension_loader_last_pressure_level: ClassVar[str] = "ok"
     _extension_loader_last_pressure_emit_ts: ClassVar[float] = 0.0
     _tiered_tools_deprecation_warned: ClassVar[Set[str]] = set()
+
+    # Track optional modules we have already reported as missing so that we do not spam logs.
+    _missing_extension_modules: ClassVar[Set[str]] = set()
+    _missing_extension_modules_lock: ClassVar[threading.RLock] = threading.RLock()
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -249,6 +254,53 @@ class VerticalExtensionLoader(ABC):
                 base._extension_loader_metrics[key] = 0
             base._extension_loader_last_pressure_level = "ok"
             base._extension_loader_last_pressure_emit_ts = 0.0
+
+    @classmethod
+    def _extension_module_candidates(cls, module_suffix: str) -> List[str]:
+        """Return possible module paths for an optional vertical extension."""
+        if not module_suffix:
+            return []
+
+        suffix = module_suffix.lstrip(".")
+        vertical_name = getattr(cls, "name", None)
+        if not isinstance(vertical_name, str) or not vertical_name:
+            return []
+
+        normalized = vertical_name.replace("-", "_")
+        candidates = [
+            f"victor.{vertical_name}.{suffix}",
+            f"victor_{normalized}.{suffix}",
+        ]
+        # Deduplicate while preserving order
+        seen = set()
+        ordered: List[str] = []
+        for path in candidates:
+            if path not in seen:
+                ordered.append(path)
+                seen.add(path)
+        return ordered
+
+    @classmethod
+    def _extension_module_available(cls, module_path: str) -> bool:
+        """Return True when the extension module can be imported."""
+        if not module_path:
+            return False
+
+        spec = importlib.util.find_spec(module_path)
+        if spec is not None:
+            return True
+
+        cache_key = f"{cls.__name__}:{module_path}"
+        with cls._missing_extension_modules_lock:
+            if cache_key not in cls._missing_extension_modules:
+                cls._missing_extension_modules.add(cache_key)
+                logger.debug(
+                    "Optional extension module '%s' not found for vertical '%s'; "
+                    "capability package likely not installed.",
+                    module_path,
+                    getattr(cls, "name", cls.__name__),
+                )
+        return False
 
     @classmethod
     def configure_extension_loader_pressure(
@@ -550,13 +602,27 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Safety extension (SafetyExtensionProtocol) or None
         """
-        try:
-            return cls._get_extension_factory(
-                "safety_extension",
-                f"victor.{cls.name}.safety",
-            )
-        except (ImportError, AttributeError):
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("safety")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
             return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    "safety_extension",
+                    module_path,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[Any]:
@@ -570,13 +636,27 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Prompt contributor (PromptContributorProtocol) or None
         """
-        try:
-            return cls._get_extension_factory(
-                "prompt_contributor",
-                f"victor.{cls.name}.prompts",
-            )
-        except (ImportError, AttributeError):
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("prompts")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
             return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    "prompt_contributor",
+                    module_path,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
@@ -590,21 +670,38 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Mode config provider (ModeConfigProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingModeConfigProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}ModeConfigProvider"
-            module = __import__(f"victor.{cls.name}.mode_config", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}ModeConfigProvider"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("mode_config")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "mode_config_provider",
-                    f"victor.{cls.name}.mode_config",
+                    module_path,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:
@@ -795,22 +892,39 @@ class VerticalExtensionLoader(ABC):
         Returns:
             RL config provider (RLConfigProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingRLConfig)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}RLConfig"
-            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}RLConfig"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("rl")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "rl_config_provider",
-                    f"victor.{cls.name}.rl",
+                    module_path,
                     class_name,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
@@ -824,21 +938,38 @@ class VerticalExtensionLoader(ABC):
         Returns:
             RLHooks instance or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingRLHooks)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}RLHooks"
-            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}RLHooks"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("rl")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                hooks_cls = getattr(module, class_name, None)
+                if hooks_cls is not None:
+                    return hooks_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "rl_hooks",
-                    f"victor.{cls.name}.rl",
+                    module_path,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -852,21 +983,38 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Team spec provider (TeamSpecProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingTeamSpecProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}TeamSpecProvider"
-            module = __import__(f"victor.{cls.name}.teams", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}TeamSpecProvider"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("teams")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "team_spec_provider",
-                    f"victor.{cls.name}.teams",
+                    module_path,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:
@@ -880,21 +1028,38 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Capability provider (BaseCapabilityProvider) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingCapabilityProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}CapabilityProvider"
-            module = __import__(f"victor.{cls.name}.capabilities", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}CapabilityProvider"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("capabilities")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "capability_provider",
-                    f"victor.{cls.name}.capabilities",
+                    module_path,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def get_service_provider(cls) -> Optional[Any]:
@@ -1079,9 +1244,7 @@ class VerticalExtensionLoader(ABC):
         return extensions
 
     @classmethod
-    def _get_cached_extensions(
-        cls, use_cache: bool
-    ) -> Optional["VerticalExtensions"]:
+    def _get_cached_extensions(cls, use_cache: bool) -> Optional["VerticalExtensions"]:
         """Return cached VerticalExtensions if available, else None."""
         if not use_cache:
             return None
@@ -1327,28 +1490,40 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Workflow provider instance (WorkflowProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingWorkflowProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}WorkflowProvider"
-            module = __import__(f"victor.{cls.name}.workflows", fromlist=[class_name])
-            provider_class = getattr(module, class_name)
-            return provider_class()
-        except (ImportError, AttributeError):
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}WorkflowProvider"
+
+        candidate_paths: List[str] = []
+        for suffix in ("workflows", "workflows.provider"):
+            for module_path in cls._extension_module_candidates(suffix):
+                if cls._extension_module_available(module_path):
+                    candidate_paths.append(module_path)
+
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Try provider submodule
-                module = __import__(f"victor.{cls.name}.workflows.provider", fromlist=[class_name])
-                provider_class = getattr(module, class_name)
-                return provider_class()
-            except (ImportError, AttributeError):
-                try:
-                    # Fall back to extension factory pattern
-                    return cls._get_extension_factory(
-                        "workflow_provider",
-                        f"victor.{cls.name}.workflows",
-                    )
-                except (ImportError, AttributeError):
-                    return None
+                module = __import__(module_path, fromlist=[class_name])
+                provider_class = getattr(module, class_name, None)
+                if provider_class is not None:
+                    return provider_class()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    "workflow_provider",
+                    module_path,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:

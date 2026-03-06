@@ -39,7 +39,7 @@ import pytest
 
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.capability_config_service import CapabilityConfigService
-from victor.coding.workflows import CodingWorkflowProvider
+from victor_coding.workflows import CodingWorkflowProvider
 from victor.devops.workflows import DevOpsWorkflowProvider
 from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
 from victor.research.workflows import ResearchWorkflowProvider
@@ -486,7 +486,7 @@ class TestCodingVerticalCapabilities:
         Since CodingWorkflowProvider doesn't implement the hook,
         test that we can still import the provider directly.
         """
-        from victor.coding.capabilities import CodingCapabilityProvider
+        from victor_coding.capabilities import CodingCapabilityProvider
 
         provider = CodingCapabilityProvider()
 
@@ -505,7 +505,7 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capabilities_accessible(self):
         """Test that all 5 Coding capabilities are accessible via direct import."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        from victor_coding.capabilities import CodingCapabilityProvider
 
         cap_provider = CodingCapabilityProvider()
         capabilities = cap_provider.get_capabilities()
@@ -518,7 +518,7 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capability_metadata(self):
         """Test that Coding capability metadata is correct."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        from victor_coding.capabilities import CodingCapabilityProvider
 
         cap_provider = CodingCapabilityProvider()
         metadata = cap_provider.get_capability_metadata()
@@ -536,7 +536,7 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capability_application(self):
         """Test that Coding capabilities can be applied to orchestrator."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        from victor_coding.capabilities import CodingCapabilityProvider
 
         cap_provider = CodingCapabilityProvider()
         orchestrator = MockOrchestrator()
@@ -559,7 +559,7 @@ class TestCodingVerticalCapabilities:
         Verifies that capabilities properly integrate with coding middleware
         like code style enforcement.
         """
-        from victor.coding.capabilities import (
+        from victor_coding.capabilities import (
             configure_code_style,
             get_code_style,
         )
@@ -886,7 +886,7 @@ class TestCapabilityMetadataConsistency:
             ("research", "victor.research.capabilities.ResearchCapabilityProvider", 5),
             ("devops", "victor.devops.capabilities.DevOpsCapabilityProvider", 5),
             ("dataanalysis", "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider", 5),
-            ("coding", "victor.coding.capabilities.CodingCapabilityProvider", 5),
+            ("coding", "victor_coding.capabilities.CodingCapabilityProvider", 5),
             ("rag", "victor.rag.capabilities.RAGCapabilityProvider", 5),
         ],
     )
@@ -916,7 +916,7 @@ class TestCapabilityMetadataConsistency:
             "victor.research.capabilities.ResearchCapabilityProvider",
             "victor.devops.capabilities.DevOpsCapabilityProvider",
             "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider",
-            "victor.coding.capabilities.CodingCapabilityProvider",
+            "victor_coding.capabilities.CodingCapabilityProvider",
             "victor.rag.capabilities.RAGCapabilityProvider",
         ],
     )
@@ -962,7 +962,7 @@ class TestCapabilityMetadataConsistency:
             ("victor.research.capabilities", "ResearchCapabilityProvider"),
             ("victor.devops.capabilities", "DevOpsCapabilityProvider"),
             ("victor.dataanalysis.capabilities", "DataAnalysisCapabilityProvider"),
-            ("victor.coding.capabilities", "CodingCapabilityProvider"),
+            ("victor_coding.capabilities", "CodingCapabilityProvider"),
             ("victor.rag.capabilities", "RAGCapabilityProvider"),
         ]
 
@@ -995,7 +995,7 @@ class TestCrossVerticalCapabilityIntegration:
         """
         from victor.research.capabilities import ResearchCapabilityProvider
         from victor.devops.capabilities import DevOpsCapabilityProvider
-        from victor.coding.capabilities import CodingCapabilityProvider
+        from victor_coding.capabilities import CodingCapabilityProvider
 
         orchestrator = MockOrchestrator()
 
@@ -1059,7 +1059,7 @@ class TestServiceBackedCapabilityConfigFlow:
     """Integration tests for service-backed capability config runtime getters."""
 
     def test_coding_service_backed_getter_flow(self):
-        from victor.coding.capabilities import configure_code_style, get_code_style
+        from victor_coding.capabilities import configure_code_style, get_code_style
 
         service = CapabilityConfigService()
         orchestrator = ServiceBackedOrchestrator(service)

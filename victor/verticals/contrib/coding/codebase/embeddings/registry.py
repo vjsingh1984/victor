@@ -16,7 +16,10 @@
 
 from typing import Dict, List, Type
 
-from victor.verticals.contrib.coding.codebase.embeddings.base import BaseEmbeddingProvider, EmbeddingConfig
+from victor.verticals.contrib.coding.codebase.embeddings.base import (
+    BaseEmbeddingProvider,
+    EmbeddingConfig,
+)
 
 
 class EmbeddingRegistry:
@@ -111,21 +114,27 @@ class EmbeddingRegistry:
 def _auto_register_providers() -> None:
     """Automatically discover and register embedding providers."""
     try:
-        from victor.verticals.contrib.coding.codebase.embeddings.chromadb_provider import ChromaDBProvider
+        from victor.verticals.contrib.coding.codebase.embeddings.chromadb_provider import (
+            ChromaDBProvider,
+        )
 
         EmbeddingRegistry.register("chromadb", ChromaDBProvider)
     except ImportError:
         pass  # ChromaDB not installed
 
     try:
-        from victor.verticals.contrib.coding.codebase.embeddings.lancedb_provider import LanceDBProvider
+        from victor.verticals.contrib.coding.codebase.embeddings.lancedb_provider import (
+            LanceDBProvider,
+        )
 
         EmbeddingRegistry.register("lancedb", LanceDBProvider)
     except ImportError:
         pass  # LanceDB not installed
 
     try:
-        from victor.verticals.contrib.coding.codebase.embeddings.proximadb_provider import ProximaDBProvider
+        from victor.verticals.contrib.coding.codebase.embeddings.proximadb_provider import (
+            ProximaDBProvider,
+        )
 
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)
     except ImportError:

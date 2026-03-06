@@ -34,7 +34,7 @@ from victor.framework.multi_agent.teams import (
     TeamTopology,
     TaskAssignmentStrategy,
 )
-from victor.coding.teams.personas import (
+from victor_coding.teams.personas import (
     CodingPersona,
     PersonaTraits as CodingPersonaTraits,
     ExpertiseCategory,

@@ -48,6 +48,15 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.container import ServiceContainer, ServiceLifetime
+from victor.core.service_registration import (
+    ServiceRegistrationSpec,
+    register_services_from_specs,
+)
+from victor.core.service_specs import (
+    WORKFLOW_SCOPED_SPECS,
+    WORKFLOW_SINGLETON_SPECS,
+    WORKFLOW_TRANSIENT_SPECS,
+)
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -124,34 +133,22 @@ class WorkflowServiceProvider:
         Args:
             container: DI container to register services in
         """
-        # Import workflow protocols and concrete classes
-        from victor.workflows.compiler_protocols import (
-            NodeExecutorFactoryProtocol,
-        )
-        from victor.workflows.executor import get_compute_handler
-        from victor.workflows.orchestrator_pool import OrchestratorPool
-        from victor.workflows.validator import WorkflowValidator
+        specs = []
+        for spec in WORKFLOW_SINGLETON_SPECS:
+            factory = getattr(self, spec.factory_attr)
+            if spec.pass_container:
+                factory_fn = lambda c, method=factory: method(c)
+            else:
+                factory_fn = lambda c, method=factory: method()
+            specs.append(
+                ServiceRegistrationSpec(
+                    spec.protocol,
+                    factory_fn,
+                    lifetime=spec.lifetime,
+                )
+            )
 
-        # NodeExecutorFactory - creates executor functions for nodes
-        container.register(
-            NodeExecutorFactoryProtocol,
-            lambda c: self._create_node_executor_factory(),
-            ServiceLifetime.SINGLETON,
-        )
-
-        # WorkflowValidator - validates workflow structure
-        container.register(
-            WorkflowValidator,
-            lambda c: WorkflowValidator(),
-            ServiceLifetime.SINGLETON,
-        )
-
-        # OrchestratorPool - manages orchestrators for multi-provider workflows
-        container.register(
-            OrchestratorPool,
-            lambda c: OrchestratorPool(self._settings, container),
-            ServiceLifetime.SINGLETON,
-        )
+        register_services_from_specs(container, specs)
 
         logger.debug("Registered singleton workflow services")
 
@@ -164,19 +161,22 @@ class WorkflowServiceProvider:
         Args:
             container: DI container to register services in
         """
-        # Import concrete ExecutionContext class
-        from victor.workflows.execution_context import ExecutionContext
+        scoped_specs = []
+        for spec in WORKFLOW_SCOPED_SPECS:
+            factory = getattr(self, spec.factory_attr)
+            if spec.pass_container:
+                factory_fn = lambda c, method=factory: method(c)
+            else:
+                factory_fn = lambda c, method=factory: method()
+            scoped_specs.append(
+                ServiceRegistrationSpec(
+                    spec.protocol,
+                    factory_fn,
+                    lifetime=spec.lifetime,
+                )
+            )
 
-        # ExecutionContext - per-execution context
-        container.register(
-            ExecutionContext,
-            lambda c: ExecutionContext(
-                orchestrator=None,  # Will be set during execution
-                settings=self._settings,
-                services=container,
-            ),
-            ServiceLifetime.SCOPED,
-        )
+        register_services_from_specs(container, scoped_specs)
 
         logger.debug("Registered scoped workflow services")
 
@@ -194,26 +194,22 @@ class WorkflowServiceProvider:
         from victor.workflows.compiled_executor import WorkflowExecutor
         from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
 
-        # WorkflowCompilerImpl - concrete implementation for DI container
-        container.register(
-            WorkflowCompilerImpl,
-            lambda c: self._create_workflow_compiler_impl(),
-            ServiceLifetime.TRANSIENT,
-        )
+        transient_specs = []
+        for spec in WORKFLOW_TRANSIENT_SPECS:
+            factory = getattr(self, spec.factory_attr)
+            if spec.pass_container:
+                factory_fn = lambda c, method=factory: method(c)
+            else:
+                factory_fn = lambda c, method=factory: method()
+            transient_specs.append(
+                ServiceRegistrationSpec(
+                    spec.protocol,
+                    factory_fn,
+                    lifetime=spec.lifetime,
+                )
+            )
 
-        # WorkflowCompilerProtocol - protocol alias for the compiler implementation
-        container.register(
-            WorkflowCompilerProtocol,
-            lambda c: self._create_workflow_compiler_impl(),
-            ServiceLifetime.TRANSIENT,
-        )
-
-        # WorkflowExecutor - executes compiled workflow graphs
-        container.register(
-            WorkflowExecutor,
-            lambda c: self._create_workflow_executor(),
-            ServiceLifetime.TRANSIENT,
-        )
+        register_services_from_specs(container, transient_specs)
 
         logger.debug("Registered transient workflow services")
 
@@ -322,7 +318,7 @@ class WorkflowServiceProvider:
     # Factory methods for scoped services
     # =========================================================================
 
-    def _create_execution_context(self) -> Any:
+    def _create_execution_context(self, container: ServiceContainer) -> Any:
         """Create ExecutionContext instance.
 
         The ExecutionContext is responsible for:
@@ -336,11 +332,13 @@ class WorkflowServiceProvider:
         """
         from victor.workflows.execution_context import ExecutionContext
 
-        # ExecutionContext will be populated with orchestrator, settings, etc.
-        # when the workflow execution begins
-        return ExecutionContext()
+        return ExecutionContext(
+            orchestrator=None,
+            settings=self._settings,
+            services=container,
+        )
 
-    def _create_orchestrator_pool(self) -> Any:
+    def _create_orchestrator_pool(self, container: ServiceContainer) -> Any:
         """Create OrchestratorPool instance.
 
         The OrchestratorPool is responsible for:
@@ -354,7 +352,7 @@ class WorkflowServiceProvider:
         """
         from victor.workflows.orchestrator_pool import OrchestratorPool
 
-        pool = OrchestratorPool(settings=self._settings, container=self.container)
+        pool = OrchestratorPool(settings=self._settings, container=container)
 
         logger.debug("Created OrchestratorPool for multi-provider workflows")
 

@@ -32,6 +32,7 @@ from victor.core.container import (
 # Test Protocols and Classes
 # =============================================================================
 
+
 class ITestService:
     """Protocol for test service."""
 
@@ -114,6 +115,7 @@ class DisposableService(ITestService):
 # =============================================================================
 # Decorator Registration Tests
 # =============================================================================
+
 
 class TestDecoratorRegistration:
     """Tests for decorator-based service registration."""
@@ -200,6 +202,7 @@ class TestDecoratorRegistration:
                 return 42
 
         with pytest.raises(ServiceAlreadyRegisteredError):
+
             @container.service(ITestService, ServiceLifetime.SINGLETON)
             class AnotherService(ITestService):
                 def get_value(self) -> int:
@@ -215,8 +218,7 @@ class TestDecoratorRegistration:
                 return 1
 
         class IAnotherService:
-            def get_name(self) -> str:
-                ...
+            def get_name(self) -> str: ...
 
         @container.service(IAnotherService, ServiceLifetime.SINGLETON)
         class Service2(IAnotherService):
@@ -237,6 +239,7 @@ class TestDecoratorRegistration:
 # =============================================================================
 # Health Check Tests
 # =============================================================================
+
 
 class TestHealthChecks:
     """Tests for service health check functionality."""
@@ -272,10 +275,7 @@ class TestHealthChecks:
     def test_check_health_service_with_failing_health_check(self):
         """Test health check when is_healthy raises an exception."""
         container = ServiceContainer()
-        container.register(
-            IHealthyService,
-            lambda c: ServiceWithFailingHealthCheck()
-        )
+        container.register(IHealthyService, lambda c: ServiceWithFailingHealthCheck())
 
         # Failing health check should return False
         assert not container.check_health(IHealthyService)
@@ -294,9 +294,7 @@ class TestHealthChecks:
                 return True
 
         container.register(
-            IHealthyService,
-            lambda c: CountingHealthyService(),
-            ServiceLifetime.SINGLETON
+            IHealthyService, lambda c: CountingHealthyService(), ServiceLifetime.SINGLETON
         )
 
         # First call creates instance
@@ -327,10 +325,7 @@ class TestHealthChecks:
 
         # Register services with different health statuses
         container.register(ITestService, lambda c: BasicService())
-        container.register(
-            IHealthyService,
-            lambda c: UnhealthyService()
-        )
+        container.register(IHealthyService, lambda c: UnhealthyService())
 
         health_status = container.check_all_health()
 
@@ -366,6 +361,7 @@ class TestHealthChecks:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestDecoratorAndHealthChecksIntegration:
     """Integration tests for decorator registration and health checks."""
@@ -409,8 +405,7 @@ class TestDecoratorAndHealthChecksIntegration:
         # Create a different service type for Service3
         @runtime_checkable
         class IUnhealthyService(Protocol):
-            def is_healthy(self) -> bool:
-                ...
+            def is_healthy(self) -> bool: ...
 
         @container.service(IUnhealthyService, ServiceLifetime.SINGLETON)
         class Service3(IUnhealthyService):
@@ -462,6 +457,7 @@ class TestThreadSafety:
 
         def register_service(index: int):
             try:
+
                 class ILocalService:
                     pass
 
@@ -472,10 +468,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=register_service, args=(i,))
-            for i in range(10)
-        ]
+        threads = [threading.Thread(target=register_service, args=(i,)) for i in range(10)]
 
         for t in threads:
             t.start()
@@ -505,10 +498,7 @@ class TestThreadSafety:
         def check_health():
             results.append(container.check_health(IHealthyService))
 
-        threads = [
-            threading.Thread(target=check_health)
-            for _ in range(10)
-        ]
+        threads = [threading.Thread(target=check_health) for _ in range(10)]
 
         for t in threads:
             t.start()

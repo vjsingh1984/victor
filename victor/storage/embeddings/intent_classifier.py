@@ -27,12 +27,24 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
 from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
+
+# Module-level optional reference to LLMDecisionService (set during bootstrap)
+_decision_service: Optional[Any] = None
+
+
+def set_decision_service(service: Optional[Any]) -> None:
+    """Set the module-level decision service reference.
+
+    Called during bootstrap when the LLM decision service is available.
+    """
+    global _decision_service
+    _decision_service = service
 
 
 # Compiled regex patterns for explicit continuation detection
@@ -185,6 +197,54 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
         r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b", re.IGNORECASE
     ),
 ]
+
+
+# Compiled regex patterns for detecting bold/markdown-wrapped completion markers
+# These handle **DONE**: , __SUMMARY__: , DONE: , SUMMARY: etc.
+# The model is instructed to output these; markdown rendering strips formatting
+COMPLETION_MARKER_HEURISTIC_PATTERNS = [
+    # **DONE**: or DONE: at line start (with optional markdown bold/italic)
+    re.compile(
+        r"(?:^|\n)\s*(?:\*\*|__)?(?:DONE|_DONE_)(?:\*\*|__)?[\s]*[:|-]",
+        re.IGNORECASE,
+    ),
+    # **SUMMARY**: or SUMMARY: at line start
+    re.compile(
+        r"(?:^|\n)\s*(?:\*\*|__)?(?:SUMMARY|_SUMMARY_)(?:\*\*|__)?[\s]*[:|-]",
+        re.IGNORECASE,
+    ),
+    # **TASK_DONE**: or TASK_DONE: at line start
+    re.compile(
+        r"(?:^|\n)\s*(?:\*\*|__)?(?:TASK[_\s]?DONE|_TASK_DONE_)(?:\*\*|__)?[\s]*[:|-]",
+        re.IGNORECASE,
+    ),
+    # **BLOCKED**: at line start
+    re.compile(
+        r"(?:^|\n)\s*(?:\*\*|__)?(?:BLOCKED|_BLOCKED_)(?:\*\*|__)?[\s]*[:|-]",
+        re.IGNORECASE,
+    ),
+]
+
+
+def _has_completion_marker_heuristic(text: str) -> bool:
+    """Check if text contains explicit completion markers (DONE:, SUMMARY:, etc.).
+
+    These markers are instructed in the system prompt and are the primary
+    mechanism for deterministic task completion detection. They survive
+    markdown rendering because the detector matches both the raw format
+    (**DONE**:) and the rendered format (DONE:).
+
+    Args:
+        text: Text to check
+
+    Returns:
+        True if text contains completion markers
+    """
+    for pattern in COMPLETION_MARKER_HEURISTIC_PATTERNS:
+        if pattern.search(text):
+            logger.debug(f"Completion-marker heuristic matched: {pattern.pattern[:40]}...")
+            return True
+    return False
 
 
 def _has_completion_offer_heuristic(text: str) -> bool:
@@ -399,6 +459,186 @@ ASKING_INPUT_PHRASES = [
     "I can implement this if you",
     "I can proceed with",
 ]
+
+
+def _classify_with_heuristics(
+    text: str,
+    best_continuation: float,
+    best_completion: float,
+    best_asking_input: float,
+    top_matches: List[Tuple[str, float]],
+    continuation_threshold: float,
+    completion_threshold: float,
+    asking_input_threshold: float,
+) -> IntentResult:
+    """Shared heuristic + semantic classification logic.
+
+    Used by both classify_intent (async) and classify_intent_sync to avoid
+    duplicating the heuristic override chain.
+
+    Heuristic priority order:
+    0. Completion markers (**DONE**:, **SUMMARY**:) - highest, deterministic
+    1. Stuck loop patterns - model planning but not executing
+    2. Continuation patterns - "let me read", "let me check"
+    3. Completion offer patterns - task done + offering to elaborate
+    4. Asking input patterns - "would you like", "should I"
+    5. Semantic similarity (fallback)
+
+    Args:
+        text: Text to classify
+        best_continuation: Best semantic score for continuation
+        best_completion: Best semantic score for completion
+        best_asking_input: Best semantic score for asking input
+        top_matches: Debug info for top matches
+        continuation_threshold: Min similarity for continuation
+        completion_threshold: Min similarity for completion
+        asking_input_threshold: Min similarity for asking input
+
+    Returns:
+        IntentResult with classified intent
+    """
+    # HEURISTIC OVERRIDE 0 (HIGHEST PRIORITY): Completion markers
+    # **DONE**: , **SUMMARY**: , **TASK_DONE**: - these are definitive completion signals
+    # instructed in the system prompt, checked first because they are unambiguous
+    if _has_completion_marker_heuristic(text):
+        top_matches.append(("heuristic:completion_marker", 0.95))
+        logger.debug("COMPLETION detected via marker heuristic (conf=0.95)")
+        return IntentResult(
+            intent=IntentType.COMPLETION,
+            confidence=0.95,
+            top_matches=top_matches,
+        )
+
+    # HEURISTIC OVERRIDE 1: Check for stuck loop patterns
+    if _has_stuck_loop_heuristic(text):
+        top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
+        logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
+        return IntentResult(
+            intent=IntentType.STUCK_LOOP,
+            confidence=0.85,
+            top_matches=top_matches,
+        )
+
+    # HEURISTIC OVERRIDE 2: Check for explicit continuation patterns
+    if _has_continuation_heuristic(text):
+        heuristic_confidence = max(best_continuation, 0.75)
+        top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
+        logger.debug(
+            f"CONTINUATION detected via heuristic override (conf={heuristic_confidence:.2f})"
+        )
+        return IntentResult(
+            intent=IntentType.CONTINUATION,
+            confidence=heuristic_confidence,
+            top_matches=top_matches,
+        )
+
+    # HEURISTIC OVERRIDE 3: Check for "task done + optional elaboration" patterns
+    if _has_completion_offer_heuristic(text):
+        heuristic_confidence = max(best_completion, 0.85)
+        top_matches.append(("heuristic:completion_offer_pattern", heuristic_confidence))
+        logger.debug(
+            f"COMPLETION detected via elaboration-offer heuristic (conf={heuristic_confidence:.2f})"
+        )
+        return IntentResult(
+            intent=IntentType.COMPLETION,
+            confidence=heuristic_confidence,
+            top_matches=top_matches,
+        )
+
+    # HEURISTIC OVERRIDE 4: Check for explicit asking-for-input patterns
+    if _has_asking_input_heuristic(text):
+        heuristic_confidence = max(best_asking_input, 0.75)
+        top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
+        logger.debug(
+            f"ASKING_INPUT detected via heuristic override (conf={heuristic_confidence:.2f})"
+        )
+        return IntentResult(
+            intent=IntentType.ASKING_INPUT,
+            confidence=heuristic_confidence,
+            top_matches=top_matches,
+        )
+
+    # Semantic similarity fallback
+    TIE_THRESHOLD = 0.05
+    max_score = max(best_continuation, best_completion, best_asking_input)
+    scores_are_tied = (
+        abs(best_continuation - max_score) < TIE_THRESHOLD
+        and abs(best_completion - max_score) < TIE_THRESHOLD
+    )
+
+    if scores_are_tied:
+        return IntentResult(
+            intent=IntentType.NEUTRAL,
+            confidence=max_score,
+            top_matches=top_matches,
+        )
+
+    if (
+        best_asking_input >= asking_input_threshold
+        and best_asking_input >= best_continuation
+        and best_asking_input >= best_completion
+    ):
+        return IntentResult(
+            intent=IntentType.ASKING_INPUT,
+            confidence=best_asking_input,
+            top_matches=top_matches,
+        )
+    elif best_continuation >= continuation_threshold and best_continuation > best_completion:
+        return IntentResult(
+            intent=IntentType.CONTINUATION,
+            confidence=best_continuation,
+            top_matches=top_matches,
+        )
+    elif best_completion >= completion_threshold and best_completion > best_continuation:
+        return IntentResult(
+            intent=IntentType.COMPLETION,
+            confidence=best_completion,
+            top_matches=top_matches,
+        )
+    else:
+        # LLM augmentation: if result is NEUTRAL and decision service is available
+        neutral_confidence = max(best_continuation, best_completion, best_asking_input)
+        if _decision_service is not None and neutral_confidence < 0.7:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = _decision_service.decide_sync(
+                    DecisionType.INTENT_CLASSIFICATION,
+                    context={
+                        "text_tail": text[-300:],
+                        "has_tool_calls": "false",
+                    },
+                    heuristic_result=IntentType.NEUTRAL,
+                    heuristic_confidence=neutral_confidence,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "intent"):
+                    intent_map = {
+                        "continuation": IntentType.CONTINUATION,
+                        "completion": IntentType.COMPLETION,
+                        "asking_input": IntentType.ASKING_INPUT,
+                        "stuck_loop": IntentType.STUCK_LOOP,
+                    }
+                    mapped = intent_map.get(decision.result.intent)
+                    if mapped is not None:
+                        top_matches.append(("llm:intent", decision.confidence))
+                        logger.debug(
+                            "LLM classified intent as %s (conf=%.2f)",
+                            mapped.value,
+                            decision.confidence,
+                        )
+                        return IntentResult(
+                            intent=mapped,
+                            confidence=decision.confidence,
+                            top_matches=top_matches,
+                        )
+            except Exception:
+                logger.debug("LLM intent classification failed", exc_info=True)
+
+        return IntentResult(
+            intent=IntentType.NEUTRAL,
+            confidence=neutral_confidence,
+            top_matches=top_matches,
+        )
 
 
 class IntentClassifier:
@@ -646,111 +886,17 @@ class IntentClassifier:
         for item, score in asking_input_results[:2]:
             top_matches.append((f"ask:{item.text[:50]}", score))
 
-        # HEURISTIC OVERRIDE 0: Check for stuck loop patterns FIRST
-        # If model keeps saying what it will do with multiple planning statements,
-        # it's likely stuck and not actually making progress
-        if _has_stuck_loop_heuristic(text):
-            top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
-            logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
-            return IntentResult(
-                intent=IntentType.STUCK_LOOP,
-                confidence=0.85,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
-        # Patterns like "let me read", "let me check" are unambiguous
-        if _has_continuation_heuristic(text):
-            heuristic_confidence = max(best_continuation, 0.75)
-            top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
-            logger.debug(
-                f"CONTINUATION detected via heuristic override (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.CONTINUATION,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 2: Check for "task done + optional elaboration" patterns
-        # These indicate the model has FINISHED and is just offering to explain more
-        # Must check BEFORE asking_input since patterns overlap (both use "Would you like")
-        if _has_completion_offer_heuristic(text):
-            heuristic_confidence = max(best_completion, 0.85)
-            top_matches.append(("heuristic:completion_offer_pattern", heuristic_confidence))
-            logger.debug(
-                f"COMPLETION detected via elaboration-offer heuristic (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.COMPLETION,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 3: Check for explicit asking-for-input patterns
-        # These patterns are unambiguous, so they override semantic classification
-        if _has_asking_input_heuristic(text):
-            # Use higher confidence when heuristic matches
-            heuristic_confidence = max(best_asking_input, 0.75)
-            top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
-            logger.debug(
-                f"ASKING_INPUT detected via heuristic override (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.ASKING_INPUT,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # Determine intent based on thresholds and relative scores
-        # If scores are too close (within 0.05), it's ambiguous -> NEUTRAL
-        TIE_THRESHOLD = 0.05
-        max_score = max(best_continuation, best_completion, best_asking_input)
-        scores_are_tied = (
-            abs(best_continuation - max_score) < TIE_THRESHOLD
-            and abs(best_completion - max_score) < TIE_THRESHOLD
+        # Classify using shared heuristic + semantic logic
+        return _classify_with_heuristics(
+            text=text,
+            best_continuation=best_continuation,
+            best_completion=best_completion,
+            best_asking_input=best_asking_input,
+            top_matches=top_matches,
+            continuation_threshold=self.continuation_threshold,
+            completion_threshold=self.completion_threshold,
+            asking_input_threshold=self.asking_input_threshold,
         )
-
-        if scores_are_tied:
-            # Scores too close to call
-            return IntentResult(
-                intent=IntentType.NEUTRAL,
-                confidence=max_score,
-                top_matches=top_matches,
-            )
-
-        # Check asking_input first (highest priority if it matches well)
-        if (
-            best_asking_input >= self.asking_input_threshold
-            and best_asking_input >= best_continuation
-            and best_asking_input >= best_completion
-        ):
-            return IntentResult(
-                intent=IntentType.ASKING_INPUT,
-                confidence=best_asking_input,
-                top_matches=top_matches,
-            )
-        elif (
-            best_continuation >= self.continuation_threshold and best_continuation > best_completion
-        ):
-            return IntentResult(
-                intent=IntentType.CONTINUATION,
-                confidence=best_continuation,
-                top_matches=top_matches,
-            )
-        elif best_completion >= self.completion_threshold and best_completion > best_continuation:
-            return IntentResult(
-                intent=IntentType.COMPLETION,
-                confidence=best_completion,
-                top_matches=top_matches,
-            )
-        else:
-            # Neither meets threshold or too close to call
-            return IntentResult(
-                intent=IntentType.NEUTRAL,
-                confidence=max(best_continuation, best_completion, best_asking_input),
-                top_matches=top_matches,
-            )
 
     def classify_intent_sync(
         self,
@@ -792,110 +938,17 @@ class IntentClassifier:
         for item, score in asking_input_results[:2]:
             top_matches.append((f"ask:{item.text[:50]}", score))
 
-        # HEURISTIC OVERRIDE 0: Check for stuck loop patterns FIRST
-        # If model keeps saying what it will do with multiple planning statements,
-        # it's likely stuck and not actually making progress
-        if _has_stuck_loop_heuristic(text):
-            top_matches.append(("heuristic:stuck_loop_pattern", 0.85))
-            logger.debug("STUCK_LOOP detected via heuristic override (conf=0.85)")
-            return IntentResult(
-                intent=IntentType.STUCK_LOOP,
-                confidence=0.85,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 1: Check for explicit continuation patterns
-        # Patterns like "let me read", "let me check" are unambiguous
-        if _has_continuation_heuristic(text):
-            heuristic_confidence = max(best_continuation, 0.75)
-            top_matches.append(("heuristic:continuation_pattern", heuristic_confidence))
-            logger.debug(
-                f"CONTINUATION detected via heuristic override (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.CONTINUATION,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 2: Check for "task done + optional elaboration" patterns
-        # These indicate the model has FINISHED and is just offering to explain more
-        # Must check BEFORE asking_input since patterns overlap (both use "Would you like")
-        if _has_completion_offer_heuristic(text):
-            heuristic_confidence = max(best_completion, 0.85)
-            top_matches.append(("heuristic:completion_offer_pattern", heuristic_confidence))
-            logger.debug(
-                f"COMPLETION detected via elaboration-offer heuristic (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.COMPLETION,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # HEURISTIC OVERRIDE 3: Check for explicit asking-for-input patterns
-        # These patterns are unambiguous, so they override semantic classification
-        if _has_asking_input_heuristic(text):
-            # Use higher confidence when heuristic matches
-            heuristic_confidence = max(best_asking_input, 0.75)
-            top_matches.append(("heuristic:asking_input_pattern", heuristic_confidence))
-            logger.debug(
-                f"ASKING_INPUT detected via heuristic override (conf={heuristic_confidence:.2f})"
-            )
-            return IntentResult(
-                intent=IntentType.ASKING_INPUT,
-                confidence=heuristic_confidence,
-                top_matches=top_matches,
-            )
-
-        # Determine intent based on thresholds and relative scores
-        # If scores are too close (within 0.05), it's ambiguous -> NEUTRAL
-        TIE_THRESHOLD = 0.05
-        max_score = max(best_continuation, best_completion, best_asking_input)
-        scores_are_tied = (
-            abs(best_continuation - max_score) < TIE_THRESHOLD
-            and abs(best_completion - max_score) < TIE_THRESHOLD
+        # Classify using shared heuristic + semantic logic
+        return _classify_with_heuristics(
+            text=text,
+            best_continuation=best_continuation,
+            best_completion=best_completion,
+            best_asking_input=best_asking_input,
+            top_matches=top_matches,
+            continuation_threshold=self.continuation_threshold,
+            completion_threshold=self.completion_threshold,
+            asking_input_threshold=self.asking_input_threshold,
         )
-
-        if scores_are_tied:
-            # Scores too close to call
-            return IntentResult(
-                intent=IntentType.NEUTRAL,
-                confidence=max_score,
-                top_matches=top_matches,
-            )
-
-        # Check asking_input first (highest priority if it matches well)
-        if (
-            best_asking_input >= self.asking_input_threshold
-            and best_asking_input >= best_continuation
-            and best_asking_input >= best_completion
-        ):
-            return IntentResult(
-                intent=IntentType.ASKING_INPUT,
-                confidence=best_asking_input,
-                top_matches=top_matches,
-            )
-        elif (
-            best_continuation >= self.continuation_threshold and best_continuation > best_completion
-        ):
-            return IntentResult(
-                intent=IntentType.CONTINUATION,
-                confidence=best_continuation,
-                top_matches=top_matches,
-            )
-        elif best_completion >= self.completion_threshold and best_completion > best_continuation:
-            return IntentResult(
-                intent=IntentType.COMPLETION,
-                confidence=best_completion,
-                top_matches=top_matches,
-            )
-        else:
-            return IntentResult(
-                intent=IntentType.NEUTRAL,
-                confidence=max(best_continuation, best_completion, best_asking_input),
-                top_matches=top_matches,
-            )
 
     def intends_to_continue(self, text: str) -> bool:
         """Quick check if text indicates continuation intent.

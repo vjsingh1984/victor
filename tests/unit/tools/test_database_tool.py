@@ -92,13 +92,15 @@ class TestDatabaseQuery:
         conn_id = result["connection_id"]
 
         # Create test table
-        _connections[conn_id].execute("""
+        _connections[conn_id].execute(
+            """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT
             )
-        """)
+        """
+        )
         _connections[conn_id].execute(
             "INSERT INTO users (name, email) VALUES ('Alice', 'alice@test.com')"
         )
@@ -234,14 +236,16 @@ class TestDatabaseDescribe:
         result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
-        _connections[conn_id].execute("""
+        _connections[conn_id].execute(
+            """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT,
                 age INTEGER
             )
-        """)
+        """
+        )
         _connections[conn_id].commit()
 
         yield conn_id

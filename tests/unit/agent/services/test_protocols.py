@@ -70,6 +70,7 @@ class TestProtocolImplementation:
 
             async def chat(self, user_message: str, **kwargs):
                 from victor.providers.base import CompletionResponse
+
                 return CompletionResponse(
                     content=f"Response to: {user_message}",
                     stop_reason="stop",
@@ -78,6 +79,7 @@ class TestProtocolImplementation:
 
             async def stream_chat(self, user_message: str, **kwargs):
                 from victor.providers.base import StreamChunk
+
                 yield StreamChunk(content=f"Chunk for: {user_message}")
 
             def reset_conversation(self) -> None:
@@ -118,6 +120,7 @@ class TestProtocolImplementation:
 
             async def execute_tool(self, tool_name, arguments):
                 from victor.tools.base import ToolResult
+
                 return ToolResult(success=True, output=f"Executed {tool_name}")
 
             async def execute_tools_parallel(self, tool_calls, max_parallel=5):
@@ -376,6 +379,7 @@ class TestProtocolImplementation:
 
             async def create_session(self, metadata=None):
                 import uuid
+
                 session_id = str(uuid.uuid4())
                 self.sessions[session_id] = MockSessionInfo(session_id)
                 self.current_id = session_id
@@ -446,8 +450,9 @@ class TestProtocolCompliance:
         """
         # Count methods in each protocol
         chat_methods = [
-            m for m in dir(ChatServiceProtocol)
-            if not m.startswith('_') and callable(getattr(ChatServiceProtocol, m))
+            m
+            for m in dir(ChatServiceProtocol)
+            if not m.startswith("_") and callable(getattr(ChatServiceProtocol, m))
         ]
 
         # ChatServiceProtocol should have reasonable number of methods
@@ -468,6 +473,7 @@ class TestProtocolCompliance:
             # ChatServiceProtocol methods
             async def chat(self, user_message, **kwargs):
                 from victor.providers.base import CompletionResponse
+
                 return CompletionResponse(
                     content=f"Response: {user_message}",
                     finish_reason="stop",
@@ -477,7 +483,9 @@ class TestProtocolCompliance:
             async def stream_chat(self, user_message, **kwargs):
                 async def chunks():
                     from victor.providers.base import StreamChunk
+
                     yield StreamChunk(content="test")
+
                 return chunks()
 
             def reset_conversation(self):
@@ -492,12 +500,14 @@ class TestProtocolCompliance:
 
             async def execute_tool(self, tool_name, arguments):
                 from victor.tools.base import ToolResult
+
                 return ToolResult(success=True, output="test")
 
             async def execute_tools_parallel(self, tool_calls, max_parallel=5):
                 async def empty_gen():
                     return
                     yield
+
                 return empty_gen()
 
             def get_tool_budget(self):
@@ -543,7 +553,7 @@ class TestProtocolTypeChecking:
         valid = ValidService()
         # We can't directly test runtime_checkable without a proper implementation
         # but we can verify the protocol has the expected structure
-        assert hasattr(ChatServiceProtocol, 'chat')
-        assert hasattr(ChatServiceProtocol, 'stream_chat')
-        assert hasattr(ChatServiceProtocol, 'reset_conversation')
-        assert hasattr(ChatServiceProtocol, 'is_healthy')
+        assert hasattr(ChatServiceProtocol, "chat")
+        assert hasattr(ChatServiceProtocol, "stream_chat")
+        assert hasattr(ChatServiceProtocol, "reset_conversation")
+        assert hasattr(ChatServiceProtocol, "is_healthy")

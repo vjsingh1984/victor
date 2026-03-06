@@ -4441,7 +4441,7 @@ class TestStreamingHandlerProperty:
 
 
 class TestCheckProgressWithHandler:
-    """Tests for progress checking (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for progress checking (now owned by StreamingChatPipeline).
 
     The _check_progress_with_handler method was removed from the orchestrator.
     Progress checking is now handled via the recovery coordinator directly.
@@ -4471,7 +4471,7 @@ class TestCheckProgressWithHandler:
 
 
 class TestHandleForceCompletionWithHandler:
-    """Tests for force completion (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for force completion (now driven by StreamingChatPipeline).
 
     The _handle_force_completion_with_handler method was removed from the orchestrator.
     Force completion is now handled via the unified_tracker and streaming context.

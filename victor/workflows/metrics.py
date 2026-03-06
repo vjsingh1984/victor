@@ -620,7 +620,8 @@ class WorkflowMetricsCollector:
             cursor = conn.cursor()
 
             # Create tables
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS workflow_metrics (
                     workflow_id TEXT PRIMARY KEY,
                     workflow_name TEXT,
@@ -633,9 +634,11 @@ class WorkflowMetricsCollector:
                     first_execution REAL,
                     last_execution REAL
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS node_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     workflow_id TEXT,
@@ -650,9 +653,11 @@ class WorkflowMetricsCollector:
                     last_execution REAL,
                     FOREIGN KEY (workflow_id) REFERENCES workflow_metrics (workflow_id)
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS tool_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     workflow_id TEXT,
@@ -663,7 +668,8 @@ class WorkflowMetricsCollector:
                     last_used REAL,
                     FOREIGN KEY (workflow_id) REFERENCES workflow_metrics (workflow_id)
                 )
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()

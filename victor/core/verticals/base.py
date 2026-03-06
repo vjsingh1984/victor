@@ -282,9 +282,7 @@ class VerticalBase(
         from victor.core.verticals.composition import CapabilityComposer
 
         # Check if composition mode is enabled
-        if get_feature_flag_manager().is_enabled(
-            FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE
-        ):
+        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE):
             logger.debug(f"[{cls.__name__}] Using composition mode")
 
         return CapabilityComposer(cls)

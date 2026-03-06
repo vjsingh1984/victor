@@ -327,11 +327,7 @@ class TestVerticalBaseCompose:
     def test_compose_fluent_api(self):
         """Test using fluent API from compose()."""
         # This should not raise
-        composer = (
-            VerticalBase
-            .compose()
-            .with_metadata("test", "description")
-        )
+        composer = VerticalBase.compose().with_metadata("test", "description")
 
         assert isinstance(composer, CapabilityComposer)
 
@@ -343,8 +339,7 @@ class TestVerticalBaseCompose:
     def test_get_composer_after_build(self):
         """Test get_composer() returns composer after build()."""
         composer = (
-            VerticalBase
-            .compose()
+            VerticalBase.compose()
             .with_metadata("test", "description")
             .with_tools(["read"])
             .with_system_prompt("Test")
@@ -381,8 +376,7 @@ class TestCompositionIntegration:
 
         # Compose the vertical
         TestVertical = (
-            VerticalBase
-            .compose()
+            VerticalBase.compose()
             .with_metadata("test_vertical", "Test assistant", "2.0.0")
             .with_tools(["read", "write", "search"])
             .with_system_prompt("You are a helpful test assistant.")
@@ -406,8 +400,7 @@ class TestCompositionIntegration:
     def test_multiple_verticals_from_same_base(self):
         """Test creating multiple verticals from same base."""
         Vertical1 = (
-            VerticalBase
-            .compose()
+            VerticalBase.compose()
             .with_metadata("vertical1", "First vertical")
             .with_tools(["read"])
             .with_system_prompt("You are vertical 1.")
@@ -415,8 +408,7 @@ class TestCompositionIntegration:
         )
 
         Vertical2 = (
-            VerticalBase
-            .compose()
+            VerticalBase.compose()
             .with_metadata("vertical2", "Second vertical")
             .with_tools(["write"])
             .with_system_prompt("You are vertical 2.")

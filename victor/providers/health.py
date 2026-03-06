@@ -112,10 +112,10 @@ class ProviderHealthChecker:
     # API key format patterns (relaxed for flexibility)
     KEY_PATTERNS = {
         "anthropic": r"^sk-ant-[a-zA-Z0-9_-]{40,}$",  # More flexible length
-        "openai": r"^sk-[a-zA-Z0-9]{20,}$",      # More flexible
-        "deepseek": r"^sk-[a-zA-Z0-9]{10,}$",   # More flexible
-        "google": r"^.{10,}$",               # Google keys vary
-        "xai": r"^xai-[a-zA-Z0-9]{20,}$",      # More flexible
+        "openai": r"^sk-[a-zA-Z0-9]{20,}$",  # More flexible
+        "deepseek": r"^sk-[a-zA-Z0-9]{10,}$",  # More flexible
+        "google": r"^.{10,}$",  # Google keys vary
+        "xai": r"^xai-[a-zA-Z0-9]{20,}$",  # More flexible
     }
 
     # Providers that don't need API keys
@@ -280,6 +280,7 @@ class ProviderHealthChecker:
     def _get_env_var(self, provider: str) -> Optional[str]:
         """Get environment variable name for provider."""
         from victor.providers.resolution import _get_provider_env_var
+
         return _get_provider_env_var(provider)
 
     async def _check_connectivity(
@@ -330,29 +331,20 @@ class ProviderHealthChecker:
                     )
                 return {"success": True, "response": "Connectivity OK"}
             except asyncio.TimeoutError:
-                return {
-                    "success": False,
-                    "error": f"Connectivity check timed out after {timeout}s"
-                }
+                return {"success": False, "error": f"Connectivity check timed out after {timeout}s"}
             except Exception as e:
                 # Some providers may return auth errors which is also useful info
                 error_str = str(e).lower()
                 if any(term in error_str for term in ["auth", "unauthorized", "invalid key"]):
-                    return {
-                        "success": False,
-                        "error": f"Authentication failed: {e}"
-                    }
+                    return {"success": False, "error": f"Authentication failed: {e}"}
                 # Other errors still indicate connectivity (just not a successful call)
                 return {
                     "success": True,
-                    "warning": f"Provider responded with error (but is reachable): {e}"
+                    "warning": f"Provider responded with error (but is reachable): {e}",
                 }
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to create provider: {e}"
-            }
+            return {"success": False, "error": f"Failed to create provider: {e}"}
 
 
 async def check_provider_health(

@@ -247,7 +247,9 @@ class TestCapabilityProviderCrossVerticalReuse:
 
         # Save coding modules before removing them
         coding_modules = {
-            m: sys.modules[m] for m in list(sys.modules.keys()) if "victor.coding" in m
+            m: sys.modules[m]
+            for m in list(sys.modules.keys())
+            if "victor_coding" in m or "victor.coding" in m
         }
 
         # Remove coding modules temporarily

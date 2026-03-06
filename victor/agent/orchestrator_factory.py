@@ -1321,6 +1321,14 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
+    def create_streaming_chat_pipeline(self, coordinator: Any) -> Any:
+        """Create the canonical StreamingChatPipeline bound to a coordinator."""
+        from victor.agent.streaming import create_streaming_chat_pipeline
+
+        pipeline = create_streaming_chat_pipeline(coordinator)
+        logger.debug("StreamingChatPipeline created and bound to coordinator")
+        return pipeline
+
     def create_rl_coordinator(self) -> Optional[Any]:
         """Create RL coordinator for reinforcement learning framework.
 
@@ -2278,6 +2286,58 @@ class OrchestratorFactory(ModeAwareMixin):
             resource_manager=self.create_resource_manager(),
             mode_completion_criteria=self.create_mode_completion_criteria(),
         )
+
+    def create_session_ledger(self) -> Any:
+        """Create SessionLedger for structured session state tracking."""
+        from victor.agent.session_ledger import SessionLedger
+
+        logger.debug("SessionLedger created")
+        return SessionLedger()
+
+    def create_compaction_summarizer(self, ledger: Any = None) -> Any:
+        """Create ledger-aware compaction summarizer strategy."""
+        from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
+
+        summarizer = LedgerAwareCompactionSummarizer()
+        logger.debug("LedgerAwareCompactionSummarizer created")
+        return summarizer
+
+    def create_tool_result_deduplicator(self) -> Any:
+        """Create ToolResultDeduplicator for file read deduplication."""
+        from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
+
+        logger.debug("ToolResultDeduplicator created")
+        return ToolResultDeduplicator()
+
+    def create_context_assembler(
+        self, ledger: Any = None, controller: Any = None
+    ) -> Any:
+        """Create TurnBoundaryContextAssembler for context selection.
+
+        Args:
+            ledger: SessionLedger instance
+            controller: ConversationController (used for score_fn extraction)
+        """
+        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+
+        score_fn = None
+        if controller is not None:
+            score_fn = getattr(controller, "_score_messages", None)
+
+        assembler = TurnBoundaryContextAssembler(
+            session_ledger=ledger,
+            score_fn=score_fn,
+        )
+        logger.debug("TurnBoundaryContextAssembler created")
+        return assembler
+
+    def create_referential_intent_resolver(self, ledger: Any = None) -> Any:
+        """Create ReferentialIntentResolver for anaphoric reference resolution."""
+        from victor.agent.referential_intent_resolver import ReferentialIntentResolver
+
+        resolver = ReferentialIntentResolver(session_ledger=ledger)
+        logger.debug("ReferentialIntentResolver created")
+        return resolver
 
     def create_mode_workflow_team_coordinator(
         self,

@@ -74,29 +74,34 @@ OUTPUT STYLE: CONCISE
 
 # Active completion signaling - deterministic detection
 # This guidance is always included to ensure predictable task completion detection
-# Uses underscore-prefixed signals to distinguish from natural language
+# Uses bold-wrapped markers with colon suffix for markdown-safe rendering:
+#   **DONE**: description  → rendered as bold "DONE:" → stripped to "DONE:"
+#   __DONE__: description  → rendered as italic "DONE:" → stripped to "DONE:"
+# The detector strips markdown formatting (**, __, *, _) and matches "KEYWORD:"
 COMPLETION_GUIDANCE = """
 TASK COMPLETION (MANDATORY):
-When you complete a task, you MUST signal completion using these EXACT markers:
+When you complete a task, you MUST signal completion using these EXACT markers.
+Use the bold format with a colon suffix exactly as shown:
 
 1. For FILE OPERATIONS (create/edit/write):
-   Say: "_DONE_ Created/Modified <filename>"
+   **DONE**: Created/Modified <filename>
 
 2. For BUG FIXES / ISSUE RESOLUTION:
-   Say: "_TASK_DONE_ <what was fixed>"
+   **TASK_DONE**: <what was fixed>
 
 3. For ANALYSIS / QUESTIONS / RESEARCH:
-   End with: "_SUMMARY_ <key findings>"
+   **SUMMARY**: <key findings>
 
 4. For FAILED / BLOCKED TASKS:
-   Say: "_BLOCKED_ <reason>" or "_CANNOT_COMPLETE_ <reason>"
+   **BLOCKED**: <reason>
 
 IMPORTANT:
-- These signals are REQUIRED for the system to detect task completion
-- Use the EXACT markers with underscores (e.g., _DONE_, _TASK_DONE_, _SUMMARY_)
+- These markers are REQUIRED for the system to detect task completion
+- Always use the bold format with colon: **DONE**: or **SUMMARY**: or **TASK_DONE**:
 - After signaling completion, STOP - do NOT ask follow-up questions
 - Do NOT say "would you like me to continue?" after completing the task
 - Do NOT re-read files you have already read
+- Signal completion ONCE - do not repeat the marker multiple times
 """.strip()
 
 # Extended grounding rules for local models that need more explicit guidance
