@@ -143,15 +143,9 @@ class ProviderRegistry:
     """
 
     def __init__(self):
-        self._team_providers: List[TeamSpecProviderProtocol] = [
-            DefaultTeamSpecProvider()
-        ]
-        self._workflow_providers: List[WorkflowProviderProtocol] = [
-            DefaultWorkflowProvider()
-        ]
-        self._safety_providers: List[SafetyRulesProviderProtocol] = [
-            DefaultSafetyRulesProvider()
-        ]
+        self._team_providers: List[TeamSpecProviderProtocol] = [DefaultTeamSpecProvider()]
+        self._workflow_providers: List[WorkflowProviderProtocol] = [DefaultWorkflowProvider()]
+        self._safety_providers: List[SafetyRulesProviderProtocol] = [DefaultSafetyRulesProvider()]
 
         # Load from entry points (optional verticals)
         self._load_from_entry_points()
