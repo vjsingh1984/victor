@@ -119,7 +119,16 @@ class TestZAIConfigStrategy:
         providers = registry.list_providers()
         assert "zai" in providers
 
+    @pytest.mark.skip(
+        reason="zai-coding-plan provider removed - use model suffix 'glm-4.6:coding' instead"
+    )
     def test_zai_coding_plan_config_registered(self):
+        """Test ZAI coding plan config is registered.
+
+        NOTE: ZAICodingPlanConfig has been removed in favor of model suffix notation.
+        Use model="glm-4.6:coding" to specify the coding plan endpoint.
+        The ZAI provider now handles this automatically via model suffix parsing.
+        """
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
@@ -182,6 +191,36 @@ class TestZAIModels:
     def test_free_flash_models(self):
         assert "glm-4.7-flash" in ZAI_MODELS
         assert "glm-4.6v-flash" in ZAI_MODELS
+
+
+# ---------------------------------------------------------------------------
+# Z.AI Model Suffix Notation for Coding Plan
+# ---------------------------------------------------------------------------
+
+
+class TestZAIModelSuffixNotation:
+    """Test model suffix notation for endpoint selection."""
+
+    def test_coding_suffix_sets_coding_endpoint(self):
+        """Test that :coding suffix sets the coding plan endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:coding")
+        assert "api.z.ai/api/coding/paas/v4" in str(provider.client.base_url)
+
+    def test_standard_suffix_or_no_suffix_uses_standard_endpoint(self):
+        """Test that :standard suffix or no suffix uses the standard endpoint."""
+        # No suffix - should use standard endpoint
+        provider = ZAIProvider(api_key="test-key")
+        assert "api.z.ai/api/paas/v4" in str(provider.client.base_url)
+
+    def test_china_suffix_sets_china_endpoint(self):
+        """Test that :china suffix sets the China endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:china")
+        assert "open.bigmodel.cn/api/paas/v4" in str(provider.client.base_url)
+
+    def test_anthropic_suffix_sets_anthropic_endpoint(self):
+        """Test that :anthropic suffix sets the Anthropic-compatible endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:anthropic")
+        assert "api.z.ai/api/anthropic/v1" in str(provider.client.base_url)
 
 
 # ---------------------------------------------------------------------------
