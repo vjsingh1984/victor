@@ -517,48 +517,37 @@ def get_team_spec(name: str) -> Optional[Any]:
 
 
 def load_all_verticals() -> int:
-    """Load team specs from all verticals.
+    """Load team specs from all verticals using protocol-based discovery.
 
-    This function explicitly imports all vertical teams modules and
-    registers their teams with the global registry. If modules are
-    already imported, it will still register their teams (useful after
-    clearing the registry).
+    This function uses the protocol-based provider system which:
+    1. Starts with safe defaults (no teams)
+    2. Loads enhanced providers from installed packages via entry points
+    3. Does NOT directly import vertical modules
+
+    This approach ensures:
+    - Framework works without any verticals installed
+    - No direct dependencies on vertical modules
+    - Verticals can enhance functionality via entry points
 
     Returns:
-        Total number of teams registered across all verticals.
+        Total number of teams registered across all providers.
     """
+    from victor.framework.providers.protocol import get_provider_registry
+
+    provider_registry = get_provider_registry()
+    all_team_specs = provider_registry.get_all_team_specs()
+
     registry = get_team_registry()
 
-    # Define verticals and their team specs attribute names
-    verticals = [
-        ("victor_coding.teams", "CODING_TEAM_SPECS", "coding"),
-        ("victor_devops.teams", "DEVOPS_TEAM_SPECS", "devops"),
-        ("victor_research.teams", "RESEARCH_TEAM_SPECS", "research"),
-        ("victor_dataanalysis.teams", "DATA_ANALYSIS_TEAM_SPECS", "data_analysis"),
-    ]
+    # Register all team specs from providers
+    total_registered = 0
+    for vertical_name, team_specs in all_team_specs.items():
+        count = registry.register_from_vertical(vertical_name, team_specs)
+        total_registered += count
+        logger.debug(f"Loaded {count} teams from {vertical_name} provider")
 
-    for module_name, specs_attr, vertical_name in verticals:
-        try:
-            import importlib
-
-            module = importlib.import_module(module_name)
-            team_specs = getattr(module, specs_attr, None)
-
-            if team_specs:
-                # Register the teams (replace=True allows re-registration)
-                count = registry.register_from_vertical(vertical_name, team_specs)
-                logger.debug(f"Loaded {count} teams from {module_name}")
-            else:
-                logger.warning(f"No {specs_attr} found in {module_name}")
-
-        except ImportError as e:
-            logger.warning(f"Failed to import {module_name}: {e}")
-        except Exception as e:
-            logger.warning(f"Error loading {module_name}: {e}")
-
-    # Return the total count of registered teams
     total_count = len(registry.list_teams())
-    logger.info(f"Loaded {total_count} teams from all verticals")
+    logger.info(f"Loaded {total_count} teams from {len(all_team_specs)} providers")
     return total_count
 
 
