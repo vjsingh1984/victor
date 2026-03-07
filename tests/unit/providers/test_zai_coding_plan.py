@@ -144,7 +144,14 @@ class TestZAIConfigStrategy:
         result = config.get_settings(settings, {})
         assert result["base_url"] == "https://api.z.ai/api/paas/v4/"
 
+    @pytest.mark.skip(
+        reason="ZAICodingPlanConfig removed - use model suffix 'glm-4.6:coding' instead"
+    )
     def test_zai_coding_plan_base_url(self):
+        """Test ZAI coding plan base URL."""
+        # NOTE: ZAICodingPlanConfig has been removed in favor of model suffix notation.
+        # Use model="glm-4.6:coding" to specify the coding plan endpoint.
+        # The ZAI provider now handles this automatically via model suffix parsing.
         from victor.config.provider_config_registry import ZAICodingPlanConfig
 
         config = ZAICodingPlanConfig()

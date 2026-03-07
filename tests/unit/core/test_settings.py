@@ -170,7 +170,7 @@ class TestSettings:
         assert settings.extension_loader_metrics_reporter_interval_seconds == 60.0
         assert settings.generic_result_cache_enabled is False
         assert settings.http_connection_pool_enabled is False
-        assert settings.framework_preload_enabled is False
+        assert settings.framework_preload_enabled is True  # Enabled by default for performance
         assert settings.framework_private_fallback_strict_mode is False
         assert settings.framework_protocol_fallback_strict_mode is False
 
