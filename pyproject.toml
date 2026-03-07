@@ -65,6 +65,9 @@ dataanalysis = "victor_dataanalysis.tool_dependencies:get_provider"
 [project.entry-points."victor.safety_rules"]
 dataanalysis = "victor_dataanalysis.safety:create_all_dataanalysis_safety_rules"
 
+[project.entry-points."victor.framework.teams.providers"]
+dataanalysis = "victor_dataanalysis.teams:DataAnalysisTeamSpecProvider"
+
 [tool.setuptools]
 packages = [
     "victor_dataanalysis",
