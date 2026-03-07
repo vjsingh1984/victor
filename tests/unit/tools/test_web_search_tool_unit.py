@@ -69,7 +69,7 @@ class TestGetWebConfig:
         assert config["fetch_pool"] is None
         assert config["max_content_length"] == 5000
         assert config["generic_result_cache_enabled"] is False
-        assert config["http_connection_pool_enabled"] is False
+        assert config["http_connection_pool_enabled"] is True  # HTTP pooling enabled by default for performance
 
     def test_config_with_empty_context(self):
         """Test getting config with empty context returns defaults."""

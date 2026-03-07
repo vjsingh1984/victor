@@ -562,6 +562,73 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
     ],
 }
 
+# Phase 9 export counts for testing
+_RESILIENCE_EXPORTS = [
+    "CircuitBreaker",
+    "CircuitBreakerError",
+    "CircuitBreakerRegistry",
+    "CircuitState",
+    "CircuitBreakerConfig",
+    "CircuitBreakerState",
+    "CircuitOpenError",
+    "ProviderUnavailableError",
+    "ResilientProvider",
+    "ProviderRetryConfig",
+    "RetryExhaustedError",
+    "ProviderRetryStrategy",
+    "ExponentialBackoffStrategy",
+    "FixedDelayStrategy",
+    "LinearBackoffStrategy",
+    "NoRetryStrategy",
+    "RetryContext",
+    "RetryExecutor",
+    "RetryOutcome",
+    "RetryResult",
+    "BaseRetryStrategy",
+    "connection_retry_strategy",
+    "provider_retry_strategy",
+    "tool_retry_strategy",
+    "with_retry",
+    "with_retry_sync",
+]
+
+_HEALTH_EXPORTS = [
+    "BaseHealthCheck",
+    "CacheHealthCheck",
+    "CallableHealthCheck",
+    "ComponentHealth",
+    "HealthCheckProtocol",
+    "HealthChecker",
+    "HealthReport",
+    "HealthStatus",
+    "MemoryHealthCheck",
+    "ProviderHealthCheck",
+    "ToolHealthCheck",
+    "create_default_health_checker",
+    "HealthCheckResult",
+    "ProviderHealthStatus",
+    "ProviderHealthChecker",
+    "ProviderHealthReport",
+    "get_provider_health_checker",
+    "reset_provider_health_checker",
+]
+
+_METRICS_EXPORTS = [
+    "Counter",
+    "Gauge",
+    "Histogram",
+    "Metric",
+    "MetricLabels",
+    "MetricsCollector",
+    "MetricsRegistry",
+    "Timer",
+    "TimerContext",
+    "get_meter",
+    "get_tracer",
+    "is_telemetry_enabled",
+    "setup_opentelemetry",
+]
+
 # Aliased imports: name -> (module, real_name)
 _ALIASED_IMPORTS: dict[str, tuple[str, str]] = {
     "AgentTeamFormation": ("victor.framework.agent_protocols", "TeamFormation"),
