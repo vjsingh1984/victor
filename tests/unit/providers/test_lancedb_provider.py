@@ -280,7 +280,11 @@ class TestLanceDBProvider:
     async def test_search_similar(self, lancedb_config, mock_lancedb):
         """Test semantic similarity search."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.list_tables.return_value.tables = ["test_table"]
+
+        # Fix: Set up list_tables to return a mock with tables attribute
+        mock_list_response = MagicMock()
+        mock_list_response.tables = ["test_table"]
+        mock_db.list_tables.return_value = mock_list_response
 
         # Mock search results
         mock_search = MagicMock()
