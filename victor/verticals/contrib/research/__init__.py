@@ -36,9 +36,11 @@ from victor.verticals.contrib.research.conversation_enhanced import (
     EnhancedResearchConversationManager,
 )
 
-__all__.extend([
-    "ResearchSafetyRules",
-    "EnhancedResearchSafetyExtension",
-    "ResearchContext",
-    "EnhancedResearchConversationManager",
-])
+__all__.extend(
+    [
+        "ResearchSafetyRules",
+        "EnhancedResearchSafetyExtension",
+        "ResearchContext",
+        "EnhancedResearchConversationManager",
+    ]
+)

@@ -48,6 +48,10 @@ from __future__ import annotations
 import logging
 import time
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
@@ -246,6 +250,56 @@ class VerticalBase(
     def _config_cache_key(cls) -> str:
         """Get namespaced cache key for this class."""
         return f"{cls.__name__}:{cls.__module__}:{cls.__qualname__}"
+
+    # =========================================================================
+    # Composition API (Phase 4 - SOLID Refactoring)
+    # =========================================================================
+
+    @classmethod
+    def compose(cls) -> "CapabilityComposer":
+        """Create a composer for this vertical.
+
+        Provides a fluent builder API for composing vertical capabilities
+        declaratively instead of using inheritance.
+
+        Example:
+            from victor.core.verticals.base import VerticalBase
+
+            MyVertical = (
+                VerticalBase
+                .compose()
+                .with_metadata("my_vertical", "My assistant", "1.0.0")
+                .with_stages(custom_stages)
+                .with_extensions([SafetyExtension(), LoggingExtension()])
+                .build()
+            )
+
+        Returns:
+            CapabilityComposer for building this vertical
+
+        Note:
+            This is an alternative to inheritance-based verticals.
+            When feature flag USE_COMPOSITION_OVER_INHERITANCE is enabled,
+            composition-based verticals will be used preferentially.
+        """
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+        from victor.core.verticals.composition import CapabilityComposer
+
+        # Check if composition mode is enabled
+        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE):
+            logger.debug(f"[{cls.__name__}] Using composition mode")
+
+        return CapabilityComposer(cls)
+
+    @classmethod
+    def get_composer(cls) -> Optional["CapabilityComposer"]:
+        """Get the composer if using composition mode.
+
+        Returns:
+            CapabilityComposer if this vertical was built via composition,
+            None otherwise
+        """
+        return getattr(cls, "_composer", None)
 
     # =========================================================================
     # Required Abstract Methods

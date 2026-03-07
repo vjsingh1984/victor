@@ -186,26 +186,54 @@ class ZAIProvider(BaseProvider):
         non_interactive: Optional[bool] = None,
         coding_plan: bool = False,
         endpoint: Optional[str] = None,
+        model: Optional[str] = None,
         **kwargs: Any,
     ):
         """Initialize ZhipuAI provider.
 
         Args:
             api_key: ZhipuAI API key (or set ZAI_API_KEY env var, or use keyring)
-            base_url: ZhipuAI API base URL (overrides endpoint/coding_plan)
+            base_url: ZhipuAI API base URL (overrides endpoint/coding_plan/model suffix)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
             coding_plan: Use GLM Coding Plan endpoint (shortcut for endpoint="coding")
             endpoint: Named endpoint — "standard", "coding", "china", "anthropic"
+            model: Model name (can include endpoint suffix, e.g., "glm-4.6:coding")
             **kwargs: Additional configuration
+
+        Model Suffix Format:
+            Models can include an endpoint suffix using colon notation:
+            - "glm-4.6:coding" - GLM coding plan endpoint
+            - "glm-4.6:standard" - Standard endpoint
+            - "glm-4.6:china" - China endpoint
+            - "glm-4.6:anthropic" - Anthropic-compatible endpoint
+
+            This is the recommended way to specify endpoint variants.
         """
-        # Resolve base URL: explicit > endpoint param > coding_plan flag > default
+        # Resolve base URL priority:
+        # 1. Explicit base_url (highest)
+        # 2. endpoint parameter
+        # 3. coding_plan flag
+        # 4. Model suffix parsing
+        # 5. Default to standard
+
         if base_url is None:
+            # Try model suffix first (e.g., "glm-4.6:coding" -> endpoint="coding")
+            model_endpoint = None
+            if model and ":" in model:
+                # Parse model suffix for endpoint variant
+                _model_name, endpoint_variant = model.rsplit(":", 1)
+                if endpoint_variant in ZAI_BASE_URLS:
+                    model_endpoint = endpoint_variant
+
             if endpoint is not None:
                 base_url = ZAI_BASE_URLS.get(endpoint, ZAI_BASE_URLS["standard"])
             elif coding_plan:
                 base_url = ZAI_BASE_URLS["coding"]
+            elif model_endpoint is not None:
+                # Use endpoint from model suffix
+                base_url = ZAI_BASE_URLS[model_endpoint]
             else:
                 base_url = ZAI_BASE_URLS["standard"]
         # Initialize structured logger

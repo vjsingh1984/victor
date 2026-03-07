@@ -23,7 +23,6 @@ from victor.providers.zai_provider import (
     ZAI_MODELS,
 )
 
-
 # ---------------------------------------------------------------------------
 # Z.AI Base URL constants
 # ---------------------------------------------------------------------------
@@ -58,9 +57,7 @@ class TestZAICodingPlan:
             api_key="test-key",
             coding_plan=True,
         )
-        assert str(provider.client.base_url).rstrip("/") == (
-            "https://api.z.ai/api/coding/paas/v4"
-        )
+        assert str(provider.client.base_url).rstrip("/") == ("https://api.z.ai/api/coding/paas/v4")
 
     def test_standard_default_base_url(self):
         provider = ZAIProvider(
@@ -147,7 +144,14 @@ class TestZAIConfigStrategy:
         result = config.get_settings(settings, {})
         assert result["base_url"] == "https://api.z.ai/api/paas/v4/"
 
+    @pytest.mark.skip(
+        reason="ZAICodingPlanConfig removed - use model suffix 'glm-4.6:coding' instead"
+    )
     def test_zai_coding_plan_base_url(self):
+        """Test ZAI coding plan base URL."""
+        # NOTE: ZAICodingPlanConfig has been removed in favor of model suffix notation.
+        # Use model="glm-4.6:coding" to specify the coding plan endpoint.
+        # The ZAI provider now handles this automatically via model suffix parsing.
         from victor.config.provider_config_registry import ZAICodingPlanConfig
 
         config = ZAICodingPlanConfig()
@@ -323,9 +327,7 @@ class TestZAIParseStreamChunk:
         assert result is None
 
     def test_content_chunk(self, provider):
-        data = {
-            "choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]
-        }
+        data = {"choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]}
         result = provider._parse_stream_chunk(data, [])
         assert result is not None
         assert result.content == "Hello"
@@ -384,9 +386,7 @@ class TestZAIParseStreamChunk:
         assert accumulated[0]["arguments"] == '{"x": 1}'
 
         # Final chunk: tool_calls finish
-        data3 = {
-            "choices": [{"delta": {}, "finish_reason": "tool_calls"}]
-        }
+        data3 = {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}
         result3 = provider._parse_stream_chunk(data3, accumulated)
         assert result3.tool_calls is not None
         assert result3.tool_calls[0]["name"] == "calc"
@@ -424,9 +424,7 @@ class TestZAIListModels:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"id": "glm-4.7"}, {"id": "glm-5"}]
-        }
+        mock_response.json.return_value = {"data": [{"id": "glm-4.7"}, {"id": "glm-5"}]}
         mock_response.raise_for_status = MagicMock()
 
         provider.client.get = AsyncMock(return_value=mock_response)

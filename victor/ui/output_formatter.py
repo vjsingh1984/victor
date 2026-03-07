@@ -46,6 +46,8 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 
+from victor.ui.rendering.markdown import render_markdown_with_hooks
+
 
 class OutputMode(Enum):
     """Output formatting modes."""
@@ -459,7 +461,7 @@ class OutputFormatter:
             # For Rich mode, content was already streamed with markdown rendering
             if not self.config.stream:
                 output = content
-                self._console.print(Markdown(content))
+                self._console.print(render_markdown_with_hooks(content))
             else:
                 output = content
                 # Final newline already handled by live display

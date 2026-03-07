@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, TypeVar
+from typing import Any, Dict, Optional, Set, Type, TypeVar
 
 from victor.config.settings import Settings, load_settings, get_project_paths
 from victor.core.container import (
@@ -47,6 +47,11 @@ from victor.core.container import (
 )
 
 logger = logging.getLogger(__name__)
+
+_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
+    "coding": "victor-coding",
+}
+_REPORTED_MISSING_VERTICALS: Set[str] = set()
 
 T = TypeVar("T")
 
@@ -191,6 +196,8 @@ def bootstrap_container(
     if settings is None:
         settings = load_settings()
 
+    active_vertical = _resolve_vertical_name(settings, vertical)
+
     container = ServiceContainer()
 
     # Register Settings as singleton
@@ -208,6 +215,10 @@ def bootstrap_container(
     # Register embedding services
     _register_embedding_services(container, settings)
 
+    # Bootstrap capability registry (stubs + entry point discovery)
+    bootstrap_capabilities()
+    _report_capability_health(active_vertical, container)
+
     # Register coding services (language plugins, indexing)
     _register_coding_services(container, settings)
 
@@ -216,6 +227,9 @@ def bootstrap_container(
 
     # Register orchestrator services (Phase 10 DI Migration)
     _register_orchestrator_services(container, settings)
+
+    # Register SOLID-refactored services (Phase 6 - Feature Flag Controlled)
+    _register_solid_refactored_services(container, settings)
 
     # Register workflow services (SOLID Refactoring)
     _register_workflow_services(container, settings)
@@ -227,7 +241,7 @@ def bootstrap_container(
     _configure_extension_loader_runtime(settings)
 
     # Register vertical services
-    _register_vertical_services(container, settings, vertical)
+    _register_vertical_services(container, settings, active_vertical)
 
     # Apply overrides for testing
     if override_services:
@@ -441,25 +455,87 @@ def _register_embedding_services(container: ServiceContainer, settings: Settings
     )
 
 
+def bootstrap_capabilities() -> None:
+    """Register capability stubs, then discover enhanced providers from entry points.
+
+    This function:
+    1. Registers all contrib stub implementations as STUB
+    2. Discovers enhanced implementations from 'victor.capabilities' entry points
+    3. Enhanced providers override stubs automatically
+
+    Safe to call multiple times — the registry tracks bootstrapped state.
+    """
+    from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
+    from victor.framework.vertical_protocols import (
+        CodebaseIndexFactoryProtocol,
+        IgnorePatternsProtocol,
+        LanguageRegistryProtocol,
+        SymbolStoreFactoryProtocol,
+        TaskTypeHintProtocol,
+        TreeSitterExtractorProtocol,
+        TreeSitterParserProtocol,
+    )
+
+    registry = CapabilityRegistry.get_instance()
+    # Mark as bootstrapped early to prevent re-entry from get()/is_enhanced() calls
+    registry._bootstrapped = True
+
+    # 1. Register all stubs
+    from victor.contrib.parsing.parser import NullTreeSitterParser
+    from victor.contrib.parsing.extractor import NullTreeSitterExtractor
+    from victor.contrib.codebase.indexer import NullCodebaseIndexFactory
+    from victor.contrib.codebase.symbol_store import NullSymbolStore
+    from victor.contrib.codebase.ignore_patterns import BasicIgnorePatterns
+    from victor.contrib.languages.registry import NullLanguageRegistry
+    from victor.contrib.prompts.task_hints import NullTaskTypeHinter
+
+    registry.register(TreeSitterParserProtocol, NullTreeSitterParser(), CapabilityStatus.STUB)
+    registry.register(TreeSitterExtractorProtocol, NullTreeSitterExtractor(), CapabilityStatus.STUB)
+    registry.register(
+        CodebaseIndexFactoryProtocol, NullCodebaseIndexFactory(), CapabilityStatus.STUB
+    )
+    registry.register(SymbolStoreFactoryProtocol, NullSymbolStore(), CapabilityStatus.STUB)
+    registry.register(IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB)
+    registry.register(LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB)
+    registry.register(TaskTypeHintProtocol, NullTaskTypeHinter(), CapabilityStatus.STUB)
+    # LSPManagerProtocol and EmbeddingModelFactoryProtocol — no stubs registered;
+    # capabilities.get() returns None when not available, which callers already handle.
+
+    # 2. Discover enhanced providers from entry points
+    try:
+        from importlib.metadata import entry_points
+
+        eps = entry_points(group="victor.capabilities")
+        for ep in eps:
+            try:
+                register_func = ep.load()
+                register_func(registry)
+                logger.debug(f"Loaded capability entry point: {ep.name}")
+            except Exception as e:
+                logger.warning(f"Failed to load capability {ep.name}: {e}")
+    except Exception as e:
+        logger.debug(f"Entry point discovery failed: {e}")
+
+
 def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
     """Register coding services (language plugins, indexing).
 
     This ensures language plugins are discovered at startup, not mid-conversation.
+    Uses the capability registry — no direct victor_coding imports.
     """
-    try:
-        from victor_coding.languages.registry import get_language_registry
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import LanguageRegistryProtocol
 
-        registry = get_language_registry()
-        # Only discover if not already discovered (check if plugins list is empty)
-        if not registry._plugins:
-            count = registry.discover_plugins()
+    registry = CapabilityRegistry.get_instance()
+    lang_registry = registry.get(LanguageRegistryProtocol)
+    if lang_registry is not None and registry.is_enhanced(LanguageRegistryProtocol):
+        try:
+            count = lang_registry.discover_plugins()
             logger.info(f"Discovered {count} language plugins at startup")
-        else:
-            logger.debug(f"Language plugins already discovered: {len(registry._plugins)} plugins")
-    except ImportError:
+        except Exception as e:
+            logger.warning(f"Failed to discover language plugins: {e}")
+    else:
         logger.debug("Language plugins not available - victor-coding package not installed")
-    except Exception as e:
-        logger.warning(f"Failed to discover language plugins: {e}")
 
 
 def _register_signature_store(container: ServiceContainer, settings: Settings) -> None:
@@ -543,6 +619,57 @@ def _register_orchestrator_services(container: ServiceContainer, settings: Setti
         logger.warning(f"Failed to register orchestrator services: {e}")
 
 
+def _register_solid_refactored_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register SOLID-refactored service architecture (Phase 6).
+
+    This function bootstraps the new service-oriented architecture when
+    feature flags are enabled. It provides a graceful migration path by:
+
+    1. Checking feature flags before bootstrapping new services
+    2. Only registering services that have their flags enabled
+    3. Maintaining backward compatibility when flags are disabled
+
+    Services registered (when flags enabled):
+    - ChatServiceProtocol: Chat flow coordination
+    - ToolServiceProtocol: Tool operations
+    - ContextServiceProtocol: Context management
+    - ProviderServiceProtocol: Provider management
+    - RecoveryServiceProtocol: Error recovery
+    - SessionServiceProtocol: Session lifecycle
+
+    Args:
+        container: DI container to register services in
+        settings: Application settings
+    """
+    try:
+        # Get conversation and streaming coordinators (required for ChatService)
+        from victor.agent.protocols import (
+            ConversationControllerProtocol,
+            StreamingCoordinatorProtocol,
+        )
+
+        conversation_controller = container.get_optional(ConversationControllerProtocol)
+        streaming_coordinator = container.get_optional(StreamingCoordinatorProtocol)
+
+        # Only bootstrap new services if feature flags are enabled
+        # AND we have the required dependencies
+        if conversation_controller is not None and streaming_coordinator is not None:
+            from victor.core.bootstrap_services import bootstrap_new_services
+
+            bootstrap_new_services(
+                container,
+                conversation_controller=conversation_controller,
+                streaming_coordinator=streaming_coordinator,
+            )
+            logger.debug("Bootstrapped SOLID-refactored services (feature flag controlled)")
+        else:
+            logger.debug("Skipping SOLID-refactored services bootstrap (missing dependencies)")
+    except Exception as e:
+        # Don't fail bootstrap if new services can't be registered
+        # The orchestrator will fall back to existing implementation
+        logger.debug(f"Failed to bootstrap SOLID-refactored services: {e}")
+
+
 def _register_workflow_services(container: ServiceContainer, settings: Settings) -> None:
     """Register workflow-related services.
 
@@ -602,6 +729,99 @@ def _register_workflow_compiler_plugins(
         logger.warning(f"Failed to register workflow compiler plugins: {e}")
 
 
+def _resolve_vertical_name(settings: Settings, requested_vertical: Optional[str]) -> str:
+    """Resolve which vertical name should be activated for this bootstrap."""
+    if isinstance(requested_vertical, str) and requested_vertical.strip():
+        return requested_vertical.strip()
+
+    default_vertical = getattr(settings, "default_vertical", None)
+    if isinstance(default_vertical, str) and default_vertical.strip():
+        return default_vertical.strip()
+
+    return "coding"
+
+
+def _report_capability_health(
+    vertical_name: Optional[str],
+    container: Optional[ServiceContainer] = None,
+) -> None:
+    """Log a single actionable warning when a requested vertical is unavailable."""
+    if vertical_name is None:
+        return
+
+    normalized = vertical_name.strip()
+    if not normalized or normalized in _REPORTED_MISSING_VERTICALS:
+        return
+
+    try:
+        from victor.core.verticals.base import VerticalRegistry
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+        from victor.core.events import get_observability_bus
+    except Exception as exc:
+        logger.debug(f"Capability health check skipped: {exc}")
+        return
+
+    available = set(VerticalRegistry.list_names())
+    try:
+        loader = get_vertical_loader()
+        available.update(loader.discover_verticals().keys())
+    except Exception as exc:
+        logger.debug(f"Vertical discovery failed during health check: {exc}")
+
+    if normalized in available:
+        return
+
+    _REPORTED_MISSING_VERTICALS.add(normalized)
+    package_hint = _VERTICAL_PACKAGE_HINTS.get(normalized)
+    if package_hint:
+        remedy = (
+            f"Install the '{package_hint}' package (e.g., `pip install {package_hint}`) "
+            "or choose a different --vertical."
+        )
+    else:
+        remedy = "Install the optional package that provides this capability or select another --vertical."
+
+    logger.warning(
+        "Vertical '%s' is unavailable via entry points; capability-dependent features "
+        "will run in fallback mode. %s",
+        normalized,
+        remedy,
+    )
+
+    # Emit usage analytics so operators have structured telemetry.
+    usage_logger = None
+    try:
+        target_container = container or get_container()
+        usage_logger = target_container.get_optional(UsageLoggerProtocol)  # type: ignore[attr-defined]
+        if usage_logger:
+            usage_logger.log_event(
+                "missing_vertical",
+                {
+                    "vertical": normalized,
+                    "package_hint": package_hint,
+                    "remedy": remedy,
+                },
+            )
+    except Exception as exc:
+        logger.debug(f"Usage analytics missing_vertical event failed: {exc}")
+
+    # Emit observability event for fleet-wide alerting.
+    try:
+        bus = get_observability_bus()
+        if bus:
+            bus.emit_sync(
+                topic="capabilities.vertical.missing",
+                data={
+                    "vertical": normalized,
+                    "package_hint": package_hint,
+                    "remedy": remedy,
+                },
+                source="CapabilityHealthMonitor",
+            )
+    except Exception as exc:
+        logger.debug(f"Observability missing_vertical event failed: {exc}")
+
+
 def _register_vertical_services(
     container: ServiceContainer,
     settings: Settings,
@@ -622,20 +842,13 @@ def _register_vertical_services(
         vertical_name: Optional vertical name. If None, uses settings.default_vertical.
                        If settings.default_vertical is also not set, defaults to "coding".
     """
-    # Determine which vertical to load
-    # Priority: explicit parameter > settings.default_vertical > "coding"
-    if vertical_name is None:
-        default_vertical = getattr(settings, "default_vertical", None)
-        if isinstance(default_vertical, str) and default_vertical.strip():
-            vertical_name = default_vertical
-        else:
-            vertical_name = "coding"
+    target_vertical = _resolve_vertical_name(settings, vertical_name)
 
     try:
         from victor.core.verticals.vertical_loader import activate_vertical_services
         from victor.core.verticals.protocols import VerticalExtensions
 
-        activation = activate_vertical_services(container, settings, vertical_name)
+        activation = activate_vertical_services(container, settings, target_vertical)
 
         # Register the extensions as a service for framework access
         from victor.core.verticals.vertical_loader import get_vertical_loader
@@ -654,14 +867,14 @@ def _register_vertical_services(
 
         logger.info(
             "Registered vertical services: %s (activated=%s, services_registered=%s)",
-            vertical_name,
+            target_vertical,
             activation.activated,
             activation.services_registered,
         )
     except ImportError as e:
         logger.debug(f"Vertical loading not available: {e}")
     except ValueError as e:
-        logger.warning(f"Failed to load vertical '{vertical_name}': {e}")
+        logger.warning(f"Failed to load vertical '{target_vertical}': {e}")
     except Exception as e:
         # Don't fail bootstrap if vertical services can't be registered
         logger.warning(f"Failed to register vertical services: {e}")
@@ -739,6 +952,7 @@ def _ensure_vertical_activated(
         settings: Application settings
         vertical_name: Vertical name to ensure is active
     """
+    _report_capability_health(vertical_name, container)
     try:
         from victor.core.verticals.vertical_loader import (
             activate_vertical_services,

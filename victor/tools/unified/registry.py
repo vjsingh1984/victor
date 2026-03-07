@@ -40,6 +40,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
@@ -53,6 +54,10 @@ from typing import (
     Union,
     runtime_checkable,
 )
+
+if TYPE_CHECKING:
+    from victor.tools.base import ToolDefinition
+    from victor.tools.selection.protocol import ToolSelectionContext
 
 from victor.framework.tools import ToolCategory
 from victor.tools.base import BaseTool, CostTier, ToolResult
@@ -166,9 +171,7 @@ class ToolMetrics:
         if duration_ms is not None:
             # Update running average
             alpha = 2 / (self.call_count + 1)
-            self.avg_duration_ms = (
-                alpha * duration_ms + (1 - alpha) * self.avg_duration_ms
-            )
+            self.avg_duration_ms = alpha * duration_ms + (1 - alpha) * self.avg_duration_ms
 
 
 @runtime_checkable
@@ -245,9 +248,7 @@ class UnifiedToolRegistry:
             RuntimeError: If called directly (use get_instance())
         """
         if not UnifiedToolRegistry._instantiation_allowed:
-            raise RuntimeError(
-                "Use UnifiedToolRegistry.get_instance() to get the singleton"
-            )
+            raise RuntimeError("Use UnifiedToolRegistry.get_instance() to get the singleton")
 
         # Core storage
         self._tools: Dict[str, BaseTool] = {}
@@ -342,9 +343,7 @@ class UnifiedToolRegistry:
             self._discovered = True
             self._discovery_paths = paths
 
-            logger.info(
-                f"UnifiedToolRegistry discovered {len(discovered)} tools from {paths}"
-            )
+            logger.info(f"UnifiedToolRegistry discovered {len(discovered)} tools from {paths}")
 
             return discovered
 
@@ -407,11 +406,7 @@ class UnifiedToolRegistry:
             True if it's a tool class
         """
         try:
-            return (
-                inspect.isclass(obj)
-                and issubclass(obj, BaseTool)
-                and obj is not BaseTool
-            )
+            return inspect.isclass(obj) and issubclass(obj, BaseTool) and obj is not BaseTool
         except TypeError:
             return False
 
@@ -505,9 +500,7 @@ class UnifiedToolRegistry:
                 self._metrics.pop(name, None)
 
                 # Remove aliases
-                self._aliases = {
-                    k: v for k, v in self._aliases.items() if v != name
-                }
+                self._aliases = {k: v for k, v in self._aliases.items() if v != name}
 
                 logger.debug(f"Unregistered tool: {name}")
 
@@ -559,7 +552,9 @@ class UnifiedToolRegistry:
 
             # Filter by enabled state
             enabled_tools = [
-                name for name in tool_names if self._metadata.get(name, ToolMetadata(name="")).enabled
+                name
+                for name in tool_names
+                if self._metadata.get(name, ToolMetadata(name="")).enabled
             ]
 
             return enabled_tools[:max_tools]
@@ -608,9 +603,7 @@ class UnifiedToolRegistry:
         elif strategy == SelectionStrategy.HYBRID:
             from victor.tools.hybrid_tool_selector import HybridToolSelector
 
-            if self._selector is None or not isinstance(
-                self._selector, HybridToolSelector
-            ):
+            if self._selector is None or not isinstance(self._selector, HybridToolSelector):
                 self._selector = HybridToolSelector()
 
             return self._selector

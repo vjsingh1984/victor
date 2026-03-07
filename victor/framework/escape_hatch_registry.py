@@ -473,7 +473,9 @@ class EscapeHatchRegistry:
             try:
                 module = importlib.import_module(legacy_path)
             except ImportError as e:
-                logger.warning(f"Could not import escape hatches from {module_path} or {legacy_path}: {e}")
+                logger.warning(
+                    f"Could not import escape hatches from {module_path} or {legacy_path}: {e}"
+                )
                 raise
 
         conditions = getattr(module, "CONDITIONS", {})

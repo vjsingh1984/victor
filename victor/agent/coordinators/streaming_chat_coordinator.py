@@ -143,9 +143,7 @@ class StreamingChatCoordinator:
         ):
             # Emit event if event emitter is available
             if self._event_emitter:
-                await self._event_emitter.emit_async(
-                    "stream_chunk", {"chunk": chunk}
-                )
+                await self._event_emitter.emit_async("stream_chunk", {"chunk": chunk})
 
             yield chunk
 
@@ -180,9 +178,7 @@ class StreamingChatCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 

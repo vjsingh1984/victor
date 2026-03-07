@@ -10,7 +10,19 @@ The TUI is built using Textual and provides:
 - Scrollable conversation history in the middle
 - Status bar showing provider/model information
 - Real-time streaming with thinking and tool call visualization
+- Unread separator marker when new responses arrive while scrolled up (`Ctrl+U` to toggle)
+- Unread separator marker includes live backlog count (e.g., `── 3 new messages ──`)
+- Quick unread jump (`Ctrl+N`) to move cursor to the unread boundary (works even if marker is hidden)
+- Status bar unread badge (e.g., `3 new`) while backlog exists
+- Sticky follow mode (`Ctrl+F`) with explicit `Following` / `Paused` status indicator
+- Session restore replays history without per-message viewport jumps, then lands at latest output once
+- Session restore progress uses the status bar (not transcript messages) to avoid replay noise
+- Very large session restores replay in chunks asynchronously so UI input/scroll stays responsive
 - 40+ slash commands for session management
+
+Unread counting applies to both assistant responses and system transcript activity (such as slash-command output).
+Unread badge and jump-button labels refresh immediately as slash-command output lines arrive.
+`Ctrl+L`, `/clear`, and `/reset` share the same clear path so transcript, agent context, and in-memory session history reset together.
 
 ## Layout
 
@@ -66,7 +78,11 @@ victor chat --no-tui
 |----------|--------|
 | `Ctrl+C` | Exit Victor |
 | `Ctrl+L` | Clear conversation |
+| `Ctrl+X` | Cancel active stream/session restore |
 | `Ctrl+T` | Toggle thinking panel |
+| `Ctrl+N` | Jump to unread boundary |
+| `Ctrl+F` | Toggle sticky follow mode |
+| `Ctrl+U` | Toggle unread separator |
 | `Ctrl+S` | Save current session |
 | `Ctrl+/` | Show help overlay |
 | `Escape` | Focus input widget |
@@ -88,6 +104,17 @@ victor chat --no-tui
 | `Ctrl+Down` | Scroll conversation down |
 | `Ctrl+Home` | Scroll to top |
 | `Ctrl+End` | Scroll to bottom |
+| `PgUp` | Scroll up one page |
+| `PgDn` | Scroll down one page |
+
+Follow behavior:
+
+- Scrolling up (mouse wheel or keyboard) pauses auto-follow so new output does not yank the viewport.
+- Status bar shows `Paused` whenever auto-follow is not active, and `Following` when live tailing is active.
+- Use `Ctrl+F` to toggle between `Following` and `Paused`; if you are paused by manual scrolling, `Ctrl+F` resumes and jumps to latest output.
+- When sticky follow is paused, the jump button changes to `Resume follow`.
+- `Ctrl+End` also resumes sticky follow mode and jumps to latest output.
+- Resizing the terminal while paused/scrolled up will not silently resume follow mode.
 
 ---
 
@@ -297,6 +324,9 @@ When streaming is enabled (default), responses appear token by token with:
 - Real-time content updates
 - Thinking panel for reasoning models
 - Tool call visualization with status indicators
+
+Streaming transcript updates are buffered and flushed in small batches to keep the terminal responsive.
+Auto-follow uses guarded programmatic scrolling so streaming updates do not accidentally pause follow mode.
 
 ### Thinking Panel
 

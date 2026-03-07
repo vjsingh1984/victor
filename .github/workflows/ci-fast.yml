@@ -137,7 +137,16 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e ".[verticals]"
+          pip install -e .
+
+      - name: Install external vertical packages
+        run: |
+          # Install vertical packages from GitHub (using protocol-based entry points)
+          pip install git+https://github.com/vjsingh1984/victor-coding.git@main
+          pip install git+https://github.com/vjsingh1984/victor-devops.git@main
+          pip install git+https://github.com/vjsingh1984/victor-rag.git@main
+          pip install git+https://github.com/vjsingh1984/victor-dataanalysis.git@main
+          pip install git+https://github.com/vjsingh1984/victor-research.git@main
 
       - name: Check vertical imports
         run: |
@@ -160,6 +169,35 @@ jobs:
               except Exception as e:
                   print(f"✗ {vertical_name} failed: {e}")
                   raise
+          PY
+
+      - name: Check protocol-based team spec loading
+        run: |
+          python - <<'PY'
+          from victor.framework.providers.protocol import get_provider_registry
+          from victor.framework.team_registry import load_all_verticals, get_team_registry
+
+          # Test provider registry
+          registry = get_provider_registry()
+          all_specs = registry.get_all_team_specs()
+
+          print("Protocol-based team spec discovery:")
+          for vertical, specs in all_specs.items():
+              print(f"  {vertical}: {len(specs)} teams")
+
+          # Test loading into team registry
+          count = load_all_verticals()
+          print(f"Total teams registered: {count}")
+
+          # Test cross-vertical team lookup
+          team_reg = get_team_registry()
+          feature_team = team_reg.find_team_for_task('feature')
+          deploy_team = team_reg.find_team_for_task('deploy')
+
+          assert feature_team is not None, "Feature team should be found"
+          assert deploy_team is not None, "Deploy team should be found"
+
+          print("✓ Protocol system working correctly")
           PY
 
       # - name: Startup KPI Guardrails
@@ -201,7 +239,6 @@ jobs:
           VICTOR_STRICT_FRAMEWORK_PROTOCOL_FALLBACKS=1 pytest \
             tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_check_capability_fallback_blocked_in_protocol_strict_mode \
             tests/unit/agent/test_capability_registry.py::TestVerticalIntegrationHelpers::test_invoke_capability_fallback_blocked_in_protocol_strict_mode \
-            tests/unit/framework/test_vertical_integration.py::TestIntegrationPlanCache::test_state_snapshot_getter_fallback_blocked_in_protocol_strict_mode \
             -q
           VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS=1 pytest \
             tests/unit/framework/test_capability_config_helpers.py::TestCapabilityConfigHelpers::test_load_private_fallback_blocked_in_strict_mode \

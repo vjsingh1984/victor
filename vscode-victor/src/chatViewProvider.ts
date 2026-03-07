@@ -6,7 +6,6 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
 import { VictorClient, ChatMessage, ToolCall } from './victorClient';
 
@@ -43,7 +42,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
+        _context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken
     ) {
         this._view = webviewView;
@@ -220,7 +219,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
     }
 
-    private async _applyCode(code: string, file?: string): Promise<void> {
+    private async _applyCode(code: string, _file?: string): Promise<void> {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showWarningMessage('No active editor to apply code');

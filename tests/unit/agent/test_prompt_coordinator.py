@@ -120,6 +120,7 @@ class TestPromptCoordinator:
 
         # Should have grounding rules at minimum
         assert isinstance(prompt, str)
+        assert "Victor" in prompt  # default identity injected by policy
 
     def test_build_system_prompt_with_identity(self, coordinator_with_identity):
         """Test building prompt with identity."""
@@ -258,6 +259,7 @@ class TestPromptCoordinator:
         prompt = coordinator.build_system_prompt(context)
 
         assert isinstance(prompt, str)
+        assert "project: victor" in prompt.lower()
 
     def test_on_prompt_built_callback(self):
         """Test prompt built callback."""
@@ -272,6 +274,30 @@ class TestPromptCoordinator:
 
         assert len(callback_calls) == 1
         assert callback_calls[0][1] == context
+
+    def test_build_system_prompt_respects_context_budget(self):
+        """Ensure context strings are truncated to the configured budget."""
+        config = PromptCoordinatorConfig(max_context_tokens=20)
+        coordinator = PromptCoordinator(config=config)
+        context = TaskContext(message="test", additional_context={"long": "x" * 100})
+
+        prompt = coordinator.build_system_prompt(context)
+
+        assert "x" * 21 not in prompt
+
+    def test_build_system_prompt_fallback_on_error(self, monkeypatch):
+        """PromptCoordinator should fall back when builder raises."""
+
+        def boom(_self):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr("victor.framework.prompt_builder.PromptBuilder.build", boom)
+
+        coordinator = PromptCoordinator()
+        prompt = coordinator.build_system_prompt(TaskContext(message="fail gracefully"))
+
+        assert "fail gracefully" in prompt
+        assert "Victor" in prompt
 
 
 class TestCreatePromptCoordinator:

@@ -116,8 +116,12 @@ class WriteResult:
             "error": self.error,
             "summary": {
                 "total_diagnostics": len(self.diagnostics),
-                "errors": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.ERROR),
-                "warnings": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.WARNING),
+                "errors": sum(
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.ERROR
+                ),
+                "warnings": sum(
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.WARNING
+                ),
                 "info": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.INFO),
                 "hints": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.HINT),
             },
@@ -251,9 +255,7 @@ class LSPWriteEnhancer:
         # Write content to temp file for formatting
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=file_path.suffix, delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=file_path.suffix, delete=False) as tmp:
             tmp_path = tmp.name
             tmp.write(content)
 

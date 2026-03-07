@@ -277,7 +277,9 @@ class AzureOpenAIProvider(BaseProvider):
                 )
 
                 url = self._get_deployment_url(model)
-                response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, url, json=payload
+                )
                 response.raise_for_status()
 
                 parsed = self._parse_response(response.json(), model)
@@ -315,12 +317,24 @@ class AzureOpenAIProvider(BaseProvider):
                     error_body = e.response.text[:500] if e.response.text else ""
                     error_str = error_body.lower()
 
-                    if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    if any(
+                        term in error_str
+                        for term in [
+                            "auth",
+                            "unauthorized",
+                            "invalid key",
+                            "invalid api",
+                            "api_key",
+                            "401",
+                        ]
+                    ):
                         raise ProviderAuthError(
                             message=f"Authentication failed: {error_body}",
                             provider=self.name,
                         ) from e
-                    elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    elif any(
+                        term in error_str for term in ["rate limit", "429", "too many requests"]
+                    ):
                         raise ProviderRateLimitError(
                             message=f"Rate limit exceeded: {error_body}",
                             provider=self.name,

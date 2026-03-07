@@ -54,7 +54,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 try:
@@ -283,7 +283,12 @@ class PromptBuilder:
         Returns:
             Self for method chaining
         """
-        self._context.append(context)
+        normalized = context.strip()
+        if not normalized:
+            return self
+
+        if normalized not in self._context:
+            self._context.append(normalized)
         return self
 
     def set_grounding_mode(self, mode: str) -> Self:
@@ -362,7 +367,7 @@ class PromptBuilder:
         Returns:
             True if the section exists, False otherwise
         """
-        return name in self._sections
+        return name in self._sections and bool(self._sections[name].content.strip())
 
     def get_section(self, name: str) -> Optional[PromptSection]:
         """Get a section by name.
@@ -374,6 +379,85 @@ class PromptBuilder:
             The PromptSection if found, None otherwise
         """
         return self._sections.get(name)
+
+    def ensure_section(
+        self,
+        name: str,
+        content: str,
+        priority: int = 50,
+        header: Optional[str] = None,
+    ) -> Self:
+        """Ensure a section exists with non-empty content.
+
+        Adds the section if it is missing or blank.
+
+        Args:
+            name: Section name
+            content: Section content
+            priority: Section priority ordering
+            header: Optional header override
+
+        Returns:
+            Self for method chaining
+        """
+        if not self.has_section(name):
+            self.add_section(name, content, priority=priority, header=header)
+        return self
+
+    def iter_sections(self) -> List[PromptSection]:
+        """Return a list of current sections."""
+        return list(self._sections.values())
+
+    def iter_named_sections(self) -> List[Tuple[str, PromptSection]]:
+        """Return (name, section) tuples for all sections."""
+        return list(self._sections.items())
+
+    def estimate_section_length(self) -> int:
+        """Estimate total character length of all sections."""
+        return sum(
+            len(section.get_formatted_content())
+            for section in self._sections.values()
+            if section.enabled
+        )
+
+    def trim_sections_by_priority(
+        self,
+        max_total_chars: int,
+        protected_sections: Optional[Iterable[str]] = None,
+        min_priority: int = 0,
+    ) -> None:
+        """Trim lower-priority sections to respect a character budget.
+
+        Args:
+            max_total_chars: Maximum allowed characters for sections
+            protected_sections: Section names that should never be trimmed
+            min_priority: Minimum priority threshold eligible for trimming
+        """
+        if max_total_chars <= 0:
+            return
+
+        protected = {name.lower() for name in protected_sections or []}
+
+        def over_budget() -> bool:
+            return self.estimate_section_length() > max_total_chars
+
+        candidates = sorted(
+            self._sections.items(),
+            key=lambda item: item[1].priority,
+            reverse=True,
+        )
+
+        for name, section in candidates:
+            if not over_budget():
+                break
+
+            if section.priority < min_priority:
+                continue
+
+            if name.lower() in protected:
+                continue
+
+            self.remove_section(name)
 
     def clear(self) -> Self:
         """Clear all sections, hints, rules, and context.

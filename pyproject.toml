@@ -139,6 +139,38 @@ dev = [
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
 ]
 
+# CI/CD dependencies - includes all testing, linting, and build tools
+ci = [
+    # All dev dependencies
+    "victor[dev]",
+
+    # Parallel test execution
+    "pytest-xdist>=3.5",
+    "pytest-split>=0.8",
+
+    # Build tools
+    "build>=0.10",
+    "wheel>=0.42",
+    "twine>=4.0",
+
+    # API dependencies for integration tests
+    "strawberry-graphql[fastapi]>=0.243",
+
+    # Coverage and reporting
+    "pytest-cov>=4.1",
+    "codecov>=2.1",
+
+    # Pre-commit hooks
+    "pre-commit>=3.5",
+    "bandit>=1.7",
+    "detect-secrets>=1.4",
+
+    # Documentation validation
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+
 docs = [
     "mkdocs>=1.5",
     "mkdocs-material>=9.5",
@@ -463,8 +495,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=victor",
-    "--cov-report=term-missing",
-    "--cov-report=html",
+    "--cov-report=",
 ]
 asyncio_mode = "auto"
 markers = [

@@ -22,9 +22,13 @@ SOLID Principles:
 - OCP: New error patterns can be added without modifying classification logic
 """
 
+import logging
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, FrozenSet, Set
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorType(Enum):
@@ -106,9 +110,14 @@ class ToolErrorClassifier:
         "try again",
     ]
 
-    def __init__(self) -> None:
-        """Initialize the classifier with empty failure tracking."""
+    def __init__(self, decision_service=None) -> None:
+        """Initialize the classifier with empty failure tracking.
+
+        Args:
+            decision_service: Optional LLMDecisionService for ambiguous error classification
+        """
         self._failed_calls: Set[ToolCallSignature] = set()
+        self._decision_service = decision_service
 
     def classify(self, error_message: str) -> ErrorType:
         """Classify an error message.
@@ -130,6 +139,34 @@ class ToolErrorClassifier:
         for pattern in self.TRANSIENT_PATTERNS:
             if pattern.lower() in error_lower:
                 return ErrorType.TRANSIENT
+
+        # LLM augmentation: when no pattern matches, consult LLM if available
+        if self._decision_service is not None:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = self._decision_service.decide_sync(
+                    DecisionType.ERROR_CLASSIFICATION,
+                    context={"error_message": error_message[:300]},
+                    heuristic_result=ErrorType.RETRYABLE,
+                    heuristic_confidence=0.4,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "error_type"):
+                    type_map = {
+                        "permanent": ErrorType.PERMANENT,
+                        "transient": ErrorType.TRANSIENT,
+                        "retryable": ErrorType.RETRYABLE,
+                    }
+                    mapped = type_map.get(decision.result.error_type)
+                    if mapped is not None:
+                        logger.debug(
+                            "LLM classified error as %s (conf=%.2f)",
+                            mapped.value,
+                            decision.confidence,
+                        )
+                        return mapped
+            except Exception:
+                logger.debug("LLM error classification failed", exc_info=True)
 
         # Default to retryable (e.g., syntax errors can be fixed)
         return ErrorType.RETRYABLE

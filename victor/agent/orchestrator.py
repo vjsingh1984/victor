@@ -555,6 +555,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
+            factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
@@ -863,7 +864,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager = self._factory.create_lifecycle_manager(
             conversation_controller=self._conversation_controller,
             metrics_collector=(
-                self._metrics_coordinator.metrics_collector if hasattr(self, "_metrics_coordinator") else None
+                self._metrics_coordinator.metrics_collector
+                if hasattr(self, "_metrics_coordinator")
+                else None
             ),
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
@@ -1343,7 +1346,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             StreamingChatCoordinator instance for optimized streaming execution
         """
         if self._streaming_chat_coordinator is None:
-            from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
+            from victor.agent.coordinators.streaming_chat_coordinator import (
+                StreamingChatCoordinator,
+            )
 
             self._streaming_chat_coordinator = StreamingChatCoordinator(
                 chat_context=self.protocol_adapter,
@@ -4350,15 +4355,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             raise ValueError(error_msg)
 
         # Get provider-level settings
-        provider_settings = settings.get_provider_settings(profile.provider)
+        # Pass profile extras to get_settings so strategies can see them (e.g., auth_mode)
+        profile_extras = (
+            profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
+        )
+        provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
 
-        # Merge profile-level overrides (base_url, timeout, api_key, etc.)
-        # ProfileConfig uses extra="allow" so extra fields are in __pydantic_extra__
-        if hasattr(profile, "__pydantic_extra__") and profile.__pydantic_extra__:
-            # Profile-level settings override provider-level settings
-            provider_settings.update(profile.__pydantic_extra__)
+        # Note: profile_extras are already merged by get_provider_settings for strategy decisions
+        # The debug log below shows what was passed (for transparency)
+        if profile_extras:
             logger.debug(
-                f"Profile '{profile_name}' overrides: {list(profile.__pydantic_extra__.keys())}"
+                f"Profile '{profile_name}' extras passed to provider config: {list(profile_extras.keys())}"
             )
 
         # Apply timeout multiplier from model capabilities

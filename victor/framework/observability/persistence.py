@@ -43,6 +43,8 @@ from victor.framework.observability.metrics import (
     AgentMetrics,
     Metric,
     MetricType,
+    ToolCallMetrics,
+    LLMCallMetrics,
 )
 
 
@@ -223,71 +225,80 @@ class SQLiteMetricsStore(MetricsStore):
         cursor = self._conn.cursor()
 
         # Insert main metrics
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO agent_metrics (
                 agent_id, session_id, created_at, started_at, completed_at,
                 total_input_tokens, total_output_tokens,
                 total_cache_read_tokens, total_cache_write_tokens,
                 total_reasoning_tokens, state_transitions, current_state, errors
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            metrics.agent_id,
-            metrics.session_id,
-            metrics.created_at,
-            metrics.started_at,
-            metrics.completed_at,
-            metrics.total_input_tokens,
-            metrics.total_output_tokens,
-            metrics.total_cache_read_tokens,
-            metrics.total_cache_write_tokens,
-            metrics.total_reasoning_tokens,
-            metrics.state_transitions,
-            metrics.current_state,
-            json.dumps(metrics.errors),
-        ))
+        """,
+            (
+                metrics.agent_id,
+                metrics.session_id,
+                metrics.created_at,
+                metrics.started_at,
+                metrics.completed_at,
+                metrics.total_input_tokens,
+                metrics.total_output_tokens,
+                metrics.total_cache_read_tokens,
+                metrics.total_cache_write_tokens,
+                metrics.total_reasoning_tokens,
+                metrics.state_transitions,
+                metrics.current_state,
+                json.dumps(metrics.errors),
+            ),
+        )
 
         metric_id = cursor.lastrowid
 
         # Insert tool calls
         for tool_call in metrics.tool_calls:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO tool_calls (
                     agent_metric_id, tool_name, start_time, end_time,
                     success, error_message, input_tokens, output_tokens
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                metric_id,
-                tool_call.tool_name,
-                tool_call.start_time,
-                tool_call.end_time,
-                1 if tool_call.success else 0,
-                tool_call.error_message,
-                tool_call.input_tokens,
-                tool_call.output_tokens,
-            ))
+            """,
+                (
+                    metric_id,
+                    tool_call.tool_name,
+                    tool_call.start_time,
+                    tool_call.end_time,
+                    1 if tool_call.success else 0,
+                    tool_call.error_message,
+                    tool_call.input_tokens,
+                    tool_call.output_tokens,
+                ),
+            )
 
         # Insert LLM calls
         for llm_call in metrics.llm_calls:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO llm_calls (
                     agent_metric_id, provider, model, start_time, end_time,
                     input_tokens, output_tokens, cache_read_tokens,
                     cache_write_tokens, reasoning_tokens, success, error_message
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                metric_id,
-                llm_call.provider,
-                llm_call.model,
-                llm_call.start_time,
-                llm_call.end_time,
-                llm_call.input_tokens,
-                llm_call.output_tokens,
-                llm_call.cache_read_tokens,
-                llm_call.cache_write_tokens,
-                llm_call.reasoning_tokens,
-                1 if llm_call.success else 0,
-                llm_call.error_message,
-            ))
+            """,
+                (
+                    metric_id,
+                    llm_call.provider,
+                    llm_call.model,
+                    llm_call.start_time,
+                    llm_call.end_time,
+                    llm_call.input_tokens,
+                    llm_call.output_tokens,
+                    llm_call.cache_read_tokens,
+                    llm_call.cache_write_tokens,
+                    llm_call.reasoning_tokens,
+                    1 if llm_call.success else 0,
+                    llm_call.error_message,
+                ),
+            )
 
         self._conn.commit()
 
@@ -348,11 +359,14 @@ class SQLiteMetricsStore(MetricsStore):
         results = []
         for row in cursor.fetchall():
             # Load tool calls
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT * FROM tool_calls
                 WHERE agent_metric_id = ?
                 ORDER BY start_time
-            """, (row["id"],))
+            """,
+                (row["id"],),
+            )
 
             tool_calls = []
             for tc_row in cursor.fetchall():
@@ -369,11 +383,14 @@ class SQLiteMetricsStore(MetricsStore):
                 )
 
             # Load LLM calls
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT * FROM llm_calls
                 WHERE agent_metric_id = ?
                 ORDER BY start_time
-            """, (row["id"],))
+            """,
+                (row["id"],),
+            )
 
             llm_calls = []
             for lc_row in cursor.fetchall():
@@ -492,24 +509,33 @@ class SQLiteMetricsStore(MetricsStore):
         cutoff = time.time() - (cutoff_hours * 3600)
 
         # Delete child rows first
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM tool_calls
             WHERE agent_metric_id IN (
                 SELECT id FROM agent_metrics WHERE created_at < ?
             )
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM llm_calls
             WHERE agent_metric_id IN (
                 SELECT id FROM agent_metrics WHERE created_at < ?
             )
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         # Delete parent rows
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM agent_metrics WHERE created_at < ?
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         deleted = cursor.rowcount
         self._conn.commit()

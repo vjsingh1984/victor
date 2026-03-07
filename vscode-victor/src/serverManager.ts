@@ -16,6 +16,7 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as net from 'net';
 
 export interface ServerConfig {
     host: string;
@@ -23,7 +24,6 @@ export interface ServerConfig {
     autoStart: boolean;
     pythonPath?: string;
     victorPath?: string;
-    backend?: 'aiohttp' | 'fastapi';
     fallbackPorts?: number[];
 }
 
@@ -184,7 +184,6 @@ export class ServerManager {
      */
     private async isPortInUse(port: number): Promise<boolean> {
         return new Promise((resolve) => {
-            const net = require('net');
             const server = net.createServer();
 
             server.once('error', (err: NodeJS.ErrnoException) => {
@@ -264,11 +263,6 @@ export class ServerManager {
             '--port', availablePort.toString(),
             '--log-level', 'INFO'
         ];
-
-        // Add backend flag if configured
-        if (this.config.backend) {
-            args.push('--backend', this.config.backend);
-        }
 
         try {
             // Spawn the server process
@@ -661,16 +655,12 @@ export function createServerManager(): ServerManager {
     const configuredPython = config.get<string>('pythonPath') || undefined;
     const pythonPath = configuredPython || detectedPython;
 
-    // Get backend preference (default to aiohttp for backward compatibility)
-    const backend = config.get<'aiohttp' | 'fastapi'>('serverBackend', 'aiohttp');
-
     return new ServerManager({
         host: '127.0.0.1',
         port: config.get('serverPort', 8765),
         autoStart: config.get('autoStart', false),
         pythonPath,
         victorPath: config.get('victorPath'),
-        backend,
         fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS)
     });
 }

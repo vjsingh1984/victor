@@ -172,7 +172,9 @@ class ConversationEmbeddingStore:
         self._db = lancedb.connect(str(self._lancedb_path))
 
         # Open or create table
-        existing_tables = self._db.list_tables().tables
+        from victor.storage.vector_stores._lancedb_compat import get_table_names
+
+        existing_tables = get_table_names(self._db)
         if self.TABLE_NAME in existing_tables:
             self._table = self._db.open_table(self.TABLE_NAME)
             logger.info(f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'")
@@ -190,34 +192,31 @@ class ConversationEmbeddingStore:
         logger.info(f"[ConversationEmbeddingStore] Created table '{self.TABLE_NAME}'")
 
     def _get_max_embedded_timestamp(self, session_id: Optional[str] = None) -> Optional[str]:
-        """Get the maximum timestamp of embedded messages."""
+        """Get the maximum timestamp of embedded messages.
+
+        Uses LanceDB's native Lance dataset to compute MAX(timestamp)
+        via PyArrow without materializing the full table into pandas.
+        """
         if self._table is None:
             return None
 
         try:
-            # Use LanceDB SQL for efficient aggregation without loading full dataset
+            import pyarrow.compute as pc
+
+            # Use the underlying Lance dataset for efficient columnar access
+            lance_ds = self._table.to_lance()
+            scanner = lance_ds.scanner(columns=["timestamp"])
             if session_id:
-                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME} WHERE session_id = '{session_id}'"
-            else:
-                query = f"SELECT MAX(timestamp) as max_ts FROM {self.TABLE_NAME}"
+                scanner = lance_ds.scanner(
+                    columns=["timestamp"],
+                    filter=f"session_id = '{session_id}'",
+                )
 
-            (
-                self._table.to_lance().to_table(filter=None).to_pandas().query(query)
-                if session_id
-                else None
-            )
-
-            # Fallback to pandas for now (LanceDB SQL support varies)
-            df = self._table.to_pandas()
-            if df.empty:
+            ts_table = scanner.to_table()
+            if ts_table.num_rows == 0:
                 return None
 
-            if session_id:
-                df = df[df["session_id"] == session_id]
-                if df.empty:
-                    return None
-
-            max_ts = df["timestamp"].max()
+            max_ts = pc.max(ts_table.column("timestamp")).as_py()
             return str(max_ts) if max_ts else None
 
         except Exception as e:
@@ -501,9 +500,14 @@ class ConversationEmbeddingStore:
 
             delete_count = count - self.MAX_EMBEDDINGS
 
-            # Get oldest timestamps only (minimal memory usage)
-            df = self._table.to_pandas()[["message_id", "timestamp"]]
-            oldest_ids = df.nsmallest(delete_count, "timestamp")["message_id"].tolist()
+            # Get oldest timestamps via Lance scanner (avoids full table materialization)
+            import pyarrow.compute as pc
+
+            lance_ds = self._table.to_lance()
+            tbl = lance_ds.scanner(columns=["message_id", "timestamp"]).to_table()
+            indices = pc.sort_indices(tbl.column("timestamp"))
+            oldest_indices = indices[:delete_count]
+            oldest_ids = pc.take(tbl.column("message_id"), oldest_indices).to_pylist()
 
             if not oldest_ids:
                 return 0

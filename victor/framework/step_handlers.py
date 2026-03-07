@@ -33,38 +33,38 @@ Step Handler Execution Order:
     ------|---------------------|--------------------------|--------------------------------------------|-------------
     5     | capability_config   | CapabilityConfigStepHandler | Centralized capability config storage    | None
     10    | tools               | ToolStepHandler          | Tool filter application                    | None
-    15    | tiered_config       | TieredConfigStepHandler  | Tiered tool config (mandatory/core/pool)   | Tool
-    20    | prompt              | PromptStepHandler        | System prompt and prompt contributors      | None
-    30    | safety              | SafetyStepHandler        | Safety patterns and extensions             | None
-    40    | config              | ConfigStepHandler        | Stages, mode configs, tool dependencies    | None
+    15    | tiered_config       | TieredConfigStepHandler  | Tiered tool config (mandatory/core/pool)   | Tools
+    20    | prompt              | PromptStepHandler        | System prompt baseline                     | None
+    40    | config              | ConfigStepHandler        | Stages, mode configs, tool dependencies    | Tools, Tiered, Prompt
     45    | extensions          | ExtensionsStepHandler    | Coordinated extension application          | Config
-    50    | middleware          | MiddlewareStepHandler    | Middleware chain application               | Extensions
-    60    | framework           | FrameworkStepHandler     | Workflows, RL, teams, chains, personas     | All prior
+    60    | framework           | FrameworkStepHandler     | Workflows, RL, teams, chains, personas     | Core steps
     100   | context             | ContextStepHandler       | Attach context to orchestrator             | All prior
 
     Dependencies Explained:
     - TieredConfig (15) runs after Tool (10) because it applies access
       rules to the tools that were just registered
-    - Extensions (45) runs after Config (40) because it needs the stages
-      and mode configuration to be available for extension handlers
-    - Middleware (50) runs after Extensions (45) as it's part of the
-      extensions system but needs to apply after core extensions
+    - Config (40) runs after Tool/Tiered/Prompt because it persists stage
+      and runtime configuration once base tool/prompt state exists
+    - Extensions (45) runs after Config (40) and coordinates extension
+      sub-handlers (service provider, tool selection, middleware, safety,
+      prompt contributors, mode config, tool deps, enrichment)
     - Framework (60) runs last because it registers workflows and teams
       that may depend on tools, prompts, and configurations being
       fully initialized
     - Context (100) runs last as a finalization step to attach the
       complete context to the orchestrator
 
-Architecture:
+    Architecture:
     StepHandlerProtocol
     ├── CapabilityConfigStepHandler - Centralized capability config storage
     ├── ToolStepHandler - Tool filter application
     ├── TieredConfigStepHandler - Tiered tool config (Phase 1 fix)
-    ├── PromptStepHandler - System prompt and prompt contributors
-    ├── SafetyStepHandler - Safety patterns and extensions
+    ├── PromptStepHandler - System prompt baseline
     ├── ConfigStepHandler - Stages, modes, and tool dependencies
     ├── ExtensionsStepHandler - Coordinated extension application
-    ├── MiddlewareStepHandler - Middleware chain application
+    │   ├── MiddlewareStepHandler (internal sub-handler)
+    │   ├── SafetyStepHandler (internal sub-handler)
+    │   └── PromptStepHandler/ConfigStepHandler helpers (internal)
     ├── FrameworkStepHandler - Workflows, RL config, and team specs
     └── ContextStepHandler - Final context attachment
 
@@ -74,10 +74,8 @@ Usage:
         ToolStepHandler,
         TieredConfigStepHandler,
         PromptStepHandler,
-        SafetyStepHandler,
         ConfigStepHandler,
         ExtensionsStepHandler,
-        MiddlewareStepHandler,
         FrameworkStepHandler,
         ContextStepHandler,
     )
@@ -88,10 +86,8 @@ Usage:
         ToolStepHandler(),
         TieredConfigStepHandler(),
         PromptStepHandler(),
-        SafetyStepHandler(),
         ConfigStepHandler(),
         ExtensionsStepHandler(),
-        MiddlewareStepHandler(),
         FrameworkStepHandler(),
         ContextStepHandler(),
     ]
@@ -696,7 +692,7 @@ class ConfigStepHandler(BaseStepHandler):
     """
 
     parallel_safe = False
-    depends_on = ("tools", "prompt", "safety")
+    depends_on = ("tools", "tiered_config", "prompt")
     side_effects = True
 
     @property
@@ -999,10 +995,8 @@ class FrameworkStepHandler(BaseStepHandler):
         "tools",
         "tiered_config",
         "prompt",
-        "safety",
         "config",
         "extensions",
-        "middleware",
     )
     side_effects = True
 
@@ -1206,8 +1200,11 @@ class FrameworkStepHandler(BaseStepHandler):
             if rl_provider and isinstance(rl_provider, RLConfigProviderProtocol):
                 rl_config = rl_provider.get_rl_config()
 
-        # Fallback: check if vertical implements RLConfigProviderProtocol directly
-        if rl_config is None and isinstance(vertical, RLConfigProviderProtocol):
+        # Fallback: check if vertical (class) implements get_rl_config directly.
+        # Note: verticals are passed as classes, so isinstance() against Protocol
+        # won't work (Protocol isinstance checks target instances). Use hasattr
+        # for this class-level duck-type check.
+        if rl_config is None and hasattr(vertical, "get_rl_config"):
             rl_config = vertical.get_rl_config()
 
         if rl_config is None:
@@ -1282,8 +1279,11 @@ class FrameworkStepHandler(BaseStepHandler):
             if team_provider and isinstance(team_provider, TeamSpecProviderProtocol):
                 team_specs = team_provider.get_team_specs()
 
-        # Fallback: check if vertical implements TeamSpecProviderProtocol directly
-        if team_specs is None and isinstance(vertical, TeamSpecProviderProtocol):
+        # Fallback: check if vertical (class) implements get_team_specs directly.
+        # Note: verticals are passed as classes, so isinstance() against Protocol
+        # won't work (Protocol isinstance checks target instances). Use hasattr
+        # for this class-level duck-type check.
+        if team_specs is None and hasattr(vertical, "get_team_specs"):
             team_specs = vertical.get_team_specs()
 
         if not team_specs:
@@ -1740,10 +1740,8 @@ class ContextStepHandler(BaseStepHandler):
         "tools",
         "tiered_config",
         "prompt",
-        "safety",
         "config",
         "extensions",
-        "middleware",
         "framework",
     )
     side_effects = True

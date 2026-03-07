@@ -354,7 +354,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_coding_workflow_provider(self):
         """Test Coding vertical workflow provider."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         provider = CodingAssistant.get_workflow_provider()
         assert provider is not None
@@ -396,7 +396,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_workflow_definition_validity(self):
         """Test that all vertical workflows pass validation."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
         from victor.dataanalysis import DataAnalysisAssistant
         from victor.devops import DevOpsAssistant
         from victor.research import ResearchAssistant

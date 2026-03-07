@@ -203,7 +203,8 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_coding_vertical(self):
         """Test TUI with coding vertical integration."""
-        from victor.coding.assistant import CodingAssistant
+        pytest.importorskip("victor_coding")
+        from victor_coding.assistant import CodingAssistant
 
         config = SessionConfig(
             mode=SessionMode.TUI,
@@ -239,6 +240,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_research_vertical(self):
         """Test TUI with research vertical integration."""
+        pytest.importorskip("victor.research")
         from victor.research.assistant import ResearchAssistant
 
         config = SessionConfig(

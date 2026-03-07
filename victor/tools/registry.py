@@ -15,10 +15,14 @@
 """Tool registry for managing available tools."""
 
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
+
+if TYPE_CHECKING:
+    from victor.tools.registration.strategies import ToolRegistrationStrategy
+    from victor.tools.registration.registry import ToolRegistrationStrategyRegistry
 
 
 class HookError(Exception):
@@ -89,7 +93,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
         self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
-        self._after_hooks: List[Union[Hook, Callable]] = []
+        self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
         # Schema cache: (enabled_tool_names_tuple, schemas_list) for both enabled/all modes
         # Key is (only_enabled: bool), value is (tool_names_tuple, schemas_list)
@@ -98,6 +102,23 @@ class ToolRegistry(BaseRegistry[str, Any]):
             False: None,  # Cache for only_enabled=False
         }
         self._schema_cache_lock = threading.RLock()
+
+        # Strategy pattern support (when flag enabled)
+        # Initialize strategy registry if flag is enabled
+        self._strategy_registry: Optional["ToolRegistrationStrategyRegistry"] = None
+        try:
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+            if get_feature_flag_manager().is_enabled(
+                FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
+            ):
+                from victor.tools.registration.registry import (
+                    get_tool_registration_strategy_registry,
+                )
+
+                self._strategy_registry = get_tool_registration_strategy_registry()
+        except ImportError:
+            pass  # Feature flags not available
 
     @property
     def _tools(self) -> Dict[str, Any]:
@@ -172,6 +193,10 @@ class ToolRegistry(BaseRegistry[str, Any]):
         The first form is preferred for tool registration; the second allows
         ToolRegistry to be used where BaseRegistry is expected.
 
+        When feature flag USE_STRATEGY_BASED_TOOL_REGISTRATION is enabled,
+        this method uses the strategy pattern to automatically determine the
+        appropriate registration strategy based on the tool type.
+
         Args:
             *args: Either (tool,) or (key, value)
             enabled: Whether the tool is enabled by default (default: True)
@@ -184,6 +209,19 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if len(args) == 1:
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
+
+            # Check feature flag for strategy-based registration
+            try:
+                from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+                if get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
+                ):
+                    return self._register_with_strategy(tool, enabled)
+            except ImportError:
+                pass  # Feature flags not available
+
+            # Use existing implementation
             if hasattr(tool, "Tool"):  # It's a decorated function
                 tool_instance = tool.Tool
                 super().register(tool_instance.name, tool_instance)
@@ -207,6 +245,75 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         # Invalidate schema cache after registration
         self._invalidate_schema_cache()
+
+    def _register_with_strategy(self, tool: Any, enabled: bool) -> None:
+        """Register using strategy pattern.
+
+        Args:
+            tool: Tool to register
+            enabled: Whether tool is enabled
+        """
+        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+
+        if self._strategy_registry is None:
+            self._strategy_registry = get_tool_registration_strategy_registry()
+
+        strategy = self._strategy_registry.get_strategy_for(tool)
+        if strategy is None:
+            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
+
+        strategy.register(self, tool, enabled)
+        self._invalidate_schema_cache()
+
+    def _register_direct(self, name: str, tool: Any, enabled: bool = True) -> None:
+        """Directly register a tool by name (used by strategies).
+
+        This method is called by registration strategies to perform
+        the actual registration with the BaseRegistry.
+
+        Args:
+            name: Tool name
+            tool: Tool instance
+            enabled: Whether tool is enabled
+        """
+        super().register(name, tool)
+        self._tool_enabled[name] = enabled
+        self._invalidate_schema_cache()
+
+    def add_custom_strategy(self, strategy: "ToolRegistrationStrategy") -> None:
+        """Add a custom registration strategy.
+
+        Allows extending tool registration without modifying core code.
+
+        Example:
+            class PydanticModelStrategy:
+                def can_handle(self, tool):
+                    try:
+                        from pydantic import BaseModel
+                        return isinstance(tool, BaseModel)
+                    except ImportError:
+                        return False
+
+                def register(self, registry, tool, enabled=True):
+                    wrapper = self._create_wrapper(tool)
+                    registry._register_direct(wrapper.name, wrapper, enabled)
+
+                @property
+                def priority(self):
+                    return 75
+
+            registry = ToolRegistry()
+            registry.add_custom_strategy(PydanticModelStrategy())
+
+        Args:
+            strategy: Strategy to add
+        """
+        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+
+        if self._strategy_registry is None:
+            self._strategy_registry = get_tool_registration_strategy_registry()
+
+        self._strategy_registry.register_strategy(strategy)
 
     # Alias for backwards compatibility with code using register_tool()
     def register_tool(self, tool: Any, enabled: bool = True) -> None:

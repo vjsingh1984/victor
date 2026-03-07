@@ -81,7 +81,7 @@ def extract_text_from_html(html_content: str) -> str:
     try:
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(html_content, "html.parser")
+        soup = BeautifulSoup(html_content, "lxml")
 
         # Remove non-content elements
         for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):

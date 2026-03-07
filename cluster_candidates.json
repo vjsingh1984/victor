@@ -1,0 +1,1668 @@
+{
+  "fanout_ids": [
+    "symbol:victor/agent/streaming/pipeline.py:run",
+    "symbol:victor/agent/orchestrator.py:__init__",
+    "symbol:victor/agent/service_provider.py:register_singleton_services",
+    "symbol:victor/tools/graph_tool.py:graph",
+    "symbol:victor/framework/step_handlers.py:_do_apply",
+    "symbol:victor/ui/slash/commands/metrics.py:execute",
+    "symbol:victor/framework/graph.py:invoke",
+    "symbol:victor/agent/tool_pipeline.py:_execute_single_call",
+    "symbol:victor/workflows/generation/validator.py:validate",
+    "symbol:victor/agent/tool_executor.py:execute"
+  ],
+  "fanin_ids": [
+    "symbol:victor/core/event_sourcing.py:append",
+    "symbol:victor/framework/graph.py:items",
+    "symbol:victor/ui/emoji.py:warning",
+    "symbol:victor/core/repository.py:list",
+    "symbol:victor/tools/patch_tool.py:patch",
+    "symbol:victor/framework/teams.py:result",
+    "symbol:victor/ui/emoji.py:error",
+    "symbol:victor/ui/tui/app.py:print",
+    "symbol:victor/observability/metrics.py:time",
+    "symbol:victor/framework/middleware.py:logging"
+  ],
+  "clusters": {
+    "symbol:victor/agent/streaming/pipeline.py:run": [
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 0.8726025223731995
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 0.8726025223731995
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 0.8726025223731995
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 0.8726025223731995
+      },
+      {
+        "id": "symbol:victor/agent/subagents/base.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/subagents/base.py",
+        "type": "function",
+        "sim": 0.8726025223731995
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.8726024627685547
+      },
+      {
+        "id": "symbol:victor/agent/post_switch_hooks.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/post_switch_hooks.py",
+        "type": "function",
+        "sim": 0.8726024627685547
+      },
+      {
+        "id": "symbol:victor/agent/post_switch_hooks.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/post_switch_hooks.py",
+        "type": "function",
+        "sim": 0.8726024627685547
+      },
+      {
+        "id": "symbol:victor/agent/post_switch_hooks.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/post_switch_hooks.py",
+        "type": "function",
+        "sim": 0.8726024627685547
+      },
+      {
+        "id": "symbol:victor/agent/provider_switch_coordinator.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/provider_switch_coordinator.py",
+        "type": "function",
+        "sim": 0.8726024627685547
+      }
+    ],
+    "symbol:victor/agent/orchestrator.py:__init__": [
+      {
+        "id": "symbol:victor/agent/subagents/base.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/subagents/base.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/coordinators/tool_coordinator.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/coordinators/tool_coordinator.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/session_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/session_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/session_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/session_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/decision_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/decision_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/provider_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/provider_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/context_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/context_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/context_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/context_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/services/context_service.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/services/context_service.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/agent/subagents/orchestrator.py:__init__",
+        "module": "victor.agent",
+        "name": "__init__",
+        "file": "victor/agent/subagents/orchestrator.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      }
+    ],
+    "symbol:victor/agent/service_provider.py:register_singleton_services": [
+      {
+        "id": "symbol:victor/agent/service_provider.py:register_services",
+        "module": "victor.agent",
+        "name": "register_services",
+        "file": "victor/agent/service_provider.py",
+        "type": "function",
+        "sim": 0.8862214088439941
+      },
+      {
+        "id": "symbol:victor/agent/service_provider.py:register_scoped_services",
+        "module": "victor.agent",
+        "name": "register_scoped_services",
+        "file": "victor/agent/service_provider.py",
+        "type": "function",
+        "sim": 0.8414981365203857
+      },
+      {
+        "id": "symbol:victor/agent/resource_manager.py:register_resource",
+        "module": "victor.agent",
+        "name": "register_resource",
+        "file": "victor/agent/resource_manager.py",
+        "type": "function",
+        "sim": 0.7936620712280273
+      },
+      {
+        "id": "symbol:victor/agent/resource_manager.py:register_resource",
+        "module": "victor.agent",
+        "name": "register_resource",
+        "file": "victor/agent/resource_manager.py",
+        "type": "function",
+        "sim": 0.7936620712280273
+      },
+      {
+        "id": "symbol:victor/agent/tool_catalog_loader.py:_register_from_shared_registry",
+        "module": "victor.agent",
+        "name": "_register_from_shared_registry",
+        "file": "victor/agent/tool_catalog_loader.py",
+        "type": "function",
+        "sim": 0.7876260280609131
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:register_provider",
+        "module": "victor.agent",
+        "name": "register_provider",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.7783312797546387
+      },
+      {
+        "id": "symbol:victor/agent/service_provider.py:register_provider",
+        "module": "victor.agent",
+        "name": "register_provider",
+        "file": "victor/agent/service_provider.py",
+        "type": "function",
+        "sim": 0.7783312797546387
+      },
+      {
+        "id": "symbol:victor/agent/model_switcher.py:register_callback",
+        "module": "victor.agent",
+        "name": "register_callback",
+        "file": "victor/agent/model_switcher.py",
+        "type": "function",
+        "sim": 0.7773299217224121
+      },
+      {
+        "id": "symbol:victor/agent/mode_controller.py:register_callback",
+        "module": "victor.agent",
+        "name": "register_callback",
+        "file": "victor/agent/mode_controller.py",
+        "type": "function",
+        "sim": 0.7773298025131226
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:register",
+        "module": "victor.agent",
+        "name": "register",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.7752994298934937
+      }
+    ],
+    "symbol:victor/tools/graph_tool.py:graph": [
+      {
+        "id": "symbol:victor/tools/graph_tool.py:_load_graph",
+        "module": "victor.tools",
+        "name": "_load_graph",
+        "file": "victor/tools/graph_tool.py",
+        "type": "function",
+        "sim": 0.862612247467041
+      },
+      {
+        "id": "symbol:victor/tools/tool_graph.py:list_graphs",
+        "module": "victor.tools",
+        "name": "list_graphs",
+        "file": "victor/tools/tool_graph.py",
+        "type": "function",
+        "sim": 0.8602764010429382
+      },
+      {
+        "id": "symbol:victor/tools/tool_graph.py:get_graph",
+        "module": "victor.tools",
+        "name": "get_graph",
+        "file": "victor/tools/tool_graph.py",
+        "type": "function",
+        "sim": 0.8565313816070557
+      },
+      {
+        "id": "symbol:victor/tools/graph_tool.py:_build_module_graph",
+        "module": "victor.tools",
+        "name": "_build_module_graph",
+        "file": "victor/tools/graph_tool.py",
+        "type": "function",
+        "sim": 0.8359907269477844
+      },
+      {
+        "id": "symbol:victor/tools/composition/lazy.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/composition/lazy.py",
+        "type": "function",
+        "sim": 0.8202795386314392
+      },
+      {
+        "id": "symbol:victor/tools/composition/runnable.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/composition/runnable.py",
+        "type": "function",
+        "sim": 0.8202795386314392
+      },
+      {
+        "id": "symbol:victor/tools/decorators.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/decorators.py",
+        "type": "function",
+        "sim": 0.8202795386314392
+      },
+      {
+        "id": "symbol:victor/tools/base.py:description",
+        "module": "victor.tools",
+        "name": "description",
+        "file": "victor/tools/base.py",
+        "type": "function",
+        "sim": 0.8128544688224792
+      },
+      {
+        "id": "symbol:victor/tools/base.py:description",
+        "module": "victor.tools",
+        "name": "description",
+        "file": "victor/tools/base.py",
+        "type": "function",
+        "sim": 0.8128544688224792
+      },
+      {
+        "id": "symbol:victor/tools/registry.py:description",
+        "module": "victor.tools",
+        "name": "description",
+        "file": "victor/tools/registry.py",
+        "type": "function",
+        "sim": 0.8128544688224792
+      }
+    ],
+    "symbol:victor/framework/step_handlers.py:_do_apply": [
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/framework/step_handlers.py:_do_apply",
+        "module": "victor.framework",
+        "name": "_do_apply",
+        "file": "victor/framework/step_handlers.py",
+        "type": "function",
+        "sim": 1.0
+      }
+    ],
+    "symbol:victor/ui/slash/commands/metrics.py:execute": [
+      {
+        "id": "symbol:victor/ui/slash/commands/metrics.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/metrics.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/metrics.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/metrics.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/metrics.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/metrics.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/tools.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/tools.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/tools.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/tools.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/tools.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/tools.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/codebase.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/codebase.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/navigation.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/navigation.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/session.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/session.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/session.py:execute",
+        "module": "victor.ui",
+        "name": "execute",
+        "file": "victor/ui/slash/commands/session.py",
+        "type": "function",
+        "sim": 1.0
+      }
+    ],
+    "symbol:victor/framework/graph.py:invoke": [
+      {
+        "id": "symbol:victor/framework/capability_runtime.py:invoke_capability",
+        "module": "victor.framework",
+        "name": "invoke_capability",
+        "file": "victor/framework/capability_runtime.py",
+        "type": "function",
+        "sim": 0.8173209428787231
+      },
+      {
+        "id": "symbol:victor/framework/protocols.py:invoke_capability",
+        "module": "victor.framework",
+        "name": "invoke_capability",
+        "file": "victor/framework/protocols.py",
+        "type": "function",
+        "sim": 0.8173209428787231
+      },
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:initialize",
+        "module": "victor.framework",
+        "name": "initialize",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.7990018725395203
+      },
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:initialize",
+        "module": "victor.framework",
+        "name": "initialize",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.7990018725395203
+      },
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:initialize",
+        "module": "victor.framework",
+        "name": "initialize",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.7990018725395203
+      },
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:initialize",
+        "module": "victor.framework",
+        "name": "initialize",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.7990018725395203
+      },
+      {
+        "id": "symbol:victor/framework/rl/learners/prompt_template.py:callback",
+        "module": "victor.framework",
+        "name": "callback",
+        "file": "victor/framework/rl/learners/prompt_template.py",
+        "type": "function",
+        "sim": 0.7956247329711914
+      },
+      {
+        "id": "symbol:victor/framework/debugging/inspector.py:capture",
+        "module": "victor.framework",
+        "name": "capture",
+        "file": "victor/framework/debugging/inspector.py",
+        "type": "function",
+        "sim": 0.7933495044708252
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:handler",
+        "module": "victor.framework",
+        "name": "handler",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.7883652448654175
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:handler",
+        "module": "victor.framework",
+        "name": "handler",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.7883651852607727
+      }
+    ],
+    "symbol:victor/agent/tool_pipeline.py:_execute_single_call": [
+      {
+        "id": "symbol:victor/agent/parallel_executor.py:_execute_single",
+        "module": "victor.agent",
+        "name": "_execute_single",
+        "file": "victor/agent/parallel_executor.py",
+        "type": "function",
+        "sim": 0.961814284324646
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:execute_streaming_single",
+        "module": "victor.agent",
+        "name": "execute_streaming_single",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.8581581711769104
+      },
+      {
+        "id": "symbol:victor/agent/coordinators/planning_coordinator.py:_execute_plan",
+        "module": "victor.agent",
+        "name": "_execute_plan",
+        "file": "victor/agent/coordinators/planning_coordinator.py",
+        "type": "function",
+        "sim": 0.8152554631233215
+      },
+      {
+        "id": "symbol:victor/agent/services/chat_service.py:_execute_tool_calls",
+        "module": "victor.agent",
+        "name": "_execute_tool_calls",
+        "file": "victor/agent/services/chat_service.py",
+        "type": "function",
+        "sim": 0.8031942248344421
+      },
+      {
+        "id": "symbol:victor/agent/streaming/tool_execution.py:_execute_tool_calls",
+        "module": "victor.agent",
+        "name": "_execute_tool_calls",
+        "file": "victor/agent/streaming/tool_execution.py",
+        "type": "function",
+        "sim": 0.8031941652297974
+      },
+      {
+        "id": "symbol:victor/agent/planning/autonomous.py:_execute_step",
+        "module": "victor.agent",
+        "name": "_execute_step",
+        "file": "victor/agent/planning/autonomous.py",
+        "type": "function",
+        "sim": 0.8018348217010498
+      },
+      {
+        "id": "symbol:victor/agent/services/tool_service.py:execute_with_limit",
+        "module": "victor.agent",
+        "name": "execute_with_limit",
+        "file": "victor/agent/services/tool_service.py",
+        "type": "function",
+        "sim": 0.7910919785499573
+      },
+      {
+        "id": "symbol:victor/agent/parallel_executor.py:_execute_sequential",
+        "module": "victor.agent",
+        "name": "_execute_sequential",
+        "file": "victor/agent/parallel_executor.py",
+        "type": "function",
+        "sim": 0.7909649610519409
+      },
+      {
+        "id": "symbol:victor/agent/planning/autonomous.py:_execute_sequential",
+        "module": "victor.agent",
+        "name": "_execute_sequential",
+        "file": "victor/agent/planning/autonomous.py",
+        "type": "function",
+        "sim": 0.7909649610519409
+      },
+      {
+        "id": "symbol:victor/agent/teams/coordinator.py:_execute_sequential",
+        "module": "victor.agent",
+        "name": "_execute_sequential",
+        "file": "victor/agent/teams/coordinator.py",
+        "type": "function",
+        "sim": 0.7909649610519409
+      }
+    ],
+    "symbol:victor/workflows/generation/validator.py:validate": [
+      {
+        "id": "symbol:victor/workflows/graph_dsl.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/graph_dsl.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/definition.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/definition.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/validator.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/validator.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/generation/validator.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/generation/validator.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/generation/validator.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/generation/validator.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/graph.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/graph.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/protocols.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/protocols.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/versioning.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/versioning.py",
+        "type": "function",
+        "sim": 1.0000001192092896
+      },
+      {
+        "id": "symbol:victor/workflows/generation/validator.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/generation/validator.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/workflows/generation/validator.py:validate",
+        "module": "victor.workflows",
+        "name": "validate",
+        "file": "victor/workflows/generation/validator.py",
+        "type": "function",
+        "sim": 1.0
+      }
+    ],
+    "symbol:victor/agent/tool_executor.py:execute": [
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/agent/specs/ensemble.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/specs/ensemble.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/agent/subagents/base.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/subagents/base.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.9999999403953552
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.9999999403953552
+      },
+      {
+        "id": "symbol:victor/agent/protocols.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/protocols.py",
+        "type": "function",
+        "sim": 0.9999999403953552
+      },
+      {
+        "id": "symbol:victor/agent/provider_switch_coordinator.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/provider_switch_coordinator.py",
+        "type": "function",
+        "sim": 0.9999999403953552
+      },
+      {
+        "id": "symbol:victor/agent/services/protocols/recovery_service.py:execute",
+        "module": "victor.agent",
+        "name": "execute",
+        "file": "victor/agent/services/protocols/recovery_service.py",
+        "type": "function",
+        "sim": 0.9999999403953552
+      }
+    ],
+    "symbol:victor/core/event_sourcing.py:append": [
+      {
+        "id": "symbol:victor/core/event_sourcing.py:append",
+        "module": "victor.core",
+        "name": "append",
+        "file": "victor/core/event_sourcing.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/event_sourcing.py:append",
+        "module": "victor.core",
+        "name": "append",
+        "file": "victor/core/event_sourcing.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/repository.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 0.8806083798408508
+      },
+      {
+        "id": "symbol:victor/core/repository.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 0.8806083798408508
+      },
+      {
+        "id": "symbol:victor/core/verticals/prompt_adapter.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/verticals/prompt_adapter.py",
+        "type": "function",
+        "sim": 0.8806083798408508
+      },
+      {
+        "id": "symbol:victor/core/repository.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 0.8806083798408508
+      },
+      {
+        "id": "symbol:victor/core/repository.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 0.8806083798408508
+      },
+      {
+        "id": "symbol:victor/core/vertical_types.py:add",
+        "module": "victor.core",
+        "name": "add",
+        "file": "victor/core/vertical_types.py",
+        "type": "function",
+        "sim": 0.880608320236206
+      },
+      {
+        "id": "symbol:victor/core/tool_tier_registry.py:extend",
+        "module": "victor.core",
+        "name": "extend",
+        "file": "victor/core/tool_tier_registry.py",
+        "type": "function",
+        "sim": 0.8202435970306396
+      },
+      {
+        "id": "symbol:victor/core/verticals/extensions/config_extensions.py:merge",
+        "module": "victor.core",
+        "name": "merge",
+        "file": "victor/core/verticals/extensions/config_extensions.py",
+        "type": "function",
+        "sim": 0.8111439943313599
+      }
+    ],
+    "symbol:victor/framework/graph.py:items": [
+      {
+        "id": "symbol:victor/framework/graph.py:list",
+        "module": "victor.framework",
+        "name": "list",
+        "file": "victor/framework/graph.py",
+        "type": "function",
+        "sim": 0.8959707021713257
+      },
+      {
+        "id": "symbol:victor/framework/graph.py:list",
+        "module": "victor.framework",
+        "name": "list",
+        "file": "victor/framework/graph.py",
+        "type": "function",
+        "sim": 0.8959707021713257
+      },
+      {
+        "id": "symbol:victor/framework/graph.py:list",
+        "module": "victor.framework",
+        "name": "list",
+        "file": "victor/framework/graph.py",
+        "type": "function",
+        "sim": 0.8959707021713257
+      },
+      {
+        "id": "symbol:victor/framework/agent_components.py:tools",
+        "module": "victor.framework",
+        "name": "tools",
+        "file": "victor/framework/agent_components.py",
+        "type": "function",
+        "sim": 0.8726423382759094
+      },
+      {
+        "id": "symbol:victor/framework/graph.py:values",
+        "module": "victor.framework",
+        "name": "values",
+        "file": "victor/framework/graph.py",
+        "type": "function",
+        "sim": 0.8455045819282532
+      },
+      {
+        "id": "symbol:victor/framework/teams.py:members",
+        "module": "victor.framework",
+        "name": "members",
+        "file": "victor/framework/teams.py",
+        "type": "function",
+        "sim": 0.8368933200836182
+      },
+      {
+        "id": "symbol:victor/framework/enrichment/core.py:set",
+        "module": "victor.framework",
+        "name": "set",
+        "file": "victor/framework/enrichment/core.py",
+        "type": "function",
+        "sim": 0.8342236876487732
+      },
+      {
+        "id": "symbol:victor/framework/observability/metrics.py:set",
+        "module": "victor.framework",
+        "name": "set",
+        "file": "victor/framework/observability/metrics.py",
+        "type": "function",
+        "sim": 0.8342235684394836
+      },
+      {
+        "id": "symbol:victor/framework/graph.py:keys",
+        "module": "victor.framework",
+        "name": "keys",
+        "file": "victor/framework/graph.py",
+        "type": "function",
+        "sim": 0.8327360153198242
+      },
+      {
+        "id": "symbol:victor/framework/vertical_protocols.py:pattern",
+        "module": "victor.framework",
+        "name": "pattern",
+        "file": "victor/framework/vertical_protocols.py",
+        "type": "function",
+        "sim": 0.8271216154098511
+      }
+    ],
+    "symbol:victor/ui/emoji.py:warning": [
+      {
+        "id": "symbol:victor/ui/emoji.py:error",
+        "module": "victor.ui",
+        "name": "error",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.787795901298523
+      },
+      {
+        "id": "symbol:victor/ui/emoji.py:info",
+        "module": "victor.ui",
+        "name": "info",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.7763137221336365
+      },
+      {
+        "id": "symbol:victor/ui/commands/scheduler.py:stop",
+        "module": "victor.ui",
+        "name": "stop",
+        "file": "victor/ui/commands/scheduler.py",
+        "type": "function",
+        "sim": 0.7684040069580078
+      },
+      {
+        "id": "symbol:victor/ui/tui/app.py:handler",
+        "module": "victor.ui",
+        "name": "handler",
+        "file": "victor/ui/tui/app.py",
+        "type": "function",
+        "sim": 0.7605195045471191
+      },
+      {
+        "id": "symbol:victor/ui/commands/security.py:security",
+        "module": "victor.ui",
+        "name": "security",
+        "file": "victor/ui/commands/security.py",
+        "type": "function",
+        "sim": 0.7601405382156372
+      },
+      {
+        "id": "symbol:victor/ui/commands/optimization.py:validate",
+        "module": "victor.ui",
+        "name": "validate",
+        "file": "victor/ui/commands/optimization.py",
+        "type": "function",
+        "sim": 0.7582541704177856
+      },
+      {
+        "id": "symbol:victor/ui/commands/index.py:index",
+        "module": "victor.ui",
+        "name": "index",
+        "file": "victor/ui/commands/index.py",
+        "type": "function",
+        "sim": 0.7555143237113953
+      },
+      {
+        "id": "symbol:victor/ui/slash/commands/debug.py:_handle_disable",
+        "module": "victor.ui",
+        "name": "_handle_disable",
+        "file": "victor/ui/slash/commands/debug.py",
+        "type": "function",
+        "sim": 0.7518700361251831
+      },
+      {
+        "id": "symbol:victor/ui/commands/ab_testing.py:_stop",
+        "module": "victor.ui",
+        "name": "_stop",
+        "file": "victor/ui/commands/ab_testing.py",
+        "type": "function",
+        "sim": 0.7503945827484131
+      },
+      {
+        "id": "symbol:victor/ui/commands/utils.py:setup_safety_confirmation",
+        "module": "victor.ui",
+        "name": "setup_safety_confirmation",
+        "file": "victor/ui/commands/utils.py",
+        "type": "function",
+        "sim": 0.7469525337219238
+      }
+    ],
+    "symbol:victor/core/repository.py:list": [
+      {
+        "id": "symbol:victor/core/repository.py:list",
+        "module": "victor.core",
+        "name": "list",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/repository.py:list",
+        "module": "victor.core",
+        "name": "list",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/repository.py:list",
+        "module": "victor.core",
+        "name": "list",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/repository.py:list",
+        "module": "victor.core",
+        "name": "list",
+        "file": "victor/core/repository.py",
+        "type": "function",
+        "sim": 1.0
+      },
+      {
+        "id": "symbol:victor/core/registry/base.py:items",
+        "module": "victor.core",
+        "name": "items",
+        "file": "victor/core/registry/base.py",
+        "type": "function",
+        "sim": 0.8959707617759705
+      },
+      {
+        "id": "symbol:victor/core/query_enhancement/registry.py:list_techniques",
+        "module": "victor.core",
+        "name": "list_techniques",
+        "file": "victor/core/query_enhancement/registry.py",
+        "type": "function",
+        "sim": 0.8563994765281677
+      },
+      {
+        "id": "symbol:victor/core/registry_base.py:list_items",
+        "module": "victor.core",
+        "name": "list_items",
+        "file": "victor/core/registry_base.py",
+        "type": "function",
+        "sim": 0.8560888171195984
+      },
+      {
+        "id": "symbol:victor/core/verticals/base.py:list_names",
+        "module": "victor.core",
+        "name": "list_names",
+        "file": "victor/core/verticals/base.py",
+        "type": "function",
+        "sim": 0.8553452491760254
+      },
+      {
+        "id": "symbol:victor/core/registry_base.py:list_names",
+        "module": "victor.core",
+        "name": "list_names",
+        "file": "victor/core/registry_base.py",
+        "type": "function",
+        "sim": 0.8553452491760254
+      },
+      {
+        "id": "symbol:victor/core/verticals/base.py:list_all",
+        "module": "victor.core",
+        "name": "list_all",
+        "file": "victor/core/verticals/base.py",
+        "type": "function",
+        "sim": 0.8408347964286804
+      }
+    ],
+    "symbol:victor/tools/patch_tool.py:patch": [
+      {
+        "id": "symbol:victor/tools/patch_tool.py:apply_patch_to_content",
+        "module": "victor.tools",
+        "name": "apply_patch_to_content",
+        "file": "victor/tools/patch_tool.py",
+        "type": "function",
+        "sim": 0.8508994579315186
+      },
+      {
+        "id": "symbol:victor/tools/decorators.py:wrapper",
+        "module": "victor.tools",
+        "name": "wrapper",
+        "file": "victor/tools/decorators.py",
+        "type": "function",
+        "sim": 0.8159411549568176
+      },
+      {
+        "id": "symbol:victor/tools/plugin.py:cleanup",
+        "module": "victor.tools",
+        "name": "cleanup",
+        "file": "victor/tools/plugin.py",
+        "type": "function",
+        "sim": 0.8073924779891968
+      },
+      {
+        "id": "symbol:victor/tools/decorators.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/decorators.py",
+        "type": "function",
+        "sim": 0.8028085231781006
+      },
+      {
+        "id": "symbol:victor/tools/composition/lazy.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/composition/lazy.py",
+        "type": "function",
+        "sim": 0.8028085231781006
+      },
+      {
+        "id": "symbol:victor/tools/composition/runnable.py:tool",
+        "module": "victor.tools",
+        "name": "tool",
+        "file": "victor/tools/composition/runnable.py",
+        "type": "function",
+        "sim": 0.8028085231781006
+      },
+      {
+        "id": "symbol:victor/tools/patch_tool.py:PatchFile",
+        "module": "victor.tools",
+        "name": "PatchFile",
+        "file": "victor/tools/patch_tool.py",
+        "type": "class",
+        "sim": 0.8022501468658447
+      },
+      {
+        "id": "symbol:victor/tools/git_tool.py:conflicts",
+        "module": "victor.tools",
+        "name": "conflicts",
+        "file": "victor/tools/git_tool.py",
+        "type": "function",
+        "sim": 0.7956499457359314
+      },
+      {
+        "id": "symbol:victor/tools/tool_graph.py:merge",
+        "module": "victor.tools",
+        "name": "merge",
+        "file": "victor/tools/tool_graph.py",
+        "type": "function",
+        "sim": 0.7923863530158997
+      },
+      {
+        "id": "symbol:victor/tools/dependency_tool.py:dependency",
+        "module": "victor.tools",
+        "name": "dependency",
+        "file": "victor/tools/dependency_tool.py",
+        "type": "function",
+        "sim": 0.7820309400558472
+      }
+    ],
+    "symbol:victor/framework/teams.py:result": [
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:get_result",
+        "module": "victor.framework",
+        "name": "get_result",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.8997702598571777
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/validation.py:success",
+        "module": "victor.framework",
+        "name": "success",
+        "file": "victor/framework/capabilities/validation.py",
+        "type": "function",
+        "sim": 0.889019787311554
+      },
+      {
+        "id": "symbol:victor/framework/conversations/protocols.py:format_result",
+        "module": "victor.framework",
+        "name": "format_result",
+        "file": "victor/framework/conversations/protocols.py",
+        "type": "function",
+        "sim": 0.8611856698989868
+      },
+      {
+        "id": "symbol:victor/framework/enrichment/core.py:on_outcome",
+        "module": "victor.framework",
+        "name": "on_outcome",
+        "file": "victor/framework/enrichment/core.py",
+        "type": "function",
+        "sim": 0.8587033152580261
+      },
+      {
+        "id": "symbol:victor/framework/middleware.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/middleware.py",
+        "type": "function",
+        "sim": 0.8356184959411621
+      },
+      {
+        "id": "symbol:victor/framework/rl/curriculum_controller.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/rl/curriculum_controller.py",
+        "type": "function",
+        "sim": 0.8356184959411621
+      },
+      {
+        "id": "symbol:victor/framework/preload.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/preload.py",
+        "type": "function",
+        "sim": 0.8356184959411621
+      },
+      {
+        "id": "symbol:victor/framework/patterns/types.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/patterns/types.py",
+        "type": "function",
+        "sim": 0.8356184959411621
+      },
+      {
+        "id": "symbol:victor/framework/patterns/types.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/patterns/types.py",
+        "type": "function",
+        "sim": 0.8356184363365173
+      },
+      {
+        "id": "symbol:victor/framework/rl/experiment_coordinator.py:success_rate",
+        "module": "victor.framework",
+        "name": "success_rate",
+        "file": "victor/framework/rl/experiment_coordinator.py",
+        "type": "function",
+        "sim": 0.8356184363365173
+      }
+    ],
+    "symbol:victor/ui/emoji.py:error": [
+      {
+        "id": "symbol:victor/ui/tui/app.py:_add_error_message",
+        "module": "victor.ui",
+        "name": "_add_error_message",
+        "file": "victor/ui/tui/app.py",
+        "type": "function",
+        "sim": 0.812690019607544
+      },
+      {
+        "id": "symbol:victor/ui/tui/widgets.py:add_error_message",
+        "module": "victor.ui",
+        "name": "add_error_message",
+        "file": "victor/ui/tui/widgets.py",
+        "type": "function",
+        "sim": 0.7922385931015015
+      },
+      {
+        "id": "symbol:victor/ui/emoji.py:warning",
+        "module": "victor.ui",
+        "name": "warning",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.787795901298523
+      },
+      {
+        "id": "symbol:victor/ui/tui/widgets.py:value",
+        "module": "victor.ui",
+        "name": "value",
+        "file": "victor/ui/tui/widgets.py",
+        "type": "function",
+        "sim": 0.7829224467277527
+      },
+      {
+        "id": "symbol:victor/ui/commands/optimization.py:validate",
+        "module": "victor.ui",
+        "name": "validate",
+        "file": "victor/ui/commands/optimization.py",
+        "type": "function",
+        "sim": 0.7722762823104858
+      },
+      {
+        "id": "symbol:victor/ui/tui/widgets.py:_update_shortcuts_error",
+        "module": "victor.ui",
+        "name": "_update_shortcuts_error",
+        "file": "victor/ui/tui/widgets.py",
+        "type": "function",
+        "sim": 0.7648650407791138
+      },
+      {
+        "id": "symbol:victor/ui/emoji.py:info",
+        "module": "victor.ui",
+        "name": "info",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.7563098669052124
+      },
+      {
+        "id": "symbol:victor/ui/commands/index.py:index",
+        "module": "victor.ui",
+        "name": "index",
+        "file": "victor/ui/commands/index.py",
+        "type": "function",
+        "sim": 0.7518689632415771
+      },
+      {
+        "id": "symbol:victor/ui/slash/registry.py:command",
+        "module": "victor.ui",
+        "name": "command",
+        "file": "victor/ui/slash/registry.py",
+        "type": "function",
+        "sim": 0.7471025586128235
+      },
+      {
+        "id": "symbol:victor/ui/rendering/live_renderer.py:start",
+        "module": "victor.ui",
+        "name": "start",
+        "file": "victor/ui/rendering/live_renderer.py",
+        "type": "function",
+        "sim": 0.7456908226013184
+      }
+    ],
+    "symbol:victor/ui/tui/app.py:print": [
+      {
+        "id": "symbol:victor/ui/slash/handler.py:print_help",
+        "module": "victor.ui",
+        "name": "print_help",
+        "file": "victor/ui/slash/handler.py",
+        "type": "function",
+        "sim": 0.838365375995636
+      },
+      {
+        "id": "symbol:victor/ui/commands/observability.py:print_dashboard",
+        "module": "victor.ui",
+        "name": "print_dashboard",
+        "file": "victor/ui/commands/observability.py",
+        "type": "function",
+        "sim": 0.8157787322998047
+      },
+      {
+        "id": "symbol:victor/ui/slash/registry.py:command",
+        "module": "victor.ui",
+        "name": "command",
+        "file": "victor/ui/slash/registry.py",
+        "type": "function",
+        "sim": 0.787032961845398
+      },
+      {
+        "id": "symbol:victor/ui/rendering/formatter_renderer.py:start",
+        "module": "victor.ui",
+        "name": "start",
+        "file": "victor/ui/rendering/formatter_renderer.py",
+        "type": "function",
+        "sim": 0.7794830203056335
+      },
+      {
+        "id": "symbol:victor/ui/rendering/protocol.py:start",
+        "module": "victor.ui",
+        "name": "start",
+        "file": "victor/ui/rendering/protocol.py",
+        "type": "function",
+        "sim": 0.7794830203056335
+      },
+      {
+        "id": "symbol:victor/ui/rendering/live_renderer.py:start",
+        "module": "victor.ui",
+        "name": "start",
+        "file": "victor/ui/rendering/live_renderer.py",
+        "type": "function",
+        "sim": 0.7794830203056335
+      },
+      {
+        "id": "symbol:victor/ui/commands/scheduler.py:start",
+        "module": "victor.ui",
+        "name": "start",
+        "file": "victor/ui/commands/scheduler.py",
+        "type": "function",
+        "sim": 0.7794830203056335
+      },
+      {
+        "id": "symbol:victor/ui/emoji.py:info",
+        "module": "victor.ui",
+        "name": "info",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.7722961902618408
+      },
+      {
+        "id": "symbol:victor/ui/emoji.py:running",
+        "module": "victor.ui",
+        "name": "running",
+        "file": "victor/ui/emoji.py",
+        "type": "function",
+        "sim": 0.7706091403961182
+      },
+      {
+        "id": "symbol:victor/ui/slash/registry.py:register",
+        "module": "victor.ui",
+        "name": "register",
+        "file": "victor/ui/slash/registry.py",
+        "type": "function",
+        "sim": 0.7705715894699097
+      }
+    ],
+    "symbol:victor/observability/metrics.py:time": [
+      {
+        "id": "symbol:victor/observability/profiler/protocol.py:duration",
+        "module": "victor.observability",
+        "name": "duration",
+        "file": "victor/observability/profiler/protocol.py",
+        "type": "function",
+        "sim": 0.8980066180229187
+      },
+      {
+        "id": "symbol:victor/observability/metrics.py:timed",
+        "module": "victor.observability",
+        "name": "timed",
+        "file": "victor/observability/metrics.py",
+        "type": "function",
+        "sim": 0.892723798751831
+      },
+      {
+        "id": "symbol:victor/observability/metrics.py:timer",
+        "module": "victor.observability",
+        "name": "timer",
+        "file": "victor/observability/metrics.py",
+        "type": "function",
+        "sim": 0.8521138429641724
+      },
+      {
+        "id": "symbol:victor/observability/profiler/protocol.py:time_per_call",
+        "module": "victor.observability",
+        "name": "time_per_call",
+        "file": "victor/observability/profiler/protocol.py",
+        "type": "function",
+        "sim": 0.8248916864395142
+      },
+      {
+        "id": "symbol:victor/observability/bridge.py:lifecycle",
+        "module": "victor.observability",
+        "name": "lifecycle",
+        "file": "victor/observability/bridge.py",
+        "type": "function",
+        "sim": 0.819654107093811
+      },
+      {
+        "id": "symbol:victor/observability/bridge.py:state",
+        "module": "victor.observability",
+        "name": "state",
+        "file": "victor/observability/bridge.py",
+        "type": "function",
+        "sim": 0.8125694394111633
+      },
+      {
+        "id": "symbol:victor/observability/resilience.py:state",
+        "module": "victor.observability",
+        "name": "state",
+        "file": "victor/observability/resilience.py",
+        "type": "function",
+        "sim": 0.8125693798065186
+      },
+      {
+        "id": "symbol:victor/observability/resilience.py:calculate_delay",
+        "module": "victor.observability",
+        "name": "calculate_delay",
+        "file": "victor/observability/resilience.py",
+        "type": "function",
+        "sim": 0.8073711395263672
+      },
+      {
+        "id": "symbol:victor/observability/resilience.py:calculate_delay",
+        "module": "victor.observability",
+        "name": "calculate_delay",
+        "file": "victor/observability/resilience.py",
+        "type": "function",
+        "sim": 0.8073711395263672
+      },
+      {
+        "id": "symbol:victor/observability/resilience.py:calculate_delay",
+        "module": "victor.observability",
+        "name": "calculate_delay",
+        "file": "victor/observability/resilience.py",
+        "type": "function",
+        "sim": 0.8073711395263672
+      }
+    ],
+    "symbol:victor/framework/middleware.py:logging": [
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:apply_audit_logging",
+        "module": "victor.framework",
+        "name": "apply_audit_logging",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.8429909944534302
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:audit_logging_capability",
+        "module": "victor.framework",
+        "name": "audit_logging_capability",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.8385009765625
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:configure_audit_logging",
+        "module": "victor.framework",
+        "name": "configure_audit_logging",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.8332459926605225
+      },
+      {
+        "id": "symbol:victor/framework/capabilities/privacy.py:get_audit_logging_config",
+        "module": "victor.framework",
+        "name": "get_audit_logging_config",
+        "file": "victor/framework/capabilities/privacy.py",
+        "type": "function",
+        "sim": 0.8163679242134094
+      },
+      {
+        "id": "symbol:victor/framework/agent.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/agent.py",
+        "type": "function",
+        "sim": 0.8041578531265259
+      },
+      {
+        "id": "symbol:victor/framework/agent_components.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/agent_components.py",
+        "type": "function",
+        "sim": 0.8041578531265259
+      },
+      {
+        "id": "symbol:victor/framework/agent_components.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/agent_components.py",
+        "type": "function",
+        "sim": 0.8041578531265259
+      },
+      {
+        "id": "symbol:victor/framework/agent.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/agent.py",
+        "type": "function",
+        "sim": 0.8041578531265259
+      },
+      {
+        "id": "symbol:victor/framework/coordinators/graph_coordinator.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/coordinators/graph_coordinator.py",
+        "type": "function",
+        "sim": 0.8041577935218811
+      },
+      {
+        "id": "symbol:victor/framework/coordinators/yaml_coordinator.py:stream",
+        "module": "victor.framework",
+        "name": "stream",
+        "file": "victor/framework/coordinators/yaml_coordinator.py",
+        "type": "function",
+        "sim": 0.8041577935218811
+      }
+    ]
+  }
+}

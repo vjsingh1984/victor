@@ -269,7 +269,9 @@ class HuggingFaceProvider(BaseProvider):
                 # HF uses model name in URL path
                 url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
 
-                response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, url, json=payload
+                )
                 response.raise_for_status()
 
                 parsed = self._parse_response(response.json(), model)
@@ -327,7 +329,9 @@ class HuggingFaceProvider(BaseProvider):
                     raise
 
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]):
+                if any(
+                    term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,

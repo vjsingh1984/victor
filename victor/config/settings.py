@@ -674,7 +674,9 @@ class Settings(BaseSettings):
     http_connection_pool_total_timeout: int = 60  # seconds
 
     # Startup/runtime preloading coordinator for warm-path dependencies.
-    framework_preload_enabled: bool = True  # Enable preloading by default for 50-70% first-request latency reduction
+    framework_preload_enabled: bool = (
+        True  # Enable preloading by default for 50-70% first-request latency reduction
+    )
     framework_preload_parallel: bool = True
 
     # Strict mode for blocking private attribute fallbacks in framework integration.
@@ -743,6 +745,43 @@ class Settings(BaseSettings):
     # - Slightly more complex debugging (state may be shared until mutation)
     # - First mutation incurs full deep copy cost
     stategraph_copy_on_write_enabled: bool = True
+
+    # ==========================================================================
+    # Feature Flags (SOLID Refactoring)
+    # ==========================================================================
+    # Feature flags for gradual rollout of new architecture components.
+    # These enable zero-downtime migration and instant rollback if issues arise.
+    #
+    # All flags default to False (disabled) for backward compatibility.
+    # Enable via environment variables: VICTOR_USE_NEW_CHAT_SERVICE=true
+    # Or via YAML config: ~/.victor/features.yaml
+    #
+    # Phase 3 - Service Implementation:
+    #   - Extract orchestrator logic into focused services (ChatService, ToolService, etc.)
+    #   - Each service can be independently enabled/disabled
+    #   - Services implement protocols for ISP compliance
+    #
+    # Phase 4 - Vertical Composition:
+    #   - Use composition over inheritance for vertical capabilities
+    #   - Enables OCP compliance (add capabilities without modifying base)
+    #
+    # Phase 5 - Tool Registration Strategy:
+    #   - Strategy pattern for extensible tool registration
+    #   - Enables OCP compliance (add tool types without modifying registry)
+
+    # Phase 3 - Service Implementation flags
+    use_new_chat_service: bool = False  # Use ChatService instead of orchestrator methods
+    use_new_tool_service: bool = False  # Use ToolService instead of orchestrator methods
+    use_new_context_service: bool = False  # Use ContextService for context management
+    use_new_provider_service: bool = False  # Use ProviderService for provider management
+    use_new_recovery_service: bool = False  # Use RecoveryService for error recovery
+    use_new_session_service: bool = False  # Use SessionService for session management
+
+    # Phase 4 - Vertical Composition flag
+    use_composition_over_inheritance: bool = False  # Use composition-based verticals
+
+    # Phase 5 - Tool Registration Strategy flag
+    use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
 
     # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
@@ -1386,23 +1425,57 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load tool config: {e}")
             return {}
 
-    def get_provider_settings(self, provider: str) -> Dict[str, Any]:
+    def get_provider_settings(
+        self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
-        Uses the ProviderConfigRegistry for OCP-compliant provider configuration.
-        Each provider has a dedicated strategy class that handles its specific
-        settings (API keys, base URLs, etc.).
+        This method now uses the new AccountManager for configuration while maintaining
+        backward compatibility with the old ProviderConfigRegistry.
+
+        Priority order:
+        1. AccountManager (config.yaml) - new unified configuration
+        2. ProviderConfigRegistry (profiles.yaml) - legacy configuration
+        3. Environment variables - CI/CD support
 
         Args:
             provider: Provider name (or alias like 'gemini' for 'google')
+            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig)
 
         Returns:
             Dictionary of provider settings
         """
+        # Try new AccountManager first
+        try:
+            from victor.config.accounts import get_account_manager
+            from victor.config.resolution import get_provider_resolver
+
+            account_manager = get_account_manager()
+            resolver = get_provider_resolver()
+
+            # Check if new config exists
+            if account_manager.config_path.exists():
+                # Use new unified configuration system
+                config = resolver.resolve_quick(
+                    provider=provider,
+                    model=self.default_model,
+                )
+                return config
+
+        except Exception as e:
+            # Fall back to old system if new system fails
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry"
+            )
+
+        # Fall back to old ProviderConfigRegistry for backward compatibility
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
-        return registry.get_settings(provider, self)
+        return registry.get_settings(provider, self, profile_overrides)
 
 
 def load_settings() -> Settings:

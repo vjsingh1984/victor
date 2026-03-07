@@ -279,13 +279,13 @@ class TestCodingVerticalHandlers:
 
     def test_coding_vertical_has_get_handlers(self):
         """Test CodingAssistant has get_handlers method."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         assert hasattr(CodingAssistant, "get_handlers")
 
     def test_coding_vertical_get_handlers_returns_handlers(self):
         """Test CodingAssistant.get_handlers returns handlers."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         result = CodingAssistant.get_handlers()
         assert isinstance(result, dict)

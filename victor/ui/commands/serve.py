@@ -1,7 +1,6 @@
 import typer
 import asyncio
 import logging
-from enum import Enum
 from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -14,13 +13,6 @@ serve_app = typer.Typer(
 )
 console = Console()
 logger = logging.getLogger(__name__)
-
-
-class ServerBackend(str, Enum):
-    """Server backend options."""
-
-    AIOHTTP = "aiohttp"
-    FASTAPI = "fastapi"
 
 
 @serve_app.callback(invoke_without_command=True)
@@ -49,12 +41,6 @@ def serve(
         "--profile",
         help="Profile to use for the server",
     ),
-    backend: ServerBackend = typer.Option(
-        ServerBackend.FASTAPI,
-        "--backend",
-        "-b",
-        help="Server backend: 'fastapi' (default, with OpenAPI docs) or 'aiohttp' (legacy)",
-    ),
     enable_hitl: bool = typer.Option(
         False,
         "--enable-hitl",
@@ -73,13 +59,12 @@ def serve(
     and external tool access.
 
     Examples:
-        victor serve                          # Start with FastAPI backend (default)
-        victor serve -p 8000                  # FastAPI on custom port
-        victor serve --backend aiohttp        # Use legacy aiohttp backend
-        victor serve --enable-hitl            # Enable HITL endpoints for approvals
+        victor serve                 # Start FastAPI backend
+        victor serve -p 8000         # FastAPI on custom port
+        victor serve --enable-hitl   # Enable HITL endpoints for approvals
     """
     if ctx.invoked_subcommand is None:
-        _serve(host, port, log_level, profile, backend, enable_hitl, hitl_auth_token)
+        _serve(host, port, log_level, profile, enable_hitl, hitl_auth_token)
 
 
 def _serve(
@@ -87,7 +72,6 @@ def _serve(
     port: int,
     log_level: Optional[str],
     profile: str,
-    backend: ServerBackend,
     enable_hitl: bool = False,
     hitl_auth_token: Optional[str] = None,
 ):
@@ -100,14 +84,11 @@ def _serve(
     # Use centralized logging config (serve has INFO default in logging_config.yaml)
     setup_logging(command="serve", cli_log_level=log_level)
 
-    # Backend-specific information
-    backend_info = ""
-    if backend == ServerBackend.FASTAPI:
-        backend_info = f"\n[bold]Docs:[/] [cyan]http://{host}:{port}/docs[/]"
+    backend_info = f"\n[bold]Docs:[/] [cyan]http://{host}:{port}/docs[/]"
 
     # HITL-specific information
     hitl_info = ""
-    if enable_hitl and backend == ServerBackend.FASTAPI:
+    if enable_hitl:
         hitl_info = f"\n[bold]HITL UI:[/] [cyan]http://{host}:{port}/hitl/ui[/]"
 
     console.print(
@@ -115,7 +96,7 @@ def _serve(
             f"[bold blue]Victor API Server[/]\n\n"
             f"[bold]Host:[/] [cyan]{host}[/]\n"
             f"[bold]Port:[/] [cyan]{port}[/]\n"
-            f"[bold]Backend:[/] [cyan]{backend.value}[/]\n"
+            f"[bold]Backend:[/] [cyan]fastapi[/]\n"
             f"[bold]Profile:[/] [cyan]{profile}[/]"
             f"{backend_info}"
             f"{hitl_info}\n\n"
@@ -125,44 +106,7 @@ def _serve(
         )
     )
 
-    if backend == ServerBackend.FASTAPI:
-        asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
-    else:
-        if enable_hitl:
-            console.print("[yellow]Warning:[/] HITL endpoints only available with FastAPI backend")
-        asyncio.run(_run_aiohttp_server(host, port, profile))
-
-
-async def _run_aiohttp_server(host: str, port: int, profile: str) -> None:
-    """Run the aiohttp API server (legacy backend)."""
-    try:
-        from pathlib import Path
-
-        from victor.integrations.api.server import VictorAPIServer
-
-        server = VictorAPIServer(
-            host=host,
-            port=port,
-            workspace_root=str(Path.cwd()),
-        )
-
-        # Run server asynchronously to avoid nested event loop errors
-        runner = await server.start_async()
-        try:
-            while True:
-                await asyncio.sleep(3600)
-        finally:
-            await runner.cleanup()
-
-    except ImportError as e:
-        console.print(f"[red]Error:[/] Missing dependency for server: {e}")
-        console.print("\nInstall with: [bold]pip install aiohttp[/]")
-        raise typer.Exit(1)
-    except KeyboardInterrupt:
-        console.print("\n[dim]Server stopped[/]")
-    except Exception as e:
-        console.print(f"[red]Error:[/] {e}")
-        raise typer.Exit(1)
+    asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
 
 
 async def _run_fastapi_server(
@@ -330,12 +274,17 @@ async def _run_hitl_server(
     """Run the HITL API server."""
     try:
         import uvicorn
+        from victor.config.settings import load_settings
+        from victor.core.bootstrap import ensure_bootstrapped
 
         from victor.workflows.hitl_api import (
             HITLStore,
             SQLiteHITLStore,
             create_hitl_app,
         )
+
+        settings = load_settings()
+        ensure_bootstrapped(settings)
 
         # Create appropriate store
         if persistent:

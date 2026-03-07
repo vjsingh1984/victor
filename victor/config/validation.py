@@ -24,7 +24,10 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
+
+if TYPE_CHECKING:
+    from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -96,12 +99,14 @@ def validate_environment(settings: "Settings" | None = None) -> ValidationResult
 
     # Check Python version
     if sys.version_info < (3, 10):
-        result.add_error(ValidationError(
-            message=f"Python {sys.version_info.major}.{sys.version_info.minor} is not supported",
-            suggestion="Python 3.10 or higher is required. "
-            "Try: python3.10 -m pip install victor-ai or upgrade your Python version.",
-            error_code="PYTHON_VERSION",
-        ))
+        result.add_error(
+            ValidationError(
+                message=f"Python {sys.version_info.major}.{sys.version_info.minor} is not supported",
+                suggestion="Python 3.10 or higher is required. "
+                "Try: python3.10 -m pip install victor-ai or upgrade your Python version.",
+                error_code="PYTHON_VERSION",
+            )
+        )
 
     # Check for deprecated configuration
     deprecated_vars = [
@@ -111,15 +116,17 @@ def validate_environment(settings: "Settings" | None = None) -> ValidationResult
     ]
     found_deprecated = [var for var in deprecated_vars if os.getenv(var)]
     if found_deprecated:
-        result.add_error(ValidationError(
-            message=f"Deprecated environment variable(s) found: {', '.join(found_deprecated)}",
-            suggestion="Remove deprecated variables. Use provider-specific environment variables "
-            "(e.g., ANTHROPIC_API_KEY) instead.",
-            error_code="DEPRECATED_ENV_VAR",
-        ))
+        result.add_error(
+            ValidationError(
+                message=f"Deprecated environment variable(s) found: {', '.join(found_deprecated)}",
+                suggestion="Remove deprecated variables. Use provider-specific environment variables "
+                "(e.g., ANTHROPIC_API_KEY) instead.",
+                error_code="DEPRECATED_ENV_VAR",
+            )
+        )
 
     # Check for API keys (only if using cloud providers)
-    if settings and hasattr(settings, 'default_provider'):
+    if settings and hasattr(settings, "default_provider"):
         provider = settings.default_provider
         local_providers = ["ollama", "lmstudio", "vllm", "llama.cpp"]
 
@@ -129,12 +136,14 @@ def validate_environment(settings: "Settings" | None = None) -> ValidationResult
             has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
 
             if not has_anthropic_key and not has_openai_key:
-                result.add_error(ValidationError(
-                    message="No API key found for cloud provider",
-                    suggestion="Set ANTHROPIC_API_KEY or OPENAI_API_KEY environment variable. "
-                    "For local models, use --provider ollama (requires Ollama to be running).",
-                    error_code="NO_API_KEY",
-                ))
+                result.add_error(
+                    ValidationError(
+                        message="No API key found for cloud provider",
+                        suggestion="Set ANTHROPIC_API_KEY or OPENAI_API_KEY environment variable. "
+                        "For local models, use --provider ollama (requires Ollama to be running).",
+                        error_code="NO_API_KEY",
+                    )
+                )
 
     return result
 
@@ -154,29 +163,33 @@ def validate_paths(settings: "Settings") -> ValidationResult:
     try:
         config_dir = settings.get_config_dir()
         if config_dir and not config_dir.exists():
-            result.add_error(ValidationError(
-                message=f"Configuration directory does not exist: {config_dir}",
-                suggestion="Run 'victor init' to create configuration or set VICTOR_CONFIG_DIR to a valid location.",
-                field="VICTOR_CONFIG_DIR",
-                error_code="CONFIG_DIR_NOT_FOUND",
-            ))
+            result.add_error(
+                ValidationError(
+                    message=f"Configuration directory does not exist: {config_dir}",
+                    suggestion="Run 'victor init' to create configuration or set VICTOR_CONFIG_DIR to a valid location.",
+                    field="VICTOR_CONFIG_DIR",
+                    error_code="CONFIG_DIR_NOT_FOUND",
+                )
+            )
     except Exception as e:
         logger.debug(f"Could not validate config directory: {e}")
 
     # Validate codebase persist directory if specified
-    if hasattr(settings, 'codebase_persist_directory') and settings.codebase_persist_directory:
+    if hasattr(settings, "codebase_persist_directory") and settings.codebase_persist_directory:
         persist_path = Path(settings.codebase_persist_directory)
         if not persist_path.exists():
             try:
                 persist_path.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                result.add_error(ValidationError(
-                    message=f"Cannot create codebase persist directory: {persist_path}",
-                    suggestion=f"Check permissions for {persist_path.parent} or set codebase_persist_directory "
-                    f"to a writable location. Error: {e}",
-                    field="codebase_persist_directory",
-                    error_code="PERSIST_DIR_PERMISSIONS",
-                ))
+                result.add_error(
+                    ValidationError(
+                        message=f"Cannot create codebase persist directory: {persist_path}",
+                        suggestion=f"Check permissions for {persist_path.parent} or set codebase_persist_directory "
+                        f"to a writable location. Error: {e}",
+                        field="codebase_persist_directory",
+                        error_code="PERSIST_DIR_PERMISSIONS",
+                    )
+                )
 
     return result
 
@@ -195,13 +208,15 @@ def validate_provider_settings(settings: "Settings") -> ValidationResult:
     # Check if default provider is configured
     default_provider = settings.default_provider
     if not default_provider:
-        result.add_error(ValidationError(
-            message="No default provider configured",
-            suggestion="Set the 'default_provider' setting in your profile or use --provider flag. "
-            "Available: anthropic, openai, ollama, lmstudio, vllm, and 18 more.",
-            field="default_provider",
-            error_code="NO_DEFAULT_PROVIDER",
-        ))
+        result.add_error(
+            ValidationError(
+                message="No default provider configured",
+                suggestion="Set the 'default_provider' setting in your profile or use --provider flag. "
+                "Available: anthropic, openai, ollama, lmstudio, vllm, and 18 more.",
+                field="default_provider",
+                error_code="NO_DEFAULT_PROVIDER",
+            )
+        )
         return result  # Cannot validate further without provider
 
     # Check for local providers that require additional setup
@@ -218,21 +233,25 @@ def validate_provider_settings(settings: "Settings") -> ValidationResult:
                     timeout=2,
                 )
                 if result_check.returncode != 0:
-                    result.add_error(ValidationError(
-                        message="Ollama provider selected but Ollama is not running",
-                        suggestion="Start Ollama: 'ollama serve' or 'brew services start ollama'. "
-                        "Verify with: ollama list",
-                        field="default_provider",
-                        error_code="OLLAMA_NOT_RUNNING",
-                    ))
+                    result.add_error(
+                        ValidationError(
+                            message="Ollama provider selected but Ollama is not running",
+                            suggestion="Start Ollama: 'ollama serve' or 'brew services start ollama'. "
+                            "Verify with: ollama list",
+                            field="default_provider",
+                            error_code="OLLAMA_NOT_RUNNING",
+                        )
+                    )
             except FileNotFoundError:
-                result.add_error(ValidationError(
-                    message="Ollama provider selected but Ollama is not installed",
-                    suggestion="Install Ollama: 'curl -fsSL https://ollama.com/install.sh | sh' "
-                    "or use: brew install ollama",
-                    field="default_provider",
-                    error_code="OLLAMA_NOT_INSTALLED",
-                ))
+                result.add_error(
+                    ValidationError(
+                        message="Ollama provider selected but Ollama is not installed",
+                        suggestion="Install Ollama: 'curl -fsSL https://ollama.com/install.sh | sh' "
+                        "or use: brew install ollama",
+                        field="default_provider",
+                        error_code="OLLAMA_NOT_INSTALLED",
+                    )
+                )
             except Exception as e:
                 logger.debug(f"Could not check Ollama status: {e}")
 
@@ -249,13 +268,15 @@ def validate_provider_settings(settings: "Settings") -> ValidationResult:
     if default_provider.lower() in cloud_providers:
         env_var = cloud_providers.get(default_provider.lower())
         if env_var and not os.getenv(env_var):
-            result.add_error(ValidationError(
-                message=f"{default_provider.title()} provider selected but API key not found",
-                suggestion=f"Set {env_var} environment variable or configure in profile YAML. "
-                f"Example: export {env_var}=your_key_here",
-                field=f"default_provider.{default_provider}",
-                error_code="API_KEY_MISSING",
-            ))
+            result.add_error(
+                ValidationError(
+                    message=f"{default_provider.title()} provider selected but API key not found",
+                    suggestion=f"Set {env_var} environment variable or configure in profile YAML. "
+                    f"Example: export {env_var}=your_key_here",
+                    field=f"default_provider.{default_provider}",
+                    error_code="API_KEY_MISSING",
+                )
+            )
 
     return result
 
@@ -273,30 +294,36 @@ def validate_tool_settings(settings: "Settings") -> ValidationResult:
 
     # Validate fallback_max_tools
     if settings.fallback_max_tools < 1:
-        result.add_error(ValidationError(
-            message=f"fallback_max_tools must be at least 1, got {settings.fallback_max_tools}",
-            suggestion="Set fallback_max_tools to 1 or higher in your profile YAML.",
-            field="fallback_max_tools",
-            error_code="INVALID_TOOL_BUDGET",
-        ))
+        result.add_error(
+            ValidationError(
+                message=f"fallback_max_tools must be at least 1, got {settings.fallback_max_tools}",
+                suggestion="Set fallback_max_tools to 1 or higher in your profile YAML.",
+                field="fallback_max_tools",
+                error_code="INVALID_TOOL_BUDGET",
+            )
+        )
 
     if settings.fallback_max_tools > 20:
-        result.add_error(ValidationError(
-            message=f"fallback_max_tools is very high: {settings.fallback_max_tools}",
-            suggestion="Consider reducing fallback_max_tools to 10 or fewer for better performance. "
-            "Large tool budgets can lead to slower response times.",
-            field="fallback_max_tools",
-            error_code="HIGH_TOOL_BUDGET",
-        ))
+        result.add_error(
+            ValidationError(
+                message=f"fallback_max_tools is very high: {settings.fallback_max_tools}",
+                suggestion="Consider reducing fallback_max_tools to 10 or fewer for better performance. "
+                "Large tool budgets can lead to slower response times.",
+                field="fallback_max_tools",
+                error_code="HIGH_TOOL_BUDGET",
+            )
+        )
 
     # Validate cache settings
     if settings.tool_selection_cache_ttl < 0:
-        result.add_error(ValidationError(
-            message=f"tool_selection_cache_ttl cannot be negative: {settings.tool_selection_cache_ttl}",
-            suggestion="Set tool_selection_cache_ttl to 0 or higher in your profile YAML.",
-            field="tool_selection_cache_ttl",
-            error_code="INVALID_CACHE_TTL",
-        ))
+        result.add_error(
+            ValidationError(
+                message=f"tool_selection_cache_ttl cannot be negative: {settings.tool_selection_cache_ttl}",
+                suggestion="Set tool_selection_cache_ttl to 0 or higher in your profile YAML.",
+                field="tool_selection_cache_ttl",
+                error_code="INVALID_CACHE_TTL",
+            )
+        )
 
     return result
 
@@ -315,31 +342,37 @@ def validate_performance_settings(settings: "Settings") -> ValidationResult:
     # Check if optimizations are enabled (warnings only, not errors)
     try:
         if not settings.framework_preload_enabled:
-            result.add_error(ValidationError(
-                message="Framework preloading is disabled",
-                suggestion="Enable framework_preload in your profile YAML for 50-70% faster first requests. "
-                "This adds a small startup cost but dramatically improves first-use experience.",
-                field="framework_preload_enabled",
-                error_code="PRELOAD_DISABLED",
-            ))
+            result.add_error(
+                ValidationError(
+                    message="Framework preloading is disabled",
+                    suggestion="Enable framework_preload in your profile YAML for 50-70% faster first requests. "
+                    "This adds a small startup cost but dramatically improves first-use experience.",
+                    field="framework_preload_enabled",
+                    error_code="PRELOAD_DISABLED",
+                )
+            )
 
         if not settings.http_connection_pool_enabled:
-            result.add_error(ValidationError(
-                message="HTTP connection pooling is disabled",
-                suggestion="Enable http_connection_pool_enabled in your profile YAML for 20-30% "
-                "faster HTTP requests to web search and API providers.",
-                field="http_connection_pool_enabled",
-                error_code="HTTP_POOL_DISABLED",
-            ))
+            result.add_error(
+                ValidationError(
+                    message="HTTP connection pooling is disabled",
+                    suggestion="Enable http_connection_pool_enabled in your profile YAML for 20-30% "
+                    "faster HTTP requests to web search and API providers.",
+                    field="http_connection_pool_enabled",
+                    error_code="HTTP_POOL_DISABLED",
+                )
+            )
 
         if not settings.tool_selection_cache_enabled:
-            result.add_error(ValidationError(
-                message="Tool selection cache is disabled",
-                suggestion="Enable tool_selection_cache_enabled in your profile YAML for 20-40% faster "
-                "conversational responses (semantic search caching).",
-                field="tool_selection_cache_enabled",
-                error_code="TOOL_CACHE_DISABLED",
-            ))
+            result.add_error(
+                ValidationError(
+                    message="Tool selection cache is disabled",
+                    suggestion="Enable tool_selection_cache_enabled in your profile YAML for 20-40% faster "
+                    "conversational responses (semantic search caching).",
+                    field="tool_selection_cache_enabled",
+                    error_code="TOOL_CACHE_DISABLED",
+                )
+            )
     except Exception as e:
         # Settings might not have these attributes in older versions
         logger.debug(f"Could not validate performance settings: {e}")
@@ -412,7 +445,11 @@ def validate_configuration(settings: "Settings" | None = None) -> ValidationResu
 
     for error in result.errors:
         # Check if this is a warning (has severity="warning" in suggestion or error_code in ("PRELOAD_DISABLED", "HTTP_POOL_DISABLED", "TOOL_CACHE_DISABLED"))
-        if "warning" in str(error.suggestion or "").lower() or error.error_code in ("PRELOAD_DISABLED", "HTTP_POOL_DISABLED", "TOOL_CACHE_DISABLED"):
+        if "warning" in str(error.suggestion or "").lower() or error.error_code in (
+            "PRELOAD_DISABLED",
+            "HTTP_POOL_DISABLED",
+            "TOOL_CACHE_DISABLED",
+        ):
             warnings.append(error)
         else:
             errors.append(error)

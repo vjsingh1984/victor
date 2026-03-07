@@ -209,6 +209,9 @@ export class VictorClient {
     private serverUrl: string;
     private apiToken?: string;
     private sessionToken?: string;
+    private statusCache: { value: ServerStatus; fetchedAt: number } | null = null;
+    private lspCapability: boolean | null = null;
+    private readonly statusCacheTtlMs = 15000;
 
     // WebSocket state
     private wsConnection: WebSocket | null = null;
@@ -246,6 +249,7 @@ export class VictorClient {
 
     setApiToken(token?: string): void {
         this.apiToken = token;
+        this.invalidateStatusCache();
         if (token) {
             this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } else {
@@ -724,6 +728,7 @@ export class VictorClient {
     async switchModel(provider: string, model: string): Promise<void> {
         try {
             await this.client.post('/model/switch', { provider, model });
+            this.invalidateStatusCache();
         } catch (error) {
             throw this._handleError(error);
         }
@@ -732,15 +737,26 @@ export class VictorClient {
     async switchMode(mode: string): Promise<void> {
         try {
             await this.client.post('/mode/switch', { mode });
+            this.invalidateStatusCache();
         } catch (error) {
             throw this._handleError(error);
         }
     }
 
     async getStatus(): Promise<ServerStatus> {
+        const now = Date.now();
+        if (this.statusCache && (now - this.statusCache.fetchedAt) < this.statusCacheTtlMs) {
+            return this.statusCache.value;
+        }
+
         try {
             const response = await this.client.get('/status');
-            return response.data;
+            const status = response.data as ServerStatus;
+            this.statusCache = { value: status, fetchedAt: now };
+            if (Array.isArray(status.capabilities)) {
+                this.lspCapability = status.capabilities.includes('lsp');
+            }
+            return status;
         } catch (error) {
             throw this._handleError(error);
         }
@@ -909,6 +925,10 @@ export class VictorClient {
         line: number;
         character: number;
     }[]> {
+        if (!(await this.supportsLspCapability())) {
+            return [];
+        }
+
         try {
             const response = await this.client.post('/lsp/definition', {
                 file,
@@ -927,6 +947,10 @@ export class VictorClient {
         line: number;
         character: number;
     }[]> {
+        if (!(await this.supportsLspCapability())) {
+            return [];
+        }
+
         try {
             const response = await this.client.post('/lsp/references', {
                 file,
@@ -941,6 +965,10 @@ export class VictorClient {
     }
 
     async getHover(file: string, line: number, character: number): Promise<string | null> {
+        if (!(await this.supportsLspCapability())) {
+            return null;
+        }
+
         try {
             const response = await this.client.post('/lsp/hover', {
                 file,
@@ -959,12 +987,39 @@ export class VictorClient {
         message: string;
         severity: string;
     }[]> {
+        if (!(await this.supportsLspCapability())) {
+            return [];
+        }
+
         try {
             const response = await this.client.post('/lsp/diagnostics', { file });
             return response.data.diagnostics || [];
         } catch (error) {
             console.error('LSP diagnostics error:', error);
             return []; // Graceful degradation
+        }
+    }
+
+    private invalidateStatusCache(): void {
+        this.statusCache = null;
+        this.lspCapability = null;
+    }
+
+    private async supportsLspCapability(): Promise<boolean> {
+        if (this.lspCapability !== null) {
+            return this.lspCapability;
+        }
+
+        try {
+            const status = await this.getStatus();
+            if (!Array.isArray(status.capabilities) || status.capabilities.length === 0) {
+                return true;
+            }
+            this.lspCapability = status.capabilities.includes('lsp');
+            return this.lspCapability;
+        } catch {
+            // If status is unavailable, keep current graceful-degradation behavior.
+            return true;
         }
     }
 

@@ -41,8 +41,11 @@ import hashlib
 import json
 import logging
 import re
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from victor.core.json_utils import json_dumps, json_loads
 
 import numpy as np
 
@@ -423,7 +426,7 @@ def repair_json(input_str: str) -> str:
 
     # Fast path: check if already valid
     try:
-        json.loads(result)
+        json_loads(result)
         return result
     except json.JSONDecodeError:
         pass
@@ -481,7 +484,7 @@ def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
                 end, json_str = match
                 # Validate
                 try:
-                    json.loads(json_str)
+                    json_loads(json_str)
                     results.append((i, end, json_str))
                     i = end
                     continue
@@ -489,7 +492,7 @@ def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
                     # Try repairing
                     repaired = repair_json(json_str)
                     try:
-                        json.loads(repaired)
+                        json_loads(repaired)
                         results.append((i, end, repaired))
                         i = end
                         continue

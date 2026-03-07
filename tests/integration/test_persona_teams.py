@@ -21,6 +21,8 @@ TeamSpec creation, and multi-agent team composition.
 import pytest
 from typing import List
 
+pytest.importorskip("victor_coding")
+
 from victor.framework.multi_agent.personas import (
     PersonaTraits,
     PersonaTemplate,
@@ -34,7 +36,7 @@ from victor.framework.multi_agent.teams import (
     TeamTopology,
     TaskAssignmentStrategy,
 )
-from victor.coding.teams.personas import (
+from victor_coding.teams.personas import (
     CodingPersona,
     PersonaTraits as CodingPersonaTraits,
     ExpertiseCategory,

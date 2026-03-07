@@ -212,10 +212,13 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
-    try:
-        from victor_coding.codebase.indexer import CodebaseIndex
-    except ImportError:
-        # External vertical package may not be installed
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+    _index_factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+    if _index_factory is None or not CapabilityRegistry.get_instance().is_enhanced(
+        CodebaseIndexFactoryProtocol
+    ):
         raise ImportError(
             "Codebase indexing requires victor-coding package. "
             "Install with: pip install victor-coding"
@@ -265,7 +268,7 @@ async def _get_or_build_index(
     graph_path = getattr(settings, "codebase_graph_path", None)
 
     # Create new index - it will load from disk if available
-    index = CodebaseIndex(
+    index = _index_factory.create(
         root_path=str(root),
         use_embeddings=True,
         embedding_config=embedding_config,

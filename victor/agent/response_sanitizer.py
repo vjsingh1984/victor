@@ -111,28 +111,27 @@ class StreamingContentFilter:
     # Max chars of thinking content before aborting (prevents runaway)
     MAX_THINKING_CONTENT: int = 50000
 
-    # Thinking token patterns (compiled for efficiency) - class-level constants
-    THINKING_START_PATTERNS: List[re.Pattern] = [
-        re.compile(r"<｜begin▁of▁thinking｜>"),  # DeepSeek
-        re.compile(r"<\|begin_of_thinking\|>"),  # ASCII variant
-        re.compile(r"<think>"),  # Qwen3
-    ]
+    # Thinking token patterns — consolidated into single alternation regexes
+    # so the regex engine matches all variants in one pass per chunk.
+    THINKING_START_PATTERN: re.Pattern = re.compile(
+        r"<｜begin▁of▁thinking｜>|<\|begin_of_thinking\|>|<think>"
+    )
 
-    THINKING_END_PATTERNS: List[re.Pattern] = [
-        re.compile(r"<｜end▁of▁thinking｜>"),  # DeepSeek
-        re.compile(r"<\|end_of_thinking\|>"),  # ASCII variant
-        re.compile(r"</think>"),  # Qwen3
-    ]
+    THINKING_END_PATTERN: re.Pattern = re.compile(
+        r"<｜end▁of▁thinking｜>|<\|end_of_thinking\|>|</think>"
+    )
 
-    # Individual token patterns to strip (single markers without blocks)
-    INLINE_TOKEN_PATTERNS: List[re.Pattern] = [
-        re.compile(r"<｜end▁of▁thinking｜>"),
-        re.compile(r"<｜begin▁of▁thinking｜>"),
-        re.compile(r"<\|end_of_thinking\|>"),
-        re.compile(r"<\|begin_of_thinking\|>"),
-        re.compile(r"</think>"),
-        re.compile(r"<think>"),
-    ]
+    # Combined pattern for stripping inline tokens (all start + end markers)
+    INLINE_TOKEN_PATTERN: re.Pattern = re.compile(
+        r"<｜end▁of▁thinking｜>|<｜begin▁of▁thinking｜>"
+        r"|<\|end_of_thinking\|>|<\|begin_of_thinking\|>"
+        r"|</think>|<think>"
+    )
+
+    # Keep list aliases for backward compatibility with any external consumers
+    THINKING_START_PATTERNS: List[re.Pattern] = [THINKING_START_PATTERN]
+    THINKING_END_PATTERNS: List[re.Pattern] = [THINKING_END_PATTERN]
+    INLINE_TOKEN_PATTERNS: List[re.Pattern] = [INLINE_TOKEN_PATTERN]
 
     def __init__(self, suppress_thinking: bool = False):
         """Initialize the streaming filter.

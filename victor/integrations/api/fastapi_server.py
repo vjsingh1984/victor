@@ -49,14 +49,23 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
+
+from victor.integrations.api.change_tracker_ops import (
+    apply_patch_request,
+    change_history,
+    create_patch_request,
+    redo_last_change,
+    undo_last_change,
+)
 from victor.integrations.api.event_bridge import EventBridge
 from victor.integrations.api.graph_export import (
     export_graph_schema,
     get_execution_state,
     WorkflowExecutionState,
 )
+from victor.integrations.api.router_plugins import load_fastapi_router_registrations
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
-from victor.core.events import ObservabilityBus as EventBus, get_observability_bus
+from victor.core.events import get_observability_bus
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
@@ -82,6 +91,7 @@ class StatusResponse(BaseModel):
     provider: str
     model: str
     workspace: str
+    capabilities: List[str] = Field(default_factory=list)
 
 
 class ChatMessage(BaseModel):
@@ -271,14 +281,6 @@ class ToolApprovalRequest(BaseModel):
     approved: bool = False
 
 
-class LSPRequest(BaseModel):
-    """LSP request payload."""
-
-    file: str
-    line: int = 0
-    character: int = 0
-
-
 class TerminalCommandRequest(BaseModel):
     """Terminal command execution request."""
 
@@ -364,6 +366,12 @@ class VictorFastAPIServer:
         self.hitl_persistent = hitl_persistent
         self._enable_graphql = enable_graphql
 
+        from victor.config.settings import load_settings
+        from victor.core.bootstrap import ensure_bootstrapped
+
+        self._settings = load_settings()
+        self._container = ensure_bootstrapped(self._settings)
+
         self._orchestrator = None
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
@@ -403,6 +411,7 @@ class VictorFastAPIServer:
 
         # Setup routes
         self._setup_routes()
+        self._setup_router_plugins()
 
         # Setup GraphQL endpoint if enabled
         if self._enable_graphql:
@@ -489,6 +498,7 @@ class VictorFastAPIServer:
                     provider=provider_name,
                     model=model_name,
                     workspace=self.workspace_root,
+                    capabilities=self._detect_capabilities(),
                 )
             except Exception as e:
                 logger.warning(f"Status check error: {e}")
@@ -498,6 +508,7 @@ class VictorFastAPIServer:
                     provider="unknown",
                     model="unknown",
                     workspace=self.workspace_root,
+                    capabilities=self._detect_capabilities(),
                 )
 
         # Chat endpoints
@@ -963,145 +974,34 @@ class VictorFastAPIServer:
         @app.post("/undo", tags=["History"])
         async def undo() -> JSONResponse:
             """Undo last change."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.undo()
-
-            return JSONResponse({"success": success, "message": message, "files": files})
+            return JSONResponse(undo_last_change())
 
         @app.post("/redo", tags=["History"])
         async def redo() -> JSONResponse:
             """Redo last undone change."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.redo()
-
-            return JSONResponse({"success": success, "message": message, "files": files})
+            return JSONResponse(redo_last_change())
 
         @app.get("/history", tags=["History"])
         async def history(limit: int = Query(10, ge=1, le=100)) -> JSONResponse:
             """Get change history."""
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            hist = tracker.get_history(limit=limit)
-
-            return JSONResponse({"history": hist})
+            return JSONResponse(change_history(limit))
 
         # Patch operations
         @app.post("/patch/apply", tags=["Patch"])
         async def apply_patch(request: PatchApplyRequest) -> JSONResponse:
             """Apply a patch."""
-            from victor.tools import patch_tool
-
-            result = await patch_tool.apply_patch(patch=request.patch, dry_run=request.dry_run)
+            result = await apply_patch_request(patch=request.patch, dry_run=request.dry_run)
             return JSONResponse(result)
 
         @app.post("/patch/create", tags=["Patch"])
         async def create_patch(request: PatchCreateRequest) -> JSONResponse:
             """Create a patch."""
-            from victor.tools import patch_tool
-
-            result = await patch_tool.create_patch(
+            result = await create_patch_request(
                 file_path=request.file_path, new_content=request.new_content
             )
             return JSONResponse(result)
 
-        # LSP endpoints
-        @app.post("/lsp/completions", tags=["LSP"])
-        async def lsp_completions(request: LSPRequest) -> JSONResponse:
-            """LSP completions."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                completions = await manager.get_completions(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse(
-                    {
-                        "completions": [
-                            {
-                                "label": c.label,
-                                "kind": c.kind,
-                                "detail": c.detail,
-                                "insert_text": c.insert_text,
-                            }
-                            for c in completions
-                        ]
-                    }
-                )
-
-            except Exception as e:
-                logger.exception("LSP completions error")
-                return JSONResponse({"completions": [], "error": str(e)})
-
-        @app.post("/lsp/hover", tags=["LSP"])
-        async def lsp_hover(request: LSPRequest) -> JSONResponse:
-            """LSP hover."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                hover = await manager.get_hover(request.file, request.line, request.character)
-
-                return JSONResponse({"contents": hover.contents if hover else None})
-
-            except Exception as e:
-                logger.exception("LSP hover error")
-                return JSONResponse({"contents": None, "error": str(e)})
-
-        @app.post("/lsp/definition", tags=["LSP"])
-        async def lsp_definition(request: LSPRequest) -> JSONResponse:
-            """LSP definition."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                locations = await manager.get_definition(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse({"locations": locations})
-
-            except Exception as e:
-                logger.exception("LSP definition error")
-                return JSONResponse({"locations": [], "error": str(e)})
-
-        @app.post("/lsp/references", tags=["LSP"])
-        async def lsp_references(request: LSPRequest) -> JSONResponse:
-            """LSP references."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                locations = await manager.get_references(
-                    request.file, request.line, request.character
-                )
-
-                return JSONResponse({"locations": locations})
-
-            except Exception as e:
-                logger.exception("LSP references error")
-                return JSONResponse({"locations": [], "error": str(e)})
-
-        @app.post("/lsp/diagnostics", tags=["LSP"])
-        async def lsp_diagnostics(request: LSPRequest) -> JSONResponse:
-            """LSP diagnostics."""
-            try:
-                from victor_coding.lsp.manager import get_lsp_manager
-
-                manager = get_lsp_manager()
-                diagnostics = manager.get_diagnostics(request.file)
-
-                return JSONResponse({"diagnostics": diagnostics})
-
-            except Exception as e:
-                logger.exception("LSP diagnostics error")
-                return JSONResponse({"diagnostics": [], "error": str(e)})
+        # LSP endpoints are provided by optional vertical router plugins.
 
         # Git integration
         @app.get("/git/status", tags=["Git"])
@@ -3188,6 +3088,51 @@ Respond with just the command to run."""
                     f"Total: {len(self._event_clients)}"
                 )
 
+    def _setup_router_plugins(self) -> None:
+        """Load optional FastAPI routers from vertical packages.
+
+        Routers are discovered via `victor.api_routers` entry points.
+        """
+        registrations = load_fastapi_router_registrations(workspace_root=self.workspace_root)
+        for registration in registrations:
+            try:
+                self.app.include_router(registration.router, prefix=registration.prefix)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to include router from entry point '%s' (%s): %s",
+                    registration.entry_point_name,
+                    registration.entry_point_value,
+                    exc,
+                )
+
+    def _detect_capabilities(self) -> List[str]:
+        """Detect capabilities from currently mounted API routes."""
+        route_paths = {getattr(route, "path", "") for route in self.app.routes}
+        capabilities: set[str] = set()
+
+        if "/chat" in route_paths:
+            capabilities.add("chat")
+        if "/completions" in route_paths:
+            capabilities.add("completions")
+        if "/search/semantic" in route_paths or "/search/code" in route_paths:
+            capabilities.add("search")
+        if any(path.startswith("/lsp/") for path in route_paths):
+            capabilities.add("lsp")
+        if "/agents/start" in route_paths:
+            capabilities.add("agents")
+        if "/plans" in route_paths:
+            capabilities.add("plans")
+        if "/workflows/execute" in route_paths:
+            capabilities.add("workflows")
+        if "/teams" in route_paths:
+            capabilities.add("teams")
+        if "/tools" in route_paths:
+            capabilities.add("tools")
+        if "/mcp/servers" in route_paths:
+            capabilities.add("mcp")
+
+        return sorted(capabilities)
+
     # =========================================================================
     # HITL (Human-in-the-Loop) Routes
     # =========================================================================
@@ -3249,9 +3194,8 @@ Respond with just the command to run."""
         """Get or create the orchestrator."""
         if self._orchestrator is None:
             from victor.agent.orchestrator import AgentOrchestrator
-            from victor.config.settings import load_settings
 
-            settings = load_settings()
+            settings = self._settings
             self._orchestrator = await AgentOrchestrator.from_settings(settings)
 
         return self._orchestrator

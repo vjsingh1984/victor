@@ -39,19 +39,32 @@ try:
         is_hidden_path,
         should_ignore_path,
     )
+
     _IGNORE_PATTERNS_AVAILABLE = True
 except ImportError:
     _IGNORE_PATTERNS_AVAILABLE = False
-    DEFAULT_SKIP_DIRS = frozenset({
-        ".git", ".venv", "venv", "__pycache__", "*.pyc",
-        "node_modules", ".pytest_cache", ".mypy_cache",
-        "dist", "build", "*.egg-info",
-    })
+    DEFAULT_SKIP_DIRS = frozenset(
+        {
+            ".git",
+            ".venv",
+            "venv",
+            "__pycache__",
+            "*.pyc",
+            "node_modules",
+            ".pytest_cache",
+            ".mypy_cache",
+            "dist",
+            "build",
+            "*.egg-info",
+        }
+    )
 
     def is_hidden_path(path: Path) -> bool:
         return path.name.startswith(".")
 
-    def should_ignore_path(path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None) -> bool:
+    def should_ignore_path(
+        path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None
+    ) -> bool:
         """Fallback implementation when victor-coding is not available."""
         # Simple fallback: check if path is hidden or in skip_dirs
         if path.name.startswith("."):
@@ -59,6 +72,7 @@ except ImportError:
         if extra_skip_dirs and any(part in extra_skip_dirs for part in path.parts):
             return True
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
+
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor.core.utils.ast_helpers import (
@@ -117,6 +131,90 @@ class CodebaseAnalysis:
     top_imports: List[Tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
     method_count: int = 0
     protocol_count: int = 0  # Python Protocol/ABC count
+
+
+class VictorMDBuilder:
+    """Lightweight helper for composing Victor context markdown."""
+
+    def __init__(self, context_file: str = VICTOR_CONTEXT_FILE):
+        self._context_file = context_file
+        self.sections: List[str] = []
+        self._started = False
+
+    def start_document(self, project_name: str, description: str) -> None:
+        if self._started:
+            raise ValueError("VictorMDBuilder.start_document already called")
+        self._started = True
+        self.sections.append(f"# {self._context_file}\n")
+        self.sections.append(
+            "This file provides guidance to Victor when working with code in this repository.\n"
+        )
+        self.sections.append("## Project Overview\n")
+        self.sections.append(f"**{project_name}**: {description}\n")
+
+    def add_table(
+        self,
+        title: str,
+        headers: List[str],
+        rows: List[List[str]],
+        separator: Optional[str] = None,
+    ) -> None:
+        if not rows:
+            return
+        if title:
+            self.sections.append(title if title.endswith("\n") else f"{title}\n")
+        header_line = "| " + " | ".join(headers) + " |"
+        self.sections.append(header_line)
+        if separator is not None:
+            self.sections.append(separator)
+        else:
+            sep_cells = ["-" * max(3, len(h)) for h in headers]
+            self.sections.append("|" + "|".join(sep_cells) + "|")
+        for row in rows:
+            self.sections.append("| " + " | ".join(row) + " |")
+        self.sections.append("")
+
+    def add_code_block(self, lines: List[str], language: str = "bash") -> None:
+        if not lines:
+            return
+        self.sections.append(f"```{language}")
+        self.sections.extend(lines)
+        self.sections.append("```\n")
+
+    def blank_line(self) -> None:
+        self.sections.append("")
+
+    def add_package_layout(self, rows: List[List[str]], note: Optional[str] = None) -> None:
+        if not rows:
+            return
+        self.append("## Package Layout\n")
+        if note:
+            self.append(note if note.endswith("\n") else f"{note}\n")
+        self.add_table(
+            "",
+            ["Path", "Type", "Description"],
+            rows,
+            separator="|------|------|-------------|",
+        )
+
+    def add_key_components_table(self, rows: List[List[str]]) -> None:
+        if not rows:
+            return
+        self.add_table(
+            "## Key Components\n",
+            ["Component", "Type", "Path", "Description"],
+            rows,
+            separator="|-----------|------|------|-------------|",
+        )
+
+    def add_command_section(self, title: str, commands: List[str], language: str = "bash") -> None:
+        if not commands:
+            return
+        self.append(title if title.endswith("\n") else f"{title}\n")
+        self.add_code_block(commands, language=language)
+
+    def build(self) -> str:
+        return "\n".join(self.sections)
 
 
 class CodebaseAnalyzer:
@@ -980,82 +1078,60 @@ def generate_smart_victor_md(
             root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
         )
 
-    sections = []
-
-    # Header - use configurable file name
-    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
-    sections.append(
-        "This file provides guidance to Victor when working with code in this repository.\n"
+    builder = VictorMDBuilder()
+    readme_desc = (
+        _extract_readme_description(analysis.root_path) or "[Add project description here]"
     )
+    builder.start_document(analysis.project_name, readme_desc)
+    sections = builder.sections
 
-    # Project Overview
-    sections.append("## Project Overview\n")
-
-    # Try to get description from README
-    readme_desc = _extract_readme_description(analysis.root_path)
-    if readme_desc:
-        sections.append(f"**{analysis.project_name}**: {readme_desc}\n")
-    else:
-        sections.append(f"**{analysis.project_name}**: [Add project description here]\n")
-
-    # Package Layout
-    sections.append("## Package Layout\n")
-    sections.append("**IMPORTANT**: Use the correct directory paths:\n")
-
-    layout_lines = []
-    layout_lines.append("| Path | Status | Description |")
-    layout_lines.append("|------|--------|-------------|")
-
+    layout_rows: List[List[str]] = []
     if analysis.main_package:
-        layout_lines.append(
-            f"| `{analysis.main_package}/` | **ACTIVE** | Main package - all source code |"
+        layout_rows.append(
+            [f"`{analysis.main_package}/`", "**ACTIVE**", "Main package - all source code"]
         )
 
     for deprecated in analysis.deprecated_paths:
-        layout_lines.append(f"| `{deprecated}` | **DEPRECATED** | Legacy - DO NOT USE |")
+        layout_rows.append([f"`{deprecated}`", "**DEPRECATED**", "Legacy - DO NOT USE"])
 
     if (analysis.root_path / "tests").is_dir():
-        layout_lines.append("| `tests/` | Active | Unit and integration tests |")
+        layout_rows.append(["`tests/`", "Active", "Unit and integration tests"])
 
     if (analysis.root_path / "docs").is_dir():
-        layout_lines.append("| `docs/` | Active | Documentation |")
+        layout_rows.append(["`docs/`", "Active", "Documentation"])
 
-    sections.append("\n".join(layout_lines) + "\n")
+    builder.add_package_layout(
+        layout_rows, note="**IMPORTANT**: Use the correct directory paths:\n"
+    )
 
     # Key Components
     if analysis.key_components:
-        sections.append("## Key Components\n")
-        sections.append("| Component | Path | Description |")
-        sections.append("|-----------|------|-------------|")
-
-        for comp in analysis.key_components[:10]:  # Top 10
+        component_rows = []
+        for comp in analysis.key_components[:10]:
             desc = comp.docstring or f"{comp.category.title() if comp.category else 'Class'}"
-            path_with_line = f"`{comp.file_path}:{comp.line_number}`"
-            sections.append(f"| {comp.name} | {path_with_line} | {desc[:60]} |")
+            component_rows.append([comp.name, f"`{comp.file_path}:{comp.line_number}`", desc[:60]])
 
-        sections.append("")
+        builder.add_table(
+            "## Key Components\n",
+            ["Component", "Path", "Description"],
+            component_rows,
+            separator="|-----------|------|-------------|",
+        )
 
     # Common Commands
-    sections.append("## Common Commands\n")
-    sections.append("```bash")
-    sections.append("# Install with dev dependencies")
-    sections.append('pip install -e ".[dev]"')
-
-    # Add entry points
+    command_lines: List[str] = [
+        "# Install with dev dependencies",
+        'pip install -e ".[dev]"',
+    ]
     if analysis.entry_points:
-        sections.append("")
-        sections.append("# Run the application")
-        for cmd in list(analysis.entry_points.keys())[:2]:
-            sections.append(cmd)
-
-    # Add dev commands
+        command_lines.append("")
+        command_lines.append("# Run the application")
+        command_lines.extend(list(analysis.entry_points.keys())[:2])
     if analysis.cli_commands:
-        sections.append("")
-        sections.append("# Development")
-        for cmd in analysis.cli_commands:
-            sections.append(cmd)
-
-    sections.append("```\n")
+        command_lines.append("")
+        command_lines.append("# Development")
+        command_lines.extend(analysis.cli_commands)
+    builder.add_command_section("## Common Commands\n", command_lines)
 
     # Architecture Notes
     if analysis.architecture_patterns:
@@ -1089,7 +1165,7 @@ def generate_smart_victor_md(
 
     sections.append("")
 
-    return "\n".join(sections)
+    return builder.build()
 
 
 def _generate_generic_victor_md(
@@ -2127,387 +2203,16 @@ async def generate_victor_md_from_index(
     include_dirs: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
 ) -> str:
-    """Generate init.md from the SymbolStore (pre-indexed symbols).
+    """Legacy entry point retained for compatibility.
 
-    This uses the SQLite symbol store for fast, accurate init.md generation.
-    The symbol store should be indexed first via `/init --index` or automatically
-    during first run.
-
-    Args:
-        root_path: Root directory. Defaults to current directory.
-        force: If True, re-index all files ignoring cache.
-
-    Returns:
-        Generated markdown content for .victor/init.md.
+    Historically this function produced init.md from the symbol store. We now
+    route all generation through the smarter analyzer to reduce maintenance cost.
+    The parameters are kept for API compatibility but only `root_path`,
+    `include_dirs`, and `exclude_dirs` influence the output.
     """
-    from victor_coding.codebase.symbol_store import SymbolStore
-
-    root = Path(root_path).resolve() if root_path else Path.cwd()
-    store = SymbolStore(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
-
-    # Index if needed (quick operation if already indexed, unless force=True)
-    await store.index_codebase(force=force)
-
-    stats = store.get_stats()
-    key_components = store.find_key_components(limit=20)  # Increased from 15 for more context
-    patterns = store.get_detected_patterns()
-    named_impls = store.find_named_implementations()
-    perf_hints = store.find_performance_hints()
-
-    # Also run CodebaseAnalyzer for enhanced info (dependencies, LOC, imports, coverage)
-    analyzer = CodebaseAnalyzer(str(root), include_dirs=include_dirs, exclude_dirs=exclude_dirs)
-    analyzer._extract_dependencies()
-    analyzer._calculate_loc_stats()
-    analyzer._extract_top_imports()
-    analyzer._extract_test_coverage()
-    enhanced_info = analyzer.analysis
-
-    graph_insights = await extract_graph_insights(root_path)
-    embedding_status = _collect_embedding_status(root_path)
-    env_vars = _infer_env_vars(root)
-    commands_inferred = _infer_commands(root)
-    quick_start = _build_quick_start(commands_inferred)
-    config_files = _find_config_files(root)
-    docs_files = _find_docs_files(root)
-
-    sections = []
-
-    # Header
-    sections.append(f"# {VICTOR_CONTEXT_FILE}\n")
-    sections.append(
-        "This file provides guidance to Victor when working with code in this repository.\n"
+    return generate_smart_victor_md(
+        root_path=root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs
     )
-
-    # Project Overview
-    sections.append("## Project Overview\n")
-    readme_desc = _extract_readme_description(root)
-    if readme_desc:
-        sections.append(f"**{root.name}**: {readme_desc}\n")
-    else:
-        sections.append(f"**{root.name}**: [Add project description here]\n")
-
-    # Languages
-    if stats.get("files_by_language"):
-        langs = [f"{lang} ({count})" for lang, count in stats["files_by_language"].items()]
-        sections.append(f"**Languages**: {', '.join(langs)}\n")
-
-    # Package Layout
-    sections.append("## Package Layout\n")
-    sections.append("| Path | Type | Description |")
-    sections.append("|------|------|-------------|")
-
-    dirs_seen: Set[str] = set()
-
-    def add_dir(path: str, type_label: str, desc: str) -> None:
-        if path in dirs_seen:
-            return
-        if (root / path).exists():
-            sections.append(f"| `{path}/` | {type_label} | {desc} |")
-            dirs_seen.add(path)
-
-    # Core/runtime dirs
-    add_dir("victor", "**ACTIVE**", "Backend / core")
-    add_dir("src", "Active", "Source code")
-    add_dir("web/server", "Active", "Backend server")
-    add_dir("web/ui", "Active", "Web UI")
-    add_dir("vscode-victor", "Active", "Editor extension")
-    add_dir("docs", "Active", "Documentation")
-    add_dir("docs/guides", "Active", "Guides and playbooks")
-    add_dir("examples", "Active", "Examples and sample workflows")
-    add_dir("scripts", "Active", "Automation and helper scripts")
-    add_dir("templates", "Active", "Scaffold and template files")
-    add_dir("tests", "Active", "Unit and integration tests")
-    add_dir("victor_test", "Active", "Lightweight demos")
-    add_dir("archive", "Legacy", "Historical code (frozen)")
-
-    # Infer additional dirs from key components for completeness
-    for comp in key_components:
-        dir_parts = Path(comp.file_path).parts
-        if len(dir_parts) > 1:
-            main_dir = dir_parts[0]
-            add_dir(main_dir, "**ACTIVE**", "Source code")
-
-    sections.append("")
-
-    # Key Components (from indexed symbols)
-    if key_components:
-        sections.append("## Key Components\n")
-        sections.append("| Component | Type | Path | Description |")
-        sections.append("|-----------|------|------|-------------|")
-
-        # Prefer runtime components over test-only entries
-        filtered_components = [
-            comp
-            for comp in key_components
-            if not str(comp.file_path).startswith("tests/")
-            and not str(comp.file_path).startswith("vscode-victor/out")
-        ]
-        display_components = filtered_components or key_components
-        seen_components: Set[str] = set()
-
-        for comp in display_components[:15]:  # Show top 15 (increased from 12)
-            if comp.name in seen_components:
-                continue
-            seen_components.add(comp.name)
-            raw_desc = (
-                comp.docstring or comp.category.title()
-                if comp.category
-                else comp.symbol_type.title()
-            )
-            # Truncate to first sentence or 120 chars, whichever is shorter
-            desc = raw_desc.split("\n")[0][:120].strip()
-            if len(raw_desc) > 120 and "." in desc:
-                # Truncate at last sentence boundary
-                desc = desc.rsplit(".", 1)[0] + "."
-            path_with_line = f"`{comp.file_path}:{comp.line_number}`"
-            sections.append(f"| {comp.name} | {comp.symbol_type} | {path_with_line} | {desc} |")
-
-        sections.append("")
-
-    # Dependencies (from pyproject.toml/package.json)
-    if enhanced_info.dependencies:
-        sections.append("## Dependencies\n")
-        if enhanced_info.dependencies.get("core"):
-            core_deps = enhanced_info.dependencies["core"][:12]
-            sections.append(
-                f"**Core** ({len(enhanced_info.dependencies['core'])} packages): {', '.join(core_deps)}"
-            )
-            if len(enhanced_info.dependencies["core"]) > 12:
-                sections.append(f"  ...and {len(enhanced_info.dependencies['core']) - 12} more")
-        if enhanced_info.dependencies.get("dev"):
-            dev_deps = enhanced_info.dependencies["dev"][:8]
-            sections.append(
-                f"\n**Dev** ({len(enhanced_info.dependencies['dev'])} packages): {', '.join(dev_deps)}"
-            )
-        sections.append("")
-
-    # Configuration hints
-    sections.append("## Configuration\n")
-    sections.append(
-        "- Settings: `.env` → `~/.victor/profiles.yaml` → CLI flags (override order)\n"
-        "- Project context: `.victor/init.md` (regenerate with `victor init --update`)"
-    )
-    sections.append("")
-
-    if quick_start:
-        sections.append("## Quick Start\n")
-        sections.append("```bash")
-        for cmd in quick_start:
-            sections.append(cmd)
-        sections.append("```\n")
-
-    if env_vars:
-        sections.append("## Environment Variables\n")
-        sections.append("Likely used (from .env/.env.example):")
-        for var in env_vars:
-            sections.append(f"- `{var}`")
-        sections.append("")
-
-    if config_files:
-        sections.append("## Config Files\n")
-        for cfg in config_files[:12]:
-            sections.append(f"- `{cfg}`")
-        sections.append("")
-
-    if docs_files:
-        sections.append("## Documentation\n")
-        for doc in docs_files[:10]:
-            sections.append(f"- `{doc}`")
-        sections.append("")
-
-    # Codebase Stats (LOC, files, coverage)
-    if enhanced_info.loc_stats:
-        sections.append("## Codebase Stats\n")
-        loc = enhanced_info.loc_stats
-
-        # Overall totals
-        total_lines = loc.get("total_lines", 0)
-        total_files = loc.get("total_files", 0)
-        stats_line = f"- **{total_lines:,}** lines of code across **{total_files}** files"
-
-        if enhanced_info.test_coverage is not None:
-            stats_line += f" ({enhanced_info.test_coverage}% test coverage)"
-        sections.append(stats_line)
-
-        # Breakdown by file type if available
-        if loc.get("source_files") and loc.get("config_files"):
-            source_lines = loc.get("source_lines", 0)
-            config_lines = loc.get("config_lines", 0)
-            source_files = loc.get("source_files", 0)
-            config_files = loc.get("config_files", 0)
-
-            sections.append(f"  - **Source**: {source_lines:,} LOC in {source_files} files")
-            sections.append(f"  - **Config**: {config_lines:,} LOC in {config_files} files")
-
-        if loc.get("largest_file"):
-            sections.append(
-                f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)"
-            )
-
-        # Show top 3 largest files
-        top_files = loc.get("top_files", [])[:3]
-        if top_files:
-            sections.append("- Top files by size:")
-            for path, lines in top_files:
-                sections.append(f"  - `{path}` ({lines:,} lines)")
-        sections.append("")
-
-    analyzer_section = _build_analyzer_section(
-        stats=stats, graph_insights=graph_insights, embedding_status=embedding_status
-    )
-    if analyzer_section:
-        sections.extend(analyzer_section)
-
-    if graph_insights.get("has_graph"):
-        graph_stats = graph_insights.get("stats", {})
-        edge_types = graph_stats.get("edge_types", {})
-        sections.append("## Graph Health\n")
-        sections.append(
-            f"- Nodes: {graph_stats.get('total_nodes', 0)}, Edges: {graph_stats.get('total_edges', 0)} "
-            f"(CALLS: {edge_types.get('CALLS', 0)}, REFERENCES: {edge_types.get('REFERENCES', 0)}, "
-            f"IMPORTS: {edge_types.get('IMPORTS', 0)}, INHERITS: {edge_types.get('INHERITS', 0)}, "
-            f"COMPOSED_OF: {edge_types.get('COMPOSED_OF', 0)})"
-        )
-        if graph_insights.get("languages"):
-            lang_preview = ", ".join(
-                f"{lang} ({count})" for lang, count in graph_insights["languages"][:4]
-            )
-            sections.append(f"- Language coverage: {lang_preview}")
-        if graph_insights.get("edge_gaps"):
-            sections.append(
-                f"- Missing edge types: {', '.join(graph_insights['edge_gaps'])} "
-                "(install tree-sitter deps and re-run `victor index`)"
-            )
-        if graph_insights.get("hub_classes"):
-            hubs = ", ".join(
-                f"{hub['name']} ({hub['degree']} links)"
-                for hub in graph_insights["hub_classes"][:3]
-            )
-            sections.append(f"- Hub classes: {hubs}")
-        if graph_insights.get("important_modules"):
-            mods = ", ".join(
-                f"{mod['module']} ({mod['role']})"
-                for mod in graph_insights["important_modules"][:3]
-            )
-            sections.append(f"- Module leaders: {mods}")
-        if graph_insights.get("pagerank"):
-            pr_preview = ", ".join(
-                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)"
-                for pr in graph_insights["pagerank"][:3]
-            )
-            sections.append(f"- PageRank leaders: {pr_preview}")
-        if graph_insights.get("centrality"):
-            dc_preview = ", ".join(
-                f"{dc['name']} ({dc['degree']} deg)" for dc in graph_insights["centrality"][:3]
-            )
-            sections.append(f"- Centrality leaders: {dc_preview}")
-        if graph_insights.get("components"):
-            comp = graph_insights["components"]
-            details = f"largest {comp[0]} nodes" + (f", next {comp[1:3]}" if len(comp) > 1 else "")
-            sections.append(f"- Connected components: {details}")
-        sections.append("")
-
-    if embedding_status and embedding_status.get("code_embeddings"):
-        ce = embedding_status["code_embeddings"]
-        sections.append("## Embeddings & Chunking\n")
-        sections.append(
-            f"- Code embeddings: {ce.get('rows', 0)} vectors @ `{ce.get('path', '')}` (table: {ce.get('table', '')})"
-        )
-        if ce.get("metadata_keys"):
-            keys = ", ".join(k for k, _ in ce["metadata_keys"])
-            sections.append(f"- Metadata keys: {keys}")
-        if ce.get("chunk_types"):
-            sections.append(f"- Chunk types: {', '.join(ce['chunk_types'])}")
-        if ce.get("max_span"):
-            sections.append(f"- Max chunk span: {ce['max_span']} lines")
-        sections.append("")
-
-    # Top Imports (most used internal/external modules)
-    if enhanced_info.top_imports:
-        sections.append("## Most Imported Modules\n")
-        sections.append("*Non-stdlib modules imported most frequently*\n")
-        for module, count in enhanced_info.top_imports[:8]:
-            sections.append(f"- `{module}` ({count} imports)")
-        sections.append("")
-
-    # Named Implementations (grouped by domain)
-    if named_impls:
-        sections.append("## Named Implementations\n")
-        for domain, impls in sorted(named_impls.items()):
-            if impls:
-                sections.append(f"### {domain}\n")
-                sections.append("| Name | Location | Description |")
-                sections.append("|------|----------|-------------|")
-                for impl in sorted(impls, key=lambda x: x["name"]):
-                    desc = impl.get("description", "") or impl.get("primary_symbol", "")
-                    # Format: SymbolName (file.py:line) for LLM navigation
-                    line_ref = f":{impl['line']}" if impl.get("line") else ""
-                    location = f"`{impl['path']}{line_ref}`"
-                    sections.append(f"| **{impl['name']}** | {location} | {desc} |")
-                sections.append("")
-
-    # Performance Hints (extracted from docstrings)
-    if perf_hints:
-        sections.append("## Performance Hints\n")
-        sections.append("*Extracted from docstrings and comments*\n")
-        hint_count = 0
-        for file_path, hints in sorted(perf_hints.items())[:10]:
-            unique_hints = list({h["value"] for h in hints})[:3]
-            if unique_hints:
-                sections.append(f"- `{file_path}`: {', '.join(unique_hints)}")
-                hint_count += 1
-                if hint_count >= 8:
-                    break
-        sections.append("")
-
-    # Architecture Patterns (from detected patterns)
-    if patterns:
-        sections.append("## Architecture\n")
-        for i, pattern in enumerate(patterns[:8], 1):
-            sections.append(f"{i}. **{pattern['name']}**: {pattern['description']}")
-        sections.append("")
-
-    # Symbol Summary by Type
-    if stats.get("symbols_by_type"):
-        sections.append("## Code Structure\n")
-        for sym_type, count in stats["symbols_by_type"].items():
-            # Proper pluralization
-            plural = sym_type + "es" if sym_type.endswith("s") else sym_type + "s"
-            sections.append(f"- {count} {plural}")
-        sections.append("")
-
-    # Setup & Commands (inferred)
-    sections.append("## Setup & Commands\n")
-    sections.append("```bash")
-    py_requires = _infer_python_requires(root)
-    if py_requires:
-        sections.append(f"# Python >= {py_requires}")
-    for cmd in commands_inferred:
-        sections.append(cmd)
-    sections.append("```\n")
-
-    # Important Notes
-    sections.append("## Important Notes\n")
-
-    # Show clear breakdown of what was indexed
-    total_files = stats.get("total_files", 0)
-    total_symbols = stats.get("total_symbols", 0)
-    graph_nodes = stats.get("graph_nodes", 0)
-    classes = stats.get("classes", 0)
-    functions = stats.get("functions", 0)
-
-    sections.append(f"- **Indexed {total_files} files**:")
-    sections.append(f"  - {classes} classes")
-    sections.append(f"  - {functions} functions")
-    sections.append(f"  - {total_symbols} total code symbols")
-    sections.append(f"  - {graph_nodes} total graph nodes (files + symbols + imports)")
-    sections.append("")
-
-    sections.append("- Check component paths above for exact file:line references")
-    sections.append("- Run `/init --update` to refresh after code changes")
-    sections.append("")
-
-    return "\n".join(sections)
 
 
 async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:

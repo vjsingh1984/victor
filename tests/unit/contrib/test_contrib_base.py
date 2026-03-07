@@ -55,9 +55,7 @@ class TestSafetyContrib:
     def test_vertical_safety_mixin_create_rule(self):
         """Test VerticalSafetyMixin creates rules."""
         mixin = VerticalSafetyMixin()
-        rule = mixin.create_dangerous_command_rule(
-            "test_rule", r"test.*cmd", "Test command"
-        )
+        rule = mixin.create_dangerous_command_rule("test_rule", r"test.*cmd", "Test command")
 
         assert rule.rule_id == "test_rule"
         assert rule.pattern == r"test.*cmd"
@@ -91,9 +89,7 @@ class TestConversationContrib:
         ctx = VerticalConversationContext(vertical_name="test", domain="testing")
 
         active_task = TaskContext(task_id="active", task_type="test", status="pending")
-        completed_task = TaskContext(
-            task_id="completed", task_type="test", status="completed"
-        )
+        completed_task = TaskContext(task_id="completed", task_type="test", status="completed")
 
         ctx.add_task(active_task)
         ctx.add_task(completed_task)

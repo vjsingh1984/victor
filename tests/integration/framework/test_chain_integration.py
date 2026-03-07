@@ -44,7 +44,7 @@ class TestCodingChainRegistry:
         # This test verifies the chains exist and can be accessed
         try:
             # Import the module
-            from victor.coding.composed_chains import CODING_CHAINS
+            from victor_coding.composed_chains import CODING_CHAINS
 
             # Get the global registry
             from victor.framework.chain_registry import get_chain_registry
@@ -68,7 +68,7 @@ class TestCodingChainRegistry:
     def test_coding_eight_chains_registered(self):
         """Exactly 8 coding chains are registered (or infrastructure in place)."""
         try:
-            from victor.coding.composed_chains import CODING_CHAINS
+            from victor_coding.composed_chains import CODING_CHAINS
             from victor.framework.chain_registry import get_chain_registry
 
             registry = get_chain_registry()
@@ -576,7 +576,7 @@ class TestChainBackwardCompatibility:
     def test_coding_composed_chains_dict_still_works(self):
         """CODING_CHAINS dict still accessible for backward compatibility (if exists)."""
         try:
-            from victor.coding.composed_chains import CODING_CHAINS, get_chain, list_chains
+            from victor_coding.composed_chains import CODING_CHAINS, get_chain, list_chains
 
             # Dict access should work
             assert len(CODING_CHAINS) > 0
@@ -596,7 +596,7 @@ class TestChainBackwardCompatibility:
         """Legacy import paths for chains still work (if exists)."""
         try:
             # These imports should not break
-            from victor.coding.composed_chains import (
+            from victor_coding.composed_chains import (
                 explore_file_chain,
                 analyze_function_chain,
                 safe_edit_chain,
@@ -627,7 +627,7 @@ class TestChainIntegrationScenarios:
     def test_coding_chains_full_workflow(self):
         """Complete workflow: register, discover, retrieve, use chains (if exists)."""
         try:
-            from victor.coding.composed_chains import (
+            from victor_coding.composed_chains import (
                 explore_file_chain,
                 CODING_CHAINS,
                 list_chains,
@@ -686,7 +686,7 @@ class TestChainIntegrationScenarios:
             registry = get_chain_registry()
 
             # Import chains to populate registry
-            from victor.coding import composed_chains
+            from victor_coding import composed_chains
 
             # Serialize
             serialized = registry.to_dict()

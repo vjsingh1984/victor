@@ -468,7 +468,14 @@ class ToolCoordinator:
         # Use ToolAccessController if available
         if self._tool_access_controller:
             context = self._build_tool_access_context()
-            return self._tool_access_controller.get_allowed_tools(context)
+            allowed = self._tool_access_controller.get_allowed_tools(context)
+
+            # Keep selector + orchestrator tools in sync with controller decisions
+            if allowed != self._enabled_tools:
+                self._enabled_tools = allowed
+                if self._selector and hasattr(self._selector, "set_enabled_tools"):
+                    self._selector.set_enabled_tools(allowed)
+            return allowed
 
         # Check mode controller for BUILD mode (allows all tools)
         if self._mode_controller:
@@ -572,41 +579,46 @@ class ToolCoordinator:
         Returns:
             Canonical tool name
         """
+        from victor.tools.tool_names import get_canonical_name
+
+        canonical = get_canonical_name(tool_name)
+
         # Resolve shell aliases to appropriate enabled variant
         shell_aliases = {
+            ToolNames.SHELL,
+            ToolNames.SHELL_READONLY,
             "run",
             "bash",
             "execute",
             "cmd",
             "execute_bash",
-            "shell_readonly",
-            "shell",
         }
 
-        if tool_name not in shell_aliases:
-            return tool_name
+        if canonical not in shell_aliases and tool_name not in shell_aliases:
+            if canonical != tool_name:
+                logger.debug(f"Resolved '{tool_name}' to canonical '{canonical}'")
+            return canonical
 
         # Check mode controller for BUILD mode (allows all tools including shell)
         if self._mode_controller:
             config = self._mode_controller.config
-            if config.allow_all_tools and "shell" not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
+            if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
+                logger.debug(
+                    f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)"
+                )
                 return ToolNames.SHELL
 
         # Check if full shell is enabled first
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
             return ToolNames.SHELL_READONLY
 
         # Neither enabled - return canonical name (will fail validation)
-        from victor.tools.tool_names import get_canonical_name
-
-        canonical = get_canonical_name(tool_name)
         logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
@@ -1034,6 +1046,10 @@ class ToolCoordinator:
                         "result_length": len(str(result.result or "")) if result.result else 0,
                         "error": str(result.error) if result.error else None,
                         "category": "tool",
+                        "arguments": self._sanitize_arguments(result.arguments or {}),
+                        "execution_time_ms": getattr(result, "execution_time_ms", None),
+                        "result_excerpt": self._build_result_excerpt(result.result),
+                        "preview": self._build_tool_preview(result),
                     },
                 )
             )
@@ -1144,6 +1160,115 @@ class ToolCoordinator:
                 "remaining": self.get_remaining_budget(),
             },
         }
+
+    # =====================================================================
+    # Preview helpers (UI/observability integration)
+    # =====================================================================
+
+    def _sanitize_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a shallow copy of arguments with large values truncated."""
+
+        def _clean(value: Any, depth: int = 0) -> Any:
+            if depth > 2:
+                return "…"
+            if isinstance(value, str):
+                text = value.strip()
+                return text if len(text) <= 200 else text[:200] + "…"
+            if isinstance(value, dict):
+                return {k: _clean(v, depth + 1) for k, v in list(value.items())[:5]}
+            if isinstance(value, list):
+                return [_clean(v, depth + 1) for v in value[:5]]
+            return value
+
+        try:
+            return {k: _clean(v) for k, v in (arguments or {}).items()}
+        except Exception:
+            return {}
+
+    def _truncate_text(self, text: str, limit: int = 600) -> str:
+        if not text:
+            return ""
+        return text if len(text) <= limit else text[:limit] + "…"
+
+    def _build_result_excerpt(self, result: Any) -> Optional[str]:
+        if result is None:
+            return None
+        if isinstance(result, str):
+            text = result.strip()
+        elif isinstance(result, (dict, list)):
+            try:
+                text = json.dumps(result, ensure_ascii=False)
+            except Exception:
+                text = str(result)
+        else:
+            text = str(result)
+        text = text.strip()
+        if not text:
+            return None
+        return self._truncate_text(text, 400)
+
+    def _extract_text_content(self, payload: Any) -> Optional[str]:
+        if isinstance(payload, str):
+            return payload
+        if isinstance(payload, dict):
+            for key in ("content", "text", "body", "value", "preview"):
+                value = payload.get(key)
+                if isinstance(value, str):
+                    return value
+        return None
+
+    def _looks_like_diff(self, text: str) -> bool:
+        if not text or len(text) < 10:
+            return False
+        lines = text.splitlines()[:40]
+        plus = any(line.startswith("+") for line in lines)
+        minus = any(line.startswith("-") for line in lines)
+        return text.lstrip().startswith("---") or "@@" in text or (plus and minus)
+
+    def _build_tool_preview(self, result: Any) -> Optional[Dict[str, Any]]:
+        """Build a structured preview payload for UI consumption."""
+        tool_name = (result.tool_name or "").lower()
+        arguments = result.arguments or {}
+        content = result.result
+
+        if tool_name in {"read", "read_file"}:
+            text = self._extract_text_content(content)
+            if text:
+                return {
+                    "type": "file_read",
+                    "tool_name": result.tool_name,
+                    "path": arguments.get("path") or arguments.get("file_path"),
+                    "snippet": self._truncate_text(text),
+                    "content": text,
+                }
+
+        diff_text = None
+        metadata: Dict[str, Any] = {}
+        if isinstance(content, dict):
+            if isinstance(content.get("diff"), str):
+                diff_text = content["diff"]
+                metadata = {
+                    "additions": content.get("additions"),
+                    "deletions": content.get("deletions"),
+                }
+            elif isinstance(content.get("preview"), str) and self._looks_like_diff(
+                content["preview"]
+            ):
+                diff_text = content["preview"]
+        elif isinstance(content, str) and self._looks_like_diff(content):
+            diff_text = content
+
+        if diff_text:
+            return {
+                "type": "diff",
+                "tool_name": result.tool_name,
+                "path": arguments.get("path") or arguments.get("file_path"),
+                "snippet": self._truncate_text(diff_text),
+                "diff": diff_text,
+                "metadata": metadata,
+            }
+
+        return None
 
     def clear_selection_history(self) -> None:
         """Clear the selection history."""
@@ -1284,9 +1409,7 @@ class ToolCoordinator:
                 canonical, tool_call.get("arguments", {})
             )
             if not schema_result.valid:
-                logger.warning(
-                    f"Schema validation: {canonical}: {schema_result.errors}"
-                )
+                logger.warning(f"Schema validation: {canonical}: {schema_result.errors}")
 
         return ToolCallValidation(
             valid=True,

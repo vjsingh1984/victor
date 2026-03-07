@@ -220,6 +220,7 @@ class TestLanceDBProvider:
         """Test indexing document when table exists."""
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.list_tables.return_value.tables = ["test_table"]
+        mock_db.table_names.return_value = ["test_table"]  # Also set for get_table_names()
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -280,7 +281,12 @@ class TestLanceDBProvider:
     async def test_search_similar(self, lancedb_config, mock_lancedb):
         """Test semantic similarity search."""
         mock_connect, mock_db, mock_table = mock_lancedb
-        mock_db.list_tables.return_value.tables = ["test_table"]
+
+        # Fix: Override list_tables to return ["test_table"]
+        # We need to modify the mock's return_value directly
+        mock_list_response = mock_db.list_tables.return_value
+        mock_list_response.tables = ["test_table"]
+        mock_db.table_names.return_value = ["test_table"]  # Also set for get_table_names()
 
         # Mock search results
         mock_search = MagicMock()
@@ -352,6 +358,7 @@ class TestLanceDBProvider:
         """Test deleting document."""
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.list_tables.return_value.tables = ["test_table"]
+        mock_db.table_names.return_value = ["test_table"]  # Also set for get_table_names()
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -392,6 +399,7 @@ class TestLanceDBProvider:
         """Test clearing entire index."""
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.list_tables.return_value.tables = ["test_table"]
+        mock_db.table_names.return_value = ["test_table"]  # Also set for get_table_names()
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -415,6 +423,7 @@ class TestLanceDBProvider:
         """Test getting index statistics."""
         mock_connect, mock_db, mock_table = mock_lancedb
         mock_db.list_tables.return_value.tables = ["test_table"]
+        mock_db.table_names.return_value = ["test_table"]  # Also set for get_table_names()
         mock_table.count_rows.return_value = 42
 
         with patch(

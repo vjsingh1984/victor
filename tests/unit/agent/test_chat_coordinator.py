@@ -420,3 +420,67 @@ class TestValidateIntelligentResponse:
         mock_orchestrator._validate_intelligent_response.assert_called_once_with(
             response="response", query="query", tool_calls=0, task_type="edit"
         )
+
+
+class StubStreamingPipeline:
+    """Test double for StreamingChatPipeline."""
+
+    def __init__(self):
+        self.calls = []
+
+    async def run(self, user_message: str):
+        from victor.providers.base import StreamChunk
+
+        self.calls.append(user_message)
+        yield StreamChunk(content=f"resp:{user_message}")
+
+
+class TestStreamingPipelineIntegration:
+    """Tests for ChatCoordinator.stream_chat pipeline delegation."""
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_uses_pipeline(self, chat_coordinator, monkeypatch):
+        """ChatCoordinator should delegate streaming to StreamingChatPipeline."""
+        pipeline = StubStreamingPipeline()
+        created = []
+
+        def fake_factory(coordinator):
+            created.append(coordinator)
+            return pipeline
+
+        monkeypatch.setattr(
+            "victor.agent.streaming.create_streaming_chat_pipeline",
+            fake_factory,
+        )
+
+        chunks = []
+        async for chunk in chat_coordinator.stream_chat("hello world"):
+            chunks.append(chunk.content)
+
+        assert chunks == ["resp:hello world"]
+        assert pipeline.calls == ["hello world"]
+        assert created == [chat_coordinator]
+
+    @pytest.mark.asyncio
+    async def test_pipeline_is_cached(self, chat_coordinator, monkeypatch):
+        """Pipeline is instantiated once and reused across turns."""
+        pipeline = StubStreamingPipeline()
+        factory_calls = 0
+
+        def fake_factory(_):
+            nonlocal factory_calls
+            factory_calls += 1
+            return pipeline
+
+        monkeypatch.setattr(
+            "victor.agent.streaming.create_streaming_chat_pipeline",
+            fake_factory,
+        )
+
+        async for _ in chat_coordinator.stream_chat("first"):
+            pass
+        async for _ in chat_coordinator.stream_chat("second"):
+            pass
+
+        assert factory_calls == 1
+        assert pipeline.calls == ["first", "second"]

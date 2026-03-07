@@ -30,7 +30,9 @@ class TestResearchVerticalIndependence:
     def test_research_imports_without_coding(self):
         """ResearchAssistant can be imported without coding module."""
         # Temporarily make coding module raise ImportError
-        coding_modules = [key for key in sys.modules.keys() if "victor.coding" in key]
+        coding_modules = [
+            key for key in sys.modules.keys() if "victor_coding" in key or "victor.coding" in key
+        ]
 
         # Store original modules
         original_modules = {key: sys.modules.get(key) for key in coding_modules}
@@ -116,14 +118,14 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_middleware(self):
         """CodingAssistant provides middleware."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         assert len(extensions.middleware) >= 1
 
     def test_coding_has_safety_patterns(self):
         """CodingAssistant provides safety patterns."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         patterns = extensions.get_all_safety_patterns()
@@ -131,7 +133,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_task_hints(self):
         """CodingAssistant provides task type hints."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         hints = extensions.get_all_task_hints()
@@ -139,7 +141,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_mode_configs(self):
         """CodingAssistant provides mode configurations."""
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
 
         extensions = CodingAssistant.get_extensions()
         modes = extensions.get_all_mode_configs()
@@ -264,7 +266,7 @@ class TestFrameworkShimIntegration:
     def test_shim_accepts_vertical_parameter(self):
         """FrameworkShim constructor accepts vertical parameter."""
         from victor.framework.shim import FrameworkShim
-        from victor.coding import CodingAssistant
+        from victor_coding import CodingAssistant
         import inspect
 
         # Check that FrameworkShim constructor accepts vertical parameter

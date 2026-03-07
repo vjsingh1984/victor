@@ -240,7 +240,9 @@ class TestEventBridgeReliability:
         bridge._broadcaster.add_client("event-loss-check", send_func)
 
         await wait_for(lambda: bridge._broadcaster._running)
-        await wait_for(lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING))
+        await wait_for(
+            lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING)
+        )
 
         total_events = 25
         for idx in range(total_events):

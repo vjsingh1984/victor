@@ -159,14 +159,43 @@ def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 
-# Lazy load FileEditor from external victor-coding package
-# This prevents circular dependency - framework doesn't import from verticals
-try:
-    from victor_coding.editing import FileEditor
-    _FILE_EDITOR_AVAILABLE = True
-except ImportError:
-    _FILE_EDITOR_AVAILABLE = False
-    FileEditor = None
+# =============================================================================
+# EDITOR PROTOCOL + GRACEFUL FALLBACK
+# =============================================================================
+# Framework depends on EditorProtocol (abstraction), not concrete implementations
+# This follows the Dependency Inversion Principle (DIP)
+#
+# The file editor tool requires the victor-coding package for transaction-based
+# file editing with undo/redo support. This is an advanced feature that goes
+# beyond simple diff-based editing.
+#
+# Fallback:
+# - victor-coding (external vertical) - transaction-based editor with backups
+# - Error message (no editor available)
+# =============================================================================
+
+
+def _create_file_editor(backup_dir: str):
+    """Create a FileEditor instance via capability registry."""
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import EditorProtocol
+
+    registry = CapabilityRegistry.get_instance()
+    factory = registry.get(EditorProtocol)
+    if factory is not None and registry.is_enhanced(EditorProtocol):
+        # The enhanced provider is a callable factory (the FileEditor class)
+        return factory(backup_dir=backup_dir)
+    return None
+
+
+def _is_file_editor_available() -> bool:
+    """Check if file editor is available (via registry or direct import)."""
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import EditorProtocol
+
+    return CapabilityRegistry.get_instance().is_enhanced(EditorProtocol)
+
+
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path
 
@@ -235,12 +264,15 @@ async def edit(
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file edits.
     """
-    # Check if FileEditor is available from external victor-coding package
-    if not _FILE_EDITOR_AVAILABLE:
+    # Check if FileEditor is available from capability registry
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import EditorProtocol
+
+    if not CapabilityRegistry.get_instance().is_enhanced(EditorProtocol):
         return {
             "success": False,
             "error": "File editing requires the victor-coding package to be installed. "
-                   "Install it with: pip install victor-coding",
+            "Install it with: pip install victor-coding",
             "ops": ops,
         }
 
@@ -391,7 +423,7 @@ async def edit(
 
     # Initialize editor
     backup_dir = get_project_paths().backups_dir
-    editor = FileEditor(backup_dir=str(backup_dir))
+    editor = _create_file_editor(backup_dir=str(backup_dir))
     transaction_id = editor.start_transaction(desc)
 
     # Initialize change tracker for undo/redo

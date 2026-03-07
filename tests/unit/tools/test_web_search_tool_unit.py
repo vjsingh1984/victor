@@ -69,7 +69,9 @@ class TestGetWebConfig:
         assert config["fetch_pool"] is None
         assert config["max_content_length"] == 5000
         assert config["generic_result_cache_enabled"] is False
-        assert config["http_connection_pool_enabled"] is False
+        assert (
+            config["http_connection_pool_enabled"] is True
+        )  # HTTP pooling enabled by default for performance
 
     def test_config_with_empty_context(self):
         """Test getting config with empty context returns defaults."""
@@ -164,7 +166,7 @@ class TestRuntimeInfraIntegration:
             "victor.tools.web_search_tool._request_text",
             new=AsyncMock(return_value=(200, html)),
         ) as mock_request:
-            result = await web_search(query="test query", context=context)
+            result = await web_search(query="test query", _exec_ctx=context)
 
         assert result["success"] is True
         assert mock_request.await_count == 1
@@ -184,7 +186,7 @@ class TestRuntimeInfraIntegration:
             "victor.tools.web_search_tool._request_text",
             new=AsyncMock(return_value=(200, html)),
         ) as mock_request:
-            first = await web_fetch(url, context=context)
+            first = await web_fetch(url, _exec_ctx=context)
 
         assert first["success"] is True
         assert mock_request.await_count == 1
@@ -193,7 +195,52 @@ class TestRuntimeInfraIntegration:
             "victor.tools.web_search_tool._request_text",
             new=AsyncMock(side_effect=AssertionError("network should not be called")),
         ):
-            second = await web_fetch(url, context=context)
+            second = await web_fetch(url, _exec_ctx=context)
 
         assert second["success"] is True
         assert second["cached"] is True
+
+
+class TestWebSearchExecContext:
+    """Tests that web_search and web_fetch use _exec_ctx properly."""
+
+    def test_web_search_schema_excludes_exec_ctx(self):
+        """After rename, _exec_ctx should not appear in web_search schema."""
+        props = web_search.Tool.parameters.get("properties", {})
+        assert "_exec_ctx" not in props
+        # Old 'context' param should also not be there anymore
+        assert "context" not in props
+
+    def test_web_fetch_schema_excludes_exec_ctx(self):
+        """After rename, _exec_ctx should not appear in web_fetch schema."""
+        props = web_fetch.Tool.parameters.get("properties", {})
+        assert "_exec_ctx" not in props
+        assert "context" not in props
+
+    @pytest.mark.asyncio
+    async def test_web_search_receives_exec_context(self):
+        """web_search should receive execution context via _exec_ctx."""
+        html = "<html><body><div class='result'><a class='result__a' href='https://x.com'>X</a></div></body></html>"
+
+        with patch(
+            "victor.tools.web_search_tool._request_text",
+            new=AsyncMock(return_value=(200, html)),
+        ):
+            with patch("victor.tools.web_search_tool._get_web_config") as mock_config:
+                mock_config.return_value = {
+                    "provider": None,
+                    "model": None,
+                    "fetch_top": None,
+                    "fetch_pool": None,
+                    "max_content_length": 5000,
+                    "generic_result_cache_enabled": False,
+                    "generic_result_cache_ttl": 300,
+                    "http_connection_pool_enabled": False,
+                    "http_connection_pool_max_connections": 100,
+                    "http_connection_pool_max_connections_per_host": 10,
+                    "http_connection_pool_connection_timeout": 30,
+                    "http_connection_pool_total_timeout": 60,
+                }
+                ctx = {"tool_config": MagicMock()}
+                await web_search(query="test", _exec_ctx=ctx)
+                mock_config.assert_called_once_with(ctx)

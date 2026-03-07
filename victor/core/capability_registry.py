@@ -1,0 +1,172 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Centralized capability registry for optional vertical capabilities.
+
+This module provides a singleton registry that manages optional capabilities
+(tree-sitter parsing, codebase indexing, LSP, etc.) with stub/enhanced semantics.
+
+At bootstrap time:
+1. All contrib stubs are registered with status STUB
+2. Entry points from installed verticals (e.g., victor-coding) are discovered
+3. Enhanced implementations override stubs via entry points
+
+This eliminates direct imports from external vertical packages (e.g., victor_coding)
+in victor core, making the framework fully self-contained.
+
+Usage:
+    from victor.core.capability_registry import capabilities
+    from victor.framework.vertical_protocols import TreeSitterParserProtocol
+
+    parser = capabilities.get(TreeSitterParserProtocol)
+    if parser is not None:
+        result = parser.get_parser("python")
+"""
+
+from __future__ import annotations
+
+import logging
+from enum import Enum
+from typing import Any, Dict, Optional, Type, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class CapabilityStatus(Enum):
+    """Status of a registered capability provider."""
+
+    STUB = "stub"
+    ENHANCED = "enhanced"
+
+
+class CapabilityRegistry:
+    """Singleton registry for optional capabilities.
+
+    Capabilities are registered with a protocol type as key and a provider
+    instance as value. Each registration has a status (STUB or ENHANCED).
+
+    Enhanced registrations will not be downgraded to STUB. This ensures
+    that once a vertical installs an enhanced provider, it stays active.
+    """
+
+    _instance: Optional[CapabilityRegistry] = None
+    _providers: Dict[Type, tuple[Any, CapabilityStatus]]
+
+    def __init__(self) -> None:
+        self._providers = {}
+        self._bootstrapped = False
+
+    @classmethod
+    def get_instance(cls) -> CapabilityRegistry:
+        """Get the singleton registry instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance. For testing only."""
+        cls._instance = None
+
+    def ensure_bootstrapped(self) -> None:
+        """Ensure capabilities have been bootstrapped (lazy init)."""
+        if not self._bootstrapped:
+            self._bootstrapped = True
+            from victor.core.bootstrap import bootstrap_capabilities
+
+            bootstrap_capabilities()
+
+    def register(
+        self,
+        protocol_type: Type,
+        provider: Any,
+        status: CapabilityStatus = CapabilityStatus.STUB,
+    ) -> None:
+        """Register a capability provider.
+
+        Enhanced providers will not be downgraded to STUB. Registering
+        a STUB when an ENHANCED provider already exists is a no-op.
+
+        Args:
+            protocol_type: The protocol type to register against
+            provider: The provider instance
+            status: STUB or ENHANCED
+        """
+        existing = self._providers.get(protocol_type)
+        if existing is not None:
+            _, existing_status = existing
+            if existing_status == CapabilityStatus.ENHANCED and status == CapabilityStatus.STUB:
+                logger.debug(
+                    f"Skipping STUB registration for {protocol_type.__name__} "
+                    f"— ENHANCED provider already registered"
+                )
+                return
+
+        self._providers[protocol_type] = (provider, status)
+        logger.debug(f"Registered {status.value} capability for {protocol_type.__name__}")
+
+    def get(self, protocol_type: Type[T]) -> Optional[T]:
+        """Get a capability provider by protocol type.
+
+        Args:
+            protocol_type: The protocol type to look up
+
+        Returns:
+            The provider instance, or None if not registered
+        """
+        self.ensure_bootstrapped()
+        entry = self._providers.get(protocol_type)
+        if entry is None:
+            return None
+        return entry[0]
+
+    def is_enhanced(self, protocol_type: Type) -> bool:
+        """Check if a capability has an enhanced (non-stub) provider.
+
+        Args:
+            protocol_type: The protocol type to check
+
+        Returns:
+            True if the registered provider is ENHANCED
+        """
+        self.ensure_bootstrapped()
+        entry = self._providers.get(protocol_type)
+        if entry is None:
+            return False
+        return entry[1] == CapabilityStatus.ENHANCED
+
+    def get_status(self, protocol_type: Type) -> Optional[CapabilityStatus]:
+        """Get the registration status for a capability.
+
+        Returns:
+            The CapabilityStatus, or None if not registered
+        """
+        entry = self._providers.get(protocol_type)
+        if entry is None:
+            return None
+        return entry[1]
+
+    def list_capabilities(self) -> Dict[str, str]:
+        """List all registered capabilities and their status.
+
+        Returns:
+            Dict mapping protocol name to status value
+        """
+        return {proto.__name__: status.value for proto, (_, status) in self._providers.items()}
+
+
+# Module-level shortcut for convenient access
+capabilities = CapabilityRegistry.get_instance()

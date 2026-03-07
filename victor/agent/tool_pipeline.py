@@ -447,6 +447,7 @@ class ToolPipeline:
         signature_store: Optional["SignatureStore"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
+        on_tool_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional["MiddlewareChain"] = None,
         semantic_cache: Optional["ToolResultCache"] = None,
@@ -481,6 +482,7 @@ class ToolPipeline:
         # Callbacks
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
+        self.on_tool_event = on_tool_event
 
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
@@ -1537,6 +1539,22 @@ class ToolPipeline:
             code_validation_errors=code_validation_errors,
         )
 
+        if self.on_tool_event:
+            try:
+                payload = {
+                    "tool_name": tool_name,
+                    "success": exec_result.success,
+                    "execution_time_ms": execution_time_ms,
+                    "arguments": normalized_args,
+                }
+                if exec_result.error:
+                    payload["error"] = exec_result.error
+                if exec_result.result is not None:
+                    payload["result"] = exec_result.result
+                self.on_tool_event("tool.raw_result", payload)
+            except Exception as e:
+                logger.debug(f"on_tool_event callback failed for raw result: {e}")
+
         # Process through middleware chain (after execution)
         if self.middleware_chain is not None:
             try:
@@ -1555,6 +1573,17 @@ class ToolPipeline:
                         code_corrected=call_result.code_corrected,
                         code_validation_errors=call_result.code_validation_errors,
                     )
+                    if self.on_tool_event:
+                        try:
+                            self.on_tool_event(
+                                "tool.middleware_adjusted",
+                                {
+                                    "tool_name": call_result.tool_name,
+                                    "description": "Result modified by middleware chain",
+                                },
+                            )
+                        except Exception as e:
+                            logger.debug(f"on_tool_event middleware notification failed: {e}")
             except (ValueError, TypeError, KeyError) as e:
                 logger.warning(f"Middleware chain process_after failed (data error): {e}")
             except AttributeError as e:
@@ -1622,6 +1651,19 @@ class ToolPipeline:
                 self.on_tool_complete(call_result)
             except Exception as e:
                 logger.warning(f"on_tool_complete callback failed: {e}")
+        elif self.on_tool_event:
+            # Emit a simple fallback event so UI can still react
+            try:
+                self.on_tool_event(
+                    "tool.complete",
+                    {
+                        "tool_name": call_result.tool_name,
+                        "success": call_result.success,
+                        "execution_time_ms": call_result.execution_time_ms,
+                    },
+                )
+            except Exception:
+                logger.debug("on_tool_event fallback emission failed", exc_info=True)
 
         return call_result
 

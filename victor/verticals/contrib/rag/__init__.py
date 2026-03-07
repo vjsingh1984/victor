@@ -99,9 +99,11 @@ from victor.verticals.contrib.rag.conversation_enhanced import (
     EnhancedRAGConversationManager,
 )
 
-__all__.extend([
-    "RAGSafetyRules",
-    "EnhancedRAGSafetyExtension",
-    "RAGContext",
-    "EnhancedRAGConversationManager",
-])
+__all__.extend(
+    [
+        "RAGSafetyRules",
+        "EnhancedRAGSafetyExtension",
+        "RAGContext",
+        "EnhancedRAGConversationManager",
+    ]
+)

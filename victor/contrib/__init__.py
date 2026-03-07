@@ -47,9 +47,33 @@ Usage:
 __version__ = "0.1.0"
 
 # Import main contrib packages for convenience
-from victor.contrib import safety, conversation, workflows, mode_config
+from victor.contrib import (
+    codebase,  # Codebase analysis utilities
+    editing,  # File editing utilities
+    embeddings,  # Text embeddings
+    languages,  # Language registry
+    lsp,  # LSP integration
+    parsing,  # Tree-sitter parsing
+    prompts,  # Task type hints
+    safety,
+    conversation,
+    vectorstores,  # Vector storage
+    workflows,
+    mode_config,
+    testing,
+)
 
 __all__ = [
+    # Core packages
+    "codebase",
+    "editing",
+    "embeddings",
+    "languages",
+    "lsp",
+    "parsing",
+    "prompts",
+    "vectorstores",
+    # Existing packages
     "safety",
     "conversation",
     "workflows",

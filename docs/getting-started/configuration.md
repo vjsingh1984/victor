@@ -230,6 +230,47 @@ victor config profiles
 | `base_url` | string | Custom API endpoint | `https://api.anthropic.com` |
 | `timeout` | int | Request timeout (seconds) | `30` |
 
+### System Prompt Policy Controls
+
+Operators can now tune the fallback system prompt directly from `~/.victor/profiles.yaml` (or via `VICTOR_PROMPT_POLICY_*` environment variables) without editing code. Key fields:
+
+| Field | Description |
+|-------|-------------|
+| `prompt_policy_identity` | Custom fallback identity text |
+| `prompt_policy_guidelines` | Custom fallback guidelines block |
+| `prompt_policy_operating_template` | Template for the operating preamble (`{stage}`, `{task_type}`, `{model}`, `{provider}`) |
+| `prompt_policy_fallback_template` | Template when prompt assembly fails (`{task_type}`, `{message}`) |
+| `prompt_policy_max_section_chars` | Character budget before low-priority sections are trimmed |
+| `prompt_policy_protected_sections` | Sections that should never be trimmed |
+| `prompt_policy_enforce_identity/guidelines/operating_preamble/unique_sections` | Booleans to toggle individual guards |
+
+Example profile snippet:
+
+```yaml
+profiles:
+  regulated:
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    prompt_policy_identity: |
+      You are Victor acting under the Regulated Banking SOP.
+    prompt_policy_guidelines: |
+      - Cite every data source.
+      - Escalate if compliance steps are unclear.
+    prompt_policy_protected_sections:
+      - identity
+      - guidelines
+      - runbook
+    prompt_policy_max_section_chars: 12000
+```
+
+To apply the same settings via environment variables:
+
+```bash
+export VICTOR_PROMPT_POLICY_IDENTITY="You are Victor running our regulated SOP."
+export VICTOR_PROMPT_POLICY_MAX_SECTION_CHARS=12000
+export VICTOR_PROMPT_POLICY_ENFORCE_IDENTITY=false  # Optional toggle
+```
+
 ### Advanced Profile Examples
 
 **Development profile with debugging:**

@@ -94,6 +94,8 @@ class StatusBar(Static):
         self.model = model
         self.status = "Idle"
         self._state = "idle"  # idle, streaming, error
+        self._follow_paused: bool = False
+        self._last_unread_count: int = 0
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="status-content"):
@@ -122,19 +124,34 @@ class StatusBar(Static):
             )
 
     def _update_shortcuts_idle(self) -> None:
-        """Update shortcuts for idle state."""
+        """Update shortcuts for idle state.
+
+        Shows follow/pause action and jump hint when follow is paused.
+        """
         try:
             hints = self.query_one("#shortcut-hints", Label)
-            hints.update(
-                Text.assemble(
-                    ("Ctrl+L", "bold"),
-                    " clear  ",
-                    ("Ctrl+S", "bold"),
-                    " save  ",
-                    ("Enter", "bold"),
-                    " send",
+            if self._follow_paused:
+                hints.update(
+                    Text.assemble(
+                        ("Ctrl+F", "bold"),
+                        " resume follow  ",
+                        ("Ctrl+End", "bold"),
+                        " latest  ",
+                        ("Enter", "bold"),
+                        " send",
+                    )
                 )
-            )
+            else:
+                hints.update(
+                    Text.assemble(
+                        ("Ctrl+F", "bold"),
+                        " pause follow  ",
+                        ("Ctrl+S", "bold"),
+                        " save  ",
+                        ("Enter", "bold"),
+                        " send",
+                    )
+                )
         except Exception as e:
             logger.debug(f"Failed to update idle shortcuts: {e}")
 
@@ -213,6 +230,40 @@ class StatusBar(Static):
         # Update shortcut hints based on state
         self.update_shortcuts(state)
 
+    def update_follow(self, paused: bool) -> None:
+        """Update the follow/paused indicator.
+
+        No-op when the state has not changed.
+        """
+        if paused == self._follow_paused:
+            return
+        self._follow_paused = paused
+        try:
+            label = self.query_one(".status-indicator", Label)
+            label.update("Paused" if paused else "Following")
+        except Exception as e:
+            logger.debug(f"Failed to update follow indicator: {e}")
+        self.update_shortcuts(self._state)
+
+    def update_unread(self, count: int) -> None:
+        """Update the unread badge.
+
+        No-op when the count has not changed.
+        """
+        if count == self._last_unread_count:
+            return
+        self._last_unread_count = count
+        try:
+            label = self.query_one(".status-indicator", Label)
+            if count > 0:
+                label.update(f"{count} new")
+                label.add_class("visible")
+            else:
+                label.update("")
+                label.remove_class("visible")
+        except Exception as e:
+            logger.debug(f"Failed to update unread indicator: {e}")
+
 
 class SubmitTextArea(TextArea):
     """Custom TextArea that submits on Enter and allows Shift+Enter for newlines.
@@ -231,7 +282,7 @@ class SubmitTextArea(TextArea):
             super().__init__()
             self.value = value
 
-    def _on_key(self, event) -> None:
+    async def _on_key(self, event) -> None:
         """Handle key events before TextArea processes them."""
         # Ctrl+Enter: Always submit
         if event.key == "ctrl+enter":
@@ -265,7 +316,7 @@ class SubmitTextArea(TextArea):
                 return
 
         # Shift+Enter and all other keys handled normally by parent
-        super()._on_key(event)
+        await super()._on_key(event)
 
 
 class InputWidget(Static):
@@ -289,6 +340,9 @@ class InputWidget(Static):
         ("ctrl+enter", "submit", "Send Message"),  # Alternative binding
     ]
 
+    _BUSY_HINT = "Working…"
+    _IDLE_HINT = "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands"
+
     # Class-level history shared across instances (persists across sessions)
     _history: list[str] = []
     _max_history: int = 100
@@ -297,6 +351,8 @@ class InputWidget(Static):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._input: SubmitTextArea | None = None
+        self._prompt_label: Label | None = None
+        self._hint_label: Label | None = None
         self._history_index: int = -1  # -1 means not browsing history
         self._draft: str = ""  # Save current draft when browsing history
         self._history_task: asyncio.Task | None = None
@@ -310,7 +366,7 @@ class InputWidget(Static):
                     id="message-input",
                 )
             yield Label(
-                "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands",
+                self._IDLE_HINT,
                 classes="input-hint",
             )
 
@@ -322,6 +378,8 @@ class InputWidget(Static):
     def on_mount(self) -> None:
         """Focus the input on mount and defer history loading."""
         self._input = self.query_one("#message-input", SubmitTextArea)
+        self._prompt_label = self.query_one(".prompt-indicator", Label)
+        self._hint_label = self.query_one(".input-hint", Label)
         self._input.focus()
 
         # Defer history loading until after TUI has rendered (non-blocking)
@@ -448,6 +506,27 @@ class InputWidget(Static):
         """Focus the input field."""
         if self._input:
             self._input.focus()
+
+    def set_busy(self, busy: bool) -> None:
+        """Set the busy state of the input widget."""
+        if busy:
+            self.add_class("busy")
+            if self._input:
+                self._input.disabled = True
+            if self._prompt_label:
+                self._prompt_label.update("⋯")
+                self._prompt_label.add_class("busy")
+            if self._hint_label:
+                self._hint_label.update(self._BUSY_HINT)
+        else:
+            self.remove_class("busy")
+            if self._input:
+                self._input.disabled = False
+            if self._prompt_label:
+                self._prompt_label.update("❯")
+                self._prompt_label.remove_class("busy")
+            if self._hint_label:
+                self._hint_label.update(self._IDLE_HINT)
 
     def add_to_history(self, text: str) -> None:
         """Add message to history (called externally after successful submit)."""
@@ -678,6 +757,9 @@ class StreamingMessageBlock(Static):
     content = reactive("")
     is_streaming = reactive(False)
 
+    # Throttle interval for streaming display updates (seconds).
+    _STREAM_THROTTLE = 0.05
+
     def __init__(
         self,
         role: str = "assistant",
@@ -689,6 +771,8 @@ class StreamingMessageBlock(Static):
         self.content = initial_content
         self.add_class(role)
         self._code_blocks: List[tuple[str, str]] = []  # (code, language)
+        self._chunk_buffer: str = ""
+        self._last_update_time: float = 0.0
 
     def compose(self) -> ComposeResult:
         role_label = {
@@ -723,11 +807,18 @@ class StreamingMessageBlock(Static):
             logger.debug(f"Failed to update streaming cursor: {e}")
 
     def _update_display(self) -> None:
-        """Update the message body with current content."""
+        """Update the message body with current content.
+
+        During streaming, renders as plain text for performance.
+        After streaming finishes, renders as Markdown.
+        """
         try:
             body = self.query_one("#message-body", Static)
-            if self.role == "assistant":
-                # Parse and render markdown, extracting code blocks
+            if self.is_streaming:
+                # Fast plain-text update while streaming
+                body.update(self.content)
+            elif self.role == "assistant":
+                # Final render as Markdown
                 body.update(Markdown(self.content))
             else:
                 body.update(self.content)
@@ -735,12 +826,27 @@ class StreamingMessageBlock(Static):
             logger.debug(f"Failed to update message display: {e}")
 
     def append_chunk(self, chunk: str) -> None:
-        """Append a streaming chunk to the content."""
-        self.content += chunk
+        """Append a streaming chunk to the content.
+
+        Chunks are buffered and flushed at a throttled rate to avoid
+        excessive redraws during fast token delivery.
+        """
+        now = time.monotonic()
+        self._chunk_buffer += chunk
+        if now - self._last_update_time >= self._STREAM_THROTTLE:
+            self.content += self._chunk_buffer
+            self._chunk_buffer = ""
+            self._last_update_time = now
 
     def finish_streaming(self) -> None:
-        """Mark streaming as complete."""
+        """Mark streaming as complete and flush any buffered content."""
+        # Flush remaining buffer
+        if self._chunk_buffer:
+            self.content += self._chunk_buffer
+            self._chunk_buffer = ""
         self.is_streaming = False
+        # Force final Markdown render
+        self._update_display()
 
 
 class ToolProgressPanel(Static):
@@ -927,9 +1033,12 @@ class EnhancedConversationLog(VerticalScroll):
 
     Provides a Claude Code-like message display:
     - Messages flow naturally one after another
-    - Auto-scrolls to show new content
+    - Auto-scrolls to show new content (respects user scroll-away)
     - Smooth scrolling through history
     - Proper message separation and styling
+    - Unread message tracking with optional separator widget
+    - Sticky follow-pause mode (Ctrl+F)
+    - Programmatic scroll guard to avoid false scroll-away detection
     """
 
     DEFAULT_CSS = """
@@ -946,18 +1055,70 @@ class EnhancedConversationLog(VerticalScroll):
     EnhancedConversationLog > StreamingMessageBlock {
         margin: 1 0;
     }
+
+    EnhancedConversationLog > .unread-separator {
+        color: $warning;
+        text-style: bold;
+        margin: 0;
+        padding: 0;
+    }
     """
 
-    def __init__(self, **kwargs) -> None:
+    # Duration (seconds) of the guard window after a programmatic scroll_end.
+    _PROGRAMMATIC_GUARD_SECONDS = 0.15
+    # Duration (seconds) of the guard window after a resize event.
+    _RESIZE_GUARD_SECONDS = 0.3
+
+    def __init__(self, show_unread_separator: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._streaming_message: Optional[StreamingMessageBlock] = None
         self._message_count = 0
         self._auto_scroll = True
         self._user_scrolled = False
+        # Follow-pause (sticky)
+        self._follow_paused = False
+        # Unread tracking
+        self._unread_count = 0
+        self._unread_separator: Optional[Static] = None
+        self._unread_boundary_id: Optional[str] = None
+        self._show_unread_separator = show_unread_separator
+        # Programmatic scroll guard timestamps
+        self._ignore_scroll_update_until: float = 0.0
+        self._ignore_resize_scroll_update_until: float = 0.0
+
+    # -- public properties ---------------------------------------------------
 
     @property
     def auto_scroll_enabled(self) -> bool:
         return self._auto_scroll
+
+    @property
+    def follow_paused(self) -> bool:
+        return self._follow_paused
+
+    @property
+    def unread_count(self) -> int:
+        return self._unread_count
+
+    @property
+    def unread_separator_enabled(self) -> bool:
+        return self._show_unread_separator
+
+    # -- follow pause --------------------------------------------------------
+
+    def set_follow_paused(self, paused: bool, jump_to_bottom: bool = False) -> None:
+        """Enable or disable sticky follow-pause mode.
+
+        When paused, auto-scroll is disabled and user messages do not
+        re-enable it.  ``jump_to_bottom=True`` scrolls and clears unread.
+        """
+        self._follow_paused = paused
+        if paused:
+            self._auto_scroll = False
+        elif jump_to_bottom:
+            self.scroll_to_bottom()
+
+    # -- message methods -----------------------------------------------------
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the log."""
@@ -968,32 +1129,37 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
-        # Always scroll to show user message
-        self.scroll_end(animate=False)
+        # User messages always re-enable follow (unless sticky-paused)
+        if not self._follow_paused:
+            self._auto_scroll = True
+            self._maybe_scroll_end(force=True)
 
     def add_assistant_message(self, content: str) -> None:
         """Add a complete assistant message to the log."""
+        msg_id = f"msg-{self._message_count}"
         msg = StreamingMessageBlock(
             role="assistant",
             initial_content=content,
-            id=f"msg-{self._message_count}",
+            id=msg_id,
         )
         self._message_count += 1
+        if not self._auto_scroll:
+            self._increment_unread(msg_id)
         self.mount(msg)
-        # Auto-scroll to show assistant response
-        if self._auto_scroll:
-            self.scroll_end(animate=False)
+        self._maybe_scroll_end()
 
     def add_system_message(self, content: str) -> None:
         """Add a system/status message to the log."""
+        msg_id = f"msg-{self._message_count}"
         msg = Static(
             Text(f"[{content}]", style="dim italic"),
-            id=f"msg-{self._message_count}",
+            id=msg_id,
         )
         self._message_count += 1
+        if not self._auto_scroll:
+            self._increment_unread(msg_id)
         self.mount(msg)
-        # Don't auto-scroll for system messages to avoid disruption
-        pass
+        self._maybe_scroll_end()
 
     def add_error_message(self, content: str) -> None:
         """Add an error message to the log."""
@@ -1004,7 +1170,39 @@ class EnhancedConversationLog(VerticalScroll):
         self._message_count += 1
         self.mount(msg)
         # Always show errors
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end(force=True)
+
+    def add_history_message(self, role: str, content: str) -> None:
+        """Add a replayed history message without scroll or unread side effects."""
+        if role == "user":
+            msg = StreamingMessageBlock(
+                role="user",
+                initial_content=content,
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "assistant":
+            msg = StreamingMessageBlock(
+                role="assistant",
+                initial_content=content,
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "system":
+            msg = Static(
+                Text(f"[{content}]", style="dim italic"),
+                id=f"msg-{self._message_count}",
+            )
+        elif role == "error":
+            msg = Static(
+                Text(f"Error: {content}", style="bold red"),
+                id=f"msg-{self._message_count}",
+            )
+        else:
+            # Unknown role — skip silently.
+            return
+        self._message_count += 1
+        self.mount(msg)
+
+    # -- streaming -----------------------------------------------------------
 
     def start_streaming(self) -> StreamingMessageBlock:
         """Start a streaming response and return the message block."""
@@ -1014,39 +1212,40 @@ class EnhancedConversationLog(VerticalScroll):
             id=f"msg-{self._message_count}",
         )
         self._streaming_message.is_streaming = True
+        msg_id = f"msg-{self._message_count}"
         self._message_count += 1
+        if not self._auto_scroll:
+            self._increment_unread(msg_id)
         self.mount(self._streaming_message)
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(force=True)
         return self._streaming_message
 
     def update_streaming(self, content: str) -> None:
         """Update the current streaming message.
 
-        Shows new content as it arrives, like Claude Code.
-        Always scrolls during streaming to show progress.
+        Respects auto-scroll: only scrolls if following.
         """
         if self._streaming_message:
             self._streaming_message.content = content
-            # Always scroll during streaming to show new content
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def append_streaming_chunk(self, chunk: str) -> None:
         """Append a chunk to the current streaming message.
 
-        Shows new content as it arrives, like Claude Code.
+        Respects auto-scroll: only scrolls if following.
         """
         if self._streaming_message:
             self._streaming_message.append_chunk(chunk)
-            # Always scroll during streaming to show new content
-            self.scroll_end(animate=False)
+            self._maybe_scroll_end()
 
     def finish_streaming(self) -> None:
         """Finish the current streaming response."""
         if self._streaming_message:
             self._streaming_message.finish_streaming()
             self._streaming_message = None
-        # Final scroll to ensure full response is visible
-        self.scroll_end(animate=False)
+        self._maybe_scroll_end()
+
+    # -- tool / code helpers -------------------------------------------------
 
     def add_tool_progress(
         self,
@@ -1081,6 +1280,8 @@ class EnhancedConversationLog(VerticalScroll):
         self.mount(block)
         self._maybe_scroll_end()
 
+    # -- clear / scroll ------------------------------------------------------
+
     def clear(self) -> None:
         """Clear all messages from the log."""
         for child in list(self.children):
@@ -1088,27 +1289,143 @@ class EnhancedConversationLog(VerticalScroll):
         self._message_count = 0
         self._streaming_message = None
         self._auto_scroll = True
-
-    def on_scroll(self, _event) -> None:
-        """Update auto-scroll when the user scrolls."""
-        self.update_auto_scroll_state()
+        self._unread_count = 0
+        self._unread_separator = None
+        self._unread_boundary_id = None
 
     def scroll_to_bottom(self, animate: bool = False) -> None:
-        """Scroll to bottom and re-enable auto-scroll."""
+        """Scroll to bottom, re-enable auto-scroll, and clear unread state."""
         self._auto_scroll = True
+        self._clear_unread()
         self.scroll_end(animate=animate)
 
     def disable_auto_scroll(self) -> None:
         """Disable auto-scroll until user returns to bottom."""
         self._auto_scroll = False
 
-    def update_auto_scroll_state(self) -> None:
-        """Update auto-scroll based on scroll position."""
-        self._auto_scroll = self._is_at_bottom()
+    # -- auto-scroll state ---------------------------------------------------
 
-    def _maybe_scroll_end(self) -> None:
-        if self._auto_scroll:
+    def update_auto_scroll_state(self) -> None:
+        """Update auto-scroll based on scroll position.
+
+        Respects sticky follow-pause: if paused, auto-scroll stays off
+        but unread count is cleared when at bottom.
+        """
+        at_bottom = self._is_at_bottom()
+        if self._follow_paused:
+            # Sticky pause keeps auto-scroll off, but clears unread at bottom
+            self._auto_scroll = False
+            if at_bottom:
+                self._unread_count = 0
+        else:
+            self._auto_scroll = at_bottom
+
+    def on_update_scroll(self, event) -> None:
+        """Handle Textual UpdateScroll messages with guard windows."""
+        now = time.monotonic()
+
+        # Resize guard — always skip when inside window (auto-scroll is off)
+        if now < self._ignore_resize_scroll_update_until:
+            return
+
+        # Programmatic guard — skip unless user actively scrolled away
+        if now < self._ignore_scroll_update_until:
+            if self._auto_scroll and self._is_at_bottom():
+                return
+            # User scrolled away during guard — fall through to update
+
+        self.update_auto_scroll_state()
+
+    def on_resize(self, event) -> None:
+        """Set a short guard after resize to suppress transient scroll events."""
+        if not self._auto_scroll:
+            self._ignore_resize_scroll_update_until = time.monotonic() + self._RESIZE_GUARD_SECONDS
+        else:
+            self._ignore_resize_scroll_update_until = 0.0
+
+    # -- unread tracking -----------------------------------------------------
+
+    def _increment_unread(self, msg_id: str) -> None:
+        """Increment unread count and optionally insert/update separator."""
+        self._unread_count += 1
+        if self._unread_boundary_id is None:
+            self._unread_boundary_id = msg_id
+        if self._show_unread_separator:
+            self._upsert_unread_separator()
+
+    def _upsert_unread_separator(self) -> None:
+        """Create or update the unread separator label."""
+        label = self._unread_label_text()
+        if self._unread_separator is None:
+            self._unread_separator = Static(label, classes="unread-separator")
+            if self._unread_boundary_id:
+                try:
+                    target = self.query_one(f"#{self._unread_boundary_id}")
+                    self.mount(self._unread_separator, before=target)
+                except Exception:
+                    self.mount(self._unread_separator)
+            else:
+                self.mount(self._unread_separator)
+        else:
+            self._unread_separator._Static__content = label  # type: ignore[attr-defined]
+
+    def _unread_label_text(self) -> str:
+        n = self._unread_count
+        suffix = "s" if n != 1 else ""
+        return f"--- {n} new message{suffix} ---"
+
+    def _clear_unread(self) -> None:
+        """Reset unread state and remove separator widget."""
+        self._unread_count = 0
+        if self._unread_separator is not None:
+            try:
+                self._unread_separator.remove()
+            except Exception:
+                pass
+            self._unread_separator = None
+        self._unread_boundary_id = None
+
+    def set_unread_separator_enabled(self, enabled: bool) -> None:
+        """Toggle unread separator marker on or off at runtime."""
+        self._show_unread_separator = enabled
+        if enabled and self._unread_count > 0 and self._unread_separator is None:
+            # Insert marker at the saved boundary
+            self._upsert_unread_separator()
+        elif not enabled and self._unread_separator is not None:
+            try:
+                self._unread_separator.remove()
+            except Exception:
+                pass
+            self._unread_separator = None
+
+    def jump_to_unread_separator(self) -> bool:
+        """Scroll to the unread separator widget.
+
+        Returns True if a target was found and scrolled to.
+        """
+        if self._unread_separator is not None:
+            self.scroll_to_widget(self._unread_separator)
+            return True
+        if self._unread_boundary_id is not None:
+            try:
+                target = self.query_one(f"#{self._unread_boundary_id}")
+                self.scroll_to_widget(target)
+                return True
+            except Exception:
+                pass
+        return False
+
+    # -- internal helpers ----------------------------------------------------
+
+    def _maybe_scroll_end(self, force: bool = False) -> None:
+        """Conditionally scroll to end.
+
+        Sets a short guard window to suppress transient UpdateScroll events
+        triggered by our own programmatic scroll.
+        """
+        if force or self._auto_scroll:
             self.scroll_end(animate=False)
+            self._ignore_scroll_update_until = time.monotonic() + self._PROGRAMMATIC_GUARD_SECONDS
 
     def _is_at_bottom(self) -> bool:
         try:

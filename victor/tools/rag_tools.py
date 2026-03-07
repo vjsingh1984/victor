@@ -14,11 +14,7 @@
 
 """RAG Tools - Auto-discovery wrappers for RAG vertical tools.
 
-try:
-    This module re-exports RAG tools from victor_rag.tools so they
-except ImportError:
-    # External vertical package may not be installed
-    pass
+This module re-exports RAG tools from victor_rag.tools so they
 can be auto-discovered by the ToolRegistrar.
 
 Tools:
@@ -36,20 +32,27 @@ try:
     from victor_rag.tools.search import RAGSearchTool
     from victor_rag.tools.query import RAGQueryTool
     from victor_rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
+
+    # List of tool classes for auto-discovery (only if imports succeeded)
+    TOOL_CLASSES = [
+        RAGIngestTool,
+        RAGSearchTool,
+        RAGQueryTool,
+        RAGListTool,
+        RAGDeleteTool,
+        RAGStatsTool,
+    ]
 except ImportError:
     # External vertical package may not be installed
-    pass
+    TOOL_CLASSES = []
 
-# List of tool classes for auto-discovery
-TOOL_CLASSES = [
-    RAGIngestTool,
-    RAGSearchTool,
-    RAGQueryTool,
-    RAGListTool,
-    RAGDeleteTool,
-    RAGStatsTool,
-]
-
+    # Define empty exports when vertical not available
+    RAGIngestTool = None  # type: ignore[misc,assignment]
+    RAGSearchTool = None  # type: ignore[misc,assignment]
+    RAGQueryTool = None  # type: ignore[misc,assignment]
+    RAGListTool = None  # type: ignore[misc,assignment]
+    RAGDeleteTool = None  # type: ignore[misc,assignment]
+    RAGStatsTool = None  # type: ignore[misc,assignment]
 __all__ = [
     "RAGIngestTool",
     "RAGSearchTool",

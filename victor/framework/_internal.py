@@ -25,16 +25,13 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
+from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
     EventType,
-    content_event,
     error_event,
     stream_end_event,
     stream_start_event,
-    thinking_event,
-    tool_call_event,
-    tool_result_event,
 )
 from victor.framework.tools import ToolSet
 from victor.framework.protocols import ObservabilityPortProtocol
@@ -328,46 +325,75 @@ async def stream_with_events(
     Yields:
         AgentExecutionEvent objects representing agent actions
     """
+    registry = get_event_registry()
+
     # Emit stream start
     yield stream_start_event()
 
     try:
         async for chunk in orchestrator.stream_chat(prompt):
-            # Handle thinking content (extended thinking mode)
-            if chunk.metadata and chunk.metadata.get("reasoning_content"):
-                yield thinking_event(chunk.metadata["reasoning_content"])
+            metadata = getattr(chunk, "metadata", None)
+            chunk_metadata = metadata if isinstance(metadata, dict) else {}
 
-            # Handle regular content
-            if chunk.content:
-                yield content_event(chunk.content)
-
-            # Handle tool start events
-            if chunk.metadata and "tool_start" in chunk.metadata:
-                tool_data = chunk.metadata["tool_start"]
-                yield tool_call_event(
-                    tool_name=tool_data.get("name", "unknown"),
-                    tool_id=tool_data.get("id"),
-                    arguments=tool_data.get("arguments", {}),
+            reasoning_content = chunk_metadata.get("reasoning_content")
+            if reasoning_content:
+                yield registry.from_external(
+                    {"reasoning_content": reasoning_content},
+                    "reasoning_content",
+                    EventTarget.STREAM_CHUNK,
+                    metadata=chunk_metadata,
                 )
 
-            # Handle tool result events
-            if chunk.metadata and "tool_result" in chunk.metadata:
-                tool_data = chunk.metadata["tool_result"]
-                yield tool_result_event(
-                    tool_name=tool_data.get("name", "unknown"),
-                    tool_id=tool_data.get("id"),
-                    result=str(tool_data.get("result", "")),
-                    success=tool_data.get("success", True),
+            content = getattr(chunk, "content", "")
+            if content:
+                yield registry.from_external(
+                    {"content": content},
+                    "content",
+                    EventTarget.STREAM_CHUNK,
+                    metadata=chunk_metadata,
                 )
 
-            # Handle tool calls in chunk
-            if chunk.tool_calls:
-                for tc in chunk.tool_calls:
-                    yield tool_call_event(
-                        tool_name=tc.get("name", "unknown"),
-                        tool_id=tc.get("id"),
-                        arguments=tc.get("arguments", {}),
-                    )
+            tool_start = chunk_metadata.get("tool_start")
+            if isinstance(tool_start, dict):
+                yield registry.from_external(
+                    {
+                        "tool_name": tool_start.get("name", "unknown"),
+                        "tool_id": tool_start.get("id"),
+                        "arguments": tool_start.get("arguments", {}),
+                    },
+                    "tool_start",
+                    EventTarget.STREAM_CHUNK,
+                    metadata=chunk_metadata,
+                )
+
+            tool_result = chunk_metadata.get("tool_result")
+            if isinstance(tool_result, dict):
+                yield registry.from_external(
+                    {
+                        "tool_name": tool_result.get("name", "unknown"),
+                        "tool_id": tool_result.get("id"),
+                        "result": tool_result.get("result", ""),
+                        "success": tool_result.get("success", True),
+                    },
+                    "tool_result",
+                    EventTarget.STREAM_CHUNK,
+                    metadata=chunk_metadata,
+                )
+
+            tool_calls = getattr(chunk, "tool_calls", None) or []
+            for tc in tool_calls:
+                if not isinstance(tc, dict):
+                    continue
+                yield registry.from_external(
+                    {
+                        "tool_name": tc.get("name", "unknown"),
+                        "tool_id": tc.get("id"),
+                        "arguments": tc.get("arguments", {}),
+                    },
+                    "tool_call",
+                    EventTarget.STREAM_CHUNK,
+                    metadata=chunk_metadata,
+                )
 
         # Emit stream end
         yield stream_end_event(success=True)

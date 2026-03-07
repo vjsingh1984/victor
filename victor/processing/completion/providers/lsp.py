@@ -112,14 +112,16 @@ class LSPCompletionProvider(BaseCompletionProvider):
         if self._lsp_manager is not None:
             return self._lsp_manager
 
-        try:
-            from victor_coding.lsp.manager import LSPConnectionPool
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            self._lsp_manager = LSPConnectionPool()
+        provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+        if provider is not None:
+            self._lsp_manager = provider.get_lsp_manager()
             return self._lsp_manager
-        except ImportError:
-            logger.debug("LSP manager not available - victor-coding package not installed")
-            return None
+
+        logger.debug("LSP manager not available - victor-coding package not installed")
+        return None
 
     async def provide_completions(self, params: CompletionParams) -> CompletionList:
         """Get completions from LSP server.

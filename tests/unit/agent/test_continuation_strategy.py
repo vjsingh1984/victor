@@ -30,34 +30,55 @@ class TestDetectMentionedTools:
     """Tests for detect_mentioned_tools static method."""
 
     def test_detects_call_pattern(self):
-        """Test detects 'call tool' pattern."""
-        text = "Let me call read to see the file"
-        tools = ["read", "search", "write"]
+        """Test detects 'call tool' pattern for non-ambiguous tool names."""
+        text = "Let me call code_search to see the file"
+        tools = ["code_search", "read_file", "write_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "read" in result
+        assert "code_search" in result
 
     def test_detects_use_pattern(self):
-        """Test detects 'use tool' pattern."""
-        text = "I'll use search to find it"
-        tools = ["read", "search", "write"]
+        """Test detects 'use tool' pattern for non-ambiguous tool names."""
+        text = "I'll use web_search to find it"
+        tools = ["read_file", "web_search", "write_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "search" in result
+        assert "web_search" in result
 
     def test_detects_execute_pattern(self):
-        """Test detects 'execute tool' pattern."""
+        """Test detects 'execute tool' pattern for non-ambiguous tool names."""
         text = "Let me execute grep"
-        tools = ["grep", "read", "write"]
+        tools = ["grep", "read_file", "write_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
         assert "grep" in result
+
+    def test_ambiguous_tool_requires_parenthesis(self):
+        """Test ambiguous tool names (common English words) need parenthesis or 'tool' suffix."""
+        # "call read" should NOT trigger for ambiguous names
+        text = "Let me call read to see the file"
+        tools = ["read", "search", "write"]
+        aliases = {}
+
+        result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
+        assert "read" not in result, "Ambiguous 'read' should not match 'call read'"
+
+        # "implementation plan" should NOT trigger plan tool
+        text2 = "I reviewed the implementation plan and the project roadmap."
+        tools2 = ["plan", "read", "search"]
+        result2 = ContinuationStrategy.detect_mentioned_tools(text2, tools2, {})
+        assert "plan" not in result2, "Natural language 'plan' should not trigger tool detection"
+
+        # But "read(" SHOULD still trigger
+        text3 = "I'll call read() to get the content"
+        result3 = ContinuationStrategy.detect_mentioned_tools(text3, tools, aliases)
+        assert "read" in result3, "read() with parenthesis should still trigger"
 
     def test_detects_parenthesis_pattern(self):
         """Test detects 'tool()' pattern."""
@@ -91,14 +112,14 @@ class TestDetectMentionedTools:
 
     def test_no_duplicates(self):
         """Test no duplicate tool names returned."""
-        text = "I'll call read and use read to check"
-        tools = ["read"]
+        text = "I'll call code_search and use code_search to check"
+        tools = ["code_search"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
         assert len(result) == 1
-        assert "read" in result
+        assert "code_search" in result
 
     def test_returns_empty_for_no_matches(self):
         """Test returns empty list when no tools mentioned."""
@@ -111,8 +132,18 @@ class TestDetectMentionedTools:
         assert result == []
 
     def test_case_insensitive(self):
-        """Test detection is case insensitive."""
-        text = "Let me CALL READ to check"
+        """Test detection is case insensitive for non-ambiguous tools."""
+        text = "Let me CALL CODE_SEARCH to check"
+        tools = ["code_search"]
+        aliases = {}
+
+        result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
+
+        assert "code_search" in result
+
+    def test_case_insensitive_ambiguous_parenthesis(self):
+        """Test ambiguous tool detection is case insensitive with parenthesis."""
+        text = "Let me call READ() to check"
         tools = ["read"]
         aliases = {}
 
@@ -121,45 +152,45 @@ class TestDetectMentionedTools:
         assert "read" in result
 
     def test_run_pattern(self):
-        """Test detects 'run tool' pattern."""
-        text = "Let me run bash to execute the command"
-        tools = ["bash", "read"]
+        """Test detects 'run tool' pattern for non-ambiguous tools."""
+        text = "Let me run execute_bash to run the command"
+        tools = ["execute_bash", "read_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "bash" in result
+        assert "execute_bash" in result
 
     def test_invoke_pattern(self):
-        """Test detects 'invoke tool' pattern."""
-        text = "I need to invoke search"
-        tools = ["search", "read"]
+        """Test detects 'invoke tool' pattern for non-ambiguous tools."""
+        text = "I need to invoke web_search"
+        tools = ["web_search", "read_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "search" in result
+        assert "web_search" in result
 
     def test_perform_pattern(self):
-        """Test detects 'perform tool' pattern."""
-        text = "Let me perform write to save"
-        tools = ["write", "read"]
+        """Test detects 'perform tool' pattern for non-ambiguous tools."""
+        text = "Let me perform write_file to save"
+        tools = ["write_file", "read_file"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "write" in result
+        assert "write_file" in result
 
     def test_multiple_tools(self):
-        """Test detects multiple tools mentioned."""
-        text = "I'll call read and then use write"
-        tools = ["read", "write", "search"]
+        """Test detects multiple non-ambiguous tools mentioned."""
+        text = "I'll call code_search and then use file_edit"
+        tools = ["code_search", "file_edit", "web_search"]
         aliases = {}
 
         result = ContinuationStrategy.detect_mentioned_tools(text, tools, aliases)
 
-        assert "read" in result
-        assert "write" in result
+        assert "code_search" in result
+        assert "file_edit" in result
 
 
 # =============================================================================

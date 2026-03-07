@@ -50,8 +50,13 @@ class ReindexCommand(BaseSlashCommand):
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-            from victor_coding.codebase.indexer import CodebaseIndex
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
             from victor.config.settings import get_project_paths, load_settings
+
+            _factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+            if _factory is None:
+                raise ImportError("Codebase indexing not available")
 
             root = Path.cwd()
             settings = load_settings()
@@ -68,7 +73,7 @@ class ReindexCommand(BaseSlashCommand):
                 "persist_directory": str(paths.embeddings_dir),
             }
 
-            index = CodebaseIndex(
+            index = _factory.create(
                 root_path=str(root),
                 use_embeddings=True,
                 embedding_config=embedding_config,

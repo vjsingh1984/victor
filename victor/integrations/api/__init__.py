@@ -22,6 +22,7 @@ Components:
 - VictorFastAPIServer: Modern FastAPI-based server (recommended, requires fastapi)
 - APIMiddlewareStack: Authentication, rate limiting, and CORS middleware
 - EventBridge: Real-time event streaming to WebSocket clients
+- Router plugins: Entry-point based FastAPI router extensions
 """
 
 from typing import TYPE_CHECKING
@@ -40,6 +41,11 @@ if TYPE_CHECKING:
         EventBroadcaster,
         BridgeEvent,
         BridgeEventType,
+    )
+    from victor.integrations.api.router_plugins import (
+        APIRouterRegistration,
+        FastAPIRouterProvider,
+        load_fastapi_router_registrations,
     )
 
 
@@ -61,6 +67,14 @@ def __getattr__(name: str):
         from victor.integrations.api import event_bridge
 
         return getattr(event_bridge, name)
+    elif name in (
+        "APIRouterRegistration",
+        "FastAPIRouterProvider",
+        "load_fastapi_router_registrations",
+    ):
+        from victor.integrations.api import router_plugins
+
+        return getattr(router_plugins, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -77,4 +91,8 @@ __all__ = [
     "EventBroadcaster",
     "BridgeEvent",
     "BridgeEventType",
+    # Router plugins
+    "APIRouterRegistration",
+    "FastAPIRouterProvider",
+    "load_fastapi_router_registrations",
 ]

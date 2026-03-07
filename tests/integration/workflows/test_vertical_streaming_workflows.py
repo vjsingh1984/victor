@@ -38,7 +38,7 @@ from unittest.mock import MagicMock
 @pytest.fixture
 def coding_provider():
     """Fixture providing CodingWorkflowProvider."""
-    from victor.coding.workflows.provider import CodingWorkflowProvider
+    from victor_coding.workflows.provider import CodingWorkflowProvider
 
     return CodingWorkflowProvider()
 

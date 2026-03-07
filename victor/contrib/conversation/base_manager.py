@@ -268,9 +268,7 @@ class BaseConversationManager:
                 context={"role": role},
             )
             if not is_safe:
-                logger.warning(
-                    f"Message blocked by safety rules for '{self.get_vertical_name()}'"
-                )
+                logger.warning(f"Message blocked by safety rules for '{self.get_vertical_name()}'")
                 # Still add but with blocked metadata
                 if metadata is None:
                     metadata = {}

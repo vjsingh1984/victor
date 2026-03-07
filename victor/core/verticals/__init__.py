@@ -149,6 +149,7 @@ def _register_builtin_verticals() -> None:
     # Only register verticals that truly exist in the victor package
     try:
         from victor.benchmark import BenchmarkVertical
+
         VerticalRegistry.register(BenchmarkVertical)
     except ImportError:
         pass
