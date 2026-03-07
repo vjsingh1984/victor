@@ -147,6 +147,11 @@ class ProviderRegistry:
         self._workflow_providers: List[WorkflowProviderProtocol] = [DefaultWorkflowProvider()]
         self._safety_providers: List[SafetyRulesProviderProtocol] = [DefaultSafetyRulesProvider()]
 
+        # Track vertical names for namespacing
+        self._team_provider_names: Dict[str, str] = {}  # provider -> vertical_name
+        self._workflow_provider_names: Dict[str, str] = {}
+        self._safety_provider_names: Dict[str, str] = {}
+
         # Load from entry points (optional verticals)
         self._load_from_entry_points()
 
@@ -165,6 +170,7 @@ class ProviderRegistry:
                         provider = provider_class()
                         if isinstance(provider, TeamSpecProviderProtocol):
                             self._team_providers.append(provider)
+                            self._team_provider_names[id(provider)] = entry_point.name
                             logger.info(f"Loaded team provider: {entry_point.name}")
                     except Exception as e:
                         logger.warning(f"Failed to load team provider {entry_point.name}: {e}")
@@ -181,6 +187,7 @@ class ProviderRegistry:
                         provider = provider_class()
                         if isinstance(provider, WorkflowProviderProtocol):
                             self._workflow_providers.append(provider)
+                            self._workflow_provider_names[id(provider)] = entry_point.name
                             logger.info(f"Loaded workflow provider: {entry_point.name}")
                     except Exception as e:
                         logger.warning(f"Failed to load workflow provider {entry_point.name}: {e}")
@@ -197,6 +204,7 @@ class ProviderRegistry:
                         provider = provider_class()
                         if isinstance(provider, SafetyRulesProviderProtocol):
                             self._safety_providers.append(provider)
+                            self._safety_provider_names[id(provider)] = entry_point.name
                             logger.info(f"Loaded safety provider: {entry_point.name}")
                     except Exception as e:
                         logger.warning(f"Failed to load safety provider {entry_point.name}: {e}")
@@ -219,37 +227,65 @@ class ProviderRegistry:
         self._safety_providers.append(provider)
 
     def get_all_team_specs(self) -> Dict[str, Any]:
-        """Collect all team specs from registered providers."""
-        all_specs = {}
+        """Collect all team specs from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to team spec dicts.
+            Example: {"coding": {"feature_team": TeamSpec(), ...}, ...}
+        """
+        all_specs: Dict[str, Any] = {}
         for provider in self._team_providers:
             try:
                 specs = provider.get_team_specs()
                 if specs:
-                    all_specs.update(specs)
+                    # Get vertical name from entry point name
+                    vertical_name = self._team_provider_names.get(id(provider))
+                    if vertical_name:
+                        # Namespace by vertical: {vertical: {team_name: TeamSpec}}
+                        all_specs[vertical_name] = specs
+                    else:
+                        # Default provider (no vertical namespace)
+                        all_specs.update(specs)
             except Exception as e:
                 logger.warning(f"Failed to get team specs from {provider}: {e}")
         return all_specs
 
     def get_all_workflows(self) -> Dict[str, Any]:
-        """Collect all workflows from registered providers."""
-        all_specs = {}
+        """Collect all workflows from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to workflow spec dicts.
+        """
+        all_specs: Dict[str, Any] = {}
         for provider in self._workflow_providers:
             try:
                 specs = provider.get_workflows()
                 if specs:
-                    all_specs.update(specs)
+                    vertical_name = self._workflow_provider_names.get(id(provider))
+                    if vertical_name:
+                        all_specs[vertical_name] = specs
+                    else:
+                        all_specs.update(specs)
             except Exception as e:
                 logger.warning(f"Failed to get workflows from {provider}: {e}")
         return all_specs
 
     def get_all_safety_rules(self) -> Dict[str, Any]:
-        """Collect all safety rules from registered providers."""
-        all_specs = {}
+        """Collect all safety rules from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to safety rule dicts.
+        """
+        all_specs: Dict[str, Any] = {}
         for provider in self._safety_providers:
             try:
                 specs = provider.get_safety_rules()
                 if specs:
-                    all_specs.update(specs)
+                    vertical_name = self._safety_provider_names.get(id(provider))
+                    if vertical_name:
+                        all_specs[vertical_name] = specs
+                    else:
+                        all_specs.update(specs)
             except Exception as e:
                 logger.warning(f"Failed to get safety rules from {provider}: {e}")
         return all_specs
