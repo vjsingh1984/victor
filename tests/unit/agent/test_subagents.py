@@ -548,7 +548,10 @@ class TestOrchestratorSubAgentIntegration:
         init_source = inspect.getsource(AgentOrchestrator.__init__)
         assert "_subagent_orchestrator" in init_source
         assert "_subagent_orchestration_enabled" in init_source
-        assert "subagent_orchestration_enabled" in init_source or "setup_subagent_orchestration" in init_source
+        assert (
+            "subagent_orchestration_enabled" in init_source
+            or "setup_subagent_orchestration" in init_source
+        )
 
     def test_subagent_orchestrator_property_is_lazy(self):
         """Test that intelligent_integration property follows lazy init pattern."""

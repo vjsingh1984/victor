@@ -530,9 +530,7 @@ class LMStudioProvider(BaseProvider):
                         )
                         return url, False
             except Exception as exc:
-                logger.warning(
-                    f"LMStudio endpoint {url} not reachable ({exc}); trying next."
-                )
+                logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
         fallback = (
             base_url

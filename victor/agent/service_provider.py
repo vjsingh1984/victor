@@ -135,12 +135,16 @@ class OrchestratorServiceProvider:
         for spec in AGENT_SINGLETON_SPECS:
             factory = getattr(self, spec.factory_attr)
             if spec.pass_container:
+
                 def make_factory(c, method=factory):
                     return method(c)
+
                 factory_fn = make_factory
             else:
+
                 def make_factory(c, method=factory):
                     return method()
+
                 factory_fn = make_factory
             spec_entries.append(
                 ServiceRegistrationSpec(

@@ -508,7 +508,9 @@ class TestSetDefaultProfile:
         assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="Integration test depends on unimplemented commands (create, edit, delete)")
+@pytest.mark.skip(
+    reason="Integration test depends on unimplemented commands (create, edit, delete)"
+)
 class TestProfilesAppIntegration:
     """Integration tests for profiles CLI app."""
 

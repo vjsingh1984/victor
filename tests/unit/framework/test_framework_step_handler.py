@@ -449,7 +449,9 @@ class TestApplyWorkflowsWithTriggers:
 class TestApplyTeamSpecsWithRegistry:
     """Tests for team spec registry registration in apply_team_specs."""
 
-    @pytest.mark.skip(reason="Vertical discovery system tries to import victor.test_team_vertical which doesn't exist")
+    @pytest.mark.skip(
+        reason="Vertical discovery system tries to import victor.test_team_vertical which doesn't exist"
+    )
     def test_apply_team_specs_registers_to_global_registry(
         self, mock_orchestrator, mock_context, mock_result
     ):

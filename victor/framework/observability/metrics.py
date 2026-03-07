@@ -1394,7 +1394,9 @@ class MetricsExporter:
 
         for metric in metrics:
             # Create metric name and labels
-            labels_str = "{" + ",".join(f'{label.key}="{label.value}"' for label in metric.labels) + "}"
+            labels_str = (
+                "{" + ",".join(f'{label.key}="{label.value}"' for label in metric.labels) + "}"
+            )
             if len(metric.labels) == 0:
                 labels_str = ""
 

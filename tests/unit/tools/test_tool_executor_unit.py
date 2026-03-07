@@ -1722,6 +1722,7 @@ class TestExecCtxDoublePassing:
     def setup_method(self):
         """Reset safety checker before each test."""
         import victor.agent.safety as safety_module
+
         safety_module._default_checker = None
 
     @pytest.mark.asyncio
