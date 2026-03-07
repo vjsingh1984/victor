@@ -567,11 +567,11 @@ class TestFrameworkMainExports:
         assert (
             len(_RESILIENCE_EXPORTS) == 26
         ), f"Expected 26 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
-        assert len(_HEALTH_EXPORTS) == 16, f"Expected 16 health exports, got {len(_HEALTH_EXPORTS)}"
+        assert len(_HEALTH_EXPORTS) == 18, f"Expected 18 health exports, got {len(_HEALTH_EXPORTS)}"
         assert (
             len(_METRICS_EXPORTS) == 13
         ), f"Expected 13 metrics exports, got {len(_METRICS_EXPORTS)}"
 
         # Total new exports from Phase 9
         total = len(_RESILIENCE_EXPORTS) + len(_HEALTH_EXPORTS) + len(_METRICS_EXPORTS)
-        assert total == 55, f"Expected 55 total Phase 9 exports, got {total}"
+        assert total == 57, f"Expected 57 total Phase 9 exports, got {total}"

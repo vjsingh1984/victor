@@ -1719,6 +1719,11 @@ class TestToolExecutorTimeoutHandling:
 class TestExecCtxDoublePassing:
     """Tests that _exec_ctx is stripped from LLM-provided arguments."""
 
+    def setup_method(self):
+        """Reset safety checker before each test."""
+        import victor.agent.safety as safety_module
+        safety_module._default_checker = None
+
     @pytest.mark.asyncio
     async def test_exec_ctx_stripped_from_arguments(self):
         """If LLM hallucinates _exec_ctx in arguments, it should be stripped before execute."""
