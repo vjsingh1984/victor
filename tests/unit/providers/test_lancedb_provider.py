@@ -281,10 +281,10 @@ class TestLanceDBProvider:
         """Test semantic similarity search."""
         mock_connect, mock_db, mock_table = mock_lancedb
 
-        # Fix: Set up list_tables to return a mock with tables attribute
-        mock_list_response = MagicMock()
+        # Fix: Override list_tables to return ["test_table"]
+        # We need to modify the mock's return_value directly
+        mock_list_response = mock_db.list_tables.return_value
         mock_list_response.tables = ["test_table"]
-        mock_db.list_tables.return_value = mock_list_response
 
         # Mock search results
         mock_search = MagicMock()
