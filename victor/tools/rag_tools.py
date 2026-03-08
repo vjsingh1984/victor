@@ -26,12 +26,25 @@ Tools:
 - rag_stats: Get store statistics
 """
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_rag_attr(module_path: str, attr_name: str):
+    """Resolve RAG tool attributes using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve RAG tool: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
+
 # Re-export RAG tools for auto-discovery
 try:
-    from victor_rag.tools.ingest import RAGIngestTool
-    from victor_rag.tools.search import RAGSearchTool
-    from victor_rag.tools.query import RAGQueryTool
-    from victor_rag.tools.management import RAGListTool, RAGDeleteTool, RAGStatsTool
+    RAGIngestTool = _load_rag_attr("victor.rag.tools.ingest", "RAGIngestTool")
+    RAGSearchTool = _load_rag_attr("victor.rag.tools.search", "RAGSearchTool")
+    RAGQueryTool = _load_rag_attr("victor.rag.tools.query", "RAGQueryTool")
+    RAGListTool = _load_rag_attr("victor.rag.tools.management", "RAGListTool")
+    RAGDeleteTool = _load_rag_attr("victor.rag.tools.management", "RAGDeleteTool")
+    RAGStatsTool = _load_rag_attr("victor.rag.tools.management", "RAGStatsTool")
 
     # List of tool classes for auto-discovery (only if imports succeeded)
     TOOL_CLASSES = [
