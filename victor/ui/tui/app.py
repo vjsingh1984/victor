@@ -234,9 +234,7 @@ class VictorTUI(App):
     └─────────────────────────────────────┘
     """
 
-    CSS = (
-        THEME_CSS
-        + """
+    CSS = THEME_CSS + """
     Screen {
         background: $background;
         color: $text;
@@ -536,7 +534,6 @@ class VictorTUI(App):
         border-top: solid $border-muted;
     }
     """
-    )
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Exit", show=True),

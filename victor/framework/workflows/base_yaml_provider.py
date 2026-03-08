@@ -44,7 +44,10 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
-from victor.core.verticals.import_resolver import import_module_with_fallback, module_import_candidates
+from victor.core.verticals.import_resolver import (
+    import_module_with_fallback,
+    module_import_candidates,
+)
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import WorkflowDefinition
 
