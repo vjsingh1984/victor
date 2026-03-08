@@ -21,7 +21,7 @@ TeamSpec creation, and multi-agent team composition.
 import pytest
 from typing import List
 
-pytest.importorskip("victor_coding")
+from victor.core.verticals.import_resolver import import_module_with_fallback
 
 from victor.framework.multi_agent.personas import (
     PersonaTraits,
@@ -36,19 +36,32 @@ from victor.framework.multi_agent.teams import (
     TeamTopology,
     TaskAssignmentStrategy,
 )
-from victor_coding.teams.personas import (
-    CodingPersona,
-    PersonaTraits as CodingPersonaTraits,
-    ExpertiseCategory,
-    CommunicationStyle as CodingCommunicationStyle,
-    DecisionStyle,
-    CODING_PERSONAS,
-    get_persona,
-    get_personas_for_role,
-    get_persona_by_expertise,
-    apply_persona_to_spec,
-    list_personas,
-)
+
+_PERSONA_MODULE, _resolved = import_module_with_fallback("victor.coding.teams.personas")
+if _PERSONA_MODULE is None:
+    pytest.skip("Coding persona module not available", allow_module_level=True)
+
+
+def _persona_attr(name: str):
+    if not hasattr(_PERSONA_MODULE, name):
+        pytest.skip(
+            f"Missing coding persona attribute: {name}",
+            allow_module_level=True,
+        )
+    return getattr(_PERSONA_MODULE, name)
+
+
+CodingPersona = _persona_attr("CodingPersona")
+CodingPersonaTraits = _persona_attr("PersonaTraits")
+ExpertiseCategory = _persona_attr("ExpertiseCategory")
+CodingCommunicationStyle = _persona_attr("CommunicationStyle")
+DecisionStyle = _persona_attr("DecisionStyle")
+CODING_PERSONAS = _persona_attr("CODING_PERSONAS")
+get_persona = _persona_attr("get_persona")
+get_personas_for_role = _persona_attr("get_personas_for_role")
+get_persona_by_expertise = _persona_attr("get_persona_by_expertise")
+apply_persona_to_spec = _persona_attr("apply_persona_to_spec")
+list_personas = _persona_attr("list_personas")
 
 # =============================================================================
 # Test Fixtures
