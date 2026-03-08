@@ -69,6 +69,16 @@ def test_module_import_candidates_for_external_path() -> None:
     ]
 
 
+def test_module_import_candidates_normalize_data_analysis_legacy_path() -> None:
+    """Legacy data_analysis path should normalize to dataanalysis fallback modules."""
+    candidates = module_import_candidates("victor.data_analysis.capabilities")
+    assert candidates[:3] == [
+        "victor_dataanalysis.capabilities",
+        "victor.dataanalysis.capabilities",
+        "victor.verticals.contrib.dataanalysis.capabilities",
+    ]
+
+
 def test_import_module_with_fallback_returns_first_importable_candidate() -> None:
     """Importer should skip missing candidates and return the first importable one."""
     legacy_module = ModuleType("victor.research.escape_hatches")
