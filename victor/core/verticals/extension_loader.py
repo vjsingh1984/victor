@@ -91,6 +91,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
+from victor.core.verticals.import_resolver import vertical_module_candidates
+
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
     from victor.core.vertical_types import TieredToolConfig
@@ -285,24 +287,11 @@ class VerticalExtensionLoader(ABC):
         if not module_suffix:
             return []
 
-        suffix = module_suffix.lstrip(".")
         vertical_name = getattr(cls, "name", None)
         if not isinstance(vertical_name, str) or not vertical_name:
             return []
 
-        normalized = vertical_name.replace("-", "_")
-        candidates = [
-            f"victor.{vertical_name}.{suffix}",
-            f"victor_{normalized}.{suffix}",
-        ]
-        # Deduplicate while preserving order
-        seen = set()
-        ordered: List[str] = []
-        for path in candidates:
-            if path not in seen:
-                ordered.append(path)
-                seen.add(path)
-        return ordered
+        return vertical_module_candidates(vertical_name, module_suffix)
 
     @classmethod
     def _extension_module_available(cls, module_path: str) -> bool:
@@ -310,9 +299,16 @@ class VerticalExtensionLoader(ABC):
         if not module_path:
             return False
 
-        spec = importlib.util.find_spec(module_path)
-        if spec is not None:
-            return True
+        try:
+            spec = importlib.util.find_spec(module_path)
+            if spec is not None:
+                return True
+        except (ImportError, ModuleNotFoundError, AttributeError, ValueError) as e:
+            logger.debug(
+                "Optional extension module lookup failed for '%s': %s",
+                module_path,
+                e,
+            )
 
         cache_key = f"{cls.__name__}:{module_path}"
         with cls._missing_extension_modules_lock:
