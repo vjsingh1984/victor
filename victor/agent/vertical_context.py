@@ -297,6 +297,9 @@ class VerticalContext:
     # Tool filter
     enabled_tools: Set[str] = field(default_factory=set)
 
+    # Capability negotiation results (Phase 4)
+    capability_negotiation_results: Optional[Dict[str, Any]] = None
+
     # New framework integrations (workflows, RL, teams)
     workflows: Dict[str, Any] = field(default_factory=dict)
     rl_config: Optional[Any] = None
