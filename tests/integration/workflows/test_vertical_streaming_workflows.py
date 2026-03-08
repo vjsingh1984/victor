@@ -44,6 +44,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
         pytest.skip(f"Missing attribute '{attr_name}' in module '{module_path}'")
     return getattr(module, attr_name)
 
+
 # ============ Test Fixtures ============
 
 

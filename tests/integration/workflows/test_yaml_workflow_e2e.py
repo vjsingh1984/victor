@@ -363,7 +363,9 @@ class TestCrossVerticalConsistency:
 
         for vertical, module in modules.items():
             module_file = getattr(module, "__file__", None)
-            assert module_file and Path(module_file).exists(), f"{vertical}/escape_hatches.py missing"
+            assert (
+                module_file and Path(module_file).exists()
+            ), f"{vertical}/escape_hatches.py missing"
 
     def test_handler_files_exist(self):
         """Test handlers.py exists for each vertical."""

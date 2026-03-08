@@ -22,8 +22,7 @@ from victor.core.utils.ast_helpers import (
 # Fixtures
 # =============================================================================
 
-SAMPLE_CODE = textwrap.dedent(
-    """\
+SAMPLE_CODE = textwrap.dedent("""\
     import os
     import os.path
     from pathlib import Path
@@ -47,8 +46,7 @@ SAMPLE_CODE = textwrap.dedent(
     @staticmethod
     def plain_func():
         pass
-"""
-)
+""")
 
 
 @pytest.fixture
@@ -118,13 +116,11 @@ class TestGetDecoratorName:
         assert get_decorator_name(node) == "staticmethod"
 
     def test_attribute_decorator(self):
-        code = textwrap.dedent(
-            """\
+        code = textwrap.dedent("""\
             class Foo:
                 @app.route
                 def bar(self): pass
-        """
-        )
+        """)
         tree = ast.parse(code)
         cls = tree.body[0]
         func = cls.body[0]
@@ -132,12 +128,10 @@ class TestGetDecoratorName:
         assert get_decorator_name(dec) == "app.route"
 
     def test_call_decorator(self):
-        code = textwrap.dedent(
-            """\
+        code = textwrap.dedent("""\
             @app.route("/")
             def index(): pass
-        """
-        )
+        """)
         tree = ast.parse(code)
         func = tree.body[0]
         dec = func.decorator_list[0]
@@ -294,13 +288,11 @@ class TestExtractSymbols:
         assert "staticmethod" in plain.decorators
 
     def test_enriched_class_decorators(self):
-        code = textwrap.dedent(
-            """\
+        code = textwrap.dedent("""\
             @dataclass
             class Foo:
                 x: int = 0
-        """
-        )
+        """)
         tree = ast.parse(code)
         symbols = extract_symbols(tree, enrich=True)
         foo = symbols[0]

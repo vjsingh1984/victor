@@ -57,8 +57,7 @@ class SemanticThresholdLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Stats table: one row per embedding_model:task_type:tool_name
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_SEMANTIC_STAT} (
                 context_key TEXT PRIMARY KEY,
                 embedding_model TEXT NOT NULL,
@@ -74,16 +73,13 @@ class SemanticThresholdLearner(BaseLearner):
                 threshold_sum REAL DEFAULT 0.0,
                 last_updated TEXT
             )
-            """
-        )
+            """)
 
         # Index for fast lookups
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_semantic_stat_model
             ON {Tables.RL_SEMANTIC_STAT}(embedding_model, task_type, tool_name)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: semantic_threshold tables ensured")

@@ -141,8 +141,7 @@ class QualityWeightLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Weights table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_WEIGHT} (
                 task_type TEXT NOT NULL,
                 dimension TEXT NOT NULL,
@@ -152,12 +151,10 @@ class QualityWeightLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (task_type, dimension)
             )
-            """
-        )
+            """)
 
         # Learning history
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_QUALITY_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_type TEXT NOT NULL,
@@ -166,16 +163,13 @@ class QualityWeightLearner(BaseLearner):
                 weights_used TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_quality_weight_task
             ON {Tables.RL_QUALITY_WEIGHT}(task_type)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: quality_weights tables ensured")

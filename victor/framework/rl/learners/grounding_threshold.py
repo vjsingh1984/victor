@@ -109,8 +109,7 @@ class GroundingThresholdLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Beta parameters table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_PARAM} (
                 context_key TEXT NOT NULL,
                 threshold REAL NOT NULL,
@@ -120,12 +119,10 @@ class GroundingThresholdLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (context_key, threshold)
             )
-            """
-        )
+            """)
 
         # Provider statistics
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_STAT} (
                 provider TEXT PRIMARY KEY,
                 true_positives INTEGER NOT NULL DEFAULT 0,
@@ -134,12 +131,10 @@ class GroundingThresholdLearner(BaseLearner):
                 false_negatives INTEGER NOT NULL DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Decision history
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_GROUNDING_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 context_key TEXT NOT NULL,
@@ -148,16 +143,13 @@ class GroundingThresholdLearner(BaseLearner):
                 reward REAL NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_grounding_param_context
             ON {Tables.RL_GROUNDING_PARAM}(context_key)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: grounding_threshold tables ensured")

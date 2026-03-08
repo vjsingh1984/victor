@@ -150,8 +150,7 @@ class SQLiteMetricsStore(MetricsStore):
         cursor = self._conn.cursor()
 
         # Create agent metrics table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS agent_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_id TEXT NOT NULL,
@@ -175,12 +174,10 @@ class SQLiteMetricsStore(MetricsStore):
                 INDEX (session_id),
                 INDEX (created_at)
             )
-        """
-        )
+        """)
 
         # Create tool calls table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS tool_calls (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_metric_id INTEGER NOT NULL,
@@ -194,12 +191,10 @@ class SQLiteMetricsStore(MetricsStore):
 
                 FOREIGN KEY (agent_metric_id) REFERENCES agent_metrics (id)
             )
-        """
-        )
+        """)
 
         # Create LLM calls table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS llm_calls (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_metric_id INTEGER NOT NULL,
@@ -217,8 +212,7 @@ class SQLiteMetricsStore(MetricsStore):
 
                 FOREIGN KEY (agent_metric_id) REFERENCES agent_metrics (id)
             )
-        """
-        )
+        """)
 
         self._conn.commit()
 

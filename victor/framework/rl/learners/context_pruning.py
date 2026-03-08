@@ -146,8 +146,7 @@ class ContextPruningLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Q-values table: state-action pairs
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_CONTEXT_PRUNING} (
                 state_key TEXT NOT NULL,
                 action TEXT NOT NULL,
@@ -159,12 +158,10 @@ class ContextPruningLearner(BaseLearner):
                 last_updated TEXT,
                 PRIMARY KEY (state_key, action)
             )
-            """
-        )
+            """)
 
         # Stats table: overall pruning statistics
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_CONTEXT_PRUNING}_stats (
                 provider_type TEXT PRIMARY KEY,
                 total_decisions INTEGER DEFAULT 0,
@@ -173,8 +170,7 @@ class ContextPruningLearner(BaseLearner):
                 best_action TEXT,
                 last_updated TEXT
             )
-            """
-        )
+            """)
 
         self.db.commit()
 
@@ -422,13 +418,11 @@ class ContextPruningLearner(BaseLearner):
                 (f"{provider_type}:%",),
             )
         else:
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT action, SUM(visit_count), AVG(q_value), SUM(success_count)
                 FROM {Tables.RL_CONTEXT_PRUNING}
                 GROUP BY action
-                """
-            )
+                """)
 
         action_stats = {}
         for row in cursor.fetchall():
@@ -440,12 +434,10 @@ class ContextPruningLearner(BaseLearner):
             }
 
         # Get overall stats
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             SELECT SUM(total_decisions), SUM(total_tokens_saved)
             FROM {Tables.RL_CONTEXT_PRUNING}_stats
-            """
-        )
+            """)
         row = cursor.fetchone()
 
         return {

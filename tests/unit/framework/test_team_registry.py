@@ -32,6 +32,7 @@ from victor.framework.team_registry import (
     find_team_for_task,
 )
 
+
 def _load_vertical_attr(module_path: str, attr_name: str):
     """Load a vertical attribute or skip when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)

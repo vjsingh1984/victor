@@ -624,7 +624,9 @@ class TestChainBackwardCompatibility:
                 "victor.coding.composed_chains",
                 "analyze_function_chain",
             )
-            safe_edit_chain = _import_vertical_attr("victor.coding.composed_chains", "safe_edit_chain")
+            safe_edit_chain = _import_vertical_attr(
+                "victor.coding.composed_chains", "safe_edit_chain"
+            )
             git_status_chain = _import_vertical_attr(
                 "victor.coding.composed_chains",
                 "git_status_chain",

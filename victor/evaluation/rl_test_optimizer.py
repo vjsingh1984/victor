@@ -119,8 +119,7 @@ class TestDependencyLearner:
     def _ensure_tables(self) -> None:
         """Create database tables if they don't exist."""
         cursor = self.db.cursor()
-        cursor.executescript(
-            """
+        cursor.executescript("""
             CREATE TABLE IF NOT EXISTS test_dependencies (
                 file_hash TEXT,
                 test_name TEXT,
@@ -150,8 +149,7 @@ class TestDependencyLearner:
 
             CREATE INDEX IF NOT EXISTS idx_test_history_name ON test_history(test_name);
             CREATE INDEX IF NOT EXISTS idx_test_history_time ON test_history(timestamp);
-        """
-        )
+        """)
         self.db.commit()
 
     def _load_q_table(self) -> None:

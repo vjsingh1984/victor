@@ -24,8 +24,7 @@ from victor.contrib.codebase import BasicCodebaseAnalyzer
 def sample_codebase(tmp_path: Path) -> Path:
     """Create a sample codebase for testing."""
     # Create Python files
-    (tmp_path / "module1.py").write_text(
-        """
+    (tmp_path / "module1.py").write_text("""
 '''Module one docstring.'''
 
 def function_one(param1, param2):
@@ -37,27 +36,22 @@ class ClassOne:
     def method_one(self):
         '''Method one docstring.'''
         pass
-"""
-    )
+""")
 
-    (tmp_path / "module2.py").write_text(
-        """
+    (tmp_path / "module2.py").write_text("""
 from module1 import function_one
 
 def function_two():
     return function_one(1, 2)
-"""
-    )
+""")
 
     # Create subdirectory
     subdir = tmp_path / "subdir"
     subdir.mkdir()
-    (subdir / "module3.py").write_text(
-        """
+    (subdir / "module3.py").write_text("""
 def function_three():
     pass
-"""
-    )
+""")
 
     # Create a text file
     (tmp_path / "README.md").write_text("# Test Project\n\nThis is a test.")
@@ -178,15 +172,13 @@ class TestPythonParsing:
     @pytest.mark.asyncio
     async def test_extract_class_with_bases(self, tmp_path: Path) -> None:
         """Test extracting class with base classes."""
-        (tmp_path / "test.py").write_text(
-            """
+        (tmp_path / "test.py").write_text("""
 class MyClass(BaseClass):
     pass
 
 class InheritedClass(Parent1, Parent2):
     pass
-"""
-        )
+""")
 
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.parse_file(tmp_path / "test.py")
@@ -199,15 +191,13 @@ class InheritedClass(Parent1, Parent2):
     @pytest.mark.asyncio
     async def test_extract_function_with_params(self, tmp_path: Path) -> None:
         """Test extracting function with parameters."""
-        (tmp_path / "test.py").write_text(
-            """
+        (tmp_path / "test.py").write_text("""
 def function_with_params(param1, param2, param3=None):
     pass
 
 async def async_function(param1: str, param2: int) -> None:
     pass
-"""
-        )
+""")
 
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.parse_file(tmp_path / "test.py")
@@ -224,14 +214,12 @@ async def async_function(param1: str, param2: int) -> None:
     @pytest.mark.asyncio
     async def test_extract_imports(self, tmp_path: Path) -> None:
         """Test extracting import statements."""
-        (tmp_path / "test.py").write_text(
-            """
+        (tmp_path / "test.py").write_text("""
 import os
 import sys
 from pathlib import Path
 from collections import defaultdict
-"""
-        )
+""")
 
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.parse_file(tmp_path / "test.py")
@@ -247,8 +235,7 @@ from collections import defaultdict
     @pytest.mark.asyncio
     async def test_extract_decorators(self, tmp_path: Path) -> None:
         """Test extracting decorators."""
-        (tmp_path / "test.py").write_text(
-            """
+        (tmp_path / "test.py").write_text("""
 @dataclass
 class MyClass:
     pass
@@ -256,8 +243,7 @@ class MyClass:
 @property
 def my_property(self):
     return 1
-"""
-        )
+""")
 
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.parse_file(tmp_path / "test.py")
@@ -270,8 +256,7 @@ def my_property(self):
     @pytest.mark.asyncio
     async def test_extract_method(self, tmp_path: Path) -> None:
         """Test extracting methods in classes."""
-        (tmp_path / "test.py").write_text(
-            """
+        (tmp_path / "test.py").write_text("""
 class MyClass:
     def method_one(self):
         pass
@@ -279,8 +264,7 @@ class MyClass:
     @staticmethod
     def static_method():
         pass
-"""
-        )
+""")
 
         analyzer = BasicCodebaseAnalyzer()
         result = await analyzer.parse_file(tmp_path / "test.py")

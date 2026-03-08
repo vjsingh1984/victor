@@ -580,7 +580,9 @@ class TestListVerticalsFunction:
         if DevOpsAssistant is not None and not VerticalRegistry.get("devops"):
             VerticalRegistry.register(DevOpsAssistant)
 
-        ResearchAssistant = _try_load_vertical_attr("victor.research.assistant", "ResearchAssistant")
+        ResearchAssistant = _try_load_vertical_attr(
+            "victor.research.assistant", "ResearchAssistant"
+        )
         if ResearchAssistant is not None and not VerticalRegistry.get("research"):
             VerticalRegistry.register(ResearchAssistant)
 
