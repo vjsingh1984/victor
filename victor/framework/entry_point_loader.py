@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import threading
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from importlib.metadata import entry_points
@@ -45,6 +46,59 @@ from victor.framework.config import SafetyEnforcer
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+_ENTRY_POINT_LOADER_STATS: Dict[str, int] = {
+    "safety_calls": 0,
+    "safety_loaded": 0,
+    "safety_failures": 0,
+    "tool_dependency_calls": 0,
+    "tool_dependency_entry_point_resolutions": 0,
+    "tool_dependency_fallback_resolutions": 0,
+    "tool_dependency_none_returns": 0,
+    "tool_dependency_failures": 0,
+    "rl_config_calls": 0,
+    "rl_config_hits": 0,
+    "rl_config_failures": 0,
+    "escape_hatch_calls": 0,
+    "escape_hatch_loaded": 0,
+    "escape_hatch_failures": 0,
+    "command_calls": 0,
+    "command_loaded": 0,
+    "command_failures": 0,
+}
+_ENTRY_POINT_LOADER_STATS_LOCK = threading.Lock()
+
+
+def _increment_loader_stat(name: str) -> None:
+    """Increment an entry-point loader telemetry counter."""
+    with _ENTRY_POINT_LOADER_STATS_LOCK:
+        _ENTRY_POINT_LOADER_STATS[name] = _ENTRY_POINT_LOADER_STATS.get(name, 0) + 1
+
+
+def get_entry_point_loader_stats() -> Dict[str, int]:
+    """Get entry-point loader telemetry counters and cache stats."""
+    with _ENTRY_POINT_LOADER_STATS_LOCK:
+        stats = dict(_ENTRY_POINT_LOADER_STATS)
+
+    cache_info = _cached_entry_points.cache_info()
+    stats.update(
+        {
+            "cache_hits": cache_info.hits,
+            "cache_misses": cache_info.misses,
+            "cache_maxsize": cache_info.maxsize or 0,
+            "cache_currsize": cache_info.currsize,
+        }
+    )
+    return stats
+
+
+def reset_entry_point_loader_stats(clear_cache: bool = False) -> None:
+    """Reset entry-point loader telemetry counters and optionally clear cache."""
+    with _ENTRY_POINT_LOADER_STATS_LOCK:
+        for key in _ENTRY_POINT_LOADER_STATS:
+            _ENTRY_POINT_LOADER_STATS[key] = 0
+    if clear_cache:
+        clear_entry_point_loader_cache()
 
 
 def _normalize_vertical_name(vertical: str) -> str:
@@ -102,6 +156,7 @@ def load_safety_rules_from_entry_points(
         # Load specific verticals only
         count = load_safety_rules_from_entry_points(enforcer, vertical_names=["coding", "devops"])
     """
+    _increment_loader_stat("safety_calls")
     count = 0
     normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
@@ -118,10 +173,13 @@ def load_safety_rules_from_entry_points(
                 register_func = ep.load()
                 register_func(enforcer)
                 count += 1
+                _increment_loader_stat("safety_loaded")
                 logger.debug(f"Loaded safety rules from '{ep.name}' vertical")
             except Exception as e:
+                _increment_loader_stat("safety_failures")
                 logger.warning(f"Failed to load safety rules from '{ep.name}': {e}")
     except Exception as e:
+        _increment_loader_stat("safety_failures")
         logger.debug(f"No safety rule entry points found: {e}")
 
     return count
@@ -150,6 +208,7 @@ def load_tool_dependency_provider_from_entry_points(
             deps = provider.get_dependencies()
             sequences = provider.get_tool_sequences()
     """
+    _increment_loader_stat("tool_dependency_calls")
     normalized_vertical = _normalize_vertical_name(vertical)
 
     try:
@@ -157,8 +216,10 @@ def load_tool_dependency_provider_from_entry_points(
         for ep in eps:
             if _normalize_vertical_name(ep.name) == normalized_vertical:
                 provider_factory = ep.load()
+                _increment_loader_stat("tool_dependency_entry_point_resolutions")
                 return provider_factory()
     except Exception as e:
+        _increment_loader_stat("tool_dependency_failures")
         logger.debug(f"No tool dependency provider found for '{vertical}' via entry points: {e}")
 
     # Compatibility fallback for extracted verticals (core + external packages).
@@ -168,17 +229,22 @@ def load_tool_dependency_provider_from_entry_points(
 
         provider = create_vertical_tool_dependency_provider(normalized_vertical)
         if isinstance(provider, EmptyToolDependencyProvider):
+            _increment_loader_stat("tool_dependency_none_returns")
             return None
+        _increment_loader_stat("tool_dependency_fallback_resolutions")
         return provider
     except ValueError:
+        _increment_loader_stat("tool_dependency_none_returns")
         logger.debug("Unknown vertical '%s' for tool dependency provider resolution", vertical)
     except Exception as e:
+        _increment_loader_stat("tool_dependency_failures")
         logger.debug(
             "Fallback tool dependency provider resolution failed for '%s': %s",
             vertical,
             e,
         )
 
+    _increment_loader_stat("tool_dependency_none_returns")
     return None
 
 
@@ -198,6 +264,7 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
         if rl_config:
             learning_rate = rl_config.get("learning_rate", 0.001)
     """
+    _increment_loader_stat("rl_config_calls")
     normalized_vertical = _normalize_vertical_name(vertical)
 
     try:
@@ -205,8 +272,10 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
         for ep in eps:
             if _normalize_vertical_name(ep.name) == normalized_vertical:
                 config_factory = ep.load()
+                _increment_loader_stat("rl_config_hits")
                 return config_factory()
     except Exception as e:
+        _increment_loader_stat("rl_config_failures")
         logger.debug(f"No RL config found for '{vertical}': {e}")
 
     return None
@@ -234,6 +303,7 @@ def register_escape_hatches_from_entry_points(
         count = register_escape_hatches_from_entry_points(registry)
         print(f"Registered escape hatches from {count} verticals")
     """
+    _increment_loader_stat("escape_hatch_calls")
     count = 0
     normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
@@ -250,10 +320,13 @@ def register_escape_hatches_from_entry_points(
                 register_func = ep.load()
                 register_func(registry)
                 count += 1
+                _increment_loader_stat("escape_hatch_loaded")
                 logger.debug(f"Registered escape hatches from '{ep.name}' vertical")
             except Exception as e:
+                _increment_loader_stat("escape_hatch_failures")
                 logger.warning(f"Failed to register escape hatches from '{ep.name}': {e}")
     except Exception as e:
+        _increment_loader_stat("escape_hatch_failures")
         logger.debug(f"No escape hatch entry points found: {e}")
 
     return count
@@ -281,6 +354,7 @@ def register_commands_from_entry_points(
         count = register_commands_from_entry_points(app)
         print(f"Registered commands from {count} verticals")
     """
+    _increment_loader_stat("command_calls")
     count = 0
     normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
@@ -297,10 +371,13 @@ def register_commands_from_entry_points(
                 register_func = ep.load()
                 register_func(app)
                 count += 1
+                _increment_loader_stat("command_loaded")
                 logger.debug(f"Registered commands from '{ep.name}' vertical")
             except Exception as e:
+                _increment_loader_stat("command_failures")
                 logger.warning(f"Failed to register commands from '{ep.name}': {e}")
     except Exception as e:
+        _increment_loader_stat("command_failures")
         logger.debug(f"No command entry points found: {e}")
 
     return count
@@ -338,4 +415,6 @@ __all__ = [
     "register_commands_from_entry_points",
     "list_installed_verticals",
     "clear_entry_point_loader_cache",
+    "get_entry_point_loader_stats",
+    "reset_entry_point_loader_stats",
 ]
