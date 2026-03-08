@@ -25,6 +25,7 @@ import logging
 import pytest
 from unittest.mock import MagicMock, patch
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.core.vertical_types import MiddlewarePriority
 from victor.framework.middleware import (
     GitSafetyMiddleware,
@@ -38,6 +39,15 @@ from victor.framework.middleware import (
     ValidationSeverity,
     ValidatorProtocol,
 )
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
 
 # =============================================================================
 # LoggingMiddleware Tests
@@ -861,7 +871,7 @@ class TestMiddlewareIntegration:
     @pytest.mark.skip(reason="Requires victor_devops external package - pending migration")
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
-        from victor_devops.assistant import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
 
         middleware_list = DevOpsAssistant.get_middleware()
 
