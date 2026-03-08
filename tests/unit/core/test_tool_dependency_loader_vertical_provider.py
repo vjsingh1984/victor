@@ -28,9 +28,11 @@ import victor.core.tool_dependency_loader as loader_mod
 
 @pytest.fixture(autouse=True)
 def _clear_tool_dependency_ep_cache() -> None:
-    """Keep entry-point cache isolated between tests."""
+    """Keep entry-point cache and telemetry isolated between tests."""
+    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
     loader_mod.clear_tool_dependency_entry_point_cache()
     yield
+    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
     loader_mod.clear_tool_dependency_entry_point_cache()
 
 
@@ -195,3 +197,67 @@ def test_clear_tool_dependency_entry_point_cache_forces_rescan(monkeypatch) -> N
         create_vertical_tool_dependency_provider("mlops")
 
     assert call_count == 2
+
+
+def test_resolution_stats_track_entry_point_path(monkeypatch) -> None:
+    """Telemetry should record successful entry-point-based resolution."""
+    sentinel = EmptyToolDependencyProvider("coding")
+
+    class _FakeEntryPoint:
+        name = "coding"
+
+        @staticmethod
+        def load():
+            return lambda: sentinel
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    provider = create_vertical_tool_dependency_provider("coding")
+    stats = loader_mod.get_tool_dependency_resolution_stats()
+
+    assert provider is sentinel
+    assert stats["total_requests"] == 1
+    assert stats["entry_point_resolutions"] == 1
+    assert stats["module_factory_resolutions"] == 0
+    assert stats["package_resource_resolutions"] == 0
+    assert stats["empty_provider_returns"] == 0
+
+
+def test_resolution_stats_track_module_factory_path(monkeypatch) -> None:
+    """Telemetry should record successful module-factory resolution."""
+    sentinel = EmptyToolDependencyProvider("coding")
+    fake_module = SimpleNamespace(get_provider=lambda: sentinel)
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
+    monkeypatch.setattr(
+        loader_mod,
+        "import_module_with_fallback",
+        lambda module_name: (fake_module, "victor_coding.tool_dependencies"),
+    )
+
+    provider = create_vertical_tool_dependency_provider("coding")
+    stats = loader_mod.get_tool_dependency_resolution_stats()
+
+    assert provider is sentinel
+    assert stats["total_requests"] == 1
+    assert stats["entry_point_resolutions"] == 0
+    assert stats["module_factory_resolutions"] == 1
+    assert stats["package_resource_resolutions"] == 0
+
+
+def test_resolution_stats_track_unknown_vertical_and_cache_hits(monkeypatch) -> None:
+    """Telemetry should record unknown-vertical errors and entry-point cache usage."""
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+
+    stats = loader_mod.get_tool_dependency_resolution_stats()
+    assert stats["total_requests"] == 2
+    assert stats["unknown_vertical_errors"] == 2
+    assert stats["entry_point_cache_misses"] >= 1
+    assert stats["entry_point_cache_hits"] >= 1

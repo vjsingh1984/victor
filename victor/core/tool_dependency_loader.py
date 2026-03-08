@@ -53,6 +53,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import threading
 from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
@@ -646,6 +647,55 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
     "dataanalysis": False,  # Preserves 'code_search' as distinct from 'grep'
 }
 
+# Resolution telemetry counters for runtime diagnostics.
+_TOOL_DEPENDENCY_RESOLUTION_STATS: Dict[str, int] = {
+    "total_requests": 0,
+    "entry_point_resolutions": 0,
+    "entry_point_load_failures": 0,
+    "module_factory_resolutions": 0,
+    "module_factory_failures": 0,
+    "package_resource_resolutions": 0,
+    "package_resource_failures": 0,
+    "empty_provider_returns": 0,
+    "unknown_vertical_errors": 0,
+}
+_TOOL_DEPENDENCY_STATS_LOCK = threading.Lock()
+
+
+def _increment_resolution_stat(name: str) -> None:
+    """Increment a tool-dependency resolution telemetry counter."""
+    with _TOOL_DEPENDENCY_STATS_LOCK:
+        _TOOL_DEPENDENCY_RESOLUTION_STATS[name] = (
+            _TOOL_DEPENDENCY_RESOLUTION_STATS.get(name, 0) + 1
+        )
+
+
+def get_tool_dependency_resolution_stats() -> Dict[str, int]:
+    """Return resolution telemetry counters and entry-point cache stats."""
+    with _TOOL_DEPENDENCY_STATS_LOCK:
+        stats = dict(_TOOL_DEPENDENCY_RESOLUTION_STATS)
+
+    cache_info = _cached_tool_dependency_entry_points.cache_info()
+    stats.update(
+        {
+            "entry_point_cache_hits": cache_info.hits,
+            "entry_point_cache_misses": cache_info.misses,
+            "entry_point_cache_maxsize": cache_info.maxsize or 0,
+            "entry_point_cache_currsize": cache_info.currsize,
+        }
+    )
+    return stats
+
+
+def reset_tool_dependency_resolution_stats(clear_entry_point_cache: bool = False) -> None:
+    """Reset resolution telemetry counters and optionally clear EP cache."""
+    with _TOOL_DEPENDENCY_STATS_LOCK:
+        for key in _TOOL_DEPENDENCY_RESOLUTION_STATS:
+            _TOOL_DEPENDENCY_RESOLUTION_STATS[key] = 0
+
+    if clear_entry_point_cache:
+        clear_tool_dependency_entry_point_cache()
+
 
 def _normalize_vertical_name(vertical: str) -> str:
     """Normalize vertical names used in tool dependency resolution."""
@@ -714,6 +764,7 @@ def create_vertical_tool_dependency_provider(
                 canonicalize=True,
             )
     """
+    _increment_resolution_stat("total_requests")
     vertical_name = _normalize_vertical_name(vertical)
 
     # Try to load from entry points (external vertical packages).
@@ -723,9 +774,11 @@ def create_vertical_tool_dependency_provider(
         try:
             provider_factory = ep.load()
             provider = provider_factory()
+            _increment_resolution_stat("entry_point_resolutions")
             logger.debug("Loaded tool dependency provider for '%s' from entry point", vertical_name)
             return provider
         except Exception as e:
+            _increment_resolution_stat("entry_point_load_failures")
             logger.debug(
                 "Failed loading tool dependency provider for '%s' from entry point '%s': %s",
                 vertical_name,
@@ -740,6 +793,7 @@ def create_vertical_tool_dependency_provider(
     if module is not None and hasattr(module, "get_provider"):
         try:
             provider = module.get_provider()
+            _increment_resolution_stat("module_factory_resolutions")
             logger.debug(
                 "Loaded tool dependency provider for '%s' from module '%s'",
                 vertical_name,
@@ -747,6 +801,7 @@ def create_vertical_tool_dependency_provider(
             )
             return provider
         except Exception as e:
+            _increment_resolution_stat("module_factory_failures")
             logger.debug(
                 "Module-level tool dependency provider failed for '%s' from '%s': %s",
                 vertical_name,
@@ -755,6 +810,7 @@ def create_vertical_tool_dependency_provider(
             )
 
     if vertical_name not in _VERTICAL_CANONICALIZE_SETTINGS:
+        _increment_resolution_stat("unknown_vertical_errors")
         available = ", ".join(sorted(_VERTICAL_CANONICALIZE_SETTINGS.keys()))
         raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
 
@@ -779,6 +835,7 @@ def create_vertical_tool_dependency_provider(
             if yaml_resource.is_file():
                 yaml_content = yaml_resource.read_text(encoding="utf-8")
                 config = ToolDependencyLoader(canonicalize=canonicalize).load_from_string(yaml_content)
+                _increment_resolution_stat("package_resource_resolutions")
                 logger.debug(
                     "Loaded tool dependency provider for '%s' from package resource '%s:tool_dependencies.yaml'",
                     vertical_name,
@@ -786,6 +843,7 @@ def create_vertical_tool_dependency_provider(
                 )
                 return BaseToolDependencyProvider(config=config)
         except Exception as e:
+            _increment_resolution_stat("package_resource_failures")
             logger.debug(
                 "Package resource fallback failed for '%s' in '%s': %s",
                 vertical_name,
@@ -801,6 +859,7 @@ def create_vertical_tool_dependency_provider(
     # Return an LSP-compliant empty provider (Null Object pattern)
     from victor.core.tool_types import EmptyToolDependencyProvider
 
+    _increment_resolution_stat("empty_provider_returns")
     return EmptyToolDependencyProvider(vertical_name)
 
 
@@ -813,5 +872,7 @@ __all__ = [
     "get_cached_provider",
     "invalidate_provider_cache",
     "clear_tool_dependency_entry_point_cache",
+    "get_tool_dependency_resolution_stats",
+    "reset_tool_dependency_resolution_stats",
     "create_vertical_tool_dependency_provider",
 ]
