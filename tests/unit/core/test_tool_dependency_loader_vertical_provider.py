@@ -119,6 +119,18 @@ def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(monkey
     assert provider.vertical == "coding"
 
 
+@pytest.mark.parametrize("alias_name", ["data-analysis", "data_analysis"])
+def test_dataanalysis_aliases_resolve_to_supported_vertical(monkeypatch, alias_name: str) -> None:
+    """Historical data-analysis spellings should resolve via compatibility fallback."""
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    provider = create_vertical_tool_dependency_provider(alias_name)
+
+    assert isinstance(provider, BaseToolDependencyProvider)
+    assert not isinstance(provider, EmptyToolDependencyProvider)
+
+
 def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
     """Entry point scans should be cached across repeated resolution calls."""
     call_count = 0

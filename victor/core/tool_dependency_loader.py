@@ -647,6 +647,14 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 }
 
 
+def _normalize_vertical_name(vertical: str) -> str:
+    """Normalize vertical names used in tool dependency resolution."""
+    normalized = vertical.strip().lower().replace("-", "_")
+    if normalized in {"data_analysis"}:
+        return "dataanalysis"
+    return normalized
+
+
 @lru_cache(maxsize=1)
 def _cached_tool_dependency_entry_points() -> Tuple[Any, ...]:
     """Cache tool dependency entry points for faster repeated resolution."""
@@ -706,51 +714,53 @@ def create_vertical_tool_dependency_provider(
                 canonicalize=True,
             )
     """
+    vertical_name = _normalize_vertical_name(vertical)
+
     # Try to load from entry points (external vertical packages).
     for ep in _cached_tool_dependency_entry_points():
-        if ep.name != vertical:
+        if ep.name != vertical_name:
             continue
         try:
             provider_factory = ep.load()
             provider = provider_factory()
-            logger.debug(f"Loaded tool dependency provider for '{vertical}' from entry point")
+            logger.debug("Loaded tool dependency provider for '%s' from entry point", vertical_name)
             return provider
         except Exception as e:
             logger.debug(
                 "Failed loading tool dependency provider for '%s' from entry point '%s': %s",
-                vertical,
+                vertical_name,
                 ep.name,
                 e,
             )
 
     # Fallback 1: module-level provider factory (external-first resolver).
     # This supports extracted vertical repos even when entry points are unavailable.
-    module_path = f"victor.{vertical}.tool_dependencies"
+    module_path = f"victor.{vertical_name}.tool_dependencies"
     module, resolved_path = import_module_with_fallback(module_path)
     if module is not None and hasattr(module, "get_provider"):
         try:
             provider = module.get_provider()
             logger.debug(
                 "Loaded tool dependency provider for '%s' from module '%s'",
-                vertical,
+                vertical_name,
                 resolved_path or module_path,
             )
             return provider
         except Exception as e:
             logger.debug(
                 "Module-level tool dependency provider failed for '%s' from '%s': %s",
-                vertical,
+                vertical_name,
                 resolved_path or module_path,
                 e,
             )
 
-    if vertical not in _VERTICAL_CANONICALIZE_SETTINGS:
+    if vertical_name not in _VERTICAL_CANONICALIZE_SETTINGS:
         available = ", ".join(sorted(_VERTICAL_CANONICALIZE_SETTINGS.keys()))
         raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
 
     # Fallback 2: package resource YAML (works for wheel/pip installs).
     if canonicalize is None:
-        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
+        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical_name, True)
 
     checked_packages: List[str] = []
     package_candidates: List[str] = []
@@ -771,27 +781,27 @@ def create_vertical_tool_dependency_provider(
                 config = ToolDependencyLoader(canonicalize=canonicalize).load_from_string(yaml_content)
                 logger.debug(
                     "Loaded tool dependency provider for '%s' from package resource '%s:tool_dependencies.yaml'",
-                    vertical,
+                    vertical_name,
                     package,
                 )
                 return BaseToolDependencyProvider(config=config)
         except Exception as e:
             logger.debug(
                 "Package resource fallback failed for '%s' in '%s': %s",
-                vertical,
+                vertical_name,
                 package,
                 e,
             )
 
     logger.debug(
         "Tool dependencies YAML package resource not found for vertical '%s'. Checked packages: %s",
-        vertical,
+        vertical_name,
         ", ".join(checked_packages),
     )
     # Return an LSP-compliant empty provider (Null Object pattern)
     from victor.core.tool_types import EmptyToolDependencyProvider
 
-    return EmptyToolDependencyProvider(vertical)
+    return EmptyToolDependencyProvider(vertical_name)
 
 
 __all__ = [
