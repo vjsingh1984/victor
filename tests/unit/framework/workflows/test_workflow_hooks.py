@@ -358,7 +358,7 @@ class TestErrorHandling:
         # Create a provider that returns a module without expected attributes
         class BrokenProvider(BaseYAMLWorkflowProvider):
             def _get_escape_hatches_module(self) -> str:
-                return "victor.research.escape_hatches"
+                return "victor_research.escape_hatches"
 
             def _get_capability_provider_module(self) -> Optional[str]:
                 return "victor.framework.capabilities.base"  # Has no CapabilityProvider
@@ -390,9 +390,9 @@ class TestRealVerticalIntegration:
 
     @pytest.mark.slow
     def test_actual_research_workflow_provider(self):
-        """Test with actual ResearchWorkflowProvider from victor.research.workflows."""
+        """Test with actual ResearchWorkflowProvider from victor_research.workflows."""
         try:
-            from victor.research.workflows import ResearchWorkflowProvider
+            from victor_research.workflows import ResearchWorkflowProvider
 
             provider = ResearchWorkflowProvider()
             result = provider.get_capability_provider()
@@ -407,13 +407,13 @@ class TestRealVerticalIntegration:
             assert "citation_management" in capabilities
 
         except ImportError:
-            pytest.skip("victor.research.workflows not available")
+            pytest.skip("victor_research.workflows not available")
 
     @pytest.mark.slow
     def test_actual_devops_workflow_provider(self):
-        """Test with actual DevOpsWorkflowProvider from victor.devops.workflows."""
+        """Test with actual DevOpsWorkflowProvider from victor_devops.workflows."""
         try:
-            from victor.devops.workflows import DevOpsWorkflowProvider
+            from victor_devops.workflows import DevOpsWorkflowProvider
 
             provider = DevOpsWorkflowProvider()
             result = provider.get_capability_provider()
@@ -428,13 +428,13 @@ class TestRealVerticalIntegration:
             assert "container_settings" in capabilities
 
         except ImportError:
-            pytest.skip("victor.devops.workflows not available")
+            pytest.skip("victor_devops.workflows not available")
 
     @pytest.mark.slow
     def test_actual_dataanalysis_workflow_provider(self):
-        """Test with actual DataAnalysisWorkflowProvider from victor.dataanalysis.workflows."""
+        """Test with actual DataAnalysisWorkflowProvider from victor_dataanalysis.workflows."""
         try:
-            from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+            from victor_dataanalysis.workflows import DataAnalysisWorkflowProvider
 
             provider = DataAnalysisWorkflowProvider()
             result = provider.get_capability_provider()
@@ -448,7 +448,7 @@ class TestRealVerticalIntegration:
             assert len(capabilities) > 0
 
         except ImportError:
-            pytest.skip("victor.dataanalysis.workflows not available")
+            pytest.skip("victor_dataanalysis.workflows not available")
 
 
 # =============================================================================

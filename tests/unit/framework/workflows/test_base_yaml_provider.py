@@ -45,7 +45,7 @@ class ConcreteYAMLWorkflowProvider:
         # Create a concrete subclass dynamically
         class TestProvider(BaseYAMLWorkflowProvider):
             def _get_escape_hatches_module(self) -> str:
-                return "victor.research.escape_hatches"
+                return "victor_research.escape_hatches"
 
             def _get_workflows_directory(self_inner) -> Path:
                 if workflows_dir:
@@ -292,7 +292,7 @@ class TestVerticalProviderIntegration:
     def test_research_provider_has_get_compiler(self):
         """Test that ResearchWorkflowProvider has get_compiler method."""
         try:
-            from victor.research.workflows import ResearchWorkflowProvider
+            from victor_research.workflows import ResearchWorkflowProvider
 
             provider = ResearchWorkflowProvider()
             assert hasattr(provider, "get_compiler")
@@ -314,7 +314,7 @@ class TestVerticalProviderIntegration:
     def test_devops_provider_has_compile_workflow(self):
         """Test that DevOpsWorkflowProvider has compile_workflow method."""
         try:
-            from victor.devops.workflows import DevOpsWorkflowProvider
+            from victor_devops.workflows import DevOpsWorkflowProvider
 
             provider = DevOpsWorkflowProvider()
             assert hasattr(provider, "compile_workflow")
@@ -325,7 +325,7 @@ class TestVerticalProviderIntegration:
     def test_dataanalysis_provider_has_run_compiled_workflow(self):
         """Test that DataAnalysisWorkflowProvider has run_compiled_workflow method."""
         try:
-            from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+            from victor_dataanalysis.workflows import DataAnalysisWorkflowProvider
 
             provider = DataAnalysisWorkflowProvider()
             assert hasattr(provider, "run_compiled_workflow")
