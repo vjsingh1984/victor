@@ -53,6 +53,7 @@ classifiers = [
 
 dependencies = [
     # Core
+    "victor-sdk>=1.0.0a1",  # SDK protocol definitions for vertical development
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",

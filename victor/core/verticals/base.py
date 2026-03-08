@@ -58,6 +58,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
 
+# Import SDK base class for dependency inversion
+from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+
 # Import focused capability providers for SRP compliance
 from victor.core.verticals.metadata import VerticalMetadataProvider
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
@@ -183,10 +186,10 @@ class VerticalConfig:
 
 
 class VerticalBase(
+    SdkVerticalBase,  # Inherit from SDK for dependency inversion
     VerticalMetadataProvider,
     VerticalExtensionLoader,
     VerticalWorkflowProvider,
-    ABC,
 ):
     """Abstract base class for domain-specific assistants.
 
@@ -333,6 +336,41 @@ class VerticalBase(
             System prompt text with domain expertise.
         """
         pass
+
+    # =========================================================================
+    # SDK Protocol Implementation (Dependency Inversion)
+    # =========================================================================
+
+    @classmethod
+    def get_name(cls) -> str:
+        """Return vertical identifier (SDK protocol implementation).
+
+        Returns:
+            Vertical name from class attribute.
+        """
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return vertical description (SDK protocol implementation).
+
+        Returns:
+            Vertical description from class attribute.
+        """
+        return cls.description
+
+    @classmethod
+    def _get_toolset(cls) -> ToolSet:
+        """Convert tool names to ToolSet (SDK protocol implementation).
+
+        This implements the SDK's abstract method by creating a ToolSet
+        from the tool names returned by get_tools().
+
+        Returns:
+            ToolSet object with tools from get_tools().
+        """
+        tool_names = cls.get_tools()
+        return ToolSet.from_tools(tool_names)
 
     # =========================================================================
     # Framework Capability Helpers (Phase 1)
