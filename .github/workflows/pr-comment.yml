@@ -252,6 +252,7 @@ jobs:
       - name: Download FEP validation report
         if: inputs.fep_validation_result != 'success'
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: fep-validation-report
           path: validation-reports
@@ -259,6 +260,7 @@ jobs:
       - name: Download vertical validation report
         if: inputs.vertical_validation_result != 'success'
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: vertical-validation-report
           path: validation-reports
