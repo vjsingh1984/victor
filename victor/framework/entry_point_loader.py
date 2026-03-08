@@ -47,6 +47,14 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+def _normalize_vertical_name(vertical: str) -> str:
+    """Normalize vertical names for entry-point matching."""
+    normalized = vertical.strip().lower().replace("-", "_")
+    if normalized in {"data_analysis"}:
+        return "dataanalysis"
+    return normalized
+
+
 @functools.lru_cache(maxsize=16)
 def _cached_entry_points(group: str) -> tuple:
     """Cache entry_points() result per group. Returns tuple for hashability."""
@@ -131,10 +139,12 @@ def load_tool_dependency_provider_from_entry_points(
             deps = provider.get_dependencies()
             sequences = provider.get_tool_sequences()
     """
+    normalized_vertical = _normalize_vertical_name(vertical)
+
     try:
         eps = _cached_entry_points("victor.tool_dependencies")
         for ep in eps:
-            if ep.name == vertical:
+            if _normalize_vertical_name(ep.name) == normalized_vertical:
                 provider_factory = ep.load()
                 return provider_factory()
     except Exception as e:
@@ -145,7 +155,7 @@ def load_tool_dependency_provider_from_entry_points(
         from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
         from victor.core.tool_types import EmptyToolDependencyProvider
 
-        provider = create_vertical_tool_dependency_provider(vertical)
+        provider = create_vertical_tool_dependency_provider(normalized_vertical)
         if isinstance(provider, EmptyToolDependencyProvider):
             return None
         return provider

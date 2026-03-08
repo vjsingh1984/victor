@@ -57,6 +57,29 @@ def test_entry_point_provider_has_priority_over_fallbacks(monkeypatch) -> None:
     assert provider is sentinel
 
 
+def test_entry_point_alias_name_matches_normalized_vertical(monkeypatch) -> None:
+    """Entry point names with alias spellings should resolve correctly."""
+    sentinel = EmptyToolDependencyProvider("dataanalysis")
+
+    class _FakeEntryPoint:
+        name = "data-analysis"
+
+        @staticmethod
+        def load():
+            return lambda: sentinel
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+
+    def _unexpected_import(_module_name: str):
+        raise AssertionError("fallback import should not execute when entry point resolves")
+
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", _unexpected_import)
+
+    provider = create_vertical_tool_dependency_provider("data_analysis")
+
+    assert provider is sentinel
+
+
 def test_module_factory_fallback_is_used_when_entry_points_missing(monkeypatch) -> None:
     """Resolver should load module-level get_provider before YAML/resource fallbacks."""
     sentinel = EmptyToolDependencyProvider("coding")

@@ -23,6 +23,21 @@ def test_load_tool_dependency_provider_prefers_entry_points(mock_cached_eps):
     assert resolved is provider
 
 
+@patch("victor.framework.entry_point_loader._cached_entry_points")
+def test_load_tool_dependency_provider_normalizes_entry_point_alias_names(mock_cached_eps):
+    """Alias entry point names (data-analysis) should match normalized caller input."""
+    provider = object()
+
+    ep = MagicMock()
+    ep.name = "data-analysis"
+    ep.load.return_value = lambda: provider
+    mock_cached_eps.return_value = (ep,)
+
+    resolved = load_tool_dependency_provider_from_entry_points("data_analysis")
+
+    assert resolved is provider
+
+
 @patch("victor.core.tool_dependency_loader.create_vertical_tool_dependency_provider")
 @patch("victor.framework.entry_point_loader._cached_entry_points")
 def test_load_tool_dependency_provider_uses_core_fallback_when_entry_point_missing(

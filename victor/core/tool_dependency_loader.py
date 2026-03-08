@@ -718,7 +718,7 @@ def create_vertical_tool_dependency_provider(
 
     # Try to load from entry points (external vertical packages).
     for ep in _cached_tool_dependency_entry_points():
-        if ep.name != vertical_name:
+        if _normalize_vertical_name(ep.name) != vertical_name:
             continue
         try:
             provider_factory = ep.load()
