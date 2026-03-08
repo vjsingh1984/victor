@@ -937,3 +937,16 @@ class VerticalRegistry:
         This allows discover_external_verticals() to run again.
         """
         cls._external_discovered = False
+        try:
+            from victor.core.verticals.vertical_loader import get_vertical_loader
+
+            get_vertical_loader().reset_discovery_state()
+        except Exception:
+            pass
+
+        try:
+            from victor.framework.module_loader import get_entry_point_cache
+
+            get_entry_point_cache().invalidate(cls.ENTRY_POINT_GROUP)
+        except Exception:
+            pass

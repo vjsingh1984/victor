@@ -559,6 +559,19 @@ class VerticalLoader:
             )
             logger.info("Plugin cache cleared, will re-discover on next access")
 
+    def reset_discovery_state(self) -> None:
+        """Reset local discovery state without global cache side effects.
+
+        This is intended for tests or explicit registry resets where we need
+        the loader to re-run discovery logic without emitting refresh events
+        or touching unrelated extension/service state.
+        """
+        with self._lock:
+            self._discovered_verticals = None
+            self._discovered_tools = None
+            self._vertical_last_discovery_ms = 0.0
+            self._tool_last_discovery_ms = 0.0
+
     def _activate(self, vertical: Type[VerticalBase]) -> None:
         """Activate a vertical.
 
