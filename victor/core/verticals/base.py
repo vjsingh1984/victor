@@ -240,6 +240,8 @@ class VerticalBase(
         that inherit from VerticalBase require no changes.
     """
 
+    VERTICAL_API_VERSION: ClassVar[int] = 1
+
     # Config cache (keyed by namespaced class identity, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _config_cache_lock: ClassVar[threading.RLock] = threading.RLock()
@@ -590,6 +592,18 @@ class VerticalBase(
         cls._lsp_capability = lsp_capability
 
     @classmethod
+    def register_tools(cls, registry: Any) -> None:
+        """Hook for verticals to register custom tools during activation.
+
+        Override this method to register vertical-specific tools with the
+        tool registry or orchestrator when the vertical is activated.
+
+        Args:
+            registry: Tool registry or orchestrator to register tools with.
+        """
+        pass
+
+    @classmethod
     def get_tool_set(cls) -> ToolSet:
         """Get the ToolSet for this vertical.
 
@@ -659,6 +673,8 @@ class VerticalRegistry:
     _registry: Dict[str, Type[VerticalBase]] = {}
     _external_discovered: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
+    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
+    CURRENT_API_VERSION: ClassVar[int] = 1
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
@@ -856,6 +872,28 @@ class VerticalRegistry:
                 f"has no 'name' attribute defined. Skipping."
             )
             return False
+
+        # Check API version compatibility
+        api_version = getattr(vertical_class, "VERTICAL_API_VERSION", None)
+        if api_version is None:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has no VERTICAL_API_VERSION. Assuming version 1."
+            )
+            api_version = 1
+        if api_version < cls.MINIMUM_SUPPORTED_API_VERSION:
+            logger.error(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"API version {api_version} is below minimum supported "
+                f"version {cls.MINIMUM_SUPPORTED_API_VERSION}. Skipping."
+            )
+            return False
+        if api_version > cls.CURRENT_API_VERSION:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"API version {api_version} is newer than current "
+                f"version {cls.CURRENT_API_VERSION}. It may use unsupported features."
+            )
 
         # Check if abstract methods are implemented
         # VerticalBase requires get_tools() and get_system_prompt()

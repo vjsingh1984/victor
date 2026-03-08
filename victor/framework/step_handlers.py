@@ -432,6 +432,12 @@ class ToolStepHandler(BaseStepHandler):
         context.apply_enabled_tools(canonical_tools)
         result.tools_applied = canonical_tools
 
+        # Call vertical's register_tools hook for custom tool registration
+        try:
+            vertical.register_tools(orchestrator)
+        except Exception as e:
+            logger.debug(f"register_tools() hook for {vertical.name}: {e}")
+
         # Use capability-based approach
         if _check_capability(orchestrator, "enabled_tools"):
             _invoke_capability(orchestrator, "enabled_tools", canonical_tools)
