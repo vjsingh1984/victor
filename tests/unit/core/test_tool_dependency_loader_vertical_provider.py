@@ -70,16 +70,20 @@ def test_module_factory_fallback_is_used_when_entry_points_missing(monkeypatch) 
     assert calls == ["victor.coding.tool_dependencies"]
 
 
-def test_package_resource_yaml_fallback_loads_contrib_config(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "vertical",
+    ["coding", "devops", "research", "rag", "dataanalysis"],
+)
+def test_package_resource_yaml_fallback_loads_contrib_config(monkeypatch, vertical: str) -> None:
     """Known verticals should load bundled YAML when providers are unavailable."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    provider = create_vertical_tool_dependency_provider("coding")
+    provider = create_vertical_tool_dependency_provider(vertical)
 
     assert isinstance(provider, BaseToolDependencyProvider)
     assert not isinstance(provider, EmptyToolDependencyProvider)
-    assert "read" in provider.get_required_tools()
+    assert provider.get_required_tools() or provider.get_dependencies()
 
 
 def test_unknown_vertical_raises_value_error_when_unresolved(monkeypatch) -> None:

@@ -486,6 +486,22 @@ exclude = ["tests*", "docs*", "victor_test*"]
 # Ensure verticals.contrib packages are included
 namespaces = true
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+# Ensure workflow/config assets are available in wheel installs.
+victor = [
+    "config/*.yaml",
+    "config/*.yml",
+    "config/*.json",
+    "verticals/contrib/*/*.yaml",
+    "verticals/contrib/*/*.toml",
+    "verticals/contrib/*/*.svg",
+    "verticals/contrib/*/workflows/*.yaml",
+    "verticals/contrib/*/workflows/*.svg",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
