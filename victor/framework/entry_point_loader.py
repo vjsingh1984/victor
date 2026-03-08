@@ -111,7 +111,11 @@ def load_safety_rules_from_entry_points(
 def load_tool_dependency_provider_from_entry_points(
     vertical: str,
 ) -> Optional[Any]:
-    """Load a tool dependency provider for a specific vertical via entry points.
+    """Load a tool dependency provider for a specific vertical.
+
+    Resolution order:
+    1. ``victor.tool_dependencies`` entry points (preferred)
+    2. Core compatibility loader fallbacks (module factory / package resources)
 
     Args:
         vertical: Vertical name (e.g., "coding", "devops", "research")
@@ -134,7 +138,25 @@ def load_tool_dependency_provider_from_entry_points(
                 provider_factory = ep.load()
                 return provider_factory()
     except Exception as e:
-        logger.debug(f"No tool dependency provider found for '{vertical}': {e}")
+        logger.debug(f"No tool dependency provider found for '{vertical}' via entry points: {e}")
+
+    # Compatibility fallback for extracted verticals (core + external packages).
+    try:
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.core.tool_types import EmptyToolDependencyProvider
+
+        provider = create_vertical_tool_dependency_provider(vertical)
+        if isinstance(provider, EmptyToolDependencyProvider):
+            return None
+        return provider
+    except ValueError:
+        logger.debug("Unknown vertical '%s' for tool dependency provider resolution", vertical)
+    except Exception as e:
+        logger.debug(
+            "Fallback tool dependency provider resolution failed for '%s': %s",
+            vertical,
+            e,
+        )
 
     return None
 
