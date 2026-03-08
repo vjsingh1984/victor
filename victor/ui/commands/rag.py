@@ -40,6 +40,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.ui.commands.utils import setup_logging
 
 rag_app = typer.Typer(
@@ -47,6 +48,14 @@ rag_app = typer.Typer(
     help="RAG (Retrieval-Augmented Generation) operations - ingest, search, query documents.",
 )
 console = Console()
+
+
+def _load_rag_attr(module_path: str, attr_name: str):
+    """Load a RAG vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve RAG attribute: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
 
 
 def _configure_log_level(log_level: Optional[str]) -> None:
@@ -148,7 +157,7 @@ async def _ingest_async(
     doc_id: Optional[str],
 ) -> None:
     """Async implementation of ingest command."""
-    from victor_rag.tools.ingest import RAGIngestTool
+    RAGIngestTool = _load_rag_attr("victor.rag.tools.ingest", "RAGIngestTool")
 
     tool = RAGIngestTool()
 
@@ -203,7 +212,7 @@ def search(
 
 async def _search_async(query: str, top_k: int) -> None:
     """Async implementation of search command."""
-    from victor_rag.tools.search import RAGSearchTool
+    RAGSearchTool = _load_rag_attr("victor.rag.tools.search", "RAGSearchTool")
 
     tool = RAGSearchTool()
 
@@ -278,7 +287,7 @@ async def _query_async(
     from rich.panel import Panel
     from rich.text import Text
 
-    from victor_rag.tools.query import RAGQueryTool
+    RAGQueryTool = _load_rag_attr("victor.rag.tools.query", "RAGQueryTool")
 
     # Show enrichment details if enabled
     if show_enrichment:
@@ -321,8 +330,15 @@ async def _show_enrichment_details(question: str) -> None:
     from rich.table import Table
     from rich.text import Text
 
-    from victor_rag.document_store import DocumentStore
-    from victor_rag.enrichment import get_rag_enrichment_strategy, reset_rag_enrichment_strategy
+    DocumentStore = _load_rag_attr("victor.rag.document_store", "DocumentStore")
+    get_rag_enrichment_strategy = _load_rag_attr(
+        "victor.rag.enrichment",
+        "get_rag_enrichment_strategy",
+    )
+    reset_rag_enrichment_strategy = _load_rag_attr(
+        "victor.rag.enrichment",
+        "reset_rag_enrichment_strategy",
+    )
 
     # Reset to ensure fresh initialization
     reset_rag_enrichment_strategy()
@@ -410,7 +426,7 @@ def list_docs() -> None:
 
 async def _list_async() -> None:
     """Async implementation of list command."""
-    from victor_rag.tools.management import RAGListTool
+    RAGListTool = _load_rag_attr("victor.rag.tools.management", "RAGListTool")
 
     tool = RAGListTool()
     result = await tool.execute()
@@ -434,7 +450,7 @@ def stats() -> None:
 
 async def _stats_async() -> None:
     """Async implementation of stats command."""
-    from victor_rag.tools.management import RAGStatsTool
+    RAGStatsTool = _load_rag_attr("victor.rag.tools.management", "RAGStatsTool")
 
     tool = RAGStatsTool()
     result = await tool.execute()
@@ -475,7 +491,7 @@ def delete(
 
 async def _delete_async(doc_id: str) -> None:
     """Async implementation of delete command."""
-    from victor_rag.tools.management import RAGDeleteTool
+    RAGDeleteTool = _load_rag_attr("victor.rag.tools.management", "RAGDeleteTool")
 
     tool = RAGDeleteTool()
     result = await tool.execute(doc_id=doc_id)
@@ -603,15 +619,13 @@ def demo_sec(
         victor rag demo-sec --stats                  # Show SEC filing stats
         victor rag demo-sec --clear                  # Clear all SEC filings
     """
-    from victor_rag.demo_sec_filings import (
-        COMPANY_PRESETS,
-        SP500_COMPANIES,
-        clear_sec_filings,
-        ingest_sec_filings,
-        list_companies as _list_companies,
-        query_filings,
-        show_stats,
-    )
+    COMPANY_PRESETS = _load_rag_attr("victor.rag.demo_sec_filings", "COMPANY_PRESETS")
+    SP500_COMPANIES = _load_rag_attr("victor.rag.demo_sec_filings", "SP500_COMPANIES")
+    clear_sec_filings = _load_rag_attr("victor.rag.demo_sec_filings", "clear_sec_filings")
+    ingest_sec_filings = _load_rag_attr("victor.rag.demo_sec_filings", "ingest_sec_filings")
+    _list_companies = _load_rag_attr("victor.rag.demo_sec_filings", "list_companies")
+    query_filings = _load_rag_attr("victor.rag.demo_sec_filings", "query_filings")
+    show_stats = _load_rag_attr("victor.rag.demo_sec_filings", "show_stats")
 
     if list_companies:
         _list_companies(preset=preset, sector=sector)
@@ -693,7 +707,7 @@ def demo_sec(
 
 async def _demo_docs() -> None:
     """Run the project docs demo."""
-    from victor_rag.demo_docs import ingest_victor_docs
+    ingest_victor_docs = _load_rag_attr("victor.rag.demo_docs", "ingest_victor_docs")
 
     try:
         results = await ingest_victor_docs()
