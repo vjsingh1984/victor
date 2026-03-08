@@ -32,16 +32,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Lazy load ignore patterns from external victor-coding package
-try:
-    from victor_coding.codebase.ignore_patterns import (
-        DEFAULT_SKIP_DIRS,
-        is_hidden_path,
-        should_ignore_path,
-    )
+from victor.core.verticals.import_resolver import import_module_with_fallback
 
+# Lazy load ignore patterns from external coding vertical package
+_ignore_module, _ = import_module_with_fallback("victor.coding.codebase.ignore_patterns")
+if (
+    _ignore_module is not None
+    and hasattr(_ignore_module, "DEFAULT_SKIP_DIRS")
+    and hasattr(_ignore_module, "is_hidden_path")
+    and hasattr(_ignore_module, "should_ignore_path")
+):
+    DEFAULT_SKIP_DIRS = _ignore_module.DEFAULT_SKIP_DIRS
+    is_hidden_path = _ignore_module.is_hidden_path
+    should_ignore_path = _ignore_module.should_ignore_path
     _IGNORE_PATTERNS_AVAILABLE = True
-except ImportError:
+else:
     _IGNORE_PATTERNS_AVAILABLE = False
     DEFAULT_SKIP_DIRS = frozenset(
         {
@@ -65,7 +70,7 @@ except ImportError:
     def should_ignore_path(
         path: Path, skip_dirs: frozenset, extra_skip_dirs: Optional[frozenset] = None
     ) -> bool:
-        """Fallback implementation when victor-coding is not available."""
+        """Fallback implementation when coding ignore-patterns module is unavailable."""
         # Simple fallback: check if path is hidden or in skip_dirs
         if path.name.startswith("."):
             return True
@@ -2383,7 +2388,6 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     """
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-    from victor_coding.codebase.graph.registry import create_graph_store
     from victor.core.schema import Tables
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
@@ -2408,6 +2412,13 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         "centrality": [],
         "components": [],
     }
+
+    graph_registry_module, _resolved = import_module_with_fallback(
+        "victor.coding.codebase.graph.registry"
+    )
+    if graph_registry_module is None or not hasattr(graph_registry_module, "create_graph_store"):
+        insights["error"] = "Graph store backend is unavailable"
+        return insights
 
     if not graph_db_path.exists():
         return insights

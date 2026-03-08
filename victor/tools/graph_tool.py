@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
 # Lazy load graph components - try main framework first, then victor-coding
 _GRAPH_AVAILABLE = False
 GraphEdge = None
@@ -47,14 +49,26 @@ try:
 
     _GRAPH_AVAILABLE = True
 except ImportError:
-    # Fall back to victor-coding external package
-    try:
-        from victor_coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
-        from victor_coding.codebase.graph.registry import create_graph_store
-
+    # Fall back to external coding vertical package via compatibility resolver.
+    protocol_module, _protocol_resolved = import_module_with_fallback(
+        "victor.coding.codebase.graph.protocol"
+    )
+    registry_module, _registry_resolved = import_module_with_fallback(
+        "victor.coding.codebase.graph.registry"
+    )
+    if (
+        protocol_module is not None
+        and registry_module is not None
+        and hasattr(protocol_module, "GraphEdge")
+        and hasattr(protocol_module, "GraphNode")
+        and hasattr(protocol_module, "GraphStoreProtocol")
+        and hasattr(registry_module, "create_graph_store")
+    ):
+        GraphEdge = protocol_module.GraphEdge
+        GraphNode = protocol_module.GraphNode
+        GraphStoreProtocol = protocol_module.GraphStoreProtocol
+        create_graph_store = registry_module.create_graph_store
         _GRAPH_AVAILABLE = True
-    except ImportError:
-        pass  # Leave all as None
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -1363,7 +1377,12 @@ async def graph(
         if not analyzer.nodes:
             logger.info("Graph is empty, triggering lazy indexing...")
             try:
-                from victor_coding.codebase.indexer import CodebaseIndex
+                indexer_module, _resolved = import_module_with_fallback(
+                    "victor.coding.codebase.indexer"
+                )
+                if indexer_module is None or not hasattr(indexer_module, "CodebaseIndex"):
+                    raise ImportError("CodebaseIndex unavailable for automatic graph indexing")
+                CodebaseIndex = indexer_module.CodebaseIndex
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()
