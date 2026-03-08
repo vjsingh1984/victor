@@ -71,7 +71,10 @@ from urllib.parse import urlparse
 
 import httpx
 
-from victor.core.verticals.package_schema import VerticalPackageMetadata
+from victor.core.verticals.package_schema import (
+    VerticalPackageMetadata,
+    is_victor_version_compatible,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -735,15 +738,7 @@ class VerticalRegistryManager:
         Returns:
             True if compatible, False otherwise
         """
-        try:
-            from packaging.requirements import Requirement
-            from packaging.version import Version
-
-            req = Requirement(f"victor-ai{required}")
-            return Version(current) in req.specifier
-        except Exception:
-            # Assume compatible if we can't check
-            return True
+        return is_victor_version_compatible(current, required)
 
     def clear_cache(self) -> None:
         """Clear the metadata cache."""
