@@ -544,6 +544,9 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
 # Mtime-aware provider cache for automatic cache invalidation
 # Format: {path_str: (mtime_ns, provider_instance)}
 _provider_cache: Dict[str, Tuple[int, BaseToolDependencyProvider]] = {}
+# Vertical provider resolution cache
+_vertical_provider_cache: Dict[Tuple[str, Optional[bool]], BaseToolDependencyProvider] = {}
+_vertical_provider_cache_lock = threading.Lock()
 
 
 def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
@@ -650,6 +653,8 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 # Resolution telemetry counters for runtime diagnostics.
 _TOOL_DEPENDENCY_RESOLUTION_STATS: Dict[str, int] = {
     "total_requests": 0,
+    "provider_cache_hits": 0,
+    "provider_cache_misses": 0,
     "entry_point_resolutions": 0,
     "entry_point_load_failures": 0,
     "module_factory_resolutions": 0,
@@ -720,6 +725,18 @@ def clear_tool_dependency_entry_point_cache() -> None:
     _cached_tool_dependency_entry_points.cache_clear()
 
 
+def clear_vertical_tool_dependency_provider_cache() -> int:
+    """Clear cached vertical tool dependency provider instances.
+
+    Returns:
+        Number of cached provider entries removed.
+    """
+    with _vertical_provider_cache_lock:
+        count = len(_vertical_provider_cache)
+        _vertical_provider_cache.clear()
+        return count
+
+
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,
@@ -766,6 +783,14 @@ def create_vertical_tool_dependency_provider(
     """
     _increment_resolution_stat("total_requests")
     vertical_name = _normalize_vertical_name(vertical)
+    cache_key = (vertical_name, canonicalize)
+
+    with _vertical_provider_cache_lock:
+        cached_provider = _vertical_provider_cache.get(cache_key)
+    if cached_provider is not None:
+        _increment_resolution_stat("provider_cache_hits")
+        return cached_provider
+    _increment_resolution_stat("provider_cache_misses")
 
     # Try to load from entry points (external vertical packages).
     for ep in _cached_tool_dependency_entry_points():
@@ -775,6 +800,8 @@ def create_vertical_tool_dependency_provider(
             provider_factory = ep.load()
             provider = provider_factory()
             _increment_resolution_stat("entry_point_resolutions")
+            with _vertical_provider_cache_lock:
+                _vertical_provider_cache[cache_key] = provider
             logger.debug("Loaded tool dependency provider for '%s' from entry point", vertical_name)
             return provider
         except Exception as e:
@@ -794,6 +821,8 @@ def create_vertical_tool_dependency_provider(
         try:
             provider = module.get_provider()
             _increment_resolution_stat("module_factory_resolutions")
+            with _vertical_provider_cache_lock:
+                _vertical_provider_cache[cache_key] = provider
             logger.debug(
                 "Loaded tool dependency provider for '%s' from module '%s'",
                 vertical_name,
@@ -841,7 +870,10 @@ def create_vertical_tool_dependency_provider(
                     vertical_name,
                     package,
                 )
-                return BaseToolDependencyProvider(config=config)
+                provider = BaseToolDependencyProvider(config=config)
+                with _vertical_provider_cache_lock:
+                    _vertical_provider_cache[cache_key] = provider
+                return provider
         except Exception as e:
             _increment_resolution_stat("package_resource_failures")
             logger.debug(
@@ -860,7 +892,10 @@ def create_vertical_tool_dependency_provider(
     from victor.core.tool_types import EmptyToolDependencyProvider
 
     _increment_resolution_stat("empty_provider_returns")
-    return EmptyToolDependencyProvider(vertical_name)
+    provider = EmptyToolDependencyProvider(vertical_name)
+    with _vertical_provider_cache_lock:
+        _vertical_provider_cache[cache_key] = provider
+    return provider
 
 
 __all__ = [
@@ -872,6 +907,7 @@ __all__ = [
     "get_cached_provider",
     "invalidate_provider_cache",
     "clear_tool_dependency_entry_point_cache",
+    "clear_vertical_tool_dependency_provider_cache",
     "get_tool_dependency_resolution_stats",
     "reset_tool_dependency_resolution_stats",
     "create_vertical_tool_dependency_provider",

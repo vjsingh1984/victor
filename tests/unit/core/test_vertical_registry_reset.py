@@ -28,6 +28,7 @@ def test_reset_discovery_clears_loader_and_entry_point_caches() -> None:
     cache = Mock()
     framework_cache_clear = Mock()
     tool_dep_cache_clear = Mock()
+    provider_cache_clear = Mock(return_value=0)
 
     with patch("victor.core.verticals.vertical_loader.get_vertical_loader", return_value=loader):
         with patch("victor.framework.module_loader.get_entry_point_cache", return_value=cache):
@@ -39,13 +40,18 @@ def test_reset_discovery_clears_loader_and_entry_point_caches() -> None:
                     "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
                     tool_dep_cache_clear,
                 ):
-                    VerticalRegistry.reset_discovery()
+                    with patch(
+                        "victor.core.tool_dependency_loader.clear_vertical_tool_dependency_provider_cache",
+                        provider_cache_clear,
+                    ):
+                        VerticalRegistry.reset_discovery()
 
     assert VerticalRegistry._external_discovered is False
     loader.reset_discovery_state.assert_called_once()
     cache.invalidate.assert_called_once_with(VerticalRegistry.ENTRY_POINT_GROUP)
     framework_cache_clear.assert_called_once()
     tool_dep_cache_clear.assert_called_once()
+    provider_cache_clear.assert_called_once()
 
 
 def test_reset_discovery_is_resilient_when_reset_hooks_fail() -> None:
@@ -68,6 +74,10 @@ def test_reset_discovery_is_resilient_when_reset_hooks_fail() -> None:
                     "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
                     side_effect=RuntimeError("tool dependency cache unavailable"),
                 ):
-                    VerticalRegistry.reset_discovery()
+                    with patch(
+                        "victor.core.tool_dependency_loader.clear_vertical_tool_dependency_provider_cache",
+                        side_effect=RuntimeError("provider cache unavailable"),
+                    ):
+                        VerticalRegistry.reset_discovery()
 
     assert VerticalRegistry._external_discovered is False

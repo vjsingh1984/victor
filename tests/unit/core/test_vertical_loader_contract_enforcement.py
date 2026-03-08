@@ -72,12 +72,17 @@ def test_refresh_plugins_clears_entry_point_loader_caches(monkeypatch):
 
     framework_called = {"value": False}
     tool_dep_called = {"value": False}
+    provider_cache_called = {"value": False}
 
     def _clear_framework_cache():
         framework_called["value"] = True
 
     def _clear_tool_dep_cache():
         tool_dep_called["value"] = True
+
+    def _clear_provider_cache():
+        provider_cache_called["value"] = True
+        return 0
 
     monkeypatch.setattr(
         "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
@@ -87,11 +92,16 @@ def test_refresh_plugins_clears_entry_point_loader_caches(monkeypatch):
         "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
         _clear_tool_dep_cache,
     )
+    monkeypatch.setattr(
+        "victor.core.tool_dependency_loader.clear_vertical_tool_dependency_provider_cache",
+        _clear_provider_cache,
+    )
 
     loader.refresh_plugins()
 
     assert framework_called["value"] is True
     assert tool_dep_called["value"] is True
+    assert provider_cache_called["value"] is True
 
 
 def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):

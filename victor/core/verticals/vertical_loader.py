@@ -548,9 +548,11 @@ class VerticalLoader:
             try:
                 from victor.core.tool_dependency_loader import (
                     clear_tool_dependency_entry_point_cache,
+                    clear_vertical_tool_dependency_provider_cache,
                 )
 
                 clear_tool_dependency_entry_point_cache()
+                clear_vertical_tool_dependency_provider_cache()
             except Exception as e:
                 logger.debug("Failed clearing tool dependency entry-point cache: %s", e)
 

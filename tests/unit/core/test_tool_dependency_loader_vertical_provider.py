@@ -30,9 +30,11 @@ import victor.core.tool_dependency_loader as loader_mod
 def _clear_tool_dependency_ep_cache() -> None:
     """Keep entry-point cache and telemetry isolated between tests."""
     loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
+    loader_mod.clear_vertical_tool_dependency_provider_cache()
     loader_mod.clear_tool_dependency_entry_point_cache()
     yield
     loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
+    loader_mod.clear_vertical_tool_dependency_provider_cache()
     loader_mod.clear_tool_dependency_entry_point_cache()
 
 
@@ -261,3 +263,56 @@ def test_resolution_stats_track_unknown_vertical_and_cache_hits(monkeypatch) -> 
     assert stats["unknown_vertical_errors"] == 2
     assert stats["entry_point_cache_misses"] >= 1
     assert stats["entry_point_cache_hits"] >= 1
+
+
+def test_provider_cache_reuses_resolved_provider(monkeypatch) -> None:
+    """Provider cache should reuse previously resolved provider instances."""
+    sentinel = EmptyToolDependencyProvider("coding")
+    load_calls = 0
+
+    class _FakeEntryPoint:
+        name = "coding"
+
+        @staticmethod
+        def load():
+            nonlocal load_calls
+            load_calls += 1
+            return lambda: sentinel
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    p1 = create_vertical_tool_dependency_provider("coding")
+    p2 = create_vertical_tool_dependency_provider("coding")
+    stats = loader_mod.get_tool_dependency_resolution_stats()
+
+    assert p1 is sentinel
+    assert p2 is sentinel
+    assert load_calls == 1
+    assert stats["provider_cache_hits"] >= 1
+    assert stats["provider_cache_misses"] >= 1
+
+
+def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
+    """Clearing provider cache should force a fresh provider resolution path."""
+    load_calls = 0
+
+    class _FakeEntryPoint:
+        name = "coding"
+
+        @staticmethod
+        def load():
+            nonlocal load_calls
+            load_calls += 1
+            # Return a fresh provider each time to detect re-resolution
+            return lambda: EmptyToolDependencyProvider("coding")
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    p1 = create_vertical_tool_dependency_provider("coding")
+    loader_mod.clear_vertical_tool_dependency_provider_cache()
+    p2 = create_vertical_tool_dependency_provider("coding")
+
+    assert p1 is not p2
+    assert load_calls == 2
