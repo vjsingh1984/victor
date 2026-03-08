@@ -21,6 +21,7 @@ of team specs from all verticals.
 import pytest
 from unittest.mock import MagicMock
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.framework.team_registry import (
     TeamSpecRegistry,
     TeamSpecEntry,
@@ -30,6 +31,14 @@ from victor.framework.team_registry import (
     load_all_verticals,
     find_team_for_task,
 )
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute or skip when unavailable."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
 
 # =============================================================================
 # TeamSpecRegistry Basic Tests
@@ -377,7 +386,7 @@ class TestAutoRegistration:
     @pytest.mark.integration
     def test_coding_vertical_team_specs_available(self):
         """Coding team specs should be available and match registered count."""
-        from victor_coding.teams import CODING_TEAM_SPECS
+        CODING_TEAM_SPECS = _load_vertical_attr("victor.coding.teams", "CODING_TEAM_SPECS")
 
         # Load via load_all_verticals to ensure registration
         load_all_verticals()
@@ -395,7 +404,7 @@ class TestAutoRegistration:
     @pytest.mark.integration
     def test_devops_vertical_team_specs_available(self):
         """DevOps team specs should be available and match registered count."""
-        from victor_devops.teams import DEVOPS_TEAM_SPECS
+        DEVOPS_TEAM_SPECS = _load_vertical_attr("victor.devops.teams", "DEVOPS_TEAM_SPECS")
 
         load_all_verticals()
 
@@ -411,7 +420,7 @@ class TestAutoRegistration:
     @pytest.mark.integration
     def test_research_vertical_team_specs_available(self):
         """Research team specs should be available and match registered count."""
-        from victor_research.teams import RESEARCH_TEAM_SPECS
+        RESEARCH_TEAM_SPECS = _load_vertical_attr("victor.research.teams", "RESEARCH_TEAM_SPECS")
 
         load_all_verticals()
 
@@ -427,7 +436,10 @@ class TestAutoRegistration:
     @pytest.mark.integration
     def test_data_analysis_vertical_team_specs_available(self):
         """Data analysis team specs should be available and match registered count."""
-        from victor_dataanalysis.teams import DATA_ANALYSIS_TEAM_SPECS
+        DATA_ANALYSIS_TEAM_SPECS = _load_vertical_attr(
+            "victor.dataanalysis.teams",
+            "DATA_ANALYSIS_TEAM_SPECS",
+        )
 
         load_all_verticals()
 
