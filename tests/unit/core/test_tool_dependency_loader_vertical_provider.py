@@ -26,6 +26,14 @@ from victor.core.tool_types import EmptyToolDependencyProvider
 import victor.core.tool_dependency_loader as loader_mod
 
 
+@pytest.fixture(autouse=True)
+def _clear_tool_dependency_ep_cache() -> None:
+    """Keep entry-point cache isolated between tests."""
+    loader_mod.clear_tool_dependency_entry_point_cache()
+    yield
+    loader_mod.clear_tool_dependency_entry_point_cache()
+
+
 def test_entry_point_provider_has_priority_over_fallbacks(monkeypatch) -> None:
     """Entry point providers should short-circuit module/resource fallbacks."""
     sentinel = EmptyToolDependencyProvider("coding")
@@ -109,3 +117,46 @@ def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(monkey
 
     assert isinstance(provider, EmptyToolDependencyProvider)
     assert provider.vertical == "coding"
+
+
+def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
+    """Entry point scans should be cached across repeated resolution calls."""
+    call_count = 0
+
+    def _fake_entry_points(group: str):
+        nonlocal call_count
+        assert group == "victor.tool_dependencies"
+        call_count += 1
+        return []
+
+    monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+
+    assert call_count == 1
+
+
+def test_clear_tool_dependency_entry_point_cache_forces_rescan(monkeypatch) -> None:
+    """Cache clear helper should force a fresh entry-point query."""
+    call_count = 0
+
+    def _fake_entry_points(group: str):
+        nonlocal call_count
+        assert group == "victor.tool_dependencies"
+        call_count += 1
+        return []
+
+    monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+    loader_mod.clear_tool_dependency_entry_point_cache()
+    with pytest.raises(ValueError, match="Unknown vertical"):
+        create_vertical_tool_dependency_provider("mlops")
+
+    assert call_count == 2

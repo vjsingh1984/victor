@@ -545,6 +545,15 @@ class VerticalLoader:
             except Exception as e:
                 logger.debug("Failed clearing framework entry-point loader cache: %s", e)
 
+            try:
+                from victor.core.tool_dependency_loader import (
+                    clear_tool_dependency_entry_point_cache,
+                )
+
+                clear_tool_dependency_entry_point_cache()
+            except Exception as e:
+                logger.debug("Failed clearing tool dependency entry-point cache: %s", e)
+
             self._plugin_refresh_last_ms = max(
                 0.0,
                 (time.perf_counter() - refresh_start) * 1000.0,

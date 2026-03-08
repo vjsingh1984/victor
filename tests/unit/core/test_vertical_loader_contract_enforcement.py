@@ -64,25 +64,34 @@ def test_loader_accepts_vertical_with_supported_api_version(monkeypatch):
     VerticalRegistry.unregister(vertical_name)
 
 
-def test_refresh_plugins_clears_framework_entry_point_loader_cache(monkeypatch):
-    """refresh_plugins() should clear framework entry-point loader cache."""
+def test_refresh_plugins_clears_entry_point_loader_caches(monkeypatch):
+    """refresh_plugins() should clear framework + tool dependency entry-point caches."""
     loader = VerticalLoader()
     loader._emit_observability_event = lambda *args, **kwargs: None
     loader._emit_observability_event_async = lambda *args, **kwargs: None
 
-    called = {"value": False}
+    framework_called = {"value": False}
+    tool_dep_called = {"value": False}
 
-    def _clear_cache():
-        called["value"] = True
+    def _clear_framework_cache():
+        framework_called["value"] = True
+
+    def _clear_tool_dep_cache():
+        tool_dep_called["value"] = True
 
     monkeypatch.setattr(
         "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
-        _clear_cache,
+        _clear_framework_cache,
+    )
+    monkeypatch.setattr(
+        "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
+        _clear_tool_dep_cache,
     )
 
     loader.refresh_plugins()
 
-    assert called["value"] is True
+    assert framework_called["value"] is True
+    assert tool_dep_called["value"] is True
 
 
 def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):

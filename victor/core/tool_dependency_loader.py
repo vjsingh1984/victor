@@ -53,6 +53,7 @@ Example:
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -646,6 +647,21 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 }
 
 
+@lru_cache(maxsize=1)
+def _cached_tool_dependency_entry_points() -> Tuple[Any, ...]:
+    """Cache tool dependency entry points for faster repeated resolution."""
+    try:
+        return tuple(entry_points(group="victor.tool_dependencies"))
+    except Exception as e:
+        logger.debug("No tool dependency entry points found: %s", e)
+        return ()
+
+
+def clear_tool_dependency_entry_point_cache() -> None:
+    """Clear cached tool dependency entry-point lookups."""
+    _cached_tool_dependency_entry_points.cache_clear()
+
+
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,
@@ -690,17 +706,22 @@ def create_vertical_tool_dependency_provider(
                 canonicalize=True,
             )
     """
-    # Try to load from entry points (external vertical packages)
-    try:
-        eps = entry_points(group="victor.tool_dependencies")
-        for ep in eps:
-            if ep.name == vertical:
-                provider_factory = ep.load()
-                provider = provider_factory()
-                logger.debug(f"Loaded tool dependency provider for '{vertical}' from entry point")
-                return provider
-    except Exception as e:
-        logger.debug(f"No tool dependency provider found for '{vertical}' in entry points: {e}")
+    # Try to load from entry points (external vertical packages).
+    for ep in _cached_tool_dependency_entry_points():
+        if ep.name != vertical:
+            continue
+        try:
+            provider_factory = ep.load()
+            provider = provider_factory()
+            logger.debug(f"Loaded tool dependency provider for '{vertical}' from entry point")
+            return provider
+        except Exception as e:
+            logger.debug(
+                "Failed loading tool dependency provider for '%s' from entry point '%s': %s",
+                vertical,
+                ep.name,
+                e,
+            )
 
     # Fallback 1: module-level provider factory (external-first resolver).
     # This supports extracted vertical repos even when entry points are unavailable.
@@ -781,5 +802,6 @@ __all__ = [
     "create_tool_dependency_provider",
     "get_cached_provider",
     "invalidate_provider_cache",
+    "clear_tool_dependency_entry_point_cache",
     "create_vertical_tool_dependency_provider",
 ]
