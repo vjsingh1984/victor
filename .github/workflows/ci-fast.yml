@@ -246,6 +246,20 @@ jobs:
             tests/unit/framework/test_capability_loader.py::TestLoaderOrchestratorIntegration::test_apply_to_blocks_private_registration_fallback_in_strict_mode \
             -q
 
+  version-sync:
+    name: Version Sync Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check victor-ai / victor-sdk version consistency
+        run: python scripts/check_version_sync.py
+
   guards:
     name: CI Guards
     runs-on: ubuntu-latest

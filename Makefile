@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release
+.PHONY: help install install-dev test lint format clean build build-binary docker release sync-version check-version
 
 # Default target
 help:
@@ -27,6 +27,10 @@ help:
 	@echo "  make build-binary  Build standalone binary"
 	@echo "  make docker        Build Docker image"
 	@echo "  make release       Create a release (VERSION=x.y.z required)"
+	@echo ""
+	@echo "Versioning:"
+	@echo "  make check-version Verify victor-ai/victor-sdk versions are in sync"
+	@echo "  make sync-version  Sync all package versions from VERSION file"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make docs          Generate documentation"
@@ -112,17 +116,28 @@ docker-push: docker
 	docker tag victor:latest vijayksingh/victor:latest
 	docker push vijayksingh/victor:latest
 
+# Version management (syncs victor-ai and victor-sdk)
+sync-version:  ## Sync all package versions from VERSION file
+	python scripts/sync_version.py
+
+check-version:  ## Verify all package versions are in sync
+	python scripts/check_version_sync.py
+
 # Release (requires VERSION)
 release:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release VERSION=0.1.0)
 endif
 	@echo "Creating release v$(VERSION)..."
-	@# Update version in pyproject.toml
-	sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' pyproject.toml && rm pyproject.toml.bak
+	@# Update VERSION file (single source of truth)
+	echo "$(VERSION)" > VERSION
+	@# Sync all pyproject.toml files from VERSION
+	python scripts/sync_version.py
+	@# Verify consistency
+	python scripts/check_version_sync.py
 	@# Commit and tag
-	git add pyproject.toml
-	git commit -m "Release v$(VERSION)"
+	git add VERSION pyproject.toml victor-sdk/pyproject.toml
+	git commit -m "release: v$(VERSION)"
 	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo ""
 	@echo "Release v$(VERSION) created!"

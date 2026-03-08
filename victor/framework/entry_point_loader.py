@@ -41,7 +41,6 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from importlib.metadata import entry_points
 
-from victor.core.verticals.import_resolver import normalize_vertical_name
 from victor.framework.config import SafetyEnforcer
 
 logger = logging.getLogger(__name__)
@@ -103,11 +102,24 @@ def reset_entry_point_loader_stats(clear_cache: bool = False) -> None:
             _ENTRY_POINT_LOADER_STATS[key] = 0
 
 
+def _get_normalize_fn() -> Callable[[str], str]:
+    """Lazy import normalize_vertical_name to avoid circular imports."""
+    from victor.core.verticals.import_resolver import normalize_vertical_name
+
+    return normalize_vertical_name
+
+
+def normalize_vertical_name(name: str) -> str:
+    """Normalize a vertical name (lazy-imported to avoid circular imports)."""
+    return _get_normalize_fn()(name)
+
+
 def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[set[str]]:
     """Normalize an optional list of vertical names for matching."""
     if vertical_names is None:
         return None
-    return {normalize_vertical_name(name) for name in vertical_names}
+    fn = _get_normalize_fn()
+    return {fn(name) for name in vertical_names}
 
 
 @functools.lru_cache(maxsize=16)

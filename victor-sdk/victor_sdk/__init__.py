@@ -4,10 +4,15 @@ Victor SDK - Protocol definitions for vertical development.
 This package provides pure protocol/ABC definitions that external verticals
 can depend on without pulling in the entire Victor framework.
 
-Version: 1.0.0a1
+Version: Synchronized with victor-ai
 """
 
-__version__ = "1.0.0"
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("victor-sdk")
+except Exception:
+    __version__ = "0.0.0"
 
 # Core types
 from victor_sdk.core.types import (
