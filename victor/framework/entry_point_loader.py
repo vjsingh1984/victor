@@ -41,6 +41,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from importlib.metadata import entry_points
 
+from victor.core.verticals.import_resolver import normalize_vertical_name
 from victor.framework.config import SafetyEnforcer
 
 logger = logging.getLogger(__name__)
@@ -101,19 +102,11 @@ def reset_entry_point_loader_stats(clear_cache: bool = False) -> None:
         clear_entry_point_loader_cache()
 
 
-def _normalize_vertical_name(vertical: str) -> str:
-    """Normalize vertical names for entry-point matching."""
-    normalized = vertical.strip().lower().replace("-", "_")
-    if normalized in {"data_analysis"}:
-        return "dataanalysis"
-    return normalized
-
-
 def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[set[str]]:
     """Normalize an optional list of vertical names for matching."""
     if vertical_names is None:
         return None
-    return {_normalize_vertical_name(name) for name in vertical_names}
+    return {normalize_vertical_name(name) for name in vertical_names}
 
 
 @functools.lru_cache(maxsize=16)
@@ -165,7 +158,7 @@ def load_safety_rules_from_entry_points(
             # Filter by vertical name if specified
             if (
                 normalized_verticals is not None
-                and _normalize_vertical_name(ep.name) not in normalized_verticals
+                and normalize_vertical_name(ep.name) not in normalized_verticals
             ):
                 continue
 
@@ -209,12 +202,12 @@ def load_tool_dependency_provider_from_entry_points(
             sequences = provider.get_tool_sequences()
     """
     _increment_loader_stat("tool_dependency_calls")
-    normalized_vertical = _normalize_vertical_name(vertical)
+    normalized_vertical = normalize_vertical_name(vertical)
 
     try:
         eps = _cached_entry_points("victor.tool_dependencies")
         for ep in eps:
-            if _normalize_vertical_name(ep.name) == normalized_vertical:
+            if normalize_vertical_name(ep.name) == normalized_vertical:
                 provider_factory = ep.load()
                 _increment_loader_stat("tool_dependency_entry_point_resolutions")
                 return provider_factory()
@@ -265,12 +258,12 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
             learning_rate = rl_config.get("learning_rate", 0.001)
     """
     _increment_loader_stat("rl_config_calls")
-    normalized_vertical = _normalize_vertical_name(vertical)
+    normalized_vertical = normalize_vertical_name(vertical)
 
     try:
         eps = _cached_entry_points("victor.rl_configs")
         for ep in eps:
-            if _normalize_vertical_name(ep.name) == normalized_vertical:
+            if normalize_vertical_name(ep.name) == normalized_vertical:
                 config_factory = ep.load()
                 _increment_loader_stat("rl_config_hits")
                 return config_factory()
@@ -312,7 +305,7 @@ def register_escape_hatches_from_entry_points(
             # Filter by vertical name if specified
             if (
                 normalized_verticals is not None
-                and _normalize_vertical_name(ep.name) not in normalized_verticals
+                and normalize_vertical_name(ep.name) not in normalized_verticals
             ):
                 continue
 
@@ -363,7 +356,7 @@ def register_commands_from_entry_points(
             # Filter by vertical name if specified
             if (
                 normalized_verticals is not None
-                and _normalize_vertical_name(ep.name) not in normalized_verticals
+                and normalize_vertical_name(ep.name) not in normalized_verticals
             ):
                 continue
 

@@ -22,6 +22,7 @@ from unittest.mock import patch
 from victor.core.verticals.import_resolver import (
     import_module_with_fallback,
     module_import_candidates,
+    normalize_vertical_name,
     vertical_module_candidates,
 )
 
@@ -39,6 +40,13 @@ def test_vertical_module_candidates_handles_dataanalysis_alias() -> None:
     """Historical data-analysis spellings should map to victor_dataanalysis."""
     candidates = vertical_module_candidates("data-analysis", "capabilities")
     assert candidates[0] == "victor_dataanalysis.capabilities"
+
+
+def test_normalize_vertical_name_maps_data_analysis_aliases() -> None:
+    """Data analysis aliases should normalize to canonical dataanalysis."""
+    assert normalize_vertical_name("data-analysis") == "dataanalysis"
+    assert normalize_vertical_name("data_analysis") == "dataanalysis"
+    assert normalize_vertical_name("dataanalysis") == "dataanalysis"
 
 
 def test_module_import_candidates_for_legacy_path() -> None:

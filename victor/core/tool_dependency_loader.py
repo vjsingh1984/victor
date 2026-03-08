@@ -65,6 +65,7 @@ import yaml
 from victor.core.verticals.import_resolver import (
     import_module_with_fallback,
     module_import_candidates,
+    normalize_vertical_name,
 )
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 
@@ -702,14 +703,6 @@ def reset_tool_dependency_resolution_stats(clear_entry_point_cache: bool = False
         clear_tool_dependency_entry_point_cache()
 
 
-def _normalize_vertical_name(vertical: str) -> str:
-    """Normalize vertical names used in tool dependency resolution."""
-    normalized = vertical.strip().lower().replace("-", "_")
-    if normalized in {"data_analysis"}:
-        return "dataanalysis"
-    return normalized
-
-
 @lru_cache(maxsize=1)
 def _cached_tool_dependency_entry_points() -> Tuple[Any, ...]:
     """Cache tool dependency entry points for faster repeated resolution."""
@@ -782,7 +775,7 @@ def create_vertical_tool_dependency_provider(
             )
     """
     _increment_resolution_stat("total_requests")
-    vertical_name = _normalize_vertical_name(vertical)
+    vertical_name = normalize_vertical_name(vertical)
     cache_key = (vertical_name, canonicalize)
 
     with _vertical_provider_cache_lock:
@@ -794,7 +787,7 @@ def create_vertical_tool_dependency_provider(
 
     # Try to load from entry points (external vertical packages).
     for ep in _cached_tool_dependency_entry_points():
-        if _normalize_vertical_name(ep.name) != vertical_name:
+        if normalize_vertical_name(ep.name) != vertical_name:
             continue
         try:
             provider_factory = ep.load()

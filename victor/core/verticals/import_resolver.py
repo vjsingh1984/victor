@@ -18,14 +18,16 @@ from typing import List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 _PACKAGE_OVERRIDES = {
-    "data-analysis": "victor_dataanalysis",
-    "data_analysis": "victor_dataanalysis",
+    "dataanalysis": "victor_dataanalysis",
 }
 
 
-def _normalize_vertical_name(vertical_name: str) -> str:
+def normalize_vertical_name(vertical_name: str) -> str:
     """Normalize a vertical name for import path construction."""
-    return vertical_name.strip().lower().replace("-", "_")
+    normalized = vertical_name.strip().lower().replace("-", "_")
+    if normalized in {"data_analysis"}:
+        return "dataanalysis"
+    return normalized
 
 
 def _dedupe(candidates: List[str]) -> List[str]:
@@ -50,7 +52,7 @@ def _join_module_path(package: str, module_suffix: str) -> str:
 
 def _external_package_candidates(vertical_name: str) -> List[str]:
     """Return external package candidates for a vertical."""
-    normalized = _normalize_vertical_name(vertical_name)
+    normalized = normalize_vertical_name(vertical_name)
 
     candidates: List[str] = []
     override = _PACKAGE_OVERRIDES.get(normalized) or _PACKAGE_OVERRIDES.get(vertical_name)
@@ -68,7 +70,7 @@ def _external_package_candidates(vertical_name: str) -> List[str]:
 
 def vertical_module_candidates(vertical_name: str, module_suffix: str) -> List[str]:
     """Build ordered import candidates for a vertical module suffix."""
-    normalized = _normalize_vertical_name(vertical_name)
+    normalized = normalize_vertical_name(vertical_name)
     suffix = module_suffix.strip(".")
     candidates: List[str] = []
 
