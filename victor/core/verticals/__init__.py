@@ -171,6 +171,16 @@ def _discover_external_verticals() -> None:
     the required abstract methods (get_tools, get_system_prompt).
     """
     try:
+        # Primary path: use VerticalLoader so runtime discovery has a single
+        # authoritative implementation with cache/observability support.
+        get_vertical_loader().discover_verticals(emit_event=False)
+        VerticalRegistry._external_discovered = True
+        return
+    except Exception:
+        pass
+
+    try:
+        # Compatibility fallback for legacy call paths/tests.
         VerticalRegistry.discover_external_verticals()
     except Exception:
         # Silently ignore discovery failures during import

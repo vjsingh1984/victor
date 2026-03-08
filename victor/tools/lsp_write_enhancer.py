@@ -44,6 +44,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from victor.core.verticals.import_resolver import module_import_candidates
+
 if TYPE_CHECKING:
     from victor.framework.protocols import LanguageRegistryProtocol, LSPPoolProtocol
 
@@ -156,10 +158,8 @@ class LSPWriteEnhancer:
         """
         if self._lsp_pool is None:
             lsp_pool_cls = self._load_optional_symbol(
-                [
-                    ("victor_coding.lsp.manager", "LSPConnectionPool"),
-                    ("victor.verticals.contrib.coding.lsp.manager", "LSPConnectionPool"),
-                ]
+                "victor.coding.lsp.manager",
+                "LSPConnectionPool",
             )
             if lsp_pool_cls is None:
                 raise ImportError(
@@ -176,10 +176,8 @@ class LSPWriteEnhancer:
         """
         if self._language_registry is None:
             get_registry = self._load_optional_symbol(
-                [
-                    ("victor_coding.languages.registry", "get_language_registry"),
-                    ("victor.verticals.contrib.coding.languages.registry", "get_language_registry"),
-                ]
+                "victor.coding.languages.registry",
+                "get_language_registry",
             )
             if get_registry is None:
                 raise ImportError(
@@ -189,11 +187,11 @@ class LSPWriteEnhancer:
             self._language_registry = get_registry()
         return self._language_registry
 
-    def _load_optional_symbol(self, candidates: List[tuple[str, str]]) -> Optional[Any]:
-        """Load first importable symbol from candidate module paths."""
-        for module_path, symbol_name in candidates:
+    def _load_optional_symbol(self, module_path: str, symbol_name: str) -> Optional[Any]:
+        """Load symbol from the first importable compatibility module path."""
+        for candidate in module_import_candidates(module_path):
             try:
-                module = importlib.import_module(module_path)
+                module = importlib.import_module(candidate)
                 return getattr(module, symbol_name)
             except Exception:
                 continue
