@@ -19,7 +19,7 @@ for intelligent tool selection in software development tasks.
 
 YAML-Based Configuration (Phase 2):
     Tool dependency configuration has been migrated from hand-coded Python
-    dictionaries to a YAML file at `victor/coding/tool_dependencies.yaml`.
+    dictionaries to a package-local YAML file (`tool_dependencies.yaml`).
     This enables:
     - Easier maintenance and modification of tool relationships
     - Consistent schema validation via Pydantic models
@@ -78,7 +78,7 @@ class CodingToolDependencyProvider(YAMLToolDependencyProvider):
     selection for software development tasks.
 
     Configuration is loaded from:
-        victor/coding/tool_dependencies.yaml
+        Path(__file__).parent / "tool_dependencies.yaml"
 
     Example:
         # Preferred (new code):

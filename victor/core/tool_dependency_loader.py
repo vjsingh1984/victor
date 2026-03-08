@@ -39,12 +39,12 @@ Example:
 
     # Load and create provider in one step
     provider = create_tool_dependency_provider(
-        Path("victor/coding/tool_dependencies.yaml")
+        Path("/path/to/tool_dependencies.yaml")
     )
 
     # Or load config separately for inspection
     config = load_tool_dependency_yaml(
-        Path("victor/coding/tool_dependencies.yaml"),
+        Path("/path/to/tool_dependencies.yaml"),
         canonicalize=True,
     )
     print(config.required_tools)  # {"read", "write", "edit", "ls", "grep"}
@@ -424,7 +424,7 @@ def load_tool_dependency_yaml(
         ToolDependencyLoadError: If loading or validation fails.
 
     Example:
-        config = load_tool_dependency_yaml("victor/coding/tool_dependencies.yaml")
+        config = load_tool_dependency_yaml("/path/to/tool_dependencies.yaml")
         print(config.required_tools)  # {"read", "write", "edit", "ls", "grep"}
     """
     path = Path(yaml_path) if isinstance(yaml_path, str) else yaml_path
@@ -458,7 +458,7 @@ def create_tool_dependency_provider(
 
     Example:
         provider = create_tool_dependency_provider(
-            "victor/coding/tool_dependencies.yaml"
+            "/path/to/tool_dependencies.yaml"
         )
         deps = provider.get_dependencies()
         sequences = provider.get_tool_sequences()
@@ -479,7 +479,7 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
 
     Example:
         provider = YAMLToolDependencyProvider(
-            Path("victor/coding/tool_dependencies.yaml")
+            Path("/path/to/tool_dependencies.yaml")
         )
         print(provider.vertical)  # "coding"
         print(provider.get_required_tools())  # {"read", "write", "edit", "ls", "grep"}
@@ -559,10 +559,10 @@ def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
 
     Example:
         # First call loads from disk
-        provider1 = get_cached_provider("victor/coding/tool_dependencies.yaml")
+        provider1 = get_cached_provider("/path/to/tool_dependencies.yaml")
 
         # Second call returns cached instance (if file unchanged)
-        provider2 = get_cached_provider("victor/coding/tool_dependencies.yaml")
+        provider2 = get_cached_provider("/path/to/tool_dependencies.yaml")
         assert provider1 is provider2
 
         # If file is modified, cache is invalidated and fresh instance returned
@@ -619,7 +619,7 @@ def invalidate_provider_cache(yaml_path: Optional[str] = None) -> int:
         count = invalidate_provider_cache()
 
         # Invalidate specific file
-        count = invalidate_provider_cache("victor/coding/tool_dependencies.yaml")
+        count = invalidate_provider_cache("/path/to/tool_dependencies.yaml")
     """
     if yaml_path:
         path_str = str(Path(yaml_path).resolve())
