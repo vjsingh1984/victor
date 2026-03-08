@@ -188,7 +188,8 @@ class SharedEncoder:
 
         cursor = self.db.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS shared_embeddings (
                 context_key TEXT PRIMARY KEY,
                 task_type TEXT NOT NULL,
@@ -199,16 +200,19 @@ class SharedEncoder:
                 usage_count INTEGER DEFAULT 1,
                 last_updated TEXT NOT NULL
             )
-            """)
+            """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS learned_task_embeddings (
                 task_type TEXT PRIMARY KEY,
                 vector TEXT NOT NULL,
                 sample_count INTEGER DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-            """)
+            """
+        )
 
         self.db.commit()
 

@@ -690,9 +690,7 @@ _TOOL_DEPENDENCY_STATS_LOCK = threading.Lock()
 def _increment_resolution_stat(name: str) -> None:
     """Increment a tool-dependency resolution telemetry counter."""
     with _TOOL_DEPENDENCY_STATS_LOCK:
-        _TOOL_DEPENDENCY_RESOLUTION_STATS[name] = (
-            _TOOL_DEPENDENCY_RESOLUTION_STATS.get(name, 0) + 1
-        )
+        _TOOL_DEPENDENCY_RESOLUTION_STATS[name] = _TOOL_DEPENDENCY_RESOLUTION_STATS.get(name, 0) + 1
 
 
 def get_tool_dependency_resolution_stats() -> Dict[str, int]:

@@ -369,12 +369,14 @@ class TestContentMatchStrategy:
         """Create a temporary project with files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            (root / "main.py").write_text("""def hello():
+            (root / "main.py").write_text(
+                """def hello():
     print("Hello, World!")
 
 def goodbye():
     print("Goodbye!")
-""")
+"""
+            )
             yield root
 
     @pytest.fixture

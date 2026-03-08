@@ -12,7 +12,8 @@ from victor.analysis.module_analyzer import ModuleAnalyzer, ModuleMetrics
 def in_memory_db():
     """Create an in-memory SQLite database with schema."""
     conn = sqlite3.connect(":memory:")
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE graph_node (
             node_id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
@@ -27,8 +28,10 @@ def in_memory_db():
             embedding_ref TEXT,
             metadata TEXT
         )
-    """)
-    conn.execute("""
+    """
+    )
+    conn.execute(
+        """
         CREATE TABLE graph_edge (
             src TEXT NOT NULL,
             dst TEXT NOT NULL,
@@ -37,8 +40,10 @@ def in_memory_db():
             metadata TEXT,
             PRIMARY KEY (src, dst, type)
         )
-    """)
-    conn.execute("""
+    """
+    )
+    conn.execute(
+        """
         CREATE TABLE graph_module_metric (
             module_path TEXT PRIMARY KEY,
             pagerank_score REAL DEFAULT 0.0,
@@ -55,8 +60,10 @@ def in_memory_db():
             tdd_priority REAL DEFAULT 0.0,
             computed_at TEXT DEFAULT (datetime('now'))
         )
-    """)
-    conn.execute("""
+    """
+    )
+    conn.execute(
+        """
         CREATE TABLE graph_module_metric_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             module_path TEXT NOT NULL,
@@ -64,7 +71,8 @@ def in_memory_db():
             tdd_priority REAL,
             computed_at TEXT DEFAULT (datetime('now'))
         )
-    """)
+    """
+    )
     conn.commit()
     return conn
 

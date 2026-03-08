@@ -457,7 +457,8 @@ class SQLiteHITLStore:
         """Initialize database schema."""
         conn = self._get_connection()
         try:
-            conn.execute(f"""
+            conn.execute(
+                f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
                     id TEXT PRIMARY KEY,
                     workflow_id TEXT,
@@ -476,15 +477,20 @@ class SQLiteHITLStore:
                     expires_at TEXT,
                     responded_at TEXT
                 )
-            """)
-            conn.execute(f"""
+            """
+            )
+            conn.execute(
+                f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_status
                 ON {self.table_name}(status)
-            """)
-            conn.execute(f"""
+            """
+            )
+            conn.execute(
+                f"""
                 CREATE INDEX IF NOT EXISTS idx_{self.table_name}_workflow
                 ON {self.table_name}(workflow_id)
-            """)
+            """
+            )
             conn.commit()
         finally:
             conn.close()

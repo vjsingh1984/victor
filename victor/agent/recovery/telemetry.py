@@ -141,7 +141,8 @@ class RecoveryTelemetryCollector:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS failure_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -152,9 +153,11 @@ class RecoveryTelemetryCollector:
                     consecutive_count INTEGER,
                     context_hash TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS recovery_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -167,17 +170,22 @@ class RecoveryTelemetryCollector:
                     model TEXT,
                     context_hash TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_failure_timestamp
                 ON failure_events(timestamp)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_recovery_timestamp
                 ON recovery_events(timestamp)
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()

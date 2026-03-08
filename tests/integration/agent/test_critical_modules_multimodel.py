@@ -132,7 +132,8 @@ def temp_workspace():
     """Create a temporary workspace directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         workspace = Path(tmpdir)
-        (workspace / "main.py").write_text('''
+        (workspace / "main.py").write_text(
+            '''
 def hello():
     """Say hello."""
     return "Hello, World!"
@@ -140,11 +141,14 @@ def hello():
 def add(a, b):
     """Add two numbers."""
     return a + b
-''')
-        (workspace / "buggy.py").write_text("""
+'''
+        )
+        (workspace / "buggy.py").write_text(
+            """
 def divide(a, b):
     return a / b  # BUG: No zero check!
-""")
+"""
+        )
         yield workspace
 
 
