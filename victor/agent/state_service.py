@@ -145,11 +145,25 @@ class StateService:
             "state_data": state_data,
             "config_json": json.dumps(context.config) if context.config else None,
             "stages_json": json.dumps(context.stages) if context.stages else None,
-            "middleware_json": json.dumps([self._serialize_middleware(m) for m in context.middleware]) if context.middleware else None,
-            "safety_patterns_json": json.dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns]) if context.safety_patterns else None,
-            "enabled_tools_json": json.dumps(list(context.enabled_tools)) if context.enabled_tools else None,
+            "middleware_json": (
+                json.dumps([self._serialize_middleware(m) for m in context.middleware])
+                if context.middleware
+                else None
+            ),
+            "safety_patterns_json": (
+                json.dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns])
+                if context.safety_patterns
+                else None
+            ),
+            "enabled_tools_json": (
+                json.dumps(list(context.enabled_tools)) if context.enabled_tools else None
+            ),
             "mode_configs_json": json.dumps(context.mode_configs) if context.mode_configs else None,
-            "negotiation_results_json": json.dumps(context.capability_negotiation_results) if context.capability_negotiation_results else None,
+            "negotiation_results_json": (
+                json.dumps(context.capability_negotiation_results)
+                if context.capability_negotiation_results
+                else None
+            ),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
@@ -256,11 +270,25 @@ class StateService:
                     state_data,
                     json.dumps(context.config) if context.config else None,
                     json.dumps(context.stages) if context.stages else None,
-                    json.dumps([self._serialize_middleware(m) for m in context.middleware]) if context.middleware else None,
-                    json.dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns]) if context.safety_patterns else None,
+                    (
+                        json.dumps([self._serialize_middleware(m) for m in context.middleware])
+                        if context.middleware
+                        else None
+                    ),
+                    (
+                        json.dumps(
+                            [self._serialize_safety_pattern(p) for p in context.safety_patterns]
+                        )
+                        if context.safety_patterns
+                        else None
+                    ),
                     json.dumps(list(context.enabled_tools)) if context.enabled_tools else None,
                     json.dumps(context.mode_configs) if context.mode_configs else None,
-                    json.dumps(context.capability_negotiation_results) if context.capability_negotiation_results else None,
+                    (
+                        json.dumps(context.capability_negotiation_results)
+                        if context.capability_negotiation_results
+                        else None
+                    ),
                     datetime.now().isoformat(),
                     state_id,
                 ),

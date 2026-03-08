@@ -714,7 +714,7 @@ class CapabilityNegotiationProtocol:
 
         # Tool capability
         if hasattr(vertical, "get_tools"):
-            tools = vertical.get_tools() if callable(vertical.get_tools) else vertical.get_tools
+            _ = vertical.get_tools() if callable(vertical.get_tools) else vertical.get_tools
             capabilities["tools"] = CapabilityDeclaration(
                 name="tools",
                 version=vertical_version,
@@ -790,9 +790,7 @@ class CapabilityNegotiationProtocol:
         capabilities = {}
 
         # Get orchestrator version
-        orchestrator_version = Version.parse(
-            getattr(orchestrator, "_version", "1.0.0")
-        )
+        orchestrator_version = Version.parse(getattr(orchestrator, "_version", "1.0.0"))
 
         # Tool capability
         if hasattr(orchestrator, "get_enabled_tools"):
