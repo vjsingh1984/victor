@@ -25,6 +25,24 @@ Tests verify that:
 import pytest
 from typing import Dict, Any, List, Optional
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _import_vertical_module(module_path: str):
+    """Import vertical module using external-first fallback resolution."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None:
+        raise ImportError(f"Vertical module not available: {module_path}")
+    return module
+
+
+def _import_vertical_attr(module_path: str, attr_name: str):
+    """Import an attribute from a vertical module with fallback resolution."""
+    module = _import_vertical_module(module_path)
+    if not hasattr(module, attr_name):
+        raise ImportError(f"Missing attribute {attr_name} in module {module_path}")
+    return getattr(module, attr_name)
+
 
 class TestCodingChainRegistry:
     """Tests for Coding vertical's chain registry integration."""
@@ -44,7 +62,7 @@ class TestCodingChainRegistry:
         # This test verifies the chains exist and can be accessed
         try:
             # Import the module
-            from victor_coding.composed_chains import CODING_CHAINS
+            CODING_CHAINS = _import_vertical_attr("victor.coding.composed_chains", "CODING_CHAINS")
 
             # Get the global registry
             from victor.framework.chain_registry import get_chain_registry
@@ -68,7 +86,7 @@ class TestCodingChainRegistry:
     def test_coding_eight_chains_registered(self):
         """Exactly 8 coding chains are registered (or infrastructure in place)."""
         try:
-            from victor_coding.composed_chains import CODING_CHAINS
+            CODING_CHAINS = _import_vertical_attr("victor.coding.composed_chains", "CODING_CHAINS")
             from victor.framework.chain_registry import get_chain_registry
 
             registry = get_chain_registry()
@@ -576,7 +594,9 @@ class TestChainBackwardCompatibility:
     def test_coding_composed_chains_dict_still_works(self):
         """CODING_CHAINS dict still accessible for backward compatibility (if exists)."""
         try:
-            from victor_coding.composed_chains import CODING_CHAINS, get_chain, list_chains
+            CODING_CHAINS = _import_vertical_attr("victor.coding.composed_chains", "CODING_CHAINS")
+            get_chain = _import_vertical_attr("victor.coding.composed_chains", "get_chain")
+            list_chains = _import_vertical_attr("victor.coding.composed_chains", "list_chains")
 
             # Dict access should work
             assert len(CODING_CHAINS) > 0
@@ -596,15 +616,31 @@ class TestChainBackwardCompatibility:
         """Legacy import paths for chains still work (if exists)."""
         try:
             # These imports should not break
-            from victor_coding.composed_chains import (
-                explore_file_chain,
-                analyze_function_chain,
-                safe_edit_chain,
-                git_status_chain,
-                search_with_context_chain,
-                lint_chain,
-                test_discovery_chain,
-                review_analysis_chain,
+            explore_file_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "explore_file_chain",
+            )
+            analyze_function_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "analyze_function_chain",
+            )
+            safe_edit_chain = _import_vertical_attr("victor.coding.composed_chains", "safe_edit_chain")
+            git_status_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "git_status_chain",
+            )
+            search_with_context_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "search_with_context_chain",
+            )
+            lint_chain = _import_vertical_attr("victor.coding.composed_chains", "lint_chain")
+            test_discovery_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "test_discovery_chain",
+            )
+            review_analysis_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "review_analysis_chain",
             )
 
             # All should be imported
@@ -627,11 +663,12 @@ class TestChainIntegrationScenarios:
     def test_coding_chains_full_workflow(self):
         """Complete workflow: register, discover, retrieve, use chains (if exists)."""
         try:
-            from victor_coding.composed_chains import (
-                explore_file_chain,
-                CODING_CHAINS,
-                list_chains,
+            explore_file_chain = _import_vertical_attr(
+                "victor.coding.composed_chains",
+                "explore_file_chain",
             )
+            CODING_CHAINS = _import_vertical_attr("victor.coding.composed_chains", "CODING_CHAINS")
+            list_chains = _import_vertical_attr("victor.coding.composed_chains", "list_chains")
             from victor.framework.chain_registry import get_chain_registry
 
             # 1. Import triggers registration
@@ -686,7 +723,7 @@ class TestChainIntegrationScenarios:
             registry = get_chain_registry()
 
             # Import chains to populate registry
-            from victor_coding import composed_chains
+            _import_vertical_module("victor.coding.composed_chains")
 
             # Serialize
             serialized = registry.to_dict()

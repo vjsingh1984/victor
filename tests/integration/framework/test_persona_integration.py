@@ -129,7 +129,7 @@ class TestVerticalPersonaRegistration:
         """Importing coding personas triggers registration (if exists)."""
         try:
             # Import coding personas
-            from victor_coding.teams import personas
+            _import_vertical_module("victor.coding.teams.personas")
         except (ImportError, ModuleNotFoundError):
             # If personas module doesn't exist yet, that's okay
             pytest.skip("Coding personas module not yet implemented")
@@ -757,7 +757,7 @@ class TestPersonaTwentyPersonasRequirement:
 
         # Import all vertical personas
         try:
-            from victor_coding.teams import personas as coding_personas
+            _import_vertical_module("victor.coding.teams.personas")
         except ImportError:
             pass
 
@@ -805,7 +805,7 @@ class TestPersonaTwentyPersonasRequirement:
             try:
                 # Import to trigger registration
                 if vertical == "coding":
-                    from victor_coding.teams import personas
+                    _import_vertical_module("victor.coding.teams.personas")
                 elif vertical == "research":
                     _import_vertical_module("victor.research.teams.personas")
                 elif vertical == "devops":
