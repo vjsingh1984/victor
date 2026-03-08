@@ -55,6 +55,13 @@ def _normalize_vertical_name(vertical: str) -> str:
     return normalized
 
 
+def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[set[str]]:
+    """Normalize an optional list of vertical names for matching."""
+    if vertical_names is None:
+        return None
+    return {_normalize_vertical_name(name) for name in vertical_names}
+
+
 @functools.lru_cache(maxsize=16)
 def _cached_entry_points(group: str) -> tuple:
     """Cache entry_points() result per group. Returns tuple for hashability."""
@@ -96,11 +103,15 @@ def load_safety_rules_from_entry_points(
         count = load_safety_rules_from_entry_points(enforcer, vertical_names=["coding", "devops"])
     """
     count = 0
+    normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
         eps = _cached_entry_points("victor.safety_rules")
         for ep in eps:
             # Filter by vertical name if specified
-            if vertical_names is not None and ep.name not in vertical_names:
+            if (
+                normalized_verticals is not None
+                and _normalize_vertical_name(ep.name) not in normalized_verticals
+            ):
                 continue
 
             try:
@@ -187,10 +198,12 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
         if rl_config:
             learning_rate = rl_config.get("learning_rate", 0.001)
     """
+    normalized_vertical = _normalize_vertical_name(vertical)
+
     try:
         eps = _cached_entry_points("victor.rl_configs")
         for ep in eps:
-            if ep.name == vertical:
+            if _normalize_vertical_name(ep.name) == normalized_vertical:
                 config_factory = ep.load()
                 return config_factory()
     except Exception as e:
@@ -222,11 +235,15 @@ def register_escape_hatches_from_entry_points(
         print(f"Registered escape hatches from {count} verticals")
     """
     count = 0
+    normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
         eps = _cached_entry_points("victor.escape_hatches")
         for ep in eps:
             # Filter by vertical name if specified
-            if vertical_names is not None and ep.name not in vertical_names:
+            if (
+                normalized_verticals is not None
+                and _normalize_vertical_name(ep.name) not in normalized_verticals
+            ):
                 continue
 
             try:
@@ -265,11 +282,15 @@ def register_commands_from_entry_points(
         print(f"Registered commands from {count} verticals")
     """
     count = 0
+    normalized_verticals = _normalize_vertical_names(vertical_names)
     try:
         eps = _cached_entry_points("victor.commands")
         for ep in eps:
             # Filter by vertical name if specified
-            if vertical_names is not None and ep.name not in vertical_names:
+            if (
+                normalized_verticals is not None
+                and _normalize_vertical_name(ep.name) not in normalized_verticals
+            ):
                 continue
 
             try:
