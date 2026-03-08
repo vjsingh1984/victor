@@ -21,19 +21,31 @@ from unittest.mock import Mock, patch
 from victor.core.verticals.base import VerticalRegistry
 
 
-def test_reset_discovery_clears_loader_and_entry_point_cache() -> None:
-    """reset_discovery should clear both registry and loader/cache discovery state."""
+def test_reset_discovery_clears_loader_and_entry_point_caches() -> None:
+    """reset_discovery should clear registry state and all relevant entry-point caches."""
     VerticalRegistry._external_discovered = True
     loader = Mock()
     cache = Mock()
+    framework_cache_clear = Mock()
+    tool_dep_cache_clear = Mock()
 
     with patch("victor.core.verticals.vertical_loader.get_vertical_loader", return_value=loader):
         with patch("victor.framework.module_loader.get_entry_point_cache", return_value=cache):
-            VerticalRegistry.reset_discovery()
+            with patch(
+                "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
+                framework_cache_clear,
+            ):
+                with patch(
+                    "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
+                    tool_dep_cache_clear,
+                ):
+                    VerticalRegistry.reset_discovery()
 
     assert VerticalRegistry._external_discovered is False
     loader.reset_discovery_state.assert_called_once()
     cache.invalidate.assert_called_once_with(VerticalRegistry.ENTRY_POINT_GROUP)
+    framework_cache_clear.assert_called_once()
+    tool_dep_cache_clear.assert_called_once()
 
 
 def test_reset_discovery_is_resilient_when_reset_hooks_fail() -> None:
@@ -48,6 +60,14 @@ def test_reset_discovery_is_resilient_when_reset_hooks_fail() -> None:
             "victor.framework.module_loader.get_entry_point_cache",
             side_effect=RuntimeError("cache unavailable"),
         ):
-            VerticalRegistry.reset_discovery()
+            with patch(
+                "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
+                side_effect=RuntimeError("framework cache unavailable"),
+            ):
+                with patch(
+                    "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
+                    side_effect=RuntimeError("tool dependency cache unavailable"),
+                ):
+                    VerticalRegistry.reset_discovery()
 
     assert VerticalRegistry._external_discovered is False

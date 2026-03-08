@@ -950,3 +950,19 @@ class VerticalRegistry:
             get_entry_point_cache().invalidate(cls.ENTRY_POINT_GROUP)
         except Exception:
             pass
+
+        try:
+            from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+
+            clear_entry_point_loader_cache()
+        except Exception:
+            pass
+
+        try:
+            from victor.core.tool_dependency_loader import (
+                clear_tool_dependency_entry_point_cache,
+            )
+
+            clear_tool_dependency_entry_point_cache()
+        except Exception:
+            pass
