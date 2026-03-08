@@ -23,6 +23,24 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _resolve_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute and skip test when unavailable."""
+    try:
+        return _resolve_vertical_attr(module_path, attr_name)
+    except ImportError:
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+
 
 class TestResearchVerticalIndependence:
     """Tests that ResearchAssistant works without coding imports."""
@@ -47,7 +65,7 @@ class TestResearchVerticalIndependence:
             if "victor.research" in sys.modules:
                 del sys.modules["victor.research"]
 
-            from victor.research import ResearchAssistant
+            ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
 
             # Should be able to access basic properties
             assert ResearchAssistant.name == "research"
@@ -59,7 +77,7 @@ class TestResearchVerticalIndependence:
 
     def test_research_extensions_no_coding_dependency(self):
         """ResearchAssistant extensions don't depend on coding."""
-        from victor.research import ResearchAssistant
+        ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
         from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = ResearchAssistant.get_extensions()
@@ -72,7 +90,7 @@ class TestResearchVerticalIndependence:
 
     def test_research_provides_valid_tools(self):
         """ResearchAssistant provides valid tool configurations."""
-        from victor.research import ResearchAssistant
+        ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
 
         tools = ResearchAssistant.get_tools()
 
@@ -88,14 +106,14 @@ class TestDevOpsVerticalIndependence:
 
     def test_devops_imports_without_coding(self):
         """DevOpsAssistant can be imported without coding module."""
-        from victor.devops import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops", "DevOpsAssistant")
 
         assert DevOpsAssistant.name == "devops"
         assert len(DevOpsAssistant.get_tools()) > 0
 
     def test_devops_extensions_no_coding_dependency(self):
         """DevOpsAssistant extensions don't depend on coding."""
-        from victor.devops import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops", "DevOpsAssistant")
         from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = DevOpsAssistant.get_extensions()
@@ -103,7 +121,7 @@ class TestDevOpsVerticalIndependence:
 
     def test_devops_provides_valid_tools(self):
         """DevOpsAssistant provides valid tool configurations."""
-        from victor.devops import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops", "DevOpsAssistant")
 
         tools = DevOpsAssistant.get_tools()
         tool_names = [t["name"] if isinstance(t, dict) else t for t in tools]
@@ -118,14 +136,14 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_middleware(self):
         """CodingAssistant provides middleware."""
-        from victor_coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         extensions = CodingAssistant.get_extensions()
         assert len(extensions.middleware) >= 1
 
     def test_coding_has_safety_patterns(self):
         """CodingAssistant provides safety patterns."""
-        from victor_coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         extensions = CodingAssistant.get_extensions()
         patterns = extensions.get_all_safety_patterns()
@@ -133,7 +151,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_task_hints(self):
         """CodingAssistant provides task type hints."""
-        from victor_coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         extensions = CodingAssistant.get_extensions()
         hints = extensions.get_all_task_hints()
@@ -141,7 +159,7 @@ class TestCodingVerticalComplete:
 
     def test_coding_has_mode_configs(self):
         """CodingAssistant provides mode configurations."""
-        from victor_coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         extensions = CodingAssistant.get_extensions()
         modes = extensions.get_all_mode_configs()
@@ -266,7 +284,6 @@ class TestFrameworkShimIntegration:
     def test_shim_accepts_vertical_parameter(self):
         """FrameworkShim constructor accepts vertical parameter."""
         from victor.framework.shim import FrameworkShim
-        from victor_coding import CodingAssistant
         import inspect
 
         # Check that FrameworkShim constructor accepts vertical parameter

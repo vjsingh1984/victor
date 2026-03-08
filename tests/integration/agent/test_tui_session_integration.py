@@ -24,6 +24,15 @@ from victor.agent.session_manager_base import (
     SessionMetrics,
     TUISessionHandler,
 )
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute and skip test when unavailable."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
 
 
 class TestTUISessionInitialization:
@@ -203,8 +212,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_coding_vertical(self):
         """Test TUI with coding vertical integration."""
-        pytest.importorskip("victor_coding")
-        from victor_coding.assistant import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding.assistant", "CodingAssistant")
 
         config = SessionConfig(
             mode=SessionMode.TUI,
@@ -240,8 +248,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_research_vertical(self):
         """Test TUI with research vertical integration."""
-        pytest.importorskip("victor.research")
-        from victor.research.assistant import ResearchAssistant
+        ResearchAssistant = _load_vertical_attr("victor.research.assistant", "ResearchAssistant")
 
         config = SessionConfig(
             mode=SessionMode.TUI,
