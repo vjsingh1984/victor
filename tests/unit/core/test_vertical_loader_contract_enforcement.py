@@ -1,0 +1,106 @@
+"""Tests for VerticalLoader contract enforcement and cache invalidation hooks."""
+
+from typing import List
+
+from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.vertical_loader import VerticalLoader
+
+
+def _make_vertical(name: str, api_version: int):
+    """Create a minimal concrete vertical for loader tests."""
+
+    class _TestVertical(VerticalBase):
+        description = f"Test vertical {name}"
+        VERTICAL_API_VERSION = api_version
+
+        @classmethod
+        def get_tools(cls) -> List[str]:
+            return ["read"]
+
+        @classmethod
+        def get_system_prompt(cls) -> str:
+            return "test prompt"
+
+    _TestVertical.name = name
+    return _TestVertical
+
+
+def test_loader_rejects_vertical_with_unsupported_api_version(monkeypatch):
+    """VerticalLoader must reject entry-point verticals below min API version."""
+    loader = VerticalLoader()
+    loader._discovered_verticals = {}
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    vertical_name = "api_too_old_vertical"
+    VerticalRegistry.unregister(vertical_name)
+    old_vertical = _make_vertical(vertical_name, api_version=0)
+
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: old_vertical)
+    loader._load_vertical_entries({"old_plugin": "fake.module:OldVertical"})
+
+    assert vertical_name not in loader._discovered_verticals
+    assert VerticalRegistry.get(vertical_name) is None
+
+
+def test_loader_accepts_vertical_with_supported_api_version(monkeypatch):
+    """VerticalLoader should accept and register compatible verticals."""
+    loader = VerticalLoader()
+    loader._discovered_verticals = {}
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    vertical_name = "api_current_vertical"
+    VerticalRegistry.unregister(vertical_name)
+    current_vertical = _make_vertical(vertical_name, api_version=1)
+
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: current_vertical)
+    loader._load_vertical_entries({"current_plugin": "fake.module:CurrentVertical"})
+
+    assert "current_plugin" in loader._discovered_verticals
+    assert loader._discovered_verticals["current_plugin"] is current_vertical
+    assert VerticalRegistry.get(vertical_name) is current_vertical
+
+    VerticalRegistry.unregister(vertical_name)
+
+
+def test_refresh_plugins_clears_framework_entry_point_loader_cache(monkeypatch):
+    """refresh_plugins() should clear framework entry-point loader cache."""
+    loader = VerticalLoader()
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    called = {"value": False}
+
+    def _clear_cache():
+        called["value"] = True
+
+    monkeypatch.setattr(
+        "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
+        _clear_cache,
+    )
+
+    loader.refresh_plugins()
+
+    assert called["value"] is True
+
+
+def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
+    """VerticalLoader should skip entry-point verticals conflicting by name."""
+    loader = VerticalLoader()
+    loader._discovered_verticals = {}
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    existing_name = "conflict_vertical"
+    existing_vertical = _make_vertical(existing_name, api_version=1)
+    conflicting_vertical = _make_vertical(existing_name, api_version=1)
+    VerticalRegistry.register(existing_vertical)
+
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: conflicting_vertical)
+    loader._load_vertical_entries({"conflict_plugin": "fake.module:ConflictingVertical"})
+
+    assert "conflict_plugin" not in loader._discovered_verticals
+    assert VerticalRegistry.get(existing_name) is existing_vertical
+
+    VerticalRegistry.unregister(existing_name)

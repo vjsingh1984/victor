@@ -64,7 +64,8 @@ class TestSchemaCreation:
 
     def test_schema_introspection(self, schema):
         """Introspection query should succeed."""
-        result = schema.execute_sync("""
+        result = schema.execute_sync(
+            """
             {
                 __schema {
                     queryType { name }
@@ -72,7 +73,8 @@ class TestSchemaCreation:
                     subscriptionType { name }
                 }
             }
-            """)
+            """
+        )
         assert result.errors is None
         data = result.data["__schema"]
         assert data["queryType"]["name"] == "Query"
@@ -134,7 +136,8 @@ class TestChatMutation:
     @pytest.mark.asyncio
     async def test_chat_mutation(self, schema):
         """Chat mutation should return ChatResponseType."""
-        result = await schema.execute("""
+        result = await schema.execute(
+            """
             mutation {
                 chat(messages: [{role: "user", content: "Hello"}]) {
                     role
@@ -142,7 +145,8 @@ class TestChatMutation:
                     toolCalls
                 }
             }
-            """)
+            """
+        )
         assert result.errors is None
         data = result.data["chat"]
         assert data["role"] == "assistant"
@@ -151,14 +155,16 @@ class TestChatMutation:
     @pytest.mark.asyncio
     async def test_chat_empty_messages(self, schema):
         """Chat with empty messages should return empty response."""
-        result = await schema.execute("""
+        result = await schema.execute(
+            """
             mutation {
                 chat(messages: []) {
                     role
                     content
                 }
             }
-            """)
+            """
+        )
         assert result.errors is None
         assert result.data["chat"]["content"] == ""
 
@@ -173,11 +179,13 @@ class TestSwitchModelMutation:
             mock_switcher = MagicMock()
             mock_get.return_value = mock_switcher
 
-            result = await schema.execute("""
+            result = await schema.execute(
+                """
                 mutation {
                     switchModel(provider: "anthropic", model: "claude-3-opus")
                 }
-                """)
+                """
+            )
 
         assert result.errors is None
         assert result.data["switchModel"] is True
@@ -190,11 +198,13 @@ class TestResetConversationMutation:
     async def test_reset_conversation(self, schema, mock_server):
         """Reset conversation should return success."""
         mock_server._orchestrator = MagicMock()
-        result = await schema.execute("""
+        result = await schema.execute(
+            """
             mutation {
                 resetConversation
             }
-            """)
+            """
+        )
         assert result.errors is None
         assert result.data["resetConversation"] is True
 

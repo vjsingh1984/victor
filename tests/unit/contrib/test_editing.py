@@ -242,13 +242,15 @@ class TestDiffEditor:
     @pytest.mark.asyncio
     async def test_edit_python_file(self, temp_python_file: Path) -> None:
         """Test editing a Python file."""
-        temp_python_file.write_text("""
+        temp_python_file.write_text(
+            """
 def foo():
     '''Old docstring.'''
     pass
 def bar():
     return None
-""")
+"""
+        )
 
         editor = DiffEditor()
         result = await editor.edit_file(

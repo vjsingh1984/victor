@@ -194,7 +194,8 @@ class TestToolOutputFormatter:
         config = ToolOutputFormatterConfig(file_structure_threshold=100)
         formatter = ToolOutputFormatter(config=config)
 
-        large_content = """class MyClass:
+        large_content = (
+            """class MyClass:
     def method1(self):
         pass
     def method2(self):
@@ -202,7 +203,9 @@ class TestToolOutputFormatter:
 
 def helper_function():
     pass
-""" * 50
+"""
+            * 50
+        )
         result = formatter.format_tool_output(
             tool_name="read_file",
             args={"path": "/path/to/file.py"},

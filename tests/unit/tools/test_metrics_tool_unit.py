@@ -133,13 +133,15 @@ class TestAnalyzeMetrics:
     async def test_analyze_file(self):
         """Test analyzing a single file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 def hello():
     print("hello")
 
 def goodbye():
     print("goodbye")
-""")
+"""
+            )
             temp_path = f.name
 
         try:

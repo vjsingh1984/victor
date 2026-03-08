@@ -2,7 +2,7 @@
 
 from unittest.mock import patch, MagicMock
 
-from victor.framework.entry_point_loader import _cached_entry_points
+from victor.framework.entry_point_loader import _cached_entry_points, clear_entry_point_loader_cache
 
 
 class TestEntryPointCaching:
@@ -44,6 +44,18 @@ class TestEntryPointCaching:
         assert mock_ep.call_count == 1
 
         _cached_entry_points.cache_clear()
+        _cached_entry_points("victor.safety_rules")
+        assert mock_ep.call_count == 2
+
+    @patch("victor.framework.entry_point_loader.entry_points")
+    def test_public_cache_clear_helper_allows_rescan(self, mock_ep):
+        """clear_entry_point_loader_cache() should clear cached lookups."""
+        mock_ep.return_value = []
+
+        _cached_entry_points("victor.safety_rules")
+        assert mock_ep.call_count == 1
+
+        clear_entry_point_loader_cache()
         _cached_entry_points("victor.safety_rules")
         assert mock_ep.call_count == 2
 
