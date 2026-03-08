@@ -779,7 +779,12 @@ def create_vertical_tool_dependency_provider(
     """
     _increment_resolution_stat("total_requests")
     vertical_name = normalize_vertical_name(vertical)
-    cache_key = (vertical_name, canonicalize)
+    effective_canonicalize = (
+        canonicalize
+        if canonicalize is not None
+        else _VERTICAL_CANONICALIZE_SETTINGS.get(vertical_name, True)
+    )
+    cache_key = (vertical_name, effective_canonicalize)
 
     with _vertical_provider_cache_lock:
         cached_provider = _vertical_provider_cache.get(cache_key)
@@ -840,9 +845,6 @@ def create_vertical_tool_dependency_provider(
         raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
 
     # Fallback 2: package resource YAML (works for wheel/pip installs).
-    if canonicalize is None:
-        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical_name, True)
-
     checked_packages: List[str] = []
     package_candidates: List[str] = []
     for candidate in module_import_candidates(module_path):
@@ -859,7 +861,9 @@ def create_vertical_tool_dependency_provider(
             yaml_resource = files(package).joinpath("tool_dependencies.yaml")
             if yaml_resource.is_file():
                 yaml_content = yaml_resource.read_text(encoding="utf-8")
-                config = ToolDependencyLoader(canonicalize=canonicalize).load_from_string(yaml_content)
+                config = ToolDependencyLoader(canonicalize=effective_canonicalize).load_from_string(
+                    yaml_content
+                )
                 _increment_resolution_stat("package_resource_resolutions")
                 logger.debug(
                     "Loaded tool dependency provider for '%s' from package resource '%s:tool_dependencies.yaml'",

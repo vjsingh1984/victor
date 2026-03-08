@@ -321,3 +321,37 @@ def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
     assert load_calls == 2
     assert stats_before_clear["provider_cache_currsize"] >= 1
     assert stats_after_clear["provider_cache_currsize"] == 0
+
+
+@pytest.mark.parametrize(
+    ("vertical", "explicit_canonicalize"),
+    [
+        ("coding", True),  # default canonicalize=True
+        ("devops", False),  # default canonicalize=False
+    ],
+)
+def test_default_and_explicit_canonicalize_share_provider_cache_key(
+    monkeypatch, vertical: str, explicit_canonicalize: bool
+) -> None:
+    """canonicalize=None and canonicalize=<default> should reuse the same cache entry."""
+    load_calls = 0
+
+    class _FakeEntryPoint:
+        name = vertical
+
+        @staticmethod
+        def load():
+            nonlocal load_calls
+            load_calls += 1
+            return lambda: EmptyToolDependencyProvider(vertical)
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    provider_default = create_vertical_tool_dependency_provider(vertical, canonicalize=None)
+    provider_explicit = create_vertical_tool_dependency_provider(
+        vertical, canonicalize=explicit_canonicalize
+    )
+
+    assert provider_default is provider_explicit
+    assert load_calls == 1
