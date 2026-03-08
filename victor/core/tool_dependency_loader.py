@@ -53,12 +53,17 @@ Example:
 from __future__ import annotations
 
 import logging
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from importlib.metadata import entry_points
 
 import yaml
 
+from victor.core.verticals.import_resolver import (
+    import_module_with_fallback,
+    module_import_candidates,
+)
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
@@ -697,36 +702,75 @@ def create_vertical_tool_dependency_provider(
     except Exception as e:
         logger.debug(f"No tool dependency provider found for '{vertical}' in entry points: {e}")
 
-    # Fallback to legacy hardcoded paths (for backward compatibility during transition)
-    # This will be removed in a future version
-    yaml_paths = {
-        "coding": Path(__file__).parent.parent / "coding" / "tool_dependencies.yaml",
-        "devops": Path(__file__).parent.parent / "devops" / "tool_dependencies.yaml",
-        "research": Path(__file__).parent.parent / "research" / "tool_dependencies.yaml",
-        "rag": Path(__file__).parent.parent / "rag" / "tool_dependencies.yaml",
-        "dataanalysis": Path(__file__).parent.parent / "dataanalysis" / "tool_dependencies.yaml",
-    }
+    # Fallback 1: module-level provider factory (external-first resolver).
+    # This supports extracted vertical repos even when entry points are unavailable.
+    module_path = f"victor.{vertical}.tool_dependencies"
+    module, resolved_path = import_module_with_fallback(module_path)
+    if module is not None and hasattr(module, "get_provider"):
+        try:
+            provider = module.get_provider()
+            logger.debug(
+                "Loaded tool dependency provider for '%s' from module '%s'",
+                vertical,
+                resolved_path or module_path,
+            )
+            return provider
+        except Exception as e:
+            logger.debug(
+                "Module-level tool dependency provider failed for '%s' from '%s': %s",
+                vertical,
+                resolved_path or module_path,
+                e,
+            )
 
-    if vertical not in yaml_paths:
-        available = ", ".join(sorted(yaml_paths.keys()))
+    if vertical not in _VERTICAL_CANONICALIZE_SETTINGS:
+        available = ", ".join(sorted(_VERTICAL_CANONICALIZE_SETTINGS.keys()))
         raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
 
-    yaml_path = yaml_paths[vertical]
+    # Fallback 2: package resource YAML (works for wheel/pip installs).
+    if canonicalize is None:
+        canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
 
-    # Check if YAML exists, fall back to empty provider if not
-    if yaml_path.exists():
-        # Determine canonicalization setting
-        if canonicalize is None:
-            canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
-        from victor.core.tool_dependency_base import YAMLToolDependencyProvider
+    checked_packages: List[str] = []
+    package_candidates: List[str] = []
+    for candidate in module_import_candidates(module_path):
+        if "." in candidate:
+            package = candidate.rsplit(".", 1)[0]
+        else:
+            package = candidate
+        if package not in package_candidates:
+            package_candidates.append(package)
 
-        return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)
-    else:
-        logger.debug(f"Tool dependencies YAML not found for vertical '{vertical}': {yaml_path}")
-        # Return an LSP-compliant empty provider (Null Object pattern)
-        from victor.core.tool_types import EmptyToolDependencyProvider
+    for package in package_candidates:
+        checked_packages.append(package)
+        try:
+            yaml_resource = files(package).joinpath("tool_dependencies.yaml")
+            if yaml_resource.is_file():
+                yaml_content = yaml_resource.read_text(encoding="utf-8")
+                config = ToolDependencyLoader(canonicalize=canonicalize).load_from_string(yaml_content)
+                logger.debug(
+                    "Loaded tool dependency provider for '%s' from package resource '%s:tool_dependencies.yaml'",
+                    vertical,
+                    package,
+                )
+                return BaseToolDependencyProvider(config=config)
+        except Exception as e:
+            logger.debug(
+                "Package resource fallback failed for '%s' in '%s': %s",
+                vertical,
+                package,
+                e,
+            )
 
-        return EmptyToolDependencyProvider(vertical)
+    logger.debug(
+        "Tool dependencies YAML package resource not found for vertical '%s'. Checked packages: %s",
+        vertical,
+        ", ".join(checked_packages),
+    )
+    # Return an LSP-compliant empty provider (Null Object pattern)
+    from victor.core.tool_types import EmptyToolDependencyProvider
+
+    return EmptyToolDependencyProvider(vertical)
 
 
 __all__ = [
