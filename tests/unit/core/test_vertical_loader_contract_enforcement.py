@@ -113,3 +113,21 @@ def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
     assert VerticalRegistry.get(existing_name) is existing_vertical
 
     VerticalRegistry.unregister(existing_name)
+
+
+def test_discovery_stats_include_tool_dependency_resolution_snapshot(monkeypatch):
+    """get_discovery_stats() should include tool dependency resolution telemetry."""
+    loader = VerticalLoader()
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    expected = {"total_requests": 3, "entry_point_resolutions": 2}
+    monkeypatch.setattr(
+        "victor.core.tool_dependency_loader.get_tool_dependency_resolution_stats",
+        lambda: expected,
+    )
+
+    stats = loader.get_discovery_stats()
+
+    assert "tool_dependency_resolution" in stats
+    assert stats["tool_dependency_resolution"] == expected

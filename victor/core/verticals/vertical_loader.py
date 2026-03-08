@@ -702,6 +702,14 @@ class VerticalLoader:
 
     def get_discovery_stats(self) -> Dict[str, Any]:
         """Get vertical/tool discovery telemetry snapshot."""
+        tool_dependency_stats: Dict[str, Any] = {}
+        try:
+            from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
+
+            tool_dependency_stats = get_tool_dependency_resolution_stats()
+        except Exception as e:
+            tool_dependency_stats = {"error": str(e)}
+
         with self._lock:
             return {
                 "vertical": {
@@ -720,6 +728,7 @@ class VerticalLoader:
                     "count": self._plugin_refresh_count,
                     "last_refresh_ms": self._plugin_refresh_last_ms,
                 },
+                "tool_dependency_resolution": tool_dependency_stats,
             }
 
 
