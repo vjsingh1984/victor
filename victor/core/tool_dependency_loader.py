@@ -656,8 +656,11 @@ _TOOL_DEPENDENCY_RESOLUTION_STATS: Dict[str, int] = {
     "total_requests": 0,
     "provider_cache_hits": 0,
     "provider_cache_misses": 0,
+    "provider_cache_clears": 0,
+    "provider_cache_entries_cleared": 0,
     "entry_point_resolutions": 0,
     "entry_point_load_failures": 0,
+    "entry_point_cache_clears": 0,
     "module_factory_resolutions": 0,
     "module_factory_failures": 0,
     "package_resource_resolutions": 0,
@@ -719,6 +722,7 @@ def _cached_tool_dependency_entry_points() -> Tuple[Any, ...]:
 def clear_tool_dependency_entry_point_cache() -> None:
     """Clear cached tool dependency entry-point lookups."""
     _cached_tool_dependency_entry_points.cache_clear()
+    _increment_resolution_stat("entry_point_cache_clears")
 
 
 def clear_vertical_tool_dependency_provider_cache() -> int:
@@ -730,7 +734,11 @@ def clear_vertical_tool_dependency_provider_cache() -> int:
     with _vertical_provider_cache_lock:
         count = len(_vertical_provider_cache)
         _vertical_provider_cache.clear()
-        return count
+    _increment_resolution_stat("provider_cache_clears")
+    if count:
+        with _TOOL_DEPENDENCY_STATS_LOCK:
+            _TOOL_DEPENDENCY_RESOLUTION_STATS["provider_cache_entries_cleared"] += count
+    return count
 
 
 def create_vertical_tool_dependency_provider(

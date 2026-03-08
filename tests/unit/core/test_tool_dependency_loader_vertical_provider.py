@@ -29,13 +29,13 @@ import victor.core.tool_dependency_loader as loader_mod
 @pytest.fixture(autouse=True)
 def _clear_tool_dependency_ep_cache() -> None:
     """Keep entry-point cache and telemetry isolated between tests."""
-    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
     loader_mod.clear_vertical_tool_dependency_provider_cache()
     loader_mod.clear_tool_dependency_entry_point_cache()
+    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=False)
     yield
-    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=True)
     loader_mod.clear_vertical_tool_dependency_provider_cache()
     loader_mod.clear_tool_dependency_entry_point_cache()
+    loader_mod.reset_tool_dependency_resolution_stats(clear_entry_point_cache=False)
 
 
 def test_entry_point_provider_has_priority_over_fallbacks(monkeypatch) -> None:
@@ -355,3 +355,28 @@ def test_default_and_explicit_canonicalize_share_provider_cache_key(
 
     assert provider_default is provider_explicit
     assert load_calls == 1
+
+
+def test_cache_clear_stats_track_clear_operations(monkeypatch) -> None:
+    """Telemetry should track provider/entry-point cache clear operations."""
+    sentinel = EmptyToolDependencyProvider("coding")
+
+    class _FakeEntryPoint:
+        name = "coding"
+
+        @staticmethod
+        def load():
+            return lambda: sentinel
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
+
+    create_vertical_tool_dependency_provider("coding")
+    cleared = loader_mod.clear_vertical_tool_dependency_provider_cache()
+    loader_mod.clear_tool_dependency_entry_point_cache()
+
+    stats = loader_mod.get_tool_dependency_resolution_stats()
+    assert cleared >= 1
+    assert stats["provider_cache_clears"] == 1
+    assert stats["provider_cache_entries_cleared"] >= 1
+    assert stats["entry_point_cache_clears"] == 1
