@@ -183,12 +183,14 @@ class ModuleAnalyzer:
         db = self._get_db()
         conn = db.connection if hasattr(db, "connection") else db._get_raw_connection()
         try:
-            rows = conn.execute("""SELECT DISTINCT n1.file, n2.file
+            rows = conn.execute(
+                """SELECT DISTINCT n1.file, n2.file
                    FROM graph_edge e
                    JOIN graph_node n1 ON e.src = n1.node_id
                    JOIN graph_node n2 ON e.dst = n2.node_id
                    WHERE n1.file IS NOT NULL AND n2.file IS NOT NULL
-                     AND n1.file != n2.file""").fetchall()
+                     AND n1.file != n2.file"""
+            ).fetchall()
         except Exception:
             return set(), {}, {}
 

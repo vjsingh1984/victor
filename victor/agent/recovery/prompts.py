@@ -520,7 +520,8 @@ class ModelSpecificPromptRegistry:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS template_stats (
                     template_id TEXT PRIMARY KEY,
                     usage_count INTEGER DEFAULT 0,
@@ -528,7 +529,8 @@ class ModelSpecificPromptRegistry:
                     total_quality_improvement REAL DEFAULT 0.0,
                     last_used TEXT
                 )
-            """)
+            """
+            )
 
             cursor.execute("SELECT * FROM template_stats")
             for row in cursor.fetchall():
@@ -555,7 +557,8 @@ class ModelSpecificPromptRegistry:
             conn = sqlite3.connect(str(self._db_path))
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS template_stats (
                     template_id TEXT PRIMARY KEY,
                     usage_count INTEGER DEFAULT 0,
@@ -563,7 +566,8 @@ class ModelSpecificPromptRegistry:
                     total_quality_improvement REAL DEFAULT 0.0,
                     last_used TEXT
                 )
-            """)
+            """
+            )
 
             stats = self._stats[template_id]
             cursor.execute(

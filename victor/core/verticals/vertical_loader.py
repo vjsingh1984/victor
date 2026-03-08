@@ -334,7 +334,21 @@ class VerticalLoader:
             try:
                 # Parse "module:attr" format and load
                 vertical_cls = self._load_entry_point(name, value)
-                if isinstance(vertical_cls, type) and issubclass(vertical_cls, VerticalBase):
+                if (
+                    isinstance(vertical_cls, type)
+                    and issubclass(vertical_cls, VerticalBase)
+                    and VerticalRegistry._validate_external_vertical(vertical_cls, name)
+                ):
+                    existing = VerticalRegistry.get(vertical_cls.name)
+                    if existing is not None and existing is not vertical_cls:
+                        logger.warning(
+                            "External vertical '%s' has name '%s' which conflicts with "
+                            "registered vertical %s. Skipping.",
+                            name,
+                            vertical_cls.name,
+                            existing.__name__,
+                        )
+                        continue
                     self._discovered_verticals[name] = vertical_cls
                     # Also register in the global registry
                     VerticalRegistry.register(vertical_cls)
@@ -523,6 +537,13 @@ class VerticalLoader:
                 clear_vertical_integration_pipeline_cache()
             except Exception as e:
                 logger.debug("Failed clearing framework vertical integration cache: %s", e)
+
+            try:
+                from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+
+                clear_entry_point_loader_cache()
+            except Exception as e:
+                logger.debug("Failed clearing framework entry-point loader cache: %s", e)
 
             self._plugin_refresh_last_ms = max(
                 0.0,

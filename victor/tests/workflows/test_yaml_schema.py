@@ -512,7 +512,8 @@ class TestDirectoryLoading:
         """Test loading all YAML files from a directory."""
         # Create test YAML file
         yaml_file = tmp_path / "test_workflow.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   dir_workflow:
     description: "Directory test"
@@ -522,7 +523,8 @@ workflows:
         role: tester
         goal: "Test loading"
         tool_budget: 5
-""")
+"""
+        )
         from victor.workflows.yaml_loader import load_workflows_from_directory
 
         workflows = load_workflows_from_directory(tmp_path)
@@ -533,7 +535,8 @@ workflows:
         """Test that non-YAML files are skipped."""
         # Create YAML and non-YAML files
         yaml_file = tmp_path / "valid.yaml"
-        yaml_file.write_text("""
+        yaml_file.write_text(
+            """
 workflows:
   valid_workflow:
     description: "Valid"
@@ -543,7 +546,8 @@ workflows:
         role: test
         goal: "Test"
         tool_budget: 1
-""")
+"""
+        )
 
         txt_file = tmp_path / "readme.txt"
         txt_file.write_text("This is not a workflow file")

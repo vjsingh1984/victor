@@ -198,7 +198,8 @@ class SymbolStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(str(self._db_path)) as conn:
-            conn.executescript("""
+            conn.executescript(
+                """
                 -- Files table
                 CREATE TABLE IF NOT EXISTS files (
                     path TEXT PRIMARY KEY,
@@ -266,7 +267,8 @@ class SymbolStore:
                     key TEXT PRIMARY KEY,
                     value TEXT
                 );
-            """)
+            """
+            )
 
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored.
@@ -1002,9 +1004,11 @@ class SymbolStore:
         patterns = []
 
         # Check for Provider pattern
-        cursor = conn.execute("""SELECT DISTINCT category, COUNT(*) as cnt
+        cursor = conn.execute(
+            """SELECT DISTINCT category, COUNT(*) as cnt
                FROM symbols WHERE category IS NOT NULL
-               GROUP BY category HAVING cnt >= 2""")
+               GROUP BY category HAVING cnt >= 2"""
+        )
         for row in cursor:
             category, count = row
             patterns.append(
@@ -1019,9 +1023,11 @@ class SymbolStore:
             )
 
         # Check for base classes (inheritance pattern)
-        cursor = conn.execute("""SELECT name, file_path, line_number FROM symbols
+        cursor = conn.execute(
+            """SELECT name, file_path, line_number FROM symbols
                WHERE symbol_type = 'class' AND
-               (name LIKE 'Base%' OR name LIKE 'Abstract%' OR name LIKE 'I%')""")
+               (name LIKE 'Base%' OR name LIKE 'Abstract%' OR name LIKE 'I%')"""
+        )
         for row in cursor:
             name, file_path, line_no = row
             patterns.append(
@@ -1293,8 +1299,10 @@ class SymbolStore:
         results: Dict[str, List[Dict[str, str]]] = {}
 
         with sqlite3.connect(str(self._db_path)) as conn:
-            cursor = conn.execute("""SELECT file_path, docstring FROM symbols
-                   WHERE docstring IS NOT NULL AND docstring != ''""")
+            cursor = conn.execute(
+                """SELECT file_path, docstring FROM symbols
+                   WHERE docstring IS NOT NULL AND docstring != ''"""
+            )
 
             for file_path, docstring in cursor:
                 if not docstring:
@@ -1410,10 +1418,12 @@ class SymbolStore:
     def clear(self) -> None:
         """Clear all data from the store."""
         with sqlite3.connect(str(self._db_path)) as conn:
-            conn.executescript("""
+            conn.executescript(
+                """
                 DELETE FROM symbols;
                 DELETE FROM files;
                 DELETE FROM imports;
                 DELETE FROM patterns;
                 DELETE FROM metadata;
-            """)
+            """
+            )

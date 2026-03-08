@@ -132,7 +132,8 @@ class ModeTransitionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Q-values table (uses Tables constants)
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_Q} (
                 state_key TEXT NOT NULL,
                 action_key TEXT NOT NULL,
@@ -141,10 +142,12 @@ class ModeTransitionLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (state_key, action_key)
             )
-            """)
+            """
+        )
 
         # Task-type statistics for budget optimization
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_TASK} (
                 task_type TEXT PRIMARY KEY,
                 optimal_tool_budget INTEGER DEFAULT 10,
@@ -153,10 +156,12 @@ class ModeTransitionLearner(BaseLearner):
                 sample_count INTEGER DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-            """)
+            """
+        )
 
         # Transition history for analysis
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODE_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 from_mode TEXT NOT NULL,
@@ -169,17 +174,22 @@ class ModeTransitionLearner(BaseLearner):
                 quality_score REAL,
                 timestamp TEXT NOT NULL
             )
-            """)
+            """
+        )
 
         # Indexes
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             CREATE INDEX IF NOT EXISTS idx_mode_q_state
             ON {Tables.RL_MODE_Q}(state_key)
-            """)
-        cursor.execute(f"""
+            """
+        )
+        cursor.execute(
+            f"""
             CREATE INDEX IF NOT EXISTS idx_mode_history_task
             ON {Tables.RL_MODE_HISTORY}(task_type, timestamp)
-            """)
+            """
+        )
 
         self.db.commit()
         logger.debug("RL: mode_transition tables ensured")

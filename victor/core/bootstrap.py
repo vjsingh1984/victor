@@ -50,6 +50,9 @@ logger = logging.getLogger(__name__)
 
 _VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
     "coding": "victor-coding",
+    "research": "victor-research",
+    "devops": "victor-devops",
+    "investment": "victor-invest",
 }
 _REPORTED_MISSING_VERTICALS: Set[str] = set()
 

@@ -34,6 +34,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
@@ -154,15 +155,18 @@ class LSPWriteEnhancer:
         Uses injected pool if available, otherwise falls back to coding vertical.
         """
         if self._lsp_pool is None:
-            try:
-                from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool
-
-                self._lsp_pool = LSPConnectionPool(self._workspace_root)
-            except ImportError:
+            lsp_pool_cls = self._load_optional_symbol(
+                [
+                    ("victor_coding.lsp.manager", "LSPConnectionPool"),
+                    ("victor.verticals.contrib.coding.lsp.manager", "LSPConnectionPool"),
+                ]
+            )
+            if lsp_pool_cls is None:
                 raise ImportError(
-                    "LSP support requires the coding vertical. "
-                    "Install it or inject an LSPPoolProtocol instance."
+                    "LSP support requires the coding vertical package. "
+                    "Install 'victor-coding' or inject an LSPPoolProtocol instance."
                 )
+            self._lsp_pool = lsp_pool_cls(self._workspace_root)
         return self._lsp_pool
 
     def _get_language_registry(self) -> "LanguageRegistryProtocol":
@@ -171,18 +175,29 @@ class LSPWriteEnhancer:
         Uses injected registry if available, otherwise falls back to coding vertical.
         """
         if self._language_registry is None:
-            try:
-                from victor.verticals.contrib.coding.languages.registry import (
-                    get_language_registry,
-                )
-
-                self._language_registry = get_language_registry()
-            except ImportError:
+            get_registry = self._load_optional_symbol(
+                [
+                    ("victor_coding.languages.registry", "get_language_registry"),
+                    ("victor.verticals.contrib.coding.languages.registry", "get_language_registry"),
+                ]
+            )
+            if get_registry is None:
                 raise ImportError(
-                    "Language registry requires the coding vertical. "
-                    "Install it or inject a LanguageRegistryProtocol instance."
+                    "Language registry requires the coding vertical package. "
+                    "Install 'victor-coding' or inject a LanguageRegistryProtocol instance."
                 )
+            self._language_registry = get_registry()
         return self._language_registry
+
+    def _load_optional_symbol(self, candidates: List[tuple[str, str]]) -> Optional[Any]:
+        """Load first importable symbol from candidate module paths."""
+        for module_path, symbol_name in candidates:
+            try:
+                module = importlib.import_module(module_path)
+                return getattr(module, symbol_name)
+            except Exception:
+                continue
+        return None
 
     async def validate_with_lsp(self, path: str, content: str) -> List[Diagnostic]:
         """Validate code content using LSP.

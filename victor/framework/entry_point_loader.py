@@ -53,6 +53,11 @@ def _cached_entry_points(group: str) -> tuple:
     return tuple(entry_points(group=group))
 
 
+def clear_entry_point_loader_cache() -> None:
+    """Clear cached entry-point lookups for this module."""
+    _cached_entry_points.cache_clear()
+
+
 def load_safety_rules_from_entry_points(
     enforcer: SafetyEnforcer,
     vertical_names: Optional[List[str]] = None,
@@ -279,4 +284,5 @@ __all__ = [
     "register_escape_hatches_from_entry_points",
     "register_commands_from_entry_points",
     "list_installed_verticals",
+    "clear_entry_point_loader_cache",
 ]
