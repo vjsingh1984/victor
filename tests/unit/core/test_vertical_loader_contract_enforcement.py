@@ -115,19 +115,26 @@ def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
     VerticalRegistry.unregister(existing_name)
 
 
-def test_discovery_stats_include_tool_dependency_resolution_snapshot(monkeypatch):
-    """get_discovery_stats() should include tool dependency resolution telemetry."""
+def test_discovery_stats_include_dependency_and_entry_point_snapshots(monkeypatch):
+    """get_discovery_stats() should include dependency + framework entry-point telemetry."""
     loader = VerticalLoader()
     loader._emit_observability_event = lambda *args, **kwargs: None
     loader._emit_observability_event_async = lambda *args, **kwargs: None
 
-    expected = {"total_requests": 3, "entry_point_resolutions": 2}
+    dependency_expected = {"total_requests": 3, "entry_point_resolutions": 2}
+    framework_expected = {"tool_dependency_calls": 5, "cache_hits": 4}
     monkeypatch.setattr(
         "victor.core.tool_dependency_loader.get_tool_dependency_resolution_stats",
-        lambda: expected,
+        lambda: dependency_expected,
+    )
+    monkeypatch.setattr(
+        "victor.framework.entry_point_loader.get_entry_point_loader_stats",
+        lambda: framework_expected,
     )
 
     stats = loader.get_discovery_stats()
 
     assert "tool_dependency_resolution" in stats
-    assert stats["tool_dependency_resolution"] == expected
+    assert stats["tool_dependency_resolution"] == dependency_expected
+    assert "framework_entry_point_loader" in stats
+    assert stats["framework_entry_point_loader"] == framework_expected

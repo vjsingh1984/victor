@@ -703,12 +703,20 @@ class VerticalLoader:
     def get_discovery_stats(self) -> Dict[str, Any]:
         """Get vertical/tool discovery telemetry snapshot."""
         tool_dependency_stats: Dict[str, Any] = {}
+        framework_entry_point_stats: Dict[str, Any] = {}
         try:
             from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
 
             tool_dependency_stats = get_tool_dependency_resolution_stats()
         except Exception as e:
             tool_dependency_stats = {"error": str(e)}
+
+        try:
+            from victor.framework.entry_point_loader import get_entry_point_loader_stats
+
+            framework_entry_point_stats = get_entry_point_loader_stats()
+        except Exception as e:
+            framework_entry_point_stats = {"error": str(e)}
 
         with self._lock:
             return {
@@ -729,6 +737,7 @@ class VerticalLoader:
                     "last_refresh_ms": self._plugin_refresh_last_ms,
                 },
                 "tool_dependency_resolution": tool_dependency_stats,
+                "framework_entry_point_loader": framework_entry_point_stats,
             }
 
 
