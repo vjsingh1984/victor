@@ -26,6 +26,16 @@ Tests verify that:
 import pytest
 from typing import Dict, Any, List, Optional
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _import_vertical_module(module_path: str):
+    """Import vertical module using external-first fallback resolution."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None:
+        pytest.skip(f"Vertical module not available: {module_path}")
+    return module
+
 
 class TestPersonaRegistryBasics:
     """Tests for basic persona registry functionality."""
@@ -138,7 +148,7 @@ class TestVerticalPersonaRegistration:
 
     def test_research_persona_import_and_register(self):
         """Importing research personas triggers registration."""
-        from victor.research.teams import personas
+        _import_vertical_module("victor.research.teams.personas")
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()
@@ -149,7 +159,7 @@ class TestVerticalPersonaRegistration:
 
     def test_devops_persona_import_and_register(self):
         """Importing devops personas triggers registration."""
-        from victor.devops.teams import personas
+        _import_vertical_module("victor.devops.teams.personas")
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()
@@ -160,7 +170,7 @@ class TestVerticalPersonaRegistration:
 
     def test_dataanalysis_persona_import_and_register(self):
         """Importing dataanalysis personas triggers registration."""
-        from victor.dataanalysis.teams import personas
+        _import_vertical_module("victor.dataanalysis.teams.personas")
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()
@@ -752,17 +762,17 @@ class TestPersonaTwentyPersonasRequirement:
             pass
 
         try:
-            from victor.research.teams import personas as research_personas
+            _import_vertical_module("victor.research.teams.personas")
         except ImportError:
             pass
 
         try:
-            from victor.devops.teams import personas as devops_personas
+            _import_vertical_module("victor.devops.teams.personas")
         except ImportError:
             pass
 
         try:
-            from victor.dataanalysis.teams import personas as dataanalysis_personas
+            _import_vertical_module("victor.dataanalysis.teams.personas")
         except ImportError:
             pass
 
@@ -797,11 +807,11 @@ class TestPersonaTwentyPersonasRequirement:
                 if vertical == "coding":
                     from victor_coding.teams import personas
                 elif vertical == "research":
-                    from victor.research.teams import personas
+                    _import_vertical_module("victor.research.teams.personas")
                 elif vertical == "devops":
-                    from victor.devops.teams import personas
+                    _import_vertical_module("victor.devops.teams.personas")
                 elif vertical == "dataanalysis":
-                    from victor.dataanalysis.teams import personas
+                    _import_vertical_module("victor.dataanalysis.teams.personas")
 
                 # Count registered
                 count = len(registry.list_personas(vertical=vertical))

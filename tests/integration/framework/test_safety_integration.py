@@ -6,20 +6,48 @@ when integrated with actual workflows and operations from each vertical.
 
 import pytest
 
-pytest.importorskip("victor_coding")
-pytest.importorskip("victor.devops")
-pytest.importorskip("victor.rag")
-pytest.importorskip("victor.research")
-pytest.importorskip("victor.dataanalysis")
-pytest.importorskip("victor.benchmark")
+from victor.core.verticals.import_resolver import import_module_with_fallback
 
 from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
-from victor_coding.safety import create_all_coding_safety_rules
-from victor.devops.safety import create_all_devops_safety_rules
-from victor.rag.safety import create_all_rag_safety_rules
-from victor.research.safety import create_all_research_safety_rules
-from victor.dataanalysis.safety import create_all_dataanalysis_safety_rules
-from victor.benchmark.safety import create_all_benchmark_safety_rules
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve vertical safety symbols using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None:
+        pytest.skip(f"Vertical module not available: {module_path}", allow_module_level=True)
+    if not hasattr(module, attr_name):
+        pytest.skip(
+            f"Missing attribute '{attr_name}' in module '{module_path}'",
+            allow_module_level=True,
+        )
+    return getattr(module, attr_name)
+
+
+create_all_coding_safety_rules = _load_vertical_attr(
+    "victor.coding.safety",
+    "create_all_coding_safety_rules",
+)
+create_all_devops_safety_rules = _load_vertical_attr(
+    "victor.devops.safety",
+    "create_all_devops_safety_rules",
+)
+create_all_rag_safety_rules = _load_vertical_attr(
+    "victor.rag.safety",
+    "create_all_rag_safety_rules",
+)
+create_all_research_safety_rules = _load_vertical_attr(
+    "victor.research.safety",
+    "create_all_research_safety_rules",
+)
+create_all_dataanalysis_safety_rules = _load_vertical_attr(
+    "victor.dataanalysis.safety",
+    "create_all_dataanalysis_safety_rules",
+)
+create_all_benchmark_safety_rules = _load_vertical_attr(
+    "victor.benchmark.safety",
+    "create_all_benchmark_safety_rules",
+)
 
 
 class TestSafetyIntegration:
