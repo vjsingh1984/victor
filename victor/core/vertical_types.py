@@ -36,9 +36,10 @@ Note:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.tools import ToolSet
@@ -417,6 +418,8 @@ class TieredToolConfig:
         readonly_only_for_analysis: If True, hide write/execute tools for analysis tasks
     """
 
+    _deprecation_warned: ClassVar[Set[str]] = set()
+
     mandatory: Set[str] = field(default_factory=set)
     vertical_core: Set[str] = field(default_factory=set)
     semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
@@ -424,6 +427,29 @@ class TieredToolConfig:
         default_factory=dict
     )  # DEPRECATED: use @tool(stages=[])
     readonly_only_for_analysis: bool = True
+
+    def __post_init__(self) -> None:
+        if self.semantic_pool and "semantic_pool" not in TieredToolConfig._deprecation_warned:
+            warnings.warn(
+                "TieredToolConfig.semantic_pool is deprecated. "
+                "Use get_effective_semantic_pool() instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            TieredToolConfig._deprecation_warned.add("semantic_pool")
+        if self.stage_tools and "stage_tools" not in TieredToolConfig._deprecation_warned:
+            warnings.warn(
+                "TieredToolConfig.stage_tools is deprecated. "
+                "Use get_tools_for_stage_from_registry() instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            TieredToolConfig._deprecation_warned.add("stage_tools")
+
+    @classmethod
+    def reset_deprecation_warnings(cls) -> None:
+        """Reset deprecation warning tracking to allow re-emission."""
+        cls._deprecation_warned.clear()
 
     def get_base_tools(self) -> Set[str]:
         """Get tools always included (mandatory + vertical core)."""

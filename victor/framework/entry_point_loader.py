@@ -34,6 +34,7 @@ Entry Point Groups:
 
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
@@ -44,6 +45,12 @@ from victor.framework.config import SafetyEnforcer
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+@functools.lru_cache(maxsize=16)
+def _cached_entry_points(group: str) -> tuple:
+    """Cache entry_points() result per group. Returns tuple for hashability."""
+    return tuple(entry_points(group=group))
 
 
 def load_safety_rules_from_entry_points(
@@ -77,7 +84,7 @@ def load_safety_rules_from_entry_points(
     """
     count = 0
     try:
-        eps = entry_points(group="victor.safety_rules")
+        eps = _cached_entry_points("victor.safety_rules")
         for ep in eps:
             # Filter by vertical name if specified
             if vertical_names is not None and ep.name not in vertical_names:
@@ -116,7 +123,7 @@ def load_tool_dependency_provider_from_entry_points(
             sequences = provider.get_tool_sequences()
     """
     try:
-        eps = entry_points(group="victor.tool_dependencies")
+        eps = _cached_entry_points("victor.tool_dependencies")
         for ep in eps:
             if ep.name == vertical:
                 provider_factory = ep.load()
@@ -144,7 +151,7 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
             learning_rate = rl_config.get("learning_rate", 0.001)
     """
     try:
-        eps = entry_points(group="victor.rl_configs")
+        eps = _cached_entry_points("victor.rl_configs")
         for ep in eps:
             if ep.name == vertical:
                 config_factory = ep.load()
@@ -179,7 +186,7 @@ def register_escape_hatches_from_entry_points(
     """
     count = 0
     try:
-        eps = entry_points(group="victor.escape_hatches")
+        eps = _cached_entry_points("victor.escape_hatches")
         for ep in eps:
             # Filter by vertical name if specified
             if vertical_names is not None and ep.name not in vertical_names:
@@ -222,7 +229,7 @@ def register_commands_from_entry_points(
     """
     count = 0
     try:
-        eps = entry_points(group="victor.commands")
+        eps = _cached_entry_points("victor.commands")
         for ep in eps:
             # Filter by vertical name if specified
             if vertical_names is not None and ep.name not in vertical_names:
@@ -256,7 +263,7 @@ def list_installed_verticals() -> List[str]:
     verticals = set()
     try:
         # Check victor.verticals entry points
-        eps = entry_points(group="victor.verticals")
+        eps = _cached_entry_points("victor.verticals")
         for ep in eps:
             verticals.add(ep.name)
     except Exception:

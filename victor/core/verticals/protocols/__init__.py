@@ -153,7 +153,7 @@ from victor.core.vertical_types import StageDefinition, TieredToolConfig
 # =============================================================================
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -187,7 +187,7 @@ class VerticalExtensions:
     team_spec_provider: Optional[TeamSpecProviderProtocol] = None
     enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
     tool_selection_strategy: Optional[ToolSelectionStrategyProtocol] = None
-    tiered_tool_config: Optional[Any] = None  # TieredToolConfig
+    tiered_tool_config: Optional[TieredToolConfig] = None
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
