@@ -23,8 +23,18 @@ import pytest
 from typing import Optional
 from pathlib import Path
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
 
 # =============================================================================
 # Mock Workflow Providers for Testing
@@ -392,7 +402,10 @@ class TestRealVerticalIntegration:
     def test_actual_research_workflow_provider(self):
         """Test with actual ResearchWorkflowProvider from victor_research.workflows."""
         try:
-            from victor_research.workflows import ResearchWorkflowProvider
+            ResearchWorkflowProvider = _load_vertical_attr(
+                "victor.research.workflows",
+                "ResearchWorkflowProvider",
+            )
 
             provider = ResearchWorkflowProvider()
             result = provider.get_capability_provider()
@@ -413,7 +426,10 @@ class TestRealVerticalIntegration:
     def test_actual_devops_workflow_provider(self):
         """Test with actual DevOpsWorkflowProvider from victor_devops.workflows."""
         try:
-            from victor_devops.workflows import DevOpsWorkflowProvider
+            DevOpsWorkflowProvider = _load_vertical_attr(
+                "victor.devops.workflows",
+                "DevOpsWorkflowProvider",
+            )
 
             provider = DevOpsWorkflowProvider()
             result = provider.get_capability_provider()
@@ -434,7 +450,10 @@ class TestRealVerticalIntegration:
     def test_actual_dataanalysis_workflow_provider(self):
         """Test with actual DataAnalysisWorkflowProvider from victor_dataanalysis.workflows."""
         try:
-            from victor_dataanalysis.workflows import DataAnalysisWorkflowProvider
+            DataAnalysisWorkflowProvider = _load_vertical_attr(
+                "victor.dataanalysis.workflows",
+                "DataAnalysisWorkflowProvider",
+            )
 
             provider = DataAnalysisWorkflowProvider()
             result = provider.get_capability_provider()
