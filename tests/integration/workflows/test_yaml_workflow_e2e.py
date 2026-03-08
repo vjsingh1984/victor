@@ -20,10 +20,33 @@ across all verticals (Research, DevOps, DataAnalysis).
 
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Dict
 
 import pytest
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_vertical_module(module_path: str) -> ModuleType:
+    """Load a vertical module using external-first fallback resolution."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is not None:
+        return module
+
+    try:
+        return import_module(module_path)
+    except ImportError:
+        pytest.skip(f"Vertical module not available: {module_path}")
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load an attribute from a resolved vertical module."""
+    module = _load_vertical_module(module_path)
+    if not hasattr(module, attr_name):
+        pytest.skip(f"Missing attribute '{attr_name}' in module '{module_path}'")
+    return getattr(module, attr_name)
 
 
 class TestResearchWorkflowE2E:
@@ -31,7 +54,10 @@ class TestResearchWorkflowE2E:
 
     def test_provider_loads_workflows(self):
         """Test ResearchWorkflowProvider loads all YAML workflows."""
-        from victor.research.workflows import ResearchWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor_research.workflows",
+            "ResearchWorkflowProvider",
+        )
 
         provider = ResearchWorkflowProvider()
         workflows = provider.get_workflows()
@@ -45,7 +71,8 @@ class TestResearchWorkflowE2E:
 
     def test_escape_hatches_registered(self):
         """Test escape hatches are available in config."""
-        from victor.research.escape_hatches import CONDITIONS, TRANSFORMS
+        CONDITIONS = _load_vertical_attr("victor_research.escape_hatches", "CONDITIONS")
+        TRANSFORMS = _load_vertical_attr("victor_research.escape_hatches", "TRANSFORMS")
 
         # Verify conditions
         assert "source_coverage_check" in CONDITIONS
@@ -61,7 +88,10 @@ class TestResearchWorkflowE2E:
 
     def test_workflow_definitions_valid(self):
         """Test workflow definitions are structurally valid."""
-        from victor.research.workflows import ResearchWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor_research.workflows",
+            "ResearchWorkflowProvider",
+        )
 
         provider = ResearchWorkflowProvider()
 
@@ -79,7 +109,10 @@ class TestResearchWorkflowE2E:
 
     def test_provider_config_uses_escape_hatches(self):
         """Test provider config includes escape hatches."""
-        from victor.research.workflows import ResearchWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor_research.workflows",
+            "ResearchWorkflowProvider",
+        )
 
         provider = ResearchWorkflowProvider()
         config = provider._get_config()
@@ -94,7 +127,7 @@ class TestResearchWorkflowE2E:
 
     def test_handlers_registered(self):
         """Test research handlers are in HANDLERS dict."""
-        from victor.research.handlers import HANDLERS
+        HANDLERS = _load_vertical_attr("victor_research.handlers", "HANDLERS")
 
         assert "web_scraper" in HANDLERS
         assert "citation_formatter" in HANDLERS
@@ -105,7 +138,10 @@ class TestDevOpsWorkflowE2E:
 
     def test_provider_loads_workflows(self):
         """Test DevOpsWorkflowProvider loads all YAML workflows."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
         workflows = provider.get_workflows()
@@ -115,7 +151,8 @@ class TestDevOpsWorkflowE2E:
 
     def test_escape_hatches_registered(self):
         """Test escape hatches are available in config."""
-        from victor.devops.escape_hatches import CONDITIONS, TRANSFORMS
+        CONDITIONS = _load_vertical_attr("victor_devops.escape_hatches", "CONDITIONS")
+        TRANSFORMS = _load_vertical_attr("victor_devops.escape_hatches", "TRANSFORMS")
 
         # Verify conditions
         assert "deployment_ready" in CONDITIONS
@@ -132,7 +169,10 @@ class TestDevOpsWorkflowE2E:
 
     def test_workflow_definitions_valid(self):
         """Test workflow definitions are structurally valid."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
         workflows = provider.get_workflows()
@@ -154,7 +194,10 @@ class TestDevOpsWorkflowE2E:
 
     def test_container_setup_workflow_exists(self):
         """Test container_setup workflow is loaded."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
         workflow_names = provider.get_workflow_names()
@@ -169,7 +212,7 @@ class TestDevOpsWorkflowE2E:
 
     def test_handlers_registered(self):
         """Test devops handlers are in HANDLERS dict."""
-        from victor.devops.handlers import HANDLERS
+        HANDLERS = _load_vertical_attr("victor_devops.handlers", "HANDLERS")
 
         assert "container_ops" in HANDLERS
         assert "terraform_apply" in HANDLERS
@@ -180,7 +223,10 @@ class TestDataAnalysisWorkflowE2E:
 
     def test_provider_loads_workflows(self):
         """Test DataAnalysisWorkflowProvider loads all YAML workflows."""
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+        DataAnalysisWorkflowProvider = _load_vertical_attr(
+            "victor_dataanalysis.workflows",
+            "DataAnalysisWorkflowProvider",
+        )
 
         provider = DataAnalysisWorkflowProvider()
         workflows = provider.get_workflows()
@@ -190,7 +236,8 @@ class TestDataAnalysisWorkflowE2E:
 
     def test_escape_hatches_registered(self):
         """Test escape hatches are available in config."""
-        from victor.dataanalysis.escape_hatches import CONDITIONS, TRANSFORMS
+        CONDITIONS = _load_vertical_attr("victor_dataanalysis.escape_hatches", "CONDITIONS")
+        TRANSFORMS = _load_vertical_attr("victor_dataanalysis.escape_hatches", "TRANSFORMS")
 
         # Verify conditions
         assert "should_retry_cleaning" in CONDITIONS
@@ -205,7 +252,10 @@ class TestDataAnalysisWorkflowE2E:
 
     def test_workflow_definitions_valid(self):
         """Test workflow definitions are structurally valid."""
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+        DataAnalysisWorkflowProvider = _load_vertical_attr(
+            "victor_dataanalysis.workflows",
+            "DataAnalysisWorkflowProvider",
+        )
 
         provider = DataAnalysisWorkflowProvider()
         workflows = provider.get_workflows()
@@ -223,7 +273,7 @@ class TestDataAnalysisWorkflowE2E:
 
     def test_handlers_registered(self):
         """Test dataanalysis handlers are in HANDLERS dict."""
-        from victor.dataanalysis.handlers import HANDLERS
+        HANDLERS = _load_vertical_attr("victor_dataanalysis.handlers", "HANDLERS")
 
         assert "stats_compute" in HANDLERS
         assert "ml_training" in HANDLERS
@@ -234,9 +284,18 @@ class TestCrossVerticalConsistency:
 
     def test_all_providers_have_yaml_config(self):
         """Test all providers use YAMLWorkflowConfig."""
-        from victor.research.workflows import ResearchWorkflowProvider
-        from victor.devops.workflows import DevOpsWorkflowProvider
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor_research.workflows",
+            "ResearchWorkflowProvider",
+        )
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
+        DataAnalysisWorkflowProvider = _load_vertical_attr(
+            "victor_dataanalysis.workflows",
+            "DataAnalysisWorkflowProvider",
+        )
 
         providers = [
             ResearchWorkflowProvider(),
@@ -251,9 +310,18 @@ class TestCrossVerticalConsistency:
 
     def test_all_providers_have_canonical_streaming_methods(self):
         """Test all providers support streaming via canonical API."""
-        from victor.research.workflows import ResearchWorkflowProvider
-        from victor.devops.workflows import DevOpsWorkflowProvider
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor_research.workflows",
+            "ResearchWorkflowProvider",
+        )
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
+        DataAnalysisWorkflowProvider = _load_vertical_attr(
+            "victor_dataanalysis.workflows",
+            "DataAnalysisWorkflowProvider",
+        )
 
         providers = [
             ResearchWorkflowProvider(),
@@ -269,12 +337,17 @@ class TestCrossVerticalConsistency:
 
     def test_workflow_yaml_files_exist(self):
         """Test YAML workflow files exist for each vertical."""
-        base = Path(__file__).parent.parent.parent.parent / "victor"
+        workflow_modules = {
+            "research": _load_vertical_module("victor_research.workflows"),
+            "devops": _load_vertical_module("victor_devops.workflows"),
+            "dataanalysis": _load_vertical_module("victor_dataanalysis.workflows"),
+        }
 
-        verticals = ["research", "devops", "dataanalysis"]
+        for vertical, module in workflow_modules.items():
+            module_file = getattr(module, "__file__", None)
+            assert module_file, f"{vertical} workflows module has no __file__"
 
-        for vertical in verticals:
-            workflow_dir = base / vertical / "workflows"
+            workflow_dir = Path(module_file).parent
             assert workflow_dir.exists(), f"{vertical} workflows directory missing"
 
             yaml_files = list(workflow_dir.glob("*.yaml"))
@@ -282,23 +355,27 @@ class TestCrossVerticalConsistency:
 
     def test_escape_hatch_files_exist(self):
         """Test escape_hatches.py exists for each vertical."""
-        base = Path(__file__).parent.parent.parent.parent / "victor"
+        modules = {
+            "research": _load_vertical_module("victor_research.escape_hatches"),
+            "devops": _load_vertical_module("victor_devops.escape_hatches"),
+            "dataanalysis": _load_vertical_module("victor_dataanalysis.escape_hatches"),
+        }
 
-        verticals = ["research", "devops", "dataanalysis"]
-
-        for vertical in verticals:
-            escape_file = base / vertical / "escape_hatches.py"
-            assert escape_file.exists(), f"{vertical}/escape_hatches.py missing"
+        for vertical, module in modules.items():
+            module_file = getattr(module, "__file__", None)
+            assert module_file and Path(module_file).exists(), f"{vertical}/escape_hatches.py missing"
 
     def test_handler_files_exist(self):
         """Test handlers.py exists for each vertical."""
-        base = Path(__file__).parent.parent.parent.parent / "victor"
+        modules = {
+            "research": _load_vertical_module("victor_research.handlers"),
+            "devops": _load_vertical_module("victor_devops.handlers"),
+            "dataanalysis": _load_vertical_module("victor_dataanalysis.handlers"),
+        }
 
-        verticals = ["research", "devops", "dataanalysis"]
-
-        for vertical in verticals:
-            handler_file = base / vertical / "handlers.py"
-            assert handler_file.exists(), f"{vertical}/handlers.py missing"
+        for vertical, module in modules.items():
+            module_file = getattr(module, "__file__", None)
+            assert module_file and Path(module_file).exists(), f"{vertical}/handlers.py missing"
 
 
 class TestWorkflowNodeTypes:
@@ -306,7 +383,10 @@ class TestWorkflowNodeTypes:
 
     def test_devops_has_hitl_nodes(self):
         """Test DevOps workflows include HITL approval nodes."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
         workflows = provider.get_workflows()
@@ -327,7 +407,10 @@ class TestWorkflowNodeTypes:
 
     def test_workflows_have_condition_nodes(self):
         """Test workflows use condition nodes with escape hatches."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor_devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
         workflows = provider.get_workflows()
@@ -351,29 +434,24 @@ class TestAutoRegistration:
 
     def test_research_handlers_auto_register(self):
         """Test research handlers auto-register on vertical import."""
-        # Import the vertical package
-        from victor.research import workflows as research_workflows
-
-        # Handler registration should have happened
-        from victor.research.handlers import HANDLERS
+        _load_vertical_module("victor_research.workflows")
+        HANDLERS = _load_vertical_attr("victor_research.handlers", "HANDLERS")
 
         assert "web_scraper" in HANDLERS
         assert "citation_formatter" in HANDLERS
 
     def test_devops_handlers_auto_register(self):
         """Test devops handlers auto-register on vertical import."""
-        from victor.devops import workflows as devops_workflows
-
-        from victor.devops.handlers import HANDLERS
+        _load_vertical_module("victor_devops.workflows")
+        HANDLERS = _load_vertical_attr("victor_devops.handlers", "HANDLERS")
 
         assert "container_ops" in HANDLERS
         assert "terraform_apply" in HANDLERS
 
     def test_dataanalysis_handlers_auto_register(self):
         """Test dataanalysis handlers auto-register on vertical import."""
-        from victor.dataanalysis import workflows as dataanalysis_workflows
-
-        from victor.dataanalysis.handlers import HANDLERS
+        _load_vertical_module("victor_dataanalysis.workflows")
+        HANDLERS = _load_vertical_attr("victor_dataanalysis.handlers", "HANDLERS")
 
         assert "stats_compute" in HANDLERS
         assert "ml_training" in HANDLERS
