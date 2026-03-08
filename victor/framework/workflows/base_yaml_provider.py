@@ -38,7 +38,6 @@ Example:
 
 from __future__ import annotations
 
-import importlib
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -194,15 +193,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         if not module_path:
             return None
 
-        module = None
-        resolved_path = None
-        for candidate in module_import_candidates(module_path):
-            try:
-                module = importlib.import_module(candidate)
-                resolved_path = candidate
-                break
-            except ImportError:
-                continue
+        module, resolved_path = import_module_with_fallback(module_path)
 
         if module is None:
             logger.warning(
