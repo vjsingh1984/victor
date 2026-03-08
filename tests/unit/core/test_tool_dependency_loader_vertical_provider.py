@@ -291,6 +291,7 @@ def test_provider_cache_reuses_resolved_provider(monkeypatch) -> None:
     assert load_calls == 1
     assert stats["provider_cache_hits"] >= 1
     assert stats["provider_cache_misses"] >= 1
+    assert stats["provider_cache_currsize"] >= 1
 
 
 def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
@@ -311,8 +312,12 @@ def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     p1 = create_vertical_tool_dependency_provider("coding")
+    stats_before_clear = loader_mod.get_tool_dependency_resolution_stats()
     loader_mod.clear_vertical_tool_dependency_provider_cache()
+    stats_after_clear = loader_mod.get_tool_dependency_resolution_stats()
     p2 = create_vertical_tool_dependency_provider("coding")
 
     assert p1 is not p2
     assert load_calls == 2
+    assert stats_before_clear["provider_cache_currsize"] >= 1
+    assert stats_after_clear["provider_cache_currsize"] == 0

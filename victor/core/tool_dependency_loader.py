@@ -680,6 +680,8 @@ def get_tool_dependency_resolution_stats() -> Dict[str, int]:
     """Return resolution telemetry counters and entry-point cache stats."""
     with _TOOL_DEPENDENCY_STATS_LOCK:
         stats = dict(_TOOL_DEPENDENCY_RESOLUTION_STATS)
+    with _vertical_provider_cache_lock:
+        provider_cache_size = len(_vertical_provider_cache)
 
     cache_info = _cached_tool_dependency_entry_points.cache_info()
     stats.update(
@@ -688,6 +690,7 @@ def get_tool_dependency_resolution_stats() -> Dict[str, int]:
             "entry_point_cache_misses": cache_info.misses,
             "entry_point_cache_maxsize": cache_info.maxsize or 0,
             "entry_point_cache_currsize": cache_info.currsize,
+            "provider_cache_currsize": provider_cache_size,
         }
     )
     return stats
