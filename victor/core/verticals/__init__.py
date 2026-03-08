@@ -83,6 +83,9 @@ from victor.core.verticals.vertical_loader import (
     get_active_vertical,
     get_vertical_extensions,
 )
+from victor.core.verticals.runtime_diagnostics import (
+    get_vertical_runtime_diagnostics,
+)
 
 __all__ = [
     # Base classes
@@ -129,6 +132,7 @@ __all__ = [
     "load_vertical",
     "get_active_vertical",
     "get_vertical_extensions",
+    "get_vertical_runtime_diagnostics",
     # Helper functions
     "get_vertical",
     "list_verticals",
