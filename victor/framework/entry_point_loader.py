@@ -66,6 +66,7 @@ _ENTRY_POINT_LOADER_STATS: Dict[str, int] = {
     "command_calls": 0,
     "command_loaded": 0,
     "command_failures": 0,
+    "cache_clears": 0,
 }
 _ENTRY_POINT_LOADER_STATS_LOCK = threading.Lock()
 
@@ -95,11 +96,11 @@ def get_entry_point_loader_stats() -> Dict[str, int]:
 
 def reset_entry_point_loader_stats(clear_cache: bool = False) -> None:
     """Reset entry-point loader telemetry counters and optionally clear cache."""
+    if clear_cache:
+        _cached_entry_points.cache_clear()
     with _ENTRY_POINT_LOADER_STATS_LOCK:
         for key in _ENTRY_POINT_LOADER_STATS:
             _ENTRY_POINT_LOADER_STATS[key] = 0
-    if clear_cache:
-        clear_entry_point_loader_cache()
 
 
 def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[set[str]]:
@@ -118,6 +119,7 @@ def _cached_entry_points(group: str) -> tuple:
 def clear_entry_point_loader_cache() -> None:
     """Clear cached entry-point lookups for this module."""
     _cached_entry_points.cache_clear()
+    _increment_loader_stat("cache_clears")
 
 
 def load_safety_rules_from_entry_points(

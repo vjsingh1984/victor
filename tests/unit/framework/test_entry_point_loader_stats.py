@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from victor.core.tool_types import EmptyToolDependencyProvider
 from victor.framework.entry_point_loader import (
+    clear_entry_point_loader_cache,
     get_entry_point_loader_stats,
     load_tool_dependency_provider_from_entry_points,
     reset_entry_point_loader_stats,
@@ -76,3 +77,18 @@ def test_stats_track_tool_dependency_none_returns(
     assert resolved is None
     assert stats["tool_dependency_calls"] == 1
     assert stats["tool_dependency_none_returns"] == 1
+
+
+def test_stats_track_cache_clear_operations() -> None:
+    """Explicit cache clearing should increment cache clear telemetry."""
+    clear_entry_point_loader_cache()
+    stats = get_entry_point_loader_stats()
+    assert stats["cache_clears"] == 1
+
+
+def test_reset_stats_with_clear_cache_keeps_zero_baseline() -> None:
+    """reset_entry_point_loader_stats(clear_cache=True) should leave counters at zero."""
+    clear_entry_point_loader_cache()
+    reset_entry_point_loader_stats(clear_cache=True)
+    stats = get_entry_point_loader_stats()
+    assert stats["cache_clears"] == 0
