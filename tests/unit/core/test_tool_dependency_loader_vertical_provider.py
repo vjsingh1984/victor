@@ -26,6 +26,29 @@ from victor.core.tool_types import EmptyToolDependencyProvider
 import victor.core.tool_dependency_loader as loader_mod
 
 
+def test_entry_point_provider_has_priority_over_fallbacks(monkeypatch) -> None:
+    """Entry point providers should short-circuit module/resource fallbacks."""
+    sentinel = EmptyToolDependencyProvider("coding")
+
+    class _FakeEntryPoint:
+        name = "coding"
+
+        @staticmethod
+        def load():
+            return lambda: sentinel
+
+    monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
+
+    def _unexpected_import(_module_name: str):
+        raise AssertionError("fallback import should not execute when entry point resolves")
+
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", _unexpected_import)
+
+    provider = create_vertical_tool_dependency_provider("coding")
+
+    assert provider is sentinel
+
+
 def test_module_factory_fallback_is_used_when_entry_points_missing(monkeypatch) -> None:
     """Resolver should load module-level get_provider before YAML/resource fallbacks."""
     sentinel = EmptyToolDependencyProvider("coding")
