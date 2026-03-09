@@ -112,6 +112,10 @@ class StatusBar(Static):
             status_label = Label(self.status, classes="status-indicator")
             status_label.add_class("idle")
             yield status_label
+            follow_label = Label("Following", classes="follow-indicator", id="follow-indicator")
+            follow_label.add_class("following")
+            yield follow_label
+            yield Label("", classes="unread-indicator", id="unread-indicator")
             yield Label(
                 Text.assemble(
                     ("Ctrl+C", "bold"),
@@ -239,8 +243,10 @@ class StatusBar(Static):
             return
         self._follow_paused = paused
         try:
-            label = self.query_one(".status-indicator", Label)
+            label = self.query_one("#follow-indicator", Label)
             label.update("Paused" if paused else "Following")
+            label.remove_class("following", "paused")
+            label.add_class("paused" if paused else "following")
         except Exception as e:
             logger.debug(f"Failed to update follow indicator: {e}")
         self.update_shortcuts(self._state)
@@ -254,7 +260,7 @@ class StatusBar(Static):
             return
         self._last_unread_count = count
         try:
-            label = self.query_one(".status-indicator", Label)
+            label = self.query_one("#unread-indicator", Label)
             if count > 0:
                 label.update(f"{count} new")
                 label.add_class("visible")
@@ -282,8 +288,37 @@ class SubmitTextArea(TextArea):
             super().__init__()
             self.value = value
 
+    _APP_SHORTCUT_ACTIONS: dict[str, str] = {
+        "ctrl+f": "action_toggle_follow_mode",
+        "ctrl+n": "action_jump_unread",
+        "ctrl+u": "action_toggle_unread_marker",
+        "ctrl+end": "action_scroll_bottom",
+        "ctrl+x": "action_cancel_stream",
+    }
+
+    def _dispatch_app_shortcut(self, event) -> bool:
+        """Forward selected app-level shortcuts while editing the prompt."""
+        action_name = self._APP_SHORTCUT_ACTIONS.get(event.key)
+        if not action_name:
+            return False
+        app = self.app
+        if app is None:
+            return False
+        action = getattr(app, action_name, None)
+        if not callable(action):
+            return False
+        result = action()
+        if asyncio.iscoroutine(result):
+            asyncio.create_task(result)
+        event.prevent_default()
+        event.stop()
+        return True
+
     async def _on_key(self, event) -> None:
         """Handle key events before TextArea processes them."""
+        if self._dispatch_app_shortcut(event):
+            return
+
         # Ctrl+Enter: Always submit
         if event.key == "ctrl+enter":
             if self.text.strip():

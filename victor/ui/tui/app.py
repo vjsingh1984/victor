@@ -234,9 +234,7 @@ class VictorTUI(App):
     └─────────────────────────────────────┘
     """
 
-    CSS = (
-        THEME_CSS
-        + """
+    CSS = THEME_CSS + """
     Screen {
         background: $background;
         color: $text;
@@ -325,6 +323,29 @@ class VictorTUI(App):
 
     StatusBar .status-indicator.streaming {
         color: $warning;
+    }
+
+    StatusBar .follow-indicator {
+        width: auto;
+        margin-left: 1;
+        color: $text-muted;
+        text-style: bold;
+    }
+
+    StatusBar .follow-indicator.paused {
+        color: $warning;
+    }
+
+    StatusBar .unread-indicator {
+        width: auto;
+        margin-left: 1;
+        color: $primary;
+        text-style: bold;
+        display: none;
+    }
+
+    StatusBar .unread-indicator.visible {
+        display: block;
     }
 
     StatusBar .provider-info .victor-name {
@@ -536,7 +557,6 @@ class VictorTUI(App):
         border-top: solid $border-muted;
     }
     """
-    )
 
     BINDINGS = [
         Binding("ctrl+c", "quit", "Exit", show=True),

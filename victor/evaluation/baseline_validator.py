@@ -294,8 +294,7 @@ class BaselineCache:
     def _init_db(self):
         """Initialize database schema."""
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS baselines (
                     cache_key TEXT PRIMARY KEY,
                     instance_id TEXT NOT NULL,
@@ -305,14 +304,11 @@ class BaselineCache:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP
                 )
-            """
-            )
-            conn.execute(
-                """
+            """)
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_repo_commit
                 ON baselines(repo, base_commit)
-            """
-            )
+            """)
 
     def _get_cache_key(self, instance_id: str, repo: str, commit: str) -> str:
         """Generate cache key for baseline."""
@@ -413,12 +409,10 @@ class BaselineCache:
             by_repo = dict(
                 conn.execute("SELECT repo, COUNT(*) FROM baselines GROUP BY repo").fetchall()
             )
-            valid = conn.execute(
-                """
+            valid = conn.execute("""
                 SELECT COUNT(*) FROM baselines
                 WHERE expires_at IS NULL OR expires_at > datetime('now')
-                """
-            ).fetchone()[0]
+                """).fetchone()[0]
 
             return {
                 "total": total,

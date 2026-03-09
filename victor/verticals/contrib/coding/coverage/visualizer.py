@@ -418,16 +418,14 @@ class CoverageVisualizer:
         ):
             safe_name = str(file_cov.file_path).replace("/", "_").replace("\\", "_")
             cov_class = self._get_coverage_class(file_cov.line_coverage_percent)
-            rows.append(
-                f"""
+            rows.append(f"""
                 <tr class="{cov_class}">
                     <td><a href="{safe_name}.html">{html.escape(str(file_cov.file_path))}</a></td>
                     <td>{file_cov.covered_lines}/{file_cov.total_lines}</td>
                     <td>{file_cov.line_coverage_percent:.1f}%</td>
                     <td><div class="bar"><div class="fill" style="width: {file_cov.line_coverage_percent}%"></div></div></td>
                 </tr>
-            """
-            )
+            """)
 
         threshold_status = (
             '<span class="pass">PASS</span>' if passed else '<span class="fail">FAIL</span>'
@@ -503,15 +501,13 @@ class CoverageVisualizer:
                 cov_class = "uncovered"
                 hits = "0"
 
-            line_rows.append(
-                f"""
+            line_rows.append(f"""
                 <tr class="{cov_class}">
                     <td class="line-num">{i}</td>
                     <td class="hits">{hits}</td>
                     <td class="source"><pre>{html.escape(source_line)}</pre></td>
                 </tr>
-            """
-            )
+            """)
 
         return f"""<!DOCTYPE html>
 <html>

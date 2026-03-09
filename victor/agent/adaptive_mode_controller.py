@@ -235,8 +235,7 @@ class QLearningStore:
         conn = self._db.get_connection()
 
         # Create tables if not present (legacy fallback)
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS {_Q_TABLE} (
                 state_key TEXT NOT NULL,
                 action_key TEXT NOT NULL,
@@ -245,11 +244,9 @@ class QLearningStore:
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (state_key, action_key)
             )
-        """
-        )
+        """)
 
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS {_HISTORY_TABLE} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 profile_name TEXT NOT NULL,
@@ -261,11 +258,9 @@ class QLearningStore:
                 reward REAL,
                 timestamp TEXT NOT NULL
             )
-        """
-        )
+        """)
 
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS {_TASK_TABLE} (
                 task_type TEXT PRIMARY KEY,
                 optimal_tool_budget INTEGER DEFAULT 10,
@@ -274,21 +269,16 @@ class QLearningStore:
                 sample_count INTEGER DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-        """
-        )
+        """)
 
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_{_Q_TABLE}_state ON {_Q_TABLE}(state_key)
-        """
-        )
+        """)
 
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_{_HISTORY_TABLE}_profile
             ON {_HISTORY_TABLE}(profile_name, timestamp)
-        """
-        )
+        """)
         conn.commit()
 
         self._initialized = True

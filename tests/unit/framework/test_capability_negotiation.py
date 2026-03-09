@@ -443,6 +443,7 @@ class TestCapabilityNegotiationProtocol:
 
     def test_extract_orchestrator_capabilities(self):
         """Test extracting capabilities from orchestrator."""
+
         # Mock orchestrator
         class MockOrchestrator:
             def __init__(self):

@@ -63,8 +63,7 @@ def create_test_sqlite_db(db_path: Path, messages: list) -> None:
     This simulates ConversationStore's messages table structure.
     """
     with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -72,8 +71,7 @@ def create_test_sqlite_db(db_path: Path, messages: list) -> None:
                 content TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
         for msg in messages:
             conn.execute(
                 """

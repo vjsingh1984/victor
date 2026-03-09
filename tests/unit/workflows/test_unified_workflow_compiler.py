@@ -460,8 +460,7 @@ class TestCompilationWithCaching:
 
         # Create initial YAML file
         yaml_file = tmp_path / "workflow.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
@@ -469,8 +468,7 @@ workflows:
         type: transform
         transform: "result = 'v1'"
         next: []
-"""
-        )
+""")
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
@@ -481,8 +479,7 @@ workflows:
         time.sleep(0.1)
 
         # Modify the file
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
@@ -490,8 +487,7 @@ workflows:
         type: transform
         transform: "result = 'v2'"
         next: []
-"""
-        )
+""")
 
         # Re-compile - should detect file change and recompile
         compiled2 = compiler.compile_yaml(yaml_file, workflow_name="test")
@@ -1046,8 +1042,7 @@ class TestCachingIntegration:
 
         # Create YAML file
         yaml_file = tmp_path / "cascade_test.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
@@ -1055,8 +1050,7 @@ workflows:
         type: transform
         transform: "result = 'done'"
         next: []
-"""
-        )
+""")
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
@@ -1085,15 +1079,13 @@ class TestErrorHandling:
 
         # Create invalid YAML file
         yaml_file = tmp_path / "invalid.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
       - id: broken
         type: [this is not valid yaml
-"""
-        )
+""")
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1109,8 +1101,7 @@ workflows:
         from victor.workflows.yaml_loader import YAMLWorkflowError
 
         yaml_file = tmp_path / "missing_node.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
@@ -1118,8 +1109,7 @@ workflows:
         type: transform
         transform: "result = 'done'"
         next: [nonexistent_node]
-"""
-        )
+""")
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1135,8 +1125,7 @@ workflows:
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         yaml_file = tmp_path / "circular.yaml"
-        yaml_file.write_text(
-            """
+        yaml_file.write_text("""
 workflows:
   test:
     nodes:
@@ -1152,8 +1141,7 @@ workflows:
         type: transform
         transform: "c = 3"
         next: [node_a]
-"""
-        )
+""")
 
         compiler = UnifiedWorkflowCompiler()
 

@@ -143,8 +143,7 @@ class SessionManager:
     def _init_db(self) -> None:
         """Initialize database schema."""
         conn = self._get_conn()
-        conn.execute(
-            f"""
+        conn.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.UI_SESSION} (
                 id TEXT PRIMARY KEY,
                 name TEXT,
@@ -155,14 +154,11 @@ class SessionManager:
                 updated_at TEXT,
                 data TEXT
             )
-        """
-        )
-        conn.execute(
-            f"""
+        """)
+        conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_ui_session_updated
             ON {Tables.UI_SESSION}(updated_at DESC)
-        """
-        )
+        """)
         conn.commit()
 
     def save(self, session: Session) -> None:

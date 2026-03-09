@@ -239,11 +239,9 @@ class BaseLearner(ABC):
             cursor.execute(f"SELECT COUNT(*) FROM {stats_table}")
             total_contexts = cursor.fetchone()[0]
 
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT SUM(total_sessions) FROM {stats_table}
-                """
-            )
+                """)
             total_sessions = cursor.fetchone()[0] or 0
 
             return {

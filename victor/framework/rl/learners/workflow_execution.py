@@ -126,8 +126,7 @@ class WorkflowExecutionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Q-values table for workflow-task pairs
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_Q} (
                 workflow_name TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -139,12 +138,10 @@ class WorkflowExecutionLearner(BaseLearner):
                 last_updated TEXT,
                 PRIMARY KEY (workflow_name, task_type)
             )
-        """
-        )
+        """)
 
         # Execution history for detailed analysis
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_WORKFLOW_RUN} (
                 execution_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workflow_name TEXT NOT NULL,
@@ -156,8 +153,7 @@ class WorkflowExecutionLearner(BaseLearner):
                 mode TEXT,
                 executed_at TEXT NOT NULL
             )
-        """
-        )
+        """)
 
         self.db.commit()
 
@@ -489,8 +485,7 @@ class WorkflowExecutionLearner(BaseLearner):
                 (workflow_name,),
             )
         else:
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT
                     workflow_name,
                     task_type,
@@ -501,8 +496,7 @@ class WorkflowExecutionLearner(BaseLearner):
                     avg_quality
                 FROM {Tables.AGENT_WORKFLOW_Q}
                 ORDER BY workflow_name, task_type
-            """
-            )
+            """)
 
         stats = {}
         for row in cursor.fetchall():

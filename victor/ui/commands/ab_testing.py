@@ -432,13 +432,11 @@ def list_experiments(
                 (status_filter,),
             )
         else:
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT experiment_id, name, status, created_at, started_at, completed_at
                 FROM experiments
                 ORDER BY created_at DESC
-            """
-            )
+            """)
 
         rows = cursor.fetchall()
         conn.close()

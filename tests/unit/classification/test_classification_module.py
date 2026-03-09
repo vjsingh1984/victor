@@ -181,8 +181,7 @@ class TestSWEBenchPatterns:
     def test_github_issue_format(self):
         """GitHub issue format should be detected as BUG_FIX."""
         matcher = PatternMatcher()
-        result = matcher.match(
-            """
+        result = matcher.match("""
 ### Description
 
 The world_to_pixel function fails to converge.
@@ -194,36 +193,31 @@ Should return pixel coordinates.
 ### Actual behavior
 
 Raises NoConvergenceError.
-"""
-        )
+""")
         assert result is not None
         assert result.task_type == TaskType.BUG_FIX
 
     def test_steps_to_reproduce(self):
         """Steps to Reproduce should be detected as BUG_FIX."""
         matcher = PatternMatcher()
-        result = matcher.match(
-            """
+        result = matcher.match("""
 Steps to Reproduce:
 1. Call the function
 2. Pass invalid parameter
 3. Error occurs
-"""
-        )
+""")
         assert result is not None
         assert result.task_type == TaskType.BUG_FIX
 
     def test_traceback_error_pattern(self):
         """Python traceback should be detected as BUG_FIX."""
         matcher = PatternMatcher()
-        result = matcher.match(
-            """
+        result = matcher.match("""
 Traceback (most recent call last):
   File "test.py", line 10
     raise ValueError("test")
 ValueError: test
-"""
-        )
+""")
         assert result is not None
         assert result.task_type == TaskType.BUG_FIX
 
