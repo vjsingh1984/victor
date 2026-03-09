@@ -49,6 +49,20 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
+      - name: Install build tools
+        run: |
+          pip install build twine
+
+      - name: Build victor-sdk
+        working-directory: victor-sdk
+        run: |
+          python -m build
+
+      - name: Install victor-sdk from local wheel
+        run: |
+          pip install victor-sdk/dist/*.whl
+          python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
+
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
@@ -162,6 +176,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Update rustup to stable
+        run: |
+          rustup update stable
+          rustup default stable
+          rustc --version
+          cargo --version
 
       - name: Install maturin
         run: pip install maturin
