@@ -42,9 +42,9 @@ Related documents:
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
 | `E1` | Orchestration tech-debt burn-down | `M1` completed, `M2` in planning |
-| `E2` | Roadmap governance consolidation | `M1` in progress |
-| `E3` | Type-safety + quality gates | `M1` in progress |
-| `E4` | Event bridge reliability | `M3` completed |
+| `E2` | Roadmap governance consolidation | `M1` complete, `M2` in planning |
+| `E3` | Type-safety + quality gates | `M1` complete, `M2` in progress |
+| `E4` | Event bridge reliability | `M1` complete, `M2` in planning |
 | `E5` | Legacy compatibility debt reduction | `M2` completed, `M3` in planning |
 | `E6` | Competitive benchmark ground-truth | `M1` in progress |
 
@@ -71,13 +71,16 @@ Milestone targets:
 ## Active Work (M1-M2)
 
 ### E2: Roadmap Governance Consolidation
-**Status**: M1 in progress
+**Status**: M1 complete, M2 in planning
 **Owner**: Product/Program Lead (assigned 2026-03-10)
 **Progress**:
-- ✅ Canonical roadmap established (roadmap.md)
-- 🔄 Duplicate sources inventory in progress
-- ⏳ Active work mapping to owner/date/KPI (target: 100%)
-- ⏳ Weekly update cadence setup (target: >= 90% adherence)
+- ✅ M1: Canonical roadmap established (roadmap.md)
+- ✅ M1: Single source of truth defined with governance hierarchy
+- ✅ M1: E3 (Type-Safety) M1 complete - 11 strict modules, CI-blocking
+- ✅ M1: E4 (Event Bridge) M1 complete - async subscribe path merged
+- 🔄 M2: Duplicate sources inventory
+- ⏳ M2: Active work mapping to owner/date/KPI (target: 100%)
+- ⏳ M2: Weekly update cadence setup (target: >= 90% adherence)
 
 ### E3: Type-Safety + Quality Gates
 **Status**: M1 complete, M2 in progress
@@ -96,6 +99,26 @@ Milestone targets:
 - `victor.core/protocols` (1 file)
 - `victor.providers.base` (1 file)
 - `victor.framework.*` (190+ files)
+
+### E4: Event Bridge / Observability Reliability
+**Status**: M1 complete, M2 in planning
+**Owner**: Observability Lead (assigned 2026-03-10)
+**Progress**:
+- ✅ M1: Async subscribe path merged (primary API)
+- ✅ M1: Sync subscribe deprecated (RuntimeError if used)
+- ✅ M1: EventBusAdapter.connect_async() added
+- ✅ M1: EventBusAdapter.disconnect_async() added
+- ✅ M1: EventBridge.async_start() and async_stop() added
+- ✅ M1: 11 new async path tests added
+- 🔄 M2: Integration tests for loss/ordering
+- ⏳ M3: SLO dashboards published
+
+**Key Changes (M1)**:
+- `EventBusAdapter.connect_async()` - Primary async connection method
+- `EventBusAdapter.disconnect_async()` - Primary async disconnection method
+- `EventBridge.async_start()` / `async_stop()` - Primary lifecycle methods
+- Sync `connect()`/`disconnect()`/`start()`/`stop()` kept for backward compatibility
+- All subscriptions now properly awaited (no fire-and-forget in async path)
 
 ## How to Influence the Roadmap
 

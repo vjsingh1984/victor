@@ -391,6 +391,11 @@ class EventBusAdapter:
 
     Subscribes to EventBus events and converts them to BridgeEvents
     for broadcasting to WebSocket clients.
+
+    M1 Async Path:
+    - Always uses async subscribe path
+    - Async methods (connect_async, disconnect_async) are the primary APIs
+    - Sync methods kept for backward compatibility but delegate to async
     """
 
     # Mapping of internal event topics to bridge event types
@@ -422,84 +427,146 @@ class EventBusAdapter:
         self._pending_async_tasks: Set[asyncio.Task[Any]] = set()
         self._disconnect_requested = False
 
-    def connect(self, event_bus: EventBus) -> None:
-        """Connect to an EventBus and subscribe to events."""
+    async def connect_async(self, event_bus: EventBus) -> None:
+        """Connect to an EventBus and subscribe to events (async path).
+
+        This is the primary connection method. All subscriptions use
+        the async subscribe API and are properly awaited.
+
+        Args:
+            event_bus: The EventBus to connect to (must support async subscribe)
+
+        Raises:
+            RuntimeError: If the event bus doesn't have an async subscribe method
+        """
         self._event_bus = event_bus
         self._disconnect_requested = False
 
         subscribe = getattr(event_bus, "subscribe", None)
         if not callable(subscribe):
             logger.warning("EventBusAdapter connect failed: event bus has no subscribe() method")
+            raise RuntimeError("EventBus has no subscribe() method")
+
+        # Verify subscribe is async (M1 requirement)
+        if not inspect.iscoroutinefunction(subscribe):
+            logger.warning(
+                "EventBusAdapter connect failed: event bus does not support async subscribe. "
+                "Use ObservabilityBus or other async-compatible event bus."
+            )
+            raise RuntimeError("EventBus must support async subscribe()")
+
+        subscriptions_created = 0
+        for pattern in self.EVENT_MAPPING.keys():
+            try:
+                # Always use async handler for modern event bus
+                handle = await subscribe(pattern, self._on_event_async)
+                self._subscriptions.append(pattern)
+                self._subscription_handles.append(handle)
+                subscriptions_created += 1
+            except Exception as e:
+                logger.warning(f"Failed to subscribe to {pattern}: {e}")
+                # Continue with other subscriptions
+
+        logger.info(
+            f"EventBusAdapter connected via async path "
+            f"({subscriptions_created}/{len(self.EVENT_MAPPING)} subscriptions)"
+        )
+
+    def connect(self, event_bus: EventBus) -> None:
+        """Connect to an EventBus (sync wrapper for backward compatibility).
+
+        Deprecated: Use connect_async() instead. This method is kept
+        for backward compatibility and may fire-and-forget the async operation.
+
+        Args:
+            event_bus: The EventBus to connect to
+        """
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule the connection
+            self._run_async_operation(
+                self.connect_async(event_bus),
+                description="connect to event bus",
+            )
+        except RuntimeError:
+            # No running loop, try to run it
+            try:
+                asyncio.run(self.connect_async(event_bus))
+            except Exception as e:
+                logger.warning(f"EventBusAdapter sync connect failed: {e}")
+
+    async def disconnect_async(self) -> None:
+        """Disconnect from the EventBus (async path).
+
+        This is the primary disconnect method. All unsubscribes use
+        the async API and are properly awaited.
+
+        Ensures all subscription handles are properly cleaned up
+        before returning.
+        """
+        if not self._event_bus:
             return
 
-        try:
-            for internal_type in self.EVENT_MAPPING.keys():
-                try:
-                    # New async APIs require async handlers; legacy APIs expect sync handlers.
-                    use_async_handler = inspect.iscoroutinefunction(subscribe)
-                    handler: Callable[[MessagingEvent], Any] = (
-                        self._on_event_async if use_async_handler else self._on_event
-                    )
-                    result = subscribe(internal_type, handler)
-                    if inspect.isawaitable(result):
-                        # If API reports awaitable despite sync detection, retry with async handler.
-                        if not use_async_handler:
-                            close_result = getattr(result, "close", None)
-                            if callable(close_result):
-                                close_result()
-                            result = subscribe(internal_type, self._on_event_async)
-                        self._subscriptions.append(internal_type)
-                        self._run_async_operation(
-                            result,
-                            description=f"subscribe to {internal_type}",
-                            on_success=self._track_subscription_handle,
-                        )
-                    else:
-                        self._track_subscription(internal_type)
-                except Exception as e:
-                    logger.debug(f"Failed to subscribe to {internal_type}: {e}")
-        except Exception as e:
-            logger.warning(f"EventBusAdapter connect failed: {e}")
+        self._disconnect_requested = True
+        unsubscribed_count = 0
 
-        logger.info(f"EventBusAdapter connected (subscriptions: {len(self._subscriptions)})")
-
-    def disconnect(self) -> None:
-        """Disconnect from the EventBus."""
-        if self._event_bus:
-            self._disconnect_requested = True
-
-            had_async_handles = bool(self._subscription_handles)
-            for handle in list(self._subscription_handles):
-                unsubscribe = getattr(handle, "unsubscribe", None)
-                if not callable(unsubscribe):
-                    continue
+        # Unsubscribe from all handles (async path)
+        for handle in list(self._subscription_handles):
+            unsubscribe = getattr(handle, "unsubscribe", None)
+            if callable(unsubscribe):
                 try:
                     result = unsubscribe()
                     if inspect.isawaitable(result):
-                        pattern = getattr(handle, "pattern", "unknown")
-                        self._run_async_operation(
-                            result,
-                            description=f"unsubscribe handle for {pattern}",
-                        )
-                except Exception:
-                    pass
-            self._subscription_handles.clear()
+                        await result
+                    unsubscribed_count += 1
+                except Exception as e:
+                    logger.debug(f"Failed to unsubscribe from handle: {e}")
 
-            # Legacy sync API fallback: unsubscribe(topic, handler)
-            subscribe_fn = getattr(self._event_bus, "subscribe", None)
-            uses_async_subscribe = callable(subscribe_fn) and inspect.iscoroutinefunction(
-                subscribe_fn
+        self._subscription_handles.clear()
+        self._subscriptions.clear()
+
+        # Wait for any pending async operations to complete
+        if self._pending_async_tasks:
+            pending = list(self._pending_async_tasks)
+            if pending:
+                # Wait up to 5 seconds for pending tasks
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=5.0,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"Timeout waiting for {len(pending)} pending async tasks "
+                        "during disconnect"
+                    )
+
+        logger.info(
+            f"EventBusAdapter disconnected via async path "
+            f"({unsubscribed_count} handles cleaned up)"
+        )
+
+    def disconnect(self) -> None:
+        """Disconnect from the EventBus (sync wrapper for backward compatibility).
+
+        Deprecated: Use disconnect_async() instead. This method is kept
+        for backward compatibility and may fire-and-forget the async operation.
+        """
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule the disconnection
+            self._run_async_operation(
+                self.disconnect_async(),
+                description="disconnect from event bus",
             )
-            has_pending_subscribes = bool(self._pending_async_tasks)
-            if not had_async_handles and not uses_async_subscribe and not has_pending_subscribes:
-                unsubscribe_fn = getattr(self._event_bus, "unsubscribe", None)
-                if callable(unsubscribe_fn):
-                    for event_type in self._subscriptions:
-                        try:
-                            unsubscribe_fn(event_type, self._on_event)
-                        except Exception:
-                            pass
-            self._subscriptions.clear()
+        except RuntimeError:
+            # No running loop, try to run it
+            try:
+                asyncio.run(self.disconnect_async())
+            except Exception as e:
+                logger.warning(f"EventBusAdapter sync disconnect failed: {e}")
 
     def _on_event(self, event: MessagingEvent) -> None:
         """Handle an internal EventBus event."""
@@ -663,13 +730,17 @@ class EventBridge:
     - Connecting to EventBus
     - Broadcasting events to WebSocket clients
 
+    M1 Async Path:
+    - async_start() and async_stop() are the primary APIs
+    - start() and stop() are sync wrappers for backward compatibility
+
     Example:
         bus = get_event_bus()
         bridge = EventBridge(bus)
-        bridge.start()
+        await bridge.async_start()
 
         # ... later
-        bridge.stop()
+        await bridge.async_stop()
     """
 
     def __init__(self, event_bus: Optional[EventBus] = None):
@@ -683,8 +754,11 @@ class EventBridge:
         self._adapter = EventBusAdapter(event_bus, self._broadcaster)
         self._running = False
 
-    def start(self) -> None:
-        """Start the EventBridge.
+    async def async_start(self) -> None:
+        """Start the EventBridge (async path).
+
+        This is the primary start method. Uses async connect and properly
+        awaits all operations.
 
         Connects to the EventBus and begins broadcasting events.
         """
@@ -692,30 +766,111 @@ class EventBridge:
             return
 
         if self._event_bus:
-            self._adapter.connect(self._event_bus)
+            await self._adapter.connect_async(self._event_bus)
 
-        self._run_async_operation(
-            self._broadcaster.start(),
-            description="start broadcaster",
-        )
+        await self._broadcaster.start()
         self._running = True
-        logger.info("EventBridge started")
+        logger.info("EventBridge started via async path")
 
-    def stop(self) -> None:
-        """Stop the EventBridge.
+    def start(self) -> None:
+        """Start the EventBridge (sync wrapper for backward compatibility).
+
+        Deprecated: Use async_start() instead. This method is kept
+        for backward compatibility and may fire-and-forget the async operation.
+        """
+        if self._running:
+            return
+
+        # Optimistically set running flag for immediate feedback
+        # (backward compatibility: old code expects start() to set _running)
+        self._running = True
+
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule the start
+            self._run_async_operation(
+                self._start_and_set_flag(),
+                description="start event bridge",
+            )
+        except RuntimeError:
+            # No running loop, try to run it
+            try:
+                asyncio.run(self._start_and_set_flag())
+            except Exception as e:
+                self._running = False  # Reset on failure
+                logger.warning(f"EventBridge sync start failed: {e}")
+
+    async def _start_and_set_flag(self) -> None:
+        """Internal helper that performs async start without early return check.
+
+        This is called by the sync start() method after setting _running=True,
+        so it needs to do the actual work without the early return.
+        """
+        try:
+            if self._event_bus:
+                await self._adapter.connect_async(self._event_bus)
+            await self._broadcaster.start()
+            logger.info("EventBridge started via sync wrapper")
+        except Exception:
+            self._running = False
+            raise
+
+    async def async_stop(self) -> None:
+        """Stop the EventBridge (async path).
+
+        This is the primary stop method. Uses async disconnect and properly
+        awaits all cleanup operations.
 
         Disconnects from EventBus and stops broadcasting.
         """
         if not self._running:
             return
 
-        self._adapter.disconnect()
-        self._run_async_operation(
-            self._broadcaster.stop(),
-            description="stop broadcaster",
-        )
+        await self._adapter.disconnect_async()
+        await self._broadcaster.stop()
         self._running = False
-        logger.info("EventBridge stopped")
+        logger.info("EventBridge stopped via async path")
+
+    def stop(self) -> None:
+        """Stop the EventBridge (sync wrapper for backward compatibility).
+
+        Deprecated: Use async_stop() instead. This method is kept
+        for backward compatibility and may fire-and-forget the async operation.
+        """
+        if not self._running:
+            return
+
+        # Optimistically clear running flag for immediate feedback
+        self._running = False
+
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule the stop
+            self._run_async_operation(
+                self._stop_and_cleanup(),
+                description="stop event bridge",
+            )
+        except RuntimeError:
+            # No running loop, try to run it
+            try:
+                asyncio.run(self._stop_and_cleanup())
+            except Exception as e:
+                logger.warning(f"EventBridge sync stop failed: {e}")
+
+    async def _stop_and_cleanup(self) -> None:
+        """Internal helper that performs async cleanup without early return check.
+
+        This is called by the sync stop() method after setting _running=False,
+        so it needs to do the actual cleanup without the early return.
+        """
+        try:
+            await self._adapter.disconnect_async()
+            await self._broadcaster.stop()
+            logger.info("EventBridge stopped via sync wrapper")
+        except Exception:
+            raise
 
     async def handle_connection(
         self,
