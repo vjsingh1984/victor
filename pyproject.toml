@@ -606,21 +606,27 @@ exclude = [
 files = ["victor"]
 
 # Strictly typed modules (these should pass strict checks)
-# M1 baseline (2026-03-10): 6 modules, expanding to 10+ for M2
+# M1 baseline (2026-03-10): 11 modules, expanded to 15+ for M2 (2026-03-10)
 [[tool.mypy.overrides]]
 module = [
+    # M1 baseline
     "victor.config.*",
     "victor.storage.cache.*",
     "victor.telemetry.*",
     "victor.analytics.*",
     "victor.profiler.*",
     "victor.debug.*",
-    # Added 2026-03-10 - Type-safety expansion (Task #18 M1)
+    # M1 expansion (2026-03-10)
     "victor.agent.services.*",
     "victor.core.container",
     "victor.core.protocols",
     "victor.providers.base",
     "victor.framework.*",
+    # M2 expansion (2026-03-10) - 4 additional packages
+    "victor.state.*",
+    "victor.workflows.*",
+    "victor.teams.*",
+    "victor.integrations.api.*",
 ]
 disallow_untyped_defs = true
 warn_return_any = true
@@ -640,11 +646,8 @@ module = [
     "victor.verticals.*",
     "victor.evaluation.*",
     "victor.protocol.*",
-    "victor.framework.*",
     "victor.embeddings.*",
-    "victor.state.*",
     "victor.observability.*",
-    "victor.telemetry.*",
     "victor.context.*",
     "victor.*",
 ]
