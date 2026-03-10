@@ -439,6 +439,237 @@ class ProfileConfig(BaseSettings):
         return v
 
 
+# =============================================================================
+# NESTED CONFIG GROUPS
+# =============================================================================
+# Focused Pydantic models that group related settings by domain.
+# Settings composes these and syncs flat field values into them,
+# enabling both flat access (settings.default_provider) and
+# structured access (settings.provider.default_provider).
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class ProviderSettings(_BaseModel):
+    """Provider connection and model defaults."""
+
+    default_provider: str = "ollama"
+    default_model: str = "qwen3-coder:30b"
+    default_temperature: float = 0.7
+    default_max_tokens: int = 4096
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    google_api_key: Optional[str] = None
+    moonshot_api_key: Optional[str] = None
+    deepseek_api_key: Optional[str] = None
+    ollama_base_url: str = "http://localhost:11434"
+    lmstudio_base_urls: List[str] = Field(
+        default_factory=lambda: ["http://127.0.0.1:1234"]
+    )
+    vllm_base_url: str = "http://localhost:8000"
+    lmstudio_max_vram_gb: Optional[float] = 48.0
+
+
+class ToolSettings(_BaseModel):
+    """Tool execution, selection, and retry configuration."""
+
+    tool_call_budget: int = Field(
+        default_factory=lambda: BUDGET_LIMITS.max_session_budget
+    )
+    tool_call_budget_warning_threshold: int = Field(
+        default_factory=lambda: int(
+            BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
+        )
+    )
+    tool_calling_models: Dict[str, list[str]] = Field(
+        default_factory=_load_tool_capable_patterns_from_yaml
+    )
+    tool_retry_enabled: bool = True
+    tool_retry_max_attempts: int = 3
+    tool_retry_base_delay: float = 1.0
+    tool_retry_max_delay: float = 10.0
+    fallback_max_tools: int = 8
+    enable_tool_deduplication: bool = True
+    tool_deduplication_window_size: int = 20
+    use_semantic_tool_selection: bool = True
+    embedding_provider: str = "sentence-transformers"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    tool_cache_enabled: bool = True
+    tool_cache_ttl: int = 600
+    tool_cache_allowlist: List[str] = Field(
+        default_factory=lambda: [
+            "code_search",
+            "semantic_code_search",
+            "list_directory",
+            "plan_files",
+        ]
+    )
+    generic_result_cache_enabled: bool = False
+    generic_result_cache_ttl: int = 300
+    tool_selection_cache_enabled: bool = True
+    tool_selection_cache_ttl: int = 300
+    tool_validation_mode: str = "lenient"
+
+
+class SearchSettings(_BaseModel):
+    """Codebase search and semantic configuration."""
+
+    unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    codebase_vector_store: str = "lancedb"
+    codebase_embedding_provider: str = "sentence-transformers"
+    codebase_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    codebase_persist_directory: Optional[str] = None
+    codebase_dimension: int = 384
+    codebase_batch_size: int = 32
+    codebase_graph_store: str = "sqlite"
+    codebase_graph_path: Optional[str] = None
+    core_readonly_tools: Optional[List[str]] = None
+    semantic_similarity_threshold: float = 0.25
+    semantic_query_expansion_enabled: bool = True
+    semantic_max_query_expansions: int = 5
+    enable_hybrid_search: bool = False
+    hybrid_search_semantic_weight: float = 0.6
+    hybrid_search_keyword_weight: float = 0.4
+    enable_semantic_threshold_rl_learning: bool = False
+    semantic_threshold_overrides: dict = Field(default_factory=dict)
+
+
+class ResilienceSettings(_BaseModel):
+    """Circuit breaker, retry, rate limiting, and streaming metrics."""
+
+    resilience_enabled: bool = True
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_success_threshold: int = 2
+    circuit_breaker_timeout: float = 60.0
+    circuit_breaker_half_open_max: int = 3
+    retry_max_attempts: int = 3
+    retry_base_delay: float = 1.0
+    retry_max_delay: float = 60.0
+    retry_exponential_base: float = 2.0
+    rate_limiting_enabled: bool = True
+    rate_limit_requests_per_minute: int = 50
+    rate_limit_tokens_per_minute: int = 50000
+    rate_limit_max_concurrent: int = 5
+    rate_limit_queue_size: int = 100
+    rate_limit_num_workers: int = 3
+    streaming_metrics_enabled: bool = True
+    streaming_metrics_history_size: int = 1000
+
+
+class SecuritySettings(_BaseModel):
+    """Server security, sandboxing, and approval settings."""
+
+    airgapped_mode: bool = False
+    server_api_key: Optional[str] = None
+    server_session_secret: Optional[str] = None
+    server_max_sessions: int = 100
+    server_max_message_bytes: int = 32768
+    server_session_ttl_seconds: int = 86400
+    render_max_payload_bytes: int = 20000
+    render_timeout_seconds: int = 10
+    render_max_concurrency: int = 2
+    code_executor_network_disabled: bool = True
+    code_executor_memory_limit: Optional[str] = "512m"
+    code_executor_cpu_shares: Optional[int] = 256
+    write_approval_mode: str = "risky_only"
+    headless_mode: bool = False
+    dry_run_mode: bool = False
+    auto_approve_safe: bool = False
+    max_file_changes: Optional[int] = None
+    security_dependency_scan: bool = False
+    security_iac_scan: bool = False
+
+
+class EventSettings(_BaseModel):
+    """Event system backend and configuration."""
+
+    event_backend_type: str = "in_memory"
+    event_backend_lazy_init: bool = True
+    event_delivery_guarantee: str = "at_most_once"
+    event_max_batch_size: int = 100
+    event_flush_interval_ms: float = 1000.0
+    event_queue_maxsize: int = 10000
+    event_queue_overflow_policy: str = "drop_newest"
+    event_queue_overflow_block_timeout_ms: float = 50.0
+    event_queue_overflow_topic_policies: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": "block_with_timeout",
+            "vertical.applied": "block_with_timeout",
+            "error.*": "block_with_timeout",
+            "core.events.emit_sync.metrics": "drop_oldest",
+            "vertical.extensions.loader.metrics": "drop_oldest",
+        }
+    )
+    event_queue_overflow_topic_block_timeout_ms: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": 150.0,
+            "vertical.applied": 120.0,
+            "error.*": 200.0,
+        }
+    )
+    event_emit_sync_metrics_enabled: bool = False
+    event_emit_sync_metrics_interval_seconds: float = 60.0
+    event_emit_sync_metrics_reset_after_emit: bool = False
+    event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
+    extension_loader_warn_queue_threshold: int = 24
+    extension_loader_error_queue_threshold: int = 32
+    extension_loader_warn_in_flight_threshold: int = 6
+    extension_loader_error_in_flight_threshold: int = 8
+    extension_loader_pressure_cooldown_seconds: float = 5.0
+    extension_loader_emit_pressure_events: bool = False
+    extension_loader_metrics_reporter_enabled: bool = False
+    extension_loader_metrics_reporter_interval_seconds: float = 60.0
+    extension_loader_metrics_reporter_reset_after_emit: bool = False
+    extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
+
+
+class PipelineSettings(_BaseModel):
+    """Intelligent agent pipeline, quality scoring, and recovery."""
+
+    intelligent_pipeline_enabled: bool = True
+    intelligent_quality_scoring: bool = True
+    intelligent_mode_learning: bool = True
+    intelligent_prompt_optimization: bool = True
+    intelligent_grounding_verification: bool = True
+    intelligent_min_quality_threshold: float = 0.5
+    intelligent_grounding_threshold: float = 0.7
+    intelligent_exploration_rate: float = 0.3
+    intelligent_learning_rate: float = 0.1
+    intelligent_discount_factor: float = 0.9
+    serialization_enabled: bool = True
+    serialization_default_format: Optional[str] = None
+    serialization_min_savings_threshold: float = 0.15
+    serialization_include_format_hint: bool = True
+    serialization_min_rows_for_tabular: int = 3
+    serialization_debug_mode: bool = False
+    max_exploration_iterations: int = 200
+    max_exploration_iterations_action: int = 500
+    max_exploration_iterations_analysis: int = 1000
+    min_content_threshold: int = 50
+    max_research_iterations: int = 50
+    recovery_empty_response_threshold: int = 5
+    recovery_blocked_consecutive_threshold: int = 6
+    recovery_blocked_total_threshold: int = 9
+    max_continuation_prompts_analysis: int = 6
+    max_continuation_prompts_action: int = 5
+    max_continuation_prompts_default: int = 3
+    continuation_prompt_overrides: dict = Field(default_factory=dict)
+    enable_continuation_rl_learning: bool = False
+    session_idle_timeout: int = 180
+
+
+# Module-level mapping of group names to nested model classes
+_NESTED_GROUPS = {
+    "provider": ProviderSettings,
+    "tools": ToolSettings,
+    "search": SearchSettings,
+    "resilience": ResilienceSettings,
+    "security": SecuritySettings,
+    "events": EventSettings,
+    "pipeline": PipelineSettings,
+}
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -447,6 +678,32 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="allow",
+    )
+
+    # Nested config groups (structured access to grouped settings).
+    # Auto-synced from flat fields by _sync_nested_groups validator.
+    # Use flat access (settings.default_provider) or
+    # nested access (settings.provider.default_provider).
+    provider: ProviderSettings = Field(
+        default_factory=ProviderSettings, exclude=True, repr=False
+    )
+    tools: ToolSettings = Field(
+        default_factory=ToolSettings, exclude=True, repr=False
+    )
+    search: SearchSettings = Field(
+        default_factory=SearchSettings, exclude=True, repr=False
+    )
+    resilience: ResilienceSettings = Field(
+        default_factory=ResilienceSettings, exclude=True, repr=False
+    )
+    security: SecuritySettings = Field(
+        default_factory=SecuritySettings, exclude=True, repr=False
+    )
+    events: EventSettings = Field(
+        default_factory=EventSettings, exclude=True, repr=False
+    )
+    pipeline: PipelineSettings = Field(
+        default_factory=PipelineSettings, exclude=True, repr=False
     )
 
     # Default provider settings (LMStudio by default for local observability)
@@ -600,11 +857,6 @@ class Settings(BaseSettings):
         default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
         description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var.",
     )
-
-    # Interaction Mode
-    # When True (one-shot mode), auto-continue when model asks for user input
-    # When False (interactive mode), return to user for choice
-    one_shot_mode: bool = False
 
     # MCP
     use_mcp_tools: bool = False
@@ -1042,24 +1294,6 @@ class Settings(BaseSettings):
     extension_loader_metrics_reporter_reset_after_emit: bool = False
     extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
 
-    # ==========================================================================
-    # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
-    # ==========================================================================
-    # Legacy configuration migrated to canonical event system above.
-    # These settings are kept for backward compatibility during migration.
-    # TODO: Remove in v0.3.0 once all components use core/events
-
-    # Legacy EventBus Backend Type (deprecated)
-    eventbus_backend: str = "memory"  # Mapped to event_backend_type
-
-    eventbus_queue_maxsize: int = 10000  # Not used in new system
-    eventbus_backpressure_strategy: str = "drop_oldest"  # Not used in new system
-    eventbus_sampling_enabled: bool = False  # Not used in new system
-    eventbus_sampling_default_rate: float = 1.0  # Not used in new system
-    eventbus_batching_enabled: bool = False  # Mapped to event_flush_interval_ms
-    eventbus_batch_size: int = 100  # Mapped to event_max_batch_size
-    eventbus_batch_flush_interval_ms: float = 1000.0  # Mapped to event_flush_interval_ms
-
     # Analytics
     analytics_enabled: bool = True
     # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
@@ -1132,6 +1366,23 @@ class Settings(BaseSettings):
                 raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
             normalized[pattern] = parsed_timeout
         return normalized
+
+    @model_validator(mode="after")
+    def _sync_nested_groups(self) -> "Settings":
+        """Sync flat field values into nested config groups.
+
+        Enables structured access via settings.provider.default_provider
+        alongside flat access via settings.default_provider.
+        Flat fields remain the source of truth for construction and env vars.
+        """
+        for group_name, model_cls in _NESTED_GROUPS.items():
+            data = {}
+            settings_fields = type(self).model_fields
+            for field_name in model_cls.model_fields:
+                if field_name in settings_fields:
+                    data[field_name] = getattr(self, field_name)
+            object.__setattr__(self, group_name, model_cls(**data))
+        return self
 
     @model_validator(mode="after")
     def validate_extension_loader_thresholds(self) -> "Settings":

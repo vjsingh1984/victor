@@ -571,6 +571,46 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
 
+    def _initialize_services(self) -> None:
+        """Resolve service adapters from DI container when USE_SERVICE_LAYER flag is enabled.
+
+        This implements the Strangler Fig pattern: when the flag is on, orchestrator
+        methods delegate to service adapters (which wrap coordinators) instead of
+        calling coordinators directly. When the flag is off, services are None and
+        methods fall through to coordinators as before.
+        """
+        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+        self._use_service_layer = get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_SERVICE_LAYER
+        )
+        if not self._use_service_layer or not hasattr(self, "_container"):
+            self._chat_service = None
+            self._tool_service = None
+            self._session_service = None
+            self._context_service = None
+            return
+
+        from victor.agent.services.protocols import (
+            ChatServiceProtocol,
+            ToolServiceProtocol,
+            SessionServiceProtocol,
+            ContextServiceProtocol,
+        )
+
+        self._chat_service = self._container.get_optional(ChatServiceProtocol)
+        self._tool_service = self._container.get_optional(ToolServiceProtocol)
+        self._session_service = self._container.get_optional(SessionServiceProtocol)
+        self._context_service = self._container.get_optional(ContextServiceProtocol)
+
+        logger.info(
+            "Service layer initialized: chat=%s, tool=%s, session=%s, context=%s",
+            self._chat_service is not None,
+            self._tool_service is not None,
+            self._session_service is not None,
+            self._context_service is not None,
+        )
+
     def __init__(
         self,
         settings: Settings,
@@ -1014,6 +1054,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Interaction runtime boundary: lazily materialize chat/tool/session coordinators.
         self._initialize_interaction_runtime()
+
+        # Service layer delegation (Strangler Fig pattern).
+        # When USE_SERVICE_LAYER flag is enabled, orchestrator delegates to
+        # service adapters instead of coordinators directly.
+        self._initialize_services()
 
         # =================================================================
         # NEW: Sync/Streaming Coordinators for Phase 2 split
@@ -1955,7 +2000,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[str]:
         """Save a manual checkpoint of the current conversation state.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             description: Human-readable description for the checkpoint
@@ -1964,12 +2009,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Checkpoint ID if saved, None if checkpointing is disabled
         """
+        if self._use_service_layer and self._session_service:
+            return await self._session_service.save_checkpoint(description, tags)
         return await self._session_coordinator.save_checkpoint(description, tags)
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
         """Restore conversation state from a checkpoint.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             checkpoint_id: ID of checkpoint to restore
@@ -1977,6 +2024,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if restored successfully, False otherwise
         """
+        if self._use_service_layer and self._session_service:
+            return await self._session_service.restore_checkpoint(checkpoint_id)
         return await self._session_coordinator.restore_checkpoint(checkpoint_id)
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
@@ -3309,7 +3358,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def chat(self, user_message: str) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
-        Delegates to ChatCoordinator for the full agentic loop implementation.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ChatCoordinator.
 
         Args:
             user_message: User's message
@@ -3317,6 +3367,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             CompletionResponse from the model with complete response
         """
+        if self._use_service_layer and self._chat_service:
+            return await self._chat_service.chat(user_message)
         return await self._chat_coordinator.chat(user_message)
 
     async def chat_with_planning(
@@ -3360,6 +3412,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 use_planning=False
             )
         """
+        if self._use_service_layer and self._chat_service:
+            return await self._chat_service.chat_with_planning(user_message, use_planning)
         return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
 
     async def _handle_context_and_iteration_limits(
@@ -3610,7 +3664,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
-        Delegates to ChatCoordinator for the full streaming implementation.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ChatCoordinator.
 
         Args:
             user_message: User's input message
@@ -3618,6 +3673,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
+        if self._use_service_layer and self._chat_service:
+            async for chunk in self._chat_service.stream_chat(user_message):
+                yield chunk
+            return
         async for chunk in self._chat_coordinator.stream_chat(user_message):
             yield chunk
 
@@ -3626,8 +3685,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[Any, bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
-        Delegates to ToolCoordinator.execute_tool_with_retry with orchestrator-specific
-        execution backend and task completion detection callback.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ToolCoordinator.
 
         Args:
             tool_name: Name of the tool to execute
@@ -3637,6 +3696,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Tuple of (result, success, error_message or None)
         """
+        if self._use_service_layer and self._tool_service:
+            return await self._tool_service.execute_tool_with_retry(
+                tool_name, tool_args, context
+            )
 
         async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
             return await self.tools.execute(name, context=ctx, **args)
@@ -3927,7 +3990,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             limit: Maximum number of sessions to return
@@ -3935,6 +3998,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of session metadata dictionaries
         """
+        if self._use_service_layer and self._session_service:
+            return self._session_service.get_recent_sessions(limit)
         return self._session_coordinator.get_recent_sessions(limit)
 
     def recover_session(self, session_id: str) -> bool:
@@ -3972,11 +4037,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Returns:
             Dictionary with session statistics.
         """
+        if self._use_service_layer and self._session_service:
+            return self._session_service.get_session_stats()
         return self._session_coordinator.get_session_stats()
 
     async def shutdown(self) -> None:
@@ -4157,11 +4224,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_available_tools(self) -> Set[str]:
         """Get all registered tool names (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Returns:
             Set of tool names available in registry
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.get_available_tools()
         return self._tool_coordinator.get_available_tools()
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
@@ -4177,27 +4246,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Returns:
             Set of enabled tool names for this session
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.get_enabled_tools()
         return self._tool_coordinator.get_enabled_tools()
 
     def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
-        Delegates core logic to ToolCoordinator, handles orchestrator-specific
-        propagation (vertical context, tiered config).
+        Delegates core logic to service layer when enabled, otherwise
+        ToolCoordinator with orchestrator-specific propagation.
 
         Args:
             tools: Set of tool names to enable
             tiered_config: Optional TieredToolConfig to propagate for stage filtering.
         """
         self._enabled_tools = tools
+        if self._use_service_layer and self._tool_service:
+            self._tool_service.set_enabled_tools(tools)
         # Only propagate to tool_coordinator if it's already initialized
         # to avoid eager materialization during orchestrator setup
-        if hasattr(self, "_tool_coordinator") and self._tool_coordinator.initialized:
+        elif hasattr(self, "_tool_coordinator") and self._tool_coordinator.initialized:
             self._tool_coordinator.set_enabled_tools(tools)
 
         # Apply to vertical context and tool access controller
@@ -4236,7 +4309,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Args:
             tool_name: Name of tool to check
@@ -4244,6 +4317,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if tool is enabled
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.is_tool_enabled(tool_name)
         return self._tool_coordinator.is_tool_enabled(tool_name)
 
     # --- SystemPromptProtocol ---
