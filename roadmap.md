@@ -41,7 +41,7 @@ Related documents:
 
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
-| `E1` | Orchestration tech-debt burn-down | `M1` completed, `M2` in planning |
+| `E1` | Orchestration tech-debt burn-down | `M2` in progress |
 | `E2` | Roadmap governance consolidation | `M1` complete, `M2` in planning |
 | `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
 | `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
@@ -69,6 +69,33 @@ Milestone targets:
 - Provider/tool/vertical registries and validation
 
 ## Active Work (M1-M2)
+
+### E1: Orchestration Tech-Debt Burn-Down
+**Status**: M1 complete, M2 in progress
+**Owner**: Architecture Lead
+**Progress**:
+- ✅ M1: Extract execution coordinator (ExecutionCoordinator: 415 lines)
+- ✅ M1: Extract tool coordinator (ToolCoordinator: 1565 lines)
+- ✅ M1: Extract chat coordinator (ChatCoordinator: 1464 lines)
+- ✅ M1: Extract planning coordinator (PlanningCoordinator: 520 lines)
+- ✅ M2: Sync/streaming coordinator paths split
+  - SyncChatCoordinator: 228 lines (clean)
+  - StreamingChatCoordinator: 281 lines (clean)
+- ✅ M2: Remove dead legacy code (-196 lines from chat_coordinator)
+- 🔄 M2: Further reduce coordinator sizes (ChatCoordinator still 1464 lines)
+- ⏳ M3: Protocol-based injection complete
+
+**Current Coordinator LOC**:
+| Coordinator | LOC | Target | Status |
+|-------------|-----|--------|--------|
+| ChatCoordinator | 1464 | 1200 | ⚠️ Above target (contains streaming helpers) |
+| ToolCoordinator | 1565 | 1200 | ⚠️ Above target |
+| ExecutionCoordinator | 415 | 1200 | ✅ Below target |
+| SyncChatCoordinator | 228 | 1200 | ✅ Below target |
+| StreamingChatCoordinator | 281 | 1200 | ✅ Below target |
+| PlanningCoordinator | 520 | 1200 | ✅ Below target |
+
+**M2 Note**: ChatCoordinator size is due to streaming helper methods used by StreamingChatPipeline. Further reduction requires pipeline refactoring (M3).
 
 ### E2: Roadmap Governance Consolidation
 **Status**: M1 complete, M2 in planning
