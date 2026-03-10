@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-import tomllib
+import sys
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 def _repo_root() -> Path:
