@@ -569,6 +569,16 @@ class EmbeddingService:
         if corpus.size == 0:
             return np.array([])
 
+        # Ensure corpus is at least 2D for axis operations
+        # Handle edge case where corpus might be 1D (malformed embeddings)
+        if corpus.ndim == 1:
+            # If corpus is 1D, it's a single vector - reshape to 2D
+            corpus = corpus.reshape(1, -1)
+        elif corpus.ndim != 2:
+            # Unexpected dimensionality - return empty
+            logger.warning(f"Unexpected corpus shape: {corpus.shape}, returning empty similarities")
+            return np.array([])
+
         # NumPy with BLAS is faster than Rust for vectorized operations
         query_norm = query / (np.linalg.norm(query) + 1e-9)
         corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
