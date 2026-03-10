@@ -294,7 +294,16 @@ class SystemPromptBuilder:
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
         """
-        self.provider_name = (provider_name or "").lower()
+        # Handle both string and ProviderSettings object for provider_name
+        # (backward compatibility with settings refactor)
+        if provider_name and hasattr(provider_name, 'default_provider'):
+            # provider_name is a ProviderSettings object
+            actual_provider_name = provider_name.default_provider
+        else:
+            # provider_name is a string or None
+            actual_provider_name = provider_name
+
+        self.provider_name = (actual_provider_name or "").lower()
         self.model = model or ""
         self.model_lower = self.model.lower()
         self.tool_adapter = tool_adapter

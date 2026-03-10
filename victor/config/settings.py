@@ -680,30 +680,82 @@ class Settings(BaseSettings):
         extra="allow",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _handle_legacy_field_names(cls, data: Any) -> Any:
+        """Handle legacy field names for backward compatibility.
+
+        Maps old field names to new field names:
+        - provider → default_provider
+        - model → default_model
+        - api_key → anthropic_api_key (default)
+
+        This allows tests and code to use the old field names while
+        internally using the new structured names.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # Handle legacy 'provider' field → 'default_provider'
+        if "provider" in data and "default_provider" not in data:
+            provider_value = data["provider"]
+            # Only map if it's a string (not already a ProviderSettings object)
+            if isinstance(provider_value, str):
+                data["default_provider"] = provider_value
+                # Remove the old field name to avoid validation errors
+                del data["provider"]
+
+        # Handle legacy 'model' field → 'default_model'
+        if "model" in data and "default_model" not in data:
+            model_value = data["model"]
+            if isinstance(model_value, str):
+                data["default_model"] = model_value
+                del data["model"]
+
+        # Handle legacy 'api_key' field → specific provider API keys
+        if "api_key" in data:
+            api_key_value = data["api_key"]
+            if isinstance(api_key_value, str):
+                # Try to determine which provider based on the default_provider
+                default_provider = data.get("default_provider", data.get("provider", "ollama"))
+                if default_provider in ["anthropic", "claude"]:
+                    data["anthropic_api_key"] = api_key_value
+                elif default_provider in ["openai", "gpt"]:
+                    data["openai_api_key"] = api_key_value
+                elif default_provider in ["google", "gemini"]:
+                    data["google_api_key"] = api_key_value
+                # Remove the generic api_key field
+                del data["api_key"]
+
+        return data
+
     # Nested config groups (structured access to grouped settings).
     # Auto-synced from flat fields by _sync_nested_groups validator.
     # Use flat access (settings.default_provider) or
     # nested access (settings.provider.default_provider).
-    provider: ProviderSettings = Field(
-        default_factory=ProviderSettings, exclude=True, repr=False
+
+    # NOTE: For backward compatibility, these fields accept None during construction
+    # and are populated by the _sync_nested_groups validator from flat fields.
+    provider: Optional[ProviderSettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    tools: ToolSettings = Field(
-        default_factory=ToolSettings, exclude=True, repr=False
+    tools: Optional[ToolSettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    search: SearchSettings = Field(
-        default_factory=SearchSettings, exclude=True, repr=False
+    search: Optional[SearchSettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    resilience: ResilienceSettings = Field(
-        default_factory=ResilienceSettings, exclude=True, repr=False
+    resilience: Optional[ResilienceSettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    security: SecuritySettings = Field(
-        default_factory=SecuritySettings, exclude=True, repr=False
+    security: Optional[SecuritySettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    events: EventSettings = Field(
-        default_factory=EventSettings, exclude=True, repr=False
+    events: Optional[EventSettings] = Field(
+        default=None, exclude=True, repr=False
     )
-    pipeline: PipelineSettings = Field(
-        default_factory=PipelineSettings, exclude=True, repr=False
+    pipeline: Optional[PipelineSettings] = Field(
+        default=None, exclude=True, repr=False
     )
 
     # Default provider settings (LMStudio by default for local observability)
@@ -1374,14 +1426,24 @@ class Settings(BaseSettings):
         Enables structured access via settings.provider.default_provider
         alongside flat access via settings.default_provider.
         Flat fields remain the source of truth for construction and env vars.
+
+        For backward compatibility, if a nested field is None or was passed
+        as a string (legacy behavior), it's populated from the corresponding
+        flat fields.
         """
         for group_name, model_cls in _NESTED_GROUPS.items():
-            data = {}
-            settings_fields = type(self).model_fields
-            for field_name in model_cls.model_fields:
-                if field_name in settings_fields:
-                    data[field_name] = getattr(self, field_name)
-            object.__setattr__(self, group_name, model_cls(**data))
+            # Get current value of the nested field
+            nested_obj = getattr(self, group_name)
+
+            # If nested field is None or needs to be synced, create it from flat fields
+            if nested_obj is None or not isinstance(nested_obj, model_cls):
+                data = {}
+                settings_fields = type(self).model_fields
+                for field_name in model_cls.model_fields:
+                    if field_name in settings_fields:
+                        data[field_name] = getattr(self, field_name)
+                object.__setattr__(self, group_name, model_cls(**data))
+        return self
         return self
 
     @model_validator(mode="after")
