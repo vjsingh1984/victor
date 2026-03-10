@@ -1,6 +1,30 @@
 # Victor Roadmap (Canonical)
 
-This file is the single source of truth for active roadmap priorities.
+**Status**: Single source of truth for all roadmap priorities
+**Last Updated**: 2026-03-10
+**Next Review**: 2026-03-17 (weekly)
+
+> ⚠️ **All other planning documents are considered non-canonical** unless explicitly
+> referenced below as supporting documentation. This roadmap overrides any conflicting
+> priorities or timelines found in other documents.
+
+## Document Governance
+
+### Canonical Hierarchy
+1. **This file** (`roadmap.md`) - Active 90-day priorities and directional horizons
+2. [`docs/planning/RANKED_90_DAY_EXECUTION_PLAN.md`](docs/planning/RANKED_90_DAY_EXECUTION_PLAN.md) - Detailed 90-day execution plan with ranked initiatives
+3. [`docs/planning/`](docs/planning/) - Supporting planning documents and templates
+
+### Archived Plans (Historical Reference Only)
+- [`docs/roadmap/improvement-plan-v1.md`](docs/roadmap/improvement-plan-v1.md) - Superseded by 90-day plan
+- [`docs/roadmap/framework-vertical-foundation-plan.md`](docs/roadmap/framework-vertical-foundation-plan.md) - Active foundation work (tracked separately)
+- [`docs/P0-P4_IMPLEMENTATION_STATUS.md`](docs/P0-P4_IMPLEMENTATION_STATUS.md) - Completed (2025-02-21)
+
+### Maintenance Process
+- **Weekly updates**: Monday of each week (or at milestone cuts)
+- **Review cadence**: At each M1/M2/M3 cut
+- **Conflict resolution**: This roadmap takes precedence over all other planning documents
+- **Change process**: Edit this file directly, then update linked documents as needed
 
 ## Governance
 
@@ -43,6 +67,35 @@ Milestone targets:
 - Workflow DSL with graph execution
 - Multi-agent team formations
 - Provider/tool/vertical registries and validation
+
+## Active Work (M1-M2)
+
+### E2: Roadmap Governance Consolidation
+**Status**: M1 in progress
+**Owner**: Product/Program Lead (assigned 2026-03-10)
+**Progress**:
+- ✅ Canonical roadmap established (roadmap.md)
+- 🔄 Duplicate sources inventory in progress
+- ⏳ Active work mapping to owner/date/KPI (target: 100%)
+- ⏳ Weekly update cadence setup (target: >= 90% adherence)
+
+### E3: Type-Safety + Quality Gates
+**Status**: M1 complete, M2 in progress
+**Owner**: DevEx/Quality Lead (assigned 2026-03-10)
+**Progress**:
+- ✅ M1: MyPy baseline captured (11 strict modules, 0 findings)
+- ✅ M1: Strict mode expanded to 11 modules (exceeds target of >= 6)
+- ✅ M1: Strict-package mypy made CI-blocking
+- 🔄 M2: Expand to 15+ modules (4+ additional packages)
+- ⏳ M2: Reduce mypy findings by 30% in priority modules
+- 📄 Baseline report: [`docs/quality/mypy_baseline_report.md`](docs/quality/mypy_baseline_report.md)
+
+**New Strict Modules (added 2026-03-10)**:
+- `victor.agent.services.*` (22 files)
+- `victor.core.container` (1 file)
+- `victor.core/protocols` (1 file)
+- `victor.providers.base` (1 file)
+- `victor.framework.*` (190+ files)
 
 ## How to Influence the Roadmap
 

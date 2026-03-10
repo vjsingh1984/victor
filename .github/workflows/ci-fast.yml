@@ -89,13 +89,20 @@ jobs:
 
       - name: Enforce strict-package MyPy gate
         run: |
+          # M1 baseline: 6 modules
+          # M2 expansion (2026-03-10): +5 modules (total 11)
           mypy --strict \
             victor/config \
             victor/storage/cache \
             victor/telemetry \
             victor/analytics \
             victor/profiler \
-            victor/debug
+            victor/debug \
+            victor/agent/services \
+            victor/core/container \
+            victor/core/protocols \
+            victor/providers/base \
+            victor/framework
 
   imports:
     name: Import Check
