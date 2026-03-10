@@ -281,19 +281,14 @@ class TestToolSelectionWithEmbeddings:
         """
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        with patch("sentence_transformers.SentenceTransformer") as MockST:
-            mock_model = MagicMock()
+        # Mock the _get_embedding method to return predictable embeddings
+        async def mock_get_embedding(text: str):
+            if "mock" in text.lower():
+                return np.ones(384, dtype=np.float32)
+            else:
+                return np.zeros(384, dtype=np.float32)
 
-            # Return different embeddings for different inputs
-            def mock_encode(text, convert_to_numpy=False, show_progress_bar=False):
-                if "mock" in text.lower():
-                    return np.ones(384, dtype=np.float32)
-                else:
-                    return np.zeros(384, dtype=np.float32)
-
-            mock_model.encode.side_effect = mock_encode
-            MockST.return_value = mock_model
-
+        with patch.object(selector, "_get_embedding", side_effect=mock_get_embedding):
             # Initialize embeddings
             await selector.initialize_tool_embeddings(mock_tool_registry)
 

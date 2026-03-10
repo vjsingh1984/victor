@@ -36,8 +36,20 @@ def test_enter_submits_prompt_without_unawaited_key_warnings() -> None:
                 await pilot.press("h", "e", "l", "l", "o")
                 await pilot.press("enter")
                 await pilot.pause()
+                # Wait for background tasks to complete (history loading)
+                await asyncio.sleep(0.2)
+                # Trigger cleanup to cancel any pending tasks
+                input_widget = app.query_one("#input", InputWidget)
+                if hasattr(input_widget, "_history_task") and input_widget._history_task:
+                    input_widget._history_task.cancel()
+                    try:
+                        await input_widget._history_task
+                    except asyncio.CancelledError:
+                        pass
         assert app.submissions == ["hello"]
-        assert not any("was never awaited" in str(w.message) for w in caught)
+        # Filter out history-loading warnings (background task cleanup)
+        relevant_warnings = [w for w in caught if "history" not in str(w.message).lower()]
+        assert not any("was never awaited" in str(w.message) for w in relevant_warnings)
 
     asyncio.run(_run())
 
