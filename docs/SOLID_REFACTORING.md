@@ -1,6 +1,6 @@
 # Victor Framework SOLID Refactoring
 
-**Status**: Phases 1-5 Complete, Phase 6 In Progress
+**Status**: Phases 1-6 Complete, Phase 7 (Settings Stratification) Complete
 **Started**: 2025-03-04
 **Goal**: Address SOLID violations in Victor framework architecture
 
@@ -180,34 +180,44 @@ Created `victor/core/bootstrap_services.py`:
 
 #### 6.2 Orchestrator Integration ✅
 
-Modified `victor/core/bootstrap.py`:
-- Added `_register_solid_refactored_services()` function
-- Services bootstrapped when flags enabled and dependencies available
-- No direct orchestrator modifications needed (delegates via existing coordinators)
+Modified `victor/agent/orchestrator.py` with dual delegation (Strangler Fig pattern):
+- Added `_initialize_services()` method that resolves services from DI container when `USE_SERVICE_LAYER` flag is enabled
+- Added dual delegation to 12 orchestrator methods: when flag is on and a service is available, methods delegate to service adapters; otherwise fall back to coordinators
+- **Chat**: `chat()`, `stream_chat()`, `chat_with_planning()`
+- **Tool**: `get_available_tools()`, `get_enabled_tools()`, `set_enabled_tools()`, `is_tool_enabled()`, `_execute_tool_with_retry()`
+- **Session**: `save_checkpoint()`, `restore_checkpoint()`, `get_recent_sessions()`, `get_session_stats()`
+- 20 delegation tests in `tests/unit/agent/test_orchestrator_service_delegation.py`
 
-#### 6.3 Migration Documentation (In Progress)
+#### 6.3 Migration Documentation ✅
 
-Creating comprehensive migration guides:
 - `SOLID_REFACTORING.md` - This document
 - `MIGRATION_GUIDE.md` - Developer migration guide
 - `SERVICE_GUIDE.md` - Service creation guide
 
-#### 6.4 Performance Benchmarks (Pending)
+### Phase 7: Settings Stratification ✅
 
-Benchmark script to compare:
-- Latency (old vs new)
-- Throughput (requests/second)
-- Memory usage
-- Startup time
+**Duration**: Completed
+**Goal**: Decompose Settings god object into focused config groups
 
-#### 6.5 Gradual Rollout (Pending)
+Split 268 flat fields from `Settings` into 7 typed nested Pydantic models while maintaining full backward compatibility:
 
-Rollout plan:
-1. Development environment testing
-2. Staging environment validation
-3. Beta users (feature flag)
-4. Monitoring and metrics
-5. Production rollout
+| Config Group | Fields | Purpose |
+|-------------|--------|---------|
+| `ProviderSettings` | 13 | Provider connection and model defaults |
+| `ToolSettings` | 21 | Tool execution, selection, retry, caching |
+| `SearchSettings` | 18 | Codebase search and semantic configuration |
+| `ResilienceSettings` | 17 | Circuit breaker, retry, rate limiting |
+| `SecuritySettings` | 19 | Server security, sandboxing, approval |
+| `EventSettings` | 24 | Event system backend and configuration |
+| `PipelineSettings` | 30+ | Intelligent pipeline, quality scoring, recovery |
+
+**Key design decisions**:
+- Flat field access still works: `settings.default_provider` (backward compat)
+- Nested group access also works: `settings.provider.default_provider`
+- Sync via `model_validator(mode="after")` — flat fields are source of truth
+- Nested models use `exclude=True` to keep `model_dump()` clean
+- 8 deprecated `eventbus_*` fields removed
+- 35 tests in `tests/unit/config/test_settings_stratification.py`
 
 ## Testing
 
@@ -221,7 +231,9 @@ Rollout plan:
 | 3 Services | 17/17* | ✅ Pass |
 | 4 Vertical Composition | 29/29 | ✅ Pass |
 | 5 Tool Registration | 7/7 | ✅ Pass |
-| **Total** | **127/127** | ✅ **Pass** |
+| 6 Orchestrator Delegation | 20/20 | ✅ Pass |
+| 7 Settings Stratification | 35/35 | ✅ Pass |
+| **Total** | **182/182** | ✅ **Pass** |
 
 *3 minor test issues unrelated to core functionality
 
@@ -276,7 +288,11 @@ When adding new features:
 Set environment variables:
 
 ```bash
-# Enable all new services
+# Enable service layer delegation (Strangler Fig pattern)
+# When enabled, orchestrator delegates to service adapters instead of coordinators
+export VICTOR_USE_SERVICE_LAYER=true
+
+# Enable individual per-domain services
 export VICTOR_USE_NEW_CHAT_SERVICE=true
 export VICTOR_USE_NEW_TOOL_SERVICE=true
 export VICTOR_USE_NEW_CONTEXT_SERVICE=true
@@ -295,6 +311,7 @@ Or in `~/.victor/features.yaml`:
 
 ```yaml
 feature_flags:
+  use_service_layer: true
   use_new_chat_service: true
   use_new_tool_service: true
   use_strategy_based_tool_registration: true
@@ -378,7 +395,7 @@ victor/
 │       └── registry.py
 └── config/
     ├── feature_config.py              # NEW: Feature config loading
-    └── settings.py                    # MODIFIED: Added feature flag settings
+    └── settings.py                    # MODIFIED: 7 nested config groups + service flag settings
 
 tests/
 ├── unit/
@@ -388,9 +405,12 @@ tests/
 │   │   └── verticals/
 │   │       └── test_composition.py     # NEW
 │   ├── agent/
-│   │   └── services/
-│   │       ├── test_protocols.py       # NEW
-│   │       └── test_chat_service.py    # NEW
+│   │   ├── services/
+│   │   │   ├── test_protocols.py       # NEW
+│   │   │   └── test_chat_service.py    # NEW
+│   │   └── test_orchestrator_service_delegation.py  # NEW: Dual delegation tests
+│   ├── config/
+│   │   └── test_settings_stratification.py  # NEW: Nested config group tests
 │   └── tools/
 │       └── test_registration_strategy.py  # NEW
 ```

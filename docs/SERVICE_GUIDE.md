@@ -2,7 +2,7 @@
 
 **Target Audience**: Victor framework contributors
 **Purpose**: Guide for creating new services following SOLID principles
-**Status**: Phase 6 - Integration & Migration
+**Status**: Phases 1-7 Complete (Settings Stratification + Service Delegation)
 
 ## Table of Contents
 
@@ -652,6 +652,55 @@ class ResilientService(ResilientServiceProtocol):
                 await asyncio.sleep(self._config.retry_delay_ms / 1000)
         raise MaxRetriesExceededError()
 ```
+
+## Orchestrator Dual Delegation Pattern
+
+When the `USE_SERVICE_LAYER` feature flag is enabled, the orchestrator delegates to service adapters instead of coordinators. This is the **Strangler Fig pattern** — gradually replacing coordinator calls with service calls.
+
+### How It Works
+
+```python
+# In AgentOrchestrator._initialize_services():
+# Resolves services from DI container when USE_SERVICE_LAYER flag is enabled
+
+# In each delegated method:
+async def chat(self, user_message: str) -> CompletionResponse:
+    if self._use_service_layer and self._chat_service:
+        return await self._chat_service.chat(user_message)
+    return await self._chat_coordinator.chat(user_message)
+```
+
+### Delegated Methods (12 total)
+
+| Domain | Method | Service |
+|--------|--------|---------|
+| **Chat** | `chat()` | `ChatServiceAdapter` |
+| **Chat** | `stream_chat()` | `ChatServiceAdapter` |
+| **Chat** | `chat_with_planning()` | `ChatServiceAdapter` |
+| **Tool** | `get_available_tools()` | `ToolServiceAdapter` |
+| **Tool** | `get_enabled_tools()` | `ToolServiceAdapter` |
+| **Tool** | `set_enabled_tools()` | `ToolServiceAdapter` |
+| **Tool** | `is_tool_enabled()` | `ToolServiceAdapter` |
+| **Tool** | `_execute_tool_with_retry()` | `ToolServiceAdapter` |
+| **Session** | `save_checkpoint()` | `SessionServiceAdapter` |
+| **Session** | `restore_checkpoint()` | `SessionServiceAdapter` |
+| **Session** | `get_recent_sessions()` | `SessionServiceAdapter` |
+| **Session** | `get_session_stats()` | `SessionServiceAdapter` |
+
+### Enabling
+
+```bash
+export VICTOR_USE_SERVICE_LAYER=true
+```
+
+Or in `~/.victor/features.yaml`:
+
+```yaml
+feature_flags:
+  use_service_layer: true
+```
+
+When the flag is off (default), all methods fall back to coordinators with zero behavior change.
 
 ## Checklist
 

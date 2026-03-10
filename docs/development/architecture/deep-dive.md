@@ -31,10 +31,11 @@ flowchart TB
         SC["StreamingController"]
         PM["ProviderManager"]
         TR["ToolRegistrar"]
+        SL["Service Layer<br/>(opt-in via USE_SERVICE_LAYER)"]
     end
 
     subgraph CoreSystems["CORE SYSTEMS"]
-        subgraph Providers["Providers (21)"]
+        subgraph Providers["Providers (22)"]
             ANT["Anthropic"]
             OAI["OpenAI"]
             GGL["Google"]
@@ -86,8 +87,9 @@ CLI/TUI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
 ```
 
 - **CLI/TUI**: User-facing entry point for chat and workflows
-- **Orchestrator**: Coordinates providers, tools, and workflows
-- **Providers**: Local or cloud LLM backends (21 supported)
+- **Orchestrator**: Coordinates providers, tools, and workflows; delegates to service layer when `USE_SERVICE_LAYER` flag enabled (Strangler Fig pattern)
+- **Service Layer**: 6 focused services (Chat, Tool, Context, Provider, Recovery, Session) behind feature flags
+- **Providers**: Local or cloud LLM backends (22 supported)
 - **Tools**: File ops, git, testing, search, etc. (33 tool modules)
 - **Verticals**: Domain presets (coding, research, devops, data, rag)
 

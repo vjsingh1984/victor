@@ -22,6 +22,13 @@ flowchart TB
         CC["ConversationController"]
         TP["ToolPipeline"]
         PM["ProviderManager"]
+        SL["Service Layer (opt-in)"]
+    end
+
+    subgraph Config["CONFIG"]
+        PROV_CFG["ProviderSettings"]
+        TOOL_CFG["ToolSettings"]
+        MORE_CFG["+ 5 more groups"]
     end
 
     subgraph Providers["PROVIDERS (22)"]
@@ -72,6 +79,7 @@ flowchart TB
     Orchestrator --> Teams
     Orchestrator --> State
     Orchestrator --> Verticals
+    Config --> Orchestrator
 
     style Clients fill:#e0e7ff,stroke:#4f46e5
     style Framework fill:#dbeafe,stroke:#3b82f6
@@ -81,6 +89,7 @@ flowchart TB
     style Teams fill:#e0e7ff,stroke:#6366f1
     style State fill:#f3e8ff,stroke:#a855f7
     style Verticals fill:#fce7f3,stroke:#ec4899
+    style Config fill:#fef9c3,stroke:#ca8a04
 ```
 
 ## Core Components
@@ -88,7 +97,9 @@ flowchart TB
 | Component | Responsibility | Entry Point |
 |-----------|----------------|-------------|
 | **Agent** | Public API: `run()`, `stream()`, `chat()`, `run_workflow()`, `run_team()` | `victor/framework/agent.py` |
-| **AgentOrchestrator** | Conversation loop, tool routing, provider calls | `victor/agent/orchestrator.py` |
+| **AgentOrchestrator** | Conversation loop, tool routing, provider calls; delegates to service layer when `USE_SERVICE_LAYER` flag enabled | `victor/agent/orchestrator.py` |
+| **Service Layer** | 6 focused services (Chat, Tool, Context, Provider, Recovery, Session) behind feature flags | `victor/agent/services/` |
+| **Config** | Settings stratified into 7 nested groups (Provider, Tool, Search, Resilience, Security, Event, Pipeline) | `victor/config/settings.py` |
 | **Providers** | LLM I/O, auth, retry, streaming (22 backends) | `victor/providers/` |
 | **Tools** | 33 tool modules across 9 categories | `victor/framework/tools.py` |
 | **StateGraph** | Typed-state execution engine with checkpointing | `victor/framework/graph.py` |
@@ -120,8 +131,9 @@ flowchart TB
 
 | Principle | How |
 |-----------|-----|
-| **Facade pattern** | Orchestrator is a thin coordinator; all logic in extracted components |
-| **Protocol-based interfaces** | Python Protocols for ISP compliance (`SubAgentContext`, `CapabilityRegistry`) |
+| **Facade pattern** | Orchestrator is a thin coordinator; delegates to services (Strangler Fig pattern) or coordinators |
+| **Protocol-based interfaces** | Python Protocols for ISP compliance (`SubAgentContext`, `ChatServiceProtocol`, etc.) |
+| **Stratified configuration** | 268 settings grouped into 7 typed nested models; flat access preserved for backward compat |
 | **Provider agnosticism** | 22 backends behind a unified interface; switch mid-conversation |
 | **Opt-in complexity** | Simple `agent.run()` by default; workflows, teams, CQRS when needed |
 | **Air-gapped capable** | Full functionality with local models (Ollama, LM Studio, vLLM) |
