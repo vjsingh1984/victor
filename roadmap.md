@@ -42,11 +42,11 @@ Related documents:
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
 | `E1` | Orchestration tech-debt burn-down | `M2` in progress |
-| `E2` | Roadmap governance consolidation | `M1` complete, `M2` in planning |
+| `E2` | Roadmap governance consolidation | `M2` complete |
 | `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
 | `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
-| `E5` | Legacy compatibility debt reduction | `M2` completed, `M3` in planning |
-| `E6` | Competitive benchmark ground-truth | `M1` complete, `M2` in planning |
+| `E5` | Legacy compatibility debt reduction | `M3` complete (9/13 = 69% removed) |
+| `E6` | Competitive benchmark ground-truth | `M2` in planning |
 
 Milestone targets:
 - `M1: Foundation Cut` due 2026-03-31
@@ -98,16 +98,17 @@ Milestone targets:
 **M2 Note**: ChatCoordinator size is due to streaming helper methods used by StreamingChatPipeline. Further reduction requires pipeline refactoring (M3).
 
 ### E2: Roadmap Governance Consolidation
-**Status**: M1 complete, M2 in planning
+**Status**: M1 complete, M2 complete
 **Owner**: Product/Program Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Canonical roadmap established (roadmap.md)
 - ✅ M1: Single source of truth defined with governance hierarchy
 - ✅ M1: E3 (Type-Safety) M1 complete - 11 strict modules, CI-blocking
 - ✅ M1: E4 (Event Bridge) M1 complete - async subscribe path merged
-- 🔄 M2: Duplicate sources inventory
-- ⏳ M2: Active work mapping to owner/date/KPI (target: 100%)
-- ⏳ M2: Weekly update cadence setup (target: >= 90% adherence)
+- ✅ M2: Duplicate sources inventory - No conflicts found
+- ✅ M2: Active work mapping to owner/date/KPI - 100% complete (6/6 epics)
+- ✅ M2: Weekly update cadence setup - Template ready, tracking defined
+- ✅ M2: GitHub labels and milestones documented
 
 ### E3: Type-Safety + Quality Gates
 **Status**: M2 complete, M3 in planning
