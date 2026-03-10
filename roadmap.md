@@ -43,8 +43,8 @@ Related documents:
 |------|-------|-------------------|
 | `E1` | Orchestration tech-debt burn-down | `M1` completed, `M2` in planning |
 | `E2` | Roadmap governance consolidation | `M1` complete, `M2` in planning |
-| `E3` | Type-safety + quality gates | `M1` complete, `M2` in progress |
-| `E4` | Event bridge reliability | `M1` complete, `M2` in planning |
+| `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
+| `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
 | `E5` | Legacy compatibility debt reduction | `M2` completed, `M3` in planning |
 | `E6` | Competitive benchmark ground-truth | `M1` in progress |
 
@@ -83,25 +83,26 @@ Milestone targets:
 - ⏳ M2: Weekly update cadence setup (target: >= 90% adherence)
 
 ### E3: Type-Safety + Quality Gates
-**Status**: M1 complete, M2 in progress
+**Status**: M2 complete, M3 in planning
 **Owner**: DevEx/Quality Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: MyPy baseline captured (11 strict modules, 0 findings)
 - ✅ M1: Strict mode expanded to 11 modules (exceeds target of >= 6)
 - ✅ M1: Strict-package mypy made CI-blocking
-- 🔄 M2: Expand to 15+ modules (4+ additional packages)
-- ⏳ M2: Reduce mypy findings by 30% in priority modules
+- ✅ M2: Expanded to 15 modules (+4: victor.state, victor.workflows, victor.teams, victor.integrations.api)
+- ✅ M2: All new modules pass strict mypy checks
+- ✅ M2: CI workflow updated to enforce strict checking on all 15 modules
+- ⏳ M3: Enable global strict mode
+- ⏳ M3: Reduce mypy findings by 30% in priority modules
 - 📄 Baseline report: [`docs/quality/mypy_baseline_report.md`](docs/quality/mypy_baseline_report.md)
 
-**New Strict Modules (added 2026-03-10)**:
-- `victor.agent.services.*` (22 files)
-- `victor.core.container` (1 file)
-- `victor.core/protocols` (1 file)
-- `victor.providers.base` (1 file)
-- `victor.framework.*` (190+ files)
+**Strict Module Timeline**:
+- M1 baseline (6 modules): `victor.config.*`, `victor.storage.cache.*`, `victor.telemetry.*`, `victor.analytics.*`, `victor.profiler.*`, `victor.debug.*`
+- M1 expansion (+5 modules): `victor.agent.services.*`, `victor.core.container`, `victor.core.protocols`, `victor.providers.base`, `victor.framework.*`
+- M2 expansion (+4 modules): `victor.state.*`, `victor.workflows.*`, `victor.teams.*`, `victor.integrations.api.*`
 
 ### E4: Event Bridge / Observability Reliability
-**Status**: M1 complete, M2 in planning
+**Status**: M2 complete, M3 in planning
 **Owner**: Observability Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Async subscribe path merged (primary API)
@@ -110,15 +111,25 @@ Milestone targets:
 - ✅ M1: EventBusAdapter.disconnect_async() added
 - ✅ M1: EventBridge.async_start() and async_stop() added
 - ✅ M1: 11 new async path tests added
-- 🔄 M2: Integration tests for loss/ordering
+- ✅ M2: Integration tests for loss/ordering (12 tests)
+- ✅ M2: High-volume burst, slow consumer, reconnect scenarios
+- ✅ M2: Event ordering tests (single source, concurrent, varying latency)
+- ✅ M2: SLO validation tests (delivery rate, p95 latency, skipped subscriptions)
 - ⏳ M3: SLO dashboards published
 
-**Key Changes (M1)**:
-- `EventBusAdapter.connect_async()` - Primary async connection method
-- `EventBusAdapter.disconnect_async()` - Primary async disconnection method
-- `EventBridge.async_start()` / `async_stop()` - Primary lifecycle methods
-- Sync `connect()`/`disconnect()`/`start()`/`stop()` kept for backward compatibility
-- All subscriptions now properly awaited (no fire-and-forget in async path)
+**M2 Integration Tests Added**:
+- `test_no_event_loss_during_high_volume_burst` - 100 events, no loss
+- `test_no_event_loss_during_slow_consumer` - Queued delivery with 50ms delay
+- `test_event_delivery_with_client_reconnect` - Reconnect scenario
+- `test_multiple_clients_no_loss` - 5 concurrent clients
+- `test_events_arrive_in_order_from_single_source` - Sequential ordering
+- `test_event_ordering_with_concurrent_sources` - Multi-source ordering
+- `test_event_ordering_with_varying_processing_times` - Variable latency ordering
+- `test_delivery_success_rate_slo` - Validates 99.9% SLO
+- `test_dispatch_latency_p95_slo` - Validates < 200ms SLO
+- `test_zero_skipped_subscriptions` - All event types subscribed
+- `test_sustained_load_no_loss` - 10 batches of 20 events
+- `test_reliability_metrics_under_load` - SLO validation under load
 
 ## How to Influence the Roadmap
 
