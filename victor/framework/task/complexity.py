@@ -480,12 +480,6 @@ class TaskComplexityService:
 
     def _classify_semantic(self, message: str) -> Optional[TaskClassification]:
         """Attempt semantic classification using embeddings."""
-        # Skip semantic classification for empty strings
-        # Empty strings have no semantic meaning and should fall through to
-        # pattern matching (which won't match) and eventually default to SIMPLE
-        if not message or not message.strip():
-            return None
-
         classifier = self._get_semantic_classifier()
         if not classifier:
             return None
@@ -518,6 +512,15 @@ class TaskComplexityService:
         Returns:
             TaskClassification with complexity, budget, and metadata
         """
+        # Empty messages default to SIMPLE (no semantic meaning, no patterns match)
+        if not message or not message.strip():
+            return TaskClassification(
+                complexity=TaskComplexity.SIMPLE,
+                tool_budget=self.budgets[TaskComplexity.SIMPLE],
+                confidence=0.3,
+                matched_patterns=[],
+            )
+
         # Try custom classifiers first
         for classifier in self.custom_classifiers:
             result = classifier(message)
@@ -560,12 +563,11 @@ class TaskComplexityService:
             if matched:
                 scores[complexity] = (total_score, matched)
 
-        # Default to SIMPLE if no patterns match (empty messages default here)
-        # Empty or meaningless messages are treated as simple queries
+        # Default to MEDIUM if no patterns match
         if not scores:
             return TaskClassification(
-                complexity=TaskComplexity.SIMPLE,
-                tool_budget=self.budgets[TaskComplexity.SIMPLE],
+                complexity=TaskComplexity.MEDIUM,
+                tool_budget=self.budgets[TaskComplexity.MEDIUM],
                 confidence=0.3,
                 matched_patterns=[],
             )
