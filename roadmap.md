@@ -46,7 +46,7 @@ Related documents:
 | `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
 | `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
 | `E5` | Legacy compatibility debt reduction | `M2` completed, `M3` in planning |
-| `E6` | Competitive benchmark ground-truth | `M1` in progress |
+| `E6` | Competitive benchmark ground-truth | `M1` complete, `M2` in planning |
 
 Milestone targets:
 - `M1: Foundation Cut` due 2026-03-31
@@ -157,6 +157,43 @@ Milestone targets:
 - `test_zero_skipped_subscriptions` - All event types subscribed
 - `test_sustained_load_no_loss` - 10 batches of 20 events
 - `test_reliability_metrics_under_load` - SLO validation under load
+
+### E6: Competitive Benchmark Ground-Truth
+**Status**: M1 complete, M2 in planning
+**Owner**: Platform Lead (assigned 2026-03-10)
+**Progress**:
+- ✅ M1: Benchmark rubric frozen (v1.0)
+- ✅ M1: 22 tasks defined across 5 categories (exceeds target of 20)
+- ✅ M1: Scoring methodology documented (100-point scale)
+- ✅ M1: Competitor matrix complete (6 frameworks)
+- ✅ M1: 3 example tasks created (C1, R2, W2)
+- 🔄 M2: Execute benchmarks on Victor + 2 competitors
+- ⏳ M2: Statistical significance analysis
+- ⏳ M3: Report published, action items identified
+
+**Benchmark Suite** (22 tasks):
+- Code Generation (5): Single-file, multi-file refactor, bug fix, code review, docs
+- Multi-Step Reasoning (4): Research synthesis, architecture design, migration planning, debug investigation
+- Tool Usage (5): File ops, git workflow, web research, database operations, command execution
+- Analysis (4): Security audit, performance analysis, dependency analysis, test coverage
+- Workflow (4): Sequential, parallel, human-in-the-loop, error recovery
+
+**Competitors**:
+- LangGraph (workflow/state machines)
+- CrewAI (role-based agents)
+- AutoGPT (autonomous agents)
+- OpenAI Swarm (multi-agent patterns)
+- Semantic Kernel (enterprise)
+
+**Scoring**:
+- Task Success Rate (40%)
+- Output Quality (20%)
+- Execution Speed (10%)
+- Resource Efficiency (15%)
+- Reliability (10%)
+- Developer Experience (5%)
+
+**Documentation**: [`docs/benchmarking/`](docs/benchmarking/)
 
 ## How to Influence the Roadmap
 
