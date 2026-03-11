@@ -23,11 +23,11 @@ from victor.providers.base import (
     ProviderError,
 )
 
-# Skip entire module if google-generativeai is not installed
+# Skip entire module if google-genai is not installed
 pytestmark = [
     pytest.mark.skipif(
         not HAS_GOOGLE_GENAI,
-        reason="google-generativeai package not installed (optional dependency)",
+        reason="google-genai package not installed (optional dependency)",
     ),
     # Many tests need rework for new google.genai API (uses client.aio.models.generate_content)
     # instead of the old GenerativeModel.start_chat() pattern

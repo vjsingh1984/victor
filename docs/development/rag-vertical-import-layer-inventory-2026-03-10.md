@@ -36,11 +36,12 @@ definition/runtime blockers instead of re-scanning the package each session.
 
 Key findings:
 
-- `rag` is earlier in the migration than `coding`. SDK adoption is limited to
-  `assistant.py`, and even there it only covers shared `ToolNames`.
-- `assistant.py` still imports the runtime base class, runtime `StageDefinition`,
-  and runtime `TieredToolConfig`, so the definition layer is still coupled to
-  the host implementation.
+- `rag` is earlier in the migration than `coding`. SDK adoption is still
+  limited to `assistant.py`, but that file now uses SDK-owned shared tool,
+  stage, and tier contracts rather than only `ToolNames`.
+- `assistant.py` now uses SDK-owned `StageDefinition` and `TieredToolConfig`,
+  but it still imports the runtime base class and has not yet declared SDK
+  capability requirements for retrieval/indexing concerns.
 - prompt/task-hint data now lives in `prompt_metadata.py`, while `prompts.py`
   has become a thin runtime adapter over that shared metadata.
 - `rag` has not yet adopted SDK capability requirements. Retrieval, indexing,
@@ -52,7 +53,7 @@ Key findings:
 
 | File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
 |---|---|---|---|---|
-| `assistant.py` | Definition | `victor.core.verticals.base`, `victor.core.verticals.protocols`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, and `TieredToolConfig`; does not declare typed capability requirements; still mixes SDK tool names with runtime-owned config types | Replace runtime base/protocol dependencies with SDK definition contracts and move runtime tool-tier config behind adapters or runtime metadata |
+| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Still depends on runtime `VerticalBase` and does not declare typed capability requirements for retrieval/vector/document workflows | Replace runtime base inheritance with SDK-first authoring plus host-owned runtime wrapping, and add SDK capability requirements |
 
 Definition-layer implication:
 
@@ -130,8 +131,7 @@ Primary targets:
 
 Expected first moves:
 
-- continue moving `assistant.py` away from runtime `VerticalBase`,
-  `StageDefinition`, and `TieredToolConfig`
+- continue moving `assistant.py` away from runtime `VerticalBase`
 - keep `prompts.py` as a runtime adapter over shared metadata instead of letting
   definition data drift back into protocol-specific classes
 - remove the remaining runtime-owned definition imports before broader package
@@ -174,7 +174,7 @@ Root-package transition rules:
 definition layer is less mature:
 
 1. `assistant.py` is the only current SDK adopter, and it still depends on
-   runtime definition types
+   the runtime base class
 2. prompt/task-hint metadata is now split cleanly, but `assistant.py` still
    needs the remaining definition/runtime boundary work
 3. the runtime-heavy surface is already well-bounded enough to migrate in

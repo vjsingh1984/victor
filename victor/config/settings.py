@@ -895,6 +895,7 @@ class Settings(BaseSettings):
 
     # Tool Selection Strategy
     use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
+    preload_embeddings: bool = False  # Defer embedding model load to first semantic query
     embedding_provider: str = (
         "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
     )

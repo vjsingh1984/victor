@@ -24,6 +24,7 @@ from victor.verticals.contrib.rag.prompt_metadata import (
     RAG_TASK_TYPE_HINTS,
 )
 
+
 class RAGPromptContributor(PromptContributorAdapter):
     """Prompt contributor for RAG vertical.
 

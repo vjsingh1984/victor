@@ -208,12 +208,19 @@ class TestCoreTypes:
             required_tools=["read"],
             optional_tools=["write"],
             allow_custom_tools=True,
+            keywords=["search"],
+            next_stages={"verify"},
+            min_confidence=0.8,
         )
 
         assert stage.name == "test"
         assert stage.required_tools == ["read"]
         assert stage.optional_tools == ["write"]
         assert stage.allow_custom_tools is True
+        assert stage.tools == {"read", "write"}
+        assert stage.keywords == ["search"]
+        assert stage.next_stages == {"verify"}
+        assert stage.min_confidence == 0.8
 
     def test_stage_definition_get_effective_tools(self):
         """get_effective_tools() returns correct tool list."""
@@ -256,6 +263,26 @@ class TestCoreTypes:
         assert config.get_max_tier_for_tools(["read"]) == Tier.BASIC
         assert config.get_max_tier_for_tools(["read", "write"]) == Tier.STANDARD
         assert config.get_max_tier_for_tools(["read", "write", "shell"]) == Tier.ADVANCED
+
+    def test_tiered_tool_config_runtime_compatibility_fields(self):
+        """TieredToolConfig should expose runtime-compatible tier aliases."""
+        config = TieredToolConfig(
+            mandatory={"read"},
+            vertical_core={"rag_query"},
+            semantic_pool={"rag_search"},
+            stage_tools={"QUERYING": {"rag_query"}},
+            readonly_only_for_analysis=False,
+        )
+
+        assert config.basic_tools == ["read"]
+        assert config.standard_tools == ["rag_query"]
+        assert config.advanced_tools == ["rag_search"]
+        assert config.mandatory == {"read"}
+        assert config.vertical_core == {"rag_query"}
+        assert config.get_base_tools() == {"read", "rag_query"}
+        assert config.get_tools_for_stage("QUERYING") == {"read", "rag_query"}
+        assert config.get_effective_semantic_pool() == {"rag_search"}
+        assert config.readonly_only_for_analysis is False
 
     def test_tool_set(self):
         """ToolSet stores tool collection."""

@@ -104,6 +104,9 @@ class ToolPipelineConfig:
     enable_code_correction: bool = False
     code_correction_auto_fix: bool = True
 
+    # Per-tool-call timeout for serial execution path
+    per_tool_timeout_seconds: float = 30.0
+
     # Parallel execution settings
     enable_parallel_execution: bool = True
     max_concurrent_tools: int = ToolPipelineDefaults.MAX_CONCURRENT_TOOLS
@@ -1513,13 +1516,28 @@ class ToolPipeline:
             except Exception as e:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
-        # Execute
+        # Execute with per-tool timeout
         start_time = time.monotonic()
-        exec_result = await self.executor.execute(
-            tool_name=tool_name,
-            arguments=normalized_args,
-            context=context,
-        )
+        try:
+            exec_result = await asyncio.wait_for(
+                self.executor.execute(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    context=context,
+                ),
+                timeout=self.config.per_tool_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"[Pipeline] Tool '{tool_name}' timed out after "
+                f"{self.config.per_tool_timeout_seconds}s"
+            )
+            exec_result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=f"Tool execution timed out after {self.config.per_tool_timeout_seconds}s",
+            )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
         # Update state
@@ -1538,6 +1556,48 @@ class ToolPipeline:
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
         )
+
+        # Attempt error recovery fallback on failure
+        if not exec_result.success and exec_result.error:
+            try:
+                from victor.agent.error_recovery import recover_from_error, RecoveryAction
+
+                recovery = recover_from_error(
+                    Exception(exec_result.error), tool_name, normalized_args
+                )
+                if (
+                    recovery.action == RecoveryAction.FALLBACK_TOOL
+                    and recovery.fallback_tool
+                ):
+                    fallback_name = recovery.fallback_tool
+                    if self.tools.is_tool_enabled(fallback_name):
+                        logger.info(
+                            f"[Pipeline] Falling back from {tool_name} to {fallback_name}"
+                        )
+                        try:
+                            fb_result = await asyncio.wait_for(
+                                self.executor.execute(
+                                    tool_name=fallback_name,
+                                    arguments=normalized_args,
+                                    context=context,
+                                ),
+                                timeout=self.config.per_tool_timeout_seconds,
+                            )
+                        except asyncio.TimeoutError:
+                            fb_result = None
+                        if fb_result is not None and fb_result.success:
+                            call_result = ToolCallResult(
+                                tool_name=fallback_name,
+                                arguments=normalized_args,
+                                success=fb_result.success,
+                                result=fb_result.result,
+                                error=fb_result.error,
+                                execution_time_ms=(
+                                    (time.monotonic() - start_time) * 1000
+                                ),
+                            )
+            except Exception as e:
+                logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
 
         if self.on_tool_event:
             try:

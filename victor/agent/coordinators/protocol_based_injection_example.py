@@ -7,7 +7,6 @@ with lightweight mocks instead of full orchestrator instances.
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
-
 # =============================================================================
 # Lightweight Protocol Implementations for Testing
 # =============================================================================
@@ -16,6 +15,7 @@ from dataclasses import dataclass, field
 @dataclass
 class MockConversation:
     """Mock conversation for testing."""
+
     messages: List[Any] = field(default_factory=list)
 
     def add_message(self, role: str, content: str) -> None:
@@ -29,6 +29,7 @@ class MockConversation:
 @dataclass
 class MockToolSelector:
     """Mock tool selector for testing."""
+
     select_calls: List[Any] = field(default_factory=list)
 
     async def select_tools(self, context: str, **kwargs) -> List[Any]:
@@ -39,6 +40,7 @@ class MockToolSelector:
 @dataclass
 class MockProvider:
     """Mock LLM provider for testing."""
+
     chat_responses: List[Any] = field(default_factory=list)
 
     async def chat(self, messages: Any, **kwargs) -> Any:
@@ -52,6 +54,7 @@ class MockProvider:
 @dataclass
 class MockTaskCoordinator:
     """Mock task coordinator for testing."""
+
     prepare_task_calls: List[Any] = field(default_factory=list)
 
     def prepare_task(self, user_message: str, task_type: Any, controller: Any) -> tuple:
@@ -63,6 +66,7 @@ class MockTaskCoordinator:
 @dataclass
 class MockContainer:
     """Mock container for testing."""
+
     _services: Dict[type, Any] = field(default_factory=dict)
 
     def get(self, service_type: type) -> Any:
@@ -159,10 +163,14 @@ class MockChatOrchestrator:
     def _apply_recovery_action(self, recovery_action: Any, stream_ctx: Any) -> Any:
         return None
 
-    def _record_intelligent_outcome(self, success: bool, quality_score: float, user_satisfied: bool, completed: bool) -> None:
+    def _record_intelligent_outcome(
+        self, success: bool, quality_score: float, user_satisfied: bool, completed: bool
+    ) -> None:
         pass
 
-    async def _validate_intelligent_response(self, response: str, query: str, tool_calls: int, task_type: str) -> Any:
+    async def _validate_intelligent_response(
+        self, response: str, query: str, tool_calls: int, task_type: str
+    ) -> Any:
         return {"valid": True}
 
     async def _prepare_intelligent_request(self, task: str, task_type: str) -> Any:
@@ -216,7 +224,9 @@ async def example_chat_with_mock_orchestrator():
     result = await coordinator.chat("Hello, coordinator!")
 
     print(f"Response: {result.content}")
-    print(f"Mock task coordinator calls: {len(mock_orchestrator.task_coordinator.prepare_task_calls)}")
+    print(
+        f"Mock task coordinator calls: {len(mock_orchestrator.task_coordinator.prepare_task_calls)}"
+    )
 
 
 # =============================================================================
@@ -287,6 +297,7 @@ def print_benefits():
 
 if __name__ == "__main__":
     import asyncio
+
     print_benefits()
     print("\n" + "=" * 60 + "\n")
     asyncio.run(example_chat_with_mock_orchestrator())

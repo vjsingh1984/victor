@@ -73,8 +73,7 @@ def test_coding_migration_discovery_parity_preserves_loader_and_binding_contract
     assert set(binding.runtime_config.tools.tools) == set(definition.get_tool_names())
     assert set(binding.runtime_config.stages) == set(definition.stages)
     assert [
-        item["capability_id"]
-        for item in binding.runtime_config.metadata["capability_requirements"]
+        item["capability_id"] for item in binding.runtime_config.metadata["capability_requirements"]
     ] == [
         CapabilityIds.FILE_OPS,
         CapabilityIds.GIT,
@@ -91,23 +90,17 @@ def test_coding_migration_activation_parity_registers_di_visible_runtime_extensi
     assert extensions is not None
     assert isinstance(extensions.service_provider, CodingServiceProvider)
     assert any(
-        isinstance(middleware, CodeCorrectionMiddleware)
-        for middleware in extensions.middleware
+        isinstance(middleware, CodeCorrectionMiddleware) for middleware in extensions.middleware
     )
-    assert any(
-        isinstance(middleware, GitSafetyMiddleware) for middleware in extensions.middleware
-    )
+    assert any(isinstance(middleware, GitSafetyMiddleware) for middleware in extensions.middleware)
     assert any(
         isinstance(contributor, CodingPromptContributor)
         for contributor in extensions.prompt_contributors
     )
     assert any(
-        isinstance(extension, CodingSafetyExtension)
-        for extension in extensions.safety_extensions
+        isinstance(extension, CodingSafetyExtension) for extension in extensions.safety_extensions
     )
-    assert isinstance(
-        container.get_optional(CodingMiddlewareProtocol), CodeCorrectionMiddleware
-    )
+    assert isinstance(container.get_optional(CodingMiddlewareProtocol), CodeCorrectionMiddleware)
     assert isinstance(container.get_optional(CodingSafetyProtocol), CodingSafetyExtension)
     assert isinstance(container.get_optional(CodingPromptProtocol), CodingPromptContributor)
     assert container.get_optional(ModeConfigProviderProtocol) is not None

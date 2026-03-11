@@ -73,7 +73,7 @@ dependencies = [
     # LLM Providers (core - always installed)
     "anthropic>=0.34",
     "openai>=1.40",
-    # google-generativeai moved to optional due to protobuf version conflicts
+    # Google Gemini support uses the optional google-genai extra.
 
     # Tools
     "gitpython>=3.1",
@@ -635,7 +635,7 @@ module = [
 # Note: These modules now inherit strict=true from global config
 # Keeping this override for documentation and milestone tracking
 
-# Modules with known issues - gradual remediation planned
+# Modules with known issues - gradual remediation planned (M4+)
 [[tool.mypy.overrides]]
 module = [
     "victor.providers.*",

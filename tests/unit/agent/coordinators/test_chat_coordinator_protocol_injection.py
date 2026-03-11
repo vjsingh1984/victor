@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
 
-
 # =============================================================================
 # Lightweight Protocol Satisfying Mocks
 # =============================================================================
@@ -31,10 +30,12 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     """
 
     # -- ChatContextProtocol --
-    conversation: Any = field(default_factory=lambda: MagicMock(
-        message_count=lambda: 1,
-        ensure_system_prompt=lambda: None,
-    ))
+    conversation: Any = field(
+        default_factory=lambda: MagicMock(
+            message_count=lambda: 1,
+            ensure_system_prompt=lambda: None,
+        )
+    )
     messages: List[Any] = field(default_factory=list)
     conversation_controller: Any = MagicMock()
     _context_compactor: Any = None
@@ -42,13 +43,15 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     settings: Any = MagicMock()
     settings.enable_planning = False
     _session_state: Any = MagicMock(reset_for_new_turn=lambda: None)
-    _cumulative_token_usage: dict = field(default_factory=lambda: {
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "total_tokens": 0,
-        "cache_creation_input_tokens": 0,
-        "cache_read_input_tokens": 0,
-    })
+    _cumulative_token_usage: dict = field(
+        default_factory=lambda: {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
+    )
     _system_added: bool = False
 
     def add_message(self, role: str, content: str) -> None:
@@ -116,10 +119,14 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     def _apply_recovery_action(self, recovery_action: Any, stream_ctx: Any) -> Any:
         return None
 
-    def _record_intelligent_outcome(self, success: bool, quality_score: float, user_satisfied: bool, completed: bool) -> None:
+    def _record_intelligent_outcome(
+        self, success: bool, quality_score: float, user_satisfied: bool, completed: bool
+    ) -> None:
         pass
 
-    async def _validate_intelligent_response(self, response: str, query: str, tool_calls: int, task_type: str) -> Any:
+    async def _validate_intelligent_response(
+        self, response: str, query: str, tool_calls: int, task_type: str
+    ) -> Any:
         return None
 
     async def _prepare_intelligent_request(self, task: str, task_type: str) -> Any:
@@ -132,12 +139,14 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     reminder_manager: Any = MagicMock()
     _chunk_generator: Any = MagicMock()
     _presentation: Any = MagicMock()
-    _metrics_collector: Any = MagicMock(init_stream_metrics=lambda: MagicMock(
-        start_time=0.0,
-        total_chunks=0,
-        total_content_length=0,
-        tool_calls_count=0,
-    ))
+    _metrics_collector: Any = MagicMock(
+        init_stream_metrics=lambda: MagicMock(
+            start_time=0.0,
+            total_chunks=0,
+            total_content_length=0,
+            tool_calls_count=0,
+        )
+    )
     _streaming_handler: Any = MagicMock()
 
     # Session state
@@ -204,8 +213,8 @@ class TestChatCoordinatorProtocolInjection:
 
         # Verify execution_coordinator is a property on the class
         # (It's lazily created when first accessed, but requires setup_streaming_pipeline first)
-        assert 'execution_coordinator' in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, 'execution_coordinator', None), property)
+        assert "execution_coordinator" in dir(ChatCoordinator)
+        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
 
     @pytest.mark.asyncio
     async def test_chat_coordinator_with_mock_provider_response(self):
@@ -265,7 +274,11 @@ class TestChatCoordinatorProtocolInjection:
 
         # Verify protocol is runtime-checkable
         from typing import Protocol, runtime_checkable
-        assert isinstance(ChatOrchestratorProtocol, type) or getattr(ChatOrchestratorProtocol, "__origin__", None) is Protocol
+
+        assert (
+            isinstance(ChatOrchestratorProtocol, type)
+            or getattr(ChatOrchestratorProtocol, "__origin__", None) is Protocol
+        )
 
         # Create coordinator with mock
         mock_orchestrator = MockOrchestrator()
@@ -295,21 +308,33 @@ class TestChatCoordinatorProtocolCompliance:
         # Just verify the protocol exists and is runtime-checkable
 
         from typing import Protocol
-        assert isinstance(ChatContextProtocol, type) or getattr(ChatContextProtocol, "__origin__", None) is Protocol
+
+        assert (
+            isinstance(ChatContextProtocol, type)
+            or getattr(ChatContextProtocol, "__origin__", None) is Protocol
+        )
 
     def test_protocol_includes_tool_context_dependencies(self):
         """Protocol should include all tool context dependencies."""
         from victor.agent.coordinators.chat_protocols import ToolContextProtocol
 
         from typing import Protocol
-        assert isinstance(ToolContextProtocol, type) or getattr(ToolContextProtocol, "__origin__", None) is Protocol
+
+        assert (
+            isinstance(ToolContextProtocol, type)
+            or getattr(ToolContextProtocol, "__origin__", None) is Protocol
+        )
 
     def test_protocol_includes_provider_context_dependencies(self):
         """Protocol should include all provider context dependencies."""
         from victor.agent.coordinators.chat_protocols import ProviderContextProtocol
 
         from typing import Protocol
-        assert isinstance(ProviderContextProtocol, type) or getattr(ProviderContextProtocol, "__origin__", None) is Protocol
+
+        assert (
+            isinstance(ProviderContextProtocol, type)
+            or getattr(ProviderContextProtocol, "__origin__", None) is Protocol
+        )
 
     def test_mock_orchestrator_satisfies_protocol(self):
         """MockOrchestrator should satisfy ChatOrchestratorProtocol."""
@@ -317,6 +342,7 @@ class TestChatCoordinatorProtocolCompliance:
 
         # Runtime check - this will fail if mock doesn't satisfy protocol
         from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+
         assert isinstance(mock, ChatOrchestratorProtocol)
 
     def test_chat_coordinator_type_checks_protocols(self):
@@ -373,5 +399,5 @@ class TestProtocolBasedInjectionBenefits:
 
         # Verify execution_coordinator exists as a property on the class
         # (lazy initialization requires set_streaming_pipeline to be called first)
-        assert 'execution_coordinator' in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, 'execution_coordinator', None), property)
+        assert "execution_coordinator" in dir(ChatCoordinator)
+        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)

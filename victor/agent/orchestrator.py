@@ -2628,6 +2628,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Should be called after orchestrator initialization to avoid blocking
         the main thread. Safe to call multiple times (no-op if already started).
+
+        Embedding preload is deferred by default to avoid +694MB memory spike
+        on first task. Set `preload_embeddings=True` in settings to eagerly load.
+        The embedding model will still lazy-load on first semantic query via
+        EmbeddingService._ensure_model_loaded().
         """
         if getattr(self.settings, "framework_preload_enabled", False):
             if self._runtime_preload_task is not None:
@@ -2636,6 +2641,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if task:
                 self._runtime_preload_task = task
                 logger.info("Started runtime preload task")
+            return
+
+        # Only preload embeddings if explicitly requested (default: deferred)
+        if not getattr(self.settings, "preload_embeddings", False):
             return
 
         if not self.use_semantic_selection or self._embedding_preload_task:

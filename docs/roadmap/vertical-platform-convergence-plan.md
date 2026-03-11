@@ -1774,6 +1774,39 @@ Likely touchpoints:
   - continue `VPC-T3.11` by removing the remaining runtime definition imports
     from `rag/assistant.py`
 
+### 2026-03-10 (Session AB)
+
+- Continued `VPC-T3.11` with the SDK stage/tier contract slice for `rag`.
+- Extended the SDK-owned `StageDefinition` contract to carry runtime-compatible
+  stage metadata:
+  - `keywords`
+  - `next_stages`
+  - `min_confidence`
+  - derived `tools` property for compatibility with runtime stage consumers
+- Extended the SDK-owned `TieredToolConfig` contract to carry runtime-compatible
+  tier metadata:
+  - `mandatory`
+  - `vertical_core`
+  - `semantic_pool`
+  - `stage_tools`
+  - `readonly_only_for_analysis`
+  - plus compatibility helpers like `get_base_tools()` and
+    `get_effective_semantic_pool()`
+- Updated `victor/verticals/contrib/rag/assistant.py` to import
+  `StageDefinition` and `TieredToolConfig` from `victor_sdk` instead of
+  `victor.core`.
+- Added regression coverage for the widened SDK contract and the `rag`
+  assistant’s stage/tier behavior.
+- Updated the `rag` inventory document to record that `assistant.py` is no
+  longer blocked on runtime stage/tier types; the remaining `VPC-T3.11`
+  blocker is runtime base inheritance plus missing capability requirements.
+- Verification:
+  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_protocols.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/test_sdk_integration.py`
+  - result: 46 passed in 4.41s
+- Next recommended implementation layer:
+  - continue `VPC-T3.11` by removing the remaining runtime base dependency from
+    `rag/assistant.py`, then proceed to `VPC-T3.12`
+
 ## Resume Protocol
 
 1. Open this file first.

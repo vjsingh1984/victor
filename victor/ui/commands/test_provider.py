@@ -216,7 +216,7 @@ async def _test_google(provider_settings: dict) -> None:
         google = GoogleProvider(**provider_settings)
     except ImportError:
         console.print("[red]✗[/] Google AI SDK not installed")
-        console.print("Install with: [bold]pip install google-generativeai[/bold]")
+        console.print("Install with: [bold]pip install victor[google][/bold]")
         return
 
     try:

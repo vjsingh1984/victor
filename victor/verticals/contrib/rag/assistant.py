@@ -27,11 +27,10 @@ Features:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import TieredToolConfig
-from victor_sdk import ToolNames
+from victor.core.verticals.base import VerticalBase
+from victor_sdk import StageDefinition, TieredToolConfig, ToolNames
 from victor.verticals.contrib.rag.prompt_metadata import (
     RAG_PROMPT_TEMPLATES,
     RAG_TASK_TYPE_HINTS,
@@ -65,7 +64,7 @@ class RAGAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools for RAG operations.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses canonical tool names from the SDK registry.
 
         Returns:
             List of RAG-specific tool names
@@ -130,7 +129,7 @@ You: [Use rag_query tool with query="authentication"]
         return dict(RAG_PROMPT_TEMPLATES)
 
     @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Dict[str, object]]:
+    def get_task_type_hints(cls) -> Dict[str, Dict[str, Any]]:
         """Get serializable task-type hints for the definition contract."""
 
         return {task_type: dict(config) for task_type, config in RAG_TASK_TYPE_HINTS.items()}
@@ -148,31 +147,35 @@ You: [Use rag_query tool with query="authentication"]
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Ready to accept RAG queries",
-                tools={"rag_search", "rag_query", "rag_list", "rag_stats"},
+                optional_tools=["rag_list", "rag_query", "rag_search", "rag_stats"],
                 next_stages={"INGESTING", "SEARCHING", "QUERYING"},
             ),
             "INGESTING": StageDefinition(
                 name="INGESTING",
                 description="Ingesting documents into knowledge base",
-                tools={"rag_ingest", ToolNames.READ, ToolNames.LS, ToolNames.WEB_FETCH},
+                optional_tools=[
+                    "rag_ingest",
+                    ToolNames.LS,
+                    ToolNames.READ,
+                    ToolNames.WEB_FETCH,
+                ],
                 next_stages={"INITIAL", "SEARCHING"},
             ),
             "SEARCHING": StageDefinition(
                 name="SEARCHING",
                 description="Searching knowledge base",
-                tools={"rag_search", "rag_query"},
+                optional_tools=["rag_query", "rag_search"],
                 next_stages={"INITIAL", "QUERYING", "SYNTHESIZING"},
             ),
             "QUERYING": StageDefinition(
                 name="QUERYING",
                 description="Processing query with retrieved context",
-                tools={"rag_query"},
+                optional_tools=["rag_query"],
                 next_stages={"SYNTHESIZING", "SEARCHING"},
             ),
             "SYNTHESIZING": StageDefinition(
                 name="SYNTHESIZING",
                 description="Synthesizing answer from retrieved context",
-                tools=set(),  # LLM response only
                 next_stages={"INITIAL"},
             ),
         }

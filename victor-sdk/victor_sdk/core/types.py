@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypeAlias, Union
+from typing import Any, Dict, List, Optional, Set, TypeAlias, Union
 
 from victor_sdk.core.exceptions import VerticalConfigurationError
 
@@ -90,6 +90,9 @@ class StageDefinition:
         required_tools: Tools that MUST be available in this stage
         optional_tools: Tools that MAY be used if available
         allow_custom_tools: Whether user can add custom tools in this stage
+        keywords: Optional routing keywords used by runtime stage detection
+        next_stages: Optional valid stage transitions for runtime workflows
+        min_confidence: Optional minimum confidence for runtime stage entry
     """
 
     name: str
@@ -97,6 +100,15 @@ class StageDefinition:
     required_tools: List[str] = field(default_factory=list)
     optional_tools: List[str] = field(default_factory=list)
     allow_custom_tools: bool = True
+    keywords: List[str] = field(default_factory=list)
+    next_stages: Set[str] = field(default_factory=set)
+    min_confidence: float = 0.5
+
+    @property
+    def tools(self) -> Set[str]:
+        """Return the runtime-compatible union of required and optional tools."""
+
+        return set(self.required_tools) | set(self.optional_tools)
 
     def get_effective_tools(self, available_tools: List[str]) -> List[str]:
         """Get effective tool list for this stage.
@@ -123,6 +135,9 @@ class StageDefinition:
             "required_tools": self.required_tools.copy(),
             "optional_tools": self.optional_tools.copy(),
             "allow_custom_tools": self.allow_custom_tools,
+            "keywords": self.keywords.copy(),
+            "next_stages": sorted(self.next_stages),
+            "min_confidence": self.min_confidence,
         }
 
 
@@ -145,6 +160,9 @@ def normalize_stage_definition(
             required_tools=list(stage.get("required_tools", [])),
             optional_tools=list(stage.get("optional_tools", legacy_tools)),
             allow_custom_tools=bool(stage.get("allow_custom_tools", True)),
+            keywords=list(stage.get("keywords", [])),
+            next_stages=set(stage.get("next_stages", [])),
+            min_confidence=float(stage.get("min_confidence", 0.5)),
         )
     if hasattr(stage, "name") and hasattr(stage, "description"):
         # Accept richer runtime stage objects during the migration to the
@@ -152,7 +170,20 @@ def normalize_stage_definition(
         return StageDefinition(
             name=getattr(stage, "name"),
             description=getattr(stage, "description"),
-            optional_tools=sorted(list(getattr(stage, "tools", []))),
+            required_tools=list(getattr(stage, "required_tools", [])),
+            optional_tools=sorted(
+                list(
+                    getattr(
+                        stage,
+                        "optional_tools",
+                        getattr(stage, "tools", []),
+                    )
+                )
+            ),
+            allow_custom_tools=bool(getattr(stage, "allow_custom_tools", True)),
+            keywords=list(getattr(stage, "keywords", [])),
+            next_stages=set(getattr(stage, "next_stages", [])),
+            min_confidence=float(getattr(stage, "min_confidence", 0.5)),
         )
     raise TypeError(
         "Stage definitions must be dicts or StageDefinition objects, "
@@ -179,11 +210,59 @@ class TieredToolConfig:
         basic_tools: Tools available at BASIC tier (minimal functionality)
         standard_tools: Additional tools at STANDARD tier
         advanced_tools: Additional tools at ADVANCED tier (full functionality)
+        mandatory: Runtime-compatible always-on tool set
+        vertical_core: Runtime-compatible vertical core tool set
+        semantic_pool: Runtime-compatible semantic candidate tool set
+        stage_tools: Optional runtime stage-specific tool mapping
+        readonly_only_for_analysis: Whether analysis flows should hide write tools
     """
 
     basic_tools: List[str] = field(default_factory=list)
     standard_tools: List[str] = field(default_factory=list)
     advanced_tools: List[str] = field(default_factory=list)
+    mandatory: Set[str] = field(default_factory=set)
+    vertical_core: Set[str] = field(default_factory=set)
+    semantic_pool: Set[str] = field(default_factory=set)
+    stage_tools: Dict[str, Set[str]] = field(default_factory=dict)
+    readonly_only_for_analysis: bool = True
+
+    def __post_init__(self) -> None:
+        """Normalize compatibility aliases between SDK and runtime tier shapes."""
+
+        normalized_mandatory = set(self.mandatory) or set(self.basic_tools)
+        normalized_vertical_core = set(self.vertical_core) or set(self.standard_tools)
+        normalized_semantic_pool = set(self.semantic_pool) or set(self.advanced_tools)
+        normalized_stage_tools = {
+            stage_name: set(tool_names)
+            for stage_name, tool_names in self.stage_tools.items()
+        }
+
+        object.__setattr__(self, "mandatory", normalized_mandatory)
+        object.__setattr__(self, "vertical_core", normalized_vertical_core)
+        object.__setattr__(self, "semantic_pool", normalized_semantic_pool)
+        object.__setattr__(self, "stage_tools", normalized_stage_tools)
+
+        if not self.basic_tools:
+            object.__setattr__(self, "basic_tools", sorted(normalized_mandatory))
+        if not self.standard_tools:
+            object.__setattr__(self, "standard_tools", sorted(normalized_vertical_core))
+        if not self.advanced_tools:
+            object.__setattr__(self, "advanced_tools", sorted(normalized_semantic_pool))
+
+    def get_base_tools(self) -> Set[str]:
+        """Return tools that should always be available."""
+
+        return set(self.mandatory) | set(self.vertical_core)
+
+    def get_tools_for_stage(self, stage: str) -> Set[str]:
+        """Return runtime-compatible base plus stage-specific tools."""
+
+        return self.get_base_tools() | set(self.stage_tools.get(stage, set()))
+
+    def get_effective_semantic_pool(self) -> Set[str]:
+        """Return the runtime-compatible semantic candidate pool."""
+
+        return set(self.semantic_pool)
 
     def get_tools_for_tier(self, tier: Union[Tier, str]) -> List[str]:
         """Get tools available at a specific tier.

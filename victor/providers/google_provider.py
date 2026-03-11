@@ -147,7 +147,7 @@ class GoogleProvider(BaseProvider):
 
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
-                "google-genai package not installed. Install with: pip install google-genai"
+                "google-genai package not installed. Install with: pip install victor[google]"
             )
 
         # Log provider initialization
