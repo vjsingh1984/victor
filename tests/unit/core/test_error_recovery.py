@@ -532,6 +532,65 @@ class TestConvenienceFunctions:
         assert result.modified_args["path"] == "."
 
 
+class TestDependencyErrorFallback:
+    """Tests for dependency/runtime error handling in ToolNotFoundHandler."""
+
+    @pytest.fixture
+    def handler(self):
+        return ToolNotFoundHandler()
+
+    def test_dependencies_missing_triggers_handler(self, handler):
+        """Test that 'dependencies missing' error triggers ToolNotFoundHandler."""
+        error = Exception("Tool 'semantic_code_search': dependencies missing for victor-coding")
+        assert handler.can_handle(error, "semantic_code_search", {}) is True
+
+    def test_no_module_named_triggers_handler(self, handler):
+        """Test that 'No module named' error triggers ToolNotFoundHandler."""
+        error = Exception("No module named 'victor.coding'")
+        assert handler.can_handle(error, "semantic_code_search", {}) is True
+
+    def test_import_error_triggers_handler(self, handler):
+        """Test that ImportError triggers ToolNotFoundHandler."""
+        error = ImportError("cannot import name 'SemanticSearch' from 'victor.coding'")
+        assert handler.can_handle(error, "semantic_code_search", {}) is True
+
+    def test_module_not_found_error_triggers_handler(self, handler):
+        """Test that ModuleNotFoundError triggers ToolNotFoundHandler."""
+        error = ModuleNotFoundError("No module named 'victor.coding.search'")
+        assert handler.can_handle(error, "semantic_code_search", {}) is True
+
+    def test_not_installed_triggers_handler(self, handler):
+        """Test that 'not installed' error triggers ToolNotFoundHandler."""
+        error = Exception("Package victor-coding is not installed")
+        assert handler.can_handle(error, "code_search", {}) is True
+
+    def test_code_search_falls_back_to_grep(self, handler):
+        """Test that code_search falls back to grep."""
+        error = Exception("Tool 'code_search' dependencies missing")
+        result = handler.handle(error, "code_search", {"query": "MyClass"})
+
+        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.fallback_tool == "grep"
+
+    def test_semantic_code_search_falls_back_to_code_search(self, handler):
+        """Test that semantic_code_search falls back to code_search."""
+        error = ImportError("No module named 'victor.coding'")
+        result = handler.handle(error, "semantic_code_search", {"query": "MyClass"})
+
+        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.fallback_tool == "code_search"
+
+    def test_chain_handles_import_error(self):
+        """Test full chain handles ImportError via ToolNotFoundHandler."""
+        chain = build_recovery_chain()
+        error = ImportError("No module named 'victor.coding.search'")
+        result = chain.process(error, "semantic_code_search", {"query": "test"})
+
+        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.fallback_tool == "code_search"
+        assert result.metadata.get("handler") == "ToolNotFoundHandler"
+
+
 class TestDeepSeekScenario:
     """Tests simulating the DeepSeek error from gap analysis."""
 

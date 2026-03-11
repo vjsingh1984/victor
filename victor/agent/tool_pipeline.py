@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
-from victor.agent.tool_executor import ToolExecutor
+from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
 from victor.agent.parallel_executor import (
     ParallelToolExecutor,
     ParallelExecutionConfig,
@@ -1565,15 +1565,10 @@ class ToolPipeline:
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
                 )
-                if (
-                    recovery.action == RecoveryAction.FALLBACK_TOOL
-                    and recovery.fallback_tool
-                ):
+                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
                     fallback_name = recovery.fallback_tool
                     if self.tools.is_tool_enabled(fallback_name):
-                        logger.info(
-                            f"[Pipeline] Falling back from {tool_name} to {fallback_name}"
-                        )
+                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
                         try:
                             fb_result = await asyncio.wait_for(
                                 self.executor.execute(
@@ -1592,9 +1587,7 @@ class ToolPipeline:
                                 success=fb_result.success,
                                 result=fb_result.result,
                                 error=fb_result.error,
-                                execution_time_ms=(
-                                    (time.monotonic() - start_time) * 1000
-                                ),
+                                execution_time_ms=((time.monotonic() - start_time) * 1000),
                             )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
