@@ -659,7 +659,7 @@ Tasks:
 
 - [x] VPC-T3.1 Classify existing vertical modules into definition-layer, runtime-layer, and shim candidates.
 - [x] VPC-T3.2 Define the target package layout for migrated verticals.
-- [ ] VPC-T3.3 Extract common runtime-only helpers out of definition modules.
+- [x] VPC-T3.3 Extract common runtime-only helpers out of definition modules.
 - [ ] VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
 
 #### VPC-F3.2: Coding Vertical Migration
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.3 Extract common runtime-only helpers out of definition modules.
-2. VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
+1. VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
+2. VPC-T3.5 Inventory and classify `coding` imports by definition/runtime/shim layer.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1530,6 +1530,31 @@ Likely touchpoints:
   - documentation/layout task only; no tests run
 - Next recommended implementation layer:
   - VPC-T3.3 extract common runtime-only helpers out of definition modules
+
+### 2026-03-10 (Session R)
+
+- Completed `VPC-T3.3`.
+- Extracted two shared runtime-only helper patterns out of assistant entrypoints:
+  - capability-config loading now lives in `victor.core.verticals.metadata`
+    and auto-resolves `get_capability_configs()` from the vertical
+    `capabilities` module
+  - the shared file-operation tool group now lives in `victor_sdk.ToolNames`
+    instead of requiring `FileOperationsCapability` inside definition modules
+- Simplified bundled assistant entrypoints to rely on shared defaults:
+  - removed assistant-local capability-config wrappers from `coding`, `rag`,
+    and `research`
+  - removed assistant-local capability-provider wrappers from `devops` and
+    `dataanalysis`
+  - removed redundant RAG extension-loader wrappers for prompt, safety, RL,
+    and team-provider resolution
+  - switched vertical tool references in assistant modules to SDK `ToolNames`
+- Added regression coverage in
+  `tests/unit/core/verticals/test_runtime_helper_defaults.py`.
+- Verification:
+  - `../.venv/bin/pytest -q victor-sdk/tests/unit/test_tool_names.py tests/unit/tools/test_tool_names_sdk_compat.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py`
+  - `32 passed in 7.10s`
+- Next recommended implementation layer:
+  - VPC-T3.4 create temporary mixed-mode adapter patterns for verticals not yet fully migrated
 
 ## Resume Protocol
 
