@@ -66,6 +66,13 @@ rag = "victor_rag.assistant:RAGAssistant"
 [project.entry-points."victor.framework.teams.providers"]
 rag = "victor_rag.teams:RAGTeamSpecProvider"
 
+# NEW: Victor SDK Protocol implementations
+[project.entry-points."victor.sdk.protocols"]
+rag-tools = "victor_rag.protocols:RAGToolProvider"
+rag-safety = "victor_rag.protocols:RAGSafetyProvider"
+rag-prompts = "victor_rag.protocols:RAGPromptProvider"
+rag-workflows = "victor_rag.protocols:RAGWorkflowProvider"
+
 [tool.setuptools]
 packages = [
     "victor_rag",
