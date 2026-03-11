@@ -46,7 +46,7 @@ Related documents:
 | `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
 | `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
 | `E5` | Legacy compatibility debt reduction | `M3` complete (9/13 = 69% removed) |
-| `E6` | Competitive benchmark ground-truth | `M2` in planning |
+| `E6` | Competitive benchmark ground-truth | `M2` in progress |
 
 Milestone targets:
 - `M1: Foundation Cut` due 2026-03-31
@@ -166,7 +166,7 @@ Milestone targets:
 - `test_reliability_metrics_under_load` - SLO validation under load
 
 ### E6: Competitive Benchmark Ground-Truth
-**Status**: M1 complete, M2 in planning
+**Status**: M1 complete, M2 in progress
 **Owner**: Platform Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Benchmark rubric frozen (v1.0)
@@ -174,6 +174,10 @@ Milestone targets:
 - ✅ M1: Scoring methodology documented (100-point scale)
 - ✅ M1: Competitor matrix complete (6 frameworks)
 - ✅ M1: 3 example tasks created (C1, R2, W2)
+- ✅ M2: Benchmark execution script created
+- ✅ M2: Task definition files created (C1, R2, T1, W1)
+- ✅ M2: Victor adapter implemented
+- ✅ M2: Competitor stub adapters created (LangGraph, CrewAI)
 - 🔄 M2: Execute benchmarks on Victor + 2 competitors
 - ⏳ M2: Statistical significance analysis
 - ⏳ M3: Report published, action items identified
