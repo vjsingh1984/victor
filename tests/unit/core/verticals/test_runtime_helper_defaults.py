@@ -13,10 +13,47 @@ from victor.verticals.contrib.coding.middleware import (
 from victor.verticals.contrib.coding.service_provider import CodingServiceProvider
 from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
 from victor.verticals.contrib.coding.teams import CODING_PERSONAS
-from victor.verticals.contrib.dataanalysis.assistant import DataAnalysisAssistant
+from victor.verticals.contrib.dataanalysis import DataAnalysisAssistant
 from victor.verticals.contrib.dataanalysis.capabilities import (
     DataAnalysisCapabilityProvider,
 )
+from victor.verticals.contrib.dataanalysis.runtime.capabilities import (
+    DataAnalysisCapabilityProvider as RuntimeDataAnalysisCapabilityProvider,
+)
+from victor.verticals.contrib.dataanalysis.mode_config import DataAnalysisModeConfigProvider
+from victor.verticals.contrib.dataanalysis.rl import DataAnalysisRLConfig
+from victor.verticals.contrib.dataanalysis.runtime.rl import (
+    DataAnalysisRLConfig as RuntimeDataAnalysisRLConfig,
+)
+from victor.verticals.contrib.dataanalysis.runtime.teams import (
+    DataAnalysisTeamSpecProvider as RuntimeDataAnalysisTeamSpecProvider,
+)
+from victor.verticals.contrib.dataanalysis.runtime.mode_config import (
+    DataAnalysisModeConfigProvider as RuntimeDataAnalysisModeConfigProvider,
+)
+from victor.verticals.contrib.dataanalysis.runtime.safety import (
+    DataAnalysisSafetyExtension as RuntimeDataAnalysisSafetyExtension,
+)
+from victor.verticals.contrib.dataanalysis.runtime.tool_dependencies import (
+    get_provider as get_runtime_dataanalysis_tool_dependency_provider,
+)
+from victor.verticals.contrib.dataanalysis.runtime.workflows import (
+    DataAnalysisWorkflowProvider as RuntimeDataAnalysisWorkflowProvider,
+)
+from victor.verticals.contrib.dataanalysis.runtime.safety_enhanced import (
+    DataAnalysisSafetyRules as RuntimeDataAnalysisSafetyRules,
+    EnhancedDataAnalysisSafetyExtension as RuntimeEnhancedDataAnalysisSafetyExtension,
+)
+from victor.verticals.contrib.dataanalysis.safety import DataAnalysisSafetyExtension
+from victor.verticals.contrib.dataanalysis.safety_enhanced import (
+    DataAnalysisSafetyRules,
+    EnhancedDataAnalysisSafetyExtension,
+)
+from victor.verticals.contrib.dataanalysis.tool_dependencies import (
+    get_provider as get_dataanalysis_tool_dependency_provider,
+)
+from victor.verticals.contrib.dataanalysis.teams import DataAnalysisTeamSpecProvider
+from victor.verticals.contrib.dataanalysis.workflows import DataAnalysisWorkflowProvider
 from victor.verticals.contrib.devops import DevOpsAssistant
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
 from victor.verticals.contrib.devops.prompts import DevOpsPromptContributor
@@ -76,7 +113,7 @@ from victor.verticals.contrib.rag.runtime.workflows import (
     RAGWorkflowProvider as RuntimeRAGWorkflowProvider,
 )
 from victor.verticals.contrib.rag.workflows import RAGWorkflowProvider
-from victor.verticals.contrib.research.assistant import ResearchAssistant
+from victor.verticals.contrib.research import ResearchAssistant
 from victor.verticals.contrib.research.capabilities import (
     get_capability_configs as get_research_capability_configs,
 )
@@ -124,6 +161,57 @@ def test_capability_provider_autoloads_for_verticals_using_default_loader() -> N
     assert isinstance(
         DataAnalysisAssistant.get_capability_provider(),
         DataAnalysisCapabilityProvider,
+    )
+
+
+def test_dataanalysis_root_runtime_shims_delegate_to_runtime_modules() -> None:
+    """Data Analysis root runtime helpers should re-export runtime-owned modules."""
+
+    root_tool_dependency_provider = get_dataanalysis_tool_dependency_provider()
+    runtime_tool_dependency_provider = get_runtime_dataanalysis_tool_dependency_provider()
+
+    assert DataAnalysisCapabilityProvider is RuntimeDataAnalysisCapabilityProvider
+    assert DataAnalysisModeConfigProvider is RuntimeDataAnalysisModeConfigProvider
+    assert DataAnalysisRLConfig is RuntimeDataAnalysisRLConfig
+    assert DataAnalysisSafetyExtension is RuntimeDataAnalysisSafetyExtension
+    assert DataAnalysisSafetyRules is RuntimeDataAnalysisSafetyRules
+    assert EnhancedDataAnalysisSafetyExtension is RuntimeEnhancedDataAnalysisSafetyExtension
+    assert DataAnalysisTeamSpecProvider is RuntimeDataAnalysisTeamSpecProvider
+    assert DataAnalysisWorkflowProvider is RuntimeDataAnalysisWorkflowProvider
+    assert get_dataanalysis_tool_dependency_provider is get_runtime_dataanalysis_tool_dependency_provider
+    assert type(root_tool_dependency_provider) is type(runtime_tool_dependency_provider)
+    assert root_tool_dependency_provider.yaml_path == runtime_tool_dependency_provider.yaml_path
+    assert isinstance(
+        DataAnalysisAssistant.get_capability_provider(),
+        RuntimeDataAnalysisCapabilityProvider,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_mode_config_provider(),
+        RuntimeDataAnalysisModeConfigProvider,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_rl_config_provider(),
+        RuntimeDataAnalysisRLConfig,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_safety_extension(),
+        RuntimeDataAnalysisSafetyExtension,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_workflow_provider(),
+        RuntimeDataAnalysisWorkflowProvider,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_team_spec_provider(),
+        RuntimeDataAnalysisTeamSpecProvider,
+    )
+    assert isinstance(
+        DataAnalysisAssistant.get_tool_dependency_provider(),
+        type(runtime_tool_dependency_provider),
+    )
+    assert (
+        DataAnalysisAssistant.get_tool_dependency_provider().yaml_path
+        == runtime_tool_dependency_provider.yaml_path
     )
 
 

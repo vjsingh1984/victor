@@ -9,7 +9,10 @@ This vertical provides:
 - Source verification and citation management
 """
 
-from victor.verticals.contrib.research.assistant import ResearchAssistant
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+from victor.verticals.contrib.research.assistant import (
+    ResearchAssistant as ResearchAssistantDefinition,
+)
 from victor.verticals.contrib.research.prompts import ResearchPromptContributor
 from victor.verticals.contrib.research.mode_config import ResearchModeConfigProvider
 from victor.verticals.contrib.research.safety import ResearchSafetyExtension
@@ -17,8 +20,11 @@ from victor.verticals.contrib.research.capabilities import ResearchCapabilityPro
 
 from victor.verticals.contrib.research.tool_dependencies import get_provider
 
+ResearchAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(ResearchAssistantDefinition)
+
 __all__ = [
     "ResearchAssistant",
+    "ResearchAssistantDefinition",
     "ResearchPromptContributor",
     "ResearchModeConfigProvider",
     "ResearchSafetyExtension",

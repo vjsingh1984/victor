@@ -631,8 +631,8 @@ Feature summary:
 | VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
 | VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
 | VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows SDK-only pattern and parity coverage is in place |
-| VPC-F3.5 | Data Analysis vertical migration | In Progress | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
-| VPC-F3.6 | Research vertical migration | Not Started | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
+| VPC-F3.5 | Data Analysis vertical migration | Completed | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
+| VPC-F3.6 | Research vertical migration | In Progress | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
 | VPC-F3.7 | External example and template migration | Not Started | VPC-F3.1 | Example packages teach the supported contract |
 | VPC-F3.8 | Extension declaration cleanup | Not Started | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
 
@@ -764,10 +764,10 @@ Likely touchpoints:
 Tasks:
 
 - [x] VPC-T3.20 Inventory and classify `dataanalysis` imports by layer.
-- [ ] VPC-T3.21 Replace definition-layer imports with SDK contracts in `dataanalysis`.
-- [ ] VPC-T3.22 Express data/file/notebook needs through SDK capability identifiers in `dataanalysis`.
-- [ ] VPC-T3.23 Move runtime integrations out of `dataanalysis` definition modules.
-- [ ] VPC-T3.24 Add Data Analysis migration tests and parity checks.
+- [x] VPC-T3.21 Replace definition-layer imports with SDK contracts in `dataanalysis`.
+- [x] VPC-T3.22 Express data/file/notebook needs through SDK capability identifiers in `dataanalysis`.
+- [x] VPC-T3.23 Move runtime integrations out of `dataanalysis` definition modules.
+- [x] VPC-T3.24 Add Data Analysis migration tests and parity checks.
 
 #### VPC-F3.6: Research Vertical Migration
 
@@ -788,9 +788,9 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.25 Inventory and classify `research` imports by layer.
-- [ ] VPC-T3.26 Replace definition-layer imports with SDK contracts in `research`.
-- [ ] VPC-T3.27 Express web/search/document needs through SDK capability identifiers in `research`.
+- [x] VPC-T3.25 Inventory and classify `research` imports by layer.
+- [x] VPC-T3.26 Replace definition-layer imports with SDK contracts in `research`.
+- [x] VPC-T3.27 Express web/search/document needs through SDK capability identifiers in `research`.
 - [ ] VPC-T3.28 Move runtime integrations out of `research` definition modules.
 - [ ] VPC-T3.29 Add Research migration tests and parity checks.
 
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.21 Replace definition-layer imports with SDK contracts in `dataanalysis`.
-2. VPC-T3.22 Express data/file/notebook needs through SDK capability identifiers in `dataanalysis`.
+1. VPC-T3.28 Move runtime integrations out of `research` definition modules.
+2. VPC-T3.29 Add Research migration tests and parity checks.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -2123,6 +2123,214 @@ Likely touchpoints:
 - Next recommended implementation layer:
   - `VPC-T3.21` replace definition-layer imports with SDK contracts in
     `dataanalysis`
+
+### 2026-03-11 (Session AO)
+
+- Completed `VPC-T3.21` for the `dataanalysis` vertical.
+- Migrated `victor/verticals/contrib/dataanalysis/assistant.py` to the SDK
+  definition contract:
+  - SDK `VerticalBase`
+  - SDK `StageDefinition`
+  - serializable prompt metadata hooks
+- Added
+  `victor/verticals/contrib/dataanalysis/prompt_metadata.py` as the shared
+  definition-layer source for prompt templates, task hints, grounding rules,
+  and prompt priority.
+- Converted `victor/verticals/contrib/dataanalysis/prompts.py` into a runtime
+  adapter over the shared metadata and updated
+  `victor/verticals/contrib/dataanalysis/__init__.py` to export a runtime
+  wrapper plus `DataAnalysisAssistantDefinition`.
+- Added regression coverage in:
+  - `tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py`
+  - `tests/unit/core/verticals/test_runtime_helper_defaults.py`
+- Updated
+  `docs/development/dataanalysis-vertical-import-layer-inventory-2026-03-11.md`
+  with the post-migration boundary state:
+  - 17 Python files in `victor/verticals/contrib/dataanalysis`
+  - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - 0 remaining definition-layer blockers in the active entrypoints
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k dataanalysis`
+    - `4 passed, 30 deselected, 1 warning`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py`
+    - `12 passed, 1 warning`
+- Advanced the current tranche to `VPC-T3.22`.
+- Next recommended implementation layer:
+  - `VPC-T3.22` express data/file/notebook needs through SDK capability
+    identifiers in `dataanalysis`
+
+### 2026-03-11 (Session AP)
+
+- Completed `VPC-T3.22` for the `dataanalysis` vertical.
+- Added SDK capability requirements to
+  `victor/verticals/contrib/dataanalysis/assistant.py`:
+  - `CapabilityIds.FILE_OPS`
+  - `CapabilityIds.SHELL_ACCESS`
+  - `CapabilityIds.VALIDATION`
+  - optional `CapabilityIds.WEB_ACCESS`
+- Added regression coverage in
+  `tests/unit/core/verticals/test_dataanalysis_definition_capability_requirements.py`
+  and verified the current Data Analysis tool bundle satisfies the new
+  declarations.
+- Started `VPC-T3.23` and extracted the first runtime-owned Data Analysis
+  modules under `victor/verticals/contrib/dataanalysis/runtime/`:
+  - `runtime/mode_config.py`
+  - `runtime/safety_enhanced.py`
+  - `runtime/__init__.py`
+- Reduced the root modules to compatibility shims:
+  - `mode_config.py`
+  - `safety_enhanced.py`
+- Updated the package export surface and regression coverage so root imports and
+  runtime helper resolution still point at the runtime-owned implementations:
+  - `victor/verticals/contrib/dataanalysis/__init__.py`
+  - `tests/unit/core/verticals/test_runtime_helper_defaults.py`
+- Updated
+  `docs/development/dataanalysis-vertical-import-layer-inventory-2026-03-11.md`
+  with the post-`VPC-T3.22` and partial-`VPC-T3.23` state:
+  - 20 Python files in `victor/verticals/contrib/dataanalysis`
+  - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - no remaining definition-layer blockers in the active entrypoints
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_dataanalysis_definition_capability_requirements.py tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k dataanalysis`
+    - `6 passed, 30 deselected, 1 warning`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py tests/unit/core/verticals/test_dataanalysis_definition_capability_requirements.py tests/integration/verticals/test_vertical_independence.py -k dataanalysis`
+    - `7 passed, 30 deselected, 1 warning`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py`
+    - `9 passed, 1 warning`
+- Advanced the current tranche to `VPC-T3.23`.
+- Next recommended implementation layer:
+  - continue `VPC-T3.23` by moving `capabilities.py` and `safety.py` behind
+    `dataanalysis/runtime/` shims
+
+### 2026-03-11 (Session AQ)
+
+- Continued `VPC-T3.23` for the `dataanalysis` vertical.
+- Moved the primary runtime-owned capability and safety modules under
+  `victor/verticals/contrib/dataanalysis/runtime/`:
+  - `runtime/capabilities.py`
+  - `runtime/safety.py`
+- Reduced the root modules to compatibility shims:
+  - `capabilities.py`
+  - `safety.py`
+- Continued the same extraction pattern for additional runtime-owned modules:
+  - `runtime/workflows.py`
+  - `runtime/rl.py`
+  - `runtime/tool_dependencies.py`
+- Restored the public import paths with compatibility shims:
+  - `workflows/__init__.py`
+  - `rl/__init__.py`
+  - `tool_dependencies.py`
+- Updated the runtime package export surface and package-root exports:
+  - `victor/verticals/contrib/dataanalysis/runtime/__init__.py`
+  - `victor/verticals/contrib/dataanalysis/__init__.py`
+- Expanded `tests/unit/core/verticals/test_runtime_helper_defaults.py` so the
+  Data Analysis runtime-shim regression now covers capability, safety, workflow,
+  RL, and tool-dependency resolution.
+- Updated
+  `docs/development/dataanalysis-vertical-import-layer-inventory-2026-03-11.md`
+  with the narrower remaining runtime surface:
+  - 25 Python files in `victor/verticals/contrib/dataanalysis`
+  - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - most direct runtime imports now live under `dataanalysis/runtime/`
+  - `teams/` is now the largest remaining root runtime package
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/framework/test_vertical_capability_integration.py tests/integration/framework/test_safety_integration.py -k dataanalysis`
+    - `11 passed, 1 skipped, 55 deselected, 1 warning`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/workflows/test_base_yaml_provider.py tests/unit/framework/workflows/test_workflow_hooks.py tests/integration/framework/test_vertical_capability_integration.py -k dataanalysis`
+    - `15 passed, 1 skipped, 103 deselected, 7 warnings`
+- Kept `VPC-T3.23` as the active tranche because `teams/__init__.py` and
+  `teams/personas.py` still need to move behind runtime shims.
+- Next recommended implementation layer:
+  - continue `VPC-T3.23` by migrating the `dataanalysis/teams` package into
+    `dataanalysis/runtime/`
+
+### 2026-03-11 (Session AR)
+
+- Completed the remaining `dataanalysis` migration gates.
+- Finished the last `VPC-T3.23` runtime extraction slice by moving the
+  `dataanalysis/teams` package under `victor/verticals/contrib/dataanalysis/runtime/`:
+  - `runtime/teams.py`
+  - `runtime/team_personas.py`
+- Restored the public import surface with compatibility shims:
+  - `teams/__init__.py`
+  - `teams/personas.py`
+- Expanded runtime-helper coverage so `dataanalysis` now asserts runtime
+  resolution for:
+  - capability provider
+  - safety extensions
+  - mode config
+  - workflow provider
+  - RL config
+  - team spec provider
+  - tool dependency provider
+- Added the parity gate in
+  `tests/integration/verticals/test_dataanalysis_migration_parity.py`.
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/test_team_registry.py tests/integration/framework/test_persona_integration.py -k 'dataanalysis or data_analysis'`
+    - `2 passed, 1 skipped, 72 deselected, 10 warnings`
+  - `../.venv/bin/pytest -c /dev/null -q tests/integration/verticals/test_dataanalysis_migration_parity.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/test_team_registry.py tests/integration/framework/test_persona_integration.py -k 'dataanalysis or data_analysis'`
+    - `5 passed, 1 skipped, 72 deselected, 10 warnings`
+- Marked `VPC-T3.23`, `VPC-T3.24`, and `VPC-F3.5` complete.
+- Started `VPC-F3.6` by completing `VPC-T3.25` for the `research` vertical.
+- Added `docs/development/research-vertical-import-layer-inventory-2026-03-11.md`
+  with the measured import-boundary baseline:
+  - 15 Python files in `victor/verticals/contrib/research`
+  - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - `assistant.py` and `prompts.py` are the current definition-layer blockers
+- Advanced the current tranche to `VPC-T3.26`.
+- Next recommended implementation layer:
+  - `VPC-T3.26` replace definition-layer imports with SDK contracts in
+    `research`
+
+### 2026-03-11 (Session AS)
+
+- Completed `VPC-T3.26` for the `research` vertical.
+- Migrated `victor/verticals/contrib/research/assistant.py` to the SDK
+  definition contract:
+  - SDK `VerticalBase`
+  - SDK `StageDefinition`
+  - serializable prompt metadata hooks
+- Added `victor/verticals/contrib/research/prompt_metadata.py` as the shared
+  definition-layer source for prompt templates, task hints, grounding rules,
+  and prompt priority.
+- Converted `victor/verticals/contrib/research/prompts.py` into a runtime
+  adapter over the shared metadata and updated
+  `victor/verticals/contrib/research/__init__.py` to export a runtime wrapper
+  plus `ResearchAssistantDefinition`.
+- Added the research capability contract for `VPC-T3.27` in
+  `victor/verticals/contrib/research/assistant.py`:
+  - `CapabilityIds.FILE_OPS`
+  - `CapabilityIds.WEB_ACCESS`
+  - `CapabilityIds.SOURCE_VERIFICATION`
+  - `CapabilityIds.VALIDATION`
+- Added regression coverage in:
+  - `tests/unit/core/verticals/test_research_definition_prompt_metadata.py`
+  - `tests/unit/core/verticals/test_research_definition_capability_requirements.py`
+- Updated
+  `docs/development/research-vertical-import-layer-inventory-2026-03-11.md`
+  with the post-`VPC-T3.26` / `VPC-T3.27` boundary state:
+  - 16 Python files in `victor/verticals/contrib/research`
+  - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - no remaining definition-layer blockers in the active entrypoints
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_research_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k research`
+    - `9 passed, 26 deselected, 1 warning`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_research_definition_prompt_metadata.py tests/unit/core/verticals/test_research_definition_capability_requirements.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k research`
+    - `11 passed, 26 deselected, 1 warning`
+- Marked `VPC-T3.26` and `VPC-T3.27` complete.
+- Advanced the current tranche to `VPC-T3.28`.
+- Next recommended implementation layer:
+  - `VPC-T3.28` move runtime integrations out of `research` definition modules
 
 ## Resume Protocol
 
