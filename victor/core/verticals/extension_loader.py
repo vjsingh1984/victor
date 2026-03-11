@@ -170,7 +170,7 @@ class VerticalExtensionLoader(ABC):
     _extension_loader_emit_pressure_events: ClassVar[bool] = False
     _extension_loader_last_pressure_level: ClassVar[str] = "ok"
     _extension_loader_last_pressure_emit_ts: ClassVar[float] = 0.0
-    _tiered_tools_deprecation_warned: ClassVar[Set[str]] = set()
+    # _tiered_tools_deprecation_warned removed (E5 M3) — get_tiered_tools() deleted
 
     # Track optional modules we have already reported as missing so that we do not spam logs.
     _missing_extension_modules: ClassVar[Set[str]] = set()
@@ -854,51 +854,7 @@ class VerticalExtensionLoader(ABC):
         """
         return None
 
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[Any]:
-        """Get tiered tool configuration for intelligent selection.
-
-        DEPRECATED: Use get_tiered_tool_config() instead.
-
-        This method is maintained for backward compatibility. New verticals
-        should override get_tiered_tool_config() which has a default
-        implementation using TieredToolTemplate.
-
-        Override to provide vertical-specific tiered tool configuration
-        for context-efficient tool selection. When implemented, this enables:
-
-        1. Mandatory tools: Always included (e.g., read, ls)
-        2. Vertical core: Always included for this vertical (e.g., web, fetch for research)
-        3. Semantic pool: Selected based on query similarity and stage
-
-        Example for research vertical:
-            return TieredToolConfig(
-                mandatory={"read", "ls"},
-                vertical_core={"web", "fetch"},
-                semantic_pool={"write", "edit", "grep", "search"},
-                stage_tools={
-                    "WRITING": {"write", "edit"},
-                    "SEARCHING": {"web", "fetch", "grep"},
-                },
-                readonly_only_for_analysis=True,
-            )
-
-        Returns:
-            TieredToolConfig or None (falls back to get_tools())
-        """
-        # Keep compatibility at the core adapter boundary only.
-        qualified_name = f"{cls.__module__}.{cls.__qualname__}"
-        with VerticalExtensionLoader._extensions_cache_lock:
-            if qualified_name not in VerticalExtensionLoader._tiered_tools_deprecation_warned:
-                VerticalExtensionLoader._tiered_tools_deprecation_warned.add(qualified_name)
-                logger.warning(
-                    "%s.get_tiered_tools() is deprecated and will be removed after 2026-06-30; "
-                    "implement get_tiered_tool_config() instead.",
-                    qualified_name,
-                )
-
-        # Delegate to the canonical method
-        return cls.get_tiered_tool_config()
+    # get_tiered_tools() removed (E5 M3) — use get_tiered_tool_config() instead
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:

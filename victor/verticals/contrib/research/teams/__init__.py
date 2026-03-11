@@ -33,20 +33,11 @@ enabling cross-vertical team discovery via:
     from victor.framework.team_registry import get_team_registry
     registry = get_team_registry()
     research_teams = registry.find_by_vertical("research")
-
-DEPRECATION NOTICE:
-    ResearchTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor.framework.team_schema instead:
-
-        from victor.framework.team_schema import TeamSpec
-
-    ResearchTeamSpec is maintained for backwards compatibility.
 """
 
 import logging
-import warnings
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
@@ -137,56 +128,7 @@ RESEARCH_ROLES: Dict[str, ResearchRoleConfig] = {
     ),
 }
 
-
-@dataclass
-class ResearchTeamSpec:
-    """Specification for a research team.
-
-    .. deprecated::
-        ResearchTeamSpec is deprecated. Use TeamSpec from
-        victor.framework.team_schema instead. ResearchTeamSpec is maintained
-        for backwards compatibility but will be removed in a future version.
-
-    Attributes:
-        name: Team name
-        description: Team description
-        formation: How agents are organized
-        members: Team member specifications
-        total_tool_budget: Total tool budget for the team
-        max_iterations: Maximum iterations
-    """
-
-    name: str
-    description: str
-    formation: TeamFormation
-    members: List[TeamMemberSpec]
-    total_tool_budget: int = 100
-    max_iterations: int = 50
-
-    def __post_init__(self):
-        """Emit deprecation warning on instantiation."""
-        warnings.warn(
-            "ResearchTeamSpec is deprecated. Use TeamSpec from "
-            "victor.framework.team_schema instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor.framework.team_schema.
-
-        Returns:
-            TeamSpec instance with vertical set to "research"
-        """
-        return TeamSpec(
-            name=self.name,
-            description=self.description,
-            vertical="research",
-            formation=self.formation,
-            members=self.members,
-            total_tool_budget=self.total_tool_budget,
-            max_iterations=self.max_iterations,
-        )
+# ResearchTeamSpec removed (E5 M3) — use TeamSpec from victor.framework.team_schema instead
 
 
 # Pre-defined team specifications with rich personas

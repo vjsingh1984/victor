@@ -52,13 +52,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `victor.verticals.contrib.research.tool_dependencies`
   - `victor.verticals.contrib.devops.tool_dependencies`
   - `victor.verticals.contrib.dataanalysis.tool_dependencies`
+- **E5 M3 Deprecation Removal** (9/13 items removed = 69%):
+  - `UnifiedWorkflowCompilerAdapter`, `CompiledGraphAdapter`, `ExecutorResultAdapter` — importing now raises `ImportError` with migration path
+  - `get_tiered_tools()` extension hook — use `get_tiered_tool_config()` instead
+  - `CodingToolDependencyProvider` class + 6 deprecated constants (`CODING_TOOL_DEPENDENCIES`, etc.) — use `get_provider()` factory
+  - `CodingTeamSpec` class — use `TeamSpec` from `victor.framework.team_schema`
+  - `ResearchTeamSpec` class — use `TeamSpec` from `victor.framework.team_schema`
+  - `TASK_TYPE_HINTS` fallback dict + `__getattr__` — use `get_task_type_hint(task_type, prompt_contributors=[...])` with vertical contributors
 
-**Migration guidance**:
+**Migration guidance (M2)**:
 ```python
 from victor.verticals.contrib.devops.tool_dependencies import get_provider
 
 provider = get_provider()
 deps = provider.get_dependencies()
+```
+
+**Migration guidance (M3)**:
+```python
+# Workflow adapter → protocol-based API
+from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
+
+# Tool dependencies → factory
+from victor.verticals.contrib.coding.tool_dependencies import get_provider
+provider = get_provider()
+
+# Team specs → canonical TeamSpec
+from victor.framework.team_schema import TeamSpec
+
+# Task hints → vertical contributors
+from victor.agent.prompt_builder import get_task_type_hint
+hint = get_task_type_hint("edit", prompt_contributors=[my_contributor])
 ```
 
 ## [0.5.4] - 2026-02-16

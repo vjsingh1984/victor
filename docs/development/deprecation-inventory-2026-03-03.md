@@ -39,3 +39,34 @@ Migration path for all three verticals:
 from victor.verticals.contrib.devops.tool_dependencies import get_provider
 provider = get_provider()
 ```
+
+## M3 Update (2026-03-10)
+
+Removed 6 more items (9/13 total = 69%, exceeds 60% target):
+
+1. **`UnifiedWorkflowCompilerAdapter` + `CompiledGraphAdapter` + `ExecutorResultAdapter`** (`victor/workflows/adapter.py`)
+   - Module now raises `ImportError` with migration message
+   - Migration: `victor.workflows.compiler_protocols.WorkflowCompilerProtocol` via DI container
+
+2. **`get_tiered_tools()` extension hook** (`victor/core/verticals/extension_loader.py`)
+   - Method and protocol declaration removed
+   - Migration: override `get_tiered_tool_config()` instead
+
+3. **`CodingToolDependencyProvider` class + 6 deprecated constants + `_LazyDeprecatedProperty` infra** (`victor/verticals/contrib/coding/tool_dependencies.py`)
+   - Only `get_provider()` factory remains
+   - Migration: `from victor.verticals.contrib.coding.tool_dependencies import get_provider`
+
+4. **`CodingTeamSpec` class + `_FORMATION_TO_TOPOLOGY`** (`victor/verticals/contrib/coding/teams/specs.py`)
+   - Migration: `TeamSpec` from `victor.framework.team_schema`
+
+5. **`ResearchTeamSpec` class** (`victor/verticals/contrib/research/teams/__init__.py`)
+   - Migration: `TeamSpec` from `victor.framework.team_schema`
+
+6. **`TASK_TYPE_HINTS` fallback dict + `__getattr__`** (`victor/agent/prompt_builder.py`)
+   - Migration: `get_task_type_hint(task_type, prompt_contributors=[...])` with vertical contributors
+
+**Remaining** (4 items, deferred to v0.8.0):
+- `UnifiedWorkflowCompiler` (19+ dependents)
+- Sync `switch_provider()`
+- `WorkflowGraph` alias
+- Fragmented event type names

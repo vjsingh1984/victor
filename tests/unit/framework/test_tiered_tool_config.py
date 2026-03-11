@@ -49,43 +49,6 @@ class MockVerticalWithTieredToolConfig:
         )
 
 
-class MockVerticalWithTieredTools:
-    """Mock vertical that implements get_tiered_tools()."""
-
-    name = "mock_with_tools"
-
-    @classmethod
-    def get_tiered_tools(cls) -> TieredToolConfig:
-        return TieredToolConfig(
-            mandatory={"read"},
-            vertical_core={"web", "fetch"},
-            semantic_pool={"write"},
-        )
-
-
-class MockVerticalWithBoth:
-    """Mock vertical that implements both methods (config takes precedence)."""
-
-    name = "mock_with_both"
-
-    @classmethod
-    def get_tiered_tool_config(cls) -> TieredToolConfig:
-        return TieredToolConfig(
-            mandatory={"read", "ls"},
-            vertical_core={"write"},
-            semantic_pool=set(),
-        )
-
-    @classmethod
-    def get_tiered_tools(cls) -> TieredToolConfig:
-        # This should NOT be used since get_tiered_tool_config exists
-        return TieredToolConfig(
-            mandatory={"different"},
-            vertical_core={"values"},
-            semantic_pool=set(),
-        )
-
-
 class MockVerticalWithNeither:
     """Mock vertical that implements neither method."""
 
@@ -118,23 +81,6 @@ class TestTieredToolConfigCanonicalContract:
         assert "read" in config.mandatory
         assert "ls" in config.mandatory
         assert "write" in config.vertical_core
-
-    def test_no_legacy_fallback_by_default(self):
-        """get_tiered_config should not use deprecated fallback by default."""
-        config = get_tiered_config(MockVerticalWithTieredTools)
-
-        assert config is None
-
-    def test_fallback_chain_with_both_methods(self):
-        """get_tiered_tool_config should take precedence over get_tiered_tools."""
-        config = get_tiered_config(MockVerticalWithBoth)
-
-        assert config is not None
-        # Should use get_tiered_tool_config values, not get_tiered_tools
-        assert "read" in config.mandatory
-        assert "ls" in config.mandatory
-        assert "different" not in config.mandatory
-        assert "values" not in config.vertical_core
 
     def test_fallback_chain_returns_none_when_neither(self):
         """get_tiered_config should return None when vertical has neither method."""
@@ -182,22 +128,6 @@ class TestTieredConfigStepHandler:
         context.apply_tiered_config.assert_called_once()
         config_arg = context.apply_tiered_config.call_args[0][0]
         assert "read" in config_arg.mandatory
-
-    def test_handler_does_not_use_legacy_fallback_by_default(self):
-        """Handler should skip deprecated get_tiered_tools implementation."""
-        handler = TieredConfigStepHandler()
-        context = MagicMock()
-        result = MagicMock()
-        orchestrator = MagicMock()
-
-        handler._do_apply(
-            orchestrator,
-            MockVerticalWithTieredTools,
-            context,
-            result,
-        )
-
-        context.apply_tiered_config.assert_not_called()
 
     def test_handler_handles_neither_method(self):
         """Handler should handle verticals with neither method gracefully."""
