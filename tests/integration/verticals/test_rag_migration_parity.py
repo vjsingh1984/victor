@@ -91,7 +91,8 @@ def test_rag_migration_activation_parity_registers_runtime_extensions() -> None:
     assert isinstance(extensions.rl_config_provider, RAGRLConfig)
     assert isinstance(extensions.team_spec_provider, RAGTeamSpecProvider)
     assert any(
-        isinstance(contributor, RAGPromptContributor) for contributor in extensions.prompt_contributors
+        isinstance(contributor, RAGPromptContributor)
+        for contributor in extensions.prompt_contributors
     )
     assert any(
         isinstance(extension, RAGSafetyExtension) for extension in extensions.safety_extensions

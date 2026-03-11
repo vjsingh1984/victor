@@ -835,9 +835,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             result = dict(row)
             metadata = dict(result.get("metadata", {}) or {})
             symbol_name = (
-                result.get("symbol_name")
-                or metadata.get("qualified_name")
-                or metadata.get("name")
+                result.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
             )
             file_path = result.get("file_path") or metadata.get("file_path")
 

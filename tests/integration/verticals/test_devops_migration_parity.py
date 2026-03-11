@@ -98,7 +98,8 @@ def test_devops_migration_activation_parity_registers_runtime_extensions() -> No
     assert isinstance(extensions.rl_config_provider, DevOpsRLConfig)
     assert isinstance(extensions.team_spec_provider, DevOpsTeamSpecProvider)
     assert any(
-        isinstance(contributor, DevOpsPromptContributor) for contributor in extensions.prompt_contributors
+        isinstance(contributor, DevOpsPromptContributor)
+        for contributor in extensions.prompt_contributors
     )
     assert any(
         isinstance(extension, DevOpsSafetyExtension) for extension in extensions.safety_extensions

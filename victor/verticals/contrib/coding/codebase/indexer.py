@@ -3236,7 +3236,9 @@ class CodebaseIndex:
             context_limit=context_limit,
         )
 
-    async def _get_embedding_capability_provider(self, auto_reindex: bool) -> "BaseEmbeddingProvider":
+    async def _get_embedding_capability_provider(
+        self, auto_reindex: bool
+    ) -> "BaseEmbeddingProvider":
         """Return an initialized embedding provider for advanced provider capabilities."""
         if not self.use_embeddings or not self.embedding_provider:
             raise ValueError("Embeddings not enabled. Initialize with use_embeddings=True")

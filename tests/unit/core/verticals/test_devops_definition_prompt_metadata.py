@@ -21,9 +21,10 @@ def test_devops_definition_exposes_serializable_prompt_metadata() -> None:
     assert {"infrastructure", "ci_cd", "dockerfile", "terraform", "general"}.issubset(hints)
     assert hints["terraform"].priority_tools == ["read", "write", "edit", "ls", "shell"]
     assert definition.prompt_metadata.metadata["priority"] == 5
-    assert "Never invent file paths or content" in definition.prompt_metadata.metadata[
-        "grounding_rules"
-    ]
+    assert (
+        "Never invent file paths or content"
+        in definition.prompt_metadata.metadata["grounding_rules"]
+    )
 
 
 def test_devops_prompt_contributor_wraps_shared_prompt_metadata() -> None:

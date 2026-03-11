@@ -122,8 +122,10 @@ Before finalizing any infrastructure configuration:
 5. **Monitoring**: Alert fatigue, missing business metrics, no runbooks
 """.strip()
 
-DEVOPS_GROUNDING_RULES = """GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
+DEVOPS_GROUNDING_RULES = (
+    """GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
 Verify configuration syntax before suggesting. Always check existing resources first.""".strip()
+)
 
 DEVOPS_PROMPT_PRIORITY = 5
 

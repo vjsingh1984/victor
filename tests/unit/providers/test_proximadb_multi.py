@@ -432,9 +432,9 @@ def parse_json(data):
                     "name": "parse_json",
                     "qualified_name": "parse_json",
                     "file_path": "src/main.py",
-                "line_start": 4,
-            },
-        }
+                    "line_start": 4,
+                },
+            }
         ]
 
         class FakeGraphHelper:
@@ -653,7 +653,9 @@ def parse_json(data):
         ):
             provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
             await provider.initialize()
-            result = await provider.trace_execution_path("main", file_path="src/main.py", max_depth=2)
+            result = await provider.trace_execution_path(
+                "main", file_path="src/main.py", max_depth=2
+            )
 
         assert result["entry_point"]["id"] == entry_node_id
         assert result["edge_type"] == "CALLS"

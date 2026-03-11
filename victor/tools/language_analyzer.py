@@ -61,7 +61,20 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, Tuple, Type, Union, cast, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    cast,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     # Type-only imports
