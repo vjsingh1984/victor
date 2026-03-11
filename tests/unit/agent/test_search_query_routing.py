@@ -42,3 +42,23 @@ def test_get_recommended_search_tool_uses_bug_route_tool_name() -> None:
     result = orchestrator.get_recommended_search_tool("find similar regressions in auth")
 
     assert result == "code_search"
+
+
+def test_route_search_query_includes_graph_arguments() -> None:
+    """Call-graph queries should recommend the graph tool with traversal args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("who calls parse_json")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {"mode": "callers", "node": "parse_json", "depth": 2}
+    assert result["search_type"] == "semantic"
+
+
+def test_get_recommended_search_tool_uses_graph_route_tool_name() -> None:
+    """Graph traversal routes should surface graph as the recommended tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool("trace execution from main")
+
+    assert result == "graph"
