@@ -14,45 +14,34 @@
 
 """CQRS Bridge - Connects framework events with CQRS event sourcing.
 
+.. deprecated::
+    This module is deprecated and will be removed in Victor 2.0.
+    Use the unified EventRegistry (victor/framework/event_registry.py) instead.
+
 This module provides adapters that bridge:
 1. Framework Events (victor/framework/events.py) ↔ CQRS Events (victor/core/event_sourcing.py)
 2. Observability EventBus ↔ CQRS EventDispatcher
 3. Framework Agent commands ↔ CQRS Command/Query buses
 
+Migration Path:
+    **OLD (deprecated):**
+        from victor.framework.cqrs_bridge import CQRSBridge
+
+        bridge = await CQRSBridge.create()
+        bridge.connect_agent(agent)
+
+    **NEW (EventRegistry):**
+        from victor.framework.event_registry import get_event_registry
+
+        registry = get_event_registry()
+        # Events are automatically unified across all subsystems
+
+For migration examples, see: ``docs/MIGRATION_GUIDE.md``
+
 Design Patterns:
 - Adapter: Converts between framework and CQRS event formats
 - Bridge: Decouples abstraction from implementation
 - Mediator: Coordinates event flow between subsystems
-
-Architecture:
-    Framework Layer                    CQRS Layer
-    ┌─────────────┐                   ┌──────────────┐
-    │   Event     │   CQRSBridge      │    Event     │
-    │  (simple)   │◄─────────────────►│  (sourced)   │
-    └─────────────┘                   └──────────────┘
-           │                                 │
-           ▼                                 ▼
-    ┌─────────────┐                   ┌──────────────┐
-    │  EventBus   │   EventAdapter    │   Event      │
-    │ (pub/sub)   │◄─────────────────►│  Dispatcher  │
-    └─────────────┘                   └──────────────┘
-
-Example:
-    from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
-
-    # Create bridge
-    bridge = CQRSBridge()
-
-    # Connect to agent
-    bridge.connect_agent(agent)
-
-    # Framework events are now automatically forwarded to CQRS layer
-    async for event in agent.stream("Analyze code"):
-        # Events are being sourced for replay/projection
-        print(event.content)
-
-    # Query session history via CQRS
-    history = await bridge.get_session_history(session_id)
 """
 
 from __future__ import annotations
@@ -578,6 +567,10 @@ class ObservabilityToCQRSBridge:
 class CQRSBridge:
     """Main bridge connecting framework API with CQRS architecture.
 
+    .. deprecated::
+        ``CQRSBridge`` is deprecated and will be removed in Victor 2.0.
+        Use the unified ``EventRegistry`` instead for event handling.
+
     This class provides:
     1. Event forwarding from framework to CQRS
     2. Command execution via CQRS CommandBus
@@ -585,24 +578,19 @@ class CQRSBridge:
     4. Session management with event sourcing
     5. Integration with observability
 
+    Migration Path:
+        **OLD (deprecated):**
+            bridge = await CQRSBridge.create()
+            bridge.connect_agent(agent)
+
+        **NEW (EventRegistry):**
+            from victor.framework.event_registry import get_event_registry
+
+            registry = get_event_registry()
+            # Events are automatically unified
+
     Design Pattern: Facade
     Simplifies interaction with the complex CQRS subsystem.
-
-    Example:
-        # Create bridge with automatic setup
-        bridge = await CQRSBridge.create()
-
-        # Connect to agent
-        bridge.connect_agent(agent)
-
-        # Execute commands
-        result = await bridge.start_session()
-
-        # Query state
-        session = await bridge.get_session(result["session_id"])
-
-        # Access projections
-        history = bridge.get_conversation_history(session_id)
     """
 
     def __init__(
@@ -614,12 +602,25 @@ class CQRSBridge:
     ) -> None:
         """Initialize CQRS bridge.
 
+        .. deprecated::
+            ``CQRSBridge`` is deprecated. Use ``EventRegistry`` instead.
+
         Args:
             command_bus: AgentCommandBus for commands/queries.
             event_dispatcher: CQRS EventDispatcher.
             projection: SessionProjection for read model.
             event_bus: Observability EventBus.
         """
+        import warnings
+
+        warnings.warn(
+            "CQRSBridge is deprecated and will be removed in Victor 2.0. "
+            "Use the unified EventRegistry (victor.framework.event_registry) instead. "
+            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self._command_bus = command_bus
         self._event_dispatcher = event_dispatcher
         self._projection = projection

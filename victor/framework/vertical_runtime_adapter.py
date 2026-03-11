@@ -1,4 +1,24 @@
-"""Host-owned adapter for translating vertical definitions into runtime config."""
+"""Host-owned adapter for translating vertical definitions into runtime config.
+
+.. deprecated::
+    This module is deprecated and will be removed in Victor 2.0.
+    Verticals now implement the runtime VerticalBase protocol directly.
+
+Migration Path:
+    **OLD (deprecated):**
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+        adapter = VerticalRuntimeAdapter()
+        binding = adapter.build_runtime_binding(vertical)
+
+    **NEW (direct implementation):**
+        from victor.core.verticals.base import VerticalBase
+
+        # Verticals directly implement VerticalBase protocol
+        config = vertical.get_config()
+
+For migration examples, see: ``docs/MIGRATION_GUIDE.md``
+"""
 
 from __future__ import annotations
 
@@ -30,7 +50,23 @@ class VerticalRuntimeBinding:
 
 
 class VerticalRuntimeAdapter:
-    """Translate definition-layer vertical contracts into runtime configuration."""
+    """Translate definition-layer vertical contracts into runtime configuration.
+
+    .. deprecated::
+        ``VerticalRuntimeAdapter`` is deprecated and will be removed in Victor 2.0.
+        Verticals should implement ``VerticalBase`` protocol directly.
+
+    Migration Path:
+        **OLD (deprecated):**
+            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+            binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
+
+        **NEW (direct protocol):**
+            from victor.core.verticals.base import VerticalBase
+
+            config = vertical.get_config()
+    """
 
     _legacy_runtime_shims: Dict[Any, type] = {}
     _FORWARDED_SDK_HOOKS = (
@@ -48,7 +84,20 @@ class VerticalRuntimeAdapter:
 
     @classmethod
     def resolve_definition(cls, source: VerticalDefinitionSource) -> VerticalDefinition:
-        """Resolve a vertical source into a normalized SDK definition."""
+        """Resolve a vertical source into a normalized SDK definition.
+
+        .. deprecated::
+            Use ``vertical.get_definition()`` directly on VerticalBase implementations.
+        """
+        import warnings
+
+        warnings.warn(
+            "VerticalRuntimeAdapter.resolve_definition() is deprecated. "
+            "Use vertical.get_definition() directly on VerticalBase implementations. "
+            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         if isinstance(source, VerticalDefinition):
             return source
@@ -75,7 +124,20 @@ class VerticalRuntimeAdapter:
         cls,
         source: VerticalDefinitionSource,
     ) -> VerticalRuntimeBinding:
-        """Build the runtime binding for a vertical source."""
+        """Build the runtime binding for a vertical source.
+
+        .. deprecated::
+            Use ``vertical.get_config()`` directly on VerticalBase implementations.
+        """
+        import warnings
+
+        warnings.warn(
+            "VerticalRuntimeAdapter.build_runtime_binding() is deprecated. "
+            "Use vertical.get_config() directly on VerticalBase implementations. "
+            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         definition = cls.resolve_definition(source)
         runtime_config = cls.definition_to_runtime_config(definition)
@@ -153,7 +215,20 @@ class VerticalRuntimeAdapter:
         model: Optional[str] = None,
         **kwargs: Any,
     ) -> Any:
-        """Create an agent using runtime-owned vertical translation."""
+        """Create an agent using runtime-owned vertical translation.
+
+        .. deprecated::
+            Use ``Agent.create(vertical=...)`` directly with VerticalBase implementations.
+        """
+        import warnings
+
+        warnings.warn(
+            "VerticalRuntimeAdapter.create_agent() is deprecated. "
+            "Use Agent.create(vertical=...) directly with VerticalBase implementations. "
+            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         from victor.framework.agent import Agent
 
