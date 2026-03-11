@@ -588,14 +588,14 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.10"
-# Gradual typing adoption - start permissive, tighten over time
-strict = false
-warn_return_any = false
+# Type checking configuration - M3: Global strict mode enabled (2026-03-10)
+strict = true
+warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_any_generics = false
+disallow_untyped_defs = true
+disallow_any_generics = true
 ignore_missing_imports = true
-check_untyped_defs = false
+check_untyped_defs = true
 no_implicit_optional = true
 exclude = [
     "^archive/",
@@ -605,10 +605,14 @@ exclude = [
 ]
 files = ["victor"]
 
-# Strictly typed modules (these should pass strict checks)
-# M1 baseline (2026-03-10): 11 modules, expanded to 15+ for M2 (2026-03-10)
+# Strict modules milestone tracking (M1-M3)
+# M1 baseline (2026-03-10): 6 modules
+# M1 expansion (2026-03-10): +5 modules (total 11)
+# M2 expansion (2026-03-10): +4 modules (total 15)
+# M3 achievement (2026-03-10): Global strict enabled
 [[tool.mypy.overrides]]
 module = [
+    # These modules paved the way for global strict adoption
     # M1 baseline
     "victor.config.*",
     "victor.storage.cache.*",
@@ -622,17 +626,16 @@ module = [
     "victor.core.protocols",
     "victor.providers.base",
     "victor.framework.*",
-    # M2 expansion (2026-03-10) - 4 additional packages
+    # M2 expansion (2026-03-10)
     "victor.state.*",
     "victor.workflows.*",
     "victor.teams.*",
     "victor.integrations.api.*",
 ]
-disallow_untyped_defs = true
-warn_return_any = true
-strict = true
+# Note: These modules now inherit strict=true from global config
+# Keeping this override for documentation and milestone tracking
 
-# Modules with known issues - ignore for now
+# Modules with known issues - gradual remediation planned
 [[tool.mypy.overrides]]
 module = [
     "victor.providers.*",
