@@ -50,7 +50,7 @@ import importlib
 import logging
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
-from victor.core.verticals.import_resolver import vertical_module_candidates
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -454,7 +454,7 @@ class EscapeHatchRegistry:
         Raises:
             ImportError: If the escape_hatches module cannot be imported
         """
-        candidates = vertical_module_candidates(vertical_name, "escape_hatches")
+        candidates = vertical_runtime_module_candidates(vertical_name, "escape_hatches")
         module = None
         last_error: Optional[Exception] = None
         for module_path in candidates:

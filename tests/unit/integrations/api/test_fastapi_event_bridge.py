@@ -466,6 +466,7 @@ class TestEventBusAdapterAsyncPath:
                     raise RuntimeError("First subscription failed")
                 # Return mock handle for others
                 from unittest.mock import Mock
+
                 handle = Mock()
                 handle.unsubscribe = AsyncMock()
                 return handle

@@ -294,9 +294,9 @@ class VerticalRuntimeAdapter:
         if isinstance(tools, list):
             return [str(tool_name) for tool_name in tools]
         if hasattr(tools, "tools"):
-            return [str(tool_name) for tool_name in getattr(tools, "tools")]
+            return [str(tool_name) for tool_name in tools.tools]
         if hasattr(tools, "names"):
-            return [str(tool_name) for tool_name in getattr(tools, "names")]
+            return [str(tool_name) for tool_name in tools.names]
         return [str(tool_name) for tool_name in tools]
 
     @staticmethod

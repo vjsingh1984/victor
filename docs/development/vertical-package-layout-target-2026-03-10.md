@@ -115,6 +115,30 @@ Transition rules:
   assembly point.
 - Root `tool_dependencies.py` should delegate to `runtime.tool_dependencies`.
 
+## Mixed-Mode Runtime Resolution
+
+During migration, runtime loaders should treat package-root modules as temporary
+shims, not the source of truth.
+
+For runtime-owned module families such as `capabilities`, `handlers`, `teams`,
+`workflows`, `safety`, and `escape_hatches`, the shared resolver now uses this
+lookup order within each package namespace:
+
+1. `runtime.<module>`
+2. package-root `<module>` shim
+
+Applied across namespaces, the effective order is:
+
+1. `victor_<vertical>.runtime.<module>`
+2. `victor_<vertical>.<module>`
+3. `victor.<vertical>.runtime.<module>`
+4. `victor.<vertical>.<module>`
+5. `victor.verticals.contrib.<vertical>.runtime.<module>`
+6. `victor.verticals.contrib.<vertical>.<module>`
+
+Definition-layer modules such as `assistant.py` and `prompts.py` do not use the
+runtime-first lookup and should remain rooted at the package top level.
+
 ## Module Family Mapping
 
 | Current family | Target location | Rationale |

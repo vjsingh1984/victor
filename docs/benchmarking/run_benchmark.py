@@ -139,15 +139,15 @@ class APIClient:
         self.session = None
 
     def connect(self) -> bool:
-        """Establish connection to API."""
+        \"\"\"Establish connection to API.\"\"\"
         pass
 
     def get_resource(self, resource_id: str) -> Optional[Dict]:
-        """Fetch a resource by ID."""
+        \"\"\"Fetch a resource by ID.\"\"\"
         pass
 
     def create_resource(self, data: Dict) -> Optional[str]:
-        """Create a new resource."""
+        \"\"\"Create a new resource.\"\"\"
         pass
 ```
 
@@ -242,6 +242,516 @@ If any step fails, provide an error message and stop.""",
         "complexity": "Medium",
         "timeout_seconds": 180,
         "max_tokens": 3000,
+    },
+    "R3": {
+        "name": "Migration planning",
+        "category": "Multi-Step Reasoning",
+        "prompt": """Plan a migration from a monolithic Django application to a microservices architecture.
+
+Current system:
+- Django 3.2 monolith with 50+ models, 200+ views
+- PostgreSQL database with 30+ tables
+- Celery for async tasks
+- Redis for caching
+- Deployed on single EC2 instance
+
+Target architecture:
+- Microservices with domain-bounded contexts
+- Container orchestration (Kubernetes)
+- Event-driven communication between services
+- Independent databases per service
+
+Provide a comprehensive migration plan including:
+1. Service boundary identification (which models/views go where)
+2. Migration phases with dependencies
+3. Data migration strategy (shared DB → independent DBs)
+4. Risk assessment with mitigation strategies
+5. Rollback plan for each phase
+6. Timeline estimate with milestones
+7. Testing strategy during migration""",
+        "complexity": "Complex",
+        "timeout_seconds": 240,
+        "max_tokens": 5000,
+    },
+    "R4": {
+        "name": "Debug investigation",
+        "category": "Multi-Step Reasoning",
+        "prompt": """Investigate and diagnose the following bug:
+
+Symptom: Users report that search results are inconsistent—the same query
+returns different results on repeated executions, and sometimes returns
+stale data that was deleted hours ago.
+
+System context:
+- Python FastAPI application with Elasticsearch backend
+- Elasticsearch cluster: 3 nodes, 2 replicas per index
+- Application uses connection pooling with 10 connections
+- Search results are cached in Redis with 5-minute TTL
+- Recently deployed: index alias rotation for zero-downtime reindexing
+
+Logs show:
+- Occasional "ConnectionTimeout" errors from Elasticsearch
+- Redis cache hit rate dropped from 85% to 40% after last deploy
+- Some search requests take 50ms, others take 3000ms+
+
+Investigate and provide:
+1. Root cause analysis (identify the most likely cause)
+2. Evidence chain (which symptoms point to which cause)
+3. Additional diagnostics you would run to confirm
+4. Fix recommendation with code changes
+5. Prevention measures for the future""",
+        "complexity": "Medium",
+        "timeout_seconds": 180,
+        "max_tokens": 4000,
+    },
+    "T2": {
+        "name": "Git workflow",
+        "category": "Tool Usage",
+        "prompt": """Execute a complete Git workflow:
+
+1. Initialize a new git repository in a temporary directory
+2. Create an initial commit with a README.md file
+3. Create a feature branch named 'feature/add-config'
+4. On the feature branch, create a config.yaml file with database settings
+5. Commit the config file with an appropriate message
+6. Switch back to main branch
+7. Create a hotfix branch named 'hotfix/fix-typo'
+8. Make a small change to README.md on the hotfix branch
+9. Commit the hotfix
+10. Merge the hotfix into main
+11. Merge the feature branch into main (resolve any conflicts)
+12. Create a tagged release v1.0.0
+13. Show the final git log with graph
+
+Use git tools to complete all operations.""",
+        "complexity": "Medium",
+        "timeout_seconds": 120,
+        "max_tokens": 3000,
+    },
+    "T3": {
+        "name": "Web research",
+        "category": "Tool Usage",
+        "prompt": """Conduct web research on the current state of WebAssembly (Wasm) adoption:
+
+1. Search for recent articles on WebAssembly usage trends
+2. Find the top 5 languages that compile to WebAssembly
+3. Identify 3 major companies using WebAssembly in production
+4. Summarize the key advantages and limitations of WebAssembly
+5. Compare WebAssembly performance vs JavaScript for compute tasks
+6. List notable WebAssembly frameworks and toolchains
+
+Provide a structured research report with:
+- Executive summary (2-3 sentences)
+- Findings organized by topic
+- Sources cited for each claim
+- Conclusion with future outlook
+
+Use web search and scraping tools to gather information.""",
+        "complexity": "Medium",
+        "timeout_seconds": 120,
+        "max_tokens": 4000,
+    },
+    "T4": {
+        "name": "Database operations",
+        "category": "Tool Usage",
+        "prompt": """Perform database operations on a SQLite database:
+
+1. Create a new SQLite database named 'benchmark.db'
+2. Create tables:
+   - users (id, name, email, created_at)
+   - orders (id, user_id, amount, status, created_at)
+   - products (id, name, price, stock)
+   - order_items (id, order_id, product_id, quantity)
+3. Insert sample data:
+   - 10 users
+   - 20 orders across various users
+   - 15 products
+   - 30 order items
+4. Execute queries:
+   - Find top 5 users by total order amount
+   - Find products with low stock (< 5 units)
+   - Calculate average order value per user
+   - Find orders with status 'pending' older than 7 days
+5. Create an index on orders(user_id) and explain query plan
+6. Export results to a JSON summary file
+
+Use database tools to complete all operations.""",
+        "complexity": "Medium",
+        "timeout_seconds": 120,
+        "max_tokens": 3000,
+    },
+    "T5": {
+        "name": "Command execution",
+        "category": "Tool Usage",
+        "prompt": """Execute and validate a series of shell commands:
+
+1. Check system information (OS, Python version, available memory)
+2. Create a temporary working directory
+3. Download a small text file from the internet (or create a sample)
+4. Count lines, words, and characters in the file
+5. Sort the file contents and save to a new file
+6. Calculate an MD5 checksum of both files
+7. Compare the two files and report differences
+8. Clean up temporary files
+
+For each command:
+- Show the command being executed
+- Validate the output is correct
+- Handle any errors gracefully
+
+Use shell/command execution tools.""",
+        "complexity": "Simple",
+        "timeout_seconds": 90,
+        "max_tokens": 2000,
+    },
+    "A1": {
+        "name": "Security audit",
+        "category": "Analysis",
+        "prompt": """Perform a security audit on the following Python web application code:
+
+```python
+import sqlite3
+from flask import Flask, request, session, redirect
+
+app = Flask(__name__)
+app.secret_key = "mysecretkey123"
+
+def get_db():
+    db = sqlite3.connect("app.db")
+    return db
+
+@app.route("/login", methods=["POST"])
+def login():
+    username = request.form["username"]
+    password = request.form["password"]
+    db = get_db()
+    query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
+    user = db.execute(query).fetchone()
+    if user:
+        session["user_id"] = user[0]
+        session["role"] = user[3]
+        return redirect("/dashboard")
+    return "Invalid credentials", 401
+
+@app.route("/admin")
+def admin():
+    if session.get("role") == "admin":
+        return "Admin panel"
+    return "Forbidden", 403
+
+@app.route("/api/users/<user_id>")
+def get_user(user_id):
+    db = get_db()
+    user = db.execute(f"SELECT * FROM users WHERE id={user_id}").fetchone()
+    return {"id": user[0], "name": user[1], "email": user[2], "role": user[3]}
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    file = request.files["file"]
+    file.save(f"/uploads/{file.filename}")
+    return "Uploaded", 200
+```
+
+Provide:
+1. List of vulnerabilities found (with severity: Critical/High/Medium/Low)
+2. OWASP Top 10 classification for each vulnerability
+3. Exploit scenario for each critical/high vulnerability
+4. Fixed code for each vulnerability
+5. Additional security recommendations""",
+        "complexity": "Complex",
+        "timeout_seconds": 240,
+        "max_tokens": 5000,
+    },
+    "A2": {
+        "name": "Performance analysis",
+        "category": "Analysis",
+        "prompt": """Analyze the performance of the following Python code and identify bottlenecks:
+
+```python
+import json
+import re
+
+def process_log_file(filepath):
+    results = []
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+
+    for line in lines:
+        parsed = json.loads(line)
+        if parsed.get('level') == 'ERROR':
+            # Extract error details
+            message = parsed['message']
+            timestamp = parsed['timestamp']
+            # Find all IP addresses in the message
+            ips = re.findall(r'\\d+\\.\\d+\\.\\d+\\.\\d+', message)
+            # Look up each IP in the full log
+            for ip in ips:
+                count = 0
+                for other_line in lines:
+                    if ip in other_line:
+                        count += 1
+                results.append({
+                    'timestamp': timestamp,
+                    'message': message,
+                    'ip': ip,
+                    'occurrences': count
+                })
+
+    # Remove duplicates
+    unique_results = []
+    for r in results:
+        is_dup = False
+        for u in unique_results:
+            if r['ip'] == u['ip'] and r['timestamp'] == u['timestamp']:
+                is_dup = True
+                break
+        if not is_dup:
+            unique_results.append(r)
+
+    # Sort by occurrences
+    for i in range(len(unique_results)):
+        for j in range(i + 1, len(unique_results)):
+            if unique_results[j]['occurrences'] > unique_results[i]['occurrences']:
+                unique_results[i], unique_results[j] = unique_results[j], unique_results[i]
+
+    return unique_results
+
+```
+
+Provide:
+1. Time complexity analysis for each section
+2. Identification of specific bottlenecks (with Big-O notation)
+3. Memory usage analysis
+4. Optimized version of the code
+5. Expected performance improvement estimates
+6. Profiling recommendations for validation""",
+        "complexity": "Complex",
+        "timeout_seconds": 240,
+        "max_tokens": 4000,
+    },
+    "A3": {
+        "name": "Dependency analysis",
+        "category": "Analysis",
+        "prompt": """Analyze the following Python project's dependency configuration:
+
+```toml
+[project]
+name = "myapp"
+requires-python = ">=3.8"
+dependencies = [
+    "flask==2.0.1",
+    "requests>=2.25.0,<3.0",
+    "sqlalchemy==1.4.23",
+    "celery[redis]>=5.0,<6.0",
+    "pydantic>=1.8,<2.0",
+    "boto3",
+    "numpy==1.21.0",
+    "pandas>=1.3",
+    "cryptography>=3.0",
+    "PyJWT==2.1.0",
+    "pillow>=8.0",
+    "redis>=3.5",
+    "psycopg2-binary>=2.9",
+    "gunicorn>=20.1",
+    "python-dateutil",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black",
+    "mypy",
+    "coverage",
+]
+```
+
+Provide:
+1. Dependency graph showing direct and transitive relationships
+2. Version constraint analysis (too strict, too loose, unpinned)
+3. Known security vulnerabilities in specified versions
+4. Compatibility issues (Python version, inter-dependency conflicts)
+5. Recommendations for version updates
+6. Risk assessment for each unpinned dependency""",
+        "complexity": "Medium",
+        "timeout_seconds": 180,
+        "max_tokens": 4000,
+    },
+    "A4": {
+        "name": "Test coverage analysis",
+        "category": "Analysis",
+        "prompt": """Analyze the test coverage for the following Python module and its test file:
+
+Module (src/calculator.py):
+```python
+class Calculator:
+    def __init__(self, precision=2):
+        self.precision = precision
+        self.history = []
+
+    def add(self, a, b):
+        result = round(a + b, self.precision)
+        self.history.append(('add', a, b, result))
+        return result
+
+    def subtract(self, a, b):
+        result = round(a - b, self.precision)
+        self.history.append(('subtract', a, b, result))
+        return result
+
+    def multiply(self, a, b):
+        result = round(a * b, self.precision)
+        self.history.append(('multiply', a, b, result))
+        return result
+
+    def divide(self, a, b):
+        if b == 0:
+            raise ValueError("Cannot divide by zero")
+        result = round(a / b, self.precision)
+        self.history.append(('divide', a, b, result))
+        return result
+
+    def get_history(self):
+        return self.history.copy()
+
+    def clear_history(self):
+        self.history.clear()
+
+    def undo(self):
+        if not self.history:
+            raise IndexError("No operations to undo")
+        return self.history.pop()
+```
+
+Tests (tests/test_calculator.py):
+```python
+from src.calculator import Calculator
+
+def test_add():
+    calc = Calculator()
+    assert calc.add(2, 3) == 5
+
+def test_subtract():
+    calc = Calculator()
+    assert calc.subtract(5, 3) == 2
+
+def test_multiply():
+    calc = Calculator()
+    assert calc.multiply(3, 4) == 12
+```
+
+Provide:
+1. Current coverage percentage (line and branch)
+2. Uncovered lines and branches identified
+3. Missing test cases categorized by priority
+4. Edge cases that should be tested
+5. Test quality assessment (assertions, isolation, naming)
+6. Recommended test additions with example code""",
+        "complexity": "Medium",
+        "timeout_seconds": 180,
+        "max_tokens": 4000,
+    },
+    "W2": {
+        "name": "Parallel execution",
+        "category": "Workflow & Coordination",
+        "prompt": """Execute a parallel data processing workflow:
+
+You have 4 independent data sources that need to be processed simultaneously:
+
+Source 1: User activity logs (parse and count events per user)
+Source 2: Transaction records (calculate daily totals)
+Source 3: Error logs (categorize and count by severity)
+Source 4: Performance metrics (compute p50, p95, p99 latencies)
+
+Workflow:
+1. Launch all 4 processing tasks in parallel
+2. Each task should:
+   - Load its data source
+   - Process according to its specific logic
+   - Return a structured result
+3. Wait for all tasks to complete (with 60-second timeout per task)
+4. Aggregate results into a unified dashboard summary
+5. If any task fails, include partial results and error details
+6. Generate a final report combining all source analyses
+
+Requirements:
+- Tasks must execute concurrently (not sequentially)
+- Individual task failures should not block other tasks
+- Results should include timing information per task
+- Final aggregation must handle missing data gracefully""",
+        "complexity": "Complex",
+        "timeout_seconds": 240,
+        "max_tokens": 4000,
+    },
+    "W3": {
+        "name": "Human-in-the-loop",
+        "category": "Workflow & Coordination",
+        "prompt": """Execute a workflow that requires human approval at key decision points:
+
+Scenario: Automated code deployment pipeline
+
+Step 1: Analyze the proposed changes (automated)
+- List files modified
+- Categorize changes (feature, bugfix, refactor)
+- Run static analysis checks
+
+Step 2: **HUMAN APPROVAL REQUIRED**
+- Present change summary to human reviewer
+- Wait for approval/rejection/modification request
+- If rejected, stop workflow with reason
+
+Step 3: Run test suite (automated)
+- Execute unit tests
+- Execute integration tests
+- Report results
+
+Step 4: **HUMAN APPROVAL REQUIRED**
+- Present test results
+- If any tests failed, request human decision (deploy anyway / fix / abort)
+- Wait for human input
+
+Step 5: Deploy (automated, only if approved)
+- Execute deployment steps
+- Verify deployment health
+- Report final status
+
+Requirements:
+- Workflow must pause and wait at human approval points
+- Human responses must be validated
+- Timeout after 5 minutes of no human response
+- All decisions must be logged for audit trail""",
+        "complexity": "Complex",
+        "timeout_seconds": 300,
+        "max_tokens": 4000,
+    },
+    "W4": {
+        "name": "Error recovery",
+        "category": "Workflow & Coordination",
+        "prompt": """Execute a workflow with robust error recovery:
+
+Scenario: Multi-step data pipeline that must handle failures gracefully.
+
+Pipeline steps:
+1. Fetch data from external API (may timeout or return errors)
+2. Validate and parse response (may have schema violations)
+3. Transform data (may encounter unexpected formats)
+4. Load into database (may fail on constraints or connectivity)
+5. Send notification (may fail on service unavailability)
+
+Error recovery requirements:
+- Step 1: Retry up to 3 times with exponential backoff (1s, 2s, 4s)
+- Step 2: Use fallback parser if primary fails; skip malformed records
+- Step 3: Log transformation errors, continue with valid records
+- Step 4: Batch insert with per-record error isolation; retry failed batch once
+- Step 5: Queue notification for retry if service unavailable
+
+Additional requirements:
+- Implement circuit breaker pattern (open after 5 consecutive failures)
+- Maintain a dead-letter queue for unrecoverable errors
+- Generate error summary report at pipeline completion
+- Ensure partial progress is preserved (checkpoint after each step)""",
+        "complexity": "Medium",
+        "timeout_seconds": 180,
+        "max_tokens": 4000,
     },
 }
 

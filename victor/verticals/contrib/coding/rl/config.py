@@ -26,7 +26,7 @@ from typing import Dict, List, Set
 
 from victor.framework.rl import LearnerType
 from victor.framework.rl.config import BaseRLConfig
-from victor.framework.tool_naming import ToolNames
+from victor_sdk import ToolNames
 
 
 @dataclass

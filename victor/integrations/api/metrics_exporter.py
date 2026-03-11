@@ -63,31 +63,43 @@ def export_prometheus_metrics() -> str:
     lines.append("")
     lines.append("# HELP victor_eventbridge_dispatch_latency_ms Dispatch latency in milliseconds")
     lines.append("# TYPE victor_eventbridge_dispatch_latency_ms gauge")
-    lines.append(f"victor_eventbridge_dispatch_latency_p95_ms {metrics['dispatch_latency_p95_ms']:.3f}")
+    lines.append(
+        f"victor_eventbridge_dispatch_latency_p95_ms {metrics['dispatch_latency_p95_ms']:.3f}"
+    )
 
     # SLO status indicators (1 = true, 0 = false)
     lines.append("")
-    lines.append("# HELP victor_eventbridge_slo_delivery_success_rate Delivery success rate SLO status")
+    lines.append(
+        "# HELP victor_eventbridge_slo_delivery_success_rate Delivery success rate SLO status"
+    )
     lines.append("# TYPE victor_eventbridge_slo_delivery_success_rate gauge")
-    slo_status = 1 if metrics['slo_status']['delivery_success_rate'] else 0
+    slo_status = 1 if metrics["slo_status"]["delivery_success_rate"] else 0
     lines.append(f"victor_eventbridge_slo_delivery_success_rate {slo_status}")
 
     lines.append("")
     lines.append("# HELP victor_eventbridge_slo_dispatch_latency Dispatch latency SLO status")
     lines.append("# TYPE victor_eventbridge_slo_dispatch_latency gauge")
-    slo_status = 1 if metrics['slo_status']['dispatch_latency_p95_ms'] else 0
+    slo_status = 1 if metrics["slo_status"]["dispatch_latency_p95_ms"] else 0
     lines.append(f"victor_eventbridge_slo_dispatch_latency {slo_status}")
 
     # SLO thresholds as constants
     lines.append("")
-    lines.append("# HELP victor_eventbridge_slo_threshold_delivery_success_rate Delivery success rate SLO threshold")
+    lines.append(
+        "# HELP victor_eventbridge_slo_threshold_delivery_success_rate Delivery success rate SLO threshold"
+    )
     lines.append("# TYPE victor_eventbridge_slo_threshold_delivery_success_rate gauge")
-    lines.append(f"victor_eventbridge_slo_threshold_delivery_success_rate {metrics['slo_thresholds']['delivery_success_rate_min']:.6f}")
+    lines.append(
+        f"victor_eventbridge_slo_threshold_delivery_success_rate {metrics['slo_thresholds']['delivery_success_rate_min']:.6f}"
+    )
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_slo_threshold_dispatch_latency_ms Dispatch latency SLO threshold in ms")
+    lines.append(
+        "# HELP victor_eventbridge_slo_threshold_dispatch_latency_ms Dispatch latency SLO threshold in ms"
+    )
     lines.append("# TYPE victor_eventbridge_slo_threshold_dispatch_latency_ms gauge")
-    lines.append(f"victor_eventbridge_slo_threshold_dispatch_latency_ms {metrics['slo_thresholds']['dispatch_latency_p95_ms_max']:.3f}")
+    lines.append(
+        f"victor_eventbridge_slo_threshold_dispatch_latency_ms {metrics['slo_thresholds']['dispatch_latency_p95_ms_max']:.3f}"
+    )
 
     return "\n".join(lines)
 
@@ -135,13 +147,19 @@ def print_metrics_table() -> None:
     print()
     print("SLO Thresholds:")
     print(f"  Delivery Rate:       {metrics['slo_thresholds']['delivery_success_rate_min']:.1%}")
-    print(f"  p95 Latency:         {metrics['slo_thresholds']['dispatch_latency_p95_ms_max']:.0f}ms")
+    print(
+        f"  p95 Latency:         {metrics['slo_thresholds']['dispatch_latency_p95_ms_max']:.0f}ms"
+    )
     print()
     print("SLO Status:")
-    delivery_icon = "✅" if metrics['slo_status']['delivery_success_rate'] else "❌"
-    latency_icon = "✅" if metrics['slo_status']['dispatch_latency_p95_ms'] else "❌"
-    print(f"  Delivery Success:    {delivery_icon} {'PASS' if metrics['slo_status']['delivery_success_rate'] else 'FAIL'}")
-    print(f"  p95 Latency:         {latency_icon} {'PASS' if metrics['slo_status']['dispatch_latency_p95_ms'] else 'FAIL'}")
+    delivery_icon = "✅" if metrics["slo_status"]["delivery_success_rate"] else "❌"
+    latency_icon = "✅" if metrics["slo_status"]["dispatch_latency_p95_ms"] else "❌"
+    print(
+        f"  Delivery Success:    {delivery_icon} {'PASS' if metrics['slo_status']['delivery_success_rate'] else 'FAIL'}"
+    )
+    print(
+        f"  p95 Latency:         {latency_icon} {'PASS' if metrics['slo_status']['dispatch_latency_p95_ms'] else 'FAIL'}"
+    )
     print()
     print("=" * 60)
     print()
@@ -159,7 +177,8 @@ if __name__ == "__main__":
         help="Output format",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=str,
         help="Output file (default: stdout)",
     )
@@ -172,6 +191,7 @@ if __name__ == "__main__":
         output = export_prometheus_metrics()
     elif args.format == "json":
         import json
+
         output = json.dumps(export_json_metrics(), indent=2)
 
     if args.format != "table":

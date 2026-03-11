@@ -71,8 +71,7 @@ class TestEventBridgeLossDetection:
 
         # Verify no events were lost
         assert len(received) == total_events, (
-            f"Event loss detected: expected {total_events}, "
-            f"received {len(received)}"
+            f"Event loss detected: expected {total_events}, " f"received {len(received)}"
         )
 
         # Verify event integrity
@@ -112,8 +111,7 @@ class TestEventBridgeLossDetection:
 
         # Should still receive all events (queued in broadcaster)
         assert len(received) == total_events, (
-            f"Event loss with slow consumer: expected {total_events}, "
-            f"received {len(received)}"
+            f"Event loss with slow consumer: expected {total_events}, " f"received {len(received)}"
         )
 
     @pytest.mark.asyncio
@@ -167,8 +165,7 @@ class TestEventBridgeLossDetection:
         # (this is expected behavior - no buffering for disconnected clients)
         # But events before and after should be delivered
         assert len(received) >= 20, (
-            f"Expected at least 20 events (before + after reconnect), "
-            f"got {len(received)}"
+            f"Expected at least 20 events (before + after reconnect), " f"got {len(received)}"
         )
 
     @pytest.mark.asyncio
@@ -186,6 +183,7 @@ class TestEventBridgeLossDetection:
                 if client_id not in client_data:
                     client_data[client_id] = []
                 client_data[client_id].append(json.loads(message))
+
             return send_func
 
         await bridge.async_start()
@@ -205,9 +203,13 @@ class TestEventBridgeLossDetection:
         # Wait for delivery
         max_wait = 10
         deadline = time.time() + max_wait
-        while any(len(client_data.get(cid, [])) < total_events
-                  for cid in [f"client-{i}" for i in range(num_clients)]) \
-                and time.time() < deadline:
+        while (
+            any(
+                len(client_data.get(cid, [])) < total_events
+                for cid in [f"client-{i}" for i in range(num_clients)]
+            )
+            and time.time() < deadline
+        ):
             await asyncio.sleep(0.05)
 
         await bridge.async_stop()
@@ -256,9 +258,9 @@ class TestEventBridgeOrdering:
 
         # Verify ordering
         received_indices = [msg["data"]["idx"] for msg in received]
-        assert received_indices == list(range(total_events)), (
-            f"Events arrived out of order: {received_indices[:10]}..."
-        )
+        assert received_indices == list(
+            range(total_events)
+        ), f"Events arrived out of order: {received_indices[:10]}..."
 
     @pytest.mark.asyncio
     async def test_event_ordering_with_concurrent_sources(self):
@@ -282,24 +284,18 @@ class TestEventBridgeOrdering:
 
         async def emit_from_source(source_id: int):
             for idx in range(events_per_source):
-                await bus.emit("tool.start", {
-                    "source": source_id,
-                    "idx": idx,
-                    "send_time": time.time()
-                })
+                await bus.emit(
+                    "tool.start", {"source": source_id, "idx": idx, "send_time": time.time()}
+                )
 
         # Run all sources concurrently
-        tasks = [
-            emit_from_source(i)
-            for i in range(num_sources)
-        ]
+        tasks = [emit_from_source(i) for i in range(num_sources)]
         await asyncio.gather(*tasks)
 
         # Wait for delivery
         max_wait = 10
         deadline = time.time() + max_wait
-        while len(received) < num_sources * events_per_source \
-                and time.time() < deadline:
+        while len(received) < num_sources * events_per_source and time.time() < deadline:
             await asyncio.sleep(0.05)
 
         await bridge.async_stop()
@@ -317,9 +313,9 @@ class TestEventBridgeOrdering:
 
         for source_id, events in by_source.items():
             indices = [e["data"]["idx"] for e in events]
-            assert indices == sorted(indices), (
-                f"Events for source {source_id} arrived out of order: {indices}"
-            )
+            assert indices == sorted(
+                indices
+            ), f"Events for source {source_id} arrived out of order: {indices}"
 
     @pytest.mark.asyncio
     async def test_event_ordering_with_varying_processing_times(self):
@@ -360,9 +356,9 @@ class TestEventBridgeOrdering:
 
         # Verify ordering based on send time
         received_indices = [msg["data"]["idx"] for msg in received]
-        assert received_indices == list(range(total_events)), (
-            "Events arrived out of order despite varying processing times"
-        )
+        assert received_indices == list(
+            range(total_events)
+        ), "Events arrived out of order despite varying processing times"
 
 
 class TestEventBridgeReliabilitySLOs:
@@ -408,9 +404,9 @@ class TestEventBridgeReliabilitySLOs:
         delivery_rate = dashboard["delivery_success_rate"]
 
         # Verify SLO compliance (99.9%)
-        assert delivery_rate >= 0.999, (
-            f"Delivery success rate {delivery_rate:.4f} below SLO of 99.9%"
-        )
+        assert (
+            delivery_rate >= 0.999
+        ), f"Delivery success rate {delivery_rate:.4f} below SLO of 99.9%"
 
     @pytest.mark.asyncio
     async def test_dispatch_latency_p95_slo(self):
@@ -439,7 +435,7 @@ class TestEventBridgeReliabilitySLOs:
             event = BridgeEvent(
                 type=BridgeEventType.TOOL_START,
                 data={"idx": idx},
-                timestamp=time.time() - 0.050  # 50ms ago
+                timestamp=time.time() - 0.050,  # 50ms ago
             )
             bridge._broadcaster.broadcast_sync(event)
 
@@ -453,9 +449,7 @@ class TestEventBridgeReliabilitySLOs:
         p95_latency = dashboard["dispatch_latency_p95_ms"]
 
         # Verify SLO compliance (p95 < 200ms)
-        assert p95_latency < 200.0, (
-            f"P95 dispatch latency {p95_latency:.2f}ms exceeds SLO of 200ms"
-        )
+        assert p95_latency < 200.0, f"P95 dispatch latency {p95_latency:.2f}ms exceeds SLO of 200ms"
 
     @pytest.mark.asyncio
     async def test_zero_skipped_subscriptions(self):
@@ -506,11 +500,9 @@ class TestEventBridgeReliabilityUnderLoad:
 
         for batch in range(num_batches):
             for idx in range(batch_size):
-                await bus.emit("tool.start", {
-                    "batch": batch,
-                    "idx": idx,
-                    "global_idx": total_events
-                })
+                await bus.emit(
+                    "tool.start", {"batch": batch, "idx": idx, "global_idx": total_events}
+                )
                 total_events += 1
             # Small pause between batches
             await asyncio.sleep(0.05)
@@ -554,9 +546,7 @@ class TestEventBridgeReliabilityUnderLoad:
         total_events = 500
         for idx in range(total_events):
             event = BridgeEvent(
-                type=BridgeEventType.TOOL_START,
-                data={"idx": idx},
-                timestamp=time.time()
+                type=BridgeEventType.TOOL_START, data={"idx": idx}, timestamp=time.time()
             )
             bridge._broadcaster.broadcast_sync(event)
 
@@ -567,10 +557,12 @@ class TestEventBridgeReliabilityUnderLoad:
         # Check SLO compliance
         dashboard = bridge.get_reliability_dashboard_data()
 
-        assert dashboard["delivery_success_rate"] >= 0.999, \
-            f"Delivery rate {dashboard['delivery_success_rate']} below SLO"
-        assert dashboard["dispatch_latency_p95_ms"] < 200.0, \
-            f"P95 latency {dashboard['dispatch_latency_p95_ms']}ms exceeds SLO"
+        assert (
+            dashboard["delivery_success_rate"] >= 0.999
+        ), f"Delivery rate {dashboard['delivery_success_rate']} below SLO"
+        assert (
+            dashboard["dispatch_latency_p95_ms"] < 200.0
+        ), f"P95 latency {dashboard['dispatch_latency_p95_ms']}ms exceeds SLO"
 
 
 if __name__ == "__main__":

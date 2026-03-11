@@ -6,6 +6,10 @@ vertical extraction migration:
 1. External package namespace (preferred): ``victor_<vertical>``
 2. Legacy in-package namespace: ``victor.<vertical>``
 3. Contrib fallback namespace: ``victor.verticals.contrib.<vertical>``
+
+It also supports the temporary mixed-mode package layout used during
+definition/runtime extraction, where runtime-owned modules may move under a
+``runtime/`` subpackage before the package root shims are removed.
 """
 
 from __future__ import annotations
@@ -20,6 +24,25 @@ logger = logging.getLogger(__name__)
 _PACKAGE_OVERRIDES = {
     "dataanalysis": "victor_dataanalysis",
 }
+
+_RUNTIME_MODULE_PREFIXES = frozenset(
+    {
+        "capabilities",
+        "conversation_enhanced",
+        "enrichment",
+        "escape_hatches",
+        "handlers",
+        "middleware",
+        "mode_config",
+        "rl",
+        "safety",
+        "safety_enhanced",
+        "service_provider",
+        "teams",
+        "tool_dependencies",
+        "workflows",
+    }
+)
 
 
 def normalize_vertical_name(vertical_name: str) -> str:
@@ -68,17 +91,65 @@ def _external_package_candidates(vertical_name: str) -> List[str]:
     return _dedupe(candidates)
 
 
+def _package_namespace_candidates(vertical_name: str) -> List[str]:
+    """Return ordered package namespaces for a vertical."""
+    normalized = normalize_vertical_name(vertical_name)
+    return _dedupe(
+        _external_package_candidates(normalized)
+        + [
+            f"victor.{normalized}",
+            f"victor.verticals.contrib.{normalized}",
+        ]
+    )
+
+
+def _is_runtime_owned_suffix(module_suffix: str) -> bool:
+    """Return True when a module suffix belongs to the runtime layer."""
+    suffix = module_suffix.strip(".")
+    if not suffix:
+        return False
+    if suffix.startswith("runtime."):
+        suffix = suffix[len("runtime.") :]
+    head = suffix.split(".", 1)[0]
+    return head in _RUNTIME_MODULE_PREFIXES
+
+
 def vertical_module_candidates(vertical_name: str, module_suffix: str) -> List[str]:
     """Build ordered import candidates for a vertical module suffix."""
-    normalized = normalize_vertical_name(vertical_name)
     suffix = module_suffix.strip(".")
     candidates: List[str] = []
 
-    for package in _external_package_candidates(normalized):
+    for package in _external_package_candidates(vertical_name):
         candidates.append(_join_module_path(package, suffix))
 
+    normalized = normalize_vertical_name(vertical_name)
     candidates.append(_join_module_path(f"victor.{normalized}", suffix))
     candidates.append(_join_module_path(f"victor.verticals.contrib.{normalized}", suffix))
+    return _dedupe(candidates)
+
+
+def vertical_runtime_module_candidates(vertical_name: str, module_suffix: str) -> List[str]:
+    """Build mixed-mode import candidates for runtime-owned vertical modules.
+
+    Runtime modules are resolved with this order per namespace:
+    1. ``runtime.<suffix>`` in the preferred package
+    2. package-root ``<suffix>`` shim in the same package
+
+    Definition-layer modules such as ``prompts`` continue to use the
+    root-only resolution order from :func:`vertical_module_candidates`.
+    """
+    suffix = module_suffix.strip(".")
+    if not _is_runtime_owned_suffix(suffix):
+        return vertical_module_candidates(vertical_name, suffix)
+
+    runtime_suffix = suffix
+    if not runtime_suffix.startswith("runtime."):
+        runtime_suffix = f"runtime.{runtime_suffix}"
+
+    candidates: List[str] = []
+    for package in _package_namespace_candidates(vertical_name):
+        candidates.append(_join_module_path(package, runtime_suffix))
+        candidates.append(_join_module_path(package, suffix))
     return _dedupe(candidates)
 
 

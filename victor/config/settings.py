@@ -463,9 +463,7 @@ class ProviderSettings(_BaseModel):
     moonshot_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
-    lmstudio_base_urls: List[str] = Field(
-        default_factory=lambda: ["http://127.0.0.1:1234"]
-    )
+    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
     vllm_base_url: str = "http://localhost:8000"
     lmstudio_max_vram_gb: Optional[float] = 48.0
 
@@ -526,9 +524,7 @@ class ProviderSettings(_BaseModel):
 class ToolSettings(_BaseModel):
     """Tool execution, selection, and retry configuration."""
 
-    tool_call_budget: int = Field(
-        default_factory=lambda: BUDGET_LIMITS.max_session_budget
-    )
+    tool_call_budget: int = Field(default_factory=lambda: BUDGET_LIMITS.max_session_budget)
     tool_call_budget_warning_threshold: int = Field(
         default_factory=lambda: int(
             BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
@@ -789,27 +785,13 @@ class Settings(BaseSettings):
 
     # NOTE: For backward compatibility, these fields accept None during construction
     # and are populated by the _sync_nested_groups validator from flat fields.
-    provider: Optional[ProviderSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    tools: Optional[ToolSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    search: Optional[SearchSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    resilience: Optional[ResilienceSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    security: Optional[SecuritySettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    events: Optional[EventSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    pipeline: Optional[PipelineSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    provider: Optional[ProviderSettings] = Field(default=None, exclude=True, repr=False)
+    tools: Optional[ToolSettings] = Field(default=None, exclude=True, repr=False)
+    search: Optional[SearchSettings] = Field(default=None, exclude=True, repr=False)
+    resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
+    security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
+    events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
+    pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"

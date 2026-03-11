@@ -8,7 +8,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from victor.framework.capability_runtime import check_capability
 from victor_sdk.constants import CapabilityIds
-from victor_sdk.core.types import CapabilityRequirement, CapabilityRequirementLike, normalize_capability_requirements
+from victor_sdk.core.types import (
+    CapabilityRequirement,
+    CapabilityRequirementLike,
+    normalize_capability_requirements,
+)
 
 
 def _load_object(import_path: str) -> Any:

@@ -74,7 +74,9 @@ def test_build_runtime_binding_from_definition():
     assert binding.runtime_config.metadata["vertical_version"] == "2.0.0"
     assert binding.runtime_config.metadata["definition_version"] == "1.0"
     assert binding.runtime_config.metadata["tool_requirements"][0]["tool_name"] == "read"
-    assert binding.runtime_config.metadata["capability_requirements"][0]["capability_id"] == "file_ops"
+    assert (
+        binding.runtime_config.metadata["capability_requirements"][0]["capability_id"] == "file_ops"
+    )
 
 
 def test_resolve_definition_falls_back_to_legacy_config():

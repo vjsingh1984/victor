@@ -244,7 +244,7 @@ class SystemPromptBuilder:
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
-        if provider_name and hasattr(provider_name, 'default_provider'):
+        if provider_name and hasattr(provider_name, "default_provider"):
             # provider_name is a ProviderSettings object
             actual_provider_name = provider_name.default_provider
         else:

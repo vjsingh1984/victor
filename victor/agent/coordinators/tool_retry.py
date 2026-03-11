@@ -225,9 +225,7 @@ class ToolRetryExecutor:
                     )
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(
-                        f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}"
-                    )
+                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
                     return None, False, last_error
 
         # Should not reach here, but handle it anyway

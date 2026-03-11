@@ -65,12 +65,24 @@ try:
 except ImportError:
     # victor-sdk not installed - provide stubs for graceful degradation
     ProtocolRegistry = None
-    get_global_registry = None
-    reset_global_registry = None
-    discover_verticals = lambda: {}
-    discover_protocols = lambda *args, **kwargs: {}
-    get_discovery_summary = lambda: "victor-sdk not installed"
-    reload_discovery = lambda: DiscoveryStats()
+
+    def get_global_registry(*args, **kwargs):
+        return None
+
+    def reset_global_registry(*args, **kwargs):
+        return None
+
+    def discover_verticals(*args, **kwargs):
+        return {}
+
+    def discover_protocols(*args, **kwargs):
+        return {}
+
+    def get_discovery_summary(*args, **kwargs):
+        return "victor-sdk not installed"
+
+    def reload_discovery(*args, **kwargs):
+        return DiscoveryStats()
 
     class DiscoveryStats:
         total_protocols: int = 0

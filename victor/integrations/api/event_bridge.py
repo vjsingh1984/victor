@@ -483,7 +483,7 @@ class EventBusAdapter:
         """
         # Check if we're in an async context
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, schedule the connection
             self._run_async_operation(
                 self.connect_async(event_bus),
@@ -555,7 +555,7 @@ class EventBusAdapter:
         """
         # Check if we're in an async context
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, schedule the disconnection
             self._run_async_operation(
                 self.disconnect_async(),
@@ -787,7 +787,7 @@ class EventBridge:
 
         # Check if we're in an async context
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, schedule the start
             self._run_async_operation(
                 self._start_and_set_flag(),
@@ -846,7 +846,7 @@ class EventBridge:
 
         # Check if we're in an async context
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, schedule the stop
             self._run_async_operation(
                 self._stop_and_cleanup(),

@@ -216,8 +216,15 @@ class TestNestedModelsExcludedFromDump:
     def test_nested_groups_not_in_dump(self):
         s = Settings()
         dump = s.model_dump()
-        for group_name in ("provider", "tools", "search", "resilience",
-                           "security", "events", "pipeline"):
+        for group_name in (
+            "provider",
+            "tools",
+            "search",
+            "resilience",
+            "security",
+            "events",
+            "pipeline",
+        ):
             assert group_name not in dump, f"{group_name} should be excluded from dump"
 
     def test_flat_fields_in_dump(self):

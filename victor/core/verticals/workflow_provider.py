@@ -27,7 +27,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
-from victor.core.verticals.import_resolver import vertical_module_candidates
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class VerticalWorkflowProvider(ABC):
         if not hasattr(cls, "name"):
             return {}
 
-        for module_path in vertical_module_candidates(str(cls.name), "handlers"):
+        for module_path in vertical_runtime_module_candidates(str(cls.name), "handlers"):
             try:
                 module = __import__(module_path, fromlist=["HANDLERS"])
                 return getattr(module, "HANDLERS", {})
@@ -116,7 +116,7 @@ class VerticalWorkflowProvider(ABC):
         # Try multiple import patterns
         patterns: List[str] = []
         for module_suffix in ("workflows", "workflows.provider"):
-            patterns.extend(vertical_module_candidates(str(cls.name), module_suffix))
+            patterns.extend(vertical_runtime_module_candidates(str(cls.name), module_suffix))
 
         for module_path in patterns:
             try:

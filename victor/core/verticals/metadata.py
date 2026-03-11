@@ -30,7 +30,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
 from victor.core.vertical_types import TieredToolTemplate
-from victor.core.verticals.import_resolver import vertical_module_candidates
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 if TYPE_CHECKING:
     from victor.core.vertical_types import TieredToolConfig
@@ -128,7 +128,7 @@ class VerticalMetadataProvider(ABC):
             return {}
 
         last_error: Optional[Exception] = None
-        for module_path in vertical_module_candidates(vertical_name, "capabilities"):
+        for module_path in vertical_runtime_module_candidates(vertical_name, "capabilities"):
             try:
                 module = importlib.import_module(module_path)
             except ImportError as exc:

@@ -627,8 +627,8 @@ Feature summary:
 
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
-| VPC-F3.1 | Shared migration scaffolding | In Progress | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
-| VPC-F3.2 | Coding vertical migration | Not Started | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
+| VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
+| VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
 | VPC-F3.3 | RAG vertical migration | Not Started | VPC-F3.1 | `rag` definition layer follows SDK-only pattern |
 | VPC-F3.4 | DevOps vertical migration | Not Started | VPC-F3.1 | `devops` definition layer follows SDK-only pattern |
 | VPC-F3.5 | Data Analysis vertical migration | Not Started | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
@@ -660,7 +660,7 @@ Tasks:
 - [x] VPC-T3.1 Classify existing vertical modules into definition-layer, runtime-layer, and shim candidates.
 - [x] VPC-T3.2 Define the target package layout for migrated verticals.
 - [x] VPC-T3.3 Extract common runtime-only helpers out of definition modules.
-- [ ] VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
+- [x] VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
 
 #### VPC-F3.2: Coding Vertical Migration
 
@@ -684,9 +684,9 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.5 Inventory and classify `coding` imports by definition/runtime/shim layer.
-- [ ] VPC-T3.6 Replace `victor.tools.tool_names` usage with SDK identifiers in `coding`.
-- [ ] VPC-T3.7 Replace direct framework capability imports with SDK-declared capability requirements in `coding`.
+- [x] VPC-T3.5 Inventory and classify `coding` imports by definition/runtime/shim layer.
+- [x] VPC-T3.6 Replace `victor.tools.tool_names` usage with SDK identifiers in `coding`.
+- [x] VPC-T3.7 Replace direct framework capability imports with SDK-declared capability requirements in `coding`.
 - [ ] VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
 - [ ] VPC-T3.9 Add coding vertical migration tests and parity checks.
 
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.4 Create temporary mixed-mode adapter patterns for verticals not yet fully migrated.
-2. VPC-T3.5 Inventory and classify `coding` imports by definition/runtime/shim layer.
+1. VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
+2. VPC-T3.9 Add coding vertical migration tests and parity checks.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1555,6 +1555,105 @@ Likely touchpoints:
   - `32 passed in 7.10s`
 - Next recommended implementation layer:
   - VPC-T3.4 create temporary mixed-mode adapter patterns for verticals not yet fully migrated
+
+### 2026-03-10 (Session S)
+
+- Completed `VPC-T3.4` and closed `VPC-F3.1`.
+- Added a shared mixed-mode runtime resolution pattern in
+  `victor.core.verticals.import_resolver`:
+  - runtime-owned module families now resolve `runtime.<module>` before the
+    package-root shim within each package namespace
+  - definition-layer modules such as `prompts` still use root-only resolution
+- Routed shared runtime consumers through the mixed-mode resolver:
+  - `victor.core.verticals.metadata` for capability-config loading
+  - `victor.core.verticals.extension_loader` for safety/mode/rl/teams/capability
+    extension discovery
+  - `victor.core.verticals.workflow_provider` for handlers and workflows
+  - `victor.framework.escape_hatch_registry` for escape-hatch discovery
+- Documented the temporary adapter order in
+  `docs/development/vertical-package-layout-target-2026-03-10.md`.
+- Added regression coverage for:
+  - runtime-first candidate ordering in `test_import_resolver.py`
+  - runtime handlers/workflows in `test_workflow_provider_resolution.py`
+  - runtime capabilities/safety/escape-hatch discovery in
+    `test_mixed_mode_runtime_resolution.py`
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_import_resolver.py tests/unit/core/verticals/test_workflow_provider_resolution.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/unit/framework/test_escape_hatch_registry.py`
+  - `57 passed, 1 skipped in 4.15s`
+- Next recommended implementation layer:
+  - VPC-T3.5 inventory and classify `coding` imports by definition/runtime/shim layer
+
+### 2026-03-10 (Session T)
+
+- Completed `VPC-T3.5` and started `VPC-F3.2`.
+- Added a dedicated `coding` migration inventory in
+  `docs/development/coding-vertical-import-layer-inventory-2026-03-10.md`.
+- Recorded the current `coding` boundary state:
+  - 21 Python files still import `victor.framework`, `victor.core`, or
+    `victor.tools` (down from the original 22-file baseline)
+  - 1 Python file currently imports `victor_sdk` (`assistant.py`)
+  - both definition targets (`assistant.py`, `prompts.py`) still have runtime/core
+    import blockers
+  - both shim candidates (`__init__.py`, `tool_dependencies.py`) still depend on
+    runtime/core surfaces
+- Grouped the runtime-heavy modules into migration buckets for `VPC-T3.6`
+  through `VPC-T3.8`:
+  - capability/middleware/safety/DI runtime
+  - workflow/team/RL runtime
+  - enrichment/tool-composition/code-intelligence helpers
+- Verification:
+  - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/coding -g '*.py' | sort`
+  - `rg -l "victor_sdk" victor/verticals/contrib/coding -g '*.py' | sort`
+- Next recommended implementation layer:
+  - VPC-T3.6 replace remaining framework-owned `ToolNames` usage in `coding`
+
+### 2026-03-10 (Session U)
+
+- Completed `VPC-T3.6`.
+- Removed the remaining framework-owned tool-name import from
+  `victor/verticals/contrib/coding/rl/config.py` by switching it to
+  `victor_sdk.ToolNames`.
+- Added regression coverage in
+  `tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py`.
+- Updated the `coding` import inventory document to reflect the new state:
+  - 21 Python files still import `victor.framework`, `victor.core`, or
+    `victor.tools`
+  - 2 Python files now import `victor_sdk`
+  - no remaining `victor.framework.tool_naming` or
+    `victor.tools.tool_names` imports remain under `coding`
+- Verification:
+  - `rg -n "victor\\.framework\\.tool_naming|victor\\.tools\\.tool_names" victor/verticals/contrib/coding -g '*.py' -S`
+  - no matches
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py tests/unit/core/verticals/test_import_resolver.py tests/unit/core/verticals/test_workflow_provider_resolution.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/unit/framework/test_escape_hatch_registry.py tests/unit/tools/test_tool_names_sdk_compat.py`
+  - `60 passed, 1 skipped in 7.72s`
+- Next recommended implementation layer:
+  - VPC-T3.7 replace direct framework capability imports with SDK-declared capability requirements in `coding`
+
+### 2026-03-10 (Session V)
+
+- Completed `VPC-T3.7`.
+- Added SDK-declared capability requirements to
+  `victor/verticals/contrib/coding/assistant.py`:
+  - required `file_ops`
+  - optional `git`
+  - optional `lsp`
+- This makes the `coding` definition contract explicit about host/runtime needs
+  without changing current activation behavior, because the core `VerticalBase`
+  already inherits the SDK definition hooks.
+- Added regression coverage in
+  `tests/unit/core/verticals/test_coding_definition_capability_requirements.py`
+  to verify:
+  - `CodingAssistant.get_definition()` exposes the expected SDK capability IDs
+  - the host-owned `VerticalRuntimeAdapter` carries those requirements into
+    runtime metadata
+- Updated the `coding` import inventory document to record that capability
+  requirements are now explicit in the definition contract.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/test_vertical_runtime_adapter.py tests/integration/test_sdk_integration.py`
+  - `25 passed in 4.70s`
+- Next recommended implementation layer:
+  - VPC-T3.8 move runtime-specific middleware, workflows, and helpers out of
+    `coding` definition modules
 
 ## Resume Protocol
 

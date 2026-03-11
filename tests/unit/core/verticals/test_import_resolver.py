@@ -24,6 +24,7 @@ from victor.core.verticals.import_resolver import (
     module_import_candidates,
     normalize_vertical_name,
     vertical_module_candidates,
+    vertical_runtime_module_candidates,
 )
 
 
@@ -40,6 +41,28 @@ def test_vertical_module_candidates_handles_dataanalysis_alias() -> None:
     """Historical data-analysis spellings should map to victor_dataanalysis."""
     candidates = vertical_module_candidates("data-analysis", "capabilities")
     assert candidates[0] == "victor_dataanalysis.capabilities"
+
+
+def test_vertical_runtime_module_candidates_prefer_runtime_modules() -> None:
+    """Runtime-owned module families should prefer the runtime package layout."""
+    candidates = vertical_runtime_module_candidates("research", "capabilities")
+
+    assert candidates[:6] == [
+        "victor_research.runtime.capabilities",
+        "victor_research.capabilities",
+        "victor.research.runtime.capabilities",
+        "victor.research.capabilities",
+        "victor.verticals.contrib.research.runtime.capabilities",
+        "victor.verticals.contrib.research.capabilities",
+    ]
+
+
+def test_vertical_runtime_module_candidates_keep_definition_modules_rooted() -> None:
+    """Definition-layer modules should keep the root-only lookup order."""
+    assert vertical_runtime_module_candidates("research", "prompts") == vertical_module_candidates(
+        "research",
+        "prompts",
+    )
 
 
 def test_normalize_vertical_name_maps_data_analysis_aliases() -> None:

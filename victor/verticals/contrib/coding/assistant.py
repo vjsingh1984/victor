@@ -35,7 +35,7 @@ from victor.core.verticals.protocols import (
     MiddlewareProtocol,
     ServiceProviderProtocol,
 )
-from victor_sdk import ToolNames
+from victor_sdk import CapabilityIds, CapabilityRequirement, ToolNames
 
 
 class CodingAssistant(VerticalBase):
@@ -126,6 +126,30 @@ class CodingAssistant(VerticalBase):
         )
 
         return tools
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the coding definition layer.
+
+        Returns:
+            Structured SDK capability requirements used by the runtime adapter.
+        """
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Read, write, and edit repository files.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.GIT,
+                optional=True,
+                purpose="Inspect and update repository state when git tooling is available.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.LSP,
+                optional=True,
+                purpose="Enable symbol, reference, and language-intelligence workflows.",
+            ),
+        ]
 
     @classmethod
     def get_system_prompt(cls) -> str:

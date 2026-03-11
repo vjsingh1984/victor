@@ -91,7 +91,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
-from victor.core.verticals.import_resolver import vertical_module_candidates
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -291,7 +291,7 @@ class VerticalExtensionLoader(ABC):
         if not isinstance(vertical_name, str) or not vertical_name:
             return []
 
-        return vertical_module_candidates(vertical_name, module_suffix)
+        return vertical_runtime_module_candidates(vertical_name, module_suffix)
 
     @classmethod
     def _extension_module_available(cls, module_path: str) -> bool:

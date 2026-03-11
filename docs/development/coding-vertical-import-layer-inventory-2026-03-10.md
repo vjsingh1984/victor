@@ -1,0 +1,177 @@
+# Coding Vertical Import Layer Inventory (2026-03-10)
+
+Purpose: complete `VPC-T3.5` by recording the current import-boundary state of
+`victor/verticals/contrib/coding` so the next migration tasks can target
+concrete files and blockers instead of re-scanning the package each session.
+
+## Scope
+
+- Included: Python modules under `victor/verticals/contrib/coding`
+- Included: imports from `victor.framework`, `victor.core`, `victor.tools`, and
+  `victor_sdk`
+- Excluded: YAML/SVG assets and non-coding vertical packages
+
+## Method
+
+- Runtime-boundary scan:
+  - `rg -l "^(from|import) victor(\\.framework|\\.core|\\.tools)" victor/verticals/contrib/coding -g '*.py' | sort`
+- SDK-adoption scan:
+  - `rg -l "victor_sdk" victor/verticals/contrib/coding -g '*.py' | sort`
+- Focused blocker inspection:
+  - `assistant.py`
+  - `prompts.py`
+  - `__init__.py`
+  - `tool_dependencies.py`
+
+## Measured Status
+
+| Metric | Count | Notes |
+|---|---:|---|
+| Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 21 | Down from the `VPC-T3.1` baseline of 22 |
+| Python files with `victor_sdk` imports | 2 | `assistant.py` and `rl/config.py` currently import the SDK |
+| Definition-layer targets still importing runtime/core | 2 / 2 | `assistant.py`, `prompts.py` |
+| Shim candidates still importing runtime/core | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
+| Runtime-layer files with direct runtime/core/tool imports | 17 | See grouped inventory below |
+
+Key findings:
+
+- The `coding` package has started definition-layer convergence in
+  `assistant.py`, but the package is still overwhelmingly runtime-owned. The
+  next refactors should focus on removing the remaining runtime imports from the
+  two definition files and narrowing the two package-root shims.
+- Canonical tool identifiers are no longer sourced from
+  `victor.framework.tool_naming` or `victor.tools.tool_names` anywhere under
+  `coding`.
+- `CodingAssistant` now declares SDK capability requirements for `file_ops`,
+  `git`, and `lsp`, so capability needs are explicit in the definition contract
+  even though the assistant still inherits the runtime base class.
+
+## Definition-Layer Blockers
+
+| File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
+|---|---|---|---|---|
+| `assistant.py` | Definition | `victor.core.verticals.base`, `victor.core.verticals.protocols`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, `VerticalConfig`, and runtime protocol types even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters |
+| `prompts.py` | Definition | `victor.core.verticals.protocols` | Implements `PromptContributorProtocol` and `TaskTypeHint` runtime objects inside a definition module | Convert prompt/task-hint data to plain serializable SDK-facing metadata and let runtime prompt contributors be optional adapters |
+
+Definition-layer implication:
+
+- `assistant.py` is no longer blocked on tool identifiers. `VPC-T3.6` is now
+  mostly about the remaining runtime-owned tool-name usage elsewhere in the
+  package, while `assistant.py` itself is blocked more by `VerticalBase` and
+  runtime protocol inheritance than by tool constants.
+
+## Shim-Layer Blockers
+
+| File | Shim role | Current boundary imports | Why it stays a shim for now | Target end state |
+|---|---|---|---|---|
+| `__init__.py` | Package-root export shim | `victor.core.tool_dependency_loader` plus broad imports of runtime modules from the package root | Aggregates assistant, middleware, safety, prompts, service provider, capability providers, and tool dependencies in one import surface | Narrow re-export surface centered on `CodingAssistant` plus explicitly documented compatibility aliases |
+| `tool_dependencies.py` | Root compatibility shim | `victor.core.tool_dependency_loader` | Provides the current entry-point provider and YAML provider surface | Delegate to `runtime.tool_dependencies` while preserving the root import path until `VPC-E4` |
+
+## Runtime-Layer Inventory
+
+These modules are runtime-owned and should move under `runtime/` during
+`VPC-T3.8`. They are grouped by migration concern.
+
+### Capability, middleware, safety, and DI runtime
+
+| Files | Current runtime/core imports | Migration note |
+|---|---|---|
+| `capabilities.py` | `victor.framework.protocols`, `victor.framework.capability_loader`, `victor.framework.capability_config_helpers`, `victor.framework.capabilities` | Remains runtime-owned; `assistant.py` should request capabilities declaratively instead of importing implementations |
+| `middleware.py` | `victor.core.verticals.protocols`, `victor.framework.middleware` | Natural candidate for `runtime.middleware` once assistant-level middleware hooks are removed |
+| `mode_config.py` | `victor.core.mode_config` | Move to `runtime.mode_config` behind shared extension resolution |
+| `safety.py`, `safety_enhanced.py` | `victor.core.verticals.protocols`, `victor.framework.config`, `victor.framework.safety` | Keep runtime-only; root package should stop importing these eagerly |
+| `service_provider.py` | `victor.core.verticals.protocols` | Move behind `runtime.service_provider` and mixed-mode loader paths |
+
+### Workflow, team, and RL runtime
+
+| Files | Current runtime/core imports | Migration note |
+|---|---|---|
+| `workflows/provider.py` | `victor.framework.workflows` | Strong runtime-only module; move early because shared mixed-mode workflow resolution now exists |
+| `teams/__init__.py`, `teams/personas.py`, `teams/specs.py` | `victor.framework.team_schema`, `victor.framework.multi_agent`, `victor.framework.teams` | Move under `runtime.teams`; root package should stop re-exporting teams by default |
+| `rl/config.py`, `rl/hooks.py` | `victor.framework.rl`, `victor.framework.tool_naming` | Runtime-only; `rl/config.py` is the remaining `ToolNames` boundary hotspot for `VPC-T3.6` |
+
+### Enrichment, tool composition, and code intelligence helpers
+
+| Files | Current runtime/core imports | Migration note |
+|---|---|---|
+| `enrichment.py` | `victor.framework.enrichment` | Runtime enrichment strategy, not definition metadata |
+| `composed_chains.py` | `victor.tools.composition` | Runtime composition helper, should move with the service/runtime stack |
+| `codebase/indexer.py`, `codebase/unified_extractor.py` | `victor.core.utils.ast_helpers` | Runtime domain engine; relocation is mostly package-structure work |
+| `codebase/query_expander.py` | `victor.framework.search.query_expansion` | Runtime helper; keep out of the definition package entirely |
+
+## Low-Friction Runtime Moves
+
+The following subpackages are still runtime-owned, but they currently depend
+mostly on package-local modules and third-party libraries rather than on broad
+framework/core surfaces:
+
+- `completion/`
+- `coverage/`
+- `docgen/`
+- `editing/`
+- `languages/`
+- `lsp/`
+- `refactor/`
+- `review/`
+- `testgen/`
+- `codebase/graph/`
+- `codebase/embeddings/`
+
+These are good candidates for mechanical relocation under `runtime/` once the
+package-root import shims are in place, because most of the work is import-path
+plumbing rather than contract redesign.
+
+## Immediate Implications For Next Tasks
+
+### `VPC-T3.6` Replace tool-name runtime paths with SDK identifiers
+
+Status:
+
+- completed in the same migration tranche
+- `rl/config.py` now imports `ToolNames` from `victor_sdk`
+- no remaining `victor.framework.tool_naming` or `victor.tools.tool_names`
+  imports remain anywhere under `coding`
+
+### `VPC-T3.7` Replace direct framework capability coupling in the definition layer
+
+Status:
+
+- completed for capability requirement declaration
+- `assistant.py` now expresses core host/runtime needs through SDK capability
+  requirements:
+  - required: `file_ops`
+  - optional: `git`, `lsp`
+- direct framework capability implementations remain isolated to
+  `capabilities.py`, which is correctly classified as runtime-only
+
+Remaining definition-layer work that is still outside `VPC-T3.7`:
+
+- `assistant.py` still inherits the runtime base/protocol surface
+- `prompts.py` is still a runtime prompt-contributor module rather than pure
+  serializable metadata
+
+### `VPC-T3.8` Move runtime-specific behavior behind adapters or `runtime/`
+
+Recommended move order:
+
+1. `capabilities.py`, `middleware.py`, `mode_config.py`, `safety*.py`, `service_provider.py`
+2. `workflows/`, `teams/`, `rl/`
+3. `enrichment.py`, `composed_chains.py`
+4. deeper domain engines and helper subpackages
+
+Root-package transition rules:
+
+- keep `__init__.py` as a narrow compatibility shim
+- keep `tool_dependencies.py` at the root as a delegating shim
+- do not move `assistant.py` or `prompts.py` under `runtime/`
+
+## Conclusion
+
+`coding` is still the right first vertical to migrate, but the package is now
+well enough inventoried to proceed surgically:
+
+1. the definition-layer blockers are limited to `assistant.py` and `prompts.py`
+2. the package-root shim problem is limited to `__init__.py` and
+   `tool_dependencies.py`
+3. the runtime-heavy surface is well-bounded and already aligns with the
+   `runtime/` package layout introduced in `VPC-T3.2` and `VPC-T3.4`

@@ -3697,9 +3697,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             Tuple of (result, success, error_message or None)
         """
         if self._use_service_layer and self._tool_service:
-            return await self._tool_service.execute_tool_with_retry(
-                tool_name, tool_args, context
-            )
+            return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
 
         async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
             return await self.tools.execute(name, context=ctx, **args)

@@ -40,7 +40,8 @@ def test_enter_submits_prompt_without_unawaited_key_warnings() -> None:
         # Filter out ResourceWarnings and RuntimeWarnings from textual framework cleanup
         # These are expected during app teardown and background task cleanup
         relevant_warnings = [
-            w for w in caught
+            w
+            for w in caught
             if not issubclass(w.category, (ResourceWarning, RuntimeWarning))
             and "observability" not in str(w.message).lower()
             and "eventbus" not in str(w.message).lower()
@@ -49,7 +50,9 @@ def test_enter_submits_prompt_without_unawaited_key_warnings() -> None:
         critical_warnings = [w for w in relevant_warnings if "was never awaited" in str(w.message)]
         # Allow some leniency for framework cleanup warnings
         unawaited_from_app = [w for w in critical_warnings if "emit" in str(w.message).lower()]
-        assert len(unawaited_from_app) == 0, f"Found unexpected unawaited coroutines: {[str(w.message) for w in unawaited_from_app]}"
+        assert (
+            len(unawaited_from_app) == 0
+        ), f"Found unexpected unawaited coroutines: {[str(w.message) for w in unawaited_from_app]}"
 
     asyncio.run(_run())
 

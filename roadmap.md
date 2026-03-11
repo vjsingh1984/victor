@@ -184,7 +184,7 @@ Milestone targets:
 - CLI access: `python -m victor.integrations.api.metrics_exporter`
 
 ### E6: Competitive Benchmark Ground-Truth
-**Status**: M1 complete, M2 in progress
+**Status**: M1 complete, M2 code-complete (runtime execution remaining)
 **Owner**: Platform Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Benchmark rubric frozen (v1.0)
@@ -193,11 +193,17 @@ Milestone targets:
 - ✅ M1: Competitor matrix complete (6 frameworks)
 - ✅ M1: 3 example tasks created (C1, R2, W2)
 - ✅ M2: Benchmark execution script created
-- ✅ M2: Task definition files created (C1, R2, T1, W1)
+- ✅ M2: All 22 task definitions in TASK_REGISTRY (was 8, added R3-R4, T2-T5, A1-A4, W2-W4)
+- ✅ M2: Task definition markdown files for all categories (22 files in docs/benchmarking/tasks/)
 - ✅ M2: Victor adapter implemented
 - ✅ M2: Competitor stub adapters created (LangGraph, CrewAI)
-- 🔄 M2: Execute benchmarks on Victor + 2 competitors
-- ⏳ M2: Statistical significance analysis
+- ✅ M2: Statistical significance analysis module (analyze_results.py)
+  - Per-task metrics: mean, std dev, 95% CI across runs
+  - High-variance flagging (std dev > 20% of mean)
+  - Weighted composite scores (6 dimensions per scoring methodology)
+  - Framework comparison with statistical tie detection (overlapping CIs)
+  - CLI + JSON output
+- 🔄 M2: Execute benchmarks on Victor + 2 competitors (runtime, requires API keys)
 - ⏳ M3: Report published, action items identified
 
 **Benchmark Suite** (22 tasks):
