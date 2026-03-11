@@ -245,9 +245,7 @@ class SlashCommandHandler:
                 tool_help = get_builtin_tool_help(command_name)
                 if tool_help:
                     title, content = tool_help
-                    self.console.print(
-                        Panel(content, title=f"Help: {title}", border_style="blue")
-                    )
+                    self.console.print(Panel(content, title=f"Help: {title}", border_style="blue"))
                     return
                 self.console.print(f"[yellow]Unknown command:[/] /{command_name}")
             return

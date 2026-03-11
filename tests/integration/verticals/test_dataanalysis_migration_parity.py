@@ -113,9 +113,15 @@ def test_dataanalysis_migration_behavior_parity_uses_shared_runtime_helper_defau
     rl_config = RuntimeDataAnalysisAssistant.get_rl_config_provider()
     team_spec_provider = RuntimeDataAnalysisAssistant.get_team_spec_provider()
 
-    assert isinstance(RuntimeDataAnalysisAssistant.get_prompt_contributor(), DataAnalysisPromptContributor)
-    assert isinstance(RuntimeDataAnalysisAssistant.get_mode_config_provider(), DataAnalysisModeConfigProvider)
-    assert isinstance(RuntimeDataAnalysisAssistant.get_safety_extension(), DataAnalysisSafetyExtension)
+    assert isinstance(
+        RuntimeDataAnalysisAssistant.get_prompt_contributor(), DataAnalysisPromptContributor
+    )
+    assert isinstance(
+        RuntimeDataAnalysisAssistant.get_mode_config_provider(), DataAnalysisModeConfigProvider
+    )
+    assert isinstance(
+        RuntimeDataAnalysisAssistant.get_safety_extension(), DataAnalysisSafetyExtension
+    )
     assert isinstance(workflow_provider, DataAnalysisWorkflowProvider)
     assert isinstance(rl_config, DataAnalysisRLConfig)
     assert isinstance(team_spec_provider, DataAnalysisTeamSpecProvider)

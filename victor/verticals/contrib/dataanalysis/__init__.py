@@ -15,7 +15,9 @@ from victor.verticals.contrib.dataanalysis.assistant import (
     DataAnalysisAssistant as DataAnalysisAssistantDefinition,
 )
 from victor.verticals.contrib.dataanalysis.prompts import DataAnalysisPromptContributor
-from victor.verticals.contrib.dataanalysis.runtime.capabilities import DataAnalysisCapabilityProvider
+from victor.verticals.contrib.dataanalysis.runtime.capabilities import (
+    DataAnalysisCapabilityProvider,
+)
 from victor.verticals.contrib.dataanalysis.runtime.mode_config import DataAnalysisModeConfigProvider
 from victor.verticals.contrib.dataanalysis.runtime.safety import DataAnalysisSafetyExtension
 from victor.verticals.contrib.dataanalysis.runtime.tool_dependencies import get_provider

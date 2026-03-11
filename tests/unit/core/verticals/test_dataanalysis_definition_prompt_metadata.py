@@ -3,7 +3,9 @@
 from victor.core.verticals.base import VerticalBase as RuntimeVerticalBase
 from victor_sdk import StageDefinition
 
-from victor.verticals.contrib.dataanalysis import DataAnalysisAssistant as RuntimeDataAnalysisAssistant
+from victor.verticals.contrib.dataanalysis import (
+    DataAnalysisAssistant as RuntimeDataAnalysisAssistant,
+)
 from victor.verticals.contrib.dataanalysis.assistant import DataAnalysisAssistant
 from victor.verticals.contrib.dataanalysis.prompts import DataAnalysisPromptContributor
 
@@ -27,9 +29,10 @@ def test_dataanalysis_definition_exposes_serializable_prompt_metadata() -> None:
     }.issubset(hints)
     assert hints["regression"].priority_tools == ["shell", "read", "write", "edit"]
     assert definition.prompt_metadata.metadata["priority"] == 5
-    assert "Never fabricate data or statistics" in definition.prompt_metadata.metadata[
-        "grounding_rules"
-    ]
+    assert (
+        "Never fabricate data or statistics"
+        in definition.prompt_metadata.metadata["grounding_rules"]
+    )
 
 
 def test_dataanalysis_prompt_contributor_wraps_shared_prompt_metadata() -> None:

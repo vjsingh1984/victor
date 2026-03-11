@@ -91,8 +91,7 @@ class DataAnalysisAssistant(VerticalBase):
         """Return serializable task-type hints for the data analysis definition."""
 
         return {
-            task_type: dict(config)
-            for task_type, config in DATA_ANALYSIS_TASK_TYPE_HINTS.items()
+            task_type: dict(config) for task_type, config in DATA_ANALYSIS_TASK_TYPE_HINTS.items()
         }
 
     @classmethod

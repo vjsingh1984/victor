@@ -31,9 +31,10 @@ def test_research_definition_exposes_serializable_prompt_metadata() -> None:
         "read",
     ]
     assert definition.prompt_metadata.metadata["priority"] == 5
-    assert "Never fabricate sources or statistics" in definition.prompt_metadata.metadata[
-        "grounding_rules"
-    ]
+    assert (
+        "Never fabricate sources or statistics"
+        in definition.prompt_metadata.metadata["grounding_rules"]
+    )
 
 
 def test_research_prompt_contributor_wraps_shared_prompt_metadata() -> None:

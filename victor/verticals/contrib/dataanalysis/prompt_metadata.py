@@ -152,8 +152,10 @@ from sklearn.metrics import accuracy_score, r2_score
 | Group | `df.groupby('col').agg({'val': 'mean'})` |
 """.strip()
 
-DATA_ANALYSIS_GROUNDING_RULES = """GROUNDING: Base ALL responses on tool output only. Never fabricate data or statistics.
+DATA_ANALYSIS_GROUNDING_RULES = (
+    """GROUNDING: Base ALL responses on tool output only. Never fabricate data or statistics.
 Verify calculations with actual data. Always show code that produced results.""".strip()
+)
 
 DATA_ANALYSIS_PROMPT_PRIORITY = 5
 

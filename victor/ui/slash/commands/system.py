@@ -43,9 +43,9 @@ def get_builtin_tool_help(name: str) -> Optional[Tuple[str, str]]:
         'graph(mode="callees", node="main", depth=2) - what a function calls\n'
         'graph(mode="trace", node="main", depth=3) - trace execution from an entry point\n\n'
         "[dim]Useful prompts:[/]\n"
-        '\"Who calls parse_json?\"\n'
-        '\"What does main call?\"\n'
-        '\"Trace execution from main\"\n\n'
+        '"Who calls parse_json?"\n'
+        '"What does main call?"\n'
+        '"Trace execution from main"\n\n'
         "[dim]Tip:[/] Add [bold]file[/] when the symbol name is ambiguous."
     )
     return ("graph", content)

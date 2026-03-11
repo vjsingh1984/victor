@@ -178,7 +178,10 @@ def test_dataanalysis_root_runtime_shims_delegate_to_runtime_modules() -> None:
     assert EnhancedDataAnalysisSafetyExtension is RuntimeEnhancedDataAnalysisSafetyExtension
     assert DataAnalysisTeamSpecProvider is RuntimeDataAnalysisTeamSpecProvider
     assert DataAnalysisWorkflowProvider is RuntimeDataAnalysisWorkflowProvider
-    assert get_dataanalysis_tool_dependency_provider is get_runtime_dataanalysis_tool_dependency_provider
+    assert (
+        get_dataanalysis_tool_dependency_provider
+        is get_runtime_dataanalysis_tool_dependency_provider
+    )
     assert type(root_tool_dependency_provider) is type(runtime_tool_dependency_provider)
     assert root_tool_dependency_provider.yaml_path == runtime_tool_dependency_provider.yaml_path
     assert isinstance(

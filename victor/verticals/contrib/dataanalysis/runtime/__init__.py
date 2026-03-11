@@ -14,7 +14,9 @@
 
 """Runtime-owned helpers for the Data Analysis vertical."""
 
-from victor.verticals.contrib.dataanalysis.runtime.capabilities import DataAnalysisCapabilityProvider
+from victor.verticals.contrib.dataanalysis.runtime.capabilities import (
+    DataAnalysisCapabilityProvider,
+)
 from victor.verticals.contrib.dataanalysis.runtime.mode_config import DataAnalysisModeConfigProvider
 from victor.verticals.contrib.dataanalysis.runtime.rl import (
     DataAnalysisRLConfig,
