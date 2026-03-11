@@ -48,6 +48,8 @@ from victor.agent.coordinators.tool_coordinator import (
     IToolCoordinator,
     create_tool_coordinator,
 )
+from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+from victor.agent.coordinators.tool_retry import ToolRetryExecutor
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.agent.coordinators.chat_protocols import (
     ChatContextProtocol,
@@ -135,4 +137,7 @@ __all__ = [
     "SafetyAction",
     "SafetyCategory",
     "MetricsCoordinator",
+    # E1 M3: Extracted from ToolCoordinator
+    "ToolObservabilityHandler",
+    "ToolRetryExecutor",
 ]
