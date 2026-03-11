@@ -61,7 +61,11 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Set, Tuple, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, Tuple, Type, Union, cast, runtime_checkable
+
+if TYPE_CHECKING:
+    # Type-only imports
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -1528,6 +1532,9 @@ class BaseLanguageAnalyzer(ABC):
     while inheriting common functionality.
     """
 
+    _parser: Optional[Any]
+    _language_obj: Optional[Any]
+
     def __init__(self, max_complexity: int = 10):
         """Initialize the analyzer.
 
@@ -1550,7 +1557,7 @@ class BaseLanguageAnalyzer(ABC):
         """Return supported file extensions."""
         pass
 
-    def _get_parser(self):
+    def _get_parser(self) -> Optional[Any]:
         """Lazy-load tree-sitter parser for this language."""
         if self._parser is None:
             try:
@@ -1680,14 +1687,14 @@ class BaseLanguageAnalyzer(ABC):
 
         return issues, functions
 
-    def _find_function_nodes(self, root) -> List[Tuple[str, Any]]:
+    def _find_function_nodes(self, root: Any) -> List[Tuple[str, Any]]:
         """Find all function/method nodes in the AST.
 
         Override in subclasses for language-specific traversal.
         """
-        results = []
+        results: List[Tuple[str, Any]] = []
 
-        def visit(node):
+        def visit(node: Any) -> None:
             # Check if this is a function node
             if self._is_function_node(node):
                 name = self._get_function_name(node)
@@ -1701,7 +1708,7 @@ class BaseLanguageAnalyzer(ABC):
         visit(root)
         return results
 
-    def _is_function_node(self, node) -> bool:
+    def _is_function_node(self, node: Any) -> bool:
         """Check if node is a function definition.
 
         Override in subclasses for language-specific logic.
@@ -1730,24 +1737,24 @@ class BaseLanguageAnalyzer(ABC):
         }
         return node.type in func_types.get(self.language, set())
 
-    def _get_function_name(self, node) -> Optional[str]:
+    def _get_function_name(self, node: Any) -> Optional[str]:
         """Extract function name from node.
 
         Override in subclasses for language-specific logic.
         """
         for child in node.children:
             if child.type == "identifier" or child.type == "property_identifier":
-                return child.text.decode("utf8")
+                return cast(str, child.text.decode("utf8"))
             if child.type == "field_identifier":  # Go methods
-                return child.text.decode("utf8")
+                return cast(str, child.text.decode("utf8"))
         return None
 
-    def _calculate_node_complexity(self, node) -> int:
+    def _calculate_node_complexity(self, node: Any) -> int:
         """Calculate cyclomatic complexity of a function node."""
         complexity = 1  # Base complexity
         complexity_types = COMPLEXITY_NODE_TYPES.get(self.language, set())
 
-        def visit(n):
+        def visit(n: Any) -> None:
             nonlocal complexity
             if n.type in complexity_types:
                 complexity += 1
@@ -1763,7 +1770,7 @@ class BaseLanguageAnalyzer(ABC):
         visit(node)
         return complexity
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Check if function has a docstring.
 
         Override in subclasses for language-specific logic.
@@ -1779,18 +1786,18 @@ class BaseLanguageAnalyzer(ABC):
                         break
         return False
 
-    def _count_parameters(self, func_node) -> int:
+    def _count_parameters(self, func_node: Any) -> int:
         """Count function parameters."""
         for child in func_node.children:
             if child.type in {"parameters", "formal_parameters", "parameter_list"}:
                 return sum(1 for c in child.children if c.type not in {"(", ")", ",", "self"})
         return 0
 
-    def _count_returns(self, func_node) -> int:
+    def _count_returns(self, func_node: Any) -> int:
         """Count return statements in function."""
         count = 0
 
-        def visit(n):
+        def visit(n: Any) -> None:
             nonlocal count
             if n.type in {"return_statement", "return"}:
                 count += 1
@@ -1872,7 +1879,7 @@ class BaseLanguageAnalyzer(ABC):
 
     def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check documentation coverage using tree-sitter."""
-        issues = []
+        issues: List[AnalysisIssue] = []
         parser = self._get_parser()
 
         if parser is None:
@@ -1964,7 +1971,7 @@ class PythonAnalyzer(BaseLanguageAnalyzer):
     def file_extensions(self) -> List[str]:
         return [".py", ".pyw", ".pyi"]
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Python-specific docstring detection."""
         for child in func_node.children:
             if child.type == "block":
@@ -1990,12 +1997,12 @@ class JavaScriptAnalyzer(BaseLanguageAnalyzer):
     def file_extensions(self) -> List[str]:
         return [".js", ".mjs", ".cjs", ".jsx"]
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """JavaScript: Check for JSDoc comment before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/") or prev_line.startswith("//")
         return False
 
@@ -2023,12 +2030,12 @@ class JavaAnalyzer(BaseLanguageAnalyzer):
     def file_extensions(self) -> List[str]:
         return [".java"]
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Java: Check for Javadoc comment before method."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/")
         return False
 
@@ -2044,12 +2051,12 @@ class GoAnalyzer(BaseLanguageAnalyzer):
     def file_extensions(self) -> List[str]:
         return [".go"]
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Go: Check for doc comment before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("//")
         return False
 
@@ -2065,12 +2072,12 @@ class RustAnalyzer(BaseLanguageAnalyzer):
     def file_extensions(self) -> List[str]:
         return [".rs"]
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Rust: Check for doc comment (///) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("///") or prev_line.startswith("//!")
         return False
 
@@ -2089,12 +2096,12 @@ class CAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type == "function_definition"
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """C: Check for comment block (/** or //) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/") or prev_line.startswith("//")
         return False
 
@@ -2125,12 +2132,12 @@ class CSharpAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"method_declaration", "constructor_declaration"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """C#: Check for XML doc comment (///) before method."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("///") or prev_line.endswith("*/")
         return False
 
@@ -2149,12 +2156,12 @@ class RubyAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"method", "singleton_method"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Ruby: Check for RDoc/YARD comment before method."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("#")
         return False
 
@@ -2173,12 +2180,12 @@ class PHPAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"function_definition", "method_declaration"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """PHP: Check for PHPDoc (/** */) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/")
         return False
 
@@ -2197,12 +2204,12 @@ class KotlinAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type == "function_declaration"
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Kotlin: Check for KDoc (/** */) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/")
         return False
 
@@ -2221,12 +2228,12 @@ class SwiftAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"function_declaration", "subscript_declaration"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Swift: Check for doc comment (///) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("///") or prev_line.endswith("*/")
         return False
 
@@ -2245,12 +2252,12 @@ class ScalaAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"function_definition", "function_declaration"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Scala: Check for Scaladoc (/** */) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.endswith("*/")
         return False
 
@@ -2269,12 +2276,12 @@ class BashAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type == "function_definition"
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Bash: Check for comment block before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("#")
         return False
 
@@ -2319,12 +2326,12 @@ class LuaAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"function_declaration", "local_function_declaration"}
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Lua: Check for comment before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("--")
         return False
 
@@ -2343,9 +2350,9 @@ class ElixirAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type in {"call"}  # def/defp calls
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Elixir: Check for @doc or @moduledoc before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         # Check previous lines for @doc
         for i in range(max(0, start_line - 3), start_line):
@@ -2368,12 +2375,12 @@ class HaskellAnalyzer(BaseLanguageAnalyzer):
     def _is_function_node(self, node) -> bool:
         return node.type == "function"
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """Haskell: Check for Haddock comment (--|) before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("-- |") or prev_line.startswith("{-|")
         return False
 
@@ -2393,12 +2400,12 @@ class RAnalyzer(BaseLanguageAnalyzer):
         # R functions are defined with <- or = assignment
         return node.type == "function_definition"
 
-    def _has_docstring(self, func_node, content: str) -> bool:
+    def _has_docstring(self, func_node: Any, content: str) -> bool:
         """R: Check for roxygen2 comment (#') before function."""
-        start_line = func_node.start_point[0]
+        start_line = cast(int, func_node.start_point[0])
         lines = content.split("\n")
         if start_line > 0:
-            prev_line = lines[start_line - 1].strip()
+            prev_line = cast(str, lines[start_line - 1].strip())
             return prev_line.startswith("#'") or prev_line.startswith("#")
         return False
 
