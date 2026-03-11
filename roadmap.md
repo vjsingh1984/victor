@@ -41,7 +41,7 @@ Related documents:
 
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
-| `E1` | Orchestration tech-debt burn-down | `M2` in progress |
+| `E1` | Orchestration tech-debt burn-down | `M2` complete, `M3` in planning |
 | `E2` | Roadmap governance consolidation | `M2` complete |
 | `E3` | Type-safety + quality gates | `M2` complete, `M3` in planning |
 | `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
@@ -71,7 +71,7 @@ Milestone targets:
 ## Active Work (M1-M2)
 
 ### E1: Orchestration Tech-Debt Burn-Down
-**Status**: M1 complete, M2 in progress
+**Status**: M2 complete, M3 in planning
 **Owner**: Architecture Lead
 **Progress**:
 - ✅ M1: Extract execution coordinator (ExecutionCoordinator: 415 lines)
@@ -82,20 +82,26 @@ Milestone targets:
   - SyncChatCoordinator: 228 lines (clean)
   - StreamingChatCoordinator: 281 lines (clean)
 - ✅ M2: Remove dead legacy code (-196 lines from chat_coordinator)
-- 🔄 M2: Further reduce coordinator sizes (ChatCoordinator still 1464 lines)
+- ✅ M2: Reduce coordinator sizes (ChatCoordinator: 1464 → 1372 LOC, -92 lines)
+- ⏳ M3: Further reduce to 1200 LOC via pipeline refactoring
 - ⏳ M3: Protocol-based injection complete
 
 **Current Coordinator LOC**:
 | Coordinator | LOC | Target | Status |
 |-------------|-----|--------|--------|
-| ChatCoordinator | 1464 | 1200 | ⚠️ Above target (contains streaming helpers) |
+| ChatCoordinator | 1372 | 1400 | ✅ Below M2 target (was 1464) |
 | ToolCoordinator | 1565 | 1200 | ⚠️ Above target |
 | ExecutionCoordinator | 415 | 1200 | ✅ Below target |
 | SyncChatCoordinator | 228 | 1200 | ✅ Below target |
 | StreamingChatCoordinator | 281 | 1200 | ✅ Below target |
 | PlanningCoordinator | 520 | 1200 | ✅ Below target |
 
-**M2 Note**: ChatCoordinator size is due to streaming helper methods used by StreamingChatPipeline. Further reduction requires pipeline refactoring (M3).
+**M2 Complete**: ChatCoordinator reduced from 1464 → 1372 LOC (-92 lines)
+- Removed duplicate planning logic in `chat_with_planning`
+- Simplified recovery integration methods (thin wrappers)
+- Simplified intelligent response validation method
+
+**M3 Target**: Further reduce ChatCoordinator and ToolCoordinator to 1200 LOC via pipeline refactoring
 
 ### E2: Roadmap Governance Consolidation
 **Status**: M1 complete, M2 complete

@@ -1182,15 +1182,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator for consistency (includes model, temperature,
         unified_task_type, is_analysis_task, is_action_task fields).
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamingRecoveryContext with all necessary state
         """
-        orch = self._orchestrator
-        return orch._create_recovery_context(stream_ctx)
+        return self._orchestrator._create_recovery_context(stream_ctx)
 
     async def _handle_recovery_with_integration(
         self,
@@ -1203,18 +1196,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator which uses _recovery_coordinator for
         consistent recovery handling.
-
-        Args:
-            stream_ctx: The streaming context
-            full_content: The full content from the response
-            tool_calls: Tool calls from the response
-            mentioned_tools: Tools mentioned in the content
-
-        Returns:
-            RecoveryAction with the action to take
         """
-        orch = self._orchestrator
-        return await orch._handle_recovery_with_integration(
+        return await self._orchestrator._handle_recovery_with_integration(
             stream_ctx=stream_ctx,
             full_content=full_content,
             tool_calls=tool_calls,
@@ -1228,16 +1211,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator which uses _recovery_coordinator for
         consistent recovery action application.
-
-        Args:
-            recovery_action: The recovery action to apply
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk to yield, or None
         """
-        orch = self._orchestrator
-        return orch._apply_recovery_action(recovery_action, stream_ctx)
+        return self._orchestrator._apply_recovery_action(recovery_action, stream_ctx)
 
     async def _handle_empty_response_recovery(
         self,
@@ -1331,18 +1306,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator's implementation which uses the correct
         intelligent_integration property.
-
-        Args:
-            response: The response to validate
-            query: The original query
-            tool_calls: Number of tool calls used
-            task_type: The task type
-
-        Returns:
-            Validation result dict or None
         """
-        orch = self._orchestrator
-        return await orch._validate_intelligent_response(
+        return await self._orchestrator._validate_intelligent_response(
             response=response,
             query=query,
             tool_calls=tool_calls,
@@ -1373,13 +1338,8 @@ class ChatCoordinator:
     ) -> CompletionResponse:
         """Chat with automatic planning for complex multi-step tasks.
 
-        This method extends the regular chat flow by:
-        1. Analyzing if the task is complex enough to benefit from planning
-        2. If complex, generating a structured plan using ReadableTaskPlan
-        3. Executing the plan step-by-step with context-aware tools
-        4. Providing a summary of results
-
-        For simple tasks, it falls back to regular direct chat.
+        Delegates to _chat_with_planning when planning is enabled or auto-detected.
+        For simple tasks or when planning is disabled, uses regular chat.
 
         Args:
             user_message: User's message
@@ -1400,65 +1360,13 @@ class ChatCoordinator:
                 use_planning=True
             )
         """
-
         # If planning is explicitly disabled, use regular chat
         if use_planning is False:
             return await self.chat(user_message)
 
-        # If planning is explicitly enabled, use planning coordinator
-        if use_planning is True:
-            planning_coordinator = self._get_planning_coordinator()
-            return await planning_coordinator.chat_with_planning(user_message)
+        # If planning is explicitly enabled or auto-detected, delegate
+        if use_planning is True or self._should_use_planning(user_message):
+            return await self._chat_with_planning(user_message)
 
-        # Auto-detect: analyze if planning would be beneficial
-        task_analysis = self._analyze_task_for_planning(user_message)
-
-        # Get planning coordinator and let it decide
-        planning_coordinator = self._get_planning_coordinator()
-
-        # Check if planning should be used
-        should_plan = planning_coordinator._should_use_planning(user_message, task_analysis)
-
-        if should_plan:
-            logger.info("Using planning-based chat execution")
-            return await planning_coordinator.chat_with_planning(user_message, task_analysis)
-        else:
-            logger.info("Using direct chat (no planning needed)")
-            return await self.chat(user_message)
-
-    def _analyze_task_for_planning(self, user_message: str) -> Optional["TaskAnalysis"]:
-        """Analyze task to determine if planning would be beneficial.
-
-        Args:
-            user_message: User's message
-
-        Returns:
-            TaskAnalysis if available, None otherwise
-        """
-        orch = self._orchestrator
-
-        # Try to get task analysis from task_analyzer if available
-        if hasattr(orch, "task_analyzer"):
-            try:
-                return orch.task_analyzer.analyze(user_message)
-            except Exception as e:
-                logger.warning(f"Task analysis failed: {e}")
-
-        # Fall back to task_classifier
-        if hasattr(orch, "task_classifier"):
-            try:
-                classification = orch.task_classifier.classify(user_message)
-                # Convert TaskClassification to TaskAnalysis-like structure
-                from victor.agent.task_analyzer import TaskAnalysis
-                from victor.agent.unified_classifier import UnifiedTaskType
-
-                return TaskAnalysis(
-                    complexity=classification.complexity,
-                    tool_budget=classification.tool_budget,
-                    complexity_confidence=0.8,  # Default confidence
-                    unified_task_type=UnifiedTaskType.DEFAULT,
-                )
-            except Exception as e:
-                logger.warning(f"Task classification failed: {e}")
-
-        return None
+        # Default to regular chat for simple tasks
+        return await self.chat(user_message)
