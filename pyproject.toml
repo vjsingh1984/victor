@@ -68,6 +68,13 @@ dataanalysis = "victor_dataanalysis.safety:create_all_dataanalysis_safety_rules"
 [project.entry-points."victor.framework.teams.providers"]
 dataanalysis = "victor_dataanalysis.teams:DataAnalysisTeamSpecProvider"
 
+# NEW: Victor SDK Protocol implementations
+[project.entry-points."victor.sdk.protocols"]
+dataanalysis-tools = "victor_dataanalysis.protocols:DataAnalysisToolProvider"
+dataanalysis-safety = "victor_dataanalysis.protocols:DataAnalysisSafetyProvider"
+dataanalysis-prompts = "victor_dataanalysis.protocols:DataAnalysisPromptProvider"
+dataanalysis-workflows = "victor_dataanalysis.protocols:DataAnalysisWorkflowProvider"
+
 [tool.setuptools]
 packages = [
     "victor_dataanalysis",
