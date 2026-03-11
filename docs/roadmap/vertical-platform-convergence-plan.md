@@ -687,7 +687,7 @@ Tasks:
 - [x] VPC-T3.5 Inventory and classify `coding` imports by definition/runtime/shim layer.
 - [x] VPC-T3.6 Replace `victor.tools.tool_names` usage with SDK identifiers in `coding`.
 - [x] VPC-T3.7 Replace direct framework capability imports with SDK-declared capability requirements in `coding`.
-- [ ] VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
+- [x] VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
 - [ ] VPC-T3.9 Add coding vertical migration tests and parity checks.
 
 #### VPC-F3.3: RAG Vertical Migration
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
-2. VPC-T3.9 Add coding vertical migration tests and parity checks.
+1. VPC-T3.9 Add coding vertical migration tests and parity checks.
+2. VPC-T3.10 Inventory and classify `rag` imports by layer.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1678,6 +1678,35 @@ Likely touchpoints:
 - Next recommended implementation layer:
   - continue `VPC-T3.8` by moving `get_composed_chains()` and `get_personas()`
     out of `coding/assistant.py`
+
+### 2026-03-10 (Session X)
+
+- Completed `VPC-T3.8`.
+- Finished extracting runtime-specific hooks from
+  `victor/verticals/contrib/coding/assistant.py` by removing:
+  - `get_middleware()`
+  - `get_service_provider()`
+  - `get_composed_chains()`
+  - `get_personas()`
+- Extended the shared runtime loader in
+  `victor.core.verticals.extension_loader` so verticals can now resolve:
+  - middleware via `middleware.py:get_middleware()`
+  - service providers via `service_provider.py:{Vertical}ServiceProvider` or
+    `get_service_provider()`
+  - composed chains via `composed_chains.py:get_composed_chains()` or
+    `<VERTICAL>_CHAINS`
+  - personas via `teams:get_personas()` or `<VERTICAL>_PERSONAS`
+- Added runtime factories for `coding` in:
+  - `victor/verticals/contrib/coding/composed_chains.py`
+  - `victor/verticals/contrib/coding/teams/__init__.py`
+  - plus the earlier `middleware.py` and `service_provider.py` factories
+- Updated the `coding` import inventory document to record that assistant-level
+  runtime helper hooks are now gone.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py tests/unit/core/verticals/test_import_resolver.py tests/unit/core/verticals/test_workflow_provider_resolution.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/unit/framework/test_framework_step_handler.py tests/integration/verticals/test_vertical_independence.py`
+  - `68 passed, 1 skipped in 81.63s`
+- Next recommended implementation layer:
+  - VPC-T3.9 add coding vertical migration tests and parity checks
 
 ## Resume Protocol
 

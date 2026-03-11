@@ -50,7 +50,7 @@ Key findings:
 
 | File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
 |---|---|---|---|---|
-| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, and `VerticalConfig`, and still carries runtime helper hooks for composed chains and personas even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters, and continue moving helper hooks into runtime modules/shared loaders |
+| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, and `VerticalConfig` even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters |
 | `prompts.py` | Definition | `victor.core.verticals.protocols` | Implements `PromptContributorProtocol` and `TaskTypeHint` runtime objects inside a definition module | Convert prompt/task-hint data to plain serializable SDK-facing metadata and let runtime prompt contributors be optional adapters |
 
 Definition-layer implication:
@@ -152,19 +152,26 @@ Remaining definition-layer work that is still outside `VPC-T3.7`:
 
 ### `VPC-T3.8` Move runtime-specific middleware, workflows, and helpers out of the definition layer
 
-Current tranche status:
+Status:
 
-- in progress
-- completed in the first slice:
-  - `assistant.py` no longer defines `get_middleware()`
-  - `assistant.py` no longer defines `get_service_provider()`
-  - shared loader defaults now resolve those runtime hooks from
-    `middleware.py` and `service_provider.py`
+- completed for the `coding` assistant definition layer
+- `assistant.py` no longer defines:
+  - `get_middleware()`
+  - `get_service_provider()`
+  - `get_composed_chains()`
+  - `get_personas()`
+- shared loader defaults now resolve those runtime hooks from:
+  - `middleware.py`
+  - `service_provider.py`
+  - `composed_chains.py`
+  - `teams/__init__.py`
 
-Remaining helper hooks still living in `assistant.py`:
+Remaining definition-layer work after `VPC-T3.8`:
 
-- `get_composed_chains()`
-- `get_personas()`
+- `assistant.py` still inherits the runtime base class instead of an SDK-only
+  definition base
+- `prompts.py` still implements a runtime prompt contributor rather than pure
+  serializable metadata
 
 ### `VPC-T3.8` Move runtime-specific behavior behind adapters or `runtime/`
 

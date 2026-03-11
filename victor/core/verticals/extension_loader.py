@@ -1164,9 +1164,7 @@ class VerticalExtensionLoader(ABC):
         if not candidate_paths:
             return {}
 
-        constant_name = (
-            f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
-        )
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
         last_error: Optional[Exception] = None
         for module_path in candidate_paths:
             try:
