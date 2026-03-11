@@ -86,6 +86,35 @@ from victor.core.verticals.vertical_loader import (
 from victor.core.verticals.runtime_diagnostics import (
     get_vertical_runtime_diagnostics,
 )
+from victor.core.verticals.sdk_discovery import (
+    # Registry access
+    get_sdk_protocol_registry,
+    discover_sdk_protocols,
+    reload_sdk_discovery,
+    reset_sdk_discovery,
+    # Protocol providers
+    get_sdk_tool_providers,
+    get_sdk_safety_providers,
+    get_sdk_workflow_providers,
+    get_sdk_prompt_providers,
+    # Capability providers
+    get_sdk_capability_providers,
+    get_sdk_capability_provider,
+    # Validators
+    get_sdk_validators,
+    get_sdk_validator,
+    # Discovery info
+    get_sdk_discovery_stats,
+    get_sdk_discovery_summary,
+    list_sdk_capabilities,
+    list_sdk_validators,
+    # Vertical enhancement
+    enhance_vertical_with_sdk_protocols,
+    # Types
+    ProtocolRegistry,
+    DiscoveryStats,
+    ProtocolMetadata,
+)
 
 __all__ = [
     # Base classes
@@ -133,6 +162,27 @@ __all__ = [
     "get_active_vertical",
     "get_vertical_extensions",
     "get_vertical_runtime_diagnostics",
+    # SDK Protocol Discovery (Phase 4: Enhanced Entry Points)
+    "get_sdk_protocol_registry",
+    "discover_sdk_protocols",
+    "reload_sdk_discovery",
+    "reset_sdk_discovery",
+    "get_sdk_tool_providers",
+    "get_sdk_safety_providers",
+    "get_sdk_workflow_providers",
+    "get_sdk_prompt_providers",
+    "get_sdk_capability_providers",
+    "get_sdk_capability_provider",
+    "get_sdk_validators",
+    "get_sdk_validator",
+    "get_sdk_discovery_stats",
+    "get_sdk_discovery_summary",
+    "list_sdk_capabilities",
+    "list_sdk_validators",
+    "enhance_vertical_with_sdk_protocols",
+    "ProtocolRegistry",
+    "DiscoveryStats",
+    "ProtocolMetadata",
     # Helper functions
     "get_vertical",
     "list_verticals",
