@@ -630,8 +630,8 @@ Feature summary:
 | VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
 | VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
 | VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
-| VPC-F3.4 | DevOps vertical migration | In Progress | VPC-F3.1 | `devops` definition layer follows SDK-only pattern |
-| VPC-F3.5 | Data Analysis vertical migration | Not Started | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
+| VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows SDK-only pattern and parity coverage is in place |
+| VPC-F3.5 | Data Analysis vertical migration | In Progress | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
 | VPC-F3.6 | Research vertical migration | Not Started | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
 | VPC-F3.7 | External example and template migration | Not Started | VPC-F3.1 | Example packages teach the supported contract |
 | VPC-F3.8 | Extension declaration cleanup | Not Started | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
@@ -737,10 +737,10 @@ Likely touchpoints:
 Tasks:
 
 - [x] VPC-T3.15 Inventory and classify `devops` imports by layer.
-- [ ] VPC-T3.16 Replace definition-layer imports with SDK contracts in `devops`.
-- [ ] VPC-T3.17 Express shell/git/infra needs through SDK capability identifiers in `devops`.
-- [ ] VPC-T3.18 Move runtime integrations out of `devops` definition modules.
-- [ ] VPC-T3.19 Add DevOps migration tests and parity checks.
+- [x] VPC-T3.16 Replace definition-layer imports with SDK contracts in `devops`.
+- [x] VPC-T3.17 Express shell/git/infra needs through SDK capability identifiers in `devops`.
+- [x] VPC-T3.18 Move runtime integrations out of `devops` definition modules.
+- [x] VPC-T3.19 Add DevOps migration tests and parity checks.
 
 #### VPC-F3.5: Data Analysis Vertical Migration
 
@@ -763,7 +763,7 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.20 Inventory and classify `dataanalysis` imports by layer.
+- [x] VPC-T3.20 Inventory and classify `dataanalysis` imports by layer.
 - [ ] VPC-T3.21 Replace definition-layer imports with SDK contracts in `dataanalysis`.
 - [ ] VPC-T3.22 Express data/file/notebook needs through SDK capability identifiers in `dataanalysis`.
 - [ ] VPC-T3.23 Move runtime integrations out of `dataanalysis` definition modules.
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.16 Replace definition-layer imports with SDK contracts in `devops`.
-2. VPC-T3.17 Express shell/git/infra needs through SDK capability identifiers in `devops`.
+1. VPC-T3.21 Replace definition-layer imports with SDK contracts in `dataanalysis`.
+2. VPC-T3.22 Express data/file/notebook needs through SDK capability identifiers in `dataanalysis`.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -2024,6 +2024,105 @@ Likely touchpoints:
   baseline only.
 - Next recommended implementation layer:
   - `VPC-T3.16` replace definition-layer imports with SDK contracts in `devops`
+
+### 2026-03-11 (Session AK)
+
+- Completed `VPC-T3.16` for the `devops` vertical.
+- Migrated `victor/verticals/contrib/devops/assistant.py` to SDK-owned
+  definition contracts:
+  - SDK `VerticalBase`
+  - SDK `StageDefinition`
+  - serializable prompt metadata hooks
+- Added `victor/verticals/contrib/devops/prompt_metadata.py` as the shared,
+  serializable prompt/task-hint data source for the vertical.
+- Converted `victor/verticals/contrib/devops/prompts.py` into a runtime adapter
+  over that shared metadata using `PromptContributorAdapter`.
+- Updated `victor/verticals/contrib/devops/__init__.py` to export a runtime
+  wrapper `DevOpsAssistant` built from the SDK definition class, preserving the
+  `victor.devops` package boundary for runtime helper calls like
+  `get_extensions()`.
+- Added focused regression coverage in
+  `tests/unit/core/verticals/test_devops_definition_prompt_metadata.py` and
+  updated shared runtime-helper coverage to import the package-root DevOps
+  runtime wrapper.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_devops_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k devops`
+  - result: 9 passed, 24 deselected in 14.40s
+- Next recommended implementation layer:
+  - `VPC-T3.17` express shell/git/infra needs through SDK capability identifiers
+    in `devops`
+
+### 2026-03-11 (Session AL)
+
+- Completed `VPC-T3.17` for the `devops` vertical.
+- Added SDK-owned DevOps capability requirements in
+  `victor/verticals/contrib/devops/assistant.py` for:
+  - file operations
+  - shell access
+  - git access
+  - container runtime access
+  - validation
+  - optional web access
+- Extended the SDK capability registry with the new stable IDs:
+  - `shell_access`
+  - `container_runtime`
+- Verified the current DevOps tool bundle satisfies those requirements through
+  runtime resolution and added focused regression coverage for both the
+  definition contract and the registry bindings.
+- Verification:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_devops_definition_capability_requirements.py tests/unit/core/verticals/test_devops_definition_prompt_metadata.py tests/unit/framework/test_sdk_capability_registry.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k devops`
+  - result: 12 passed, 31 deselected in 3.01s
+- Next recommended implementation layer:
+  - `VPC-T3.18` move runtime integrations out of `devops` definition modules
+
+### 2026-03-11 (Session AM)
+
+- Completed `VPC-T3.18` and `VPC-T3.19` for the `devops` vertical.
+- Extracted assistant-owned runtime middleware into
+  `victor/verticals/contrib/devops/middleware.py`, leaving the SDK definition
+  class free of runtime helper implementations.
+- Added `tests/integration/verticals/test_devops_migration_parity.py` to cover:
+  - discovery and runtime binding through `VerticalLoader` and
+    `VerticalRuntimeAdapter`
+  - bootstrap activation of DevOps middleware, prompt, mode-config, workflow,
+    RL, and team extensions
+  - runtime-wrapper behavior through the package-root `DevOpsAssistant`
+- Marked `VPC-F3.4` complete and advanced the current tranche to
+  `dataanalysis` starting at `VPC-T3.20`.
+- Verification:
+  - `../.venv/bin/pytest -c /dev/null -q tests/integration/verticals/test_devops_migration_parity.py tests/unit/core/verticals/test_devops_definition_capability_requirements.py tests/unit/core/verticals/test_devops_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_vertical_independence.py -k devops`
+  - result: 15 passed, 24 deselected in 3.11s
+- Note:
+  - the repo-level `pytest` configuration could not be used in this session
+    because the existing `pyproject.toml` in the worktree contains an unrelated
+    parse error, so focused verification used `-c /dev/null`
+- Next recommended implementation layer:
+  - `VPC-T3.20` inventory and classify `dataanalysis` imports by layer
+
+### 2026-03-11 (Session AN)
+
+- Started `VPC-F3.5` by completing `VPC-T3.20` for the `dataanalysis`
+  vertical.
+- Added
+  `docs/development/dataanalysis-vertical-import-layer-inventory-2026-03-11.md`
+  with the measured import-boundary baseline:
+  - 16 Python files in `victor/verticals/contrib/dataanalysis`
+  - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+- Identified the current definition-layer blockers:
+  - `assistant.py` still uses the core vertical base and stage types
+  - `prompts.py` still uses core prompt protocol objects instead of serializable
+    metadata
+- Classified `__init__.py` and `tool_dependencies.py` as shim-layer targets and
+  grouped the runtime surface into capability/config/safety, workflow/team/RL,
+  and lower-friction runtime helpers.
+- Marked `VPC-F3.5` as `In Progress` and advanced the current tranche to
+  `VPC-T3.21`.
+- No tests were run because this session established the inventory/tracking
+  baseline only.
+- Next recommended implementation layer:
+  - `VPC-T3.21` replace definition-layer imports with SDK contracts in
+    `dataanalysis`
 
 ## Resume Protocol
 

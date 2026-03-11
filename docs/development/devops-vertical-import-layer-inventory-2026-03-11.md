@@ -27,59 +27,49 @@ measured definition/runtime blockers instead of re-scanning the package.
 
 | Metric | Count | Notes |
 |---|---:|---|
-| Python files in `devops` package | 16 | Includes runtime helpers, teams, workflows, RL, and package exports |
+| Python files in `devops` package | 17 | Includes runtime helpers, teams, workflows, RL, prompt metadata, and package exports |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 12 | This is the active runtime-boundary surface for `devops` |
 | Python files with `victor_sdk` imports | 1 | Only `assistant.py` currently imports the SDK |
-| Definition-layer targets still importing runtime/core | 2 / 2 | `assistant.py` and `prompts.py` are both still coupled to core/runtime APIs |
+| Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and `prompt_metadata.py` are now definition-layer clean |
 | Shim candidates still depending on runtime-heavy package or core loaders | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
-| Runtime-layer files with direct runtime/core/tool imports | 10 | Runtime integrations are still package-root modules today |
+| Runtime-layer files with direct runtime/core/tool imports | 10 | Runtime integrations are still mostly package-root modules today |
 
 Key findings:
 
-- `devops` is earlier in migration than `rag`. The assistant already uses
-  SDK-owned tool identifiers, but it still subclasses the core `VerticalBase`
-  and imports `StageDefinition` from `victor.core.verticals.base`.
-- `assistant.py` is the primary definition blocker:
-  - imports the core vertical base and stage type
-  - imports `MiddlewareProtocol` from core
-  - still defines `get_middleware()` directly, which reaches into
-    `victor.framework.middleware.MiddlewareComposer`
-- `prompts.py` is the second definition blocker:
-  - imports `PromptContributorProtocol` and `TaskTypeHint` from core
-  - stores prompt/task-hint data as runtime protocol objects rather than
-    serializable metadata
-- `__init__.py` already behaves like a package-root runtime export shim, but it
-  still re-exports root runtime modules directly rather than preferring a
-  `runtime/` package.
+- `assistant.py` now subclasses SDK `VerticalBase`, uses SDK `StageDefinition`,
+  and exposes serializable prompt metadata through the definition contract.
+- `assistant.py` now declares SDK capability requirements for file operations,
+  shell access, git access, container runtime access, validation, and optional
+  web access.
+- `prompt_metadata.py` now owns the serializable task-hint and prompt-section
+  data, while `prompts.py` has been reduced to a runtime adapter using
+  `PromptContributorAdapter`.
+- `__init__.py` now behaves like the RAG package boundary: it exports a runtime
+  wrapper `DevOpsAssistant` built from the SDK definition class and keeps the
+  root public import path stable.
+- `middleware.py` now owns the DevOps middleware stack, so `assistant.py` is no
+  longer carrying runtime helper implementations.
+- `devops` now has explicit migration parity coverage for discovery, bootstrap
+  activation, and runtime-wrapper behavior in
+  `tests/integration/verticals/test_devops_migration_parity.py`.
 - `tool_dependencies.py` remains the main compatibility shim candidate because
   it still owns YAML-backed tool-graph logic plus legacy helpers at the package
   root.
 
 ## Definition-Layer Status
 
-Current definition-layer blockers:
+`VPC-T3.16` is now complete:
 
-- `assistant.py`
-  - core `VerticalBase` import
-  - core `StageDefinition` import
-  - core `MiddlewareProtocol` import
-  - direct framework middleware composition in the assistant class
-- `prompts.py`
-  - core prompt protocol imports
-  - runtime prompt object declarations instead of serializable metadata
+- `assistant.py` is SDK-only at the import boundary
+- `prompt_metadata.py` is the definition-layer prompt data source
+- `prompts.py` is now a runtime adapter instead of a definition blocker
+- the package root exports a runtime wrapper while preserving the public
+  `victor.devops` import surface
 
-Definition-layer targets to migrate first in `VPC-T3.16`:
+Remaining semantic follow-on for later runtime extraction:
 
-1. `assistant.py`
-2. `prompts.py`
-
-Expected first moves:
-
-- move `StageDefinition`/base-class usage to SDK contracts
-- express prompt/task-hint data as serializable metadata, then keep `prompts.py`
-  as a runtime adapter if needed
-- remove assistant-owned middleware composition in favor of runtime-module
-  defaults or a runtime shim
+- move additional runtime providers behind `runtime/` shims once packaging work
+  reaches `devops`
 
 ## Shim-Layer Blockers
 
@@ -100,7 +90,7 @@ the definition contract is cleaned up.
 | `capabilities.py` | `victor.framework.protocols`, `victor.framework.capability_loader`, `victor.framework.capabilities` | Capability provider/config module; good candidate for the runtime-module pattern already used in `rag` |
 | `enrichment.py` | `victor.framework.enrichment` | Runtime prompt-enrichment strategy and infra context injection |
 | `mode_config.py` | `victor.core.mode_config` | Registry-backed runtime config provider |
-| `prompts.py` | `victor.core.verticals.protocols` | Split needed: metadata to SDK-facing data, runtime adapter stays at the runtime layer |
+| `prompts.py` | `victor.core.verticals.prompt_adapter` | Prompt runtime adapter over shared metadata; no longer a definition blocker |
 | `safety.py` | `victor.core.verticals.protocols`, `victor.framework.config` | Primary safety extension and framework safety-rule factories |
 | `safety_enhanced.py` | `victor.core.verticals.protocols`, `victor.framework.config` | Enhanced safety integration with runtime coordinators |
 
@@ -133,42 +123,54 @@ established.
 
 ### `VPC-T3.16` Replace definition-layer imports with SDK contracts in `devops`
 
-Primary targets:
+Current status:
 
-- `assistant.py`
-- `prompts.py`
-
-Expected first moves:
-
-- migrate the assistant to SDK `VerticalBase` and SDK `StageDefinition`
-- replace runtime prompt objects with serializable task-hint/prompt metadata
-- preserve current behavior via runtime adapters and package-root shims
+- complete
+- `assistant.py` now uses SDK base/stage/prompt contracts
+- `prompt_metadata.py` owns serializable prompt metadata
+- `prompts.py` is a runtime adapter over shared metadata
+- `victor.verticals.contrib.devops` now exports a runtime wrapper around the SDK
+  definition class
 
 ### `VPC-T3.17` Express shell/git/infra needs through SDK capability identifiers in `devops`
 
-Likely capability buckets:
+Current status:
 
-- file operations
-- shell execution
-- git operations
-- container/runtime tooling
-- optional web/documentation access
+- complete
+- current DevOps definition requirements are:
+  - file operations
+  - shell access
+  - git access
+  - container runtime access
+  - validation
+  - optional web access
 
 ### `VPC-T3.18` Move runtime integrations out of `devops` definition modules
 
-Recommended move order:
+Current status:
 
-1. `prompts.py` runtime adapter cleanup and assistant-owned middleware extraction
-2. `capabilities.py`, `mode_config.py`, `safety.py`, `safety_enhanced.py`
-3. `workflows/`, `teams/`, `rl/`
-4. `tool_dependencies.py`
+- complete for the definition-layer migration goal
+- `middleware.py` now owns the middleware stack and the package-root runtime
+  wrapper resolves it through shared loader defaults
+- remaining runtime packaging work now sits outside the definition-layer
+  acceptance gate
+
+### `VPC-T3.19` Add DevOps migration tests and parity checks
+
+Current status:
+
+- complete
+- parity coverage now exists for:
+  - discovery and runtime binding
+  - bootstrap activation of DevOps extensions
+  - runtime-wrapper behavior after the definition/runtime split
 
 ## Conclusion
 
 `devops` is ready for the same migration sequence already proven on `coding`
 and `rag`:
 
-1. clean the assistant and prompt definition layer first
-2. express runtime needs through SDK capability requirements
-3. move runtime providers behind `runtime/` modules plus root compatibility
-   shims
+1. the assistant and prompt definition layer are now cleaned up
+2. runtime needs are now declared through SDK capability requirements
+3. move the remaining runtime providers behind `runtime/` modules plus root
+   compatibility shims

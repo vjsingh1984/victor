@@ -7,7 +7,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from victor_sdk import PromptMetadata, StageDefinition, ToolNames, VerticalBase
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    PromptMetadata,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
+)
 
 from victor.verticals.contrib.devops.prompt_metadata import (
     DEVOPS_GROUNDING_RULES,
@@ -99,6 +106,38 @@ class DevOpsAssistant(VerticalBase):
                 "priority": DEVOPS_PROMPT_PRIORITY,
             },
         )
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the DevOps definition."""
+
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Inspect and modify infrastructure configuration files and repository assets.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.SHELL_ACCESS,
+                purpose="Run infrastructure, deployment, and validation commands from the shell.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.GIT,
+                purpose="Inspect version control history and prepare safe infrastructure changes.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.CONTAINER_RUNTIME,
+                purpose="Build, inspect, and validate container images and runtime settings.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.VALIDATION,
+                purpose="Validate configurations and run tests before deployment changes are finalized.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.WEB_ACCESS,
+                optional=True,
+                purpose="Fetch remote documentation and platform references when local sources are insufficient.",
+            ),
+        ]
 
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
@@ -215,41 +254,3 @@ When creating configurations:
 3. Note any prerequisites or dependencies
 4. Suggest validation commands to verify correctness
 """
-
-    @classmethod
-    def get_middleware(cls) -> List[Any]:
-        """Get DevOps-specific middleware.
-
-        Uses MiddlewareComposer for consistent middleware composition:
-        - GitSafetyMiddleware: Block dangerous git operations (strict for infrastructure)
-        - SecretMaskingMiddleware: Mask secrets in tool results
-        - LoggingMiddleware: Audit logging for tool calls
-
-        DevOps has stricter git safety since infrastructure changes are critical.
-
-        Returns:
-            List of middleware implementations
-        """
-        from victor.framework.middleware import MiddlewareComposer
-
-        return (
-            MiddlewareComposer()
-            .git_safety(
-                block_dangerous=True,  # Strict for infrastructure
-                warn_on_risky=True,
-                protected_branches={"production", "staging"},  # Additional protected branches
-            )
-            .secret_masking(
-                replacement="[REDACTED]",
-                mask_in_arguments=True,  # Also mask secrets in inputs
-            )
-            .logging(
-                include_arguments=True,
-                include_results=True,
-            )
-            .build()
-        )
-
-    # =========================================================================
-    # New Framework Integrations (Workflows, RL, Teams)
-    # =========================================================================

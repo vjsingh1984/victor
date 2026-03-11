@@ -19,6 +19,12 @@ from victor.verticals.contrib.dataanalysis.capabilities import (
 )
 from victor.verticals.contrib.devops import DevOpsAssistant
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
+from victor.verticals.contrib.devops.prompts import DevOpsPromptContributor
+from victor.framework.middleware import (
+    GitSafetyMiddleware as FrameworkGitSafetyMiddleware,
+    LoggingMiddleware,
+    SecretMaskingMiddleware,
+)
 from victor.verticals.contrib.rag import RAGAssistant
 from victor.verticals.contrib.rag.capabilities import (
     RAGCapabilityProvider,
@@ -119,6 +125,20 @@ def test_capability_provider_autoloads_for_verticals_using_default_loader() -> N
         DataAnalysisAssistant.get_capability_provider(),
         DataAnalysisCapabilityProvider,
     )
+
+
+def test_devops_runtime_extensions_resolve_via_shared_loader_defaults() -> None:
+    """DevOps should inherit middleware and prompt runtime hooks from shared defaults."""
+
+    assert "get_middleware" not in DevOpsAssistant.__victor_sdk_source__.__dict__
+
+    middleware = DevOpsAssistant.get_middleware()
+
+    assert len(middleware) == 3
+    assert isinstance(middleware[0], FrameworkGitSafetyMiddleware)
+    assert isinstance(middleware[1], SecretMaskingMiddleware)
+    assert isinstance(middleware[2], LoggingMiddleware)
+    assert isinstance(DevOpsAssistant.get_prompt_contributor(), DevOpsPromptContributor)
 
 
 def test_rag_runtime_extensions_resolve_via_shared_loader_defaults() -> None:

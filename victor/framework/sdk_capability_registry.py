@@ -247,9 +247,23 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
         )
         registry.register(
             RuntimeCapabilityBinding(
+                capability_id=CapabilityIds.SHELL_ACCESS,
+                description="Shell access is satisfied by the shell tool.",
+                any_tools=("shell",),
+            )
+        )
+        registry.register(
+            RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.GIT,
                 description="Git access is satisfied by the git tool.",
                 any_tools=("git",),
+            )
+        )
+        registry.register(
+            RuntimeCapabilityBinding(
+                capability_id=CapabilityIds.CONTAINER_RUNTIME,
+                description="Container runtime access is satisfied by Docker-style tooling.",
+                any_tools=("docker",),
             )
         )
         registry.register(

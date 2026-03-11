@@ -204,6 +204,11 @@ Milestone targets:
   - Framework comparison with statistical tie detection (overlapping CIs)
   - CLI + JSON output
 - 🔄 M2: Execute benchmarks on Victor + 2 competitors (runtime, requires API keys)
+- ✅ M2: P0-P1 benchmark fixes applied (2026-03-11):
+  - R4 (Debug investigation): Fixed — error recovery fallback wired into tool pipeline; `semantic_code_search` now falls back to `code_search`/`grep` on dependency errors
+  - T1 (File operations): Per-tool timeout added (prevents individual tool hangs); overall 90s task timeout still exceeded due to LLM inference latency on local Ollama
+  - Memory: First-task spike reduced from +694MB to +111MB by deferring embedding preload (`preload_embeddings=False`)
+  - Per-tool timeout: `asyncio.wait_for()` wraps all serial tool calls (15-60s based on complexity)
 - ⏳ M3: Report published, action items identified
 
 **Benchmark Suite** (22 tasks):

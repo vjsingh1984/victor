@@ -8,7 +8,10 @@ class CapabilityIds:
 
     FILE_OPS = "file_ops"
     FILE_OPERATIONS = FILE_OPS
+    SHELL_ACCESS = "shell_access"
+    SHELL_EXECUTION = SHELL_ACCESS
     GIT = "git"
+    CONTAINER_RUNTIME = "container_runtime"
     LSP = "lsp"
     WEB_ACCESS = "web_access"
     DOCUMENT_INGESTION = "document_ingestion"

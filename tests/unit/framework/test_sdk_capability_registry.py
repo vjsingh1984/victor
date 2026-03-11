@@ -23,7 +23,9 @@ def test_runtime_capability_registry_contains_core_bindings():
     registry = get_runtime_capability_registry(reset=True)
 
     assert registry.get(CapabilityIds.FILE_OPS) is not None
+    assert registry.get(CapabilityIds.SHELL_ACCESS) is not None
     assert registry.get(CapabilityIds.LSP) is not None
+    assert registry.get(CapabilityIds.CONTAINER_RUNTIME) is not None
     assert registry.get(CapabilityIds.PRIVACY) is not None
     assert registry.get(CapabilityIds.DOCUMENT_INGESTION) is not None
     assert registry.get(CapabilityIds.RETRIEVAL) is not None
@@ -54,6 +56,32 @@ def test_resolve_lsp_requirement_from_orchestrator_capability():
     assert resolution.available is True
     assert resolution.known is True
     assert resolution.source == "orchestrator:lsp"
+
+
+def test_resolve_devops_capabilities_from_tool_bundles():
+    """DevOps-specific SDK capabilities should resolve from the current tool surface."""
+
+    tool_names = {"shell", "docker", "git"}
+
+    shell = resolve_capability_requirement(
+        CapabilityIds.SHELL_ACCESS,
+        available_tools=tool_names,
+    )
+    container = resolve_capability_requirement(
+        CapabilityIds.CONTAINER_RUNTIME,
+        available_tools=tool_names,
+    )
+    git = resolve_capability_requirement(
+        CapabilityIds.GIT,
+        available_tools=tool_names,
+    )
+
+    assert shell.available is True
+    assert shell.source == "tools:shell"
+    assert container.available is True
+    assert container.source == "tools:docker"
+    assert git.available is True
+    assert git.source == "tools:git"
 
 
 def test_resolve_builtin_privacy_requirement():
