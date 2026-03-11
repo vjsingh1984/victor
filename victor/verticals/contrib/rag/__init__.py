@@ -48,8 +48,8 @@ from victor.verticals.contrib.rag.document_store import (
 )
 from victor.verticals.contrib.rag.chunker import DocumentChunker, ChunkingConfig
 from victor.verticals.contrib.rag.prompts import RAGPromptContributor
-from victor.verticals.contrib.rag.mode_config import RAGModeConfigProvider
-from victor.verticals.contrib.rag.capabilities import RAGCapabilityProvider
+from victor.verticals.contrib.rag.runtime.mode_config import RAGModeConfigProvider
+from victor.verticals.contrib.rag.runtime.capabilities import RAGCapabilityProvider
 from victor.verticals.contrib.rag.tools import (
     RAGIngestTool,
     RAGSearchTool,
@@ -85,7 +85,7 @@ __all__ = [
 ]
 
 # Enhanced features with new coordinators
-from victor.verticals.contrib.rag.safety_enhanced import (
+from victor.verticals.contrib.rag.runtime.safety_enhanced import (
     RAGSafetyRules,
     EnhancedRAGSafetyExtension,
 )

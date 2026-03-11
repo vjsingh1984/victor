@@ -630,6 +630,241 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         results.sort(key=lambda row: row["recorded_at"])
         return results
 
+    async def find_callers(
+        self,
+        function_name: str,
+        file_path: Optional[str] = None,
+        edge_type: str = "CALLS",
+        max_depth: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """Find graph callers for a function using ProximaDB's graph helper."""
+        if not self._initialized:
+            await self.initialize()
+
+        graph_api = self._graph_api or self._build_graph_api()
+        if graph_api is None or not hasattr(graph_api, "find_callers"):
+            return []
+
+        properties: Dict[str, Any] = {"name": function_name}
+        if file_path:
+            properties["file_path"] = file_path
+
+        nodes = self._query_graph_nodes(labels=["Function"], properties=properties)
+        callers: List[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for node in nodes:
+            try:
+                matches = graph_api.find_callers(
+                    node["id"],
+                    edge_type=edge_type,
+                    max_depth=max_depth,
+                )
+            except Exception:
+                logger.debug("Graph caller lookup failed for %s", node.get("id"))
+                continue
+
+            for caller in matches:
+                metadata = dict(getattr(caller, "properties", {}) or {})
+                caller_id = getattr(caller, "id", None) or metadata.get("id")
+                if not caller_id or caller_id in seen_ids:
+                    continue
+                seen_ids.add(caller_id)
+                callers.append(
+                    {
+                        "id": caller_id,
+                        "name": metadata.get("qualified_name") or metadata.get("name"),
+                        "file_path": metadata.get("file_path"),
+                        "line_start": metadata.get("line_start"),
+                        "line_end": metadata.get("line_end"),
+                        "labels": list(getattr(caller, "labels", []) or []),
+                        "metadata": metadata,
+                    }
+                )
+
+        callers.sort(
+            key=lambda row: (
+                row.get("file_path") or "",
+                row.get("line_start") or 0,
+                row.get("name") or "",
+            )
+        )
+        return callers
+
+    async def find_callees(
+        self,
+        function_name: str,
+        file_path: Optional[str] = None,
+        edge_type: str = "CALLS",
+        max_depth: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """Find functions reached by a graph traversal from a starting function."""
+        if not self._initialized:
+            await self.initialize()
+
+        properties: Dict[str, Any] = {"name": function_name}
+        if file_path:
+            properties["file_path"] = file_path
+
+        nodes = self._query_graph_nodes(labels=["Function"], properties=properties)
+        callees: List[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for node in nodes:
+            start_node_id = node.get("id")
+            if not start_node_id:
+                continue
+
+            traversal = self._traverse_graph(
+                start_node_id=start_node_id,
+                edge_types=[edge_type] if edge_type else None,
+                max_depth=max_depth,
+            )
+            for visited in traversal.get("nodes", []):
+                callee = self._graph_node_to_result(visited)
+                callee_id = callee.get("id")
+                if not callee_id or callee_id == start_node_id or callee_id in seen_ids:
+                    continue
+                seen_ids.add(callee_id)
+                callees.append(callee)
+
+        callees.sort(
+            key=lambda row: (
+                row.get("file_path") or "",
+                row.get("line_start") or 0,
+                row.get("name") or "",
+            )
+        )
+        return callees
+
+    async def trace_execution_path(
+        self,
+        entry_function: str,
+        file_path: Optional[str] = None,
+        max_depth: int = 3,
+        edge_type: str = "CALLS",
+    ) -> Dict[str, Any]:
+        """Trace a bounded execution path from an entry function through the call graph."""
+        if not self._initialized:
+            await self.initialize()
+
+        properties: Dict[str, Any] = {"name": entry_function}
+        if file_path:
+            properties["file_path"] = file_path
+
+        nodes = self._query_graph_nodes(labels=["Function"], properties=properties)
+        if not nodes:
+            return {
+                "entry_point": None,
+                "nodes": [],
+                "edges": [],
+                "edge_type": edge_type,
+                "max_depth": max_depth,
+            }
+
+        entry_node = nodes[0]
+        entry_node_id = entry_node.get("id")
+        if not entry_node_id:
+            return {
+                "entry_point": None,
+                "nodes": [],
+                "edges": [],
+                "edge_type": edge_type,
+                "max_depth": max_depth,
+            }
+
+        traversal = self._traverse_graph(
+            start_node_id=entry_node_id,
+            edge_types=[edge_type] if edge_type else None,
+            max_depth=max_depth,
+        )
+        node_map: Dict[str, Dict[str, Any]] = {
+            entry_node_id: self._graph_node_to_result(entry_node)
+        }
+        for node in traversal.get("nodes", []):
+            normalized = self._graph_node_to_result(node)
+            node_id = normalized.get("id")
+            if node_id:
+                node_map[node_id] = normalized
+
+        edges = []
+        for edge in traversal.get("edges", []):
+            normalized = self._graph_edge_to_result(edge)
+            if edge_type and normalized.get("edge_type") != edge_type:
+                continue
+            edges.append(normalized)
+
+        ordered_nodes = list(node_map.values())
+        ordered_nodes.sort(
+            key=lambda row: (
+                row.get("file_path") or "",
+                row.get("line_start") or 0,
+                row.get("name") or "",
+            )
+        )
+
+        return {
+            "entry_point": node_map[entry_node_id],
+            "nodes": ordered_nodes,
+            "edges": edges,
+            "edge_type": edge_type,
+            "max_depth": max_depth,
+        }
+
+    async def find_similar_bugs(
+        self,
+        bug_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Find semantically similar bug sites and enrich them with local graph context."""
+        if not self._initialized:
+            await self.initialize()
+
+        document_filter = {"language": language} if language else None
+        ranked = await self.hybrid_search(
+            query=bug_description,
+            document_filter=document_filter,
+            top_k=top_k,
+        )
+
+        enriched: List[Dict[str, Any]] = []
+        for row in ranked:
+            result = dict(row)
+            metadata = dict(result.get("metadata", {}) or {})
+            symbol_name = (
+                result.get("symbol_name")
+                or metadata.get("qualified_name")
+                or metadata.get("name")
+            )
+            file_path = result.get("file_path") or metadata.get("file_path")
+
+            if include_graph_context and symbol_name and file_path:
+                callers = await self.find_callers(symbol_name, file_path=file_path)
+                callees = await self.find_callees(symbol_name, file_path=file_path)
+                result["graph_context"] = {
+                    "callers": callers[:context_limit],
+                    "callees": callees[:context_limit],
+                    "related_files": sorted(
+                        {
+                            candidate.get("file_path")
+                            for candidate in [*callers[:context_limit], *callees[:context_limit]]
+                            if candidate.get("file_path")
+                        }
+                    ),
+                }
+            else:
+                result["graph_context"] = {
+                    "callers": [],
+                    "callees": [],
+                    "related_files": [],
+                }
+            enriched.append(result)
+
+        return enriched
+
     def _ensure_collection(self, collection_name: str) -> None:
         """Create a collection if it does not already exist."""
         try:
@@ -670,6 +905,96 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         except Exception:
             logger.debug("Failed to initialize ProximaDBGraph for %s", self._graph_collection)
             return None
+
+    def _query_graph_nodes(
+        self,
+        labels: List[str],
+        properties: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        try:
+            result = self._client.query_nodes(
+                graph_id=self._graph_collection,
+                labels=labels,
+                properties=properties,
+            )
+        except TypeError:
+            result = self._client.query_nodes(labels=labels, properties=properties)
+        except Exception:
+            logger.debug("Graph node lookup failed for labels=%s properties=%s", labels, properties)
+            return []
+
+        if isinstance(result, dict):
+            return list(result.get("nodes", []) or [])
+        return []
+
+    def _traverse_graph(
+        self,
+        start_node_id: str,
+        edge_types: Optional[List[str]],
+        max_depth: int,
+    ) -> Dict[str, Any]:
+        try:
+            result = self._client.traverse_graph(
+                graph_id=self._graph_collection,
+                start_node_id=start_node_id,
+                max_depth=max_depth,
+                edge_types=edge_types,
+            )
+        except TypeError:
+            result = self._client.traverse_graph(
+                start_node_id=start_node_id,
+                max_depth=max_depth,
+                edge_types=edge_types,
+            )
+        except Exception:
+            logger.debug("Graph traversal failed for %s", start_node_id)
+            return {"nodes": [], "edges": []}
+
+        if isinstance(result, dict):
+            return result
+        return {"nodes": [], "edges": []}
+
+    def _graph_node_to_result(self, node: Any) -> Dict[str, Any]:
+        if isinstance(node, dict):
+            node_id = node.get("id")
+            labels = list(node.get("labels", []) or [])
+            metadata = dict(node.get("properties", {}) or {})
+        else:
+            node_id = getattr(node, "id", None)
+            labels = list(getattr(node, "labels", []) or [])
+            metadata = dict(getattr(node, "properties", {}) or {})
+
+        return {
+            "id": node_id,
+            "name": metadata.get("qualified_name") or metadata.get("name"),
+            "file_path": metadata.get("file_path"),
+            "line_start": metadata.get("line_start"),
+            "line_end": metadata.get("line_end"),
+            "labels": labels,
+            "metadata": metadata,
+        }
+
+    def _graph_edge_to_result(self, edge: Any) -> Dict[str, Any]:
+        if isinstance(edge, dict):
+            edge_id = edge.get("id")
+            from_node_id = edge.get("from_node_id") or edge.get("from_node")
+            to_node_id = edge.get("to_node_id") or edge.get("to_node")
+            edge_type = edge.get("edge_type")
+            metadata = dict(edge.get("properties", {}) or {})
+        else:
+            edge_id = getattr(edge, "id", None)
+            from_node_id = getattr(edge, "from_node_id", None) or getattr(edge, "from_node", None)
+            to_node_id = getattr(edge, "to_node_id", None) or getattr(edge, "to_node", None)
+            edge_type = getattr(edge, "edge_type", None)
+            metadata = dict(getattr(edge, "properties", {}) or {})
+
+        return {
+            "id": edge_id,
+            "from_node_id": from_node_id,
+            "to_node_id": to_node_id,
+            "edge_type": edge_type,
+            "metadata": metadata,
+        }
 
     def _collection_name(self, key: str, suffix: str) -> str:
         override = self.config.extra_config.get(key)

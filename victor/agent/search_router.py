@@ -28,9 +28,9 @@ Design Principles:
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,8 @@ class SearchRoute:
     reason: str
     transformed_query: Optional[str]
     matched_patterns: List[str]
+    tool_name: Optional[str] = None
+    tool_arguments: Dict[str, Any] = field(default_factory=dict)
 
 
 # Patterns that indicate KEYWORD search is better
@@ -128,6 +130,22 @@ SEMANTIC_SIGNALS: List[Tuple[str, float, str, bool]] = [
     (r"\bgoal(s)?\b", 0.7, "goals", False),
 ]
 
+# Patterns that indicate bug similarity search is better than generic semantic search.
+# These queries still map to code_search, but with mode="bugs" so providers can
+# use graph-enriched bug similarity when available.
+BUG_SIMILARITY_SIGNALS: List[Tuple[str, float, str, bool]] = [
+    (
+        r"\bsimilar\s+(bug|bugs|issue|issues|failure|failures|regression|regressions)\b",
+        1.0,
+        "similar_bug",
+        False,
+    ),
+    (r"\b(regression|regressions)\b", 0.9, "regression", False),
+    (r"\b(crash|crashes|crashed|panic|panics|panicked|segfault)\b", 0.9, "crash", False),
+    (r"\b(traceback|stack\s*trace)\b", 0.8, "stacktrace", False),
+    (r"\b(bug|bugs|failing|failure|failures|broken)\b", 0.7, "bug_symptom", False),
+]
+
 
 class SearchRouter:
     """Routes search queries to appropriate search tools.
@@ -169,9 +187,11 @@ class SearchRouter:
         # Compile patterns
         self._keyword_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._semantic_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._bug_patterns: List[Tuple[re.Pattern, float, str]] = []
 
         self._compile_patterns(KEYWORD_SIGNALS, self._keyword_patterns)
         self._compile_patterns(SEMANTIC_SIGNALS, self._semantic_patterns)
+        self._compile_patterns(BUG_SIMILARITY_SIGNALS, self._bug_patterns)
 
         # Add custom signals
         if custom_signals:
@@ -179,6 +199,8 @@ class SearchRouter:
                 self._compile_patterns(custom_signals["keyword"], self._keyword_patterns)
             if "semantic" in custom_signals:
                 self._compile_patterns(custom_signals["semantic"], self._semantic_patterns)
+            if "bug" in custom_signals:
+                self._compile_patterns(custom_signals["bug"], self._bug_patterns)
 
     def _compile_patterns(
         self,
@@ -213,6 +235,10 @@ class SearchRouter:
             result = router(query)
             if result is not None:
                 return result
+
+        bug_route = self._route_bug_similarity_query(query)
+        if bug_route is not None:
+            return bug_route
 
         # Check for quoted strings (always keyword)
         if self._has_quoted_string(query):
@@ -269,6 +295,29 @@ class SearchRouter:
                 matched_patterns=[],
             )
 
+    def _route_bug_similarity_query(self, query: str) -> Optional[SearchRoute]:
+        """Return a code_search bug-similarity route for bug/regression style queries."""
+        if self._has_quoted_string(query):
+            return None
+
+        bug_score, bug_matches = self._score_patterns(query, self._bug_patterns)
+        if bug_score < 0.7:
+            return None
+
+        keyword_score, _ = self._score_patterns(query, self._keyword_patterns)
+        if keyword_score >= 1.0:
+            return None
+
+        return SearchRoute(
+            search_type=SearchType.SEMANTIC,
+            confidence=min(1.0, 0.45 + bug_score / 2.0),
+            reason="Query describes a bug/regression pattern suited for bug similarity search",
+            transformed_query=None,
+            matched_patterns=bug_matches,
+            tool_name="code_search",
+            tool_arguments={"mode": "bugs"},
+        )
+
     def _score_patterns(
         self,
         query: str,
@@ -307,6 +356,8 @@ class SearchRouter:
             Tool name: "code_search" or "semantic_code_search"
         """
         route = self.route(query)
+        if route.tool_name:
+            return route.tool_name
         if route.search_type == SearchType.SEMANTIC:
             return "semantic_code_search"
         return "code_search"

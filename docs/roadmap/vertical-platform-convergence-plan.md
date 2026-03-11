@@ -629,8 +629,8 @@ Feature summary:
 |---|---|---|---|---|
 | VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
 | VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
-| VPC-F3.3 | RAG vertical migration | In Progress | VPC-F3.1 | `rag` definition layer follows SDK-only pattern |
-| VPC-F3.4 | DevOps vertical migration | Not Started | VPC-F3.1 | `devops` definition layer follows SDK-only pattern |
+| VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
+| VPC-F3.4 | DevOps vertical migration | In Progress | VPC-F3.1 | `devops` definition layer follows SDK-only pattern |
 | VPC-F3.5 | Data Analysis vertical migration | Not Started | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
 | VPC-F3.6 | Research vertical migration | Not Started | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
 | VPC-F3.7 | External example and template migration | Not Started | VPC-F3.1 | Example packages teach the supported contract |
@@ -713,8 +713,8 @@ Tasks:
 - [x] VPC-T3.10 Inventory and classify `rag` imports by layer.
 - [x] VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
 - [x] VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
-- [ ] VPC-T3.13 Move runtime integrations out of `rag` definition modules.
-- [ ] VPC-T3.14 Add RAG migration tests and parity checks.
+- [x] VPC-T3.13 Move runtime integrations out of `rag` definition modules.
+- [x] VPC-T3.14 Add RAG migration tests and parity checks.
 
 #### VPC-F3.4: DevOps Vertical Migration
 
@@ -736,7 +736,7 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.15 Inventory and classify `devops` imports by layer.
+- [x] VPC-T3.15 Inventory and classify `devops` imports by layer.
 - [ ] VPC-T3.16 Replace definition-layer imports with SDK contracts in `devops`.
 - [ ] VPC-T3.17 Express shell/git/infra needs through SDK capability identifiers in `devops`.
 - [ ] VPC-T3.18 Move runtime integrations out of `devops` definition modules.
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.13 Move runtime integrations out of `rag` definition modules.
-2. VPC-T3.14 Add RAG migration tests and parity checks.
+1. VPC-T3.16 Replace definition-layer imports with SDK contracts in `devops`.
+2. VPC-T3.17 Express shell/git/infra needs through SDK capability identifiers in `devops`.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1872,6 +1872,158 @@ Likely touchpoints:
   - result: 33 passed in 7.01s
 - Next recommended implementation layer:
   - `VPC-T3.13` move runtime integrations out of `rag` definition modules
+
+### 2026-03-10 (Session AE)
+
+- Started `VPC-T3.13` with the first concrete `rag/runtime/` extraction slice.
+- Added `victor/verticals/contrib/rag/runtime/` and moved these runtime-owned
+  modules under it:
+  - `runtime/mode_config.py`
+  - `runtime/safety_enhanced.py`
+- Converted the package-root modules into compatibility shims:
+  - `victor/verticals/contrib/rag/mode_config.py`
+  - `victor/verticals/contrib/rag/safety_enhanced.py`
+- Updated the package export surface in `victor/verticals/contrib/rag/__init__.py`
+  to import those symbols from the new runtime package instead of the root
+  shims, keeping the package root aligned with the target layout.
+- Added regression coverage proving:
+  - the root shims re-export the runtime classes
+  - `RAGAssistant.get_mode_config_provider()` resolves through the runtime
+    module path
+  - shared mixed-mode runtime resolution still passes after the package move
+- Updated the `rag` inventory document to record the new `runtime/` package and
+  the completed first extraction slice.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/integration/test_sdk_integration.py`
+  - result: 29 passed in 5.02s
+- Next recommended implementation layer:
+  - continue `VPC-T3.13` by moving `capabilities.py`, `enrichment.py`, or the
+    primary `safety.py` module under `rag/runtime/`
+
+### 2026-03-11 (Session AF)
+
+- Continued `VPC-T3.13` with the next runtime extraction slice for `rag`.
+- Moved the RAG capability provider/config implementation under
+  `victor/verticals/contrib/rag/runtime/capabilities.py`.
+- Converted `victor/verticals/contrib/rag/capabilities.py` into a compatibility
+  shim that re-exports the runtime-owned provider, config helpers, and loader
+  surfaces.
+- Updated `victor/verticals/contrib/rag/__init__.py` to import
+  `RAGCapabilityProvider` from the runtime package instead of the root shim,
+  keeping the package export surface aligned with the target layout.
+- Added regression coverage proving:
+  - the root `capabilities.py` shim re-exports the runtime provider and config
+    helper
+  - `RAGAssistant.get_capability_provider()` resolves to the runtime provider
+  - direct `rag` capability integration tests still pass through the root import
+    path
+- Updated the `rag` inventory document to record that the runtime capability
+  slice is complete and that the next likely runtime moves are `enrichment.py`
+  or the primary `safety.py` module.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/framework/test_vertical_capability_integration.py -k rag`
+  - result: 11 passed, 52 deselected in 4.49s
+- Next recommended implementation layer:
+  - continue `VPC-T3.13` by moving `enrichment.py` or `safety.py` under
+    `rag/runtime/`
+
+### 2026-03-11 (Session AG)
+
+- Continued `VPC-T3.13` with the next runtime extraction slice for `rag`.
+- Moved the primary RAG safety extension and framework safety-rule factories
+  under `victor/verticals/contrib/rag/runtime/safety.py`.
+- Converted `victor/verticals/contrib/rag/safety.py` into a compatibility shim
+  that re-exports the runtime-owned extension, safety constants, and rule
+  factory functions, preserving the public `victor.rag.safety` import surface.
+- Updated `victor/verticals/contrib/rag/runtime/__init__.py` to export the
+  runtime safety helper alongside the already migrated mode-config,
+  capabilities, and enhanced-safety modules.
+- Added regression coverage proving:
+  - the root `safety.py` shim re-exports the runtime safety extension and rule
+    factory
+  - `RAGAssistant.get_safety_extension()` resolves to the runtime-owned class
+  - the external-first `victor.rag.safety` import path still passes the RAG
+    safety integration suite
+- Updated the `rag` inventory document to record the new `runtime/safety.py`
+  module and the reduced root runtime surface.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/framework/test_safety_integration.py -k rag`
+  - result: 2 passed, 1 skipped, 4 deselected in 12.12s
+- Next recommended implementation layer:
+  - continue `VPC-T3.13` by moving `enrichment.py` under `rag/runtime/`, then
+    proceed to grouped runtime moves for `workflows/`, `teams/`, and `rl/`
+
+### 2026-03-11 (Session AH)
+
+- Continued `VPC-T3.13` with the remaining runtime-module extraction slices for
+  `rag`.
+- Moved `victor/verticals/contrib/rag/enrichment.py` under
+  `victor/verticals/contrib/rag/runtime/enrichment.py` and reduced the
+  package-root module to a compatibility shim for direct query-tool imports.
+- Moved the workflow, team, and RL implementations under:
+  - `victor/verticals/contrib/rag/runtime/workflows.py`
+  - `victor/verticals/contrib/rag/runtime/teams.py`
+  - `victor/verticals/contrib/rag/runtime/rl.py`
+- Converted the root `workflows`, `teams`, and `rl` packages into compatibility
+  shims and updated `victor/verticals/contrib/rag/runtime/__init__.py` to
+  export the runtime-owned provider classes.
+- Expanded regression coverage proving:
+  - the root `enrichment`, `workflows`, `teams`, and `rl` shims re-export the
+    runtime-owned classes/functions
+  - `RAGAssistant` runtime helper resolution still returns the workflow, RL, and
+    team providers through the shared loader defaults
+  - the RAG workflow provider remains importable through the external-first
+    integration path
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/framework/test_vertical_capability_integration.py -k rag`
+  - result: 12 passed, 52 deselected in 4.72s
+- Next recommended implementation layer:
+  - close `VPC-T3.13` and add explicit `rag` migration parity coverage
+
+### 2026-03-11 (Session AI)
+
+- Completed `VPC-T3.14` by adding
+  `tests/integration/verticals/test_rag_migration_parity.py`.
+- The new parity suite covers:
+  - discovery and runtime binding through `VerticalLoader` and
+    `VerticalRuntimeAdapter`
+  - bootstrap activation of RAG prompt, safety, mode-config, workflow, RL, and
+    team extensions
+  - behavior parity through the runtime wrapper class exported at the RAG
+    package root
+- Updated the tests to reflect the real migration boundary: `assistant.py`
+  remains the definition class while `victor.verticals.contrib.rag` exposes the
+  runtime wrapper class for loader-driven helpers.
+- Marked `VPC-F3.3` complete and advanced the current tranche to the `devops`
+  migration starting at `VPC-T3.15`.
+- Verification:
+  - `../.venv/bin/pytest -q tests/integration/verticals/test_rag_migration_parity.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/framework/test_vertical_capability_integration.py -k rag`
+  - result: 15 passed, 52 deselected in 5.05s
+- Next recommended implementation layer:
+  - `VPC-T3.15` inventory and classify `devops` imports by layer
+
+### 2026-03-11 (Session AJ)
+
+- Started `VPC-F3.4` by completing `VPC-T3.15` for the `devops` vertical.
+- Added `docs/development/devops-vertical-import-layer-inventory-2026-03-11.md`
+  with the measured import-boundary baseline:
+  - 16 Python files in `victor/verticals/contrib/devops`
+  - 12 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+- Identified the current definition-layer blockers:
+  - `assistant.py` still uses the core vertical base and stage types and still
+    composes middleware directly
+  - `prompts.py` still uses core prompt protocol objects instead of serializable
+    metadata
+- Classified `__init__.py` and `tool_dependencies.py` as shim-layer targets and
+  grouped the runtime surface into capability/config/safety, workflow/team/RL,
+  and lower-friction runtime helpers.
+- Marked `VPC-F3.4` as `In Progress` and advanced the current tranche to
+  `VPC-T3.16`.
+- No tests were run because this session established the inventory/tracking
+  baseline only.
+- Next recommended implementation layer:
+  - `VPC-T3.16` replace definition-layer imports with SDK contracts in `devops`
 
 ## Resume Protocol
 

@@ -234,6 +234,13 @@ class TestConvenienceFunctions:
         tool = suggest_search_tool("how does the caching mechanism work")
         assert tool == "semantic_code_search"
 
+    def test_suggest_search_tool_bug_similarity(self):
+        """Bug/regression queries should keep using code_search with bug mode."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("find similar crashes in the auth flow")
+        assert tool == "code_search"
+
     def test_is_keyword_query(self):
         """Test is_keyword_query function."""
         from victor.agent.search_router import is_keyword_query
@@ -304,6 +311,18 @@ class TestRealWorldQueries:
         result = router.route("how is error handling implemented across providers")
 
         assert result.search_type == SearchType.SEMANTIC
+
+    def test_bug_similarity_query_sets_tool_arguments(self):
+        """Bug-style queries should route to code_search with mode='bugs'."""
+        from victor.agent.search_router import SearchRouter, SearchType
+
+        router = SearchRouter()
+        result = router.route("json parsing crash on empty payload")
+
+        assert result.search_type == SearchType.SEMANTIC
+        assert result.tool_name == "code_search"
+        assert result.tool_arguments == {"mode": "bugs"}
+        assert "crash" in result.matched_patterns
 
     def test_import_exact_match(self):
         """Test exact import routes to KEYWORD."""

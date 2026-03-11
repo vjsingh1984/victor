@@ -193,6 +193,96 @@ def _keyword_score(text: str, query: str) -> int:
     return sum(t.count(word) for word in q)
 
 
+def _normalize_result_dict(result: Any) -> Dict[str, Any]:
+    """Normalize search results from models or dict-like providers."""
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+    if isinstance(result, dict):
+        return dict(result)
+    return dict(result)
+
+
+def _prepare_ranked_results(
+    results: List[Any],
+    search_mode: str,
+    max_content_chars: int = 500,
+) -> List[Dict[str, Any]]:
+    """Normalize, truncate, and importance-rank search results."""
+    ranked_results: List[Dict[str, Any]] = []
+    for result in results:
+        result_dict = _normalize_result_dict(result)
+        result_dict.setdefault("search_mode", search_mode)
+
+        content = result_dict.get("content", "")
+        if isinstance(content, str) and len(content) > max_content_chars:
+            result_dict["content"] = (
+                content[:max_content_chars] + f"... [truncated, {len(content)} chars total]"
+            )
+            result_dict["content_truncated"] = True
+
+        file_path = result_dict.get("file_path", result_dict.get("path", ""))
+        symbol_type = result_dict.get("symbol_type")
+        importance = _calculate_importance_score(file_path, symbol_type)
+        result_dict["importance_score"] = round(importance, 2)
+
+        raw_score = result_dict.get("score", result_dict.get("similarity"))
+        if raw_score is None:
+            raw_score = result_dict.get("combined_score", 0.5)
+        try:
+            numeric_score = float(raw_score)
+        except (TypeError, ValueError):
+            numeric_score = 0.5
+        result_dict["combined_score"] = round(numeric_score * importance, 3)
+
+        ranked_results.append(result_dict)
+
+    ranked_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+    return ranked_results
+
+
+def _build_search_response(
+    *,
+    results: List[Dict[str, Any]],
+    mode: str,
+    rebuilt: bool,
+    root_path: Path,
+    exec_ctx: Optional[Dict[str, Any]],
+    filters_applied: List[str],
+    ranking_note: str,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build a consistent search tool response envelope."""
+    cache_entry = _get_index_cache(exec_ctx).get(str(root_path), {})
+    metadata = {
+        "rebuilt": rebuilt,
+        "root": str(root_path),
+        "indexed_at": cache_entry.get("indexed_at"),
+        "filters_applied": filters_applied if filters_applied else None,
+        "chunking_strategy": "BODY_AWARE",
+        "importance_weighted": True,
+        "available_filters": [
+            "file_path",
+            "symbol_type",
+            "visibility",
+            "language",
+            "is_test_file",
+            "has_docstring",
+        ],
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
+    return {
+        "success": True,
+        "results": results,
+        "count": len(results),
+        "mode": mode,
+        "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
+        "ranking_note": ranking_note,
+        "metadata": metadata,
+    }
+
+
 async def _get_or_build_index(
     root: Path,
     settings: Any,
@@ -346,6 +436,11 @@ async def _literal_search(
         "concept",
         "pattern",
         "similar",
+        "bug",
+        "bugs",
+        "regression",
+        "crash",
+        "failure",
         "find",
         "grep",
         "literal",
@@ -393,16 +488,17 @@ async def code_search(
     Modes:
     - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
     - "literal": Keyword matching (like grep). Best for exact text/identifiers.
+    - "bugs": Similar bug search with graph context when supported by the provider.
 
     Args:
         query: Search query (semantic concepts or literal text)
         path: Directory to search
         k: Max results
-        mode: Search mode - "semantic" (default) or "literal"
+        mode: Search mode - "semantic" (default), "literal", or "bugs"
         reindex: Force re-index (semantic mode only)
         file: Filter by file path (semantic mode only)
         symbol: Filter by type (class/function/method) (semantic mode only)
-        lang: Filter by language (python/rust/js) (semantic mode only)
+        lang: Filter by language (python/rust/js) (semantic and bugs modes)
         test: Filter test files (true/false) (semantic mode only)
         exts: File extensions for literal mode (e.g., [".py", ".js"])
         _exec_ctx: Framework execution context (contains settings, etc.)
@@ -410,6 +506,7 @@ async def code_search(
     Example:
         search(query="error handling in providers")  # Semantic: find related concepts
         search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
+        search(query="json parsing crash on empty payload", mode="bugs")
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
@@ -466,6 +563,55 @@ async def code_search(
         index, rebuilt = await _get_or_build_index(
             root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
         )
+
+        if mode == "bugs":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                bug_results = await index.find_similar_bugs(
+                    bug_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    bug_results,
+                    search_mode="bug_similarity",
+                )
+                extra_metadata = {
+                    "provider_capability": "find_similar_bugs",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="bugs",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (bug_similarity × importance). Graph context included when available.",
+                    extra_metadata=extra_metadata,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Bug similarity mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "bugs",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
+            else:
+                fallback_metadata = {}
+        else:
+            fallback_metadata = {}
 
         # Get semantic search configuration from settings
         # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
@@ -595,58 +741,18 @@ async def code_search(
                 logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
                 # Fall back to semantic-only results (already have them)
 
-        # Truncate content in results to prevent context overflow
-        # Keep enough for context but not entire function bodies
-        MAX_CONTENT_CHARS = 500
-        truncated_results = []
-        for result in results:
-            # Convert to dict for serialization
-            result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
-            content = result_dict.get("content", "")
-            if len(content) > MAX_CONTENT_CHARS:
-                result_dict["content"] = (
-                    content[:MAX_CONTENT_CHARS] + f"... [truncated, {len(content)} chars total]"
-                )
-                result_dict["content_truncated"] = True
+        ranked_results = _prepare_ranked_results(results, search_mode="semantic")
 
-            # Calculate importance score for ranking
-            file_path = result_dict.get("file_path", "")
-            symbol_type = result_dict.get("symbol_type")
-            importance = _calculate_importance_score(file_path, symbol_type)
-            result_dict["importance_score"] = round(importance, 2)
-
-            # Combine semantic similarity with importance for final ranking
-            semantic_score = result_dict.get("score", result_dict.get("similarity", 0.5))
-            result_dict["combined_score"] = round(semantic_score * importance, 3)
-
-            truncated_results.append(result_dict)
-
-        # Re-sort by combined score (importance-weighted semantic relevance)
-        truncated_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
-
-        return {
-            "success": True,
-            "results": truncated_results,
-            "count": len(truncated_results),
-            "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
-            "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
-            "metadata": {
-                "rebuilt": rebuilt,
-                "root": str(root_path),
-                "indexed_at": _get_index_cache(_exec_ctx)[str(root_path)]["indexed_at"],
-                "filters_applied": filters_applied if filters_applied else None,
-                "chunking_strategy": "BODY_AWARE",
-                "importance_weighted": True,
-                "available_filters": [
-                    "file_path",
-                    "symbol_type",
-                    "visibility",
-                    "language",
-                    "is_test_file",
-                    "has_docstring",
-                ],
-            },
-        }
+        return _build_search_response(
+            results=ranked_results,
+            mode="semantic",
+            rebuilt=rebuilt,
+            root_path=root_path,
+            exec_ctx=_exec_ctx,
+            filters_applied=filters_applied,
+            ranking_note="Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
+            extra_metadata=fallback_metadata,
+        )
     except ImportError as exc:
         return {
             "success": False,

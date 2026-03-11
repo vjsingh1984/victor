@@ -36,6 +36,7 @@ import re
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -3109,6 +3110,141 @@ class CodebaseIndex:
             }
             for result in all_results
         ]
+
+    async def hybrid_search(
+        self,
+        query: str,
+        graph_query: Optional[str] = None,
+        document_filter: Optional[Dict[str, Any]] = None,
+        time_range: Optional[tuple[datetime, datetime]] = None,
+        top_k: int = 10,
+        auto_reindex: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Run provider-backed hybrid search when supported by the embedding store."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "hybrid_search"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support hybrid_search()"
+            )
+        return await provider.hybrid_search(
+            query=query,
+            graph_query=graph_query,
+            document_filter=document_filter,
+            time_range=time_range,
+            top_k=top_k,
+        )
+
+    async def get_code_metrics(
+        self,
+        file_path: str,
+        days: int = 30,
+        auto_reindex: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Return time-series style code metrics when supported by the provider."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "get_code_metrics"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support get_code_metrics()"
+            )
+        return await provider.get_code_metrics(file_path=file_path, days=days)
+
+    async def find_callers(
+        self,
+        function_name: str,
+        file_path: Optional[str] = None,
+        edge_type: str = "CALLS",
+        max_depth: int = 1,
+        auto_reindex: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Return reverse call graph matches when supported by the provider."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "find_callers"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support find_callers()"
+            )
+        return await provider.find_callers(
+            function_name=function_name,
+            file_path=file_path,
+            edge_type=edge_type,
+            max_depth=max_depth,
+        )
+
+    async def find_callees(
+        self,
+        function_name: str,
+        file_path: Optional[str] = None,
+        edge_type: str = "CALLS",
+        max_depth: int = 1,
+        auto_reindex: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Return forward call graph matches when supported by the provider."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "find_callees"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support find_callees()"
+            )
+        return await provider.find_callees(
+            function_name=function_name,
+            file_path=file_path,
+            edge_type=edge_type,
+            max_depth=max_depth,
+        )
+
+    async def trace_execution_path(
+        self,
+        entry_function: str,
+        file_path: Optional[str] = None,
+        max_depth: int = 3,
+        edge_type: str = "CALLS",
+        auto_reindex: bool = True,
+    ) -> Dict[str, Any]:
+        """Trace a bounded execution path when supported by the provider."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "trace_execution_path"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support "
+                "trace_execution_path()"
+            )
+        return await provider.trace_execution_path(
+            entry_function=entry_function,
+            file_path=file_path,
+            max_depth=max_depth,
+            edge_type=edge_type,
+        )
+
+    async def find_similar_bugs(
+        self,
+        bug_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+        auto_reindex: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Return provider-backed bug similarity matches when supported."""
+        provider = await self._get_embedding_capability_provider(auto_reindex=auto_reindex)
+        if not hasattr(provider, "find_similar_bugs"):
+            raise NotImplementedError(
+                f"Embedding provider {type(provider).__name__} does not support "
+                "find_similar_bugs()"
+            )
+        return await provider.find_similar_bugs(
+            bug_description=bug_description,
+            language=language,
+            top_k=top_k,
+            include_graph_context=include_graph_context,
+            context_limit=context_limit,
+        )
+
+    async def _get_embedding_capability_provider(self, auto_reindex: bool) -> "BaseEmbeddingProvider":
+        """Return an initialized embedding provider for advanced provider capabilities."""
+        if not self.use_embeddings or not self.embedding_provider:
+            raise ValueError("Embeddings not enabled. Initialize with use_embeddings=True")
+
+        await self.ensure_indexed(auto_reindex=auto_reindex)
+        if not self.embedding_provider._initialized:
+            await self.embedding_provider.initialize()
+        return self.embedding_provider
 
     def _build_symbol_context(self, symbol: Symbol) -> str:
         """Build context string for a symbol (for embedding).

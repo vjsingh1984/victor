@@ -3,11 +3,19 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import Dict, List
+from __future__ import annotations
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import MiddlewareProtocol
-from victor_sdk import ToolNames
+from typing import Any, Dict, List
+
+from victor_sdk import PromptMetadata, StageDefinition, ToolNames, VerticalBase
+
+from victor.verticals.contrib.devops.prompt_metadata import (
+    DEVOPS_GROUNDING_RULES,
+    DEVOPS_PROMPT_PRIORITY,
+    DEVOPS_PROMPT_TEMPLATES,
+    DEVOPS_SYSTEM_PROMPT_SECTION,
+    DEVOPS_TASK_TYPE_HINTS,
+)
 
 
 class DevOpsAssistant(VerticalBase):
@@ -19,6 +27,18 @@ class DevOpsAssistant(VerticalBase):
     name = "devops"
     description = "Infrastructure automation, container management, CI/CD, and deployment"
     version = "1.0.0"
+
+    @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
+
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
+
+        return cls.description
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -54,6 +74,33 @@ class DevOpsAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
+    def get_prompt_templates(cls) -> Dict[str, str]:
+        """Return serializable prompt templates for the DevOps definition."""
+
+        return dict(DEVOPS_PROMPT_TEMPLATES)
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Dict[str, Any]]:
+        """Return serializable task-type hints for the DevOps definition."""
+
+        return {task_type: dict(config) for task_type, config in DEVOPS_TASK_TYPE_HINTS.items()}
+
+    @classmethod
+    def get_prompt_metadata(cls) -> PromptMetadata:
+        """Return full prompt metadata, including runtime adapter hints."""
+
+        metadata = super().get_prompt_metadata()
+        return PromptMetadata(
+            templates=metadata.templates,
+            task_type_hints=metadata.task_type_hints,
+            metadata={
+                "system_prompt_section": DEVOPS_SYSTEM_PROMPT_SECTION,
+                "grounding_rules": DEVOPS_GROUNDING_RULES,
+                "priority": DEVOPS_PROMPT_PRIORITY,
+            },
+        )
+
+    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
@@ -63,56 +110,61 @@ class DevOpsAssistant(VerticalBase):
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the infrastructure request",
-                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW},
+                optional_tools=[ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW],
                 keywords=["what", "how", "explain", "infrastructure", "setup"],
                 next_stages={"ASSESSMENT", "PLANNING"},
             ),
             "ASSESSMENT": StageDefinition(
                 name="ASSESSMENT",
                 description="Assessing current infrastructure state",
-                tools={ToolNames.READ, ToolNames.SHELL, ToolNames.GREP, ToolNames.GIT},
+                optional_tools=[ToolNames.READ, ToolNames.SHELL, ToolNames.GREP, ToolNames.GIT],
                 keywords=["check", "status", "current", "existing", "review"],
                 next_stages={"PLANNING", "IMPLEMENTATION"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning infrastructure changes",
-                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
+                optional_tools=[
+                    ToolNames.READ,
+                    ToolNames.GREP,
+                    ToolNames.WEB_SEARCH,
+                    ToolNames.WEB_FETCH,
+                ],
                 keywords=["plan", "design", "architecture", "strategy"],
                 next_stages={"IMPLEMENTATION"},
             ),
             "IMPLEMENTATION": StageDefinition(
                 name="IMPLEMENTATION",
                 description="Implementing infrastructure changes",
-                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER},
+                optional_tools=[ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER],
                 keywords=["create", "build", "configure", "implement", "deploy"],
                 next_stages={"VALIDATION", "DEPLOYMENT"},
             ),
             "VALIDATION": StageDefinition(
                 name="VALIDATION",
                 description="Validating configurations and testing",
-                tools={ToolNames.SHELL, ToolNames.READ, ToolNames.TEST},
+                optional_tools=[ToolNames.SHELL, ToolNames.READ, ToolNames.TEST],
                 keywords=["test", "validate", "verify", "check"],
                 next_stages={"DEPLOYMENT", "IMPLEMENTATION"},
             ),
             "DEPLOYMENT": StageDefinition(
                 name="DEPLOYMENT",
                 description="Deploying to target environment",
-                tools={ToolNames.SHELL, ToolNames.GIT, ToolNames.DOCKER},
+                optional_tools=[ToolNames.SHELL, ToolNames.GIT, ToolNames.DOCKER],
                 keywords=["deploy", "push", "release", "launch"],
                 next_stages={"MONITORING", "COMPLETION"},
             ),
             "MONITORING": StageDefinition(
                 name="MONITORING",
                 description="Setting up monitoring and observability",
-                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL},
+                optional_tools=[ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL],
                 keywords=["monitor", "observe", "alert", "metrics"],
                 next_stages={"COMPLETION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Documenting and finalizing",
-                tools={ToolNames.WRITE, ToolNames.GIT},
+                optional_tools=[ToolNames.WRITE, ToolNames.GIT],
                 keywords=["done", "complete", "document", "finish"],
                 next_stages=set(),
             ),
@@ -165,7 +217,7 @@ When creating configurations:
 """
 
     @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
+    def get_middleware(cls) -> List[Any]:
         """Get DevOps-specific middleware.
 
         Uses MiddlewareComposer for consistent middleware composition:

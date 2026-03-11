@@ -17,16 +17,59 @@ from victor.verticals.contrib.dataanalysis.assistant import DataAnalysisAssistan
 from victor.verticals.contrib.dataanalysis.capabilities import (
     DataAnalysisCapabilityProvider,
 )
-from victor.verticals.contrib.devops.assistant import DevOpsAssistant
+from victor.verticals.contrib.devops import DevOpsAssistant
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
 from victor.verticals.contrib.rag import RAGAssistant
 from victor.verticals.contrib.rag.capabilities import (
+    RAGCapabilityProvider,
     get_capability_configs as get_rag_capability_configs,
 )
+from victor.verticals.contrib.rag.enrichment import (
+    RAGEnrichmentConfig,
+    RAGEnrichmentStrategy,
+    get_rag_enrichment_strategy,
+    reset_rag_enrichment_strategy,
+)
+from victor.verticals.contrib.rag.mode_config import RAGModeConfigProvider
 from victor.verticals.contrib.rag.prompts import RAGPromptContributor
 from victor.verticals.contrib.rag.rl import RAGRLConfig
+from victor.verticals.contrib.rag.runtime.rl import RAGRLConfig as RuntimeRAGRLConfig
 from victor.verticals.contrib.rag.safety import RAGSafetyExtension
+from victor.verticals.contrib.rag.safety import (
+    create_all_rag_safety_rules as create_root_rag_safety_rules,
+)
+from victor.verticals.contrib.rag.safety_enhanced import (
+    EnhancedRAGSafetyExtension,
+    RAGSafetyRules,
+)
+from victor.verticals.contrib.rag.runtime.safety import (
+    RAGSafetyExtension as RuntimeRAGSafetyExtension,
+    create_all_rag_safety_rules as create_runtime_rag_safety_rules,
+)
+from victor.verticals.contrib.rag.runtime.mode_config import (
+    RAGModeConfigProvider as RuntimeRAGModeConfigProvider,
+)
+from victor.verticals.contrib.rag.runtime.capabilities import (
+    RAGCapabilityProvider as RuntimeRAGCapabilityProvider,
+    get_capability_configs as get_runtime_rag_capability_configs,
+)
+from victor.verticals.contrib.rag.runtime.enrichment import (
+    RAGEnrichmentStrategy as RuntimeRAGEnrichmentStrategy,
+    get_rag_enrichment_strategy as get_runtime_rag_enrichment_strategy,
+    reset_rag_enrichment_strategy as reset_runtime_rag_enrichment_strategy,
+)
+from victor.verticals.contrib.rag.runtime.safety_enhanced import (
+    EnhancedRAGSafetyExtension as RuntimeEnhancedRAGSafetyExtension,
+    RAGSafetyRules as RuntimeRAGSafetyRules,
+)
 from victor.verticals.contrib.rag.teams import RAGTeamSpecProvider
+from victor.verticals.contrib.rag.runtime.teams import (
+    RAGTeamSpecProvider as RuntimeRAGTeamSpecProvider,
+)
+from victor.verticals.contrib.rag.runtime.workflows import (
+    RAGWorkflowProvider as RuntimeRAGWorkflowProvider,
+)
+from victor.verticals.contrib.rag.workflows import RAGWorkflowProvider
 from victor.verticals.contrib.research.assistant import ResearchAssistant
 from victor.verticals.contrib.research.capabilities import (
     get_capability_configs as get_research_capability_configs,
@@ -82,6 +125,41 @@ def test_rag_runtime_extensions_resolve_via_shared_loader_defaults() -> None:
     """RAG should use the inherited runtime extension loader for common optional modules."""
 
     assert isinstance(RAGAssistant.get_safety_extension(), RAGSafetyExtension)
+    assert isinstance(RAGAssistant.get_safety_extension(), RuntimeRAGSafetyExtension)
     assert isinstance(RAGAssistant.get_prompt_contributor(), RAGPromptContributor)
-    assert isinstance(RAGAssistant.get_rl_config_provider(), RAGRLConfig)
-    assert isinstance(RAGAssistant.get_team_spec_provider(), RAGTeamSpecProvider)
+    assert isinstance(RAGAssistant.get_rl_config_provider(), RuntimeRAGRLConfig)
+    assert isinstance(RAGAssistant.get_team_spec_provider(), RuntimeRAGTeamSpecProvider)
+    assert isinstance(RAGAssistant.get_workflow_provider(), RuntimeRAGWorkflowProvider)
+
+
+def test_rag_mode_config_and_enhanced_safety_root_shims_delegate_to_runtime_modules() -> None:
+    """Root compatibility shims should re-export runtime-owned RAG helpers."""
+
+    assert RAGModeConfigProvider is RuntimeRAGModeConfigProvider
+    assert RAGCapabilityProvider is RuntimeRAGCapabilityProvider
+    assert RAGRLConfig is RuntimeRAGRLConfig
+    assert RAGSafetyExtension is RuntimeRAGSafetyExtension
+    assert EnhancedRAGSafetyExtension is RuntimeEnhancedRAGSafetyExtension
+    assert RAGSafetyRules is RuntimeRAGSafetyRules
+    assert RAGTeamSpecProvider is RuntimeRAGTeamSpecProvider
+    assert RAGWorkflowProvider is RuntimeRAGWorkflowProvider
+    assert create_root_rag_safety_rules is create_runtime_rag_safety_rules
+    assert get_rag_capability_configs is get_runtime_rag_capability_configs
+    assert isinstance(RAGAssistant.get_capability_provider(), RuntimeRAGCapabilityProvider)
+    assert isinstance(RAGAssistant.get_mode_config_provider(), RuntimeRAGModeConfigProvider)
+
+
+def test_rag_enrichment_root_shim_delegates_to_runtime_module() -> None:
+    """Root enrichment imports should delegate to the runtime-owned module."""
+
+    assert RAGEnrichmentStrategy is RuntimeRAGEnrichmentStrategy
+    assert get_rag_enrichment_strategy is get_runtime_rag_enrichment_strategy
+    assert reset_rag_enrichment_strategy is reset_runtime_rag_enrichment_strategy
+
+    reset_rag_enrichment_strategy()
+    strategy = get_rag_enrichment_strategy(
+        config=RAGEnrichmentConfig(use_llm_enhancement=False),
+    )
+    assert isinstance(strategy, RuntimeRAGEnrichmentStrategy)
+    assert get_runtime_rag_enrichment_strategy() is strategy
+    reset_runtime_rag_enrichment_strategy()

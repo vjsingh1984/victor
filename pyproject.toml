@@ -664,11 +664,34 @@ module = [
 ]
 ignore_errors = true
 
+<<<<<<< Updated upstream
 # M4 Remaining High-Priority Files:
 # - victor/processing/native/__init__.py (142 errors) - Rust extension wrapper issues
 # - victor/agent/orchestrator.py (127 errors) - Complex orchestration logic
 # - victor/tools/graph_tool.py (119 errors) - Graph operations
 # - victor/observability/dashboard/app.py (75 errors) - Dashboard application
+=======
+# TEMPORARY: Testing files for M4 remediation - removing ignore_errors for specific files
+[[tool.mypy.overrides]]
+module = [
+    "victor.tools.language_analyzer",  # FIXED - 74 errors resolved
+    "victor.tools.graph_tool",  # Next: 119 errors
+    "victor.agent.orchestrator",  # Next: 127 errors
+    "victor.processing.native.*",  # Next: 142 errors (Rust extension issues)
+    "victor.observability.dashboard.app",  # Next: 75 errors
+]
+ignore_errors = false
+
+# M4 Status Summary:
+# - Removed ignore_errors for 13 modules (800 files)
+# - Remaining: ~6,146 type errors across 804 files
+# - Top error categories:
+#   * Missing return type annotations (469)
+#   * Missing type annotations for arguments (269)
+#   * Missing type parameters for generics (Callable, dict, tuple, list)
+#   * Returning Any from typed functions
+#   * Incompatible type assignments
+>>>>>>> Stashed changes
 #
 # Total remaining: ~473 errors across 4 high-priority files
 

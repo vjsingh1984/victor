@@ -2676,6 +2676,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with routing recommendation:
                 - recommended_tool: "code_search" or "semantic_code_search" or "both"
+                - recommended_args: Suggested tool arguments (for example {"mode": "bugs"})
                 - confidence: Confidence in the recommendation (0.0-1.0)
                 - reason: Human-readable explanation
                 - search_type: SearchType enum value
@@ -2696,8 +2697,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             SearchType.HYBRID: "both",
         }
 
+        recommended_tool = route.tool_name or tool_map.get(route.search_type, "code_search")
+
         return {
-            "recommended_tool": tool_map.get(route.search_type, "code_search"),
+            "recommended_tool": recommended_tool,
+            "recommended_args": route.tool_arguments,
             "confidence": route.confidence,
             "reason": route.reason,
             "search_type": route.search_type.value,

@@ -14,7 +14,8 @@ Enhanced Features:
 - Enhanced conversation management with ConversationCoordinator (conversation_enhanced.py)
 """
 
-from victor.verticals.contrib.devops.assistant import DevOpsAssistant
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+from victor.verticals.contrib.devops.assistant import DevOpsAssistant as DevOpsAssistantDefinition
 from victor.verticals.contrib.devops.prompts import DevOpsPromptContributor
 from victor.verticals.contrib.devops.mode_config import DevOpsModeConfigProvider
 from victor.verticals.contrib.devops.safety import DevOpsSafetyExtension
@@ -29,8 +30,11 @@ from victor.verticals.contrib.devops.conversation_enhanced import (
 from victor.verticals.contrib.devops.tool_dependencies import get_provider
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
 
+DevOpsAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(DevOpsAssistantDefinition)
+
 __all__ = [
     "DevOpsAssistant",
+    "DevOpsAssistantDefinition",
     "DevOpsPromptContributor",
     "DevOpsModeConfigProvider",
     "DevOpsSafetyExtension",

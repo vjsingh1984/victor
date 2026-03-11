@@ -340,30 +340,46 @@ class TestProtocolProviderInterface:
         """Test that ToolProvider has get_tools method."""
         from victor_sdk.verticals.protocols import ToolProvider
 
-        # Check that ToolProvider is runtime checkable
-        assert hasattr(ToolProvider, "__protocol_attrs__")
-        assert "get_tools" in ToolProvider.__protocol_attrs__
+        # Check that ToolProvider is a runtime protocol
+        assert hasattr(ToolProvider, "_is_protocol")
+        assert hasattr(ToolProvider, "_is_runtime_protocol")
+        assert ToolProvider._is_protocol
+        assert ToolProvider._is_runtime_protocol
+        # Check that get_tools is a protocol member
+        assert hasattr(ToolProvider, "get_tools")
 
     def test_safety_provider_interface(self):
         """Test that SafetyProvider has required methods."""
         from victor_sdk.verticals.protocols import SafetyProvider
 
-        assert hasattr(SafetyProvider, "__protocol_attrs__")
+        # Check that SafetyProvider is a runtime protocol
+        assert hasattr(SafetyProvider, "_is_protocol")
+        assert hasattr(SafetyProvider, "_is_runtime_protocol")
+        assert SafetyProvider._is_protocol
+        assert SafetyProvider._is_runtime_protocol
         # SafetyProvider has: get_safety_rules, validate_prompt, validate_tool_call
-        assert "get_safety_rules" in SafetyProvider.__protocol_attrs__
+        assert hasattr(SafetyProvider, "get_safety_rules")
 
     def test_workflow_provider_interface(self):
         """Test that WorkflowProvider has required methods."""
         from victor_sdk.verticals.protocols import WorkflowProvider
 
-        assert hasattr(WorkflowProvider, "__protocol_attrs__")
+        # Check that WorkflowProvider is a runtime protocol
+        assert hasattr(WorkflowProvider, "_is_protocol")
+        assert hasattr(WorkflowProvider, "_is_runtime_protocol")
+        assert WorkflowProvider._is_protocol
+        assert WorkflowProvider._is_runtime_protocol
         # WorkflowProvider has: get_initial_stage, get_stage_definitions, get_workflow_spec
-        assert "get_workflow_spec" in WorkflowProvider.__protocol_attrs__
+        assert hasattr(WorkflowProvider, "get_workflow_spec")
 
     def test_prompt_provider_interface(self):
         """Test that PromptProvider has required methods."""
         from victor_sdk.verticals.protocols import PromptProvider
 
-        assert hasattr(PromptProvider, "__protocol_attrs__")
+        # Check that PromptProvider is a runtime protocol
+        assert hasattr(PromptProvider, "_is_protocol")
+        assert hasattr(PromptProvider, "_is_runtime_protocol")
+        assert PromptProvider._is_protocol
+        assert PromptProvider._is_runtime_protocol
         # PromptProvider has: format_prompt, get_base_prompt, get_prompt_template
-        assert "get_base_prompt" in PromptProvider.__protocol_attrs__
+        assert hasattr(PromptProvider, "get_base_prompt")

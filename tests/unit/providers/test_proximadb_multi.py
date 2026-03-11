@@ -6,7 +6,7 @@ import importlib.util
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -65,6 +65,15 @@ class FakeSearchHit:
     metadata: Dict[str, Any]
 
 
+@dataclass
+class FakeGraphNode:
+    """Minimal graph node shape returned by helper-backed graph queries."""
+
+    id: str
+    labels: List[str]
+    properties: Dict[str, Any]
+
+
 class FakeProximaClient:
     """In-memory ProximaDB stand-in for unit tests."""
 
@@ -77,6 +86,8 @@ class FakeProximaClient:
         self.deleted_vectors: List[tuple[str, List[str]]] = []
         self.graph_nodes: List[Dict[str, Any]] = []
         self.graph_edges: List[Dict[str, Any]] = []
+        self.query_node_rows: List[Dict[str, Any]] = []
+        self.traversal_rows: Dict[str, Dict[str, Any]] = {}
         self.sql_rows: List[Dict[str, Any]] = []
 
     def create_collection(self, name: str, config: Any = None, **kwargs: Any) -> Dict[str, Any]:
@@ -150,6 +161,27 @@ class FakeProximaClient:
             "edge_count": len(self.graph_edges),
         }
 
+    def query_nodes(
+        self,
+        graph_id: Optional[str] = None,
+        labels: Optional[List[str]] = None,
+        properties: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        del graph_id, kwargs
+        labels = list(labels or [])
+        properties = dict(properties or {})
+        matches = []
+        for node in self.query_node_rows:
+            node_labels = list(node.get("labels", []))
+            node_props = dict(node.get("properties", {}) or {})
+            if labels and not all(label in node_labels for label in labels):
+                continue
+            if any(node_props.get(key) != value for key, value in properties.items()):
+                continue
+            matches.append(node)
+        return {"nodes": matches}
+
     def delete_graph(self, graph_id: str) -> None:
         self.deleted_graphs.append(graph_id)
 
@@ -205,6 +237,19 @@ class FakeProximaClient:
     ) -> Dict[str, Any]:
         del query, parameters, collection
         return {"rows": list(self.sql_rows)}
+
+    def traverse_graph(
+        self,
+        graph_id: Optional[str] = None,
+        start_node_id: Optional[str] = None,
+        max_depth: int = 1,
+        edge_types: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        del graph_id, max_depth, edge_types, kwargs
+        if start_node_id is None:
+            return {"nodes": [], "edges": []}
+        return dict(self.traversal_rows.get(start_node_id, {"nodes": [], "edges": []}))
 
 
 @pytest.fixture
@@ -370,3 +415,368 @@ def parse_json(data):
         assert results[0]["file_path"] == "src/main.py"
         assert "vector" in results[0]["sources"]
         assert any("graph" in row["sources"] for row in results)
+
+    @pytest.mark.asyncio
+    async def test_find_callers_uses_graph_helper(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        target_node_id = "victor_test_repo:function:src/main.py:parse_json:4"
+        fake_client.query_node_rows = [
+            {
+                "id": target_node_id,
+                "labels": ["Function"],
+                "properties": {
+                    "name": "parse_json",
+                    "qualified_name": "parse_json",
+                    "file_path": "src/main.py",
+                "line_start": 4,
+            },
+        }
+        ]
+
+        class FakeGraphHelper:
+            def __init__(self) -> None:
+                self.calls: List[tuple[str, str, int]] = []
+
+            def find_callers(
+                self,
+                node_id: str,
+                edge_type: str = "CALLS",
+                max_depth: int = 1,
+            ) -> List[FakeGraphNode]:
+                self.calls.append((node_id, edge_type, max_depth))
+                return [
+                    FakeGraphNode(
+                        id="victor_test_repo:function:src/main.py:main:2",
+                        labels=["Function"],
+                        properties={
+                            "name": "main",
+                            "qualified_name": "main",
+                            "file_path": "src/main.py",
+                            "line_start": 2,
+                            "line_end": 3,
+                        },
+                    )
+                ]
+
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+            helper = FakeGraphHelper()
+            provider._graph_api = helper
+            results = await provider.find_callers("parse_json", file_path="src/main.py")
+
+        assert helper.calls == [(target_node_id, "CALLS", 1)]
+        assert results == [
+            {
+                "id": "victor_test_repo:function:src/main.py:main:2",
+                "name": "main",
+                "file_path": "src/main.py",
+                "line_start": 2,
+                "line_end": 3,
+                "labels": ["Function"],
+                "metadata": {
+                    "name": "main",
+                    "qualified_name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 2,
+                    "line_end": 3,
+                },
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_find_callees_uses_graph_traversal(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        start_node_id = "victor_test_repo:function:src/main.py:main:2"
+        callee_node_id = "victor_test_repo:function:src/main.py:parse_json:4"
+        fake_client.query_node_rows = [
+            {
+                "id": start_node_id,
+                "labels": ["Function"],
+                "properties": {
+                    "name": "main",
+                    "qualified_name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 2,
+                },
+            }
+        ]
+        fake_client.traversal_rows[start_node_id] = {
+            "nodes": [
+                {
+                    "id": start_node_id,
+                    "labels": ["Function"],
+                    "properties": {
+                        "name": "main",
+                        "qualified_name": "main",
+                        "file_path": "src/main.py",
+                        "line_start": 2,
+                    },
+                },
+                {
+                    "id": callee_node_id,
+                    "labels": ["Function"],
+                    "properties": {
+                        "name": "parse_json",
+                        "qualified_name": "parse_json",
+                        "file_path": "src/main.py",
+                        "line_start": 4,
+                        "line_end": 5,
+                    },
+                },
+            ],
+            "edges": [
+                {
+                    "id": "edge:main:parse_json",
+                    "from_node_id": start_node_id,
+                    "to_node_id": callee_node_id,
+                    "edge_type": "CALLS",
+                    "properties": {"file_path": "src/main.py", "line_number": 3},
+                }
+            ],
+        }
+
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+            results = await provider.find_callees("main", file_path="src/main.py")
+
+        assert results == [
+            {
+                "id": callee_node_id,
+                "name": "parse_json",
+                "file_path": "src/main.py",
+                "line_start": 4,
+                "line_end": 5,
+                "labels": ["Function"],
+                "metadata": {
+                    "name": "parse_json",
+                    "qualified_name": "parse_json",
+                    "file_path": "src/main.py",
+                    "line_start": 4,
+                    "line_end": 5,
+                },
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_trace_execution_path_returns_nodes_and_edges(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        entry_node_id = "victor_test_repo:function:src/main.py:main:2"
+        parse_node_id = "victor_test_repo:function:src/main.py:parse_json:4"
+        loads_node_id = "victor_test_repo:external:function:json.loads"
+        fake_client.query_node_rows = [
+            {
+                "id": entry_node_id,
+                "labels": ["Function"],
+                "properties": {
+                    "name": "main",
+                    "qualified_name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 2,
+                    "line_end": 3,
+                },
+            }
+        ]
+        fake_client.traversal_rows[entry_node_id] = {
+            "nodes": [
+                {
+                    "id": entry_node_id,
+                    "labels": ["Function"],
+                    "properties": {
+                        "name": "main",
+                        "qualified_name": "main",
+                        "file_path": "src/main.py",
+                        "line_start": 2,
+                        "line_end": 3,
+                    },
+                },
+                {
+                    "id": parse_node_id,
+                    "labels": ["Function"],
+                    "properties": {
+                        "name": "parse_json",
+                        "qualified_name": "parse_json",
+                        "file_path": "src/main.py",
+                        "line_start": 4,
+                        "line_end": 5,
+                    },
+                },
+                {
+                    "id": loads_node_id,
+                    "labels": ["Function", "External"],
+                    "properties": {
+                        "name": "json.loads",
+                        "qualified_name": "json.loads",
+                    },
+                },
+            ],
+            "edges": [
+                {
+                    "id": "edge:main:parse_json",
+                    "from_node_id": entry_node_id,
+                    "to_node_id": parse_node_id,
+                    "edge_type": "CALLS",
+                    "properties": {"file_path": "src/main.py", "line_number": 3},
+                },
+                {
+                    "id": "edge:parse_json:json.loads",
+                    "from_node_id": parse_node_id,
+                    "to_node_id": loads_node_id,
+                    "edge_type": "CALLS",
+                    "properties": {"file_path": "src/main.py", "line_number": 5},
+                },
+            ],
+        }
+
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+            result = await provider.trace_execution_path("main", file_path="src/main.py", max_depth=2)
+
+        assert result["entry_point"]["id"] == entry_node_id
+        assert result["edge_type"] == "CALLS"
+        assert result["max_depth"] == 2
+        assert [edge["id"] for edge in result["edges"]] == [
+            "edge:main:parse_json",
+            "edge:parse_json:json.loads",
+        ]
+        assert {node["id"] for node in result["nodes"]} == {
+            entry_node_id,
+            parse_node_id,
+            loads_node_id,
+        }
+
+    @pytest.mark.asyncio
+    async def test_find_similar_bugs_enriches_hybrid_hits_with_graph_context(
+        self,
+        provider_config: EmbeddingConfig,
+        fake_client: FakeProximaClient,
+        stub_model: StubEmbeddingModel,
+    ) -> None:
+        with patch(
+            "victor.storage.vector_stores.proximadb_multi.create_embedding_model",
+            return_value=stub_model,
+        ):
+            provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
+            await provider.initialize()
+
+        provider.hybrid_search = AsyncMock(
+            return_value=[
+                {
+                    "id": "hit:1",
+                    "file_path": "src/main.py",
+                    "symbol_name": "parse_json",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.91,
+                    "sources": ["vector", "document"],
+                    "metadata": {
+                        "file_path": "src/main.py",
+                        "language": "python",
+                        "qualified_name": "parse_json",
+                    },
+                }
+            ]
+        )
+        provider.find_callers = AsyncMock(
+            return_value=[
+                {
+                    "id": "caller:1",
+                    "name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 2,
+                    "line_end": 3,
+                    "labels": ["Function"],
+                    "metadata": {"name": "main"},
+                }
+            ]
+        )
+        provider.find_callees = AsyncMock(
+            return_value=[
+                {
+                    "id": "callee:1",
+                    "name": "json.loads",
+                    "file_path": "src/json_utils.py",
+                    "line_start": 8,
+                    "line_end": 8,
+                    "labels": ["Function", "External"],
+                    "metadata": {"name": "json.loads"},
+                }
+            ]
+        )
+
+        results = await provider.find_similar_bugs(
+            "json parsing crash",
+            language="python",
+            top_k=5,
+            context_limit=2,
+        )
+
+        provider.hybrid_search.assert_awaited_once_with(
+            query="json parsing crash",
+            document_filter={"language": "python"},
+            top_k=5,
+        )
+        provider.find_callers.assert_awaited_once_with("parse_json", file_path="src/main.py")
+        provider.find_callees.assert_awaited_once_with("parse_json", file_path="src/main.py")
+        assert results == [
+            {
+                "id": "hit:1",
+                "file_path": "src/main.py",
+                "symbol_name": "parse_json",
+                "content": "def parse_json(data): return json.loads(data)",
+                "score": 0.91,
+                "sources": ["vector", "document"],
+                "metadata": {
+                    "file_path": "src/main.py",
+                    "language": "python",
+                    "qualified_name": "parse_json",
+                },
+                "graph_context": {
+                    "callers": [
+                        {
+                            "id": "caller:1",
+                            "name": "main",
+                            "file_path": "src/main.py",
+                            "line_start": 2,
+                            "line_end": 3,
+                            "labels": ["Function"],
+                            "metadata": {"name": "main"},
+                        }
+                    ],
+                    "callees": [
+                        {
+                            "id": "callee:1",
+                            "name": "json.loads",
+                            "file_path": "src/json_utils.py",
+                            "line_start": 8,
+                            "line_end": 8,
+                            "labels": ["Function", "External"],
+                            "metadata": {"name": "json.loads"},
+                        }
+                    ],
+                    "related_files": ["src/json_utils.py", "src/main.py"],
+                },
+            }
+        ]
