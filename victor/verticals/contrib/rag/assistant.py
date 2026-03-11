@@ -29,7 +29,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from victor_sdk import StageDefinition, TieredToolConfig, ToolNames, VerticalBase
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    StageDefinition,
+    TieredToolConfig,
+    ToolNames,
+    VerticalBase,
+)
 from victor.verticals.contrib.rag.prompt_metadata import (
     RAG_PROMPT_TEMPLATES,
     RAG_TASK_TYPE_HINTS,
@@ -92,6 +99,34 @@ class RAGAssistant(VerticalBase):
             ToolNames.WEB_FETCH,
             # Shell for document processing
             ToolNames.SHELL,
+        ]
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the RAG definition layer."""
+
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Read local documents and inspect repository content before ingesting.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.DOCUMENT_INGESTION,
+                purpose="Ingest source files and URLs into the knowledge base.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.RETRIEVAL,
+                purpose="Search indexed content and answer questions from retrieved context.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.VECTOR_INDEXING,
+                purpose="Build and maintain embedding-backed indexes for retrieval workflows.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.WEB_ACCESS,
+                optional=True,
+                purpose="Fetch remote documents and web sources for ingestion when enabled.",
+            ),
         ]
 
     @classmethod

@@ -25,6 +25,9 @@ def test_runtime_capability_registry_contains_core_bindings():
     assert registry.get(CapabilityIds.FILE_OPS) is not None
     assert registry.get(CapabilityIds.LSP) is not None
     assert registry.get(CapabilityIds.PRIVACY) is not None
+    assert registry.get(CapabilityIds.DOCUMENT_INGESTION) is not None
+    assert registry.get(CapabilityIds.RETRIEVAL) is not None
+    assert registry.get(CapabilityIds.VECTOR_INDEXING) is not None
 
 
 def test_resolve_file_ops_requirement_from_tools():
@@ -62,6 +65,32 @@ def test_resolve_builtin_privacy_requirement():
     assert resolution.known is True
     assert resolution.source is not None
     assert resolution.source.startswith("builtin:")
+
+
+def test_resolve_rag_document_capabilities_from_tool_bundles():
+    """RAG-specific SDK capabilities should resolve from the current tool surface."""
+
+    tool_names = {"rag_ingest", "rag_query", "rag_search", "read", "ls"}
+
+    ingestion = resolve_capability_requirement(
+        CapabilityIds.DOCUMENT_INGESTION,
+        available_tools=tool_names,
+    )
+    retrieval = resolve_capability_requirement(
+        CapabilityIds.RETRIEVAL,
+        available_tools=tool_names,
+    )
+    indexing = resolve_capability_requirement(
+        CapabilityIds.VECTOR_INDEXING,
+        available_tools=tool_names,
+    )
+
+    assert ingestion.available is True
+    assert ingestion.source == "tools:rag_ingest,read,ls"
+    assert retrieval.available is True
+    assert retrieval.source == "tools:rag_query,rag_search"
+    assert indexing.available is True
+    assert indexing.source == "tools:rag_ingest"
 
 
 def test_unknown_capability_requirement_is_reported_explicitly():

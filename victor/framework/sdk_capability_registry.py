@@ -271,6 +271,27 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
         )
         registry.register(
             RuntimeCapabilityBinding(
+                capability_id=CapabilityIds.DOCUMENT_INGESTION,
+                description="Document ingestion is satisfied by the RAG ingestion tool bundle.",
+                required_tools=("rag_ingest", "read", "ls"),
+            )
+        )
+        registry.register(
+            RuntimeCapabilityBinding(
+                capability_id=CapabilityIds.RETRIEVAL,
+                description="Retrieval is satisfied by the RAG query/search tool bundle.",
+                required_tools=("rag_query", "rag_search"),
+            )
+        )
+        registry.register(
+            RuntimeCapabilityBinding(
+                capability_id=CapabilityIds.VECTOR_INDEXING,
+                description="Vector indexing is satisfied by RAG ingestion or query tooling.",
+                any_tools=("rag_ingest", "rag_query"),
+            )
+        )
+        registry.register(
+            RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.PROMPT_CONTRIBUTIONS,
                 description="Prompt contribution support is provided by framework prompt capabilities.",
                 orchestrator_capabilities=("task_type_hints", "prompt_section", "prompt_builder"),

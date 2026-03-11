@@ -64,6 +64,7 @@ except ImportError:
     TREE_SITTER_AVAILABLE = False
 
 try:
+    from proximadb_sdk.graph import ProximaDBGraph
     from proximadb_sdk.models import (
         CollectionConfig,
         DistanceMetric,
@@ -75,6 +76,7 @@ try:
 
     PROXIMADB_SDK_AVAILABLE = True
 except Exception:
+    ProximaDBGraph = None  # type: ignore[assignment]
     CollectionConfig = None  # type: ignore[assignment]
     DistanceMetric = None  # type: ignore[assignment]
     IndexingAlgorithm = None  # type: ignore[assignment]
@@ -209,6 +211,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
 
         self.embedding_model: Optional[BaseEmbeddingModel] = None
         self._client = client
+        self._graph_api: Optional[Any] = None
         self._language_registry = language_registry or get_language_registry()
         if not self._language_registry._plugins:
             self._language_registry.discover_plugins()
@@ -265,6 +268,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             self._ensure_collection(self._metrics_collection)
         if self._graph_enabled:
             self._ensure_graph()
+            self._graph_api = self._build_graph_api()
 
         self._initialized = True
 
@@ -395,6 +399,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             except Exception:
                 logger.debug("Failed to delete graph %s during clear_index", self._graph_collection)
             self._ensure_graph()
+            self._graph_api = self._build_graph_api()
 
     async def get_stats(self) -> Dict[str, Any]:
         """Return provider configuration and best-effort collection statistics."""
@@ -655,6 +660,16 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             )
         except Exception:
             logger.debug("Graph %s already exists or could not be created", self._graph_collection)
+
+    def _build_graph_api(self) -> Optional[Any]:
+        """Create the optional SDK graph helper when available."""
+        if self._client is None or ProximaDBGraph is None:
+            return None
+        try:
+            return ProximaDBGraph(self._client, self._graph_collection)
+        except Exception:
+            logger.debug("Failed to initialize ProximaDBGraph for %s", self._graph_collection)
+            return None
 
     def _collection_name(self, key: str, suffix: str) -> str:
         override = self.config.extra_config.get(key)
@@ -1333,8 +1348,11 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         base_metadata: Dict[str, Any],
         snapshot: _GraphSnapshot,
     ) -> Dict[str, int]:
+        queued_nodes: Dict[str, Dict[str, Any]] = {}
+        queued_edges: Dict[str, Dict[str, Any]] = {}
         module_id = self._module_node_id(file_path)
-        self._create_graph_node(
+        self._queue_graph_node(
+            queued_nodes,
             node_id=module_id,
             labels=["Module"],
             properties={
@@ -1365,7 +1383,12 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 "docstring": symbol.docstring,
                 **symbol.metadata,
             }
-            self._create_graph_node(node_id=node_id, labels=labels, properties=properties)
+            self._queue_graph_node(
+                queued_nodes,
+                node_id=node_id,
+                labels=labels,
+                properties=properties,
+            )
             symbol_nodes[symbol.qualified_name] = node_id
             symbol_nodes[symbol.name] = node_id
 
@@ -1375,7 +1398,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 function_count += 1
 
             if symbol.parent_symbol and symbol.parent_symbol in symbol_nodes:
-                self._create_graph_edge(
+                self._queue_graph_edge(
+                    queued_edges,
                     edge_id=self._edge_id(
                         "defines", symbol.parent_symbol, symbol.qualified_name, file_path
                     ),
@@ -1385,7 +1409,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                     properties={"file_path": file_path},
                 )
             else:
-                self._create_graph_edge(
+                self._queue_graph_edge(
+                    queued_edges,
                     edge_id=self._edge_id("defines", file_path, symbol.qualified_name, file_path),
                     from_node_id=module_id,
                     to_node_id=node_id,
@@ -1402,7 +1427,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             is_internal_target = target_id is not None
             if target_id is None:
                 target_id = self._external_symbol_node_id(edge.target, "Function")
-                self._create_graph_node(
+                self._queue_graph_node(
+                    queued_nodes,
                     node_id=target_id,
                     labels=["Function", "External"],
                     properties={
@@ -1413,7 +1439,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                         "node_type": "external_function",
                     },
                 )
-            self._create_graph_edge(
+            self._queue_graph_edge(
+                queued_edges,
                 edge_id=self._edge_id(
                     "calls", edge.source, edge.target, file_path, edge.line_number
                 ),
@@ -1430,31 +1457,54 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 call_count += 1
 
         for edge in snapshot.inheritance_edges:
-            self._store_symbol_relationship(edge, file_path, symbol_nodes, class_label="Class")
+            self._store_symbol_relationship(
+                edge,
+                file_path,
+                symbol_nodes,
+                queued_nodes,
+                queued_edges,
+                class_label="Class",
+            )
         for edge in snapshot.implements_edges:
             self._store_symbol_relationship(
                 edge,
                 file_path,
                 symbol_nodes,
+                queued_nodes,
+                queued_edges,
                 class_label="Interface",
             )
         for edge in snapshot.composition_edges:
-            self._store_symbol_relationship(edge, file_path, symbol_nodes, class_label="Class")
+            self._store_symbol_relationship(
+                edge,
+                file_path,
+                symbol_nodes,
+                queued_nodes,
+                queued_edges,
+                class_label="Class",
+            )
 
         for imported in snapshot.imports:
             import_id = self._module_import_node_id(imported)
-            self._create_graph_node(
+            self._queue_graph_node(
+                queued_nodes,
                 node_id=import_id,
                 labels=["Module", "Imported"],
                 properties={"workspace": self._workspace, "name": imported, "file_path": imported},
             )
-            self._create_graph_edge(
+            self._queue_graph_edge(
+                queued_edges,
                 edge_id=self._edge_id("imports", file_path, imported, file_path),
                 from_node_id=module_id,
                 to_node_id=import_id,
                 edge_type="IMPORTS",
                 properties={"file_path": file_path},
             )
+
+        self._flush_graph_records(
+            nodes=list(queued_nodes.values()),
+            edges=list(queued_edges.values()),
+        )
 
         return {
             "functions": function_count,
@@ -1471,12 +1521,15 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         edge: _GraphEdge,
         file_path: str,
         symbol_nodes: Dict[str, str],
+        queued_nodes: Dict[str, Dict[str, Any]],
+        queued_edges: Dict[str, Dict[str, Any]],
         class_label: str,
     ) -> None:
         source_id = symbol_nodes.get(edge.source)
         if source_id is None:
             source_id = self._external_symbol_node_id(edge.source, class_label)
-            self._create_graph_node(
+            self._queue_graph_node(
+                queued_nodes,
                 node_id=source_id,
                 labels=[class_label, "External"],
                 properties={"workspace": self._workspace, "name": edge.source},
@@ -1485,19 +1538,86 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         target_id = symbol_nodes.get(edge.target)
         if target_id is None:
             target_id = self._external_symbol_node_id(edge.target, class_label)
-            self._create_graph_node(
+            self._queue_graph_node(
+                queued_nodes,
                 node_id=target_id,
                 labels=[class_label, "External"],
                 properties={"workspace": self._workspace, "name": edge.target},
             )
 
-        self._create_graph_edge(
+        self._queue_graph_edge(
+            queued_edges,
             edge_id=self._edge_id(edge.edge_type.lower(), edge.source, edge.target, file_path),
             from_node_id=source_id,
             to_node_id=target_id,
             edge_type=edge.edge_type,
             properties={"file_path": file_path, "line_number": edge.line_number, **edge.metadata},
         )
+
+    def _queue_graph_node(
+        self,
+        queued_nodes: Dict[str, Dict[str, Any]],
+        node_id: str,
+        labels: List[str],
+        properties: Dict[str, Any],
+    ) -> None:
+        existing = queued_nodes.get(node_id)
+        if existing is None:
+            queued_nodes[node_id] = {
+                "id": node_id,
+                "labels": list(dict.fromkeys(labels)),
+                "properties": dict(properties),
+            }
+            return
+
+        existing["labels"] = list(dict.fromkeys([*existing.get("labels", []), *labels]))
+        existing["properties"].update(properties)
+
+    def _queue_graph_edge(
+        self,
+        queued_edges: Dict[str, Dict[str, Any]],
+        edge_id: str,
+        from_node_id: str,
+        to_node_id: str,
+        edge_type: str,
+        properties: Dict[str, Any],
+    ) -> None:
+        queued_edges[edge_id] = {
+            "id": edge_id,
+            "from_node": from_node_id,
+            "to_node": to_node_id,
+            "edge_type": edge_type,
+            "properties": dict(properties),
+        }
+
+    def _flush_graph_records(
+        self,
+        nodes: List[Dict[str, Any]],
+        edges: List[Dict[str, Any]],
+    ) -> None:
+        graph_api = self._graph_api or self._build_graph_api()
+        if graph_api is not None:
+            try:
+                graph_api.batch_create_nodes(nodes, batch_size=max(self._batch_size, 1))
+                graph_api.batch_create_edges(edges, batch_size=max(self._batch_size, 1))
+                return
+            except Exception:
+                logger.debug("Graph batch write failed for %s", self._graph_collection)
+
+        for node in nodes:
+            self._create_graph_node(
+                node_id=node["id"],
+                labels=node.get("labels", []),
+                properties=node.get("properties", {}),
+            )
+        for edge in edges:
+            self._create_graph_edge(
+                edge_id=edge["id"],
+                from_node_id=edge["from_node"],
+                to_node_id=edge["to_node"],
+                edge_type=edge["edge_type"],
+                properties=edge.get("properties", {}),
+            )
 
     def _create_graph_node(
         self,
@@ -1649,6 +1769,28 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         return stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*")
 
     def _search_graph(self, graph_query: str, top_k: int) -> List[Dict[str, Any]]:
+        graph_api = self._graph_api or self._build_graph_api()
+        if graph_api is not None and graph_query.lstrip().upper().startswith("MATCH"):
+            try:
+                result = graph_api.query_cypher(graph_query)
+                rows: List[Dict[str, Any]] = []
+                for node in getattr(result, "nodes", [])[:top_k]:
+                    metadata = dict(getattr(node, "properties", {}) or {})
+                    rows.append(
+                        {
+                            "id": getattr(node, "id", None),
+                            "file_path": metadata.get("file_path"),
+                            "symbol_name": metadata.get("qualified_name") or metadata.get("name"),
+                            "content": metadata.get("source", ""),
+                            "score": 0.5,
+                            "metadata": metadata,
+                        }
+                    )
+                if rows:
+                    return rows
+            except Exception:
+                logger.debug("Graph helper query failed: %s", graph_query)
+
         try:
             result = self._client.execute_sql(graph_query, collection=self._graph_collection)
         except TypeError:

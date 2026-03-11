@@ -17,9 +17,7 @@ if importlib.util.find_spec("proximadb_sdk") is None:
     pytest.skip("proximadb_sdk not installed", allow_module_level=True)
 
 
-def test_proximadb_sdk_top_level_imports(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
-) -> None:
+def test_proximadb_sdk_top_level_imports(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Smoke test the ProximaDB SDK imports Victor depends on."""
 
     monkeypatch.setenv("DSP_CACHEBOOL", "false")
@@ -157,30 +155,44 @@ class FakeProximaClient:
 
     def create_node(
         self,
-        node_id: str,
-        labels: List[str],
+        node_id: Optional[str] = None,
+        labels: Optional[List[str]] = None,
         properties: Optional[Dict[str, Any]] = None,
+        graph_id: Optional[str] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
-        self.graph_nodes.append(
-            {"id": node_id, "labels": list(labels), "properties": dict(properties or {})}
-        )
+        del graph_id
+        node_id = node_id or kwargs.get("id")
+        labels = list(labels or kwargs.get("labels", []))
+        properties = dict(properties or kwargs.get("properties", {}))
+        self.graph_nodes.append({"id": node_id, "labels": labels, "properties": properties})
         return self.graph_nodes[-1]
 
     def create_edge(
         self,
-        edge_id: str,
-        from_node_id: str,
-        to_node_id: str,
-        edge_type: str,
+        edge_id: Optional[str] = None,
+        from_node_id: Optional[str] = None,
+        to_node_id: Optional[str] = None,
+        edge_type: Optional[str] = None,
         properties: Optional[Dict[str, Any]] = None,
+        graph_id: Optional[str] = None,
+        from_node: Optional[str] = None,
+        to_node: Optional[str] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
+        del graph_id
+        edge_id = edge_id or kwargs.get("id")
+        from_node_id = from_node_id or from_node or kwargs.get("from_node")
+        to_node_id = to_node_id or to_node or kwargs.get("to_node")
+        edge_type = edge_type or kwargs.get("edge_type")
+        properties = dict(properties or kwargs.get("properties", {}))
         self.graph_edges.append(
             {
                 "id": edge_id,
                 "from_node_id": from_node_id,
                 "to_node_id": to_node_id,
                 "edge_type": edge_type,
-                "properties": dict(properties or {}),
+                "properties": properties,
             }
         )
         return self.graph_edges[-1]

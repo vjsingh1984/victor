@@ -11,6 +11,9 @@ class CapabilityIds:
     GIT = "git"
     LSP = "lsp"
     WEB_ACCESS = "web_access"
+    DOCUMENT_INGESTION = "document_ingestion"
+    RETRIEVAL = "retrieval"
+    VECTOR_INDEXING = "vector_indexing"
 
     PROMPT_CONTRIBUTIONS = "prompt_contributions"
     PRIVACY = "privacy"

@@ -30,42 +30,42 @@ definition/runtime blockers instead of re-scanning the package each session.
 | Python files in `rag` package | 30 | Includes tools, UI, runtime helpers, demos, and prompt metadata |
 | Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 15 | This is the active runtime-boundary surface for `rag` |
 | Python files with `victor_sdk` imports | 1 | Only `assistant.py` currently imports the SDK |
-| Definition-layer targets still importing runtime/core | 1 / 2 | `assistant.py` is still blocked; `prompt_metadata.py` is data-only |
+| Definition-layer targets still importing runtime/core | 0 / 2 | `assistant.py` and `prompt_metadata.py` are now definition-layer clean |
 | Shim candidates still depending on runtime-heavy package or core loaders | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
 | Runtime-layer files with direct runtime/core/tool imports | 13 | Includes `prompts.py`, which now acts as a runtime adapter |
 
 Key findings:
 
 - `rag` is earlier in the migration than `coding`. SDK adoption is still
-  limited to `assistant.py`, but that file now uses SDK-owned shared tool,
-  stage, and tier contracts rather than only `ToolNames`.
-- `assistant.py` now uses SDK-owned `StageDefinition` and `TieredToolConfig`,
-  but it still imports the runtime base class and has not yet declared SDK
-  capability requirements for retrieval/indexing concerns.
+  limited to `assistant.py`, but the definition layer is now clean: that file
+  uses the SDK base plus SDK-owned tool, stage, and tier contracts.
+- `assistant.py` no longer imports runtime/core modules. Runtime compatibility
+  for package consumers is now preserved at the package boundary via a
+  host-owned shim exported from `__init__.py`.
 - prompt/task-hint data now lives in `prompt_metadata.py`, while `prompts.py`
   has become a thin runtime adapter over that shared metadata.
-- `rag` has not yet adopted SDK capability requirements. Retrieval, indexing,
-  storage, and enrichment needs are still implicit in runtime modules.
+- `rag` now declares SDK capability requirements for file operations, document
+  ingestion, retrieval, vector indexing, and optional web access.
 - The root package and tool-dependency module still act as transitional shims,
-  with `__init__.py` eagerly exporting runtime-heavy surfaces.
+  with `__init__.py` now explicitly acting as the runtime export shim.
 
-## Definition-Layer Blockers
+## Definition-Layer Status
 
-| File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
-|---|---|---|---|---|
-| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Still depends on runtime `VerticalBase` and does not declare typed capability requirements for retrieval/vector/document workflows | Replace runtime base inheritance with SDK-first authoring plus host-owned runtime wrapping, and add SDK capability requirements |
+`rag` no longer has a definition-layer import blocker:
 
-Definition-layer implication:
+- `assistant.py` is now SDK-only and relies on host-owned runtime wrapping.
+- `prompt_metadata.py` remains data-only.
 
-- `rag` is no longer blocked on prompt/task-hint data modeling. The remaining
-  definition-layer blocker is `assistant.py` plus missing SDK capability
-  declarations for retrieval/indexing concerns.
+Remaining definition-layer work is semantic rather than import-boundary work:
+
+- keep future definition changes out of the package-root runtime shim
+- preserve parity while runtime helpers move behind narrower shims
 
 ## Shim-Layer Blockers
 
 | File | Shim role | Current boundary imports | Why it stays a shim for now | Target end state |
 |---|---|---|---|---|
-| `__init__.py` | Package-root export shim | No direct `victor.framework` / `victor.core` imports, but eagerly re-exports runtime-heavy modules from the root package | Aggregates assistant, document store, tools, prompt contributor, mode config, capabilities, and enhanced runtime helpers into one root import surface | Narrow re-export surface centered on `RAGAssistant` plus documented compatibility aliases |
+| `__init__.py` | Package-root export shim | `victor.framework.vertical_runtime_adapter` plus runtime-heavy re-exports | Exports a runtime-compatible `RAGAssistant` shim for backward compatibility while still aggregating document store, tools, prompt contributor, mode config, capabilities, and enhanced runtime helpers | Narrow re-export surface centered on runtime `RAGAssistant` plus documented compatibility aliases |
 | `tool_dependencies.py` | Root compatibility shim | `victor.core.tool_dependency_loader`, `victor.core.tool_types`, `victor.tools.tool_graph` | Provides the current YAML-backed dependency provider plus legacy constants and graph helpers | Delegate to `runtime.tool_dependencies` while preserving the root import path until packaging convergence |
 
 ## Runtime-Layer Inventory
@@ -131,27 +131,29 @@ Primary targets:
 
 Expected first moves:
 
-- continue moving `assistant.py` away from runtime `VerticalBase`
+- `assistant.py` runtime/base split is complete; protect it with parity coverage
 - keep `prompts.py` as a runtime adapter over shared metadata instead of letting
   definition data drift back into protocol-specific classes
-- remove the remaining runtime-owned definition imports before broader package
-  moves
+- avoid reintroducing runtime-owned imports into the definition layer
 
 ### `VPC-T3.12` Express retrieval/vector/document needs through SDK capability identifiers
 
-Current gap:
+Current status:
 
-- `rag` exposes no SDK capability requirements today
-- retrieval, indexing, document ingestion, storage, and enrichment dependencies
-  are still implicit in runtime modules and tool implementations
+- `assistant.py` now declares SDK capability requirements for:
+  - file operations
+  - document ingestion
+  - retrieval
+  - vector indexing
+  - optional web access
+- the runtime registry resolves those requirements against the current RAG tool
+  bundle, so activation does not emit unknown-capability warnings for the
+  current surface
 
-Likely capability buckets to formalize:
+Follow-on capability buckets to consider later:
 
-- document access / ingestion
-- retrieval / search
-- vector storage / indexing
 - enrichment / reranking
-- optional web fetch / shell support
+- source verification / citation enforcement
 
 ### `VPC-T3.13` Move runtime integrations out of `rag` definition modules
 
@@ -170,13 +172,10 @@ Root-package transition rules:
 
 ## Conclusion
 
-`rag` is ready for the same migration pattern now proven on `coding`, but its
-definition layer is less mature:
+`rag` is ready for the same migration pattern now proven on `coding`:
 
-1. `assistant.py` is the only current SDK adopter, and it still depends on
-   the runtime base class
-2. prompt/task-hint metadata is now split cleanly, but `assistant.py` still
-   needs the remaining definition/runtime boundary work
+1. `assistant.py` is the only current SDK adopter, and it is now definition-layer clean
+2. prompt/task-hint metadata and capability requirements now live on the SDK
+   definition contract
 3. the runtime-heavy surface is already well-bounded enough to migrate in
-   grouped layers once `VPC-T3.11` and `VPC-T3.12` establish the definition
-   contract
+   grouped layers now that the definition contract is established

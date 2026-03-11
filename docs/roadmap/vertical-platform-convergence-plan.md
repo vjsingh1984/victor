@@ -711,8 +711,8 @@ Likely touchpoints:
 Tasks:
 
 - [x] VPC-T3.10 Inventory and classify `rag` imports by layer.
-- [ ] VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
-- [ ] VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
+- [x] VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
+- [x] VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
 - [ ] VPC-T3.13 Move runtime integrations out of `rag` definition modules.
 - [ ] VPC-T3.14 Add RAG migration tests and parity checks.
 
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
-2. VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
+1. VPC-T3.13 Move runtime integrations out of `rag` definition modules.
+2. VPC-T3.14 Add RAG migration tests and parity checks.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1806,6 +1806,72 @@ Likely touchpoints:
 - Next recommended implementation layer:
   - continue `VPC-T3.11` by removing the remaining runtime base dependency from
     `rag/assistant.py`, then proceed to `VPC-T3.12`
+
+### 2026-03-10 (Session AC)
+
+- Completed `VPC-T3.11` by removing the remaining runtime base dependency from
+  `rag/assistant.py` while keeping runtime behavior backward compatible.
+- Updated the host runtime boundary so SDK-only vertical classes can be loaded
+  and activated safely:
+  - `victor/core/verticals/base.py` now validates external verticals against
+    the SDK `VerticalBase` protocol instead of requiring the runtime subclass
+  - `victor/core/verticals/vertical_loader.py` now accepts SDK-only discovered
+    classes and normalizes them through `VerticalRuntimeAdapter` at activation
+    time
+  - `victor/framework/vertical_runtime_adapter.py` now distinguishes real
+    runtime subclasses from SDK-only definitions, preserves source class names
+    for convention-based extension loading, and forwards optional definition
+    hooks like `get_tiered_tool_config()`
+- Migrated `victor/verticals/contrib/rag/assistant.py` to the SDK base and moved
+  runtime compatibility to the package boundary:
+  - `assistant.py` is now definition-layer only
+  - `victor/verticals/contrib/rag/__init__.py` exports a runtime-compatible shim
+    as `RAGAssistant` and keeps the SDK definition class available as
+    `RAGAssistantDefinition`
+- Added regression coverage for:
+  - SDK-only loader acceptance and runtime activation shims
+  - runtime-adapter shim behavior for forwarded hooks
+  - SDK-only external plugin discovery validation
+  - `rag` package export parity between definition-layer and runtime-layer
+    contracts
+- Updated the `rag` inventory document to record that definition-layer import
+  cleanup is complete and the next blocker is capability declaration.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/framework/test_vertical_runtime_adapter.py tests/unit/core/test_vertical_loader_contract_enforcement.py tests/integration/verticals/test_vertical_plugin_loading.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/test_sdk_integration.py`
+  - result: 67 passed in 6.85s
+- Next recommended implementation layer:
+  - `VPC-T3.12` express retrieval/vector/document needs through SDK capability
+    identifiers in `rag`
+
+### 2026-03-10 (Session AD)
+
+- Completed `VPC-T3.12` by declaring RAG runtime needs through SDK capability
+  identifiers and wiring them into the host capability registry.
+- Extended the SDK capability identifier registry with RAG-relevant canonical
+  IDs:
+  - `document_ingestion`
+  - `retrieval`
+  - `vector_indexing`
+- Added corresponding runtime bindings in
+  `victor/framework/sdk_capability_registry.py` so the current RAG tool bundle
+  satisfies those requirements without emitting unknown-capability warnings.
+- Updated `victor/verticals/contrib/rag/assistant.py` to declare:
+  - required file operations
+  - required document ingestion
+  - required retrieval
+  - required vector indexing
+  - optional web access for remote document ingestion
+- Added regression coverage for:
+  - RAG definition capability requirements
+  - runtime-binding round-trip of those requirements
+  - runtime registry resolution for the new SDK capability IDs
+- Updated the `rag` inventory document to record that the definition contract is
+  now complete and that the next work is runtime-module extraction/parity.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_rag_definition_capability_requirements.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/test_sdk_capability_registry.py tests/integration/test_sdk_integration.py`
+  - result: 33 passed in 7.01s
+- Next recommended implementation layer:
+  - `VPC-T3.13` move runtime integrations out of `rag` definition modules
 
 ## Resume Protocol
 
