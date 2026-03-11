@@ -635,8 +635,8 @@ module = [
 # Note: These modules now inherit strict=true from global config
 # Keeping this override for documentation and milestone tracking
 
-# M4: Technical debt remediation in progress (2026-03-10)
-# Modules verified as type-safe (removed from ignore_errors):
+# M4: Technical debt remediation progress (2026-03-11)
+# Modules verified as type-safe and removed from ignore_errors:
 [[tool.mypy.overrides]]
 module = [
     # Verified type-safe in M4
@@ -652,17 +652,34 @@ module = [
     "victor.embeddings.*",  # victor/contrib/embeddings: 2, victor/storage/embeddings: 6
     "victor.observability.*",  # 52 files
     "victor.context.*",  # 6 files
+    "victor.ui.*",  # 73 files
 ]
 
-# Modules still with type issues (need remediation)
+# Remaining modules requiring type fixes (estimated 6,146 errors in 804 files)
 [[tool.mypy.overrides]]
 module = [
-    "victor.ui.*",  # 73 files - has type errors in commands/chat.py and commands/init.py
     "victor.api.*",  # Doesn't exist at top level
     "victor.protocol.*",  # Doesn't exist (victor.protocols is type-safe)
-    "victor.*",  # Catch-all
+    "victor.*",  # Catch-all for remaining untyped modules
 ]
 ignore_errors = true
+
+# M4 Status Summary:
+# - Removed ignore_errors for 13 modules (800 files)
+# - Remaining: ~6,146 type errors across 804 files
+# - Top error categories:
+#   * Missing return type annotations (469)
+#   * Missing type annotations for arguments (269)
+#   * Missing type parameters for generics (Callable, dict, tuple, list)
+#   * Returning Any from typed functions
+#   * Incompatible type assignments
+#
+# High-priority files for remediation:
+# - victor/processing/native/__init__.py (142 errors)
+# - victor/agent/orchestrator.py (127 errors)
+# - victor/tools/graph_tool.py (119 errors)
+# - victor/observability/dashboard/app.py (75 errors)
+# - victor/tools/language_analyzer.py (74 errors)
 
 [tool.black]
 line-length = 100
