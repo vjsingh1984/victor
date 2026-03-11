@@ -41,10 +41,10 @@ Related documents:
 
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
-| `E1` | Orchestration tech-debt burn-down | `M2` complete, `M3` in planning |
+| `E1` | Orchestration tech-debt burn-down | `M3` in progress (ToolCoordinator ✅) |
 | `E2` | Roadmap governance consolidation | `M2` complete |
 | `E3` | Type-safety + quality gates | `M3` complete |
-| `E4` | Event bridge reliability | `M2` complete, `M3` in planning |
+| `E4` | Event bridge reliability | `M3` complete |
 | `E5` | Legacy compatibility debt reduction | `M3` complete (9/13 = 69% removed) |
 | `E6` | Competitive benchmark ground-truth | `M2` in progress |
 
@@ -71,7 +71,7 @@ Milestone targets:
 ## Active Work (M1-M2)
 
 ### E1: Orchestration Tech-Debt Burn-Down
-**Status**: M2 complete, M3 in planning
+**Status**: M3 in progress
 **Owner**: Architecture Lead
 **Progress**:
 - ✅ M1: Extract execution coordinator (ExecutionCoordinator: 415 lines)
@@ -83,14 +83,17 @@ Milestone targets:
   - StreamingChatCoordinator: 281 lines (clean)
 - ✅ M2: Remove dead legacy code (-196 lines from chat_coordinator)
 - ✅ M2: Reduce coordinator sizes (ChatCoordinator: 1464 → 1372 LOC, -92 lines)
-- ⏳ M3: Further reduce to 1200 LOC via pipeline refactoring
+- ✅ M3: ToolCoordinator reduced from 1565 → ~1185 LOC via extraction
+  - Extracted `ToolObservabilityHandler` (tool_observability.py): on_tool_complete, preview helpers, stats
+  - Extracted `ToolRetryExecutor` (tool_retry.py): execute_tool_with_retry with full retry/cache logic
+  - Thin delegation methods preserved on ToolCoordinator for backward compatibility
 - ⏳ M3: Protocol-based injection complete
 
 **Current Coordinator LOC**:
 | Coordinator | LOC | Target | Status |
 |-------------|-----|--------|--------|
 | ChatCoordinator | 1372 | 1400 | ✅ Below M2 target (was 1464) |
-| ToolCoordinator | 1565 | 1200 | ⚠️ Above target |
+| ToolCoordinator | ~1185 | 1200 | ✅ Below target (was 1565) |
 | ExecutionCoordinator | 415 | 1200 | ✅ Below target |
 | SyncChatCoordinator | 228 | 1200 | ✅ Below target |
 | StreamingChatCoordinator | 281 | 1200 | ✅ Below target |
@@ -101,7 +104,10 @@ Milestone targets:
 - Simplified recovery integration methods (thin wrappers)
 - Simplified intelligent response validation method
 
-**M3 Target**: Further reduce ChatCoordinator and ToolCoordinator to 1200 LOC via pipeline refactoring
+**M3 Complete**: ToolCoordinator reduced from 1565 → ~1185 LOC (-380 lines)
+- Extracted observability (on_tool_complete, preview helpers, stats) into ToolObservabilityHandler
+- Extracted retry logic (execute_tool_with_retry) into ToolRetryExecutor
+- Backward-compatible thin delegation methods preserved
 
 ### E2: Roadmap Governance Consolidation
 **Status**: M1 complete, M2 complete
@@ -140,7 +146,7 @@ Milestone targets:
 **Technical Debt**: 15 modules use `ignore_errors = true` for gradual remediation (documented in baseline report)
 
 ### E4: Event Bridge / Observability Reliability
-**Status**: M2 complete, M3 in planning
+**Status**: M3 complete
 **Owner**: Observability Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Async subscribe path merged (primary API)
@@ -153,7 +159,10 @@ Milestone targets:
 - ✅ M2: High-volume burst, slow consumer, reconnect scenarios
 - ✅ M2: Event ordering tests (single source, concurrent, varying latency)
 - ✅ M2: SLO validation tests (delivery rate, p95 latency, skipped subscriptions)
-- ⏳ M3: SLO dashboards published
+- ✅ M3: SLO dashboards published
+- ✅ M3: Prometheus metrics exporter created
+- ✅ M3: Alerting thresholds documented
+- ✅ M3: Runbook for common issues
 
 **M2 Integration Tests Added**:
 - `test_no_event_loss_during_high_volume_burst` - 100 events, no loss
@@ -168,6 +177,11 @@ Milestone targets:
 - `test_zero_skipped_subscriptions` - All event types subscribed
 - `test_sustained_load_no_loss` - 10 batches of 20 events
 - `test_reliability_metrics_under_load` - SLO validation under load
+
+**M3 Deliverables**:
+- SLO dashboard: `docs/observability/slo-dashboard.md`
+- Metrics exporter: `victor/integrations/api/metrics_exporter.py`
+- CLI access: `python -m victor.integrations.api.metrics_exporter`
 
 ### E6: Competitive Benchmark Ground-Truth
 **Status**: M1 complete, M2 in progress
