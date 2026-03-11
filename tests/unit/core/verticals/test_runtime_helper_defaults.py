@@ -6,6 +6,13 @@ from victor.verticals.contrib.coding.assistant import CodingAssistant
 from victor.verticals.contrib.coding.capabilities import (
     get_capability_configs as get_coding_capability_configs,
 )
+from victor.verticals.contrib.coding.middleware import (
+    CodeCorrectionMiddleware,
+    GitSafetyMiddleware,
+)
+from victor.verticals.contrib.coding.service_provider import CodingServiceProvider
+from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
+from victor.verticals.contrib.coding.teams import CODING_PERSONAS
 from victor.verticals.contrib.dataanalysis.assistant import DataAnalysisAssistant
 from victor.verticals.contrib.dataanalysis.capabilities import (
     DataAnalysisCapabilityProvider,
@@ -42,6 +49,23 @@ def test_capability_configs_autoload_from_vertical_capabilities_modules() -> Non
     assert CodingAssistant.get_capability_configs() == get_coding_capability_configs()
     assert RAGAssistant.get_capability_configs() == get_rag_capability_configs()
     assert ResearchAssistant.get_capability_configs() == get_research_capability_configs()
+
+
+def test_coding_runtime_extensions_resolve_via_shared_loader_defaults() -> None:
+    """Coding should inherit middleware and service-provider runtime hooks."""
+
+    assert "get_middleware" not in CodingAssistant.__dict__
+    assert "get_service_provider" not in CodingAssistant.__dict__
+    assert "get_composed_chains" not in CodingAssistant.__dict__
+    assert "get_personas" not in CodingAssistant.__dict__
+
+    middleware = CodingAssistant.get_middleware()
+    assert len(middleware) == 2
+    assert isinstance(middleware[0], CodeCorrectionMiddleware)
+    assert isinstance(middleware[1], GitSafetyMiddleware)
+    assert isinstance(CodingAssistant.get_service_provider(), CodingServiceProvider)
+    assert CodingAssistant.get_composed_chains() == CODING_CHAINS
+    assert CodingAssistant.get_personas() == CODING_PERSONAS
 
 
 def test_capability_provider_autoloads_for_verticals_using_default_loader() -> None:

@@ -50,7 +50,7 @@ Key findings:
 
 | File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
 |---|---|---|---|---|
-| `assistant.py` | Definition | `victor.core.verticals.base`, `victor.core.verticals.protocols`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, `VerticalConfig`, and runtime protocol types even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters |
+| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, and `VerticalConfig`, and still carries runtime helper hooks for composed chains and personas even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters, and continue moving helper hooks into runtime modules/shared loaders |
 | `prompts.py` | Definition | `victor.core.verticals.protocols` | Implements `PromptContributorProtocol` and `TaskTypeHint` runtime objects inside a definition module | Convert prompt/task-hint data to plain serializable SDK-facing metadata and let runtime prompt contributors be optional adapters |
 
 Definition-layer implication:
@@ -77,10 +77,10 @@ These modules are runtime-owned and should move under `runtime/` during
 | Files | Current runtime/core imports | Migration note |
 |---|---|---|
 | `capabilities.py` | `victor.framework.protocols`, `victor.framework.capability_loader`, `victor.framework.capability_config_helpers`, `victor.framework.capabilities` | Remains runtime-owned; `assistant.py` should request capabilities declaratively instead of importing implementations |
-| `middleware.py` | `victor.core.verticals.protocols`, `victor.framework.middleware` | Natural candidate for `runtime.middleware` once assistant-level middleware hooks are removed |
+| `middleware.py` | `victor.core.verticals.protocols`, `victor.framework.middleware` | The assistant override is now gone; shared loader defaults resolve this runtime module via `get_middleware()` |
 | `mode_config.py` | `victor.core.mode_config` | Move to `runtime.mode_config` behind shared extension resolution |
 | `safety.py`, `safety_enhanced.py` | `victor.core.verticals.protocols`, `victor.framework.config`, `victor.framework.safety` | Keep runtime-only; root package should stop importing these eagerly |
-| `service_provider.py` | `victor.core.verticals.protocols` | Move behind `runtime.service_provider` and mixed-mode loader paths |
+| `service_provider.py` | `victor.core.verticals.protocols` | The assistant override is now gone; shared loader defaults resolve this runtime module through the generic service-provider path |
 
 ### Workflow, team, and RL runtime
 
@@ -149,6 +149,22 @@ Remaining definition-layer work that is still outside `VPC-T3.7`:
 - `assistant.py` still inherits the runtime base/protocol surface
 - `prompts.py` is still a runtime prompt-contributor module rather than pure
   serializable metadata
+
+### `VPC-T3.8` Move runtime-specific middleware, workflows, and helpers out of the definition layer
+
+Current tranche status:
+
+- in progress
+- completed in the first slice:
+  - `assistant.py` no longer defines `get_middleware()`
+  - `assistant.py` no longer defines `get_service_provider()`
+  - shared loader defaults now resolve those runtime hooks from
+    `middleware.py` and `service_provider.py`
+
+Remaining helper hooks still living in `assistant.py`:
+
+- `get_composed_chains()`
+- `get_personas()`
 
 ### `VPC-T3.8` Move runtime-specific behavior behind adapters or `runtime/`
 

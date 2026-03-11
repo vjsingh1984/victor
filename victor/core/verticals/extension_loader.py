@@ -84,6 +84,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import importlib
 import importlib.util
 import logging
 import threading
@@ -602,12 +603,40 @@ class VerticalExtensionLoader(ABC):
     def get_middleware(cls) -> List[Any]:
         """Get middleware implementations for this vertical.
 
-        Override to provide vertical-specific middleware for tool
-        execution processing.
+        Default implementation resolves a ``get_middleware()`` factory from the
+        vertical's runtime middleware module when present. Override only when a
+        vertical needs custom behavior beyond the shared loader pattern.
 
         Returns:
             List of middleware implementations (MiddlewareProtocol)
         """
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("middleware")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return []
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_middleware", None)
+            if not callable(factory):
+                continue
+
+            return cls._get_cached_extension(
+                "middleware",
+                lambda factory=factory: list(factory() or []),
+            )
+
+        if last_error:
+            raise last_error
         return []
 
     @classmethod
@@ -1041,21 +1070,128 @@ class VerticalExtensionLoader(ABC):
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 
-        By default, returns a BaseVerticalServiceProvider that registers
-        the vertical's prompt contributor, safety extension, mode config,
-        and tool dependency providers with the DI container.
+        Default implementation first resolves an optional vertical-specific
+        ``service_provider`` module via the shared runtime loader, then falls
+        back to the generic BaseVerticalServiceProviderFactory.
 
         Override to provide custom service registration logic.
 
         Returns:
             Service provider (ServiceProviderProtocol) or factory-created provider
         """
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}ServiceProvider"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("service_provider")
+            if cls._extension_module_available(path)
+        ]
+        last_error: Optional[Exception] = None
+
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            provider_cls = getattr(module, class_name, None)
+            if provider_cls is not None:
+                return cls._get_cached_extension(
+                    "service_provider",
+                    lambda provider_cls=provider_cls: provider_cls(),
+                )
+
+            factory = getattr(module, "get_service_provider", None)
+            if callable(factory):
+                return cls._get_cached_extension("service_provider", factory)
+
         try:
             from victor.core.verticals.base_service_provider import VerticalServiceProviderFactory
 
             return VerticalServiceProviderFactory.create(cls)
         except ImportError:
+            if last_error is not None:
+                raise last_error
             return None
+
+    @classmethod
+    def get_composed_chains(cls) -> Dict[str, Any]:
+        """Get composed tool chains for this vertical from runtime modules."""
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("composed_chains")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return {}
+
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_CHAINS"
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_composed_chains", None)
+            if callable(factory):
+                return cls._get_cached_extension(
+                    "composed_chains",
+                    lambda factory=factory: dict(factory() or {}),
+                )
+
+            chains = getattr(module, constant_name, None)
+            if isinstance(chains, dict):
+                return cls._get_cached_extension(
+                    "composed_chains",
+                    lambda chains=chains: dict(chains),
+                )
+
+        if last_error:
+            raise last_error
+        return {}
+
+    @classmethod
+    def get_personas(cls) -> Dict[str, Any]:
+        """Get vertical personas from runtime team modules when available."""
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("teams")
+            if cls._extension_module_available(path)
+        ]
+        if not candidate_paths:
+            return {}
+
+        constant_name = (
+            f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
+        )
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_personas", None)
+            if callable(factory):
+                return cls._get_cached_extension(
+                    "personas",
+                    lambda factory=factory: dict(factory() or {}),
+                )
+
+            personas = getattr(module, constant_name, None)
+            if isinstance(personas, dict):
+                return cls._get_cached_extension(
+                    "personas",
+                    lambda personas=personas: dict(personas),
+                )
+
+        if last_error:
+            raise last_error
+        return {}
 
     @classmethod
     def get_enrichment_strategy(cls) -> Optional[Any]:

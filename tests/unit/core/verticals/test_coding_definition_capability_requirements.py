@@ -23,7 +23,9 @@ from victor.verticals.contrib.coding.assistant import CodingAssistant
 def test_coding_definition_declares_sdk_capability_requirements() -> None:
     """Coding should expose host/runtime needs through the SDK definition contract."""
     definition = CodingAssistant.get_definition()
-    requirements = {requirement.capability_id: requirement for requirement in definition.capability_requirements}
+    requirements = {
+        requirement.capability_id: requirement for requirement in definition.capability_requirements
+    }
 
     assert set(requirements) == {
         CapabilityIds.FILE_OPS,

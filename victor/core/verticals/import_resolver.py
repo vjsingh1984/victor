@@ -28,6 +28,7 @@ _PACKAGE_OVERRIDES = {
 _RUNTIME_MODULE_PREFIXES = frozenset(
     {
         "capabilities",
+        "composed_chains",
         "conversation_enhanced",
         "enrichment",
         "escape_hatches",

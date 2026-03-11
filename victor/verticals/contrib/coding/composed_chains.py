@@ -632,6 +632,12 @@ def list_chains() -> List[str]:
     return list(CODING_CHAINS.keys())
 
 
+def get_composed_chains() -> Dict[str, Runnable]:
+    """Return the coding vertical's composed-chain registry."""
+
+    return CODING_CHAINS
+
+
 # =============================================================================
 # Framework Chain Registry Integration
 # =============================================================================
@@ -764,6 +770,7 @@ __all__ = [
     # Registry
     "get_chain",
     "list_chains",
+    "get_composed_chains",
     "CODING_CHAINS",
     # Config
     "ChainConfig",

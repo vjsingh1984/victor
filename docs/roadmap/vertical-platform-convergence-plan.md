@@ -1655,6 +1655,30 @@ Likely touchpoints:
   - VPC-T3.8 move runtime-specific middleware, workflows, and helpers out of
     `coding` definition modules
 
+### 2026-03-10 (Session W)
+
+- Started `VPC-T3.8` with the first non-breaking runtime-hook extraction slice.
+- Moved two runtime-specific hooks out of `victor/verticals/contrib/coding/assistant.py`:
+  - removed the assistant-owned `get_middleware()` override
+  - removed the assistant-owned `get_service_provider()` override
+- Added shared loader support in `victor.core.verticals.extension_loader` so
+  verticals can resolve:
+  - `middleware.py:get_middleware()`
+  - `service_provider.py:{Vertical}ServiceProvider` or `get_service_provider()`
+- Added runtime-module factories for `coding` in:
+  - `victor/verticals/contrib/coding/middleware.py`
+  - `victor/verticals/contrib/coding/service_provider.py`
+- Added regression coverage to prove `CodingAssistant` now inherits those hooks
+  from shared loader defaults rather than defining them directly.
+- Kept `VPC-T3.8` open because `assistant.py` still owns runtime helper methods
+  for composed chains and personas.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_coding_rl_config_sdk_tool_names.py tests/unit/core/verticals/test_import_resolver.py tests/unit/core/verticals/test_workflow_provider_resolution.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/integration/verticals/test_vertical_independence.py`
+  - `51 passed in 8.13s`
+- Next recommended implementation layer:
+  - continue `VPC-T3.8` by moving `get_composed_chains()` and `get_personas()`
+    out of `coding/assistant.py`
+
 ## Resume Protocol
 
 1. Open this file first.

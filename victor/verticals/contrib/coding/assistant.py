@@ -28,13 +28,9 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    ServiceProviderProtocol,
-)
 from victor_sdk import CapabilityIds, CapabilityRequirement, ToolNames
 
 
@@ -296,96 +292,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "cpp",
         ]
         return config
-
-    # =========================================================================
-    # Extension Protocol Methods
-    # =========================================================================
-
-    @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
-        """Get coding-specific middleware (cached).
-
-        Returns:
-            List of middleware implementations
-        """
-
-        def _create_middleware() -> List[MiddlewareProtocol]:
-            from victor.verticals.contrib.coding.middleware import (
-                CodeCorrectionMiddleware,
-                GitSafetyMiddleware,
-            )
-
-            return [
-                CodeCorrectionMiddleware(enabled=True, auto_fix=True),
-                GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
-            ]
-
-        return cls._get_cached_extension("middleware", _create_middleware)
-
-    @classmethod
-    def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
-        """Get coding-specific service provider (cached).
-
-        Returns:
-            Service provider for DI registration
-        """
-        return cls._get_extension_factory("service_provider", "victor.coding.service_provider")
-
-    @classmethod
-    def get_composed_chains(cls) -> Dict[str, Any]:
-        """Get pre-built LCEL-composed tool chains (cached).
-
-        Provides LCEL composition chains for common coding tasks:
-        - explore_file: Read file and analyze symbols
-        - analyze_function: Get function details with references
-        - safe_edit: Edit with verification
-        - git_status: Parallel git state collection
-        - search_with_context: Code search with result context
-        - lint: Language-aware linting
-        - test_discovery: Find test files
-        - review_analysis: Parallel review data collection
-
-        Returns:
-            Dict mapping chain names to Runnable instances
-        """
-
-        def _create() -> Dict[str, Any]:
-            from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
-
-            return CODING_CHAINS
-
-        return cls._get_cached_extension("composed_chains", _create)
-
-    @classmethod
-    def get_personas(cls) -> Dict[str, Any]:
-        """Get persona definitions for team members (cached).
-
-        Provides rich persona definitions with:
-        - Expertise categories
-        - Communication styles
-        - Decision-making preferences
-        - Behavioral traits
-
-        Available personas:
-        - code_archaeologist: Deep code analysis expert
-        - security_auditor: Security-focused reviewer
-        - architect: Solution designer
-        - refactoring_strategist: Safe refactoring planner
-        - craftsman: Clean code implementer
-        - debugger: Bug hunting specialist
-        - quality_guardian: Code review expert
-        - test_specialist: Testing expert
-
-        Returns:
-            Dict mapping persona names to CodingPersona instances
-        """
-
-        def _create() -> Dict[str, Any]:
-            from victor.verticals.contrib.coding.teams import CODING_PERSONAS
-
-            return CODING_PERSONAS
-
-        return cls._get_cached_extension("personas", _create)
 
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.
