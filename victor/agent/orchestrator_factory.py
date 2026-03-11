@@ -1068,6 +1068,7 @@ class OrchestratorFactory(ModeAwareMixin):
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional[Any] = None,
         semantic_cache: Optional[Any] = None,
+        search_router: Optional[Any] = None,
     ) -> Any:
         """Create tool pipeline for coordinating tool execution flow.
 
@@ -1083,6 +1084,7 @@ class OrchestratorFactory(ModeAwareMixin):
             deduplication_tracker: Optional tracker for preventing duplicate calls
             middleware_chain: Optional middleware chain for processing tool calls
             semantic_cache: Optional FAISS-based semantic cache for tool results
+            search_router: Optional search router for enriching search tool calls
 
         Returns:
             ToolPipeline instance coordinating tool execution
@@ -1107,6 +1109,7 @@ class OrchestratorFactory(ModeAwareMixin):
             deduplication_tracker=deduplication_tracker,
             middleware_chain=middleware_chain,
             semantic_cache=semantic_cache,
+            search_router=search_router,
         )
         logger.debug(
             "ToolPipeline created%s%s",

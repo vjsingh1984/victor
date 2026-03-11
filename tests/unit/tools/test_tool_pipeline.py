@@ -19,6 +19,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.agent.search_router import SearchRouter
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
@@ -500,6 +501,47 @@ class TestToolPipelineNormalization:
         args, strategy = pipeline._normalize_arguments("test_tool", {"x": 1})
         assert "x" in args
 
+    def test_normalize_tool_call_adds_bug_mode_to_code_search(self, pipeline):
+        """Bug-style code_search queries should get mode='bugs' automatically."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "code_search",
+            {"query": "json parsing crash on empty payload"},
+        )
+
+        assert tool_name == "code_search"
+        assert args["mode"] == "bugs"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_semantic_bug_search(self, pipeline):
+        """Bug-style semantic_code_search queries should route to code_search."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "find similar regressions in auth"},
+        )
+
+        assert tool_name == "code_search"
+        assert args["mode"] == "bugs"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_call_graph_query_to_graph(self, pipeline):
+        """Call-graph semantic queries should route to graph with traversal args."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "who calls parse_json"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "callers"
+        assert args["node"] == "parse_json"
+        assert args["depth"] == 2
+        assert strategy is not None
+
     def test_get_call_signature_json(self, pipeline):
         """Test generating call signature."""
         sig = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
@@ -735,6 +777,87 @@ class TestToolPipelineCallbacks:
         # Should not raise - exception is logged but execution continues
         result = await pipeline.execute_tool_calls(tool_calls, {})
 
+        assert result.successful_calls == 1
+
+
+class TestToolPipelineSearchRouting:
+    """Tests for search router integration in tool execution."""
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_semantic_bug_query(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """semantic_code_search bug queries should execute as code_search(mode='bugs')."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="code_search",
+                success=True,
+                result={"matches": ["src/parser.py"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "semantic_code_search",
+                    "arguments": {"query": "json parsing crash on empty payload"},
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "code_search"
+        assert executed_kwargs["arguments"]["query"] == "json parsing crash on empty payload"
+        assert executed_kwargs["arguments"]["mode"] == "bugs"
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_search_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Call-graph search queries should execute as graph tool calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["main", "worker"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "who calls parse_json",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "callers"
+        assert executed_kwargs["arguments"]["node"] == "parse_json"
+        assert executed_kwargs["arguments"]["depth"] == 2
+        assert "directory" not in executed_kwargs["arguments"]
         assert result.successful_calls == 1
 
     @pytest.mark.asyncio

@@ -931,6 +931,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             on_tool_complete=self._on_tool_complete_callback,
             deduplication_tracker=self._deduplication_tracker,
             middleware_chain=self._middleware_chain,
+            search_router=self.search_router,
         )
 
         # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
@@ -2668,14 +2669,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Route a search query to the optimal search tool using SearchRouter.
 
         Analyzes the query to determine whether keyword search (code_search)
-        or semantic search (semantic_code_search) would yield better results.
+        semantic search (semantic_code_search), or graph traversal (graph)
+        would yield better results.
 
         Args:
             query: The search query
 
         Returns:
             Dictionary with routing recommendation:
-                - recommended_tool: "code_search" or "semantic_code_search" or "both"
+                - recommended_tool: "code_search" or "semantic_code_search" or "graph" or "both"
                 - recommended_args: Suggested tool arguments (for example {"mode": "bugs"})
                 - confidence: Confidence in the recommendation (0.0-1.0)
                 - reason: Human-readable explanation
@@ -2718,7 +2720,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             query: The search query
 
         Returns:
-            Tool name: "code_search", "semantic_code_search", or "both"
+            Tool name: "code_search", "semantic_code_search", "graph", or "both"
         """
         return self.route_search_query(query)["recommended_tool"]
 
