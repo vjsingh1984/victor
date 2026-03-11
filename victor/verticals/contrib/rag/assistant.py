@@ -32,6 +32,10 @@ from typing import Dict, List, Optional
 from victor.core.verticals.base import StageDefinition, VerticalBase
 from victor.core.verticals.protocols import TieredToolConfig
 from victor_sdk import ToolNames
+from victor.verticals.contrib.rag.prompt_metadata import (
+    RAG_PROMPT_TEMPLATES,
+    RAG_TASK_TYPE_HINTS,
+)
 
 
 class RAGAssistant(VerticalBase):
@@ -118,6 +122,18 @@ User: "What does the documentation say about authentication?"
 You: [Use rag_query tool with query="authentication"]
      Then synthesize the results with citations.
 """
+
+    @classmethod
+    def get_prompt_templates(cls) -> Dict[str, str]:
+        """Get serializable prompt templates for the definition contract."""
+
+        return dict(RAG_PROMPT_TEMPLATES)
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Dict[str, object]]:
+        """Get serializable task-type hints for the definition contract."""
+
+        return {task_type: dict(config) for task_type, config in RAG_TASK_TYPE_HINTS.items()}
 
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:

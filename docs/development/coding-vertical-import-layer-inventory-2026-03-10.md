@@ -173,6 +173,26 @@ Remaining definition-layer work after `VPC-T3.8`:
 - `prompts.py` still implements a runtime prompt contributor rather than pure
   serializable metadata
 
+### `VPC-T3.9` Add coding vertical migration tests and parity checks
+
+Status:
+
+- completed
+- added `tests/integration/verticals/test_coding_migration_parity.py`
+- coverage now locks:
+  - discovery parity through `VerticalLoader.load("coding")`
+  - activation parity through `bootstrap_container(..., vertical="coding")`
+    plus DI-visible `VerticalExtensions` and coding service registrations
+  - behavior parity for shared runtime-helper defaults after the helper hooks
+    were removed from `assistant.py`
+
+Remaining definition-layer work after `VPC-T3.9`:
+
+- `assistant.py` still inherits the runtime base class instead of an SDK-only
+  definition base
+- `prompts.py` still implements a runtime prompt contributor rather than pure
+  serializable metadata
+
 ### `VPC-T3.8` Move runtime-specific behavior behind adapters or `runtime/`
 
 Recommended move order:

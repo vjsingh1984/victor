@@ -629,7 +629,7 @@ Feature summary:
 |---|---|---|---|---|
 | VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
 | VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
-| VPC-F3.3 | RAG vertical migration | Not Started | VPC-F3.1 | `rag` definition layer follows SDK-only pattern |
+| VPC-F3.3 | RAG vertical migration | In Progress | VPC-F3.1 | `rag` definition layer follows SDK-only pattern |
 | VPC-F3.4 | DevOps vertical migration | Not Started | VPC-F3.1 | `devops` definition layer follows SDK-only pattern |
 | VPC-F3.5 | Data Analysis vertical migration | Not Started | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
 | VPC-F3.6 | Research vertical migration | Not Started | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
@@ -688,7 +688,7 @@ Tasks:
 - [x] VPC-T3.6 Replace `victor.tools.tool_names` usage with SDK identifiers in `coding`.
 - [x] VPC-T3.7 Replace direct framework capability imports with SDK-declared capability requirements in `coding`.
 - [x] VPC-T3.8 Move runtime-specific middleware, workflows, and helpers out of `coding` definition modules.
-- [ ] VPC-T3.9 Add coding vertical migration tests and parity checks.
+- [x] VPC-T3.9 Add coding vertical migration tests and parity checks.
 
 #### VPC-F3.3: RAG Vertical Migration
 
@@ -710,7 +710,7 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.10 Inventory and classify `rag` imports by layer.
+- [x] VPC-T3.10 Inventory and classify `rag` imports by layer.
 - [ ] VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
 - [ ] VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
 - [ ] VPC-T3.13 Move runtime integrations out of `rag` definition modules.
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.9 Add coding vertical migration tests and parity checks.
-2. VPC-T3.10 Inventory and classify `rag` imports by layer.
+1. VPC-T3.11 Replace definition-layer imports with SDK contracts in `rag`.
+2. VPC-T3.12 Express retrieval/vector/document needs through SDK capability identifiers in `rag`.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -1707,6 +1707,72 @@ Likely touchpoints:
   - `68 passed, 1 skipped in 81.63s`
 - Next recommended implementation layer:
   - VPC-T3.9 add coding vertical migration tests and parity checks
+
+### 2026-03-10 (Session Y)
+
+- Completed `VPC-T3.9`.
+- Added dedicated coding migration parity coverage in:
+  - `tests/integration/verticals/test_coding_migration_parity.py`
+- The new parity tests now lock three roadmap guarantees in one place:
+  - discovery parity through `VerticalLoader.load("coding")` plus
+    `VerticalRuntimeAdapter.build_runtime_binding()`
+  - activation parity through `bootstrap_container(..., vertical="coding")`
+    with DI-visible `VerticalExtensions` and coding service registrations
+  - behavior parity through shared runtime-helper defaults for middleware,
+    service provider, composed chains, and personas after those hooks were
+    removed from `assistant.py`
+- Updated the `coding` inventory document to record `VPC-T3.9` completion and
+  the remaining definition-layer blockers.
+- Verification:
+  - `../.venv/bin/pytest -q tests/integration/verticals/test_coding_migration_parity.py tests/integration/verticals/test_vertical_independence.py tests/integration/test_registry_wiring.py tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_runtime_helper_defaults.py`
+  - result: 46 passed in 5.79s
+- Next recommended implementation layer:
+  - VPC-T3.10 inventory and classify `rag` imports by layer
+
+### 2026-03-10 (Session Z)
+
+- Completed `VPC-T3.10`.
+- Added the reusable `rag` inventory artifact:
+  - `docs/development/rag-vertical-import-layer-inventory-2026-03-10.md`
+- Recorded the measured baseline for the package:
+  - 29 Python files total under `victor/verticals/contrib/rag`
+  - 15 files currently import `victor.framework`, `victor.core`, or
+    `victor.tools`
+  - 1 file currently imports `victor_sdk`
+- Classified the current blockers:
+  - definition layer: `assistant.py`, `prompts.py`
+  - shim layer: `__init__.py`, `tool_dependencies.py`
+  - runtime groups: capability/safety/enrichment, workflow/team/RL, and tool
+    entrypoints
+- Marked `VPC-F3.3` as `In Progress` and advanced the current tranche to
+  `VPC-T3.11` and `VPC-T3.12`.
+- Verification:
+  - no tests run; this session added inventory/tracking artifacts only
+- Next recommended implementation layer:
+  - VPC-T3.11 replace definition-layer imports with SDK contracts in `rag`
+
+### 2026-03-10 (Session AA)
+
+- Started `VPC-T3.11` with the prompt/task-hint metadata slice for `rag`.
+- Added `victor/verticals/contrib/rag/prompt_metadata.py` as a data-only prompt
+  metadata module shared by the definition contract and runtime prompt adapter.
+- Updated `RAGAssistant` to expose prompt templates and task-type hints through
+  SDK-facing definition hooks, so `RAGAssistant.get_definition()` now carries
+  serializable RAG prompt metadata.
+- Reworked `victor/verticals/contrib/rag/prompts.py` into a thin runtime
+  adapter over shared metadata instead of a definition module built from
+  runtime prompt protocol types.
+- Added regression coverage in:
+  - `tests/unit/core/verticals/test_rag_definition_prompt_metadata.py`
+- Updated the `rag` inventory document to record that `prompts.py` is no longer
+  a definition blocker; the remaining `VPC-T3.11` blocker is `assistant.py`
+  and its runtime base/stage/tier imports.
+- Verification:
+  - `../.venv/bin/pytest -q tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/test_sdk_integration.py`
+  - result: 21 passed in 4.37s
+- Next recommended implementation layer:
+  - continue `VPC-T3.11` by removing the remaining runtime definition imports
+    from `rag/assistant.py`
 
 ## Resume Protocol
 

@@ -12,97 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RAG Prompt Contributor - Task hints and prompt contributions for RAG."""
+"""Runtime prompt contributor adapter for the RAG vertical."""
 
-from typing import Dict, List, Optional
+from __future__ import annotations
 
-from victor.core.vertical_types import TaskTypeHint
-from victor.core.verticals.protocols import PromptContributorProtocol
+from typing import Dict, List
 
+from victor.core.verticals.prompt_adapter import PromptContributorAdapter
+from victor.verticals.contrib.rag.prompt_metadata import (
+    RAG_SYSTEM_PROMPT_SECTION,
+    RAG_TASK_TYPE_HINTS,
+)
 
-class RAGPromptContributor(PromptContributorProtocol):
+class RAGPromptContributor(PromptContributorAdapter):
     """Prompt contributor for RAG vertical.
 
-    Provides task-type hints and prompt contributions for RAG operations.
+    Wraps serializable RAG prompt metadata for runtime prompt integration.
     """
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
-        """Get task type hints for RAG operations.
-
-        Returns:
-            Dictionary of task type to hints
-        """
-        return {
-            "document_ingestion": TaskTypeHint(
-                task_type="document_ingestion",
-                description="Ingesting documents into the knowledge base",
-                tool_budget=5,
-                recommended_tools=["rag_ingest", "read", "ls"],
-                grounding_rules=[
-                    "Always confirm the file exists before ingestion",
-                    "Report the number of chunks created",
-                    "Suggest relevant document type if not specified",
-                ],
-            ),
-            "knowledge_search": TaskTypeHint(
-                task_type="knowledge_search",
-                description="Searching the knowledge base",
-                tool_budget=3,
-                recommended_tools=["rag_search", "rag_query"],
-                grounding_rules=[
-                    "Use specific search terms",
-                    "Report relevance scores",
-                    "Cite sources in responses",
-                ],
-            ),
-            "question_answering": TaskTypeHint(
-                task_type="question_answering",
-                description="Answering questions from the knowledge base",
-                tool_budget=5,
-                recommended_tools=["rag_query", "rag_search"],
-                grounding_rules=[
-                    "Always search before answering",
-                    "Cite source documents with [N] notation",
-                    "If no relevant context found, say so",
-                    "Don't hallucinate facts not in sources",
-                ],
-            ),
-            "knowledge_management": TaskTypeHint(
-                task_type="knowledge_management",
-                description="Managing the knowledge base",
-                tool_budget=5,
-                recommended_tools=["rag_list", "rag_delete", "rag_stats"],
-                grounding_rules=[
-                    "Confirm before deleting documents",
-                    "Show document details before deletion",
-                ],
-            ),
-        }
-
-    def get_system_prompt_section(self) -> str:
-        """Get system prompt section for RAG.
-
-        Returns:
-            System prompt section text
-        """
-        return """
-## RAG Operations
-
-When answering questions:
-1. Always use rag_query first to retrieve relevant context
-2. If context is insufficient, use rag_search for broader exploration
-3. Cite sources using [Source N] notation from the retrieved context
-4. If the answer isn't in the knowledge base, clearly state this
-
-When ingesting documents:
-1. Verify the file exists using read or ls
-2. Use appropriate doc_type (text, markdown, code, pdf)
-3. Report successful ingestion with chunk count
-
-Citation Format:
-- Use [1], [2] etc. to reference sources from rag_query results
-- Include the source name when summarizing multiple sources
-"""
+    def __init__(self) -> None:
+        adapter = PromptContributorAdapter.from_dict(
+            task_hints=RAG_TASK_TYPE_HINTS,
+            system_prompt_section=RAG_SYSTEM_PROMPT_SECTION,
+        )
+        super().__init__(
+            task_hints=adapter.get_task_type_hints(),
+            system_prompt_section=adapter.get_system_prompt_section(),
+            grounding_rules=adapter.get_grounding_rules(),
+            priority=adapter.get_priority(),
+        )
 
     def get_context_hints(self, context: Dict) -> List[str]:
         """Get context-specific hints.
@@ -127,3 +65,8 @@ Citation Format:
             hints.append("This appears to be an ingestion request. Use rag_ingest.")
 
         return hints
+
+
+__all__ = [
+    "RAGPromptContributor",
+]
