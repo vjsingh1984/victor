@@ -10,15 +10,23 @@ This vertical provides:
 - CSV/Excel/JSON data processing
 """
 
-from victor.verticals.contrib.dataanalysis.assistant import DataAnalysisAssistant
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+from victor.verticals.contrib.dataanalysis.assistant import (
+    DataAnalysisAssistant as DataAnalysisAssistantDefinition,
+)
 from victor.verticals.contrib.dataanalysis.prompts import DataAnalysisPromptContributor
-from victor.verticals.contrib.dataanalysis.mode_config import DataAnalysisModeConfigProvider
-from victor.verticals.contrib.dataanalysis.safety import DataAnalysisSafetyExtension
-from victor.verticals.contrib.dataanalysis.tool_dependencies import get_provider
-from victor.verticals.contrib.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+from victor.verticals.contrib.dataanalysis.runtime.capabilities import DataAnalysisCapabilityProvider
+from victor.verticals.contrib.dataanalysis.runtime.mode_config import DataAnalysisModeConfigProvider
+from victor.verticals.contrib.dataanalysis.runtime.safety import DataAnalysisSafetyExtension
+from victor.verticals.contrib.dataanalysis.runtime.tool_dependencies import get_provider
+
+DataAnalysisAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(
+    DataAnalysisAssistantDefinition
+)
 
 __all__ = [
     "DataAnalysisAssistant",
+    "DataAnalysisAssistantDefinition",
     "DataAnalysisPromptContributor",
     "DataAnalysisModeConfigProvider",
     "DataAnalysisSafetyExtension",
@@ -27,13 +35,13 @@ __all__ = [
 ]
 
 # Enhanced features with new coordinators
-from victor.verticals.contrib.dataanalysis.safety_enhanced import (
-    DataAnalysisSafetyRules,
-    EnhancedDataAnalysisSafetyExtension,
-)
 from victor.verticals.contrib.dataanalysis.conversation_enhanced import (
     DataAnalysisContext,
     EnhancedDataAnalysisConversationManager,
+)
+from victor.verticals.contrib.dataanalysis.runtime.safety_enhanced import (
+    DataAnalysisSafetyRules,
+    EnhancedDataAnalysisSafetyExtension,
 )
 
 __all__.extend(
