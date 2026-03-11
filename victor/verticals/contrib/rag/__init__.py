@@ -23,7 +23,7 @@ This vertical provides a complete RAG implementation showcasing:
 - Reranking for improved relevance
 
 Package Structure:
-    assistant.py        - RAGAssistant vertical class
+    assistant.py        - SDK definition-layer RAGAssistant class
     document_store.py   - LanceDB-based document storage
     chunker.py          - Intelligent document chunking
     tools/              - RAG-specific tools (ingest, search, query)
@@ -33,17 +33,12 @@ Package Structure:
 Usage:
     from victor.rag import RAGAssistant
 
-    # Get vertical configuration
-    config = RAGAssistant.get_config()
-
     # Create agent with RAG vertical
-    agent = await Agent.create(
-        tools=config.tools,
-        vertical=RAGAssistant,
-    )
+    agent = await Agent.create(vertical=RAGAssistant)
 """
 
-from victor.verticals.contrib.rag.assistant import RAGAssistant
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+from victor.verticals.contrib.rag.assistant import RAGAssistant as RAGAssistantDefinition
 from victor.verticals.contrib.rag.document_store import (
     Document,
     DocumentChunk,
@@ -99,11 +94,14 @@ from victor.verticals.contrib.rag.conversation_enhanced import (
     EnhancedRAGConversationManager,
 )
 
+RAGAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(RAGAssistantDefinition)
+
 __all__.extend(
     [
         "RAGSafetyRules",
         "EnhancedRAGSafetyExtension",
         "RAGContext",
         "EnhancedRAGConversationManager",
+        "RAGAssistantDefinition",
     ]
 )

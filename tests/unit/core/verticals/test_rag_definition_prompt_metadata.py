@@ -1,8 +1,10 @@
 """Regression coverage for RAG prompt metadata definition/runtime parity."""
 
+from victor.core.verticals.base import VerticalBase as RuntimeVerticalBase
 from victor_sdk import StageDefinition, TieredToolConfig
 
 from victor.verticals.contrib.rag.assistant import RAGAssistant
+from victor.verticals.contrib.rag import RAGAssistant as RuntimeRAGAssistant
 from victor.verticals.contrib.rag.prompts import RAGPromptContributor
 
 
@@ -69,3 +71,12 @@ def test_rag_assistant_uses_sdk_stage_and_tier_contracts() -> None:
         "rag_list",
         "rag_stats",
     }
+
+
+def test_rag_package_exports_runtime_compatible_shim() -> None:
+    """The package boundary should preserve runtime helper behavior for RAG."""
+
+    assert RAGAssistant is not RuntimeRAGAssistant
+    assert RuntimeRAGAssistant.__victor_sdk_source__ is RAGAssistant
+    assert issubclass(RuntimeRAGAssistant, RuntimeVerticalBase)
+    assert RuntimeRAGAssistant.get_definition().name == "rag"

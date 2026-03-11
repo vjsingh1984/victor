@@ -797,7 +797,7 @@ class VerticalRegistry:
 
         Scans installed packages for the 'victor.verticals' entry point group
         and registers any valid vertical classes found. External verticals must:
-        - Inherit from VerticalBase
+        - Inherit from the SDK VerticalBase protocol
         - Have a non-empty 'name' attribute
 
         Returns:
@@ -808,7 +808,7 @@ class VerticalRegistry:
             security = "victor_security:SecurityAssistant"
 
         This would load SecurityAssistant from the victor_security package
-        and register it if it's a valid VerticalBase subclass.
+        and register it if it's a valid vertical class.
         """
         import logging
         from importlib.metadata import entry_points
@@ -900,8 +900,9 @@ class VerticalRegistry:
             )
             return False
 
-        # Check if it inherits from VerticalBase
-        if not issubclass(vertical_class, VerticalBase):
+        # Check if it inherits from the SDK protocol base.
+        # Runtime VerticalBase subclasses satisfy this automatically.
+        if not issubclass(vertical_class, SdkVerticalBase):
             logger.warning(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
                 f"does not inherit from VerticalBase. Skipping."

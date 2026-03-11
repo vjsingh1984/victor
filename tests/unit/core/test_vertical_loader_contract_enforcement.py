@@ -4,6 +4,7 @@ from typing import List
 
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
+from victor_sdk import VerticalBase as SdkVerticalBase
 
 
 def _make_vertical(name: str, api_version: int):
@@ -23,6 +24,35 @@ def _make_vertical(name: str, api_version: int):
 
     _TestVertical.name = name
     return _TestVertical
+
+
+def _make_sdk_vertical(name: str, api_version: int):
+    """Create a minimal SDK-only vertical for loader tests."""
+
+    vertical_name = name
+
+    class _SdkTestVertical(SdkVerticalBase):
+        name = vertical_name
+        description = f"SDK test vertical {vertical_name}"
+        VERTICAL_API_VERSION = api_version
+
+        @classmethod
+        def get_name(cls) -> str:
+            return cls.name
+
+        @classmethod
+        def get_description(cls) -> str:
+            return cls.description
+
+        @classmethod
+        def get_tools(cls) -> List[str]:
+            return ["read"]
+
+        @classmethod
+        def get_system_prompt(cls) -> str:
+            return "sdk test prompt"
+
+    return _SdkTestVertical
 
 
 def test_loader_rejects_vertical_with_unsupported_api_version(monkeypatch):
@@ -60,6 +90,32 @@ def test_loader_accepts_vertical_with_supported_api_version(monkeypatch):
     assert "current_plugin" in loader._discovered_verticals
     assert loader._discovered_verticals["current_plugin"] is current_vertical
     assert VerticalRegistry.get(vertical_name) is current_vertical
+
+    VerticalRegistry.unregister(vertical_name)
+
+
+def test_loader_wraps_sdk_only_verticals_at_activation_time(monkeypatch):
+    """SDK-only entry-point verticals should be discovered raw and activated as runtime shims."""
+
+    loader = VerticalLoader()
+    loader._discovered_verticals = {}
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    vertical_name = "sdk_only_vertical"
+    VerticalRegistry.unregister(vertical_name)
+    sdk_vertical = _make_sdk_vertical(vertical_name, api_version=1)
+
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: sdk_vertical)
+    loader._load_vertical_entries({"sdk_plugin": "fake.module:SdkVertical"})
+    loaded = loader.load(vertical_name)
+
+    assert loader._discovered_verticals["sdk_plugin"] is sdk_vertical
+    assert VerticalRegistry.get(vertical_name) is sdk_vertical
+    assert loaded is loader.active_vertical
+    assert loaded is not sdk_vertical
+    assert loaded.__victor_sdk_source__ is sdk_vertical
+    assert loaded.get_definition().name == vertical_name
 
     VerticalRegistry.unregister(vertical_name)
 

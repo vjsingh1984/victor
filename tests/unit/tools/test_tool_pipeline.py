@@ -803,9 +803,7 @@ class TestFallbackOnToolFailure:
 
     async def test_fallback_on_tool_failure(self, fallback_pipeline):
         """Test that failed tool call triggers fallback to alternative tool."""
-        tool_calls = [
-            {"name": "semantic_code_search", "arguments": {"query": "MyClass"}}
-        ]
+        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "MyClass"}}]
         result = await fallback_pipeline.execute_tool_calls(tool_calls, {})
 
         assert result.successful_calls == 1
@@ -850,9 +848,7 @@ class TestFallbackOnToolFailure:
             config=ToolPipelineConfig(tool_budget=10),
         )
 
-        tool_calls = [
-            {"name": "semantic_code_search", "arguments": {"query": "test"}}
-        ]
+        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "test"}}]
         result = await pipeline.execute_tool_calls(tool_calls, {})
 
         assert result.failed_calls == 1

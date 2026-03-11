@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-from victor_sdk.core.types import VerticalDefinition
+from victor_sdk.core.types import TieredToolConfig, VerticalDefinition
 
 
 class DefinitionVertical:
@@ -34,6 +34,13 @@ class DefinitionVertical:
                 "provider_hints": {"preferred_providers": ["anthropic"]},
                 "evaluation_criteria": ["accuracy"],
             },
+        )
+
+    @classmethod
+    def get_tiered_tool_config(cls) -> TieredToolConfig:
+        return TieredToolConfig(
+            mandatory={"read"},
+            vertical_core={"write"},
         )
 
 
@@ -91,6 +98,17 @@ def test_resolve_definition_falls_back_to_legacy_config():
     assert definition.system_prompt == "Legacy path."
     assert definition.workflow_metadata.provider_hints == {"preferred_providers": ["openai"]}
     assert definition.workflow_metadata.evaluation_criteria == ["coverage"]
+
+
+def test_as_runtime_vertical_class_wraps_definition_only_verticals() -> None:
+    """SDK-style definition classes should be wrapped into runtime-compatible shims."""
+
+    runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(DefinitionVertical)
+
+    assert runtime_vertical is not DefinitionVertical
+    assert runtime_vertical.__victor_sdk_source__ is DefinitionVertical
+    assert runtime_vertical.get_definition().name == "definition_vertical"
+    assert runtime_vertical.get_tiered_tool_config().mandatory == {"read"}
 
 
 @pytest.mark.asyncio

@@ -19,7 +19,7 @@ from victor.verticals.contrib.dataanalysis.capabilities import (
 )
 from victor.verticals.contrib.devops.assistant import DevOpsAssistant
 from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
-from victor.verticals.contrib.rag.assistant import RAGAssistant
+from victor.verticals.contrib.rag import RAGAssistant
 from victor.verticals.contrib.rag.capabilities import (
     get_capability_configs as get_rag_capability_configs,
 )

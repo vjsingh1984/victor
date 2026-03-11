@@ -376,3 +376,35 @@ class TestZeroDependencyVertical:
 
         # Note: get_config() will use the SDK's simple implementation
         # that returns a SDK VerticalConfig (not the enhanced victor-ai one)
+
+    def test_sdk_only_vertical_can_be_wrapped_for_runtime(self):
+        """Host runtime should provide a compatibility shim for SDK-only verticals."""
+
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+        from victor_sdk.verticals.protocols.base import VerticalBase as SdkBase
+
+        class SdkOnlyVertical(SdkBase):
+            name = "sdk-only"
+            description = "SDK-only vertical"
+
+            @classmethod
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return cls.description
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "You are a helpful assistant."
+
+        runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(SdkOnlyVertical)
+
+        assert runtime_vertical is not SdkOnlyVertical
+        assert runtime_vertical.__victor_sdk_source__ is SdkOnlyVertical
+        assert runtime_vertical.get_definition().name == "sdk-only"

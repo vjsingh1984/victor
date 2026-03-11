@@ -17,6 +17,22 @@ if importlib.util.find_spec("proximadb_sdk") is None:
     pytest.skip("proximadb_sdk not installed", allow_module_level=True)
 
 
+def test_proximadb_sdk_top_level_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Smoke test the ProximaDB SDK imports Victor depends on."""
+
+    monkeypatch.setenv("DSP_CACHEBOOL", "false")
+    monkeypatch.setenv("DSPY_CACHEDIR", str(tmp_path / "dspy-cache"))
+
+    import proximadb_sdk
+    from proximadb_sdk import ProximaDBClient, ProximaDBGraph
+
+    assert proximadb_sdk.__file__
+    assert ProximaDBClient.__name__ == "ProximaDBClient"
+    assert ProximaDBGraph.__name__ == "ProximaDBGraph"
+
+
 class StubEmbeddingModel:
     """Minimal async embedding model used by provider tests."""
 

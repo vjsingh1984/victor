@@ -51,6 +51,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from victor.core.events.emit_helper import emit_event_sync
 from victor.framework.module_loader import get_entry_point_cache
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 if TYPE_CHECKING:
@@ -148,8 +149,9 @@ class VerticalLoader:
                 available = self._get_available_names()
                 raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
-            self._activate(vertical)
-            return vertical
+            runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical)
+            self._activate(runtime_vertical)
+            return runtime_vertical
 
     def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
         """Import a vertical from entry points.
@@ -334,10 +336,8 @@ class VerticalLoader:
             try:
                 # Parse "module:attr" format and load
                 vertical_cls = self._load_entry_point(name, value)
-                if (
-                    isinstance(vertical_cls, type)
-                    and issubclass(vertical_cls, VerticalBase)
-                    and VerticalRegistry._validate_external_vertical(vertical_cls, name)
+                if isinstance(vertical_cls, type) and VerticalRegistry._validate_external_vertical(
+                    vertical_cls, name
                 ):
                     existing = VerticalRegistry.get(vertical_cls.name)
                     if existing is not None and existing is not vertical_cls:

@@ -33,6 +33,18 @@ class VerticalRuntimeAdapter:
     """Translate definition-layer vertical contracts into runtime configuration."""
 
     _legacy_runtime_shims: Dict[Any, type] = {}
+    _FORWARDED_SDK_HOOKS = (
+        "get_tool_requirements",
+        "get_capability_requirements",
+        "get_prompt_templates",
+        "get_task_type_hints",
+        "get_prompt_metadata",
+        "get_initial_stage",
+        "get_workflow_spec",
+        "get_workflow_metadata",
+        "get_metadata",
+        "get_tiered_tool_config",
+    )
 
     @classmethod
     def resolve_definition(cls, source: VerticalDefinitionSource) -> VerticalDefinition:
@@ -229,7 +241,7 @@ class VerticalRuntimeAdapter:
 
         runtime_config = binding.runtime_config
         definition = binding.definition
-        shim_name = f"{getattr(source, '__name__', definition.name.title())}RuntimeShim"
+        shim_name = getattr(source, "__name__", definition.name.title())
 
         class LegacyRuntimeShim(RuntimeVerticalBase):
             name = definition.name
@@ -275,15 +287,41 @@ class VerticalRuntimeAdapter:
         LegacyRuntimeShim.__name__ = shim_name
         LegacyRuntimeShim.__qualname__ = shim_name
         LegacyRuntimeShim.__module__ = getattr(source, "__module__", __name__)
+        LegacyRuntimeShim.__victor_runtime_shim__ = True
+        LegacyRuntimeShim.__victor_sdk_source__ = source
+
+        for hook_name in cls._FORWARDED_SDK_HOOKS:
+            if hook_name in LegacyRuntimeShim.__dict__:
+                continue
+
+            hook = getattr(source, hook_name, None)
+            if not callable(hook):
+                continue
+
+            setattr(LegacyRuntimeShim, hook_name, cls._build_source_delegate(source, hook_name))
+
         return LegacyRuntimeShim
 
     @staticmethod
     def _is_runtime_vertical_class(source: Any) -> bool:
         """Return whether the object already exposes the runtime vertical hook surface."""
 
-        return callable(getattr(source, "get_tools", None)) and callable(
-            getattr(source, "get_system_prompt", None)
-        )
+        if not isinstance(source, type):
+            return False
+
+        from victor.core.verticals.base import VerticalBase as RuntimeVerticalBase
+
+        return issubclass(source, RuntimeVerticalBase)
+
+    @staticmethod
+    def _build_source_delegate(source: Any, hook_name: str) -> classmethod:
+        """Build a classmethod that forwards optional hooks to the definition source."""
+
+        @classmethod
+        def _delegate(cls, *args: Any, **kwargs: Any) -> Any:
+            return getattr(source, hook_name)(*args, **kwargs)
+
+        return _delegate
 
     @staticmethod
     def _extract_tool_names(tools: Any) -> list[str]:

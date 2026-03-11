@@ -29,8 +29,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import VerticalBase
-from victor_sdk import StageDefinition, TieredToolConfig, ToolNames
+from victor_sdk import StageDefinition, TieredToolConfig, ToolNames, VerticalBase
 from victor.verticals.contrib.rag.prompt_metadata import (
     RAG_PROMPT_TEMPLATES,
     RAG_TASK_TYPE_HINTS,
@@ -49,16 +48,25 @@ class RAGAssistant(VerticalBase):
     Example:
         from victor.rag import RAGAssistant
 
-        config = RAGAssistant.get_config()
-        agent = await Agent.create(
-            tools=config.tools,
-            vertical=RAGAssistant,
-        )
+        definition = RAGAssistant.get_definition()
+        agent = await Agent.create(vertical=RAGAssistant)
     """
 
     name = "rag"
     description = "Retrieval-Augmented Generation assistant for document Q&A"
     version = "1.0.0"
+
+    @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
+
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
+
+        return cls.description
 
     @classmethod
     def get_tools(cls) -> List[str]:
