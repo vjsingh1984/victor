@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool Selection Defaults** - Centralized configuration in settings module
 - **Deprecated Workflow Executor APIs** - Removed legacy execution engine stubs
 - **Vertical Tool Dependency Access** - `research`, `devops`, and `dataanalysis` now expose provider factories only (`get_provider()` + canonical YAML providers)
+- **Vertical Runtime Boundary** - Shared vertical activation now adapts definition-only and legacy config-only verticals through the host-owned runtime adapter
+
+### Deprecated
+- **`victor.core.verticals.VerticalBase.create_agent()`** - Use `await Agent.create(vertical=MyVertical, ...)` instead
+  - Deprecated in: `Unreleased` (`2026-03-10`)
+  - To be removed in: `v0.8.0` (`2026-12-31`)
+  - Compatibility path: legacy config-only vertical activation remains supported through the runtime shim until the same milestone
+  - Migration guide: `victor-sdk/MIGRATION_GUIDE.md`
 
 ### Fixed
 - **Integration Test Blocking** - Resolved issues causing test hangs

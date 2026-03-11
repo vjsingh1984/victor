@@ -11,6 +11,7 @@ Complete guide for developing Victor verticals from scratch.
 5. [Testing Your Vertical](#testing-your-vertical)
 6. [Publishing Your Vertical](#publishing-your-vertical)
 7. [Best Practices](#best-practices)
+8. [Definition Contract](#definition-contract)
 
 ---
 
@@ -23,6 +24,17 @@ A **vertical** is a domain-specific assistant built on the Victor framework. Ver
 - **Workflow Definitions**: Multi-stage processes tailored to the domain
 - **Safety Rules**: Domain-specific safety constraints
 - **Custom Capabilities**: Unique features for the domain
+
+### Supported External Authoring Model
+
+For external packages, the supported contract is SDK-first:
+
+- depend on `victor-sdk` only
+- import `VerticalBase`, `ToolNames`, and `CapabilityIds` from `victor_sdk`
+- declare requirements and metadata through `get_definition()` or the class hooks
+  that feed it
+- leave runtime concerns such as agent creation and capability injection to
+  `victor-ai`
 
 ### Example Verticals
 
@@ -110,8 +122,13 @@ my-vertical = "my_vertical:MyVertical"
 ```python
 # my_vertical/__init__.py
 
-from victor_sdk.verticals.protocols.base import VerticalBase
-from victor_sdk.core.types import Tier
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    ToolNames,
+    ToolRequirement,
+    VerticalBase,
+)
 
 
 class MyVertical(VerticalBase):
@@ -137,38 +154,31 @@ class MyVertical(VerticalBase):
         return "Custom vertical for X, Y, and Z tasks"
 
     @classmethod
-    def get_tools(cls) -> list[str]:
-        """Return list of tool names for this vertical.
-
-        Choose from available Victor tools:
-        - File: read, write, search, overview
-        - Git: git_status, git_diff, git_log, git_branch
-        - Shell: shell, command
-        - Code: code_search, symbol, refs, lsp
-        - Testing: test, pytest
-        - Web: web_search, fetch
-        - Database: database_query
-        - Docker: docker
-        """
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
+        """Return typed tool requirements for this vertical."""
         return [
-            # File operations
-            "read",
-            "write",
-            "search",
-            "overview",
+            ToolRequirement(ToolNames.READ, purpose="inspect local files"),
+            ToolRequirement(ToolNames.WRITE, purpose="modify reports or configs"),
+            ToolRequirement(ToolNames.CODE_SEARCH, purpose="find relevant code paths"),
+            ToolRequirement(ToolNames.SYMBOL, required=False, purpose="jump to symbols"),
+            ToolRequirement(ToolNames.GIT, required=False, purpose="inspect repository history"),
+            ToolRequirement(ToolNames.SHELL, required=False, purpose="run local checks"),
+            ToolRequirement(ToolNames.TEST, required=False, purpose="validate changes"),
+        ]
 
-            # Code operations
-            "code_search",
-            "symbol",
-
-            # Git operations
-            "git_status",
-            "git_diff",
-            "git_log",
-
-            # Execution
-            "shell",
-            "test",
+    @classmethod
+    def get_capability_requirements(cls) -> list[CapabilityRequirement]:
+        """Declare host/runtime capabilities needed by this vertical."""
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="read and write workspace files",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.GIT,
+                optional=True,
+                purpose="use repository-aware workflows when available",
+            ),
         ]
 
     @classmethod
@@ -207,6 +217,51 @@ You specialize in:
 - Provide examples when helpful
 - Explain trade-offs and alternatives
 - Flag potential issues early"""
+
+    @classmethod
+    def get_prompt_templates(cls) -> dict[str, str]:
+        return {
+            "analysis": "Analyze the target before making changes.",
+            "implementation": "Implement the requested change and verify it.",
+        }
+
+    @classmethod
+    def get_task_type_hints(cls) -> dict[str, dict[str, object]]:
+        return {
+            "analysis": {
+                "hint": "Prefer read-first workflows and summarize findings clearly.",
+                "tool_budget": 8,
+                "priority_tools": [ToolNames.READ, ToolNames.CODE_SEARCH],
+            }
+        }
+```
+
+The preferred artifact for external verticals is the validated manifest returned
+by `get_definition()`:
+
+```python
+definition = MyVertical.get_definition()
+config = MyVertical.get_config()  # compatibility bridge for current runtime users
+```
+
+## Definition Contract
+
+`VerticalDefinition` is the SDK-owned, serializable contract for external
+verticals. It includes:
+
+- `definition_version` for schema compatibility checks
+- canonical tool IDs via `ToolNames`
+- typed tool and capability requirements
+- prompt metadata and task-type hints
+- declarative stages and workflow metadata
+
+Use the SDK-owned identifiers rather than runtime-owned string registries:
+
+```python
+from victor_sdk import CapabilityIds, ToolNames
+
+tools = [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL]
+capabilities = [CapabilityIds.FILE_OPS, CapabilityIds.GIT]
 ```
 
 ### Step 3: Create README.md
@@ -640,6 +695,9 @@ def get_tools(cls):
     ]
 ```
 
+For new external verticals, prefer `get_tool_requirements()` with
+`ToolRequirement` so each tool has an explicit purpose and optionality.
+
 ### 4. Provide Good System Prompts
 
 Invest time in your system prompt:
@@ -681,7 +739,7 @@ pytest tests/ --cov=my_vertical --cov-report=html
 
 ## Getting Help
 
-- **SDK Guide**: See `SDK_GUIDE.md`
+- **SDK README**: See `README.md`
 - **Migration Guide**: See `MIGRATION_GUIDE.md`
 - **Examples**: Check `victor-sdk/examples/`
 - **Issues**: https://github.com/vjsingh1984/victor/issues

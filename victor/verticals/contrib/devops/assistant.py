@@ -3,17 +3,11 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Dict, List
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-)
+from victor.core.verticals.protocols import MiddlewareProtocol
+from victor_sdk import ToolNames
 
 
 class DevOpsAssistant(VerticalBase):
@@ -30,10 +24,8 @@ class DevOpsAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get the list of tools for DevOps tasks.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return [
             # Core filesystem
             ToolNames.READ,  # read_file → read
@@ -65,10 +57,8 @@ class DevOpsAssistant(VerticalBase):
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
@@ -207,17 +197,6 @@ When creating configurations:
             )
             .build()
         )
-
-    @classmethod
-    def get_capability_provider(cls):
-        """Get the capability provider for DevOpsAssistant.
-
-        Returns:
-            DevOpsCapabilityProvider instance
-        """
-        from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
-
-        return DevOpsCapabilityProvider()
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)

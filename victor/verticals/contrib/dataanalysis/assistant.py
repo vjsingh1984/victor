@@ -3,19 +3,10 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-)
-
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
+from victor_sdk import ToolNames
 
 
 class DataAnalysisAssistant(VerticalBase):
@@ -28,22 +19,14 @@ class DataAnalysisAssistant(VerticalBase):
     description = "Data exploration, statistical analysis, visualization, and ML insights"
     version = "1.0.0"
 
-    # Phase 3: Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for data analysis tasks.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
-        to reduce code duplication and maintain consistency across verticals.
-
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers, including the shared file-operation
+        tool group.
         """
-        from victor.tools.tool_names import ToolNames
-
-        # Start with framework file operations (read, write, edit, grep)
-        tools = cls._file_ops.get_tool_list()
+        tools = list(ToolNames.file_operations())
 
         # Add data analysis-specific tools
         tools.extend(
@@ -73,10 +56,8 @@ class DataAnalysisAssistant(VerticalBase):
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get Data Analysis-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
@@ -183,19 +164,6 @@ When presenting analysis:
 - Note potential biases in data
 - Be transparent about limitations
 """
-
-    @classmethod
-    def get_capability_provider(cls):
-        """Get the capability provider for DataAnalysisAssistant.
-
-        Returns:
-            DataAnalysisCapabilityProvider instance
-        """
-        from victor.verticals.contrib.dataanalysis.capabilities import (
-            DataAnalysisCapabilityProvider,
-        )
-
-        return DataAnalysisCapabilityProvider()
 
     # =========================================================================
     # New Framework Integrations (Workflows, RL, Teams)

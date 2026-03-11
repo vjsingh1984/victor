@@ -3,19 +3,10 @@
 Competitive positioning: Perplexity AI, Google Gemini Deep Research, ChatGPT Browse.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-)
-
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
+from victor_sdk import ToolNames
 
 
 class ResearchAssistant(VerticalBase):
@@ -28,22 +19,14 @@ class ResearchAssistant(VerticalBase):
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "1.0.0"
 
-    # Phase 3: Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for research tasks.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
-        to reduce code duplication and maintain consistency across verticals.
-
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers, including the shared file-operation
+        tool group.
         """
-        from victor.tools.tool_names import ToolNames
-
-        # Start with framework file operations (read, write, edit, grep)
-        tools = cls._file_ops.get_tool_list()
+        tools = list(ToolNames.file_operations())
 
         # Add research-specific tools
         tools.extend(
@@ -70,10 +53,8 @@ class ResearchAssistant(VerticalBase):
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get research-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
@@ -179,20 +160,3 @@ IMPORTANT: When asked about topics requiring external information (news, trends,
 - Distinguish between facts, analysis, and opinions
 - Update findings when new information emerges
 """
-
-    # =========================================================================
-    # New Framework Integrations (Workflows, RL, Teams)
-    # =========================================================================
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get research capability configurations for centralized storage.
-
-        Returns default research configuration for VerticalContext storage.
-        This replaces direct orchestrator attribute assignments for research configs.
-
-        Returns:
-            Dict with default research capability configurations
-        """
-        from victor.verticals.contrib.research.capabilities import get_capability_configs
-
-        return get_capability_configs()

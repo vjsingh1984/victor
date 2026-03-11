@@ -20,6 +20,8 @@ Architecture Decision Records (ADRs) document significant architectural decision
 | [ADR-003](003-workflow-engine.md) | Workflow Engine Architecture | Accepted | 2025-02-26 |
 | [ADR-004](004-tool-system.md) | Tool System Architecture | Accepted | 2025-02-26 |
 | [ADR-005](005-event-system.md) | Event System Architecture | Accepted | 2025-02-26 |
+| [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | 2026-02-28 |
+| [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and SDK Boundary | Proposed | 2026-03-10 |
 
 ## ADR Summaries
 
@@ -93,6 +95,7 @@ Proposed → Accepted → Superseded/Deprecated
 
 - [Victor Architecture](../architecture-analysis-phase3.md)
 - [Implementation Plan](../roadmap/improvement-plan-v1.md)
+- [Vertical Platform Convergence Plan](../roadmap/vertical-platform-convergence-plan.md)
 - [API Reference](../api/README.md)
 
 ## References

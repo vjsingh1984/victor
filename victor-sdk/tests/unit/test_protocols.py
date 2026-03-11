@@ -4,13 +4,16 @@ import pytest
 
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols import (
+    CapabilityProvider,
     ToolProvider,
     SafetyProvider,
     PromptProvider,
     WorkflowProvider,
 )
 from victor_sdk.core.types import (
+    CapabilityRequirement,
     VerticalConfig,
+    VerticalDefinition,
     StageDefinition,
     TieredToolConfig,
     ToolSet,
@@ -81,6 +84,59 @@ class TestVerticalBase:
         assert config.name == "test"
         assert config.description == "Test vertical"
         assert config.system_prompt == "Test prompt"
+
+    def test_get_definition_default(self):
+        """get_definition() returns a serializable VerticalDefinition."""
+
+        class TestVertical(VerticalBase):
+            @classmethod
+            def get_name(cls) -> str:
+                return "test"
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Test vertical"
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Test prompt"
+
+        definition = TestVertical.get_definition()
+        assert isinstance(definition, VerticalDefinition)
+        assert definition.name == "test"
+        assert definition.tools == ["read"]
+        assert definition.system_prompt == "Test prompt"
+
+    def test_get_definition_wraps_invalid_definition_errors(self):
+        """Invalid hook output should surface as VerticalConfigurationError."""
+
+        class TestVertical(VerticalBase):
+            @classmethod
+            def get_name(cls) -> str:
+                return "test"
+
+            @classmethod
+            def get_description(cls) -> str:
+                return "Test vertical"
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "Test prompt"
+
+            @classmethod
+            def get_workflow_spec(cls) -> dict[str, object]:
+                return {"stage_order": ["missing"]}
+
+        with pytest.raises(VerticalConfigurationError, match="initial_stage|stage_order"):
+            TestVertical.get_definition()
 
     def test_get_stages_default(self):
         """get_stages() returns default 3-stage workflow."""
@@ -255,6 +311,26 @@ class TestCoreTypes:
         new_config = config.with_extension("safety", {"rules": []})
         assert new_config.extensions["safety"] == {"rules": []}
         assert config.extensions == {}  # Original unchanged
+
+    def test_capability_requirement_serialization(self):
+        """CapabilityRequirement stores structured requirement metadata."""
+
+        requirement = CapabilityRequirement(
+            capability_id="file_ops",
+            min_version="1.2",
+            optional=True,
+            purpose="workspace exploration",
+            metadata={"scope": "local"},
+        )
+
+        assert requirement.as_legacy_string() == "file_ops"
+        assert requirement.to_dict() == {
+            "capability_id": "file_ops",
+            "optional": True,
+            "min_version": "1.2",
+            "purpose": "workspace exploration",
+            "metadata": {"scope": "local"},
+        }
 
 
 class TestExceptions:

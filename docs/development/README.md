@@ -96,9 +96,9 @@ victor vertical create security --description "Security analysis"
 ```
 
 Or manually create in `victor/{vertical}/` with:
-- `__init__.py` - Vertical class extending `VerticalBase`
-- `tools/` - Vertical-specific tools
-- `workflows/` - YAML workflow definitions
+- `__init__.py` - Package export for the SDK-first assistant definition
+- `assistant.py` - Vertical definition authored against `victor_sdk`
+- optional runtime-side modules only if the host integration still needs them
 
 ## Key Patterns
 

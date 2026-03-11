@@ -47,6 +47,8 @@ Before creating a release, ensure:
 - [ ] Linting passes: `make lint`
 - [ ] Documentation is updated
 - [ ] CHANGELOG.md is updated (if applicable)
+- [ ] Deprecation inventory is updated for any new or removed compatibility surfaces
+- [ ] Release notes/changelog include replacement path, target removal version/date, and shim status for every deprecation touched in the release
 - [ ] Version in `pyproject.toml` is correct
 - [ ] All PRs for this release are merged
 - [ ] Dependencies are up to date

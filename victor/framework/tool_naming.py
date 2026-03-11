@@ -50,8 +50,8 @@ Example:
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Re-export core naming utilities from tools module
-from victor.tools.tool_names import (
+# Re-export the SDK-owned naming registry for runtime utilities.
+from victor_sdk.constants import (
     CANONICAL_TO_ALIASES,
     TOOL_ALIASES,
     ToolNameEntry,

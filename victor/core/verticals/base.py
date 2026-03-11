@@ -48,6 +48,7 @@ from __future__ import annotations
 import logging
 import time
 import threading
+import warnings
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -669,16 +670,20 @@ class VerticalBase(
         Returns:
             Configured Agent instance.
         """
-        from victor.framework import Agent
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
-        config = cls.get_config()
-        agent_kwargs = config.to_agent_kwargs()
-        agent_kwargs.update(kwargs)
+        warnings.warn(
+            "VerticalBase.create_agent() is deprecated and will be removed in v0.8.0. "
+            "Use victor.framework.Agent.create(vertical=YourVertical, ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        return await Agent.create(
+        return await VerticalRuntimeAdapter.create_agent(
+            cls,
             provider=provider,
             model=model,
-            **agent_kwargs,
+            **kwargs,
         )
 
 

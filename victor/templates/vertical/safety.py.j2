@@ -12,60 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""{{ name_title }}-specific safety patterns.
+"""Optional runtime-side safety notes for {{ name }}.
 
-This module defines dangerous operation patterns specific to
-{{ name }} tasks.
+External vertical definitions should not import runtime safety implementations.
+Keep any runtime-only safety adapters separate from the SDK definition layer.
 """
 
 from __future__ import annotations
 
-from typing import List
 
-from victor.core.verticals.protocols import SafetyPattern
-from victor.framework.defaults import DefaultSafetyExtension
-
-
-# {{ name_title }}-specific dangerous patterns
-# Add patterns that should trigger warnings or blocks for {{ name }} operations
-{{ name_upper }}_PATTERNS: List[SafetyPattern] = [
-    # Example patterns - customize for your vertical
-    # SafetyPattern(
-    #     pattern=r"dangerous_{{ name }}_command",
-    #     description="Dangerous {{ name }} operation",
-    #     risk_level="HIGH",
-    #     category="{{ name }}",
-    # ),
+{{ name_upper }}_SAFETY_NOTES: list[dict[str, str]] = [
+    {
+        "category": "{{ name }}",
+        "description": "Add runtime-only safety patterns here if this vertical needs them.",
+    }
 ]
 
 
-class {{ name_class }}SafetyExtension(DefaultSafetyExtension):
-    """Safety extension for {{ name }} vertical.
-
-    Inherits common safety patterns (git, filesystem, credentials)
-    and adds {{ name }}-specific patterns.
-    """
-
-    def get_bash_patterns(self) -> List[SafetyPattern]:
-        """Get bash command patterns including base and {{ name }}-specific.
-
-        Returns:
-            List of safety patterns for dangerous bash commands
-        """
-        patterns = super().get_bash_patterns()
-        patterns.extend({{ name_upper }}_PATTERNS)
-        return patterns
-
-    def get_category(self) -> str:
-        """Get the category name for these patterns.
-
-        Returns:
-            Category identifier
-        """
-        return "{{ name }}"
-
-
-__all__ = [
-    "{{ name_class }}SafetyExtension",
-    "{{ name_upper }}_PATTERNS",
-]
+__all__ = ["{{ name_upper }}_SAFETY_NOTES"]

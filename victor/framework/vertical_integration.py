@@ -948,6 +948,10 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+        vertical_class = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_class)
+
         result.vertical_name = vertical_class.name
 
         cache_key: Optional[str] = None
@@ -980,7 +984,7 @@ class VerticalIntegrationPipeline:
                 result.add_warning(f"Pre-hook error: {e}")
 
         # Create context
-        context = self._create_context(vertical_class, result)
+        context = self._create_context(orchestrator, vertical_class, result)
         if context is None:
             return result
         result.context = context
@@ -1732,6 +1736,10 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+        vertical_cls = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_cls)
+
         cache_key: Optional[str] = None
         cache_hit = False
 
@@ -1756,7 +1764,7 @@ class VerticalIntegrationPipeline:
 
         # Create context and result
         result = IntegrationResult(vertical_name=vertical_cls.name)
-        context = self._create_context(vertical_cls, result)
+        context = self._create_context(orchestrator, vertical_cls, result)
         if context is None:
             result.add_error("Failed to create vertical context")
             return result
@@ -2273,7 +2281,10 @@ class VerticalIntegrationPipeline:
         return vertical
 
     def _create_context(
-        self, vertical: Type["VerticalBase"], result: IntegrationResult
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        result: IntegrationResult,
     ) -> Optional[VerticalContext]:
         """Create the VerticalContext for this vertical.
 
@@ -2285,11 +2296,37 @@ class VerticalIntegrationPipeline:
             VerticalContext or None on error
         """
         try:
-            config = vertical.get_config()
+            from victor.framework.sdk_capability_registry import (
+                resolve_capability_requirements,
+            )
+            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+            binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
             context = create_vertical_context(
                 name=vertical.name,
-                config=config,
+                config=binding.runtime_config,
             )
+            capability_resolutions = resolve_capability_requirements(
+                binding.definition.capability_requirements,
+                orchestrator=orchestrator,
+                available_tools=binding.definition.get_tool_names(),
+            )
+            if capability_resolutions:
+                context.apply_capability_configs(
+                    {
+                        "sdk_capability_resolutions": [
+                            resolution.to_dict() for resolution in capability_resolutions
+                        ],
+                    }
+                )
+                for resolution in capability_resolutions:
+                    if resolution.available:
+                        continue
+                    prefix = "Optional" if resolution.optional else "Required"
+                    result.add_warning(
+                        f"{prefix} SDK capability '{resolution.capability_id}' is not currently satisfied: "
+                        f"{resolution.reason or 'runtime binding unresolved'}"
+                    )
             return context
         except Exception as e:
             result.add_error(f"Failed to create context: {e}")

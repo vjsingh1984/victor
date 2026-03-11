@@ -1,223 +1,206 @@
 # Victor SDK
 
-Protocol definitions and abstractions for building Victor verticals without runtime dependencies.
+Protocol and type definitions for building Victor verticals without pulling in
+the Victor runtime.
 
 ## Overview
 
-Victor SDK provides pure protocol/ABC definitions that external verticals can depend on without pulling in the entire Victor framework. This enables:
+Use `victor-sdk` when you want to author or publish a vertical package. Use
+`victor-ai` when you want to run a vertical inside the Victor host runtime.
 
-- **Zero-runtime-dependency verticals** - Define verticals with only `victor-sdk` as a dependency
-- **Clean separation of concerns** - Protocols in SDK, implementations in `victor-ai`
-- **Dependency Inversion** - Verticals depend on abstractions, not concrete implementations
-- **Fast development** - No need to install the full framework to define a vertical
+The supported external authoring model is contract-first:
 
-### Architecture
-
-```
-External Verticals → victor-sdk (protocols only)
-                    ↓
-                victor-ai (implements SDK protocols)
-```
+- vertical packages depend on `victor-sdk` only
+- verticals declare tools, capabilities, prompts, and workflow metadata through
+  the SDK contract
+- `victor-ai` remains responsible for runtime concerns such as agent creation,
+  capability injection, and tool execution
 
 ## Installation
 
-### For Vertical Development (SDK Only)
+### SDK-only authoring
 
 ```bash
 pip install victor-sdk
 ```
 
-This gives you access to all protocols and types with **ZERO runtime dependencies**.
-
-### For Using Verticals (With Runtime)
+### Runtime usage
 
 ```bash
 pip install victor-ai
 ```
 
-The victor-ai package depends on victor-sdk and includes all runtime implementations.
+## Stable SDK Surface
+
+The core authoring surface is available from the top-level package:
+
+```python
+from victor_sdk import (
+    CURRENT_DEFINITION_VERSION,
+    CapabilityIds,
+    CapabilityRequirement,
+    ToolNames,
+    ToolRequirement,
+    VerticalBase,
+    VerticalDefinition,
+)
+```
+
+Key pieces:
+
+- `VerticalBase`: SDK base class for external verticals
+- `ToolNames`: canonical SDK-owned tool identifiers
+- `CapabilityIds`: canonical SDK-owned runtime capability identifiers
+- `ToolRequirement` / `CapabilityRequirement`: typed requirement declarations
+- `VerticalDefinition`: validated serializable manifest returned by
+  `get_definition()`
 
 ## Quick Start
 
-### Creating a Minimal Vertical
-
 ```python
-from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    ToolNames,
+    ToolRequirement,
+    VerticalBase,
+)
 
-class MyVertical(VerticalBase):
-    """A zero-dependency vertical."""
+
+class SecurityVertical(VerticalBase):
+    name = "security"
+    description = "Security analysis and audit workflows"
+    version = "1.0.0"
 
     @classmethod
     def get_name(cls) -> str:
-        return "my-vertical"
+        return cls.name
 
     @classmethod
     def get_description(cls) -> str:
-        return "My custom vertical"
+        return cls.description
 
     @classmethod
-    def get_tools(cls) -> list[str]:
-        return ["read", "write", "search"]
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
+        return [
+            ToolRequirement(ToolNames.READ, purpose="inspect code and configs"),
+            ToolRequirement(ToolNames.GREP, purpose="search for vulnerable patterns"),
+            ToolRequirement(ToolNames.SHELL, required=False, purpose="run scanners"),
+            ToolRequirement(ToolNames.WEB_SEARCH, required=False, purpose="look up CVEs"),
+        ]
+
+    @classmethod
+    def get_capability_requirements(cls) -> list[CapabilityRequirement]:
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="read repository contents",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.WEB_ACCESS,
+                optional=True,
+                purpose="fetch external security references",
+            ),
+        ]
 
     @classmethod
     def get_system_prompt(cls) -> str:
-        return "You are a helpful assistant for my vertical."
+        return "You are a security-focused assistant."
+
+    @classmethod
+    def get_prompt_templates(cls) -> dict[str, str]:
+        return {
+            "audit": "Audit the target for security issues and explain severity."
+        }
+
+    @classmethod
+    def get_task_type_hints(cls) -> dict[str, dict[str, object]]:
+        return {
+            "audit": {
+                "hint": "Start with read-first reconnaissance, then validate findings.",
+                "tool_budget": 12,
+                "priority_tools": [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL],
+            }
+        }
+
+
+definition = SecurityVertical.get_definition()
+assert definition.definition_version == "1.0"
+assert definition.tools == [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL, ToolNames.WEB_SEARCH]
 ```
 
-### Package Structure
+## Definition Contract
 
-```
-my-vertical/
-├── pyproject.toml          # Only depends on victor-sdk
-├── my_vertical/
-│   └── __init__.py        # Vertical definition
-└── README.md
-```
+`VerticalBase.get_definition()` is the preferred SDK contract. It returns a
+validated `VerticalDefinition` manifest that contains:
 
-### pyproject.toml
+- `definition_version`
+- canonical tool identifiers
+- typed tool and capability requirements
+- system prompt text
+- prompt metadata and task-type hints
+- declarative stage definitions
+- workflow metadata such as initial stage, provider hints, and evaluation criteria
+
+Compatibility note:
+
+- `get_config()` still exists as a bridge for current victor-ai integrations
+- `VerticalDefinition.to_config()` / `from_config()` bridge the legacy config shape
+- `VerticalDefinition.from_dict()` supports serialized manifest round-tripping
+
+## Packaging
+
+Register the vertical via the standard Victor entry point:
 
 ```toml
 [project]
-name = "my-vertical"
+name = "victor-security"
 version = "1.0.0"
-description = "My custom vertical"
-dependencies = [
-    "victor-sdk>=1.0.0",  # Only SDK - no runtime dependencies!
-]
+dependencies = ["victor-sdk>=1.0.0"]
 
 [project.entry-points."victor.verticals"]
-my-vertical = "my_vertical:MyVertical"
+security = "victor_security:SecurityVertical"
 ```
 
-## Documentation
+## Discovery
 
-- **[SDK Guide](SDK_GUIDE.md)** - Complete guide for using victor-sdk
-- **[Vertical Development Guide](VERTICAL_DEVELOPMENT.md)** - How to develop verticals
-- **[Migration Guide](MIGRATION_GUIDE.md)** - How to migrate existing verticals
-- **[Implementation Summary](IMPLEMENTATION_SUMMARY.md)** - Architecture and design
-
-## Features
-
-### Protocol System
-
-Victor SDK provides protocol definitions for:
-
-- **ToolProvider**: Provide tool configurations
-- **SafetyProvider**: Validate tool calls and prompts
-- **PromptProvider**: Customize prompts
-- **WorkflowProvider**: Define multi-stage workflows
-- **TeamProvider**: Configure multi-agent teams
-- **MiddlewareProvider**: Add execution middleware
-- **ModeConfigProvider**: Define operation modes
-- **RLProvider**: Configure reinforcement learning
-- **EnrichmentProvider**: Add context enrichment
-
-### Core Types
-
-- **VerticalConfig**: Complete vertical configuration
-- **StageDefinition**: Workflow stage configuration
-- **TieredToolConfig**: Progressive tool tiers
-- **ToolSet**: Tool collection with metadata
-- **Tier**: Capability tier (BASIC, STANDARD, ADVANCED)
-
-### Discovery System
-
-Automatic discovery of verticals and protocols via entry points:
+Victor discovers external verticals through Python entry points:
 
 ```python
-from victor_sdk.discovery import get_global_registry, get_discovery_summary
+from victor_sdk.discovery import get_global_registry
 
 registry = get_global_registry()
-
-# Discover verticals
 verticals = registry.get_verticals()
-
-# Get statistics
-print(get_discovery_summary())
 ```
 
-## Entry Points
+## Guides And Examples
 
-Victor SDK supports multiple entry point groups:
-
-```toml
-# Vertical registration (standard)
-[project.entry-points."victor.verticals"]
-my-vertical = "my_vertical:MyVertical"
-
-# Protocol implementations (NEW - Phase 4)
-[project.entry-points."victor.sdk.protocols"]
-my-tools = "my_vertical.protocols:MyToolProvider"
-my-safety = "my_vertical.protocols:MySafetyProvider"
-
-# Capability providers (NEW - Phase 4)
-[project.entry-points."victor.sdk.capabilities"]
-my-search = "my_vertical.capabilities:MySearchCapability"
-
-# Validators (NEW - Phase 4)
-[project.entry-points."victor.sdk.validators"]
-file-path = "my_vertical.validators:validate_file_path"
-```
-
-## Examples
-
-See the `examples/` directory for complete examples:
-
-- **[minimal_vertical](examples/minimal_vertical/)** - Minimal SDK-only vertical
-- **[protocol_implementations](examples/minimal_vertical/protocols.py)** - Protocol examples
-- **[capability_providers](examples/minimal_vertical/capabilities.py)** - Capability examples
-- **[validators](examples/minimal_vertical/validators.py)** - Validator examples
+- [Vertical Development Guide](VERTICAL_DEVELOPMENT.md)
+- [Migration Guide](MIGRATION_GUIDE.md)
+- [Minimal SDK-only example](examples/minimal_vertical/README.md)
 
 ## Testing
 
-### Unit Tests
-
 ```bash
-# Install with dev dependencies
 pip install -e ".[dev]"
-
-# Run tests
-make test
-# or
-pytest tests/ -v
+pytest victor-sdk/tests -q
 ```
 
-### Integration Tests
+To verify compatibility with the runtime as well:
 
 ```bash
-# Install with runtime
-pip install -e ".[dev]" "victor-ai>=0.6.0"
-
-# Run integration tests
-pytest tests/integration/ -v
+pip install -e ".[dev]" victor-ai
+pytest victor-sdk/tests/unit tests/integration/test_sdk_integration.py -q
 ```
 
 ## Versioning
 
-Victor SDK follows semantic versioning:
-
-- **1.0.0a1**: Alpha release - Phase 1-3 complete (SDK + victor-ai integration)
-- **1.0.0**: Stable release - All phases complete
-
-### Current Status
-
-✅ Phase 1: victor-sdk Package (Complete)
-✅ Phase 2: victor-ai Integration (Complete)
-✅ Phase 3: Backward Compatibility (Complete)
-✅ Phase 4: Enhanced Entry Points (Complete)
-🔄 Phase 5-6: External Vertical Migration (In Progress)
-⏳ Phase 7-10: Testing, Documentation, Release (Pending)
-
-## Contributing
-
-Contributions are welcome! Please see our contributing guidelines.
-
-## License
-
-Apache-2.0
+The package follows semantic versioning, and the manifest contract is versioned
+separately via `VerticalDefinition.definition_version`. External verticals
+should treat the SDK contract as the source of truth for supported identifiers
+and manifest fields.
 
 ## Links
 
-- **GitHub**: https://github.com/vjsingh1984/victor
-- **Documentation**: https://docs.victor.dev/sdk
-- **Issues**: https://github.com/vjsingh1984/victor/issues
+- Repository: https://github.com/vjsingh1984/victor
+- Issues: https://github.com/vjsingh1984/victor/issues

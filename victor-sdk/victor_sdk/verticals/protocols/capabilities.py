@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Callable
 
+from victor_sdk.core.types import CapabilityRequirementLike
+
 
 @runtime_checkable
 class CapabilityProvider(Protocol):
@@ -35,11 +37,11 @@ class CapabilityProvider(Protocol):
         """
         ...
 
-    def get_capability_requirements(self) -> List[str]:
+    def get_capability_requirements(self) -> List[CapabilityRequirementLike]:
         """Return list of required capabilities.
 
         Returns:
-            List of capability names that must be available
+            List of capability names or typed requirements that must be available
         """
         ...
 

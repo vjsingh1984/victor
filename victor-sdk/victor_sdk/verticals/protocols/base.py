@@ -10,7 +10,23 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from victor_sdk.core.types import VerticalConfig, StageDefinition, Tier, ToolSet
+from victor_sdk.core.types import (
+    CapabilityRequirementLike,
+    PromptMetadata,
+    WorkflowMetadata,
+    ToolRequirementLike,
+    VerticalConfig,
+    VerticalDefinition,
+    StageDefinition,
+    Tier,
+    ToolSet,
+    normalize_capability_requirements,
+    normalize_prompt_metadata,
+    normalize_prompt_templates,
+    normalize_task_type_hints,
+    normalize_tool_requirements,
+    normalize_workflow_metadata,
+)
 from victor_sdk.core.exceptions import VerticalConfigurationError
 
 
@@ -49,6 +65,7 @@ class VerticalBase(ABC):
     # Class attributes that subclasses SHOULD override
     name: str
     description: str
+    version: str = "1.0.0"
 
     @classmethod
     @abstractmethod
@@ -116,15 +133,50 @@ class VerticalBase(ABC):
         Returns:
             VerticalConfig object with all necessary configuration
         """
-        return VerticalConfig(
-            name=cls.get_name(),
-            description=cls.get_description(),
-            tools=cls.get_tools(),  # Use tools list directly in SDK version
-            system_prompt=cls.get_system_prompt(),
-            stages=cls.get_stages(),
-            tier=cls.get_tier(),
-            metadata=cls.get_metadata(),
-        )
+        return cls.get_definition().to_config()
+
+    @classmethod
+    def get_definition(cls) -> VerticalDefinition:
+        """Return the serializable definition-layer contract for this vertical."""
+        vertical_name = getattr(cls, "name", cls.__name__)
+
+        try:
+            vertical_name = cls.get_name()
+            return VerticalDefinition(
+                name=vertical_name,
+                description=cls.get_description(),
+                version=cls.get_version(),
+                tools=[
+                    requirement.tool_name
+                    for requirement in normalize_tool_requirements(
+                        cls.get_tool_requirements()
+                    )
+                ],
+                tool_requirements=normalize_tool_requirements(cls.get_tool_requirements()),
+                capability_requirements=normalize_capability_requirements(
+                    cls.get_capability_requirements()
+                ),
+                system_prompt=cls.get_system_prompt(),
+                prompt_metadata=cls.get_prompt_metadata(),
+                stages=cls.get_stages(),
+                workflow_metadata=cls.get_workflow_metadata(),
+                tier=cls.get_tier(),
+                metadata=cls.get_metadata(),
+            )
+        except VerticalConfigurationError as exc:
+            if exc.vertical_name is not None:
+                raise
+            raise VerticalConfigurationError(
+                exc.message,
+                vertical_name=vertical_name,
+                details=exc.details,
+            ) from exc
+        except Exception as exc:
+            raise VerticalConfigurationError(
+                "Invalid vertical definition generated from protocol hooks.",
+                vertical_name=vertical_name,
+                details={"error": str(exc)},
+            ) from exc
 
     @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
@@ -165,6 +217,81 @@ class VerticalBase(ABC):
             Capability tier (basic, standard, advanced)
         """
         return Tier.STANDARD
+
+    @classmethod
+    def get_version(cls) -> str:
+        """Return the version for this vertical definition."""
+
+        return getattr(cls, "version", "1.0.0")
+
+    @classmethod
+    def get_tool_requirements(cls) -> List[ToolRequirementLike]:
+        """Return required tools for this vertical definition."""
+
+        return cls.get_tools()
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirementLike]:
+        """Return required runtime capabilities for this vertical definition."""
+
+        return []
+
+    @classmethod
+    def get_prompt_templates(cls) -> Dict[str, Any]:
+        """Return task-specific prompt templates for this vertical."""
+
+        return {}
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Any]:
+        """Return task-type hints for this vertical."""
+
+        return {}
+
+    @classmethod
+    def get_prompt_metadata(cls) -> PromptMetadata:
+        """Return serializable prompt metadata for this vertical."""
+
+        return PromptMetadata(
+            templates=normalize_prompt_templates(cls.get_prompt_templates()),
+            task_type_hints=normalize_task_type_hints(cls.get_task_type_hints()),
+        )
+
+    @classmethod
+    def get_initial_stage(cls) -> Optional[str]:
+        """Return the initial stage name for this vertical workflow."""
+
+        stages = cls.get_stages()
+        return next(iter(stages.keys()), None)
+
+    @classmethod
+    def get_workflow_spec(cls) -> Dict[str, Any]:
+        """Return serializable workflow metadata for this vertical."""
+
+        return {"stage_order": list(cls.get_stages().keys())}
+
+    @classmethod
+    def get_provider_hints(cls) -> Dict[str, Any]:
+        """Return provider selection hints for this vertical."""
+
+        return {}
+
+    @classmethod
+    def get_evaluation_criteria(cls) -> List[str]:
+        """Return evaluation criteria for this vertical."""
+
+        return []
+
+    @classmethod
+    def get_workflow_metadata(cls) -> WorkflowMetadata:
+        """Return serializable workflow metadata for this vertical."""
+
+        return WorkflowMetadata(
+            initial_stage=cls.get_initial_stage(),
+            workflow_spec=cls.get_workflow_spec(),
+            provider_hints=cls.get_provider_hints(),
+            evaluation_criteria=cls.get_evaluation_criteria(),
+        )
 
     @classmethod
     def get_metadata(cls) -> Dict[str, Any]:

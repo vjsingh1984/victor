@@ -28,26 +28,14 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
-    WorkflowProviderProtocol,
     ServiceProviderProtocol,
-    TieredToolConfig,
-    VerticalExtensions,
 )
-
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import (
-    FileOperationsCapability,
-    PromptContributionCapability,
-)
+from victor_sdk import ToolNames
 
 
 class CodingAssistant(VerticalBase):
@@ -89,17 +77,6 @@ class CodingAssistant(VerticalBase):
     version = "2.0.0"  # Extension support
 
     # =========================================================================
-    # Phase 3: Framework Capabilities
-    # =========================================================================
-    # Reuse framework capabilities to reduce code duplication
-
-    # Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
-
-    # Framework prompt contributions (common hints like read_first, verify_changes)
-    _prompt_contrib = PromptContributionCapability()
-
-    # =========================================================================
     # Extension Caching
     # =========================================================================
     # Individual extension caching is provided by VerticalBase._get_cached_extension()
@@ -110,19 +87,13 @@ class CodingAssistant(VerticalBase):
     def get_tools(cls) -> List[str]:
         """Get tools optimized for software development.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
-        to reduce code duplication and maintain consistency across verticals.
-
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers, including the shared file-operation
+        tool group, so the definition layer does not need framework capability objects.
 
         Returns:
             List of tool names including filesystem, git, shell, and code tools.
         """
-        from victor.tools.tool_names import ToolNames
-
-        # Phase 3: Start with framework file operations (read, write, edit, grep)
-        # This reduces duplication and ensures consistency across verticals
-        tools = cls._file_ops.get_tool_list()
+        tools = list(ToolNames.file_operations())
 
         # Add coding-specific tools
         tools.extend(
@@ -196,13 +167,11 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get coding-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
 
         Returns:
             Stage definitions optimized for software development workflow.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
@@ -393,23 +362,6 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             return CODING_PERSONAS
 
         return cls._get_cached_extension("personas", _create)
-
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get coding capability configurations for centralized storage.
-
-        Returns coding capability configurations for VerticalContext storage.
-        This replaces direct orchestrator attribute assignment patterns like:
-        - orchestrator.code_style = {...}
-        - orchestrator.test_config = {...}
-        - orchestrator.lsp_config = {...}
-
-        Returns:
-            Dict with coding capability configurations
-        """
-        from victor.verticals.contrib.coding.capabilities import get_capability_configs
-
-        return get_capability_configs()
 
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.

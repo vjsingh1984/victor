@@ -63,7 +63,17 @@ Brief description of this release (2-3 sentences).
 - **[Feature/API]**: Description
   - Deprecated in: [Version]
   - To be removed in: [Version]
+  - Target removal date: YYYY-MM-DD
+  - Replacement: [API/path]
   - Migration path: Link to documentation
+  - Compatibility shim status: [still supported until X / removed in this release]
+
+Required for every deprecation or removal carried in the release:
+
+- Include the target removal version and removal date.
+- State whether a compatibility shim still exists.
+- Link to the migration guide or include a minimal migration snippet.
+- If the deprecated surface is removed in this release, repeat it under `Breaking Changes`.
 
 ### Documentation
 

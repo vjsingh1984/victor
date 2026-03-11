@@ -6,6 +6,7 @@ Victor verticals without runtime dependencies.
 
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols import (
+    CapabilityProvider,
     ToolProvider,
     ToolSelectionStrategy,
     SafetyProvider,
@@ -38,4 +39,5 @@ __all__ = [
     "RLProvider",
     "EnrichmentProvider",
     "ServiceProvider",
+    "CapabilityProvider",
 ]

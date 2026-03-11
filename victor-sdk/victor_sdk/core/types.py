@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, TypeAlias, Union
+
+from victor_sdk.core.exceptions import VerticalConfigurationError
 
 
 class Tier(str, Enum):
@@ -17,6 +19,65 @@ class Tier(str, Enum):
     BASIC = "basic"
     STANDARD = "standard"
     ADVANCED = "advanced"
+
+
+CURRENT_DEFINITION_VERSION = "1.0"
+MINIMUM_SUPPORTED_DEFINITION_VERSION = "1.0"
+
+
+def _parse_definition_version(version: str) -> tuple[int, int]:
+    """Parse a definition version string into `(major, minor)` integers."""
+
+    if not isinstance(version, str):
+        raise VerticalConfigurationError(
+            "Definition version must be a string.",
+            details={"definition_version": version},
+        )
+
+    parts = version.split(".")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        raise VerticalConfigurationError(
+            "Definition version must use '<major>.<minor>' numeric format.",
+            details={"definition_version": version},
+        )
+
+    return int(parts[0]), int(parts[1])
+
+
+def is_supported_definition_version(version: str) -> bool:
+    """Return whether a definition version is supported by this SDK."""
+
+    try:
+        validate_definition_version(version)
+    except VerticalConfigurationError:
+        return False
+    return True
+
+
+def validate_definition_version(version: str) -> None:
+    """Validate compatibility for a vertical definition schema version."""
+
+    parsed_version = _parse_definition_version(version)
+    minimum_version = _parse_definition_version(MINIMUM_SUPPORTED_DEFINITION_VERSION)
+    current_version = _parse_definition_version(CURRENT_DEFINITION_VERSION)
+
+    if parsed_version < minimum_version:
+        raise VerticalConfigurationError(
+            "Definition version is below the minimum supported schema version.",
+            details={
+                "definition_version": version,
+                "minimum_supported": MINIMUM_SUPPORTED_DEFINITION_VERSION,
+            },
+        )
+
+    if parsed_version > current_version:
+        raise VerticalConfigurationError(
+            "Definition version is newer than this SDK supports.",
+            details={
+                "definition_version": version,
+                "current_supported": CURRENT_DEFINITION_VERSION,
+            },
+        )
 
 
 @dataclass(frozen=True)
@@ -52,6 +113,62 @@ class StageDefinition:
         effective.update(tool for tool in self.optional_tools if tool in available_tools)
 
         return sorted(effective)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the stage definition."""
+
+        return {
+            "name": self.name,
+            "description": self.description,
+            "required_tools": self.required_tools.copy(),
+            "optional_tools": self.optional_tools.copy(),
+            "allow_custom_tools": self.allow_custom_tools,
+        }
+
+
+StageDefinitionLike: TypeAlias = Union[Dict[str, Any], StageDefinition]
+
+
+def normalize_stage_definition(
+    stage_name: str,
+    stage: StageDefinitionLike,
+) -> StageDefinition:
+    """Normalize a stage declaration into a StageDefinition object."""
+
+    if isinstance(stage, StageDefinition):
+        return stage
+    if isinstance(stage, dict):
+        legacy_tools = list(stage.get("tools", []))
+        return StageDefinition(
+            name=stage.get("name", stage_name),
+            description=stage.get("description", ""),
+            required_tools=list(stage.get("required_tools", [])),
+            optional_tools=list(stage.get("optional_tools", legacy_tools)),
+            allow_custom_tools=bool(stage.get("allow_custom_tools", True)),
+        )
+    if hasattr(stage, "name") and hasattr(stage, "description"):
+        # Accept richer runtime stage objects during the migration to the
+        # SDK definition contract without importing runtime-only types here.
+        return StageDefinition(
+            name=getattr(stage, "name"),
+            description=getattr(stage, "description"),
+            optional_tools=sorted(list(getattr(stage, "tools", []))),
+        )
+    raise TypeError(
+        "Stage definitions must be dicts or StageDefinition objects, "
+        f"got {type(stage)!r}"
+    )
+
+
+def normalize_stage_definitions(
+    stages: Dict[str, StageDefinitionLike],
+) -> Dict[str, StageDefinition]:
+    """Normalize stage declarations to StageDefinition objects."""
+
+    return {
+        stage_name: normalize_stage_definition(stage_name, stage)
+        for stage_name, stage in stages.items()
+    }
 
 
 @dataclass(frozen=True)
@@ -135,6 +252,359 @@ class ToolSet:
         return iter(self.names)
 
 
+@dataclass(frozen=True)
+class ToolRequirement:
+    """Serializable requirement for a tool used by a vertical.
+
+    Attributes:
+        tool_name: Canonical tool identifier from the SDK tool registry
+        required: Whether the tool is mandatory for the vertical definition
+        purpose: Human-readable reason this tool is included
+        metadata: Additional serializable requirement metadata
+    """
+
+    tool_name: str
+    required: bool = True
+    purpose: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def as_legacy_string(self) -> str:
+        """Return the legacy string form used by older integrations."""
+
+        return self.tool_name
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the requirement."""
+
+        payload: Dict[str, Any] = {
+            "tool_name": self.tool_name,
+            "required": self.required,
+        }
+        if self.purpose:
+            payload["purpose"] = self.purpose
+        if self.metadata:
+            payload["metadata"] = self.metadata
+        return payload
+
+
+ToolRequirementLike: TypeAlias = Union[str, Dict[str, Any], ToolRequirement]
+
+
+def normalize_tool_requirement(requirement: ToolRequirementLike) -> ToolRequirement:
+    """Convert a legacy string or typed requirement into a requirement object."""
+
+    if isinstance(requirement, ToolRequirement):
+        return requirement
+    if isinstance(requirement, str):
+        return ToolRequirement(tool_name=requirement)
+    if isinstance(requirement, dict):
+        return ToolRequirement(
+            tool_name=requirement.get("tool_name", ""),
+            required=bool(requirement.get("required", True)),
+            purpose=requirement.get("purpose", ""),
+            metadata=dict(requirement.get("metadata", {})),
+        )
+    raise TypeError(
+        "Tool requirements must be strings, dicts, or ToolRequirement objects, "
+        f"got {type(requirement)!r}"
+    )
+
+
+def normalize_tool_requirements(
+    requirements: List[ToolRequirementLike],
+) -> List[ToolRequirement]:
+    """Normalize a list of tool requirements to typed objects."""
+
+    return [normalize_tool_requirement(requirement) for requirement in requirements]
+
+
+@dataclass(frozen=True)
+class PromptTemplateDefinition:
+    """Serializable prompt template for a task type."""
+
+    task_type: str
+    template: str
+    description: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the prompt template."""
+
+        payload: Dict[str, Any] = {
+            "task_type": self.task_type,
+            "template": self.template,
+        }
+        if self.description:
+            payload["description"] = self.description
+        if self.metadata:
+            payload["metadata"] = self.metadata
+        return payload
+
+
+PromptTemplateLike: TypeAlias = Union[str, Dict[str, Any], PromptTemplateDefinition]
+
+
+def normalize_prompt_template(
+    task_type: str,
+    template: PromptTemplateLike,
+) -> PromptTemplateDefinition:
+    """Normalize a prompt template declaration."""
+
+    if isinstance(template, PromptTemplateDefinition):
+        return template
+    if isinstance(template, str):
+        return PromptTemplateDefinition(task_type=task_type, template=template)
+    if isinstance(template, dict):
+        return PromptTemplateDefinition(
+            task_type=template.get("task_type", task_type),
+            template=template.get("template", ""),
+            description=template.get("description", ""),
+            metadata=dict(template.get("metadata", {})),
+        )
+    raise TypeError(
+        "Prompt templates must be strings, dicts, or PromptTemplateDefinition objects, "
+        f"got {type(template)!r}"
+    )
+
+
+def normalize_prompt_templates(
+    templates: Union[Dict[str, PromptTemplateLike], List[PromptTemplateDefinition]],
+) -> List[PromptTemplateDefinition]:
+    """Normalize prompt template declarations to serializable dataclasses."""
+
+    if isinstance(templates, list):
+        return [
+            template if isinstance(template, PromptTemplateDefinition) else normalize_prompt_template("", template)
+            for template in templates
+        ]
+    return [
+        normalize_prompt_template(task_type, template)
+        for task_type, template in templates.items()
+    ]
+
+
+@dataclass(frozen=True)
+class TaskTypeHintDefinition:
+    """Serializable task-type hint for prompt and planning guidance."""
+
+    task_type: str
+    hint: str
+    tool_budget: int = 10
+    priority_tools: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the task hint."""
+
+        payload: Dict[str, Any] = {
+            "task_type": self.task_type,
+            "hint": self.hint,
+            "tool_budget": self.tool_budget,
+            "priority_tools": self.priority_tools.copy(),
+        }
+        if self.metadata:
+            payload["metadata"] = self.metadata
+        return payload
+
+
+TaskTypeHintLike: TypeAlias = Union[str, Dict[str, Any], TaskTypeHintDefinition]
+
+
+def normalize_task_type_hint(
+    task_type: str,
+    hint: TaskTypeHintLike,
+) -> TaskTypeHintDefinition:
+    """Normalize a task-type hint declaration."""
+
+    if isinstance(hint, TaskTypeHintDefinition):
+        return hint
+    if isinstance(hint, str):
+        return TaskTypeHintDefinition(task_type=task_type, hint=hint)
+    if isinstance(hint, dict):
+        metadata = {
+            key: value
+            for key, value in hint.items()
+            if key not in {"task_type", "hint", "tool_budget", "priority_tools"}
+        }
+        return TaskTypeHintDefinition(
+            task_type=hint.get("task_type", task_type),
+            hint=hint.get("hint", ""),
+            tool_budget=int(hint.get("tool_budget", 10)),
+            priority_tools=list(hint.get("priority_tools", [])),
+            metadata=metadata,
+        )
+    raise TypeError(
+        "Task type hints must be strings, dicts, or TaskTypeHintDefinition objects, "
+        f"got {type(hint)!r}"
+    )
+
+
+def normalize_task_type_hints(
+    hints: Union[Dict[str, TaskTypeHintLike], List[TaskTypeHintDefinition]],
+) -> List[TaskTypeHintDefinition]:
+    """Normalize task-type hint declarations to serializable dataclasses."""
+
+    if isinstance(hints, list):
+        return [
+            hint if isinstance(hint, TaskTypeHintDefinition) else normalize_task_type_hint("", hint)
+            for hint in hints
+        ]
+    return [normalize_task_type_hint(task_type, hint) for task_type, hint in hints.items()]
+
+
+@dataclass(frozen=True)
+class PromptMetadata:
+    """Serializable prompt metadata for a vertical definition."""
+
+    templates: List[PromptTemplateDefinition] = field(default_factory=list)
+    task_type_hints: List[TaskTypeHintDefinition] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the prompt metadata."""
+
+        return {
+            "templates": [template.to_dict() for template in self.templates],
+            "task_type_hints": [hint.to_dict() for hint in self.task_type_hints],
+            "metadata": dict(self.metadata),
+        }
+
+
+def normalize_prompt_metadata(metadata: Union[Dict[str, Any], PromptMetadata]) -> PromptMetadata:
+    """Normalize prompt metadata payloads to PromptMetadata."""
+
+    if isinstance(metadata, PromptMetadata):
+        return metadata
+    if isinstance(metadata, dict):
+        return PromptMetadata(
+            templates=normalize_prompt_templates(metadata.get("templates", {})),
+            task_type_hints=normalize_task_type_hints(metadata.get("task_type_hints", {})),
+            metadata=dict(metadata.get("metadata", {})),
+        )
+    raise TypeError(
+        "Prompt metadata must be a dict or PromptMetadata object, "
+        f"got {type(metadata)!r}"
+    )
+
+
+@dataclass(frozen=True)
+class WorkflowMetadata:
+    """Serializable workflow metadata for a vertical definition."""
+
+    initial_stage: Optional[str] = None
+    workflow_spec: Dict[str, Any] = field(default_factory=dict)
+    provider_hints: Dict[str, Any] = field(default_factory=dict)
+    evaluation_criteria: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the workflow metadata."""
+
+        payload: Dict[str, Any] = {
+            "workflow_spec": dict(self.workflow_spec),
+            "provider_hints": dict(self.provider_hints),
+            "evaluation_criteria": self.evaluation_criteria.copy(),
+            "metadata": dict(self.metadata),
+        }
+        if self.initial_stage is not None:
+            payload["initial_stage"] = self.initial_stage
+        return payload
+
+
+def normalize_workflow_metadata(
+    metadata: Union[Dict[str, Any], WorkflowMetadata],
+) -> WorkflowMetadata:
+    """Normalize workflow metadata payloads to WorkflowMetadata."""
+
+    if isinstance(metadata, WorkflowMetadata):
+        return metadata
+    if isinstance(metadata, dict):
+        return WorkflowMetadata(
+            initial_stage=metadata.get("initial_stage"),
+            workflow_spec=dict(metadata.get("workflow_spec", {})),
+            provider_hints=dict(metadata.get("provider_hints", {})),
+            evaluation_criteria=list(metadata.get("evaluation_criteria", [])),
+            metadata=dict(metadata.get("metadata", {})),
+        )
+    raise TypeError(
+        "Workflow metadata must be a dict or WorkflowMetadata object, "
+        f"got {type(metadata)!r}"
+    )
+
+
+@dataclass(frozen=True)
+class CapabilityRequirement:
+    """Serializable requirement for a host/runtime capability.
+
+    Attributes:
+        capability_id: Stable capability identifier from `victor_sdk.constants`
+        min_version: Optional minimum runtime capability version
+        optional: Whether the capability is a preference instead of a hard requirement
+        purpose: Human-readable reason this capability is needed
+        metadata: Additional serializable requirement metadata
+    """
+
+    capability_id: str
+    min_version: Optional[str] = None
+    optional: bool = False
+    purpose: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def as_legacy_string(self) -> str:
+        """Return the legacy string form used by older integrations."""
+
+        return self.capability_id
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the requirement."""
+
+        payload: Dict[str, Any] = {
+            "capability_id": self.capability_id,
+            "optional": self.optional,
+        }
+        if self.min_version is not None:
+            payload["min_version"] = self.min_version
+        if self.purpose:
+            payload["purpose"] = self.purpose
+        if self.metadata:
+            payload["metadata"] = self.metadata
+        return payload
+
+
+CapabilityRequirementLike: TypeAlias = Union[str, Dict[str, Any], CapabilityRequirement]
+
+
+def normalize_capability_requirement(
+    requirement: CapabilityRequirementLike,
+) -> CapabilityRequirement:
+    """Convert a legacy string or typed requirement into a requirement object."""
+
+    if isinstance(requirement, CapabilityRequirement):
+        return requirement
+    if isinstance(requirement, str):
+        return CapabilityRequirement(capability_id=requirement)
+    if isinstance(requirement, dict):
+        return CapabilityRequirement(
+            capability_id=requirement.get("capability_id", ""),
+            min_version=requirement.get("min_version"),
+            optional=bool(requirement.get("optional", False)),
+            purpose=requirement.get("purpose", ""),
+            metadata=dict(requirement.get("metadata", {})),
+        )
+    raise TypeError(
+        "Capability requirements must be strings, dicts, or CapabilityRequirement objects, "
+        f"got {type(requirement)!r}"
+    )
+
+
+def normalize_capability_requirements(
+    requirements: List[CapabilityRequirementLike],
+) -> List[CapabilityRequirement]:
+    """Normalize a list of capability requirements to typed objects."""
+
+    return [normalize_capability_requirement(requirement) for requirement in requirements]
+
+
 @dataclass
 class VerticalConfig:
     """Configuration for a vertical.
@@ -199,4 +669,331 @@ class VerticalConfig:
             tier=self.tier,
             metadata=self.metadata,
             extensions=new_extensions,
+        )
+
+
+@dataclass(frozen=True)
+class VerticalDefinition:
+    """Serializable definition-layer contract for a vertical.
+
+    This object is intentionally runtime-agnostic. It captures the declarative
+    information a host runtime needs in order to construct a vertical-specific
+    agent configuration.
+
+    Attributes:
+        name: Vertical identifier
+        description: Human-readable description
+        version: Version of the vertical definition/package
+        definition_version: Schema version for this definition payload
+        tools: Canonical tool identifiers required by the vertical
+        capability_requirements: Host/runtime capabilities required by the vertical
+        system_prompt: System prompt for the vertical
+        stages: Declarative workflow stage definitions
+        tier: Capability tier for the vertical
+        metadata: Additional serializable metadata
+        extensions: Additional serializable extension metadata
+    """
+
+    name: str
+    description: str
+    tools: List[str]
+    system_prompt: str
+    version: str = "1.0.0"
+    definition_version: str = CURRENT_DEFINITION_VERSION
+    tool_requirements: List[ToolRequirement] = field(default_factory=list)
+    capability_requirements: List[CapabilityRequirement] = field(default_factory=list)
+    prompt_metadata: PromptMetadata = field(default_factory=PromptMetadata)
+    stages: Dict[str, StageDefinition] = field(default_factory=dict)
+    workflow_metadata: WorkflowMetadata = field(default_factory=WorkflowMetadata)
+    tier: Tier = Tier.STANDARD
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    extensions: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize and validate constructor payloads."""
+
+        try:
+            normalized_tier = Tier(self.tier) if isinstance(self.tier, str) else self.tier
+            normalized_tool_requirements = normalize_tool_requirements(
+                list(self.tool_requirements)
+            )
+            normalized_capability_requirements = normalize_capability_requirements(
+                list(self.capability_requirements)
+            )
+            normalized_tools = list(self.tools)
+            if not normalized_tools and normalized_tool_requirements:
+                normalized_tools = [
+                    requirement.tool_name for requirement in normalized_tool_requirements
+                ]
+            normalized_prompt_metadata = normalize_prompt_metadata(self.prompt_metadata)
+            normalized_stages = normalize_stage_definitions(dict(self.stages))
+            normalized_workflow_metadata = normalize_workflow_metadata(
+                self.workflow_metadata
+            )
+            normalized_metadata = dict(self.metadata)
+            normalized_extensions = dict(self.extensions)
+        except VerticalConfigurationError:
+            raise
+        except Exception as exc:
+            raise VerticalConfigurationError(
+                "Vertical definition payload could not be normalized.",
+                vertical_name=self.name if isinstance(self.name, str) and self.name else None,
+                details={"error": str(exc)},
+            ) from exc
+
+        object.__setattr__(self, "tier", normalized_tier)
+        object.__setattr__(self, "tool_requirements", normalized_tool_requirements)
+        object.__setattr__(self, "capability_requirements", normalized_capability_requirements)
+        object.__setattr__(self, "tools", normalized_tools)
+        object.__setattr__(self, "prompt_metadata", normalized_prompt_metadata)
+        object.__setattr__(self, "stages", normalized_stages)
+        object.__setattr__(self, "workflow_metadata", normalized_workflow_metadata)
+        object.__setattr__(self, "metadata", normalized_metadata)
+        object.__setattr__(self, "extensions", normalized_extensions)
+
+        self.validate()
+
+    def get_tool_names(self) -> List[str]:
+        """Return the canonical tool identifiers for this definition."""
+
+        if self.tools:
+            return self.tools.copy()
+        if self.tool_requirements:
+            return [requirement.tool_name for requirement in self.tool_requirements]
+        return []
+
+    def validate(self) -> None:
+        """Validate the definition contract and schema compatibility."""
+
+        validate_definition_version(self.definition_version)
+
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise VerticalConfigurationError("Vertical definition name must be a non-empty string.")
+
+        if not isinstance(self.description, str):
+            raise VerticalConfigurationError(
+                "Vertical definition description must be a string.",
+                vertical_name=self.name,
+            )
+
+        if not isinstance(self.system_prompt, str):
+            raise VerticalConfigurationError(
+                "Vertical definition system_prompt must be a string.",
+                vertical_name=self.name,
+            )
+
+        invalid_tools = [
+            tool_name for tool_name in self.tools if not isinstance(tool_name, str) or not tool_name.strip()
+        ]
+        if invalid_tools:
+            raise VerticalConfigurationError(
+                "Vertical definition tools must be non-empty strings.",
+                vertical_name=self.name,
+                details={"tools": invalid_tools},
+            )
+
+        if self.tool_requirements:
+            requirement_tools = [
+                requirement.tool_name for requirement in self.tool_requirements
+            ]
+            if self.tools != requirement_tools:
+                raise VerticalConfigurationError(
+                    "Vertical definition tools must match tool requirement order.",
+                    vertical_name=self.name,
+                    details={
+                        "tools": self.tools,
+                        "tool_requirements": requirement_tools,
+                    },
+                )
+
+        for stage_name, stage_definition in self.stages.items():
+            if stage_definition.name != stage_name:
+                raise VerticalConfigurationError(
+                    "Stage definition name must match its mapping key.",
+                    vertical_name=self.name,
+                    details={
+                        "stage_key": stage_name,
+                        "stage_name": stage_definition.name,
+                    },
+                )
+
+        initial_stage = self.workflow_metadata.initial_stage
+        if initial_stage is not None and initial_stage not in self.stages:
+            raise VerticalConfigurationError(
+                "Workflow initial_stage must exist in the stage definitions.",
+                vertical_name=self.name,
+                details={"initial_stage": initial_stage},
+            )
+
+        stage_order = self.workflow_metadata.workflow_spec.get("stage_order")
+        if stage_order is not None:
+            if not isinstance(stage_order, list) or not all(
+                isinstance(stage_name, str) for stage_name in stage_order
+            ):
+                raise VerticalConfigurationError(
+                    "Workflow stage_order must be a list of stage-name strings.",
+                    vertical_name=self.name,
+                )
+
+            missing_stages = [
+                stage_name for stage_name in stage_order if stage_name not in self.stages
+            ]
+            if missing_stages:
+                raise VerticalConfigurationError(
+                    "Workflow stage_order references undefined stages.",
+                    vertical_name=self.name,
+                    details={"missing_stages": missing_stages},
+                )
+
+        template_task_types = [template.task_type for template in self.prompt_metadata.templates]
+        if len(template_task_types) != len(set(template_task_types)):
+            raise VerticalConfigurationError(
+                "Prompt metadata template task types must be unique.",
+                vertical_name=self.name,
+            )
+
+        hint_task_types = [hint.task_type for hint in self.prompt_metadata.task_type_hints]
+        if len(hint_task_types) != len(set(hint_task_types)):
+            raise VerticalConfigurationError(
+                "Prompt metadata task-type hints must be unique.",
+                vertical_name=self.name,
+            )
+
+    def get_stage_names(self) -> List[str]:
+        """Return the stage names present in this definition."""
+
+        return list(self.stages.keys())
+
+    def to_config(self) -> VerticalConfig:
+        """Convert the definition into the legacy SDK config shape."""
+
+        config_extensions = dict(self.extensions)
+        if self.tool_requirements:
+            config_extensions["tool_requirements"] = self.tool_requirements.copy()
+        if self.capability_requirements:
+            config_extensions["capability_requirements"] = self.capability_requirements.copy()
+        if (
+            self.prompt_metadata.templates
+            or self.prompt_metadata.task_type_hints
+            or self.prompt_metadata.metadata
+        ):
+            config_extensions["prompt_metadata"] = self.prompt_metadata.to_dict()
+        if (
+            self.workflow_metadata.initial_stage is not None
+            or self.workflow_metadata.workflow_spec
+            or self.workflow_metadata.provider_hints
+            or self.workflow_metadata.evaluation_criteria
+            or self.workflow_metadata.metadata
+        ):
+            config_extensions["workflow_metadata"] = self.workflow_metadata.to_dict()
+
+        return VerticalConfig(
+            name=self.name,
+            description=self.description,
+            tools=self.get_tool_names(),
+            system_prompt=self.system_prompt,
+            stages=self.stages.copy(),
+            tier=self.tier,
+            metadata={
+                **self.metadata,
+                "vertical_version": self.version,
+                "definition_version": self.definition_version,
+            },
+            extensions=config_extensions,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the definition."""
+
+        return {
+            "name": self.name,
+            "description": self.description,
+            "version": self.version,
+            "definition_version": self.definition_version,
+            "tools": self.get_tool_names(),
+            "tool_requirements": [
+                requirement.to_dict() for requirement in self.tool_requirements
+            ],
+            "capability_requirements": [
+                requirement.to_dict() for requirement in self.capability_requirements
+            ],
+            "system_prompt": self.system_prompt,
+            "prompt_metadata": self.prompt_metadata.to_dict(),
+            "stages": {
+                stage_name: stage_definition.to_dict()
+                for stage_name, stage_definition in self.stages.items()
+            },
+            "workflow_metadata": self.workflow_metadata.to_dict(),
+            "tier": self.tier.value,
+            "metadata": dict(self.metadata),
+            "extensions": dict(self.extensions),
+        }
+
+    @classmethod
+    def from_config(
+        cls,
+        config: VerticalConfig,
+        *,
+        version: str = "1.0.0",
+        definition_version: str = CURRENT_DEFINITION_VERSION,
+    ) -> "VerticalDefinition":
+        """Create a definition from an existing SDK config object."""
+
+        config_metadata = dict(config.metadata)
+        config_version = config_metadata.pop("vertical_version", version)
+        config_definition_version = config_metadata.pop(
+            "definition_version", definition_version
+        )
+        config_extensions = dict(config.extensions)
+        tool_requirements = normalize_tool_requirements(
+            config_extensions.pop("tool_requirements", config.get_tool_names())
+        )
+        capability_requirements = normalize_capability_requirements(
+            config_extensions.pop("capability_requirements", [])
+        )
+        prompt_metadata = normalize_prompt_metadata(
+            config_extensions.pop("prompt_metadata", {})
+        )
+        workflow_metadata = normalize_workflow_metadata(
+            config_extensions.pop("workflow_metadata", {})
+        )
+
+        return cls(
+            name=config.name,
+            description=config.description,
+            version=config_version,
+            definition_version=config_definition_version,
+            tools=config.get_tool_names(),
+            tool_requirements=tool_requirements,
+            capability_requirements=capability_requirements,
+            system_prompt=config.system_prompt,
+            prompt_metadata=prompt_metadata,
+            stages=config.stages.copy(),
+            workflow_metadata=workflow_metadata,
+            tier=config.tier,
+            metadata=config_metadata,
+            extensions=config_extensions,
+        )
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "VerticalDefinition":
+        """Create a definition from a serialized dictionary payload."""
+
+        return cls(
+            name=payload.get("name", ""),
+            description=payload.get("description", ""),
+            version=payload.get("version", "1.0.0"),
+            definition_version=payload.get(
+                "definition_version", CURRENT_DEFINITION_VERSION
+            ),
+            tools=list(payload.get("tools", [])),
+            tool_requirements=payload.get("tool_requirements", []),
+            capability_requirements=payload.get("capability_requirements", []),
+            system_prompt=payload.get("system_prompt", ""),
+            prompt_metadata=payload.get("prompt_metadata", {}),
+            stages=payload.get("stages", {}),
+            workflow_metadata=payload.get("workflow_metadata", {}),
+            tier=payload.get("tier", Tier.STANDARD),
+            metadata=dict(payload.get("metadata", {})),
+            extensions=dict(payload.get("extensions", {})),
         )

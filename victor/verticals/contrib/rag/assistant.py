@@ -27,19 +27,11 @@ Features:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
-    TieredToolConfig,
-    VerticalExtensions,
-)
-from victor.framework.tool_naming import ToolNames
+from victor.core.verticals.base import StageDefinition, VerticalBase
+from victor.core.verticals.protocols import TieredToolConfig
+from victor_sdk import ToolNames
 
 
 class RAGAssistant(VerticalBase):
@@ -131,7 +123,7 @@ You: [Use rag_query tool with query="authentication"]
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get RAG-specific workflow stages.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
 
         Returns:
             Stage definitions for RAG workflow
@@ -206,67 +198,3 @@ You: [Use rag_query tool with query="authentication"]
             # Analysis tasks should not have write tools
             readonly_only_for_analysis=True,
         )
-
-    # Extension providers delegated to base class (OCP/caching compliance)
-    # RAG previously overrode get_extensions() directly, bypassing base class caching.
-    # Now we implement the individual getter methods and let VerticalBase.get_extensions()
-    # handle caching and aggregation.
-
-    @classmethod
-    def get_middleware(cls) -> list:
-        """Get RAG middleware (none needed).
-
-        Returns:
-            Empty list - RAG doesn't use custom middleware
-        """
-        return []
-
-    @classmethod
-    def get_safety_extension(cls):
-        """Get RAG safety extension.
-
-        Returns:
-            RAGSafetyExtension instance
-        """
-        return cls._get_extension_factory("safety_extension", "victor_rag.safety")
-
-    @classmethod
-    def get_prompt_contributor(cls):
-        """Get RAG prompt contributor.
-
-        Returns:
-            RAGPromptContributor instance
-        """
-        return cls._get_extension_factory("prompt_contributor", "victor_rag.prompts")
-
-    @classmethod
-    def get_rl_config_provider(cls):
-        """Get the RL configuration provider for RAG vertical.
-
-        Returns:
-            RAGRLConfig instance
-        """
-        return cls._get_extension_factory("rl_config_provider", "victor_rag.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls):
-        """Get the team specification provider for RAG vertical.
-
-        Returns:
-            RAGTeamSpecProvider instance
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor_rag.teams")
-
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get RAG capability configurations for centralized storage.
-
-        Returns default RAG configuration for VerticalContext storage.
-        This replaces direct orchestrator.rag_config assignment.
-
-        Returns:
-            Dict with default RAG capability configurations
-        """
-        from victor.verticals.contrib.rag.capabilities import get_capability_configs
-
-        return get_capability_configs()

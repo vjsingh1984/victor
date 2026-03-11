@@ -9,6 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
+from victor_sdk.core.types import (
+    CapabilityRequirement,
+    CapabilityRequirementLike,
+    normalize_capability_requirement,
+)
+
 
 @dataclass(frozen=True)
 class VerticalMetadata:
@@ -24,6 +30,7 @@ class VerticalMetadata:
         author: Author name or organization
         capabilities: List of capability identifiers
         requirements: List of required capabilities or services
+        capability_requirements: Structured capability requirements
         tags: List of tags for categorization
         categories: List of category names
         provider_hints: Hints about which providers to use
@@ -36,6 +43,7 @@ class VerticalMetadata:
     author: str = ""
     capabilities: List[str] = field(default_factory=list)
     requirements: List[str] = field(default_factory=list)
+    capability_requirements: List[CapabilityRequirement] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
     categories: List[str] = field(default_factory=list)
     provider_hints: Dict[str, str] = field(default_factory=dict)
@@ -50,11 +58,37 @@ class VerticalMetadata:
             author=self.author,
             capabilities=[*self.capabilities, capability],
             requirements=self.requirements.copy(),
+            capability_requirements=self.capability_requirements.copy(),
             tags=self.tags.copy(),
             categories=self.categories.copy(),
             provider_hints=self.provider_hints.copy(),
             evaluation_criteria=self.evaluation_criteria.copy(),
         )
+
+    def with_requirement(self, requirement: CapabilityRequirementLike) -> VerticalMetadata:
+        """Return metadata with an additional capability requirement."""
+
+        normalized = normalize_capability_requirement(requirement)
+        return VerticalMetadata(
+            name=self.name,
+            description=self.description,
+            version=self.version,
+            author=self.author,
+            capabilities=self.capabilities.copy(),
+            requirements=[*self.requirements, normalized.capability_id],
+            capability_requirements=[*self.capability_requirements, normalized],
+            tags=self.tags.copy(),
+            categories=self.categories.copy(),
+            provider_hints=self.provider_hints.copy(),
+            evaluation_criteria=self.evaluation_criteria.copy(),
+        )
+
+    def get_requirement_names(self) -> List[str]:
+        """Return required capability identifiers in legacy string form."""
+
+        if self.capability_requirements:
+            return [requirement.capability_id for requirement in self.capability_requirements]
+        return self.requirements.copy()
 
     def with_tag(self, tag: str) -> VerticalMetadata:
         """Return metadata with an additional tag."""
@@ -65,6 +99,7 @@ class VerticalMetadata:
             author=self.author,
             capabilities=self.capabilities.copy(),
             requirements=self.requirements.copy(),
+            capability_requirements=self.capability_requirements.copy(),
             tags=[*self.tags, tag],
             categories=self.categories.copy(),
             provider_hints=self.provider_hints.copy(),
@@ -80,6 +115,9 @@ class VerticalMetadata:
             "author": self.author,
             "capabilities": self.capabilities,
             "requirements": self.requirements,
+            "capability_requirements": [
+                requirement.to_dict() for requirement in self.capability_requirements
+            ],
             "tags": self.tags,
             "categories": self.categories,
             "provider_hints": self.provider_hints,

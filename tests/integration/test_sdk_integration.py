@@ -7,11 +7,12 @@ This test suite validates that:
 """
 
 import pytest
+from unittest.mock import AsyncMock, patch
 
 from victor.core.verticals.base import VerticalBase
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
-from victor_sdk.core.types import VerticalConfig, Tier
+from victor_sdk.core.types import VerticalConfig, VerticalDefinition, Tier
 
 
 class TestSdkIntegration:
@@ -62,6 +63,112 @@ class TestSdkIntegration:
         # Should return victor-ai's VerticalConfig (not SDK's)
         # The victor-ai version has tools as ToolSet
         assert hasattr(config.tools, "tools")
+
+    def test_sdk_definition_generation(self):
+        """SDK definition generation should work with victor-ai implementation."""
+
+        class TestVertical(VerticalBase):
+            name = "test"
+            description = "Test vertical"
+            version = "2.0.0"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test prompt"
+
+        definition = TestVertical.get_definition()
+
+        assert isinstance(definition, VerticalDefinition)
+        assert definition.name == "test"
+        assert definition.version == "2.0.0"
+        assert definition.tools == ["read", "write"]
+        assert definition.tool_requirements[0].tool_name == "read"
+
+    @pytest.mark.asyncio
+    async def test_victor_ai_create_agent_delegates_to_runtime_adapter(self):
+        """victor-ai VerticalBase.create_agent should delegate to the host-owned adapter."""
+
+        class TestVertical(VerticalBase):
+            name = "test"
+            description = "Test vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test prompt"
+
+        with patch(
+            "victor.framework.vertical_runtime_adapter.VerticalRuntimeAdapter.create_agent",
+            new=AsyncMock(return_value="agent-instance"),
+        ) as mock_create_agent:
+            with pytest.warns(
+                DeprecationWarning,
+                match="VerticalBase.create_agent\\(\\) is deprecated",
+            ):
+                result = await TestVertical.create_agent(
+                    provider="openai",
+                    model="gpt-4.1",
+                    thinking=True,
+                )
+
+        assert result == "agent-instance"
+        mock_create_agent.assert_awaited_once_with(
+            TestVertical,
+            provider="openai",
+            model="gpt-4.1",
+            thinking=True,
+        )
+
+    def test_sdk_definition_captures_prompt_and_workflow_metadata(self):
+        """victor-ai subclasses should inherit SDK prompt/workflow definition hooks."""
+
+        class TestVertical(VerticalBase):
+            name = "test"
+            description = "Test vertical"
+            version = "2.0.0"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test prompt"
+
+            @classmethod
+            def get_prompt_templates(cls):
+                return {"analysis": "Analyze the repository."}
+
+            @classmethod
+            def get_task_type_hints(cls):
+                return {
+                    "analysis": {
+                        "hint": "Start with reading relevant files.",
+                        "tool_budget": 10,
+                    }
+                }
+
+            @classmethod
+            def get_provider_hints(cls):
+                return {"preferred_providers": ["anthropic"]}
+
+            @classmethod
+            def get_evaluation_criteria(cls):
+                return ["accuracy"]
+
+        definition = TestVertical.get_definition()
+
+        assert definition.prompt_metadata.templates[0].task_type == "analysis"
+        assert definition.prompt_metadata.task_type_hints[0].tool_budget == 10
+        assert definition.workflow_metadata.provider_hints["preferred_providers"] == ["anthropic"]
+        assert definition.workflow_metadata.evaluation_criteria == ["accuracy"]
 
     def test_backward_compatibility_class_attributes(self):
         """Existing class attributes should still work."""

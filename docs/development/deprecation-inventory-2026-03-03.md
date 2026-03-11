@@ -19,11 +19,18 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 | `CodingTeamSpec` | `victor/verticals/contrib/coding/teams/specs.py` | `TeamSpec` from `victor.framework.team_schema` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 | `ResearchTeamSpec` | `victor/verticals/contrib/research/teams/__init__.py` | `TeamSpec` from `victor.framework.team_schema` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 | Fragmented/legacy event type names (module-level compatibility) | `victor/core/events/taxonomy.py` | `UnifiedEventType` values from `victor.core.events.taxonomy` | Observability Lead | `v0.8.0` | `2026-12-31` |
+| `VerticalBase.create_agent()` convenience factory | `victor/core/verticals/base.py` | `Agent.create(vertical=MyVertical, ...)` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 
 ## Notes
 
 - Entries with explicit source-level targets were kept as-is (`v0.7.0` / `2026-06-30`).
 - Entries without explicit source targets are assigned provisional `v0.8.0` / `2026-12-31` per policy and should be re-validated at each milestone cut.
+- `VerticalBase.create_agent()` and the legacy config-only vertical activation shim
+  share the same provisional removal milestone: `v0.8.0` / `2026-12-31`.
+- Until that removal milestone lands, each release note set must include:
+  - the replacement path `Agent.create(vertical=MyVertical, ...)`
+  - confirmation that legacy config-only verticals still run through the runtime shim
+  - a link to `victor-sdk/MIGRATION_GUIDE.md`
 
 ## M2 Update (2026-03-04)
 
