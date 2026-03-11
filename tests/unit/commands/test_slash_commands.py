@@ -320,6 +320,21 @@ class TestSlashCommandHandlerHelp:
         # Should show model command info
         assert "model" in output.lower()
 
+    @pytest.mark.asyncio
+    async def test_help_graph_tool_modes(self):
+        """Test help can describe graph tool call modes."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        await handler.execute("/help graph")
+        output = stdout.getvalue().lower()
+
+        assert "callers" in output
+        assert "callees" in output
+        assert "trace" in output
+
 
 class TestSlashCommandHandlerClear:
     """Tests for clear command."""
@@ -744,6 +759,19 @@ class TestSystemCommands:
         assert meta.name == "help"
         assert "?" in meta.aliases
         assert meta.category == "system"
+
+    def test_handler_get_help_supports_graph_tool(self):
+        """Test programmatic help includes embedded graph tool guidance."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        output = handler.get_help("graph").lower()
+
+        assert "callers" in output
+        assert "callees" in output
+        assert "trace" in output
 
     def test_config_command_metadata(self):
         """Test ConfigCommand metadata."""

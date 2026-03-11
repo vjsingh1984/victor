@@ -817,6 +817,9 @@ class StreamingChatHandler:
                         maybe_prefix(
                             "The previous action did not complete. Use discovery tools:\n"
                             "- graph(mode='pagerank', top_k=5) to find important symbols\n"
+                            "- graph(mode='callers', node='symbol', depth=2) to find reverse call chains\n"
+                            "- graph(mode='callees', node='symbol', depth=2) to find forward call chains\n"
+                            "- graph(mode='trace', node='entry_function', depth=3) to trace execution flow\n"
                             "- search(query='...') for semantic code search\n"
                             "- overview(path='.') for project structure\n"
                             "Pick ONE tool to continue."
@@ -842,6 +845,9 @@ class StreamingChatHandler:
                     (
                         "The previous action did not complete. Use discovery tools:\n"
                         "- graph(mode='pagerank', top_k=5) - find important symbols\n"
+                        "- graph(mode='callers', node='symbol', depth=2) - find who calls a function\n"
+                        "- graph(mode='callees', node='symbol', depth=2) - find what a function calls\n"
+                        "- graph(mode='trace', node='entry_function', depth=3) - trace execution flow\n"
                         "- search(query='...') - semantic code search\n"
                         "- overview(path='.') - project structure\n"
                         "- refs(symbol_name='...') - find usages\n"

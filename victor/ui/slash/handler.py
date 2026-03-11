@@ -198,6 +198,12 @@ class SlashCommandHandler:
                     f"[dim]Aliases:[/] {aliases}\n"
                     f"[dim]Category:[/] {meta.category}"
                 )
+            from victor.ui.slash.commands.system import get_builtin_tool_help
+
+            tool_help = get_builtin_tool_help(command_name)
+            if tool_help:
+                _, content = tool_help
+                return content
             return f"Unknown command: /{command_name}"
 
         # Build table of all commands
@@ -234,6 +240,15 @@ class SlashCommandHandler:
                     )
                 )
             else:
+                from victor.ui.slash.commands.system import get_builtin_tool_help
+
+                tool_help = get_builtin_tool_help(command_name)
+                if tool_help:
+                    title, content = tool_help
+                    self.console.print(
+                        Panel(content, title=f"Help: {title}", border_style="blue")
+                    )
+                    return
                 self.console.print(f"[yellow]Unknown command:[/] /{command_name}")
             return
 

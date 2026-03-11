@@ -81,9 +81,12 @@ logger = logging.getLogger(__name__)
 GraphMode = Literal[
     "find",  # Find symbols by name/pattern, optionally expand via graph
     "neighbors",  # Get direct connections (callers/callees)
+    "callers",  # Reverse CALLS traversal for a function
+    "callees",  # Forward CALLS traversal for a function
     "pagerank",  # Find most important symbols
     "centrality",  # Find most connected symbols
     "path",  # Find shortest path between symbols
+    "trace",  # Bounded execution trace from an entry function
     "impact",  # What would be affected if symbol changes
     "clusters",  # Find tightly coupled symbol groups
     "stats",  # Graph statistics
@@ -1165,6 +1168,164 @@ async def _load_graph(graph_store: GraphStoreProtocol) -> GraphAnalyzer:
     return analyzer
 
 
+async def _get_capability_index(
+    exec_ctx: Optional[Dict[str, Any]] = None,
+    force_reindex: bool = False,
+) -> Any:
+    """Load the CodebaseIndex used for provider-backed graph capabilities."""
+    from victor.config.settings import load_settings
+    from victor.tools.code_search_tool import _get_or_build_index
+
+    root = Path.cwd()
+    settings = exec_ctx.get("settings") if exec_ctx else None
+    if settings is None:
+        settings = load_settings()
+
+    index, _rebuilt = await _get_or_build_index(
+        root,
+        settings,
+        force_reindex=force_reindex,
+        exec_ctx=exec_ctx,
+    )
+    return index
+
+
+def _normalize_graph_symbol(analyzer: GraphAnalyzer, node_id: str) -> Dict[str, Any]:
+    """Convert an analyzer node into a provider-like graph result."""
+    node = analyzer.nodes.get(node_id)
+    if node is None:
+        return {
+            "id": node_id,
+            "name": node_id,
+            "file_path": None,
+            "line_start": None,
+            "line_end": None,
+            "labels": [],
+            "metadata": {},
+        }
+
+    metadata = {
+        "name": node.name,
+        "file_path": node.file,
+        "line_start": node.line,
+        "line_end": node.line,
+        "node_id": node.node_id,
+        "node_type": node.type,
+    }
+    return {
+        "id": node.node_id,
+        "name": node.name,
+        "file_path": node.file,
+        "line_start": node.line,
+        "line_end": node.line,
+        "labels": [node.type.title()] if node.type else [],
+        "metadata": metadata,
+        "type": node.type,
+    }
+
+
+def _fallback_call_traversal(
+    analyzer: GraphAnalyzer,
+    node_id: str,
+    *,
+    direction: Literal["in", "out"],
+    max_depth: int,
+    edge_type: str = "CALLS",
+) -> List[Dict[str, Any]]:
+    """Fallback caller/callee traversal using the in-memory analyzer."""
+    neighbors = analyzer.get_neighbors(
+        node_id=node_id,
+        direction=direction,
+        edge_types=[edge_type] if edge_type else None,
+        max_depth=max_depth,
+    )
+    flattened: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
+
+    for depth, rows in sorted(neighbors.get("neighbors_by_depth", {}).items()):
+        for row in rows:
+            target_id = row.get("node_id")
+            if not target_id or target_id in seen_ids:
+                continue
+            seen_ids.add(target_id)
+            normalized = _normalize_graph_symbol(analyzer, target_id)
+            normalized["depth"] = depth
+            normalized["edge_type"] = row.get("edge_type")
+            normalized["direction"] = row.get("direction")
+            flattened.append(normalized)
+
+    flattened.sort(
+        key=lambda item: (
+            item.get("depth") or 0,
+            item.get("file_path") or "",
+            item.get("line_start") or 0,
+            item.get("name") or "",
+        )
+    )
+    return flattened
+
+
+def _fallback_trace_execution(
+    analyzer: GraphAnalyzer,
+    entry_node_id: str,
+    *,
+    max_depth: int,
+    edge_type: str = "CALLS",
+) -> Dict[str, Any]:
+    """Fallback bounded execution trace using outgoing CALLS edges."""
+    visited: Set[str] = {entry_node_id}
+    queue: deque[Tuple[str, int]] = deque([(entry_node_id, 0)])
+    node_depths: Dict[str, int] = {entry_node_id: 0}
+    edges: List[Dict[str, Any]] = []
+
+    while queue:
+        current_id, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+
+        for target_id, current_edge_type, weight in analyzer.outgoing.get(current_id, []):
+            if edge_type and current_edge_type != edge_type:
+                continue
+
+            edges.append(
+                {
+                    "from_node_id": current_id,
+                    "to_node_id": target_id,
+                    "edge_type": current_edge_type,
+                    "weight": weight,
+                    "depth": depth + 1,
+                }
+            )
+
+            if target_id not in visited:
+                visited.add(target_id)
+                node_depths[target_id] = depth + 1
+                queue.append((target_id, depth + 1))
+
+    nodes = []
+    for node_id in visited:
+        normalized = _normalize_graph_symbol(analyzer, node_id)
+        normalized["depth"] = node_depths.get(node_id, 0)
+        nodes.append(normalized)
+
+    nodes.sort(
+        key=lambda item: (
+            item.get("depth") or 0,
+            item.get("file_path") or "",
+            item.get("line_start") or 0,
+            item.get("name") or "",
+        )
+    )
+
+    return {
+        "entry_point": _normalize_graph_symbol(analyzer, entry_node_id),
+        "nodes": nodes,
+        "edges": edges,
+        "edge_type": edge_type,
+        "max_depth": max_depth,
+    }
+
+
 # =============================================================================
 # Main Tool
 # =============================================================================
@@ -1251,6 +1412,7 @@ async def graph(
     neighbors_edge_types: Optional[List[str]] = None,
     neighbors_limit: int = 3,
     granularity: Literal["file", "package"] = "file",
+    _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """[GRAPH] Query codebase STRUCTURE for relationships, impact, and importance.
 
@@ -1266,9 +1428,12 @@ async def graph(
         mode: Analysis mode - determines what algorithm to run:
             - "find": Search symbols by name pattern (combines search + graph)
             - "neighbors": Get direct callers/callees of a symbol
+            - "callers": Get reverse CALLS traversal for a function
+            - "callees": Get forward CALLS traversal for a function
             - "pagerank": Find most important symbols (PageRank algorithm)
             - "centrality": Find most connected symbols (degree centrality)
             - "path": Find shortest path between two symbols
+            - "trace": Trace bounded execution from an entry function via CALLS
             - "impact": What would be affected if symbol changes
             - "subgraph": Extract neighborhood around a symbol
             - "file_deps": Get file-level import dependencies
@@ -1312,13 +1477,16 @@ async def graph(
         include_calls: Include CALLS edges in edge-type breakdowns (default: True)
         include_refs: Include REFERENCES edges in breakdowns (default: False to reduce noise)
 
-    Returns:
+        Returns:
         Results vary by mode:
         - find: {query, matches: [{name, type, file, in_degree, out_degree, neighbors?}]}
         - neighbors: {source, neighbors_by_depth, total_neighbors}
+        - callers: {function, file_path, count, results, provider_backed}
+        - callees: {function, file_path, count, results, provider_backed}
         - pagerank: [{rank, node_id, name, type, file, score, in_degree, out_degree}]
         - centrality: [{rank, node_id, name, degree, in_degree, out_degree}]
         - path: {found, source, target, length, path}
+        - trace: {entry_point, nodes, edges, max_depth, provider_backed}
         - impact: {node_name, total_affected, affected_by_depth, affected_files}
         - subgraph: {center, nodes, edges, nodes_count, edges_count}
         - file_deps: {file, imports, imported_by, symbols_in_file}
@@ -1336,6 +1504,13 @@ async def graph(
 
         # What functions call "process_request"?
         graph(mode="neighbors", node="process_request", direction="in", edge_types=["CALLS"])
+
+        # Direct caller/callee traversal for a function
+        graph(mode="callers", node="process_request", depth=2)
+        graph(mode="callees", node="process_request", depth=2)
+
+        # Trace execution from an entry function
+        graph(mode="trace", node="main", depth=3)
 
         # What would be affected if I change "UserModel"?
         graph(mode="impact", node="UserModel", depth=3)
@@ -1615,6 +1790,82 @@ async def graph(
                 return {"error": "node parameter required for 'neighbors' mode"}
             return analyzer.get_neighbors(resolved_node, direction, edge_types, depth)
 
+        elif mode == "callers":
+            if not resolved_node:
+                return {"error": "node parameter required for 'callers' mode"}
+
+            resolved_symbol = analyzer.nodes.get(resolved_node)
+            provider_backed = False
+            results: List[Dict[str, Any]]
+
+            try:
+                index = await _get_capability_index(_exec_ctx)
+                results = await index.find_callers(
+                    function_name=(
+                        resolved_symbol.name if resolved_symbol else node or resolved_node
+                    ),
+                    file_path=file or (resolved_symbol.file if resolved_symbol else None),
+                    edge_type="CALLS",
+                    max_depth=depth,
+                )
+                provider_backed = True
+            except Exception as exc:
+                logger.debug("Provider-backed callers traversal unavailable: %s", exc)
+                results = _fallback_call_traversal(
+                    analyzer,
+                    resolved_node,
+                    direction="in",
+                    max_depth=depth,
+                    edge_type="CALLS",
+                )
+
+            return {
+                "mode": "callers",
+                "function": resolved_symbol.name if resolved_symbol else node,
+                "file_path": file or (resolved_symbol.file if resolved_symbol else None),
+                "count": len(results),
+                "results": results,
+                "provider_backed": provider_backed,
+            }
+
+        elif mode == "callees":
+            if not resolved_node:
+                return {"error": "node parameter required for 'callees' mode"}
+
+            resolved_symbol = analyzer.nodes.get(resolved_node)
+            provider_backed = False
+            results = []
+
+            try:
+                index = await _get_capability_index(_exec_ctx)
+                results = await index.find_callees(
+                    function_name=(
+                        resolved_symbol.name if resolved_symbol else node or resolved_node
+                    ),
+                    file_path=file or (resolved_symbol.file if resolved_symbol else None),
+                    edge_type="CALLS",
+                    max_depth=depth,
+                )
+                provider_backed = True
+            except Exception as exc:
+                logger.debug("Provider-backed callees traversal unavailable: %s", exc)
+                results = _fallback_call_traversal(
+                    analyzer,
+                    resolved_node,
+                    direction="out",
+                    max_depth=depth,
+                    edge_type="CALLS",
+                )
+
+            return {
+                "mode": "callees",
+                "function": resolved_symbol.name if resolved_symbol else node,
+                "file_path": file or (resolved_symbol.file if resolved_symbol else None),
+                "count": len(results),
+                "results": results,
+                "provider_backed": provider_backed,
+            }
+
         elif mode == "pagerank":
             weighted_edges = edge_types
             if runtime_weighted and not edge_types:
@@ -1673,6 +1924,39 @@ async def graph(
             if not resolved_node or not resolved_target:
                 return {"error": "Both 'node' and 'target' required for 'path' mode"}
             return analyzer.shortest_path(resolved_node, resolved_target, edge_types, depth)
+
+        elif mode == "trace":
+            if not resolved_node:
+                return {"error": "node parameter required for 'trace' mode"}
+
+            resolved_symbol = analyzer.nodes.get(resolved_node)
+            provider_backed = False
+
+            try:
+                index = await _get_capability_index(_exec_ctx)
+                trace_result = await index.trace_execution_path(
+                    entry_function=(
+                        resolved_symbol.name if resolved_symbol else node or resolved_node
+                    ),
+                    file_path=file or (resolved_symbol.file if resolved_symbol else None),
+                    max_depth=depth,
+                    edge_type="CALLS",
+                )
+                provider_backed = True
+            except Exception as exc:
+                logger.debug("Provider-backed execution trace unavailable: %s", exc)
+                trace_result = _fallback_trace_execution(
+                    analyzer,
+                    resolved_node,
+                    max_depth=depth,
+                    edge_type="CALLS",
+                )
+
+            trace_result["mode"] = "trace"
+            trace_result["provider_backed"] = provider_backed
+            trace_result["nodes_count"] = len(trace_result.get("nodes", []))
+            trace_result["edges_count"] = len(trace_result.get("edges", []))
+            return trace_result
 
         elif mode == "impact":
             if not resolved_node:

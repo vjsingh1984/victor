@@ -92,6 +92,12 @@ class TestSystemPromptBuilder:
         assert "tool" in result.lower()
         assert "read_file" in result or "list_directory" in result
 
+    def test_build_cloud_prompt_mentions_graph_call_modes(self):
+        """Test that generic cloud prompts mention graph traversal modes."""
+        builder = SystemPromptBuilder(provider_name="anthropic", model="claude-3")
+        result = builder._build_cloud_prompt()
+        assert "graph(mode='callers'|'callees'|'trace')" in result
+
     def test_build_with_adapter_uses_hints(self):
         """Test that adapter hints are used when available."""
         mock_adapter = MagicMock()
@@ -138,6 +144,24 @@ class TestSystemPromptBuilder:
         builder = SystemPromptBuilder(provider_name="vllm", model="mistral")
         result = builder._build_vllm_prompt()
         assert "OpenAI-compatible" in result
+
+    def test_build_google_prompt_mentions_graph_call_modes(self):
+        """Test Google prompts mention graph traversal modes."""
+        builder = SystemPromptBuilder(provider_name="google", model="gemini-2.5-pro")
+        result = builder._build_google_prompt()
+        assert "graph(mode='callers'|'callees'|'trace')" in result
+
+    def test_build_deepseek_prompt_mentions_graph_call_modes(self):
+        """Test DeepSeek prompts mention graph traversal modes."""
+        builder = SystemPromptBuilder(provider_name="deepseek", model="deepseek-coder")
+        result = builder._build_deepseek_prompt()
+        assert "graph(mode='callers'|'callees'|'trace')" in result
+
+    def test_build_xai_prompt_mentions_graph_call_modes(self):
+        """Test xAI prompts mention graph traversal modes."""
+        builder = SystemPromptBuilder(provider_name="xai", model="grok-4")
+        result = builder._build_xai_prompt()
+        assert "graph(mode='callers'|'callees'|'trace')" in result
 
     def test_build_default_prompt(self):
         """Test default prompt for unknown providers."""
