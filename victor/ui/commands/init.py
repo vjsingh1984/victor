@@ -127,7 +127,7 @@ def init(
     wizard: bool = typer.Option(
         False, "--wizard", "-w", help="Run interactive setup wizard for first-time users"
     ),
-):
+) -> None:
     """Initialize project context and configuration."""
     # If wizard mode is requested, run the onboarding wizard instead
     if wizard:
@@ -352,7 +352,7 @@ providers:
 
         try:
 
-            def on_progress(stage: str, msg: str):
+            def on_progress(stage: str, msg: str) -> None:
                 console.print(f"[dim]  {msg}[/]")
 
             if deep or learn:
