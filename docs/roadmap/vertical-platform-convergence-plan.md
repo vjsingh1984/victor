@@ -632,9 +632,9 @@ Feature summary:
 | VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
 | VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows SDK-only pattern and parity coverage is in place |
 | VPC-F3.5 | Data Analysis vertical migration | Completed | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
-| VPC-F3.6 | Research vertical migration | In Progress | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
-| VPC-F3.7 | External example and template migration | Not Started | VPC-F3.1 | Example packages teach the supported contract |
-| VPC-F3.8 | Extension declaration cleanup | Not Started | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
+| VPC-F3.6 | Research vertical migration | Completed | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
+| VPC-F3.7 | External example and template migration | Completed | VPC-F3.1 | Example packages teach the supported contract |
+| VPC-F3.8 | Extension declaration cleanup | In Progress | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
 
 #### VPC-F3.1: Shared Migration Scaffolding
 
@@ -791,8 +791,8 @@ Tasks:
 - [x] VPC-T3.25 Inventory and classify `research` imports by layer.
 - [x] VPC-T3.26 Replace definition-layer imports with SDK contracts in `research`.
 - [x] VPC-T3.27 Express web/search/document needs through SDK capability identifiers in `research`.
-- [ ] VPC-T3.28 Move runtime integrations out of `research` definition modules.
-- [ ] VPC-T3.29 Add Research migration tests and parity checks.
+- [x] VPC-T3.28 Move runtime integrations out of `research` definition modules.
+- [x] VPC-T3.29 Add Research migration tests and parity checks.
 
 #### VPC-F3.7: External Example And Template Migration
 
@@ -815,10 +815,10 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.30 Rewrite `examples/external_vertical` to use SDK-only definition imports.
-- [ ] VPC-T3.31 Validate clean-environment install/discovery for the external example.
-- [ ] VPC-T3.32 Update scaffolding/templates used for new vertical packages.
-- [ ] VPC-T3.33 Update contributor documentation to reference the new example.
+- [x] VPC-T3.30 Rewrite `examples/external_vertical` to use SDK-only definition imports.
+- [x] VPC-T3.31 Validate clean-environment install/discovery for the external example.
+- [x] VPC-T3.32 Update scaffolding/templates used for new vertical packages.
+- [x] VPC-T3.33 Update contributor documentation to reference the new example.
 
 #### VPC-F3.8: Extension Declaration Cleanup
 
@@ -841,8 +841,8 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T3.34 Standardize how prompts, stages, tools, and teams are declared in the definition contract.
-- [ ] VPC-T3.35 Move runtime-only add-ons behind adapters or extension entry points.
+- [x] VPC-T3.34 Standardize how prompts, stages, tools, and teams are declared in the definition contract.
+- [x] VPC-T3.35 Move runtime-only add-ons behind adapters or extension entry points.
 - [ ] VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
 - [ ] VPC-T3.37 Add import-boundary verification for all migrated verticals.
 
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.28 Move runtime integrations out of `research` definition modules.
-2. VPC-T3.29 Add Research migration tests and parity checks.
+1. VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
+2. VPC-T3.37 Add import-boundary verification for all migrated verticals.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -2331,6 +2331,174 @@ Likely touchpoints:
 - Advanced the current tranche to `VPC-T3.28`.
 - Next recommended implementation layer:
   - `VPC-T3.28` move runtime integrations out of `research` definition modules
+
+### 2026-03-11 (Session AT)
+
+- Completed the remaining `research` runtime extraction work for `VPC-T3.28`.
+- Moved the remaining team runtime modules under
+  `victor/verticals/contrib/research/runtime/`:
+  - `runtime/teams.py`
+  - `runtime/team_personas.py`
+- Restored the public import surface with compatibility shims:
+  - `teams/__init__.py`
+  - `teams/personas.py`
+- Expanded `victor/verticals/contrib/research/runtime/__init__.py` to export
+  the runtime team and persona helpers alongside the existing runtime-owned
+  modules.
+- Expanded `tests/unit/core/verticals/test_runtime_helper_defaults.py` so the
+  shared regression now verifies `research` root shims for:
+  - team spec provider
+  - persona helper imports
+  - assistant team-provider resolution
+- Added the parity gate in
+  `tests/integration/verticals/test_research_migration_parity.py`.
+- Updated
+  `docs/development/research-vertical-import-layer-inventory-2026-03-11.md`
+  with the completed post-migration state:
+  - 26 Python files in `victor/verticals/contrib/research`
+  - 11 files importing `victor.framework` / `victor.core` / `victor.tools`
+  - 1 file importing `victor_sdk`
+  - package-root and `teams/` import paths now preserved via runtime shims
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_runtime_helper_defaults.py tests/unit/framework/test_team_registry.py tests/integration/framework/test_persona_integration.py tests/integration/verticals/test_research_migration_parity.py tests/integration/verticals/test_vertical_independence.py -k research`
+    - `10 passed, 1 skipped, 90 deselected, 10 warnings`
+- Marked `VPC-T3.28`, `VPC-T3.29`, and `VPC-F3.6` complete.
+- Advanced the current tranche to `VPC-T3.30`.
+- Next recommended implementation layer:
+  - `VPC-T3.30` rewrite `examples/external_vertical` to use SDK-only
+    definition imports
+
+### 2026-03-11 (Session AU)
+
+- Verified that `examples/external_vertical` already matches the target SDK-only
+  authoring contract for `VPC-T3.30`:
+  - `src/victor_security/assistant.py` imports only `victor_sdk`
+  - `pyproject.toml` depends on `victor-sdk` and keeps `victor-ai` in the
+    optional `runtime` extra
+  - `README.md` documents SDK-only authoring plus entry-point runtime discovery
+- Ran a source-path smoke check:
+  - `python -c "import sys; sys.path.insert(0, 'examples/external_vertical/src'); from victor_security import SecurityAssistant; definition = SecurityAssistant.get_definition(); print(definition.name); print([req.tool_name for req in definition.tool_requirements]); print([req.capability_id for req in definition.capability_requirements])"`
+    - printed:
+      - `security`
+      - `['read', 'ls', 'code_search', 'overview', 'shell', 'web_search', 'write']`
+      - `['file_ops', 'git', 'web_access']`
+- Marked `VPC-T3.30` complete.
+- Advanced the current tranche to `VPC-T3.31`.
+- Next recommended implementation layer:
+  - `VPC-T3.31` validate clean-environment install/discovery for the external
+    example
+
+### 2026-03-11 (Session AV)
+
+- Completed `VPC-T3.31` by adding the offline clean-environment regression in
+  `tests/integration/verticals/test_external_vertical_install_discovery.py`.
+- The new slow integration coverage validates two install paths in throwaway
+  venvs:
+  - SDK-only install of `victor-sdk` + `examples/external_vertical`
+  - runtime install of `victor-sdk` + local `victor-ai` + `examples/external_vertical`
+- The regression proves both entry-point exposure and runtime discovery through
+  `VerticalLoader`, while forcing a temp cache path so entry-point caching stays
+  sandbox-safe.
+- Verified `VPC-T3.32` is already satisfied by the SDK-first scaffold/template
+  path:
+  - `victor/templates/vertical/assistant.py.j2`
+  - `victor/ui/commands/scaffold.py`
+  - `tests/unit/commands/test_scaffold.py`
+- Completed `VPC-T3.33` by updating contributor docs to reference the repo
+  external example explicitly:
+  - `victor-sdk/README.md`
+  - `victor-sdk/VERTICAL_DEVELOPMENT.md`
+  - `docs/development/extending/verticals.md`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/integration/verticals/test_external_vertical_install_discovery.py`
+    - `2 passed, 3 warnings`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/commands/test_scaffold.py`
+    - `11 passed, 1 warning`
+- Marked `VPC-T3.31`, `VPC-T3.32`, `VPC-T3.33`, and `VPC-F3.7` complete.
+- Advanced the current tranche to `VPC-T3.34`.
+- Next recommended implementation layer:
+  - `VPC-T3.34` standardize how prompts, stages, tools, and teams are declared
+    in the definition contract
+
+### 2026-03-11 (Session AW)
+
+- Completed `VPC-T3.34` by extending the SDK definition contract to cover
+  declarative team metadata alongside tools, prompts, stages, and workflow
+  metadata.
+- Added new SDK-owned serializable team types in
+  `victor-sdk/victor_sdk/core/types.py`:
+  - `TeamMemberDefinition`
+  - `TeamDefinition`
+  - `TeamMetadata`
+  - normalization helpers and validation
+- Updated the SDK base protocol in
+  `victor-sdk/victor_sdk/verticals/protocols/base.py` with the new hooks:
+  - `get_team_declarations()`
+  - `get_default_team()`
+  - `get_team_metadata()`
+- Updated the host-owned runtime bridge so definition-backed teams are usable
+  without runtime-side `teams` modules:
+  - `victor/framework/vertical_runtime_adapter.py`
+  - `victor/core/verticals/extension_loader.py`
+- Extended the public external example to exercise the new contract in
+  `examples/external_vertical/src/victor_security/assistant.py` by declaring
+  a `security_review_team` through SDK hooks only.
+- Added and expanded regression coverage:
+  - `victor-sdk/tests/unit/test_team_metadata.py`
+  - `tests/unit/framework/test_vertical_runtime_adapter.py`
+  - `tests/integration/test_sdk_integration.py`
+  - `tests/integration/verticals/test_external_vertical_install_discovery.py`
+- Updated authoring docs to describe the new team declaration pattern:
+  - `victor-sdk/README.md`
+  - `victor-sdk/VERTICAL_DEVELOPMENT.md`
+  - `docs/development/extending/verticals.md`
+  - `examples/external_vertical/README.md`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q victor-sdk/tests/unit/test_team_metadata.py victor-sdk/tests/unit/test_vertical_definition.py victor-sdk/tests/unit/test_protocols.py tests/unit/framework/test_vertical_runtime_adapter.py tests/integration/test_sdk_integration.py tests/integration/verticals/test_external_vertical_install_discovery.py`
+    - `57 passed, 18 warnings`
+- Marked `VPC-T3.34` complete and started `VPC-F3.8`.
+- Advanced the current tranche to `VPC-T3.35`.
+- Next recommended implementation layer:
+  - `VPC-T3.35` move runtime-only add-ons behind adapters or extension entry
+    points
+
+### 2026-03-11 (Session AX)
+
+- Completed `VPC-T3.35` by moving provider-style runtime add-ons onto explicit
+  entry-point resolution paths while keeping existing runtime-module fallbacks:
+  - added reusable runtime-extension entry-point loading in
+    `victor/framework/entry_point_loader.py`
+  - added new explicit entry-point groups for prompt contributors, mode configs,
+    workflow providers, team spec providers, capability providers, and service
+    providers
+  - added `load_rl_config_provider_from_entry_points()` so RL config providers
+    can be resolved as runtime objects instead of only raw config dicts
+- Routed shared extension defaults through the framework entry-point loader in
+  `victor/core/verticals/extension_loader.py`:
+  - prompt contributors now prefer `victor.prompt_contributors`
+  - mode config providers now prefer `victor.mode_configs`
+  - tool dependency providers now route through
+    `load_tool_dependency_provider_from_entry_points()`
+  - RL config providers now route through
+    `load_rl_config_provider_from_entry_points()`
+  - workflow, team spec, capability, and service providers now prefer explicit
+    provider entry-point groups before package-module fallback
+- Added regression coverage for the new boundary:
+  - `tests/unit/framework/test_entry_point_loader_runtime_extensions.py`
+  - `tests/unit/core/verticals/test_extension_entry_point_resolution.py`
+  - exercised existing normalization/stats/tool-dependency/runtime-helper suites
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/framework/test_entry_point_loader_runtime_extensions.py tests/unit/framework/test_entry_point_loader_normalization.py tests/unit/framework/test_entry_point_loader_stats.py tests/unit/framework/test_entry_point_loader_tool_dependencies.py tests/unit/core/verticals/test_extension_entry_point_resolution.py tests/unit/core/verticals/test_mixed_mode_runtime_resolution.py tests/unit/core/verticals/test_runtime_helper_defaults.py`
+    - `39 passed, 9 warnings`
+- Marked `VPC-T3.35` complete.
+- Advanced the current tranche to `VPC-T3.36`.
+- Next recommended implementation layer:
+  - `VPC-T3.36` remove direct framework-registry access from migrated
+    definition modules
 
 ## Resume Protocol
 

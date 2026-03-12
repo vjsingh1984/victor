@@ -14,11 +14,10 @@ from victor.verticals.contrib.research.assistant import (
     ResearchAssistant as ResearchAssistantDefinition,
 )
 from victor.verticals.contrib.research.prompts import ResearchPromptContributor
-from victor.verticals.contrib.research.mode_config import ResearchModeConfigProvider
-from victor.verticals.contrib.research.safety import ResearchSafetyExtension
-from victor.verticals.contrib.research.capabilities import ResearchCapabilityProvider
-
-from victor.verticals.contrib.research.tool_dependencies import get_provider
+from victor.verticals.contrib.research.runtime.capabilities import ResearchCapabilityProvider
+from victor.verticals.contrib.research.runtime.mode_config import ResearchModeConfigProvider
+from victor.verticals.contrib.research.runtime.safety import ResearchSafetyExtension
+from victor.verticals.contrib.research.runtime.tool_dependencies import get_provider
 
 ResearchAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(ResearchAssistantDefinition)
 
@@ -33,7 +32,7 @@ __all__ = [
 ]
 
 # Enhanced features with new coordinators
-from victor.verticals.contrib.research.safety_enhanced import (
+from victor.verticals.contrib.research.runtime.safety_enhanced import (
     ResearchSafetyRules,
     EnhancedResearchSafetyExtension,
 )

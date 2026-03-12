@@ -156,3 +156,50 @@ before their runtime extraction work:
 2. declarative capability requirements are now in place
 3. the remaining work is concentrated in runtime module extraction under
    `VPC-T3.28`
+
+## Completion Update (Post `VPC-T3.28` / `VPC-T3.29`)
+
+Measured after the full `research` migration tranche:
+
+| Metric | Count | Notes |
+|---|---:|---|
+| Python files in `research` package | 26 | Includes the new `runtime/` package plus root compatibility shims |
+| Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 11 | Runtime-heavy imports are now concentrated in runtime-owned modules |
+| Python files with `victor_sdk` imports | 1 | `assistant.py` remains the sole definition-layer SDK entrypoint |
+
+Completed runtime extraction:
+
+- `capabilities.py` -> `runtime/capabilities.py`
+- `mode_config.py` -> `runtime/mode_config.py`
+- `safety.py` -> `runtime/safety.py`
+- `safety_enhanced.py` -> `runtime/safety_enhanced.py`
+- `workflows/__init__.py` -> `runtime/workflows.py`
+- `rl/__init__.py` -> `runtime/rl.py`
+- `tool_dependencies.py` -> `runtime/tool_dependencies.py`
+- `teams/__init__.py` -> `runtime/teams.py`
+- `teams/personas.py` -> `runtime/team_personas.py`
+
+Legacy import paths preserved through compatibility shims:
+
+- package root shims for capabilities, mode config, safety, workflows, RL, and
+  tool dependencies
+- `teams/__init__.py` shim delegating to `runtime.teams`
+- `teams/personas.py` shim delegating to `runtime.team_personas`
+
+Parity coverage now exists for the completed migration shape:
+
+- `tests/unit/core/verticals/test_runtime_helper_defaults.py`
+- `tests/integration/verticals/test_research_migration_parity.py`
+- `tests/unit/framework/test_team_registry.py`
+- `tests/integration/framework/test_persona_integration.py`
+
+Current status:
+
+- `VPC-T3.28` complete
+- `VPC-T3.29` complete
+- `VPC-F3.6` complete
+
+Next resume point:
+
+- `VPC-T3.30` rewrite `examples/external_vertical` to use SDK-only definition
+  imports

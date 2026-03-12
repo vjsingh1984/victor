@@ -115,8 +115,44 @@ from victor.verticals.contrib.rag.runtime.workflows import (
 from victor.verticals.contrib.rag.workflows import RAGWorkflowProvider
 from victor.verticals.contrib.research import ResearchAssistant
 from victor.verticals.contrib.research.capabilities import (
+    ResearchCapabilityProvider,
     get_capability_configs as get_research_capability_configs,
 )
+from victor.verticals.contrib.research.mode_config import ResearchModeConfigProvider
+from victor.verticals.contrib.research.rl import ResearchRLConfig
+from victor.verticals.contrib.research.runtime.capabilities import (
+    ResearchCapabilityProvider as RuntimeResearchCapabilityProvider,
+)
+from victor.verticals.contrib.research.runtime.mode_config import (
+    ResearchModeConfigProvider as RuntimeResearchModeConfigProvider,
+)
+from victor.verticals.contrib.research.runtime.team_personas import (
+    list_personas as list_runtime_research_personas,
+)
+from victor.verticals.contrib.research.runtime.rl import (
+    ResearchRLConfig as RuntimeResearchRLConfig,
+)
+from victor.verticals.contrib.research.runtime.safety import (
+    ResearchSafetyExtension as RuntimeResearchSafetyExtension,
+)
+from victor.verticals.contrib.research.runtime.teams import (
+    ResearchTeamSpecProvider as RuntimeResearchTeamSpecProvider,
+)
+from victor.verticals.contrib.research.runtime.tool_dependencies import (
+    get_provider as get_runtime_research_tool_dependency_provider,
+)
+from victor.verticals.contrib.research.runtime.workflows import (
+    ResearchWorkflowProvider as RuntimeResearchWorkflowProvider,
+)
+from victor.verticals.contrib.research.safety import ResearchSafetyExtension
+from victor.verticals.contrib.research.teams import ResearchTeamSpecProvider
+from victor.verticals.contrib.research.teams.personas import (
+    list_personas as list_root_research_personas,
+)
+from victor.verticals.contrib.research.tool_dependencies import (
+    get_provider as get_research_tool_dependency_provider,
+)
+from victor.verticals.contrib.research.workflows import ResearchWorkflowProvider
 
 
 def test_sdk_file_operation_group_is_used_by_definition_entrypoints() -> None:
@@ -214,6 +250,56 @@ def test_dataanalysis_root_runtime_shims_delegate_to_runtime_modules() -> None:
     )
     assert (
         DataAnalysisAssistant.get_tool_dependency_provider().yaml_path
+        == runtime_tool_dependency_provider.yaml_path
+    )
+
+
+def test_research_root_runtime_shims_delegate_to_runtime_modules() -> None:
+    """Research root runtime helpers should re-export runtime-owned modules."""
+
+    root_tool_dependency_provider = get_research_tool_dependency_provider()
+    runtime_tool_dependency_provider = get_runtime_research_tool_dependency_provider()
+
+    assert ResearchCapabilityProvider is RuntimeResearchCapabilityProvider
+    assert ResearchModeConfigProvider is RuntimeResearchModeConfigProvider
+    assert ResearchRLConfig is RuntimeResearchRLConfig
+    assert ResearchSafetyExtension is RuntimeResearchSafetyExtension
+    assert ResearchTeamSpecProvider is RuntimeResearchTeamSpecProvider
+    assert ResearchWorkflowProvider is RuntimeResearchWorkflowProvider
+    assert list_root_research_personas is list_runtime_research_personas
+    assert get_research_tool_dependency_provider is get_runtime_research_tool_dependency_provider
+    assert type(root_tool_dependency_provider) is type(runtime_tool_dependency_provider)
+    assert root_tool_dependency_provider.yaml_path == runtime_tool_dependency_provider.yaml_path
+    assert isinstance(
+        ResearchAssistant.get_capability_provider(),
+        RuntimeResearchCapabilityProvider,
+    )
+    assert isinstance(
+        ResearchAssistant.get_mode_config_provider(),
+        RuntimeResearchModeConfigProvider,
+    )
+    assert isinstance(
+        ResearchAssistant.get_rl_config_provider(),
+        RuntimeResearchRLConfig,
+    )
+    assert isinstance(
+        ResearchAssistant.get_safety_extension(),
+        RuntimeResearchSafetyExtension,
+    )
+    assert isinstance(
+        ResearchAssistant.get_workflow_provider(),
+        RuntimeResearchWorkflowProvider,
+    )
+    assert isinstance(
+        ResearchAssistant.get_team_spec_provider(),
+        RuntimeResearchTeamSpecProvider,
+    )
+    assert isinstance(
+        ResearchAssistant.get_tool_dependency_provider(),
+        type(runtime_tool_dependency_provider),
+    )
+    assert (
+        ResearchAssistant.get_tool_dependency_provider().yaml_path
         == runtime_tool_dependency_provider.yaml_path
     )
 
