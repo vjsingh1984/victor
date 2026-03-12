@@ -18,6 +18,11 @@ export interface VictorEvent {
     timestamp: number;
 }
 
+export interface EventBridgeSubscription {
+    categories?: string[];
+    correlationId?: string;
+}
+
 export type EventHandler = (event: VictorEvent) => void;
 
 export enum ConnectionState {
@@ -63,6 +68,7 @@ export class EventBridgeClient {
     private outputChannel: vscode.OutputChannel;
     private reconnectTimer: NodeJS.Timeout | null = null;
     private pingInterval: NodeJS.Timeout | null = null;
+    private subscription: EventBridgeSubscription = { categories: ['all'] };
 
     constructor(reconnectConfig: ReconnectConfig = DEFAULT_RECONNECT_CONFIG) {
         this.reconnectConfig = reconnectConfig;
@@ -74,8 +80,28 @@ export class EventBridgeClient {
      *
      * @param serverUrl Base URL of the Victor server (e.g., http://127.0.0.1:8765)
      */
-    connect(serverUrl: string): void {
+    connect(serverUrl: string, subscription?: EventBridgeSubscription): void {
+        const serverChanged = this.serverUrl !== '' && this.serverUrl !== serverUrl;
         this.serverUrl = serverUrl;
+        if (subscription) {
+            this.subscription = {
+                categories: subscription.categories && subscription.categories.length > 0
+                    ? subscription.categories
+                    : ['all'],
+                correlationId: subscription.correlationId,
+            };
+        }
+
+        if (serverChanged) {
+            this.disconnect();
+            this.serverUrl = serverUrl;
+        }
+
+        if (this.state === ConnectionState.Connected && this.ws?.readyState === WebSocket.OPEN) {
+            this.sendSubscription();
+            return;
+        }
+
         this.doConnect();
     }
 
@@ -99,6 +125,21 @@ export class EventBridgeClient {
      */
     getState(): ConnectionState {
         return this.state;
+    }
+
+    getSubscription(): EventBridgeSubscription {
+        return {
+            categories: [...(this.subscription.categories || ['all'])],
+            correlationId: this.subscription.correlationId,
+        };
+    }
+
+    subscribe(categories: string[] = ['all'], correlationId?: string): void {
+        this.subscription = {
+            categories: categories.length > 0 ? categories : ['all'],
+            correlationId,
+        };
+        this.sendSubscription();
     }
 
     /**
@@ -184,12 +225,7 @@ export class EventBridgeClient {
                 this.setState(ConnectionState.Connected);
                 this.reconnectAttempt = 0;
                 this.startPing();
-
-                // Send subscription message
-                this.ws?.send(JSON.stringify({
-                    type: 'subscribe',
-                    categories: ['all']
-                }));
+                this.sendSubscription();
             });
 
             this.ws.on('message', (data: WebSocket.Data) => {
@@ -199,6 +235,11 @@ export class EventBridgeClient {
                         this.handleEvent(message.event);
                     } else if (message.type === 'pong') {
                         // Ping response received
+                    } else if (message.type === 'subscribed') {
+                        this.log(
+                            `Subscribed to EventBridge categories=${JSON.stringify(message.categories || ['all'])}` +
+                            ` correlation_id=${message.correlation_id || 'none'}`
+                        );
                     }
                 } catch (error) {
                     this.log(`Error parsing message: ${error}`);
@@ -288,6 +329,21 @@ export class EventBridgeClient {
                 this.ws.send(JSON.stringify({ type: 'ping' }));
             }
         }, 30000);
+    }
+
+    private sendSubscription(): void {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        const categories = this.subscription.categories && this.subscription.categories.length > 0
+            ? this.subscription.categories
+            : ['all'];
+        this.ws.send(JSON.stringify({
+            type: 'subscribe',
+            categories,
+            correlation_id: this.subscription.correlationId,
+        }));
     }
 
     private stopPing(): void {

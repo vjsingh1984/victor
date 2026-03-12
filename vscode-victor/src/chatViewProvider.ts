@@ -7,7 +7,8 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { VictorClient, ChatMessage, ToolCall } from './victorClient';
+import { VictorClient, ChatMessage, ToolCall, StreamEvent } from './victorClient';
+import { EventBridgeClient, VictorEvent, getEventBridgeClient } from './eventBridgeClient';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     public static readonly viewType = 'victor.chatView';
@@ -16,12 +17,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private _disposables: vscode.Disposable[] = [];
     private _webviewReady = false;
     private _useSvelteUI = true; // Use Svelte-built UI by default
+    private _activeRequestId: string | null = null;
+    private _activeToolCalls: ToolCall[] = [];
+    private _trackedToolCalls: Map<string, ToolCall> = new Map();
+    private readonly _eventBridge: EventBridgeClient;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _client: VictorClient,
         private readonly _log?: vscode.OutputChannel
     ) {
+        this._eventBridge = getEventBridgeClient();
+        this._disposables.push(this._eventBridge.onAny((event) => {
+            this._handleEventBridgeEvent(event);
+        }));
+
         // Check if Svelte build exists
         const webviewPath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'index.html');
         try {
@@ -135,7 +145,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         try {
             // Stream response
             let assistantContent = '';
-            const toolCalls: ToolCall[] = [];
+            this._activeRequestId = null;
+            this._activeToolCalls = [];
+            this._trackedToolCalls.clear();
+            this._ensureEventBridgeConnected();
 
             await this._client.streamChat(
                 this._messages,
@@ -147,11 +160,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
                     });
                 },
                 (toolCall: ToolCall) => {
-                    toolCalls.push(toolCall);
+                    const trackedToolCall = this._upsertTrackedToolCall(toolCall);
                     this._postMessage({
                         type: 'toolCall',
-                        toolCall,
+                        toolCall: trackedToolCall,
                     });
+                },
+                (event: StreamEvent) => {
+                    this._handleStreamEvent(event);
                 }
             );
 
@@ -159,7 +175,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             const assistantMessage: ChatMessage = {
                 role: 'assistant',
                 content: assistantContent,
-                toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                toolCalls: this._activeToolCalls.length > 0 ? [...this._activeToolCalls] : undefined,
             };
             this._messages.push(assistantMessage);
             this._updateMessages();
@@ -214,8 +230,210 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
                 });
             }
         } finally {
+            this._activeRequestId = null;
+            this._activeToolCalls = [];
+            this._trackedToolCalls.clear();
             this._log?.appendLine('[Chat] Done');
             this._postMessage({ type: 'thinking', thinking: false });
+        }
+    }
+
+    private _ensureEventBridgeConnected(): void {
+        this._eventBridge.connect(this._client.getServerUrl(), {
+            categories: ['tool.start', 'tool.progress', 'tool.complete', 'tool.error'],
+        });
+    }
+
+    private _handleStreamEvent(event: StreamEvent): void {
+        if (event.type !== 'request' || !event.requestId) {
+            return;
+        }
+
+        this._activeRequestId = event.requestId;
+        this._log?.appendLine(`[Chat] Request correlation id: ${event.requestId}`);
+        this._eventBridge.subscribe(
+            ['tool.start', 'tool.progress', 'tool.complete', 'tool.error'],
+            event.requestId
+        );
+        void this._hydrateRecentToolEvents(event.requestId);
+    }
+
+    private async _hydrateRecentToolEvents(requestId: string): Promise<void> {
+        try {
+            const events = await this._client.getRecentEvents({
+                limit: 12,
+                categories: ['tool.start', 'tool.progress', 'tool.complete', 'tool.error'],
+                correlationId: requestId,
+            });
+            for (const event of events.reverse()) {
+                this._handleEventBridgeEvent(event);
+            }
+        } catch (error) {
+            this._log?.appendLine(`[Chat] Failed to hydrate recent tool events: ${error}`);
+        }
+    }
+
+    private _handleEventBridgeEvent(event: VictorEvent): void {
+        if (!this._activeRequestId) {
+            return;
+        }
+
+        const requestId = typeof event.data.request_id === 'string'
+            ? event.data.request_id
+            : typeof event.data.correlation_id === 'string'
+                ? event.data.correlation_id
+                : undefined;
+        if (requestId && requestId !== this._activeRequestId) {
+            return;
+        }
+
+        switch (event.type) {
+            case 'tool.start': {
+                const toolCall = this._buildToolCallFromBridgeEvent(event);
+                if (!toolCall) {
+                    return;
+                }
+                const tracked = this._upsertTrackedToolCall(toolCall);
+                this._postMessage({ type: 'toolCall', toolCall: tracked });
+                break;
+            }
+            case 'tool.complete':
+            case 'tool.error': {
+                const trackedId = this._findTrackedToolCallId(event);
+                const status: ToolCall['status'] = event.type === 'tool.complete' ? 'success' : 'error';
+                const result = this._formatBridgeResult(event);
+
+                if (trackedId) {
+                    const tracked = this._trackedToolCalls.get(trackedId);
+                    if (tracked) {
+                        tracked.status = status;
+                        tracked.result = result;
+                    }
+                    this._postMessage({
+                        type: 'toolCallResult',
+                        id: trackedId,
+                        status,
+                        result,
+                    });
+                    return;
+                }
+
+                const fallbackToolCall = this._buildToolCallFromBridgeEvent(event, status, result);
+                if (fallbackToolCall) {
+                    const tracked = this._upsertTrackedToolCall(fallbackToolCall);
+                    this._postMessage({ type: 'toolCall', toolCall: tracked });
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    private _upsertTrackedToolCall(toolCall: ToolCall): ToolCall {
+        const id = toolCall.id || `tool-${Date.now()}`;
+        const existing = this._trackedToolCalls.get(id);
+        if (existing) {
+            Object.assign(existing, toolCall, { id });
+            return existing;
+        }
+
+        const normalized: ToolCall = {
+            ...toolCall,
+            id,
+            status: toolCall.status || 'running',
+        };
+        this._trackedToolCalls.set(id, normalized);
+        this._activeToolCalls.push(normalized);
+        return normalized;
+    }
+
+    private _findTrackedToolCallId(event: VictorEvent): string | null {
+        const toolId = typeof event.data.tool_id === 'string' ? event.data.tool_id : undefined;
+        if (toolId && this._trackedToolCalls.has(toolId)) {
+            return toolId;
+        }
+
+        const toolName = typeof event.data.tool_name === 'string' ? event.data.tool_name : undefined;
+        if (!toolName) {
+            return null;
+        }
+
+        const eventArgs = this._stableStringify(event.data.arguments);
+        for (let i = this._activeToolCalls.length - 1; i >= 0; i--) {
+            const candidate = this._activeToolCalls[i];
+            if (candidate.name !== toolName) {
+                continue;
+            }
+            if (candidate.status === 'success' || candidate.status === 'error') {
+                continue;
+            }
+            if (eventArgs && this._stableStringify(candidate.arguments) !== eventArgs) {
+                continue;
+            }
+            return candidate.id || null;
+        }
+
+        return null;
+    }
+
+    private _buildToolCallFromBridgeEvent(
+        event: VictorEvent,
+        status: ToolCall['status'] = 'running',
+        result?: unknown
+    ): ToolCall | null {
+        const toolName = typeof event.data.tool_name === 'string' ? event.data.tool_name : undefined;
+        if (!toolName) {
+            return null;
+        }
+
+        const rawArgs = event.data.arguments;
+        const argumentsValue = typeof rawArgs === 'object' && rawArgs !== null
+            ? rawArgs as Record<string, unknown>
+            : {};
+        const toolId = typeof event.data.tool_id === 'string'
+            ? event.data.tool_id
+            : `bridge-${event.id}`;
+
+        return {
+            id: toolId,
+            name: toolName,
+            arguments: argumentsValue,
+            status,
+            result,
+        };
+    }
+
+    private _formatBridgeResult(event: VictorEvent): unknown {
+        const preview = event.data.preview;
+        if (typeof preview === 'string' && preview.trim()) {
+            return preview;
+        }
+        if (preview !== undefined) {
+            return this._stableStringify(preview);
+        }
+
+        const excerpt = event.data.result_excerpt;
+        if (typeof excerpt === 'string' && excerpt.trim()) {
+            return excerpt;
+        }
+
+        const error = event.data.error;
+        if (typeof error === 'string' && error.trim()) {
+            return error;
+        }
+
+        return undefined;
+    }
+
+    private _stableStringify(value: unknown): string | undefined {
+        if (value === undefined) {
+            return undefined;
+        }
+        try {
+            return JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort());
+        } catch {
+            return String(value);
         }
     }
 

@@ -58,6 +58,22 @@ export interface SearchResult {
     context?: string;
 }
 
+export interface VictorEvent {
+    id: string;
+    type: string;
+    data: Record<string, unknown>;
+    timestamp: number;
+}
+
+export interface StreamEvent {
+    type: string;
+    requestId?: string;
+    content?: string;
+    toolCalls?: ToolCall[];
+    error?: string;
+    raw: Record<string, unknown>;
+}
+
 export interface UndoRedoResult {
     success: boolean;
     message: string;
@@ -243,6 +259,10 @@ export class VictorClient {
         });
     }
 
+    getServerUrl(): string {
+        return this.serverUrl;
+    }
+
     // =========================================================================
     // Connection Management
     // =========================================================================
@@ -255,6 +275,19 @@ export class VictorClient {
         } else {
             delete this.client.defaults.headers.common['Authorization'];
         }
+    }
+
+    setServerUrl(serverUrl: string): void {
+        const normalized = serverUrl.replace(/\/+$/, '');
+        if (this.serverUrl === normalized) {
+            return;
+        }
+
+        this.serverUrl = normalized;
+        this.client.defaults.baseURL = normalized;
+        this.sessionToken = undefined;
+        this.invalidateStatusCache();
+        this.disconnectWebSocket();
     }
 
     /**
@@ -604,7 +637,17 @@ export class VictorClient {
     async chat(messages: ChatMessage[]): Promise<ChatMessage> {
         try {
             const response = await this.client.post('/chat', { messages });
-            return response.data;
+            const payload = response.data as {
+                role?: ChatMessage['role'];
+                content?: string;
+                tool_calls?: ToolCall[];
+                toolCalls?: ToolCall[];
+            };
+            return {
+                role: payload.role || 'assistant',
+                content: payload.content || '',
+                toolCalls: payload.toolCalls || payload.tool_calls,
+            };
         } catch (error) {
             const handled = this._handleError(error);
             console.error('[VictorClient] chat error', handled);
@@ -615,7 +658,8 @@ export class VictorClient {
     async streamChat(
         messages: ChatMessage[],
         onChunk: (chunk: string) => void,
-        onToolCall?: (toolCall: ToolCall) => void
+        onToolCall?: (toolCall: ToolCall) => void,
+        onEvent?: (event: StreamEvent) => void
     ): Promise<void> {
         try {
             const response = await this.client.post('/chat/stream', { messages }, {
@@ -635,16 +679,71 @@ export class VictorClient {
                             const payload = line.slice(6);
                             // Skip [DONE] marker
                             if (payload === '[DONE]') {
+                                onEvent?.({ type: 'done', raw: { type: 'done' } });
                                 return;
                             }
                             try {
-                                const data = JSON.parse(payload);
+                                const data = JSON.parse(payload) as Record<string, unknown>;
+                                const requestId = typeof data.request_id === 'string'
+                                    ? data.request_id
+                                    : undefined;
                                 if (data.type === 'content') {
-                                    onChunk(data.content);
-                                } else if (data.type === 'tool_call' && onToolCall) {
-                                    onToolCall(data.tool_call);
+                                    const content = typeof data.content === 'string' ? data.content : '';
+                                    if (content) {
+                                        onChunk(content);
+                                    }
+                                    onEvent?.({
+                                        type: 'content',
+                                        content,
+                                        requestId,
+                                        raw: data,
+                                    });
+                                } else if (data.type === 'tool_call') {
+                                    const rawToolCalls = Array.isArray(data.tool_call)
+                                        ? data.tool_call
+                                        : data.tool_call
+                                            ? [data.tool_call]
+                                            : [];
+                                    const toolCalls = rawToolCalls.filter(
+                                        (toolCall): toolCall is ToolCall =>
+                                            typeof toolCall === 'object' && toolCall !== null
+                                    );
+                                    if (onToolCall) {
+                                        for (const toolCall of toolCalls) {
+                                            onToolCall(toolCall);
+                                        }
+                                    }
+                                    onEvent?.({
+                                        type: 'tool_call',
+                                        toolCalls,
+                                        requestId,
+                                        raw: data,
+                                    });
+                                } else if (data.type === 'request') {
+                                    onEvent?.({
+                                        type: 'request',
+                                        requestId: typeof data.request_id === 'string'
+                                            ? data.request_id
+                                            : undefined,
+                                        raw: data,
+                                    });
                                 } else if (data.type === 'error') {
-                                    reject(new VictorError(data.message, VictorErrorType.ServerError));
+                                    const message = typeof data.message === 'string'
+                                        ? data.message
+                                        : 'Unknown stream error';
+                                    onEvent?.({
+                                        type: 'error',
+                                        error: message,
+                                        requestId,
+                                        raw: data,
+                                    });
+                                    reject(new VictorError(message, VictorErrorType.ServerError));
+                                } else {
+                                    onEvent?.({
+                                        type: typeof data.type === 'string' ? data.type : 'unknown',
+                                        requestId,
+                                        raw: data,
+                                    });
                                 }
                             } catch (e) {
                                 // Log parse errors for debugging incomplete SSE chunks
@@ -1005,22 +1104,73 @@ export class VictorClient {
         this.lspCapability = null;
     }
 
-    private async supportsLspCapability(): Promise<boolean> {
-        if (this.lspCapability !== null) {
-            return this.lspCapability;
-        }
-
+    async supportsCapability(capability: string): Promise<boolean> {
         try {
             const status = await this.getStatus();
             if (!Array.isArray(status.capabilities) || status.capabilities.length === 0) {
                 return true;
             }
-            this.lspCapability = status.capabilities.includes('lsp');
-            return this.lspCapability;
+            return status.capabilities.includes(capability);
         } catch {
-            // If status is unavailable, keep current graceful-degradation behavior.
             return true;
         }
+    }
+
+    async getCapabilityManifest(vertical?: string): Promise<Record<string, unknown>> {
+        try {
+            const response = await this.client.get('/capabilities', {
+                params: vertical ? { vertical } : undefined,
+            });
+            return response.data as Record<string, unknown>;
+        } catch (error) {
+            throw this._handleError(error);
+        }
+    }
+
+    async getRecentEvents(
+        options: {
+            limit?: number;
+            categories?: string[];
+            correlationId?: string;
+        } = {}
+    ): Promise<VictorEvent[]> {
+        try {
+            const response = await this.client.get('/events/recent', {
+                params: {
+                    limit: options.limit ?? 12,
+                    categories: options.categories,
+                    correlation_id: options.correlationId,
+                },
+                paramsSerializer: {
+                    indexes: null,
+                },
+            });
+            return Array.isArray(response.data?.events) ? response.data.events as VictorEvent[] : [];
+        } catch (error) {
+            console.error('Recent events error:', error);
+            return [];
+        }
+    }
+
+    private async requireCapability(capability: string, featureLabel?: string): Promise<void> {
+        const supported = await this.supportsCapability(capability);
+        if (!supported) {
+            const label = featureLabel || capability;
+            throw new VictorError(
+                `${label} is not enabled on the connected Victor server`,
+                VictorErrorType.NotFound,
+                404
+            );
+        }
+    }
+
+    private async supportsLspCapability(): Promise<boolean> {
+        if (this.lspCapability !== null) {
+            return this.lspCapability;
+        }
+
+        this.lspCapability = await this.supportsCapability('lsp');
+        return this.lspCapability;
     }
 
     // =========================================================================
@@ -1521,6 +1671,7 @@ export class VictorClient {
         name?: string
     ): Promise<string> {
         try {
+            await this.requireCapability('agents', 'Agents');
             const request: AgentStartRequest = { task, mode, name };
             const response = await this.client.post('/agents/start', request);
             return response.data.agent_id;
@@ -1535,6 +1686,9 @@ export class VictorClient {
      */
     async listAgents(status?: string, limit: number = 20): Promise<BackgroundAgent[]> {
         try {
+            if (!(await this.supportsCapability('agents'))) {
+                return [];
+            }
             const params: Record<string, unknown> = { limit };
             if (status) {
                 params.status = status;
@@ -1552,6 +1706,9 @@ export class VictorClient {
      */
     async getAgent(agentId: string): Promise<BackgroundAgent | null> {
         try {
+            if (!(await this.supportsCapability('agents'))) {
+                return null;
+            }
             const response = await this.client.get(`/agents/${agentId}`);
             return response.data;
         } catch (error) {
@@ -1568,6 +1725,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('agents', 'Agents');
             const response = await this.client.post(`/agents/${agentId}/cancel`);
             return response.data;
         } catch (error) {
@@ -1584,6 +1742,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('agents', 'Agents');
             const response = await this.client.post('/agents/clear');
             return response.data;
         } catch (error) {
@@ -1648,6 +1807,9 @@ export class VictorClient {
         steps: Array<{ description: string; status?: string }>;
     }[]> {
         try {
+            if (!(await this.supportsCapability('plans'))) {
+                return [];
+            }
             const response = await this.client.get('/plans');
             return response.data.plans || [];
         } catch (error) {
@@ -1665,6 +1827,7 @@ export class VictorClient {
         steps: Array<{ description: string }>
     ): Promise<{ id: string; status: string; message: string }> {
         try {
+            await this.requireCapability('plans', 'Plans');
             const response = await this.client.post('/plans', {
                 title,
                 description,
@@ -1694,6 +1857,9 @@ export class VictorClient {
         error?: string;
     } | null> {
         try {
+            if (!(await this.supportsCapability('plans'))) {
+                return null;
+            }
             const response = await this.client.get(`/plans/${planId}`);
             return response.data;
         } catch (error) {
@@ -1711,6 +1877,7 @@ export class VictorClient {
         status: string;
     }> {
         try {
+            await this.requireCapability('plans', 'Plans');
             const response = await this.client.post(`/plans/${planId}/approve`);
             return response.data;
         } catch (error) {
@@ -1727,6 +1894,7 @@ export class VictorClient {
         status: string;
     }> {
         try {
+            await this.requireCapability('plans', 'Plans');
             const response = await this.client.post(`/plans/${planId}/execute`);
             return response.data;
         } catch (error) {
@@ -1742,6 +1910,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('plans', 'Plans');
             const response = await this.client.delete(`/plans/${planId}`);
             return response.data;
         } catch (error) {
@@ -1769,6 +1938,7 @@ export class VictorClient {
         totalToolBudget?: number;
     }): Promise<string> {
         try {
+            await this.requireCapability('teams', 'Teams');
             const response = await this.client.post('/teams', {
                 name: config.name,
                 goal: config.goal,
@@ -1787,6 +1957,9 @@ export class VictorClient {
      */
     async listTeams(status?: string): Promise<unknown[]> {
         try {
+            if (!(await this.supportsCapability('teams'))) {
+                return [];
+            }
             const params: Record<string, unknown> = {};
             if (status) {
                 params.status = status;
@@ -1804,6 +1977,9 @@ export class VictorClient {
      */
     async getTeam(teamId: string): Promise<unknown | null> {
         try {
+            if (!(await this.supportsCapability('teams'))) {
+                return null;
+            }
             const response = await this.client.get(`/teams/${teamId}`);
             return response.data;
         } catch (error) {
@@ -1820,6 +1996,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('teams', 'Teams');
             const response = await this.client.post(`/teams/${teamId}/start`);
             return response.data;
         } catch (error) {
@@ -1835,6 +2012,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('teams', 'Teams');
             const response = await this.client.post(`/teams/${teamId}/cancel`);
             return response.data;
         } catch (error) {
@@ -1850,6 +2028,7 @@ export class VictorClient {
         cleared: number;
     }> {
         try {
+            await this.requireCapability('teams', 'Teams');
             const response = await this.client.post('/teams/clear');
             return response.data;
         } catch (error) {
@@ -1871,6 +2050,9 @@ export class VictorClient {
         }>;
     }> {
         try {
+            if (!(await this.supportsCapability('teams'))) {
+                return { messages: [] };
+            }
             const response = await this.client.get(`/teams/${teamId}/messages`);
             return response.data;
         } catch (error) {
@@ -1910,6 +2092,9 @@ export class VictorClient {
         tags?: string[];
     }>> {
         try {
+            if (!(await this.supportsCapability('workflows'))) {
+                return [];
+            }
             const response = await this.client.get('/workflows/templates');
             return response.data.templates || [];
         } catch (error) {
@@ -1923,6 +2108,9 @@ export class VictorClient {
      */
     async getWorkflowTemplate(templateId: string): Promise<unknown | null> {
         try {
+            if (!(await this.supportsCapability('workflows'))) {
+                return null;
+            }
             const response = await this.client.get(`/workflows/templates/${templateId}`);
             return response.data;
         } catch (error) {
@@ -1939,6 +2127,7 @@ export class VictorClient {
         parameters: Record<string, unknown>
     ): Promise<string> {
         try {
+            await this.requireCapability('workflows', 'Workflows');
             const response = await this.client.post('/workflows/execute', {
                 template_id: templateId,
                 parameters,
@@ -1954,6 +2143,9 @@ export class VictorClient {
      */
     async listWorkflowExecutions(status?: string): Promise<unknown[]> {
         try {
+            if (!(await this.supportsCapability('workflows'))) {
+                return [];
+            }
             const params: Record<string, unknown> = {};
             if (status) {
                 params.status = status;
@@ -1971,6 +2163,9 @@ export class VictorClient {
      */
     async getWorkflowExecution(executionId: string): Promise<unknown | null> {
         try {
+            if (!(await this.supportsCapability('workflows'))) {
+                return null;
+            }
             const response = await this.client.get(`/workflows/executions/${executionId}`);
             return response.data;
         } catch (error) {
@@ -1987,6 +2182,7 @@ export class VictorClient {
         message: string;
     }> {
         try {
+            await this.requireCapability('workflows', 'Workflows');
             const response = await this.client.post(`/workflows/executions/${executionId}/cancel`);
             return response.data;
         } catch (error) {

@@ -248,6 +248,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
     private _refreshInterval: NodeJS.Timeout | null = null;
     private _isLoading: boolean = false;
     private _lastFetchTime: number = 0;
+    private _capabilityAvailable: boolean | null = null;
     private _statusBarItem: vscode.StatusBarItem;
 
     constructor(
@@ -490,6 +491,16 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         this._isLoading = true;
 
         try {
+            const agentsAvailable = await this._client.supportsCapability('agents');
+            this._capabilityAvailable = agentsAvailable;
+            if (!agentsAvailable) {
+                this._agents.clear();
+                this.refresh();
+                this._updateStatusBar();
+                this._log('Agents capability unavailable on current server');
+                return;
+            }
+
             const agents = await this._client.listAgents();
 
             // Update local state
@@ -703,6 +714,10 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
     // =========================================================================
 
     private _getAgentItems(): AgentTreeItem[] {
+        if (this._capabilityAvailable === false) {
+            return [new AgentInfoItem('Agents unavailable', 'This Victor server does not expose agent APIs', 'circle-slash')];
+        }
+
         if (this._agents.size === 0) {
             return [new AgentInfoItem('No active agents', 'Start a task to see agents here', 'info')];
         }
