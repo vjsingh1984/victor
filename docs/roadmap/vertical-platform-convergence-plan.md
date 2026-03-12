@@ -843,7 +843,7 @@ Tasks:
 
 - [x] VPC-T3.34 Standardize how prompts, stages, tools, and teams are declared in the definition contract.
 - [x] VPC-T3.35 Move runtime-only add-ons behind adapters or extension entry points.
-- [ ] VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
+- [x] VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
 - [ ] VPC-T3.37 Add import-boundary verification for all migrated verticals.
 
 ### VPC-E4: Packaging And Source-Of-Truth Convergence
@@ -1150,8 +1150,8 @@ Scope:
 
 Immediate next tasks:
 
-1. VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
-2. VPC-T3.37 Add import-boundary verification for all migrated verticals.
+1. VPC-T3.37 Add import-boundary verification for all migrated verticals.
+2. VPC-T4.1 Define the per-vertical extraction order and dependency graph.
 3. Keep additive convergence work non-breaking until ADR-007 is accepted.
 
 Likely touchpoints:
@@ -2499,6 +2499,40 @@ Likely touchpoints:
 - Next recommended implementation layer:
   - `VPC-T3.36` remove direct framework-registry access from migrated
     definition modules
+
+### 2026-03-11 (Session AY)
+
+- Completed `VPC-T3.36` by removing the last core/runtime base dependency from
+  the `coding` assistant definition layer:
+  - migrated `victor/verticals/contrib/coding/assistant.py` to SDK-owned
+    `VerticalBase` and `StageDefinition`
+  - replaced the runtime `customize_config()` hook with SDK-owned
+    `get_metadata()` so coding metadata remains serializable and survives the
+    runtime binding
+  - converted stage declarations from the old core-only `tools=` shape to the
+    SDK stage contract
+- Split coding definition/runtime exports the same way the other migrated
+  verticals already work:
+  - `victor.verticals.contrib.coding.assistant` is now the SDK definition class
+  - `victor.verticals.contrib.coding` exports the host-owned runtime wrapper via
+    `VerticalRuntimeAdapter.as_runtime_vertical_class(...)`
+- Updated coding parity/regression coverage:
+  - `tests/integration/verticals/test_coding_migration_parity.py`
+  - `tests/unit/core/verticals/test_runtime_helper_defaults.py`
+  - `tests/unit/core/verticals/test_coding_definition_capability_requirements.py`
+- Refreshed the persisted coding inventory in
+  `docs/development/coding-vertical-import-layer-inventory-2026-03-10.md`:
+  - runtime/core/tool imports under `coding` dropped from `21` to `20`
+  - `assistant.py` is no longer a definition-layer blocker
+  - `prompts.py` remains the remaining root-level definition blocker
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_runtime_helper_defaults.py tests/integration/verticals/test_coding_migration_parity.py`
+    - `16 passed, 17 warnings`
+- Marked `VPC-T3.36` complete.
+- Advanced the current tranche to `VPC-T3.37`.
+- Next recommended implementation layer:
+  - `VPC-T3.37` add import-boundary verification for all migrated verticals
 
 ## Resume Protocol
 

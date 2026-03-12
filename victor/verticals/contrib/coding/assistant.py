@@ -28,10 +28,15 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor_sdk import CapabilityIds, CapabilityRequirement, ToolNames
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
+)
 
 
 class CodingAssistant(VerticalBase):
@@ -44,40 +49,32 @@ class CodingAssistant(VerticalBase):
     - Testing and verification
     - Git operations and version control
 
-    The CodingAssistant provides full integration with the framework
-    through extension protocols, enabling:
-    - Code correction middleware for validation
-    - Git safety checks for dangerous operations
-    - Task-type-specific prompt hints
-    - Mode configurations for different scenarios
-    - Tool dependency graph for intelligent selection
+    The definition layer is SDK-only. Runtime middleware, prompt contributors,
+    service providers, and other integrations are attached by the package root
+    runtime wrapper and shared host-side loaders.
 
     Example:
-        from victor.coding import CodingAssistant
+        from victor.verticals.contrib.coding.assistant import CodingAssistant
 
-        # Get vertical configuration
-        config = CodingAssistant.get_config()
-
-        # Get extensions for framework integration
-        extensions = CodingAssistant.get_extensions()
-
-        # Create agent with this vertical
-        agent = await Agent.create(
-            tools=config.tools,
-            vertical=CodingAssistant,
-        )
+        definition = CodingAssistant.get_definition()
+        prompt = definition.system_prompt
     """
 
     name = "coding"
     description = "Software development assistant for code exploration, writing, and refactoring"
     version = "2.0.0"  # Extension support
 
-    # =========================================================================
-    # Extension Caching
-    # =========================================================================
-    # Individual extension caching is provided by VerticalBase._get_cached_extension()
-    # Composite extensions caching is provided by VerticalBase.get_extensions()
-    # Use clear_config_cache() to invalidate all caches.
+    @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
+
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
+
+        return cls.description
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -196,48 +193,63 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the coding request",
-                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW, ToolNames.GREP},
+                optional_tools=[
+                    ToolNames.READ,
+                    ToolNames.LS,
+                    ToolNames.OVERVIEW,
+                    ToolNames.GREP,
+                ],
                 keywords=["what", "how", "explain", "where", "show me"],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning the implementation approach",
-                tools={ToolNames.GREP, ToolNames.PLAN, ToolNames.OVERVIEW, ToolNames.READ},
+                optional_tools=[
+                    ToolNames.GREP,
+                    ToolNames.PLAN,
+                    ToolNames.OVERVIEW,
+                    ToolNames.READ,
+                ],
                 keywords=["plan", "approach", "design", "architecture", "strategy"],
                 next_stages={"READING", "EXECUTION"},
             ),
             "READING": StageDefinition(
                 name="READING",
                 description="Reading code and gathering context",
-                tools={
+                optional_tools=[
                     ToolNames.READ,
                     ToolNames.CODE_SEARCH,
                     ToolNames.GREP,
                     ToolNames.LSP,
                     ToolNames.SYMBOL,
                     ToolNames.REFS,
-                },
+                ],
                 keywords=["read", "show", "find", "look", "check", "search"],
                 next_stages={"ANALYSIS", "EXECUTION"},
             ),
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Analyzing code structure and dependencies",
-                tools={ToolNames.LSP, ToolNames.SYMBOL, ToolNames.REFS, ToolNames.OVERVIEW},
+                optional_tools=[
+                    ToolNames.LSP,
+                    ToolNames.SYMBOL,
+                    ToolNames.REFS,
+                    ToolNames.OVERVIEW,
+                ],
                 keywords=["analyze", "review", "understand", "why", "how does"],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
             "EXECUTION": StageDefinition(
                 name="EXECUTION",
                 description="Implementing changes",
-                tools={
+                optional_tools=[
                     ToolNames.WRITE,
                     ToolNames.EDIT,
                     ToolNames.SHELL,
                     ToolNames.GIT,
                     ToolNames.RENAME,
-                },
+                ],
                 keywords=[
                     "change",
                     "modify",
@@ -255,47 +267,43 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Testing and validating changes",
-                tools={ToolNames.SHELL, ToolNames.TEST, ToolNames.GIT, ToolNames.READ},
+                optional_tools=[
+                    ToolNames.SHELL,
+                    ToolNames.TEST,
+                    ToolNames.GIT,
+                    ToolNames.READ,
+                ],
                 keywords=["test", "verify", "check", "validate", "run", "build"],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Committing and summarizing",
-                tools={ToolNames.GIT},
+                optional_tools=[ToolNames.GIT],
                 keywords=["done", "finish", "complete", "commit", "summarize"],
                 next_stages=set(),
             ),
         }
 
     @classmethod
-    def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
-        """Add coding-specific configuration.
+    def get_metadata(cls) -> Dict[str, Any]:
+        """Return coding-specific serializable metadata for the definition layer."""
 
-        Args:
-            config: Base configuration.
-
-        Returns:
-            Customized configuration.
-        """
-        config.metadata["supports_lsp"] = True
-        config.metadata["supports_git"] = True
-        config.metadata["max_file_size"] = 1_000_000  # 1MB
-        config.metadata["supported_languages"] = [
-            "python",
-            "typescript",
-            "javascript",
-            "rust",
-            "go",
-            "java",
-            "c",
-            "cpp",
-        ]
-        return config
-
-    # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
-    # Individual extension getters use _get_cached_extension() from VerticalBase.
-    # To clear all caches, use cls.clear_config_cache().
+        return {
+            "supports_lsp": True,
+            "supports_git": True,
+            "max_file_size": 1_000_000,
+            "supported_languages": [
+                "python",
+                "typescript",
+                "javascript",
+                "rust",
+                "go",
+                "java",
+                "c",
+                "cpp",
+            ],
+        }
 
 
 __all__ = ["CodingAssistant"]

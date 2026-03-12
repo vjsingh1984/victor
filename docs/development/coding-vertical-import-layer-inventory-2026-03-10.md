@@ -27,38 +27,36 @@ concrete files and blockers instead of re-scanning the package each session.
 
 | Metric | Count | Notes |
 |---|---:|---|
-| Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 21 | Down from the `VPC-T3.1` baseline of 22 |
+| Python files with `victor.framework` / `victor.core` / `victor.tools` imports | 20 | Down from the `VPC-T3.1` baseline of 22 |
 | Python files with `victor_sdk` imports | 2 | `assistant.py` and `rl/config.py` currently import the SDK |
-| Definition-layer targets still importing runtime/core | 2 / 2 | `assistant.py`, `prompts.py` |
+| Definition-layer targets still importing runtime/core | 1 / 2 | `prompts.py` remains the only root-level definition blocker |
 | Shim candidates still importing runtime/core | 2 / 2 | `__init__.py`, `tool_dependencies.py` |
-| Runtime-layer files with direct runtime/core/tool imports | 17 | See grouped inventory below |
+| Runtime-layer files with direct runtime/core/tool imports | 17 | See grouped inventory below; `teams/__init__.py` is intentionally runtime-owned |
 
 Key findings:
 
-- The `coding` package has started definition-layer convergence in
+- The `coding` package has now removed runtime/core imports from
   `assistant.py`, but the package is still overwhelmingly runtime-owned. The
-  next refactors should focus on removing the remaining runtime imports from the
-  two definition files and narrowing the two package-root shims.
+  next refactors should focus on converting `prompts.py` into a thin runtime
+  adapter over serializable prompt metadata and narrowing the two package-root
+  shims.
 - Canonical tool identifiers are no longer sourced from
   `victor.framework.tool_naming` or `victor.tools.tool_names` anywhere under
   `coding`.
-- `CodingAssistant` now declares SDK capability requirements for `file_ops`,
-  `git`, and `lsp`, so capability needs are explicit in the definition contract
-  even though the assistant still inherits the runtime base class.
+- `CodingAssistant` now imports only SDK-owned definition contracts and exposes
+  coding-specific metadata through `get_metadata()`, with the package root
+  exporting the runtime wrapper separately.
 
 ## Definition-Layer Blockers
 
 | File | Current layer target | Current boundary imports | Why it is still blocked | Required next move |
 |---|---|---|---|---|
-| `assistant.py` | Definition | `victor.core.verticals.base`, `victor_sdk` | Uses runtime `VerticalBase`, `StageDefinition`, and `VerticalConfig` even though tool identifiers and capability requirements are already SDK-owned | Replace runtime base/protocol dependencies with SDK definition contracts plus host-owned runtime adapters |
 | `prompts.py` | Definition | `victor.core.verticals.protocols` | Implements `PromptContributorProtocol` and `TaskTypeHint` runtime objects inside a definition module | Convert prompt/task-hint data to plain serializable SDK-facing metadata and let runtime prompt contributors be optional adapters |
 
 Definition-layer implication:
 
-- `assistant.py` is no longer blocked on tool identifiers. `VPC-T3.6` is now
-  mostly about the remaining runtime-owned tool-name usage elsewhere in the
-  package, while `assistant.py` itself is blocked more by `VerticalBase` and
-  runtime protocol inheritance than by tool constants.
+- `assistant.py` is no longer a definition-layer blocker. The remaining root
+  definition work is isolated to `prompts.py`.
 
 ## Shim-Layer Blockers
 
@@ -146,7 +144,6 @@ Status:
 
 Remaining definition-layer work that is still outside `VPC-T3.7`:
 
-- `assistant.py` still inherits the runtime base/protocol surface
 - `prompts.py` is still a runtime prompt-contributor module rather than pure
   serializable metadata
 
@@ -168,8 +165,6 @@ Status:
 
 Remaining definition-layer work after `VPC-T3.8`:
 
-- `assistant.py` still inherits the runtime base class instead of an SDK-only
-  definition base
 - `prompts.py` still implements a runtime prompt contributor rather than pure
   serializable metadata
 
@@ -188,10 +183,26 @@ Status:
 
 Remaining definition-layer work after `VPC-T3.9`:
 
-- `assistant.py` still inherits the runtime base class instead of an SDK-only
-  definition base
 - `prompts.py` still implements a runtime prompt contributor rather than pure
   serializable metadata
+
+### `VPC-T3.36` Remove direct framework-registry access from migrated definition modules
+
+Status:
+
+- completed for the `coding` assistant definition module
+- `assistant.py` now imports only SDK-owned definition contracts
+- coding-specific runtime metadata moved from `customize_config()` into
+  `get_metadata()`
+- `victor.verticals.contrib.coding` now exports a host-owned runtime wrapper
+  while `assistant.py` remains the SDK definition source
+
+Remaining definition-layer work after `VPC-T3.36`:
+
+- `prompts.py` still implements a runtime prompt contributor rather than pure
+  serializable metadata
+- the package-root shims still import runtime/core modules, which is tracked
+  separately under `VPC-E4`
 
 ### `VPC-T3.8` Move runtime-specific behavior behind adapters or `runtime/`
 
@@ -213,7 +224,7 @@ Root-package transition rules:
 `coding` is still the right first vertical to migrate, but the package is now
 well enough inventoried to proceed surgically:
 
-1. the definition-layer blockers are limited to `assistant.py` and `prompts.py`
+1. the remaining root-level definition blocker is `prompts.py`
 2. the package-root shim problem is limited to `__init__.py` and
    `tool_dependencies.py`
 3. the runtime-heavy surface is well-bounded and already aligns with the

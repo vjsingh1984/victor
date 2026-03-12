@@ -2,7 +2,10 @@
 
 from victor_sdk import ToolNames
 
-from victor.verticals.contrib.coding.assistant import CodingAssistant
+from victor.verticals.contrib.coding import CodingAssistant
+from victor.verticals.contrib.coding.assistant import (
+    CodingAssistant as CodingAssistantDefinition,
+)
 from victor.verticals.contrib.coding.capabilities import (
     get_capability_configs as get_coding_capability_configs,
 )
@@ -176,10 +179,10 @@ def test_capability_configs_autoload_from_vertical_capabilities_modules() -> Non
 def test_coding_runtime_extensions_resolve_via_shared_loader_defaults() -> None:
     """Coding should inherit middleware and service-provider runtime hooks."""
 
-    assert "get_middleware" not in CodingAssistant.__dict__
-    assert "get_service_provider" not in CodingAssistant.__dict__
-    assert "get_composed_chains" not in CodingAssistant.__dict__
-    assert "get_personas" not in CodingAssistant.__dict__
+    assert "get_middleware" not in CodingAssistantDefinition.__dict__
+    assert "get_service_provider" not in CodingAssistantDefinition.__dict__
+    assert "get_composed_chains" not in CodingAssistantDefinition.__dict__
+    assert "get_personas" not in CodingAssistantDefinition.__dict__
 
     middleware = CodingAssistant.get_middleware()
     assert len(middleware) == 2

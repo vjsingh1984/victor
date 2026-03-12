@@ -47,3 +47,18 @@ def test_coding_definition_capability_requirements_round_trip_into_runtime_confi
         CapabilityIds.GIT,
         CapabilityIds.LSP,
     ]
+
+
+def test_coding_definition_metadata_round_trips_into_runtime_binding() -> None:
+    """Coding metadata should be expressed through the SDK definition contract."""
+    definition = CodingAssistant.get_definition()
+    binding = VerticalRuntimeAdapter.build_runtime_binding(CodingAssistant)
+
+    assert definition.metadata["supports_lsp"] is True
+    assert definition.metadata["supports_git"] is True
+    assert definition.metadata["max_file_size"] == 1_000_000
+    assert "python" in definition.metadata["supported_languages"]
+    assert binding.runtime_config.metadata["supports_lsp"] is True
+    assert binding.runtime_config.metadata["supports_git"] is True
+    assert binding.runtime_config.metadata["max_file_size"] == 1_000_000
+    assert "python" in binding.runtime_config.metadata["supported_languages"]

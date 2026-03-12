@@ -26,7 +26,7 @@ enabling the framework to remain domain-agnostic while providing rich
 coding assistant functionality.
 
 Package Structure:
-    assistant.py              - CodingAssistant vertical class
+    assistant.py              - SDK definition-layer CodingAssistant class
     middleware.py             - Code correction middleware
     safety.py                  - Coding-specific safety patterns (legacy)
     safety_enhanced.py        - Enhanced safety with SafetyCoordinator
@@ -40,11 +40,8 @@ Package Structure:
 Usage:
     from victor.coding import CodingAssistant
 
-    # Get vertical configuration
-    config = CodingAssistant.get_config()
-
-    # Get extensions for framework integration
-    extensions = CodingAssistant.get_extensions()
+    # Create agent with coding vertical
+    agent = await Agent.create(vertical=CodingAssistant)
 
     # Use enhanced features
     from victor.coding import EnhancedCodingSafetyExtension, EnhancedCodingConversationManager
@@ -53,7 +50,8 @@ Usage:
     conv_mgr = EnhancedCodingConversationManager()
 """
 
-from victor.verticals.contrib.coding.assistant import CodingAssistant
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+from victor.verticals.contrib.coding.assistant import CodingAssistant as CodingAssistantDefinition
 from victor.verticals.contrib.coding.middleware import (
     CodingMiddleware,
     CodeCorrectionMiddleware,
@@ -85,6 +83,7 @@ CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding"
 __all__ = [
     # Main vertical
     "CodingAssistant",
+    "CodingAssistantDefinition",
     # Extensions
     "CodingMiddleware",
     "CodeCorrectionMiddleware",
@@ -104,3 +103,5 @@ __all__ = [
     "get_coding_capabilities",
     "create_coding_capability_loader",
 ]
+
+CodingAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(CodingAssistantDefinition)

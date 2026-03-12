@@ -24,7 +24,10 @@ from victor.core.container import ServiceContainer, set_container
 from victor.core.verticals.protocols import ModeConfigProviderProtocol, VerticalExtensions
 from victor.core.verticals.vertical_loader import get_vertical_loader
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-from victor.verticals.contrib.coding.assistant import CodingAssistant
+from victor.verticals.contrib.coding import CodingAssistant as RuntimeCodingAssistant
+from victor.verticals.contrib.coding.assistant import (
+    CodingAssistant as CodingAssistantDefinition,
+)
 from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
 from victor.verticals.contrib.coding.middleware import (
     CodeCorrectionMiddleware,
@@ -48,13 +51,13 @@ def reset_coding_vertical_state() -> None:
 
     loader = get_vertical_loader()
     loader.reset()
-    CodingAssistant.clear_config_cache()
+    RuntimeCodingAssistant.clear_config_cache()
     set_container(ServiceContainer())
 
     yield
 
     loader.reset()
-    CodingAssistant.clear_config_cache()
+    RuntimeCodingAssistant.clear_config_cache()
     set_container(ServiceContainer())
 
 
@@ -64,11 +67,11 @@ def test_coding_migration_discovery_parity_preserves_loader_and_binding_contract
     loader = get_vertical_loader()
     vertical = loader.load("coding")
     binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
-    definition = vertical.get_definition()
+    definition = CodingAssistantDefinition.get_definition()
 
-    assert vertical is CodingAssistant
+    assert vertical is RuntimeCodingAssistant
     assert loader.active_vertical_name == "coding"
-    assert loader.get_tools() == CodingAssistant.get_tools()
+    assert set(loader.get_tools()) == set(CodingAssistantDefinition.get_tools())
     assert loader.get_system_prompt() == definition.system_prompt
     assert set(binding.runtime_config.tools.tools) == set(definition.get_tool_names())
     assert set(binding.runtime_config.stages) == set(definition.stages)
@@ -112,16 +115,16 @@ def test_coding_migration_activation_parity_registers_di_visible_runtime_extensi
 def test_coding_migration_behavior_parity_uses_shared_runtime_helper_defaults() -> None:
     """Behavior should stay intact even though runtime hooks left assistant.py."""
 
-    assert "get_middleware" not in CodingAssistant.__dict__
-    assert "get_service_provider" not in CodingAssistant.__dict__
-    assert "get_composed_chains" not in CodingAssistant.__dict__
-    assert "get_personas" not in CodingAssistant.__dict__
+    assert "get_middleware" not in CodingAssistantDefinition.__dict__
+    assert "get_service_provider" not in CodingAssistantDefinition.__dict__
+    assert "get_composed_chains" not in CodingAssistantDefinition.__dict__
+    assert "get_personas" not in CodingAssistantDefinition.__dict__
 
-    middleware = CodingAssistant.get_middleware()
+    middleware = RuntimeCodingAssistant.get_middleware()
 
     assert len(middleware) == 2
     assert isinstance(middleware[0], CodeCorrectionMiddleware)
     assert isinstance(middleware[1], GitSafetyMiddleware)
-    assert isinstance(CodingAssistant.get_service_provider(), CodingServiceProvider)
-    assert CodingAssistant.get_composed_chains() == CODING_CHAINS
-    assert CodingAssistant.get_personas() == CODING_PERSONAS
+    assert isinstance(RuntimeCodingAssistant.get_service_provider(), CodingServiceProvider)
+    assert RuntimeCodingAssistant.get_composed_chains() == CODING_CHAINS
+    assert RuntimeCodingAssistant.get_personas() == CODING_PERSONAS
