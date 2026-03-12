@@ -41,6 +41,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -57,7 +58,7 @@ from victor.integrations.api.change_tracker_ops import (
     redo_last_change,
     undo_last_change,
 )
-from victor.integrations.api.event_bridge import EventBridge
+from victor.integrations.api.event_bridge import EventBridge, EventBroadcaster
 from victor.integrations.api.graph_export import (
     export_graph_schema,
     get_execution_state,
@@ -66,6 +67,7 @@ from victor.integrations.api.graph_export import (
 from victor.integrations.api.router_plugins import load_fastapi_router_registrations
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
+from victor.observability.request_correlation import request_correlation_id
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
@@ -113,6 +115,11 @@ class ChatResponse(BaseModel):
     role: str = "assistant"
     content: str
     tool_calls: Optional[List[Dict[str, Any]]] = None
+
+
+def _new_chat_request_id() -> str:
+    """Create a stable request identifier for chat API calls."""
+    return f"chat_{uuid.uuid4().hex[:12]}"
 
 
 class CompletionPosition(BaseModel):
@@ -511,18 +518,43 @@ class VictorFastAPIServer:
                     capabilities=self._detect_capabilities(),
                 )
 
+        @app.get("/events/recent", tags=["System"])
+        async def recent_events(
+            limit: int = Query(default=12, ge=1, le=100),
+            categories: Optional[List[str]] = Query(default=None),
+            correlation_id: Optional[str] = Query(default=None),
+        ) -> JSONResponse:
+            """Return recent bridged events for websocket timeline hydration."""
+            broadcaster = (
+                self._event_bridge._broadcaster if self._event_bridge else EventBroadcaster()
+            )
+            events = broadcaster.get_recent_events(
+                limit=limit,
+                subscriptions=set(categories) if categories else None,
+                correlation_id=correlation_id,
+            )
+            return JSONResponse(
+                {
+                    "events": [event.to_dict() for event in events],
+                    "count": len(events),
+                }
+            )
+
         # Chat endpoints
         @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
-        async def chat(request: ChatRequest) -> ChatResponse:
+        async def chat(request: ChatRequest, response: Response) -> ChatResponse:
             """Chat endpoint (non-streaming)."""
             if not request.messages:
                 raise HTTPException(status_code=400, detail="No messages provided")
 
+            request_id = _new_chat_request_id()
+            response.headers["X-Victor-Request-Id"] = request_id
             orchestrator = await self._get_orchestrator()
-            response = await orchestrator.chat(request.messages[-1].content)
+            with request_correlation_id(request_id):
+                chat_result = await orchestrator.chat(request.messages[-1].content)
 
-            content = getattr(response, "content", None) or ""
-            tool_calls = getattr(response, "tool_calls", None) or []
+            content = getattr(chat_result, "content", None) or ""
+            tool_calls = getattr(chat_result, "tool_calls", None) or []
 
             return ChatResponse(role="assistant", content=content, tool_calls=tool_calls)
 
@@ -532,29 +564,45 @@ class VictorFastAPIServer:
             if not request.messages:
                 raise HTTPException(status_code=400, detail="No messages provided")
 
+            request_id = _new_chat_request_id()
+
             async def event_generator() -> AsyncIterator[str]:
                 try:
                     orchestrator = await self._get_orchestrator()
-                    async for chunk in orchestrator.stream_chat(request.messages[-1].content):
-                        if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
-                            content = getattr(chunk, "content", "")
-                            tool_calls = getattr(chunk, "tool_calls", None)
-                            if content:
-                                event = {"type": "content", "content": content}
-                            elif tool_calls:
-                                event = {"type": "tool_call", "tool_call": tool_calls}
-                            else:
-                                continue
-                        else:
-                            event = chunk
+                    yield f'data: {json.dumps({"type": "request", "request_id": request_id})}\n\n'
 
-                        yield f"data: {json.dumps(event)}\n\n"
+                    with request_correlation_id(request_id):
+                        async for chunk in orchestrator.stream_chat(request.messages[-1].content):
+                            if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
+                                content = getattr(chunk, "content", "")
+                                tool_calls = getattr(chunk, "tool_calls", None)
+                                if content:
+                                    event = {
+                                        "type": "content",
+                                        "content": content,
+                                        "request_id": request_id,
+                                    }
+                                elif tool_calls:
+                                    event = {
+                                        "type": "tool_call",
+                                        "tool_call": tool_calls,
+                                        "request_id": request_id,
+                                    }
+                                else:
+                                    continue
+                            else:
+                                event = chunk
+                                if isinstance(event, dict):
+                                    event.setdefault("request_id", request_id)
+
+                            yield f"data: {json.dumps(event)}\n\n"
 
                     yield "data: [DONE]\n\n"
 
                 except Exception as e:
                     logger.exception("Stream chat error")
-                    yield f'data: {{"type": "error", "message": "{str(e)}"}}\n\n'
+                    error_event = {"type": "error", "message": str(e), "request_id": request_id}
+                    yield f"data: {json.dumps(error_event)}\n\n"
 
             return StreamingResponse(
                 event_generator(),
@@ -562,6 +610,7 @@ class VictorFastAPIServer:
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
+                    "X-Victor-Request-Id": request_id,
                 },
             )
 
@@ -3041,7 +3090,7 @@ Respond with just the command to run."""
             provider updates, etc.) to connected clients like VS Code.
 
             Message format:
-                Incoming: {"type": "subscribe", "categories": ["all"]}
+                Incoming: {"type": "subscribe", "categories": ["all"], "correlation_id": "chat_..."}
                 Outgoing: {"type": "event", "event": {...}}
             """
             await websocket.accept()
@@ -3069,9 +3118,36 @@ Respond with just the command to run."""
                     if msg_type == "subscribe":
                         # Client wants to subscribe to specific event categories
                         categories = data.get("categories", ["all"])
+                        normalized = self._event_bridge._broadcaster.normalize_subscriptions(
+                            categories
+                        )
+                        correlation_id = data.get("correlation_id")
+                        self._event_bridge._broadcaster.update_subscriptions(
+                            client_id,
+                            normalized,
+                            correlation_id=(
+                                correlation_id if isinstance(correlation_id, str) else None
+                            ),
+                        )
                         logger.debug(f"Client {client_id} subscribed to: {categories}")
                         # Send acknowledgment
-                        await websocket.send_json({"type": "subscribed", "categories": categories})
+                        await websocket.send_json(
+                            {
+                                "type": "subscribed",
+                                "categories": categories,
+                                "correlation_id": (
+                                    correlation_id if isinstance(correlation_id, str) else None
+                                ),
+                            }
+                        )
+
+                    elif msg_type == "unsubscribe":
+                        self._event_bridge._broadcaster.update_subscriptions(
+                            client_id,
+                            set(),
+                            correlation_id=None,
+                        )
+                        await websocket.send_json({"type": "unsubscribed"})
 
                     elif msg_type == "ping":
                         await websocket.send_json({"type": "pong"})

@@ -20,9 +20,11 @@ TDD tests for real-time event streaming to VS Code and other clients.
 import asyncio
 import json
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from victor.core.events import MessagingEvent
 
 
 class TestEventBridgeEventTypes:
@@ -147,7 +149,7 @@ class TestEventBridgeConvenienceEmitters:
         """emit_tool_complete should preserve follow-up suggestion payloads."""
         from victor.integrations.api.event_bridge import emit_tool_complete
 
-        broadcaster = AsyncMock()
+        broadcaster = MagicMock()
 
         with patch(
             "victor.integrations.api.event_bridge.EventBroadcaster",
@@ -243,6 +245,24 @@ class TestEventBusAdapterCompatibility:
         # and the async connect_async() should raise RuntimeError
         with pytest.raises(RuntimeError, match="async subscribe"):
             await adapter.connect_async(event_bus)
+
+    def test_event_bus_adapter_preserves_correlation_id_in_bridge_payload(self):
+        """Bridge payloads should expose correlation_id for websocket clients."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        broadcaster = MagicMock()
+        adapter = EventBusAdapter(broadcaster=broadcaster)
+        event = MessagingEvent(
+            topic="tool.complete",
+            data={"tool_name": "graph", "success": True},
+            correlation_id="chat_req_456",
+        )
+
+        adapter._on_event(event)
+
+        broadcaster.broadcast_sync.assert_called_once()
+        bridge_event = broadcaster.broadcast_sync.call_args.args[0]
+        assert bridge_event.data["correlation_id"] == "chat_req_456"
 
 
 class TestEventBridgeReliability:
@@ -436,6 +456,105 @@ class TestEventBridgeFiltering:
 
         for type_name in expected_types:
             assert hasattr(BridgeEventType, type_name), f"Missing event type: {type_name}"
+
+    @pytest.mark.asyncio
+    async def test_broadcaster_filters_events_by_correlation_id(self):
+        """Clients with a correlation filter should only receive matching events."""
+        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBroadcaster
+
+        broadcaster = EventBroadcaster()
+        broadcaster._clients.clear()
+
+        matching = AsyncMock()
+        general = AsyncMock()
+
+        broadcaster.add_client(
+            "filtered",
+            matching,
+            subscriptions={"tool.complete"},
+            correlation_id="chat_123",
+        )
+        broadcaster.add_client("general", general, subscriptions={"tool.complete"})
+
+        await broadcaster._send_to_clients(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_999"},
+            )
+        )
+
+        matching.assert_not_awaited()
+        general.assert_awaited_once()
+
+        await broadcaster._send_to_clients(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_123"},
+            )
+        )
+
+        assert matching.await_count == 1
+        assert general.await_count == 2
+        broadcaster._clients.clear()
+
+    @pytest.mark.asyncio
+    async def test_websocket_handler_subscribe_supports_categories_and_correlation_id(self):
+        """Subscribe messages should normalize categories and preserve correlation filters."""
+        from victor.integrations.api.event_bridge import WebSocketEventHandler
+
+        broadcaster = MagicMock()
+        handler = WebSocketEventHandler(broadcaster=broadcaster)
+
+        await handler._handle_message(
+            "client-1",
+            json.dumps(
+                {
+                    "type": "subscribe",
+                    "categories": ["tool.complete", "tool.error"],
+                    "correlation_id": "chat_abc",
+                }
+            ),
+        )
+
+        broadcaster.normalize_subscriptions.assert_called_once_with(
+            ["tool.complete", "tool.error"]
+        )
+        broadcaster.update_subscriptions.assert_called_once_with(
+            "client-1",
+            broadcaster.normalize_subscriptions.return_value,
+            correlation_id="chat_abc",
+        )
+
+    def test_broadcaster_recent_events_supports_same_filters(self):
+        """Recent-event snapshots should use the same category/correlation matching rules."""
+        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBroadcaster
+
+        broadcaster = EventBroadcaster()
+        broadcaster._recent_events.clear()
+
+        broadcaster.broadcast_sync(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_1"},
+            )
+        )
+        broadcaster.broadcast_sync(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_ERROR,
+                data={"tool_name": "graph", "correlation_id": "chat_2"},
+            )
+        )
+
+        filtered = broadcaster.get_recent_events(
+            limit=5,
+            subscriptions={"tool.complete"},
+            correlation_id="chat_1",
+        )
+
+        assert len(filtered) == 1
+        assert filtered[0].type is BridgeEventType.TOOL_COMPLETE
+        assert filtered[0].data["correlation_id"] == "chat_1"
+        broadcaster._recent_events.clear()
 
 
 class TestEventBusAdapterAsyncPath:

@@ -107,15 +107,29 @@ class ClientConnection:
 
     id: str
     send: Callable[[str], None]  # Async send function
-    subscriptions: Set[str] = field(default_factory=set)  # Event types subscribed to
+    subscriptions: Set[str] = field(default_factory=lambda: {"*"})  # Event types subscribed to
+    correlation_id: Optional[str] = None
     connected_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
 
     def is_subscribed(self, event_type: str) -> bool:
         """Check if client is subscribed to event type."""
-        if not self.subscriptions:
-            return True  # No subscriptions = all events
         return event_type in self.subscriptions or "*" in self.subscriptions
+
+    def accepts(self, event: BridgeEvent) -> bool:
+        """Check whether the client should receive this event."""
+        if not self.is_subscribed(event.type.value):
+            return False
+
+        if not self.correlation_id:
+            return True
+
+        request_id = event.data.get("request_id")
+        if isinstance(request_id, str) and request_id == self.correlation_id:
+            return True
+
+        correlation_id = event.data.get("correlation_id")
+        return isinstance(correlation_id, str) and correlation_id == self.correlation_id
 
 
 class EventBroadcaster:
@@ -140,6 +154,7 @@ class EventBroadcaster:
 
         self._clients: Dict[str, ClientConnection] = {}
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
+        self._recent_events: deque[BridgeEvent] = deque(maxlen=500)
         self._broadcast_task: Optional[asyncio.Task] = None
         self._dispatch_latency_ms_window: deque[float] = deque(maxlen=2000)
         self._client_send_success_count = 0
@@ -177,12 +192,14 @@ class EventBroadcaster:
         client_id: str,
         send_func: Callable[[str], None],
         subscriptions: Optional[Set[str]] = None,
+        correlation_id: Optional[str] = None,
     ) -> None:
         """Add a connected client."""
         self._clients[client_id] = ClientConnection(
             id=client_id,
             send=send_func,
-            subscriptions=subscriptions or set(),
+            subscriptions=subscriptions or {"*"},
+            correlation_id=correlation_id,
         )
         logger.info(f"Client connected: {client_id}")
 
@@ -192,10 +209,31 @@ class EventBroadcaster:
             del self._clients[client_id]
             logger.info(f"Client disconnected: {client_id}")
 
-    def update_subscriptions(self, client_id: str, subscriptions: Set[str]) -> None:
+    def update_subscriptions(
+        self,
+        client_id: str,
+        subscriptions: Set[str],
+        correlation_id: Optional[str] = None,
+    ) -> None:
         """Update client's event subscriptions."""
         if client_id in self._clients:
             self._clients[client_id].subscriptions = subscriptions
+            self._clients[client_id].correlation_id = correlation_id
+
+    @staticmethod
+    def normalize_subscriptions(values: Optional[List[str] | Set[str]]) -> Set[str]:
+        """Normalize incoming subscription names for internal matching."""
+        if not values:
+            return {"*"}
+
+        normalized = set()
+        for value in values:
+            if value in ("all", "*"):
+                normalized.add("*")
+            elif value:
+                normalized.add(value)
+
+        return normalized or {"*"}
 
     @property
     def client_count(self) -> int:
@@ -205,13 +243,33 @@ class EventBroadcaster:
     async def broadcast(self, event: BridgeEvent) -> None:
         """Queue an event for broadcast."""
         await self._event_queue.put(event)
+        self._recent_events.append(event)
 
     def broadcast_sync(self, event: BridgeEvent) -> None:
         """Queue an event for broadcast (sync version)."""
         try:
             self._event_queue.put_nowait(event)
+            self._recent_events.append(event)
         except asyncio.QueueFull:
             logger.warning("Event queue full, dropping event")
+
+    def get_recent_events(
+        self,
+        *,
+        limit: int = 20,
+        subscriptions: Optional[Set[str]] = None,
+        correlation_id: Optional[str] = None,
+    ) -> List[BridgeEvent]:
+        """Return recent events, newest first, optionally filtered."""
+        normalized = self.normalize_subscriptions(subscriptions)
+        probe = ClientConnection(
+            id="snapshot",
+            send=lambda _message: None,
+            subscriptions=normalized,
+            correlation_id=correlation_id,
+        )
+        matched = [event for event in reversed(self._recent_events) if probe.accepts(event)]
+        return matched[: max(1, limit)]
 
     async def _broadcast_loop(self) -> None:
         """Main broadcast loop."""
@@ -230,7 +288,7 @@ class EventBroadcaster:
         disconnected = []
 
         for client_id, client in self._clients.items():
-            if client.is_subscribed(event.type.value):
+            if client.accepts(event):
                 try:
                     send_result = client.send(event_json)
                     if inspect.isawaitable(send_result):
@@ -367,12 +425,18 @@ class WebSocketEventHandler:
 
             if msg_type == "subscribe":
                 # Update subscriptions
-                subscriptions = set(data.get("events", ["*"]))
-                self._broadcaster.update_subscriptions(client_id, subscriptions)
+                requested = data.get("categories") or data.get("events") or ["all"]
+                subscriptions = self._broadcaster.normalize_subscriptions(requested)
+                correlation_id = data.get("correlation_id")
+                self._broadcaster.update_subscriptions(
+                    client_id,
+                    subscriptions,
+                    correlation_id=correlation_id if isinstance(correlation_id, str) else None,
+                )
 
             elif msg_type == "unsubscribe":
                 # Remove subscriptions
-                self._broadcaster.update_subscriptions(client_id, set())
+                self._broadcaster.update_subscriptions(client_id, set(), correlation_id=None)
 
             elif msg_type == "ping":
                 # Respond with pong
@@ -575,9 +639,13 @@ class EventBusAdapter:
         if not bridge_type:
             return
 
+        bridge_data = dict(event.data)
+        if event.correlation_id and "correlation_id" not in bridge_data:
+            bridge_data["correlation_id"] = event.correlation_id
+
         bridge_event = BridgeEvent(
             type=bridge_type,
-            data=event.data,
+            data=bridge_data,
         )
 
         self._broadcaster.broadcast_sync(bridge_event)

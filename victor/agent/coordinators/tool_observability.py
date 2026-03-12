@@ -37,6 +37,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+from victor.observability.request_correlation import get_request_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,17 +95,20 @@ class ToolObservabilityHandler:
         """
         metrics_collector.on_tool_complete(result)
         follow_up_suggestions = self._extract_follow_up_suggestions(result.result)
+        tool_id = getattr(result, "tool_id", None) or f"tool-{max(pipeline_calls_used - 1, 0)}"
 
         # Emit tool complete event
         from victor.core.events import get_observability_bus
 
         bus = get_observability_bus()
+        correlation_id = get_request_correlation_id()
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(
                 bus.emit(
                     topic="tool.complete",
                     data={
+                        "tool_id": tool_id,
                         "tool_name": result.tool_name,
                         "success": result.success,
                         "result_length": len(str(result.result or "")) if result.result else 0,
@@ -116,6 +120,7 @@ class ToolObservabilityHandler:
                         "preview": self._build_tool_preview(result),
                         "follow_up_suggestions": follow_up_suggestions,
                     },
+                    correlation_id=correlation_id,
                 )
             )
         except RuntimeError:
@@ -175,7 +180,6 @@ class ToolObservabilityHandler:
 
         # Emit observability event for tool completion
         if observability:
-            tool_id = f"tool-{pipeline_calls_used}"
             observability.on_tool_end(
                 tool_name=result.tool_name,
                 result=result.result,

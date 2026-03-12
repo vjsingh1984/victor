@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from victor.core.events import ObservabilityBus, get_observability_bus
 from victor.core.events.emit_helper import emit_event_sync
 from victor.observability.hooks import StateHookManager, TransitionHistory
+from victor.observability.request_correlation import get_request_correlation_id
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -378,6 +379,7 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
+        correlation_id = get_request_correlation_id() or self._session_id
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(
@@ -389,6 +391,7 @@ class ObservabilityIntegration:
                         "tool_id": tool_id,
                         "category": "tool",
                     },
+                    correlation_id=correlation_id,
                 )
             )
         except RuntimeError:
@@ -417,6 +420,7 @@ class ObservabilityIntegration:
         key = tool_id or tool_name
         start_time = self._tool_start_times.pop(key, None)
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
+        correlation_id = get_request_correlation_id() or self._session_id
 
         # Emit tool complete/end event
         try:
@@ -432,6 +436,7 @@ class ObservabilityIntegration:
                         "duration_ms": duration_ms,
                         "category": "tool",
                     },
+                    correlation_id=correlation_id,
                 )
             )
         except RuntimeError:
