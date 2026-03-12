@@ -82,7 +82,7 @@ victor --list-verticals
 - `victor_sdk.VerticalBase` is the only base class used by the package
 - tools are declared with `ToolRequirement` and `ToolNames`
 - runtime needs are declared with `CapabilityRequirement` and `CapabilityIds`
-- prompt templates, task hints, stages, and workflow metadata are all expressed
+- prompt templates, task hints, stages, team layouts, and workflow metadata are all expressed
   through SDK hooks
 - no `victor.core` or `victor.framework` imports are required to author the package
 

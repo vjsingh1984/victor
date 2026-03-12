@@ -10,6 +10,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from victor.core.verticals.base import VerticalBase
+from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
 from victor_sdk.core.types import VerticalConfig, VerticalDefinition, Tier
@@ -169,6 +170,48 @@ class TestSdkIntegration:
         assert definition.prompt_metadata.task_type_hints[0].tool_budget == 10
         assert definition.workflow_metadata.provider_hints["preferred_providers"] == ["anthropic"]
         assert definition.workflow_metadata.evaluation_criteria == ["accuracy"]
+
+    def test_sdk_definition_captures_team_metadata(self):
+        """victor-ai subclasses should inherit SDK team metadata hooks."""
+
+        class TestVertical(VerticalBase):
+            name = "team_test"
+            description = "Team test vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Test prompt"
+
+            @classmethod
+            def get_team_declarations(cls):
+                return {
+                    "review_team": {
+                        "name": "Review Team",
+                        "formation": "sequential",
+                        "members": [
+                            {
+                                "role": "researcher",
+                                "goal": "Inspect the target.",
+                            }
+                        ],
+                    }
+                }
+
+            @classmethod
+            def get_default_team(cls):
+                return "review_team"
+
+        definition = TestVertical.get_definition()
+        runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(TestVertical)
+
+        assert definition.team_metadata.default_team == "review_team"
+        assert definition.team_metadata.teams[0].team_id == "review_team"
+        assert runtime_vertical.get_team_spec_provider().get_default_team() == "review_team"
+        assert runtime_vertical.get_team_specs()["review_team"].members[0].role == "researcher"
 
     def test_backward_compatibility_class_attributes(self):
         """Existing class attributes should still work."""

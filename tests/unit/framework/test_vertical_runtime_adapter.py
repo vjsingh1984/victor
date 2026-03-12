@@ -111,6 +111,55 @@ def test_as_runtime_vertical_class_wraps_definition_only_verticals() -> None:
     assert runtime_vertical.get_tiered_tool_config().mandatory == {"read"}
 
 
+def test_as_runtime_vertical_class_builds_team_provider_from_definition_metadata() -> None:
+    """Definition-backed teams should be exposed through the runtime shim."""
+
+    class TeamDefinitionVertical(DefinitionVertical):
+        @classmethod
+        def get_definition(cls) -> VerticalDefinition:
+            return VerticalDefinition(
+                name="team_vertical",
+                description="Definition-backed teams",
+                tools=["read"],
+                system_prompt="Definition-backed teams.",
+                team_metadata={
+                    "teams": {
+                        "review_team": {
+                            "name": "Review Team",
+                            "formation": "pipeline",
+                            "members": [
+                                {
+                                    "role": "researcher",
+                                    "goal": "Inspect the target.",
+                                    "name": "Analyst",
+                                    "tool_budget": 10,
+                                    "memory": True,
+                                },
+                                {
+                                    "role": "reviewer",
+                                    "goal": "Validate the findings.",
+                                    "name": "Reviewer",
+                                    "tool_budget": 6,
+                                },
+                            ],
+                        }
+                    },
+                    "default_team": "review_team",
+                },
+            )
+
+    runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(TeamDefinitionVertical)
+    team_provider = runtime_vertical.get_team_spec_provider()
+    team_specs = runtime_vertical.get_team_specs()
+
+    assert team_provider is not None
+    assert team_provider.get_default_team() == "review_team"
+    assert "review_team" in team_specs
+    assert team_specs["review_team"].formation.value == "pipeline"
+    assert team_specs["review_team"].members[0].name == "Analyst"
+    assert team_specs["review_team"].members[0].memory is True
+
+
 @pytest.mark.asyncio
 async def test_create_agent_routes_through_framework_agent():
     """Agent creation should remain host-owned after translation."""

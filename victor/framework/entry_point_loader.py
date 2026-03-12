@@ -28,6 +28,12 @@ Entry Point Groups:
     victor.tool_dependencies  - Tool dependency provider factories
     victor.safety_rules        - Safety rule registration functions
     victor.rl_configs          - RL configuration provider factories
+    victor.prompt_contributors - Prompt contributor factories/classes
+    victor.mode_configs        - Mode config provider factories/classes
+    victor.workflow_providers  - Workflow provider factories/classes
+    victor.team_spec_providers - Team provider factories/classes
+    victor.capability_providers - Capability provider factories/classes
+    victor.service_providers   - Service provider factories/classes
     victor.escape_hatches     - Escape hatch registration functions
     victor.commands            - CLI command registration functions
 """
@@ -46,6 +52,13 @@ from victor.framework.config import SafetyEnforcer
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+PROMPT_CONTRIBUTORS_ENTRY_POINT_GROUP = "victor.prompt_contributors"
+MODE_CONFIGS_ENTRY_POINT_GROUP = "victor.mode_configs"
+WORKFLOW_PROVIDERS_ENTRY_POINT_GROUP = "victor.workflow_providers"
+TEAM_SPEC_PROVIDERS_ENTRY_POINT_GROUP = "victor.team_spec_providers"
+CAPABILITY_PROVIDERS_ENTRY_POINT_GROUP = "victor.capability_providers"
+SERVICE_PROVIDERS_ENTRY_POINT_GROUP = "victor.service_providers"
 
 _ENTRY_POINT_LOADER_STATS: Dict[str, int] = {
     "safety_calls": 0,
@@ -122,6 +135,25 @@ def _normalize_vertical_names(vertical_names: Optional[List[str]]) -> Optional[s
     return {fn(name) for name in vertical_names}
 
 
+def _entry_point_group_stat_prefix(group: str) -> str:
+    """Return a stable telemetry prefix for an entry-point group."""
+    if group.startswith("victor."):
+        group = group[len("victor.") :]
+    return group.replace(".", "_").replace("-", "_")
+
+
+def _increment_group_loader_stat(group: str, suffix: str) -> None:
+    """Increment a telemetry counter for a specific entry-point group."""
+    _increment_loader_stat(f"{_entry_point_group_stat_prefix(group)}_{suffix}")
+
+
+def _resolve_loaded_entry_point_target(target: Any) -> Any:
+    """Instantiate zero-argument entry-point targets when needed."""
+    if callable(target):
+        return target()
+    return target
+
+
 @functools.lru_cache(maxsize=16)
 def _cached_entry_points(group: str) -> tuple:
     """Cache entry_points() result per group. Returns tuple for hashability."""
@@ -132,6 +164,65 @@ def clear_entry_point_loader_cache() -> None:
     """Clear cached entry-point lookups for this module."""
     _cached_entry_points.cache_clear()
     _increment_loader_stat("cache_clears")
+
+
+def load_runtime_extension_from_entry_points(
+    vertical: str,
+    group: str,
+) -> Optional[Any]:
+    """Load a runtime extension/provider instance from an explicit entry-point group.
+
+    The entry-point target may be a class, a zero-argument factory, or a pre-built
+    instance. This helper performs only entry-point resolution; callers remain
+    responsible for any compatibility fallbacks.
+
+    Args:
+        vertical: Vertical name (for example, ``"coding"``)
+        group: Entry-point group name (for example, ``"victor.workflow_providers"``)
+
+    Returns:
+        Instantiated extension/provider object, or ``None`` when no matching entry
+        point is available.
+    """
+    _increment_group_loader_stat(group, "calls")
+    normalized_vertical = normalize_vertical_name(vertical)
+
+    try:
+        eps = _cached_entry_points(group)
+    except Exception as e:
+        _increment_group_loader_stat(group, "failures")
+        logger.debug(
+            "Failed to inspect entry-point group '%s' for vertical '%s': %s",
+            group,
+            vertical,
+            e,
+        )
+        return None
+
+    for ep in eps:
+        if normalize_vertical_name(ep.name) != normalized_vertical:
+            continue
+
+        try:
+            resolved = _resolve_loaded_entry_point_target(ep.load())
+        except Exception as e:
+            _increment_group_loader_stat(group, "failures")
+            logger.debug(
+                "Failed to load entry point '%s' from group '%s': %s",
+                ep.name,
+                group,
+                e,
+            )
+            continue
+
+        if resolved is None:
+            continue
+
+        _increment_group_loader_stat(group, "hits")
+        return resolved
+
+    _increment_group_loader_stat(group, "none_returns")
+    return None
 
 
 def load_safety_rules_from_entry_points(
@@ -272,20 +363,36 @@ def load_rl_config_from_entry_points(vertical: str) -> Optional[Dict[str, Any]]:
             learning_rate = rl_config.get("learning_rate", 0.001)
     """
     _increment_loader_stat("rl_config_calls")
-    normalized_vertical = normalize_vertical_name(vertical)
+    provider = load_rl_config_provider_from_entry_points(vertical)
+    if provider is None:
+        return None
 
-    try:
-        eps = _cached_entry_points("victor.rl_configs")
-        for ep in eps:
-            if normalize_vertical_name(ep.name) == normalized_vertical:
-                config_factory = ep.load()
-                _increment_loader_stat("rl_config_hits")
-                return config_factory()
-    except Exception as e:
-        _increment_loader_stat("rl_config_failures")
-        logger.debug(f"No RL config found for '{vertical}': {e}")
+    if isinstance(provider, dict):
+        _increment_loader_stat("rl_config_hits")
+        return provider
 
+    get_rl_config = getattr(provider, "get_rl_config", None)
+    if callable(get_rl_config):
+        try:
+            config = get_rl_config()
+        except Exception as e:
+            _increment_loader_stat("rl_config_failures")
+            logger.debug("Failed to resolve RL config for '%s': %s", vertical, e)
+            return None
+        _increment_loader_stat("rl_config_hits")
+        return config
+
+    _increment_loader_stat("rl_config_failures")
+    logger.debug(
+        "RL config entry point for '%s' did not expose get_rl_config() or a config dict",
+        vertical,
+    )
     return None
+
+
+def load_rl_config_provider_from_entry_points(vertical: str) -> Optional[Any]:
+    """Load an RL config provider instance for a specific vertical via entry points."""
+    return load_runtime_extension_from_entry_points(vertical, "victor.rl_configs")
 
 
 def register_escape_hatches_from_entry_points(
@@ -415,9 +522,17 @@ def list_installed_verticals() -> List[str]:
 
 
 __all__ = [
+    "PROMPT_CONTRIBUTORS_ENTRY_POINT_GROUP",
+    "MODE_CONFIGS_ENTRY_POINT_GROUP",
+    "WORKFLOW_PROVIDERS_ENTRY_POINT_GROUP",
+    "TEAM_SPEC_PROVIDERS_ENTRY_POINT_GROUP",
+    "CAPABILITY_PROVIDERS_ENTRY_POINT_GROUP",
+    "SERVICE_PROVIDERS_ENTRY_POINT_GROUP",
+    "load_runtime_extension_from_entry_points",
     "load_safety_rules_from_entry_points",
     "load_tool_dependency_provider_from_entry_points",
     "load_rl_config_from_entry_points",
+    "load_rl_config_provider_from_entry_points",
     "register_escape_hatches_from_entry_points",
     "register_commands_from_entry_points",
     "list_installed_verticals",

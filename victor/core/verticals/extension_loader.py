@@ -90,7 +90,7 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type
 
 from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
@@ -531,6 +531,52 @@ class VerticalExtensionLoader(ABC):
             return cls._extensions_cache[cache_key]
 
     @classmethod
+    def _get_cached_extension_value(cls, key: str) -> tuple[bool, Any]:
+        """Return a cached extension value without caching misses."""
+        cache_key = f"{cls._cache_namespace()}:{key}"
+        with cls._extensions_cache_lock:
+            if cache_key in cls._extensions_cache:
+                return True, cls._extensions_cache[cache_key]
+        return False, None
+
+    @classmethod
+    def _load_cached_optional_extension(
+        cls,
+        extension_key: str,
+        loader: Callable[[], Optional[Any]],
+    ) -> Optional[Any]:
+        """Load an optional extension while caching hits but not misses."""
+        cached, value = cls._get_cached_extension_value(extension_key)
+        if cached:
+            return value
+
+        resolved = loader()
+        if resolved is None:
+            return None
+
+        return cls._get_cached_extension(
+            extension_key,
+            lambda resolved=resolved: resolved,
+        )
+
+    @classmethod
+    def _load_named_entry_point_extension(
+        cls,
+        extension_key: str,
+        group: str,
+    ) -> Optional[Any]:
+        """Resolve an optional runtime extension from an explicit entry-point group."""
+        try:
+            from victor.framework.entry_point_loader import load_runtime_extension_from_entry_points
+        except ImportError:
+            return None
+
+        return cls._load_cached_optional_extension(
+            extension_key,
+            lambda: load_runtime_extension_from_entry_points(cls.name, group),
+        )
+
+    @classmethod
     def _get_extension_factory(
         cls,
         extension_key: str,
@@ -685,6 +731,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Prompt contributor (PromptContributorProtocol) or None
         """
+        contributor = cls._load_named_entry_point_extension(
+            "prompt_contributor",
+            "victor.prompt_contributors",
+        )
+        if contributor is not None:
+            return contributor
+
         candidate_paths = [
             path
             for path in cls._extension_module_candidates("prompts")
@@ -719,6 +772,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Mode config provider (ModeConfigProviderProtocol) or None
         """
+        provider = cls._load_named_entry_point_extension(
+            "mode_config_provider",
+            "victor.mode_configs",
+        )
+        if provider is not None:
+            return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}ModeConfigProvider"
         candidate_paths = [
@@ -848,15 +908,27 @@ class VerticalExtensionLoader(ABC):
             Tool dependency provider (ToolDependencyProviderProtocol) or None
         """
         try:
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return cls._get_cached_extension(
-                "tool_dependency_provider",
-                lambda: create_vertical_tool_dependency_provider(cls.name),
+            from victor.framework.entry_point_loader import (
+                load_tool_dependency_provider_from_entry_points,
             )
-        except (ImportError, ValueError):
-            # If factory not available or vertical not recognized, return None
-            return None
+
+            return cls._load_cached_optional_extension(
+                "tool_dependency_provider",
+                lambda: load_tool_dependency_provider_from_entry_points(cls.name),
+            )
+        except ImportError:
+            try:
+                from victor.core.tool_dependency_loader import (
+                    create_vertical_tool_dependency_provider,
+                )
+
+                return cls._load_cached_optional_extension(
+                    "tool_dependency_provider",
+                    lambda: create_vertical_tool_dependency_provider(cls.name),
+                )
+            except (ImportError, ValueError):
+                # If factory not available or vertical not recognized, return None
+                return None
 
     @classmethod
     def get_tool_graph(cls) -> Optional[Any]:
@@ -897,6 +969,20 @@ class VerticalExtensionLoader(ABC):
         Returns:
             RL config provider (RLConfigProviderProtocol) or None
         """
+        try:
+            from victor.framework.entry_point_loader import (
+                load_rl_config_provider_from_entry_points,
+            )
+        except ImportError:
+            pass
+        else:
+            provider = cls._load_cached_optional_extension(
+                "rl_config_provider",
+                lambda: load_rl_config_provider_from_entry_points(cls.name),
+            )
+            if provider is not None:
+                return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}RLConfig"
         candidate_paths = [
@@ -988,6 +1074,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Team spec provider (TeamSpecProviderProtocol) or None
         """
+        provider = cls._load_named_entry_point_extension(
+            "team_spec_provider",
+            "victor.team_spec_providers",
+        )
+        if provider is not None:
+            return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}TeamSpecProvider"
         candidate_paths = [
@@ -995,9 +1088,6 @@ class VerticalExtensionLoader(ABC):
             for path in cls._extension_module_candidates("teams")
             if cls._extension_module_available(path)
         ]
-        if not candidate_paths:
-            return None
-
         last_error: Optional[Exception] = None
         for module_path in candidate_paths:
             try:
@@ -1017,9 +1107,32 @@ class VerticalExtensionLoader(ABC):
             except (ImportError, AttributeError) as exc:
                 last_error = exc
 
+        try:
+            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+            provider = VerticalRuntimeAdapter.build_team_spec_provider(cls)
+            if provider is not None:
+                return provider
+        except Exception as exc:
+            if last_error is None:
+                last_error = exc
+
         if last_error:
             raise last_error
         return None
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for this vertical.
+
+        Returns:
+            Dict mapping team names to TeamSpec instances
+        """
+
+        provider = cls.get_team_spec_provider()
+        if provider is None or not hasattr(provider, "get_team_specs"):
+            return {}
+        return provider.get_team_specs()
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:
@@ -1033,6 +1146,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Capability provider (BaseCapabilityProvider) or None
         """
+        provider = cls._load_named_entry_point_extension(
+            "capability_provider",
+            "victor.capability_providers",
+        )
+        if provider is not None:
+            return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}CapabilityProvider"
         candidate_paths = [
@@ -1079,6 +1199,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Service provider (ServiceProviderProtocol) or factory-created provider
         """
+        provider = cls._load_named_entry_point_extension(
+            "service_provider",
+            "victor.service_providers",
+        )
+        if provider is not None:
+            return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}ServiceProvider"
         candidate_paths = [
@@ -1600,6 +1727,13 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Workflow provider instance (WorkflowProviderProtocol) or None
         """
+        provider = cls._load_named_entry_point_extension(
+            "workflow_provider",
+            "victor.workflow_providers",
+        )
+        if provider is not None:
+            return provider
+
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}WorkflowProvider"
 

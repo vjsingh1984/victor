@@ -184,6 +184,45 @@ Priorities:
         return {"stage_order": ["reconnaissance", "analysis", "reporting"]}
 
     @classmethod
+    def get_team_declarations(cls) -> dict[str, dict[str, object]]:
+        return {
+            "security_review_team": {
+                "name": "Security Review Team",
+                "description": "Two-stage security review with analysis and validation.",
+                "formation": "pipeline",
+                "members": [
+                    {
+                        "role": "researcher",
+                        "goal": "Inspect the repository and identify likely security risks.",
+                        "name": "Security Analyst",
+                        "tool_budget": 18,
+                        "backstory": (
+                            "You specialize in application security reviews and threat discovery."
+                        ),
+                        "expertise": ["static analysis", "dependency risk", "secret detection"],
+                        "personality": "methodical and evidence-driven",
+                        "memory": True,
+                    },
+                    {
+                        "role": "reviewer",
+                        "goal": "Validate findings and summarize remediation guidance.",
+                        "name": "Validation Reviewer",
+                        "tool_budget": 12,
+                        "backstory": "You verify findings before they are escalated to developers.",
+                        "expertise": ["severity calibration", "secure remediation"],
+                        "personality": "skeptical and precise",
+                    },
+                ],
+                "task_types": ["vulnerability_scan", "incident_review"],
+                "tags": ["security", "review"],
+            }
+        }
+
+    @classmethod
+    def get_default_team(cls) -> str:
+        return "security_review_team"
+
+    @classmethod
     def get_provider_hints(cls) -> dict[str, object]:
         return {
             "preferred_providers": ["anthropic", "openai"],

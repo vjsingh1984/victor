@@ -49,6 +49,24 @@ class VerticalRuntimeBinding:
         return self.runtime_config.to_agent_kwargs()
 
 
+@dataclass(frozen=True)
+class DefinitionBackedTeamSpecProvider:
+    """Runtime team provider synthesized from SDK team metadata."""
+
+    team_specs: Dict[str, Any]
+    default_team: Optional[str] = None
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Return runtime team specs keyed by team identifier."""
+
+        return dict(self.team_specs)
+
+    def get_default_team(self) -> Optional[str]:
+        """Return the default team identifier if one is declared."""
+
+        return self.default_team
+
+
 class VerticalRuntimeAdapter:
     """Translate definition-layer vertical contracts into runtime configuration.
 
@@ -75,6 +93,9 @@ class VerticalRuntimeAdapter:
         "get_prompt_templates",
         "get_task_type_hints",
         "get_prompt_metadata",
+        "get_team_declarations",
+        "get_default_team",
+        "get_team_metadata",
         "get_initial_stage",
         "get_workflow_spec",
         "get_workflow_metadata",
@@ -144,6 +165,16 @@ class VerticalRuntimeAdapter:
         return VerticalRuntimeBinding(definition=definition, runtime_config=runtime_config)
 
     @classmethod
+    def build_team_spec_provider(
+        cls,
+        source: VerticalDefinitionSource,
+    ) -> Optional[DefinitionBackedTeamSpecProvider]:
+        """Build a runtime team-spec provider from a definition source."""
+
+        definition = cls.resolve_definition(source)
+        return cls._build_definition_team_provider(definition)
+
+    @classmethod
     def as_runtime_vertical_class(cls, source: Any) -> Any:
         """Return a runtime-compatible vertical class, shimming legacy shapes when needed."""
 
@@ -196,6 +227,12 @@ class VerticalRuntimeAdapter:
             or definition.workflow_metadata.metadata
         ):
             metadata.setdefault("workflow_metadata", definition.workflow_metadata.to_dict())
+        if (
+            definition.team_metadata.teams
+            or definition.team_metadata.default_team is not None
+            or definition.team_metadata.metadata
+        ):
+            metadata.setdefault("team_metadata", definition.team_metadata.to_dict())
 
         return RuntimeVerticalConfig(
             tools=ToolSet.from_tools(definition.get_tool_names()),
@@ -317,6 +354,9 @@ class VerticalRuntimeAdapter:
         runtime_config = binding.runtime_config
         definition = binding.definition
         shim_name = getattr(source, "__name__", definition.name.title())
+        team_provider = cls._build_definition_team_provider(definition)
+        source_team_provider = getattr(source, "get_team_spec_provider", None)
+        source_team_specs = getattr(source, "get_team_specs", None)
 
         class LegacyRuntimeShim(RuntimeVerticalBase):
             name = definition.name
@@ -365,6 +405,22 @@ class VerticalRuntimeAdapter:
         LegacyRuntimeShim.__victor_runtime_shim__ = True
         LegacyRuntimeShim.__victor_sdk_source__ = source
 
+        if team_provider is not None and not callable(source_team_provider):
+            @classmethod
+            def _get_team_spec_provider(
+                cls,
+            ) -> Optional[DefinitionBackedTeamSpecProvider]:
+                return team_provider
+
+            setattr(LegacyRuntimeShim, "get_team_spec_provider", _get_team_spec_provider)
+
+        if team_provider is not None and not callable(source_team_specs):
+            @classmethod
+            def _get_team_specs(cls) -> Dict[str, Any]:
+                return team_provider.get_team_specs()
+
+            setattr(LegacyRuntimeShim, "get_team_specs", _get_team_specs)
+
         for hook_name in cls._FORWARDED_SDK_HOOKS:
             if hook_name in LegacyRuntimeShim.__dict__:
                 continue
@@ -376,6 +432,68 @@ class VerticalRuntimeAdapter:
             setattr(LegacyRuntimeShim, hook_name, cls._build_source_delegate(source, hook_name))
 
         return LegacyRuntimeShim
+
+    @classmethod
+    def _build_definition_team_provider(
+        cls,
+        definition: VerticalDefinition,
+    ) -> Optional[DefinitionBackedTeamSpecProvider]:
+        """Build a runtime team-spec provider from SDK team metadata."""
+
+        if not definition.team_metadata.teams:
+            return None
+
+        from victor.framework.team_schema import TeamSpec
+        from victor.framework.teams import TeamMemberSpec
+        from victor.teams.types import MemoryConfig, TeamFormation
+
+        team_specs: Dict[str, TeamSpec] = {}
+        for team in definition.team_metadata.teams:
+            members = []
+            for member in team.members:
+                memory_config = (
+                    MemoryConfig(**member.memory_config)
+                    if member.memory_config
+                    else None
+                )
+                members.append(
+                    TeamMemberSpec(
+                        role=member.role,
+                        goal=member.goal,
+                        name=member.name,
+                        tool_budget=member.tool_budget,
+                        allowed_tools=member.allowed_tools or None,
+                        is_manager=member.is_manager,
+                        priority=member.priority,
+                        backstory=member.backstory,
+                        expertise=member.expertise.copy(),
+                        personality=member.personality,
+                        max_delegation_depth=member.max_delegation_depth,
+                        memory=member.memory,
+                        memory_config=memory_config,
+                        cache=member.cache,
+                        verbose=member.verbose,
+                        max_iterations=member.max_iterations,
+                    )
+                )
+
+            team_specs[team.team_id] = TeamSpec(
+                name=team.name,
+                description=team.description,
+                vertical=definition.name,
+                formation=TeamFormation(team.formation),
+                members=members,
+                total_tool_budget=team.total_tool_budget,
+                max_iterations=team.max_iterations,
+                tags=team.tags.copy(),
+                task_types=team.task_types.copy(),
+                metadata=dict(team.metadata),
+            )
+
+        return DefinitionBackedTeamSpecProvider(
+            team_specs=team_specs,
+            default_team=definition.team_metadata.default_team,
+        )
 
     @staticmethod
     def _is_runtime_vertical_class(source: Any) -> bool:
