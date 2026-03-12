@@ -121,3 +121,42 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(tmp_
     assert result["metadata"]["requested_mode"] == "bugs"
     assert result["metadata"]["fallback_mode"] == "semantic"
     assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(tmp_path) -> None:
+    """Semantic results that identify an entrypoint should suggest graph follow-ups."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/main.py",
+                    "content": "def main():\n    parse_json(data)\n",
+                    "score": 0.82,
+                    "name": "main",
+                    "symbol_type": "function",
+                }
+            ]
+        )
+    )
+    exec_ctx = {"settings": _settings()}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ):
+        result = await code_search(
+            query="entry point for request processing",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    follow_ups = result["metadata"]["follow_up_suggestions"]
+    assert result["success"] is True
+    assert result["mode"] == "semantic"
+    assert result["hint"].endswith('graph(mode="trace", node="main", depth=3)')
+    assert follow_ups[0]["tool"] == "graph"
+    assert follow_ups[0]["arguments"] == {"mode": "trace", "node": "main", "depth": 3}
+    assert any(item["arguments"]["mode"] == "callers" for item in follow_ups)
+    assert any(item["arguments"]["mode"] == "callees" for item in follow_ups)

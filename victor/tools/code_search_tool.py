@@ -101,6 +101,9 @@ CORE_DIRS = {
     "api",
 }
 
+GRAPH_FOLLOW_UP_SYMBOL_TYPES = {"function", "method"}
+ENTRYPOINT_SYMBOL_NAMES = {"main", "run", "start", "serve", "cli", "bootstrap"}
+
 
 def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
     """Calculate importance score for a search result.
@@ -240,6 +243,78 @@ def _prepare_ranked_results(
     return ranked_results
 
 
+def _extract_graph_follow_up_symbol(result: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Extract a symbol candidate suitable for graph follow-up suggestions."""
+    metadata = result.get("metadata")
+    metadata_dict = metadata if isinstance(metadata, dict) else {}
+
+    symbol_type = (
+        result.get("symbol_type")
+        or result.get("type")
+        or metadata_dict.get("symbol_type")
+        or metadata_dict.get("type")
+    )
+    symbol_name = (
+        result.get("name")
+        or result.get("symbol_name")
+        or metadata_dict.get("name")
+        or metadata_dict.get("symbol_name")
+    )
+
+    if not isinstance(symbol_type, str) or not isinstance(symbol_name, str):
+        return None
+
+    normalized_type = symbol_type.strip().lower()
+    normalized_name = symbol_name.strip()
+    if normalized_type not in GRAPH_FOLLOW_UP_SYMBOL_TYPES or not normalized_name:
+        return None
+
+    return {"name": normalized_name, "symbol_type": normalized_type}
+
+
+def _build_graph_follow_up_suggestions(
+    results: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Build graph-tool follow-up suggestions from ranked search results."""
+    for result in results:
+        symbol = _extract_graph_follow_up_symbol(result)
+        if symbol is None:
+            continue
+
+        symbol_name = symbol["name"]
+        symbol_name_lower = symbol_name.lower()
+        suggestions: List[Dict[str, Any]] = []
+
+        if symbol_name_lower in ENTRYPOINT_SYMBOL_NAMES:
+            trace_args = {"mode": "trace", "node": symbol_name, "depth": 3}
+            suggestions.append(
+                {
+                    "tool": "graph",
+                    "command": f'graph(mode="trace", node="{symbol_name}", depth=3)',
+                    "arguments": trace_args,
+                    "reason": f"Trace execution starting from {symbol_name}.",
+                }
+            )
+
+        for mode, reason in (
+            ("callers", f"Find who calls {symbol_name}."),
+            ("callees", f"Find what {symbol_name} calls."),
+        ):
+            depth = 2
+            suggestions.append(
+                {
+                    "tool": "graph",
+                    "command": f'graph(mode="{mode}", node="{symbol_name}", depth={depth})',
+                    "arguments": {"mode": mode, "node": symbol_name, "depth": depth},
+                    "reason": reason,
+                }
+            )
+
+        return suggestions
+
+    return []
+
+
 def _build_search_response(
     *,
     results: List[Dict[str, Any]],
@@ -250,9 +325,17 @@ def _build_search_response(
     filters_applied: List[str],
     ranking_note: str,
     extra_metadata: Optional[Dict[str, Any]] = None,
+    follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Build a consistent search tool response envelope."""
     cache_entry = _get_index_cache(exec_ctx).get(str(root_path), {})
+    hint = (
+        "Use read_file with offset/limit based on line_number/end_line for precise reads. "
+        "Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)"
+    )
+    if follow_up_suggestions:
+        hint += f" Graph follow-up: {follow_up_suggestions[0]['command']}"
+
     metadata = {
         "rebuilt": rebuilt,
         "root": str(root_path),
@@ -271,13 +354,15 @@ def _build_search_response(
     }
     if extra_metadata:
         metadata.update(extra_metadata)
+    if follow_up_suggestions:
+        metadata["follow_up_suggestions"] = follow_up_suggestions
 
     return {
         "success": True,
         "results": results,
         "count": len(results),
         "mode": mode,
-        "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
+        "hint": hint,
         "ranking_note": ranking_note,
         "metadata": metadata,
     }
@@ -587,6 +672,7 @@ async def code_search(
                 }
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                 return _build_search_response(
                     results=ranked_results,
                     mode="bugs",
@@ -596,6 +682,7 @@ async def code_search(
                     filters_applied=filters_applied,
                     ranking_note="Results ranked by combined_score (bug_similarity × importance). Graph context included when available.",
                     extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
                 )
             except NotImplementedError as exc:
                 logger.info(
@@ -742,6 +829,7 @@ async def code_search(
                 # Fall back to semantic-only results (already have them)
 
         ranked_results = _prepare_ranked_results(results, search_mode="semantic")
+        follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
 
         return _build_search_response(
             results=ranked_results,
@@ -752,6 +840,7 @@ async def code_search(
             filters_applied=filters_applied,
             ranking_note="Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
             extra_metadata=fallback_metadata,
+            follow_up_suggestions=follow_up_suggestions,
         )
     except ImportError as exc:
         return {
