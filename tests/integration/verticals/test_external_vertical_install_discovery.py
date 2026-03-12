@@ -115,6 +115,42 @@ def _pip_install_editable(venv_dir: Path, env: dict[str, str], *paths: Path) -> 
     _run(args, cwd=REPO_ROOT, env=env)
 
 
+def _pip_install(venv_dir: Path, env: dict[str, str], *artifacts: Path) -> None:
+    """Install local wheel artifacts into the validation venv without external deps."""
+
+    args = [
+        str(_venv_bin(venv_dir, "pip")),
+        "install",
+        "--no-build-isolation",
+        "--no-deps",
+    ]
+    args.extend(str(artifact) for artifact in artifacts)
+    _run(args, cwd=REPO_ROOT, env=env)
+
+
+def _build_wheel(venv_dir: Path, env: dict[str, str], package_dir: Path, output_dir: Path) -> Path:
+    """Build a wheel for a local package without reaching out to PyPI."""
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _run(
+        [
+            str(_venv_bin(venv_dir, "pip")),
+            "wheel",
+            "--no-build-isolation",
+            "--no-deps",
+            str(package_dir),
+            "-w",
+            str(output_dir),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+    )
+
+    wheels = sorted(output_dir.glob("*.whl"))
+    assert wheels, f"No wheel built for {package_dir}"
+    return wheels[-1]
+
+
 def _run_python(venv_dir: Path, env: dict[str, str], script: str) -> subprocess.CompletedProcess[str]:
     """Execute Python in the validation venv."""
 
@@ -137,7 +173,14 @@ def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(t
 
     env = _subprocess_env(tmp_path)
     venv_dir = _create_validation_venv(tmp_path, env)
-    _pip_install_editable(venv_dir, env, VICTOR_SDK_DIR, EXTERNAL_EXAMPLE_DIR)
+    wheel_path = _build_wheel(
+        venv_dir,
+        env,
+        EXTERNAL_EXAMPLE_DIR,
+        tmp_path / "dist" / "external-sdk-only",
+    )
+    _pip_install_editable(venv_dir, env, VICTOR_SDK_DIR)
+    _pip_install(venv_dir, env, wheel_path)
 
     completed = _run_python(
         venv_dir,
@@ -197,7 +240,14 @@ def test_external_vertical_runtime_install_is_discoverable_by_vertical_loader(
 
     env = _subprocess_env(tmp_path)
     venv_dir = _create_validation_venv(tmp_path, env)
-    _pip_install_editable(venv_dir, env, VICTOR_SDK_DIR, REPO_ROOT, EXTERNAL_EXAMPLE_DIR)
+    wheel_path = _build_wheel(
+        venv_dir,
+        env,
+        EXTERNAL_EXAMPLE_DIR,
+        tmp_path / "dist" / "external-runtime",
+    )
+    _pip_install_editable(venv_dir, env, VICTOR_SDK_DIR, REPO_ROOT)
+    _pip_install(venv_dir, env, wheel_path)
 
     entry_point_cache_dir = tmp_path / "victor-cache"
     completed = _run_python(

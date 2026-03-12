@@ -65,6 +65,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
@@ -74,6 +75,10 @@ import httpx
 from victor.core.verticals.package_schema import (
     VerticalPackageMetadata,
     is_victor_version_compatible,
+)
+from victor.core.verticals.cache_invalidation import (
+    VerticalRuntimeInvalidationReason,
+    invalidate_vertical_runtime_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -597,6 +602,8 @@ class VerticalRegistryManager:
         if self.dry_run:
             return True, f"Would install: {' '.join(cmd)}"
 
+        invalidation_reason = self._detect_install_invalidation_reason(package_spec)
+
         # Execute installation
         try:
             subprocess.run(
@@ -606,6 +613,10 @@ class VerticalRegistryManager:
                 check=True,
             )
 
+            invalidate_vertical_runtime_state(
+                invalidation_reason,
+                package_name=package_spec.name,
+            )
             # Success
             return True, f"Successfully installed {package_spec.name}"
 
@@ -645,6 +656,10 @@ class VerticalRegistryManager:
                 check=True,
             )
 
+            invalidate_vertical_runtime_state(
+                VerticalRuntimeInvalidationReason.UNINSTALL,
+                package_name=name,
+            )
             # Success
             return True, f"Successfully uninstalled {name}"
 
@@ -749,3 +764,27 @@ class VerticalRegistryManager:
             self._metadata_cache.clear()
         except Exception as e:
             logger.warning(f"Failed to clear cache: {e}")
+
+    def _detect_install_invalidation_reason(
+        self,
+        package_spec: PackageSpec,
+    ) -> VerticalRuntimeInvalidationReason:
+        """Classify a successful install as fresh install vs upgrade.
+
+        The current runtime uses the same invalidation mechanics for both, but the
+        reason is tracked separately so tests, logs, and future refresh behavior
+        can distinguish them.
+        """
+
+        try:
+            distribution(package_spec.name)
+        except PackageNotFoundError:
+            return VerticalRuntimeInvalidationReason.INSTALL
+        except Exception as e:
+            logger.debug(
+                "Failed to determine pre-install package state for %s: %s",
+                package_spec.name,
+                e,
+            )
+            return VerticalRuntimeInvalidationReason.INSTALL
+        return VerticalRuntimeInvalidationReason.UPGRADE

@@ -1021,12 +1021,12 @@ class TestConfigCacheTTL:
             ConcreteVertical._config_cache_ttl = original_ttl
 
     def test_custom_ttl_per_vertical(self):
-        """Verify subclass can override _config_cache_ttl."""
+        """Verify subclass TTL overrides affect cache expiry behavior."""
 
         class ShortTTLVertical(VerticalBase):
             name = "short_ttl"
             description = "Short TTL vertical"
-            _config_cache_ttl = 60.0  # Custom TTL
+            _config_cache_ttl = 0.01  # 10ms custom TTL
 
             @classmethod
             def get_tools(cls) -> List[str]:
@@ -1036,7 +1036,13 @@ class TestConfigCacheTTL:
             def get_system_prompt(cls) -> str:
                 return "Short TTL prompt"
 
-        assert ShortTTLVertical._config_cache_ttl == 60.0
+        ShortTTLVertical.clear_config_cache(clear_all=True)
+        config1 = ShortTTLVertical.get_config(use_cache=True)
+        time.sleep(0.02)
+        config2 = ShortTTLVertical.get_config(use_cache=True)
+
+        assert config1 is not config2
+        assert ShortTTLVertical._config_cache_ttl == 0.01
         assert ConcreteVertical._config_cache_ttl == 300.0
 
     def test_use_cache_false_bypasses_ttl(self):

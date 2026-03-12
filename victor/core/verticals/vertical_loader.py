@@ -216,6 +216,77 @@ class VerticalLoader:
             "stats": self.get_discovery_stats(),
         }
 
+    def _log_discovery_telemetry(
+        self,
+        *,
+        event: str,
+        kind: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """Emit structured discovery logging with cache/discovery context."""
+        stats = payload.get("stats", {})
+        kind_stats = stats.get("vertical" if kind == "vertical" else "tools", {})
+        entry_point_cache = stats.get("entry_point_cache", {})
+        entry_point_group = "victor.verticals" if kind == "vertical" else "victor.tools"
+        entry_point_group_stats: Dict[str, Any] = {}
+        if isinstance(entry_point_cache, dict):
+            groups = entry_point_cache.get("groups", {})
+            if isinstance(groups, dict):
+                raw_group_stats = groups.get(entry_point_group, {})
+                if isinstance(raw_group_stats, dict):
+                    entry_point_group_stats = raw_group_stats
+
+        level = logging.DEBUG if payload.get("cache_hit") and not payload.get("force_refresh") else logging.INFO
+        logger.log(
+            level,
+            "%s kind=%s count=%s cache_hit=%s force_refresh=%s duration_ms=%.2f",
+            event,
+            kind,
+            payload.get("count", 0),
+            payload.get("cache_hit", False),
+            payload.get("force_refresh", False),
+            float(payload.get("duration_ms", 0.0) or 0.0),
+            extra={
+                "event": event,
+                "discovery_kind": kind,
+                "discovered_count": int(payload.get("count", 0) or 0),
+                "cache_hit": bool(payload.get("cache_hit", False)),
+                "force_refresh": bool(payload.get("force_refresh", False)),
+                "duration_ms": float(payload.get("duration_ms", 0.0) or 0.0),
+                "loader_stats": kind_stats,
+                "entry_point_cache_group": entry_point_group,
+                "entry_point_cache_group_stats": entry_point_group_stats,
+                "entry_point_groups_cached": int(
+                    entry_point_cache.get("groups_cached", 0) or 0
+                )
+                if isinstance(entry_point_cache, dict)
+                else 0,
+            },
+        )
+
+    def _log_refresh_telemetry(self) -> None:
+        """Emit structured logging after plugin refresh/invalidation."""
+        stats = self.get_discovery_stats()
+        refresh_stats = stats.get("refresh", {})
+        entry_point_cache = stats.get("entry_point_cache", {})
+        logger.info(
+            "VERTICAL_PLUGIN_REFRESH count=%s duration_ms=%.2f",
+            int(refresh_stats.get("count", 0) or 0),
+            float(refresh_stats.get("last_refresh_ms", 0.0) or 0.0),
+            extra={
+                "event": "VERTICAL_PLUGIN_REFRESH",
+                "refresh_count": int(refresh_stats.get("count", 0) or 0),
+                "duration_ms": float(refresh_stats.get("last_refresh_ms", 0.0) or 0.0),
+                "refresh_stats": refresh_stats,
+                "entry_point_groups_cached": int(
+                    entry_point_cache.get("groups_cached", 0) or 0
+                )
+                if isinstance(entry_point_cache, dict)
+                else 0,
+                "entry_point_cache": entry_point_cache,
+            },
+        )
+
     def discover_verticals(
         self,
         force_refresh: bool = False,
@@ -245,17 +316,19 @@ class VerticalLoader:
             # {'coding': <class 'victor_coding.CodingVertical'>}
         """
         discovered, cache_hit, duration_ms = self._discover_verticals_internal(force_refresh)
+        payload = self._build_discovery_event_payload(
+            kind="vertical",
+            count=len(discovered),
+            duration_ms=duration_ms,
+            cache_hit=cache_hit,
+            force_refresh=force_refresh,
+        )
         if emit_event:
             self._emit_observability_event(
                 topic="vertical.plugins.discovered",
-                data=self._build_discovery_event_payload(
-                    kind="vertical",
-                    count=len(discovered),
-                    duration_ms=duration_ms,
-                    cache_hit=cache_hit,
-                    force_refresh=force_refresh,
-                ),
+                data=payload,
             )
+        self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
         return discovered
 
     def _discover_verticals_internal(
@@ -314,16 +387,18 @@ class VerticalLoader:
             force_refresh,
         )
 
+        payload = self._build_discovery_event_payload(
+            kind="vertical",
+            count=len(discovered),
+            duration_ms=duration_ms,
+            cache_hit=cache_hit,
+            force_refresh=force_refresh,
+        )
         await self._emit_observability_event_async(
             topic="vertical.plugins.discovered",
-            data=self._build_discovery_event_payload(
-                kind="vertical",
-                count=len(discovered),
-                duration_ms=duration_ms,
-                cache_hit=cache_hit,
-                force_refresh=force_refresh,
-            ),
+            data=payload,
         )
+        self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
         return discovered
 
     def _load_vertical_entries(self, ep_entries: Dict[str, str]) -> None:
@@ -409,17 +484,19 @@ class VerticalLoader:
             # {'code_search': <class 'victor_coding.tools.CodeSearchTool'>}
         """
         discovered, cache_hit, duration_ms = self._discover_tools_internal(force_refresh)
+        payload = self._build_discovery_event_payload(
+            kind="tools",
+            count=len(discovered),
+            duration_ms=duration_ms,
+            cache_hit=cache_hit,
+            force_refresh=force_refresh,
+        )
         if emit_event:
             self._emit_observability_event(
                 topic="vertical.plugins.discovered",
-                data=self._build_discovery_event_payload(
-                    kind="tools",
-                    count=len(discovered),
-                    duration_ms=duration_ms,
-                    cache_hit=cache_hit,
-                    force_refresh=force_refresh,
-                ),
+                data=payload,
             )
+        self._log_discovery_telemetry(event="TOOL_DISCOVERY", kind="tools", payload=payload)
         return discovered
 
     def _discover_tools_internal(
@@ -476,16 +553,18 @@ class VerticalLoader:
             force_refresh,
         )
 
+        payload = self._build_discovery_event_payload(
+            kind="tools",
+            count=len(discovered),
+            duration_ms=duration_ms,
+            cache_hit=cache_hit,
+            force_refresh=force_refresh,
+        )
         await self._emit_observability_event_async(
             topic="vertical.plugins.discovered",
-            data=self._build_discovery_event_payload(
-                kind="tools",
-                count=len(discovered),
-                duration_ms=duration_ms,
-                cache_hit=cache_hit,
-                force_refresh=force_refresh,
-            ),
+            data=payload,
         )
+        self._log_discovery_telemetry(event="TOOL_DISCOVERY", kind="tools", payload=payload)
         return discovered
 
     def _load_tool_entries(self, ep_entries: Dict[str, str]) -> None:
@@ -568,7 +647,7 @@ class VerticalLoader:
                     "stats": self.get_discovery_stats(),
                 },
             )
-            logger.info("Plugin cache cleared, will re-discover on next access")
+            self._log_refresh_telemetry()
 
     def reset_discovery_state(self) -> None:
         """Reset local discovery state without global cache side effects.
@@ -706,6 +785,7 @@ class VerticalLoader:
         """Get vertical/tool discovery telemetry snapshot."""
         tool_dependency_stats: Dict[str, Any] = {}
         framework_entry_point_stats: Dict[str, Any] = {}
+        entry_point_cache_stats: Dict[str, Any] = {}
         try:
             from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
 
@@ -719,6 +799,11 @@ class VerticalLoader:
             framework_entry_point_stats = get_entry_point_loader_stats()
         except Exception as e:
             framework_entry_point_stats = {"error": str(e)}
+
+        try:
+            entry_point_cache_stats = get_entry_point_cache().get_cache_stats()
+        except Exception as e:
+            entry_point_cache_stats = {"error": str(e)}
 
         with self._lock:
             return {
@@ -740,6 +825,7 @@ class VerticalLoader:
                 },
                 "tool_dependency_resolution": tool_dependency_stats,
                 "framework_entry_point_loader": framework_entry_point_stats,
+                "entry_point_cache": entry_point_cache_stats,
             }
 
 
