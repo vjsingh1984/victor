@@ -93,6 +93,7 @@ class ToolObservabilityHandler:
             pipeline_calls_used: Current pipeline call count for observability
         """
         metrics_collector.on_tool_complete(result)
+        follow_up_suggestions = self._extract_follow_up_suggestions(result.result)
 
         # Emit tool complete event
         from victor.core.events import get_observability_bus
@@ -113,6 +114,7 @@ class ToolObservabilityHandler:
                         "execution_time_ms": getattr(result, "execution_time_ms", None),
                         "result_excerpt": self._build_result_excerpt(result.result),
                         "preview": self._build_tool_preview(result),
+                        "follow_up_suggestions": follow_up_suggestions,
                     },
                 )
             )
@@ -257,6 +259,26 @@ class ToolObservabilityHandler:
     def clear_failed_signatures(self) -> None:
         """Clear the failed tool signatures cache."""
         self._coordinator._failed_tool_signatures.clear()
+
+    def _extract_follow_up_suggestions(self, result_value: Any) -> Optional[List[Dict[str, Any]]]:
+        """Extract normalized follow-up suggestions from a tool result payload."""
+        if not isinstance(result_value, dict):
+            return None
+        metadata = result_value.get("metadata")
+        if not isinstance(metadata, dict):
+            return None
+        suggestions = metadata.get("follow_up_suggestions")
+        if not isinstance(suggestions, list):
+            return None
+        normalized: List[Dict[str, Any]] = []
+        for suggestion in suggestions:
+            if not isinstance(suggestion, dict):
+                continue
+            command = suggestion.get("command")
+            if not isinstance(command, str) or not command.strip():
+                continue
+            normalized.append(suggestion)
+        return normalized or None
 
     # =====================================================================
     # Preview helpers (UI/observability integration)

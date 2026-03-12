@@ -673,17 +673,22 @@ def emit_tool_complete(
     tool_id: str,
     result: str,
     duration_ms: Optional[int] = None,
+    follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """Emit a tool complete event."""
+    data: Dict[str, Any] = {
+        "tool_id": tool_id,
+        "result": result,
+        "duration_ms": duration_ms,
+    }
+    if follow_up_suggestions:
+        data["follow_up_suggestions"] = follow_up_suggestions
+
     broadcaster = EventBroadcaster()
     broadcaster.broadcast_sync(
         BridgeEvent(
             type=BridgeEventType.TOOL_COMPLETE,
-            data={
-                "tool_id": tool_id,
-                "result": result,
-                "duration_ms": duration_ms,
-            },
+            data=data,
         )
     )
 
