@@ -123,9 +123,9 @@ Priority scale:
 | VPC-E0 | P0 | Architecture decision and transition governance | In Progress | ADR accepted/rejected, compatibility rules documented, source-of-truth policy explicit |
 | VPC-E1 | P1 | SDK contract completion | In Progress | SDK exports all definition-layer contracts required for SDK-only vertical authoring |
 | VPC-E2 | P1 | Runtime boundary cleanup | Complete | Vertical definition layer no longer depends on host runtime creation |
-| VPC-E3 | P1 | Definition-layer decoupling | In Progress | Vertical definition modules use SDK-only imports and pass guardrail checks |
-| VPC-E4 | P2 | Packaging and source-of-truth convergence | Not Started | One authoritative implementation source per vertical |
-| VPC-E5 | P2 | Hardening and CI guardrails | Not Started | Import-boundary checks, packaging smoke tests, cache invalidation tests, startup benchmarks |
+| VPC-E3 | P1 | Definition-layer decoupling | Complete | Vertical definition modules use SDK-only imports and pass guardrail checks |
+| VPC-E4 | P2 | Packaging and source-of-truth convergence | In Progress | One authoritative implementation source per vertical |
+| VPC-E5 | P2 | Hardening and CI guardrails | In Progress | Import-boundary checks, packaging smoke tests, cache invalidation tests, startup benchmarks |
 
 ## Decision Gate
 
@@ -628,13 +628,13 @@ Feature summary:
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
 | VPC-F3.1 | Shared migration scaffolding | Completed | VPC-E1, VPC-E2 | Common split pattern exists for definition vs runtime modules |
-| VPC-F3.2 | Coding vertical migration | In Progress | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
+| VPC-F3.2 | Coding vertical migration | Completed | VPC-F3.1 | `coding` becomes the first SDK-only definition migration |
 | VPC-F3.3 | RAG vertical migration | Completed | VPC-F3.1 | `rag` definition layer follows SDK-only pattern and parity coverage is in place |
 | VPC-F3.4 | DevOps vertical migration | Completed | VPC-F3.1 | `devops` definition layer follows SDK-only pattern and parity coverage is in place |
 | VPC-F3.5 | Data Analysis vertical migration | Completed | VPC-F3.1 | `dataanalysis` definition layer follows SDK-only pattern |
 | VPC-F3.6 | Research vertical migration | Completed | VPC-F3.1 | `research` definition layer follows SDK-only pattern |
 | VPC-F3.7 | External example and template migration | Completed | VPC-F3.1 | Example packages teach the supported contract |
-| VPC-F3.8 | Extension declaration cleanup | In Progress | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
+| VPC-F3.8 | Extension declaration cleanup | Completed | VPC-F3.2 through VPC-F3.7 | Runtime add-ons are declared cleanly and consistently |
 
 #### VPC-F3.1: Shared Migration Scaffolding
 
@@ -844,7 +844,7 @@ Tasks:
 - [x] VPC-T3.34 Standardize how prompts, stages, tools, and teams are declared in the definition contract.
 - [x] VPC-T3.35 Move runtime-only add-ons behind adapters or extension entry points.
 - [x] VPC-T3.36 Remove direct framework-registry access from migrated definition modules.
-- [ ] VPC-T3.37 Add import-boundary verification for all migrated verticals.
+- [x] VPC-T3.37 Add import-boundary verification for all migrated verticals.
 
 ### VPC-E4: Packaging And Source-Of-Truth Convergence
 
@@ -857,7 +857,7 @@ Feature summary:
 
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
-| VPC-F4.1 | Release topology and extraction sequence | Not Started | VPC-E3 | Maintainers know which vertical moves when and under what release policy |
+| VPC-F4.1 | Release topology and extraction sequence | Completed | VPC-E3 | Maintainers know which vertical moves when and under what release policy |
 | VPC-F4.2 | Entry-point and package metadata alignment | Not Started | VPC-F4.1 | Packaging metadata matches the accepted source-of-truth model |
 | VPC-F4.3 | Bundled contrib shims and removals | Not Started | VPC-F4.2 | Bundled copies are reduced to shims or removed safely |
 | VPC-F4.4 | Import resolver convergence | Not Started | VPC-F4.3 | Resolver behavior matches the final architecture |
@@ -881,13 +881,14 @@ Likely touchpoints:
 - `pyproject.toml`
 - release tooling under `scripts/`
 - `docs/roadmap/vertical-platform-convergence-plan.md`
+- `docs/development/vertical-extraction-order-and-dependency-graph-2026-03-12.md`
 
 Tasks:
 
-- [ ] VPC-T4.1 Define the per-vertical extraction order and dependency graph.
-- [ ] VPC-T4.2 Define package naming, ownership, and versioning policy for extracted verticals.
-- [ ] VPC-T4.3 Define bundled-shim retirement milestones and release criteria.
-- [ ] VPC-T4.4 Update release checklists for the extracted-vertical model.
+- [x] VPC-T4.1 Define the per-vertical extraction order and dependency graph.
+- [x] VPC-T4.2 Define package naming, ownership, and versioning policy for extracted verticals.
+- [x] VPC-T4.3 Define bundled-shim retirement milestones and release criteria.
+- [x] VPC-T4.4 Update release checklists for the extracted-vertical model.
 
 #### VPC-F4.2: Entry-Point And Package Metadata Alignment
 
@@ -1001,10 +1002,10 @@ Feature summary:
 
 | Feature ID | Feature | Status | Dependencies | Acceptance Summary |
 |---|---|---|---|---|
-| VPC-F5.1 | Forbidden-import CI guardrails | Not Started | VPC-E3 | Definition-layer boundary violations fail automatically |
-| VPC-F5.2 | SDK-only example and packaging smoke tests | Not Started | VPC-E3, VPC-E4 | Public authoring/install path is continuously verified |
-| VPC-F5.3 | Cache invalidation and plugin refresh hardening | Not Started | VPC-E2, VPC-E4 | Refresh/install/update flows invalidate stale state correctly |
-| VPC-F5.4 | Startup and discovery telemetry | Not Started | VPC-E4 | Performance work is measurement-driven and regression visible |
+| VPC-F5.1 | Forbidden-import CI guardrails | Completed | VPC-E3 | Definition-layer boundary violations fail automatically |
+| VPC-F5.2 | SDK-only example and packaging smoke tests | Completed | VPC-E3, VPC-E4 | Public authoring/install path is continuously verified |
+| VPC-F5.3 | Cache invalidation and plugin refresh hardening | Completed | VPC-E2, VPC-E4 | Refresh/install/update flows invalidate stale state correctly |
+| VPC-F5.4 | Startup and discovery telemetry | In Progress | VPC-E4 | Performance work is measurement-driven and regression visible |
 | VPC-F5.5 | Release readiness gates | Not Started | VPC-E1 through VPC-E4 | Bundled-shim removals and releases have an explicit go/no-go checklist |
 
 #### VPC-F5.1: Forbidden-Import CI Guardrails
@@ -1028,10 +1029,10 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T5.1 Implement a definition-layer forbidden-import check.
-- [ ] VPC-T5.2 Wire the check into CI and local developer workflows.
-- [ ] VPC-T5.3 Document the exception process, if any, for temporary migration waivers.
-- [ ] VPC-T5.4 Fail on `victor.framework`, `victor.core.verticals`, and core tool-registry imports from definition modules.
+- [x] VPC-T5.1 Implement a definition-layer forbidden-import check.
+- [x] VPC-T5.2 Wire the check into CI and local developer workflows.
+- [x] VPC-T5.3 Document the exception process, if any, for temporary migration waivers.
+- [x] VPC-T5.4 Fail on `victor.framework`, `victor.core.verticals`, and core tool-registry imports from definition modules.
 
 #### VPC-F5.2: SDK-Only Example And Packaging Smoke Tests
 
@@ -1054,10 +1055,10 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T5.5 Add a smoke test that builds and installs the SDK-only external vertical example.
-- [ ] VPC-T5.6 Add an entry-point discovery and activation smoke test for an external vertical package.
-- [ ] VPC-T5.7 Add wheel/sdist verification for `victor-sdk` and at least one vertical package.
-- [ ] VPC-T5.8 Add a docs/example integrity check so examples cannot drift silently.
+- [x] VPC-T5.5 Add a smoke test that builds and installs the SDK-only external vertical example.
+- [x] VPC-T5.6 Add an entry-point discovery and activation smoke test for an external vertical package.
+- [x] VPC-T5.7 Add wheel/sdist verification for `victor-sdk` and at least one vertical package.
+- [x] VPC-T5.8 Add a docs/example integrity check so examples cannot drift silently.
 
 #### VPC-F5.3: Cache Invalidation And Plugin Refresh Hardening
 
@@ -1081,10 +1082,10 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T5.9 Define cache invalidation triggers for install, uninstall, upgrade, and reload.
-- [ ] VPC-T5.10 Implement invalidation hooks or version-aware refresh behavior.
-- [ ] VPC-T5.11 Add tests for TTL override, explicit refresh, and post-install/post-upgrade behavior.
-- [ ] VPC-T5.12 Add CLI-level tests for `victor vertical install` and refresh flows.
+- [x] VPC-T5.9 Define cache invalidation triggers for install, uninstall, upgrade, and reload.
+- [x] VPC-T5.10 Implement invalidation hooks or version-aware refresh behavior.
+- [x] VPC-T5.11 Add tests for TTL override, explicit refresh, and post-install/post-upgrade behavior.
+- [x] VPC-T5.12 Add CLI-level tests for `victor vertical install` and refresh flows.
 
 #### VPC-F5.4: Startup And Discovery Telemetry
 
@@ -1107,8 +1108,8 @@ Likely touchpoints:
 
 Tasks:
 
-- [ ] VPC-T5.13 Add a startup/discovery benchmark script or test.
-- [ ] VPC-T5.14 Capture baseline metrics before and after resolver/discovery changes.
+- [x] VPC-T5.13 Add a startup/discovery benchmark script or test.
+- [x] VPC-T5.14 Capture baseline metrics before and after resolver/discovery changes.
 - [ ] VPC-T5.15 Add telemetry or structured logging around discovery/cache behavior.
 - [ ] VPC-T5.16 Define regression thresholds and reporting rules.
 
@@ -1145,14 +1146,14 @@ Scope:
 - Preserve architecture context across sessions in one place
 - Keep downstream epics execution-ready but do not start breaking packaging work
   until ADR-007 is explicitly accepted
-- Start runtime-boundary cleanup only where additive, host-owned abstractions can
-  be introduced without breaking existing verticals
+- Prefer planning, guardrails, smoke tests, and release-ops work while
+  packaging flips remain gated
 
 Immediate next tasks:
 
-1. VPC-T3.37 Add import-boundary verification for all migrated verticals.
-2. VPC-T4.1 Define the per-vertical extraction order and dependency graph.
-3. Keep additive convergence work non-breaking until ADR-007 is accepted.
+1. VPC-T5.15 Add telemetry or structured logging around discovery/cache behavior.
+2. VPC-T5.16 Define regression thresholds and reporting rules.
+3. VPC-T4.5 Update entry points for extracted vertical packages (gated on ADR-007 acceptance).
 
 Likely touchpoints:
 
@@ -1161,6 +1162,10 @@ Likely touchpoints:
 - `docs/roadmap/vertical-platform-convergence-plan.md`
 - `docs/development/vertical-module-layer-classification-2026-03-10.md`
 - `docs/development/vertical-package-layout-target-2026-03-10.md`
+- `docs/development/vertical-extraction-order-and-dependency-graph-2026-03-12.md`
+- `docs/development/vertical-package-naming-ownership-versioning-policy-2026-03-12.md`
+- `docs/development/bundled-vertical-shim-retirement-milestones-2026-03-12.md`
+- `docs/development/definition-import-boundary-waivers-2026-03-12.md`
 
 ## Session Log
 
@@ -2534,11 +2539,169 @@ Likely touchpoints:
 - Next recommended implementation layer:
   - `VPC-T3.37` add import-boundary verification for all migrated verticals
 
+### 2026-03-12 (Session AZ)
+
+- Completed `VPC-T3.37` by adding a repo-local import-boundary guardrail over all
+  migrated definition-layer entrypoints and prompt-metadata modules:
+  - added `tests/unit/core/verticals/test_definition_import_boundaries.py`
+  - verifies migrated definition files only import `victor_sdk` plus explicitly
+    allowed package-local definition helpers
+  - verifies public definition entrypoints continue to import `victor_sdk`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_definition_import_boundaries.py tests/unit/core/verticals/test_coding_definition_capability_requirements.py tests/unit/core/verticals/test_rag_definition_prompt_metadata.py tests/unit/core/verticals/test_devops_definition_prompt_metadata.py tests/unit/core/verticals/test_dataanalysis_definition_prompt_metadata.py tests/unit/core/verticals/test_research_definition_prompt_metadata.py`
+    - `35 passed, 15 warnings`
+- Marked `VPC-T3.37` complete and closed `VPC-F3.8`, which completes `VPC-E3`.
+- Completed `VPC-T4.1` by defining the extraction order and packaging-risk graph
+  in `docs/development/vertical-extraction-order-and-dependency-graph-2026-03-12.md`:
+  - no vertical has a hard runtime dependency on another vertical
+  - extraction order is therefore driven by packaging blast radius, not by
+    import coupling between verticals
+  - recommended operational sequence:
+    `research -> devops -> dataanalysis -> rag -> coding`
+  - `coding` remains last because it has the highest measured runtime coupling
+    and the widest repo-level external-package assumptions
+- Completed the remaining `VPC-F4.1` planning tasks:
+  - `VPC-T4.2` in
+    `docs/development/vertical-package-naming-ownership-versioning-policy-2026-03-12.md`
+    defines canonical package names, import roots, ownership, and lockstep
+    suite-versioning for first-party extracted verticals
+  - `VPC-T4.3` in
+    `docs/development/bundled-vertical-shim-retirement-milestones-2026-03-12.md`
+    defines `N`, `N+1`, `N+2` milestone behavior plus the `2` minor release /
+    `90` day minimum support window for bundled shims
+  - `VPC-T4.4` updates `docs/development/releasing/publishing.md` and
+    `docs/RELEASE_NOTES_TEMPLATE.md` so releases must call out authoritative
+    packages, shim status, and removal milestones
+- No new runtime tests were needed for `VPC-F4.1` because this tranche was
+  documentation/release-policy work only.
+- Completed `VPC-F5.1` as an explicit local/CI guardrail instead of leaving it
+  implicit inside the general unit suite:
+  - extended `tests/unit/core/verticals/test_definition_import_boundaries.py`
+    so migrated definition modules now fail explicitly on
+    `victor.framework`, `victor.core.verticals`,
+    `victor.tools.tool_names`, and `victor.framework.tool_naming`
+  - added `make test-definition-boundaries` to the local developer workflow
+  - added the `Definition Import Boundaries` job to
+    `.github/workflows/ci-fast.yml`
+  - documented the waiver process in
+    `docs/development/definition-import-boundary-waivers-2026-03-12.md`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/verticals/test_definition_import_boundaries.py`
+    - `26 passed, 1 warning`
+- Completed the first `VPC-F5.2` packaging-smoke slice by strengthening
+  `tests/integration/verticals/test_external_vertical_install_discovery.py`:
+  - the SDK-only example is now built into a wheel before install instead of
+    being tested only via editable source installs
+  - the runtime-discovery smoke path now also installs the built wheel before
+    loading the vertical through `VerticalLoader`
+  - this closes `VPC-T5.5` and `VPC-T5.6`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/integration/verticals/test_external_vertical_install_discovery.py`
+    - `2 passed, 3 warnings`
+- Completed `VPC-T5.8` by adding
+  `tests/unit/core/test_external_vertical_example_integrity.py`:
+  - validates that `examples/external_vertical/pyproject.toml`,
+    `examples/external_vertical/README.md`, and
+    `examples/external_vertical/src/victor_security/assistant.py` stay aligned
+  - checks package identity, runtime extra, entry-point declaration, install
+    snippets, and the example definition metadata contract
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/test_external_vertical_example_integrity.py tests/integration/verticals/test_external_vertical_install_discovery.py`
+    - `4 passed, 3 warnings`
+- Completed `VPC-T5.7` by adding
+  `tests/integration/core/test_sdk_vertical_package_artifacts.py`:
+  - builds wheel and sdist artifacts for `victor-sdk`
+  - builds wheel and sdist artifacts for the SDK-only external vertical example
+  - verifies packaged contract files and entry-point metadata inside the built
+    archives instead of relying only on install-time smoke tests
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/integration/core/test_sdk_vertical_package_artifacts.py`
+    - `2 passed, 3 warnings`
+- Completed `VPC-F5.2`.
+- Completed the first `VPC-F5.3` cache-invalidation slice:
+  - added the trigger matrix in
+    `docs/development/vertical-cache-invalidation-triggers-2026-03-12.md`
+    to define install, uninstall, upgrade, and reload invalidation behavior
+  - added the host-owned invalidation helper in
+    `victor/core/verticals/cache_invalidation.py`
+  - wired `VerticalRegistryManager.install(...)` and
+    `VerticalRegistryManager.uninstall(...)` to invalidate runtime/discovery
+    caches after successful package changes
+  - updated `victor/ui/commands/vertical.py` so the CLI now states that the
+    current process refreshed package caches and only other Victor sessions
+    still need restart
+  - added focused coverage in
+    `tests/unit/core/test_vertical_cache_invalidation.py`
+    and extended `tests/unit/commands/test_vertical_commands.py`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/test_vertical_cache_invalidation.py tests/unit/commands/test_vertical_commands.py`
+    - `53 passed, 1 warning`
+- Completed the remaining `VPC-F5.3` verification and CLI coverage:
+  - `tests/unit/core/test_vertical_base.py` now proves subclass TTL overrides
+    actually change cache-expiry behavior instead of only asserting the class
+    attribute exists
+  - `tests/unit/core/test_vertical_loader_contract_enforcement.py` now proves
+    `discover_verticals(force_refresh=True)` bypasses the loader cache and
+    rescans entry points
+  - `victor/core/verticals/registry_manager.py` now classifies successful
+    package changes as `install` vs `upgrade` before invalidation
+  - `tests/unit/commands/test_vertical_commands.py` now covers upgrade-triggered
+    invalidation and the CLI messaging that the current process refreshed caches
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/core/test_vertical_base.py tests/unit/core/test_vertical_loader_contract_enforcement.py tests/unit/commands/test_vertical_commands.py`
+    - `107 passed, 26 warnings`
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/commands/test_vertical_commands.py`
+    - `52 passed, 1 warning`
+- Completed `VPC-F5.3`.
+- Advanced the current tranche to `VPC-T5.13`, while leaving `VPC-T4.5` and
+  `VPC-T4.6` explicitly gated on ADR-007 acceptance.
+- Next recommended implementation layers:
+  - `VPC-T5.13` add a startup/discovery benchmark script or test
+  - `VPC-T5.14` capture baseline metrics before and after resolver/discovery
+    changes
+  - `VPC-T4.5` update entry points for extracted vertical packages once ADR-007
+    is accepted
+- Completed `VPC-T5.13` by extending `scripts/benchmark_startup_kpi.py`:
+  - added an explicit `--discovery-probe` mode for cold/warm vertical discovery
+    timing and cache counters
+  - added `--skip-agent-create` so startup/discovery measurements can run
+    without a live provider backend
+  - added discovery thresholds and minimums for future CI/regression use
+  - added focused unit coverage in `tests/unit/test_benchmark_startup_kpi.py`
+- Verification used `-c /dev/null` because the current worktree still has an
+  unrelated `pyproject.toml` parse error:
+  - `../.venv/bin/pytest -c /dev/null -q tests/unit/test_benchmark_startup_kpi.py`
+    - `11 passed, 1 warning`
+- Completed `VPC-T5.14` by capturing the initial startup/discovery baseline in
+  `docs/development/startup-discovery-baseline-2026-03-12.md` using:
+  - `../.venv/bin/python scripts/benchmark_startup_kpi.py --json --skip-agent-create --discovery-probe --iterations 5`
+  - baseline snapshot:
+    - `import_victor.cold_ms`: `1800.67`
+    - `discovery_probe.cold_ms`: `127.94`
+    - `discovery_probe.warm_mean_ms`: `0.00103`
+    - `discovery_probe.discovered_count`: `7`
+    - `discovery_probe.cache_hit_total`: `5`
+- Advanced the current tranche to `VPC-T5.15`.
+- Next recommended implementation layers:
+  - `VPC-T5.15` add telemetry or structured logging around discovery/cache
+    behavior
+  - `VPC-T5.16` define regression thresholds and reporting rules
+  - `VPC-T4.5` update entry points for extracted vertical packages once ADR-007
+    is accepted
+
 ## Resume Protocol
 
 1. Open this file first.
-2. Confirm ADR-007 status. If still `Proposed`, stay inside VPC-E0 work unless the
-   user explicitly authorizes additive non-breaking work in VPC-E1.
+2. Confirm ADR-007 status. If still `Proposed`, continue only non-breaking
+   planning, guardrails, smoke tests, documentation, and host-owned adapter work;
+   do not flip package authority or remove bundled shims.
 3. Continue from the first unchecked P0 task, then the first unchecked P1 task.
 4. Update:
    - task checkboxes
