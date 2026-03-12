@@ -20,7 +20,7 @@ TDD tests for real-time event streaming to VS Code and other clients.
 import asyncio
 import json
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -138,6 +138,42 @@ class TestEventBridgeIntegration:
         bridge = EventBridge(bus)
 
         assert hasattr(bridge, "_broadcaster")
+
+
+class TestEventBridgeConvenienceEmitters:
+    """Tests for direct helper emitters."""
+
+    def test_emit_tool_complete_includes_follow_up_suggestions(self):
+        """emit_tool_complete should preserve follow-up suggestion payloads."""
+        from victor.integrations.api.event_bridge import emit_tool_complete
+
+        broadcaster = AsyncMock()
+
+        with patch(
+            "victor.integrations.api.event_bridge.EventBroadcaster",
+            return_value=broadcaster,
+        ):
+            emit_tool_complete(
+                "tool-123",
+                "done",
+                duration_ms=42,
+                follow_up_suggestions=[
+                    {
+                        "command": 'graph(mode="callers", node="parse_json", depth=1)',
+                        "description": "Show callers of parse_json.",
+                    }
+                ],
+            )
+
+        broadcaster.broadcast_sync.assert_called_once()
+        event = broadcaster.broadcast_sync.call_args.args[0]
+        assert event.data["tool_id"] == "tool-123"
+        assert event.data["follow_up_suggestions"] == [
+            {
+                "command": 'graph(mode="callers", node="parse_json", depth=1)',
+                "description": "Show callers of parse_json.",
+            }
+        ]
 
 
 class TestEventBusAdapterCompatibility:
