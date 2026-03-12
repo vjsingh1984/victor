@@ -253,6 +253,27 @@ jobs:
             tests/unit/framework/test_capability_loader.py::TestLoaderOrchestratorIntegration::test_apply_to_blocks_private_registration_fallback_in_strict_mode \
             -q
 
+  definition-import-boundaries:
+    name: Definition Import Boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ./victor-sdk
+          pip install -e ".[dev]"
+
+      - name: Run definition import boundary guards
+        run: make test-definition-boundaries
+
   version-sync:
     name: Version Sync Check
     runs-on: ubuntu-latest

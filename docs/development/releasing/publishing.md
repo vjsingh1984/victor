@@ -49,6 +49,9 @@ Before creating a release, ensure:
 - [ ] CHANGELOG.md is updated (if applicable)
 - [ ] Deprecation inventory is updated for any new or removed compatibility surfaces
 - [ ] Release notes/changelog include replacement path, target removal version/date, and shim status for every deprecation touched in the release
+- [ ] If the release changes first-party vertical packaging, the authoritative package, bundled-shim status, and earliest removal milestone are called out explicitly
+- [ ] If the release publishes or updates an extracted first-party vertical, package versions remain aligned with the Victor suite version for that release
+- [ ] Clean-environment install/discovery smoke tests pass for every extracted vertical touched by the release
 - [ ] Version in `pyproject.toml` is correct
 - [ ] All PRs for this release are merged
 - [ ] Dependencies are up to date
@@ -66,6 +69,26 @@ We follow [Semantic Versioning](https://semver.org/):
 | New features (backward compatible) | MINOR | 0.1.0 → 0.2.0 |
 | Bug fixes | PATCH | 0.1.0 → 0.1.1 |
 | Pre-release | Suffix | 0.2.0-beta |
+
+### Extracted Vertical Release Rules
+
+When a release touches first-party extracted vertical packages:
+
+- use the canonical package identities from
+  `docs/development/vertical-package-naming-ownership-versioning-policy-2026-03-12.md`
+- treat extracted first-party vertical packages as lockstep-versioned with the
+  Victor suite for that release
+- treat bundled contrib copies as compatibility shims only once a vertical flips
+- do not remove bundled shims until the retirement policy in
+  `docs/development/bundled-vertical-shim-retirement-milestones-2026-03-12.md`
+  is satisfied
+
+Release notes should always state:
+
+- which package is authoritative
+- whether a bundled shim still exists
+- the earliest removal version/date for that shim
+- the install/upgrade command users should follow
 
 ## Creating a Release
 

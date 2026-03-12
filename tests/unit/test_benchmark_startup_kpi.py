@@ -32,6 +32,8 @@ def test_collect_thresholds_maps_cli_args():
         max_agent_create_warm_mean_ms=240.0,
         max_activation_cold_ms=980.0,
         max_activation_warm_mean_ms=None,
+        max_discovery_cold_ms=45.0,
+        max_discovery_warm_mean_ms=4.5,
     )
 
     thresholds = module._collect_thresholds(args)
@@ -41,6 +43,8 @@ def test_collect_thresholds_maps_cli_args():
         "import_victor.warm_mean_ms": 15.5,
         "agent_create.warm_mean_ms": 240.0,
         "activation_probe.cold_ms": 980.0,
+        "discovery_probe.cold_ms": 45.0,
+        "discovery_probe.warm_mean_ms": 4.5,
     }
 
 
@@ -69,12 +73,16 @@ def test_collect_minimums_maps_cli_args():
     args = argparse.Namespace(
         min_framework_registry_attempted_total=4.0,
         min_framework_registry_applied_total=None,
+        min_discovery_vertical_count=1.0,
+        min_discovery_cache_hits=3.0,
     )
 
     minimums = module._collect_minimums(args)
 
     assert minimums == {
         "activation_probe.framework_registry_attempted_total": 4.0,
+        "discovery_probe.discovered_count": 1.0,
+        "discovery_probe.cache_hit_total": 3.0,
     }
 
 
@@ -138,6 +146,91 @@ def test_evaluate_flag_expectation_failures_reports_mismatch():
     assert len(failures) == 2
     assert "generic_result_cache_enabled" in failures[0]
     assert any("coordination_runtime_lazy" in failure for failure in failures)
+
+
+def test_measure_discovery_probe_returns_summary(monkeypatch):
+    module = _load_benchmark_module()
+    monkeypatch.setattr(
+        module,
+        "_run_snippet",
+        lambda **_: {
+            "cold_ms": 18.0,
+            "warm_ms": [1.0, 2.0, 3.0],
+            "warm_mean_ms": 2.0,
+            "warm_p95_ms": 3.0,
+            "discovered_count": 2,
+            "discovered_vertical_names": ["coding", "research"],
+            "call_total": 4,
+            "cache_hit_total": 3,
+            "scan_total": 1,
+            "last_discovery_ms": 18.0,
+            "entry_point_groups_cached": 1,
+            "entry_point_vertical_entries": 2,
+        },
+    )
+
+    probe = module._measure_discovery_probe(
+        python_executable=sys.executable,
+        iterations=3,
+        timeout_seconds=30.0,
+    )
+
+    assert probe["cold_ms"] == 18.0
+    assert probe["warm_samples_ms"] == [1.0, 2.0, 3.0]
+    assert probe["warm_mean_ms"] == 2.0
+    assert probe["cache_hit_total"] == 3
+    assert probe["discovered_vertical_names"] == ["coding", "research"]
+
+
+def test_main_can_run_discovery_probe_without_agent_create(monkeypatch, capsys):
+    module = _load_benchmark_module()
+    monkeypatch.setattr(
+        module,
+        "_measure_import_victor",
+        lambda **_: module._TimingSummary(cold_ms=10.0, warm_samples_ms=[1.0, 1.0]),
+    )
+
+    def _unexpected_agent_create(**_):
+        raise AssertionError("Agent.create probe should have been skipped")
+
+    monkeypatch.setattr(module, "_measure_agent_create", _unexpected_agent_create)
+    monkeypatch.setattr(
+        module,
+        "_measure_discovery_probe",
+        lambda **_: {
+            "cold_ms": 30.0,
+            "warm_samples_ms": [3.0, 3.0],
+            "warm_mean_ms": 3.0,
+            "warm_p95_ms": 3.0,
+            "discovered_count": 0,
+            "discovered_vertical_names": [],
+            "call_total": 3,
+            "cache_hit_total": 2,
+            "scan_total": 1,
+            "last_discovery_ms": 30.0,
+            "entry_point_groups_cached": 1,
+            "entry_point_vertical_entries": 0,
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        [
+            "benchmark_startup_kpi.py",
+            "--json",
+            "--skip-agent-create",
+            "--discovery-probe",
+        ],
+    )
+
+    exit_code = module.main()
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    assert "agent_create" not in payload
+    assert payload["discovery_probe"]["cache_hit_total"] == 2
+    assert payload["discovery_probe"]["discovered_count"] == 0
 
 
 def test_main_returns_exit_code_2_when_thresholds_fail(monkeypatch, capsys):
@@ -236,3 +329,52 @@ def test_main_returns_exit_code_2_when_activation_expectations_fail(monkeypatch,
     assert any(
         "framework_registry_attempted_total" in item for item in payload["threshold_failures"]
     )
+
+
+def test_main_returns_exit_code_2_when_discovery_expectations_fail(monkeypatch, capsys):
+    module = _load_benchmark_module()
+    monkeypatch.setattr(
+        module,
+        "_measure_import_victor",
+        lambda **_: module._TimingSummary(cold_ms=10.0, warm_samples_ms=[1.0, 1.0]),
+    )
+    monkeypatch.setattr(
+        module,
+        "_measure_discovery_probe",
+        lambda **_: {
+            "cold_ms": 35.0,
+            "warm_samples_ms": [4.0, 4.0],
+            "warm_mean_ms": 4.0,
+            "warm_p95_ms": 4.0,
+            "discovered_count": 0,
+            "discovered_vertical_names": [],
+            "call_total": 3,
+            "cache_hit_total": 1,
+            "scan_total": 1,
+            "last_discovery_ms": 35.0,
+            "entry_point_groups_cached": 1,
+            "entry_point_vertical_entries": 0,
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        [
+            "benchmark_startup_kpi.py",
+            "--json",
+            "--skip-agent-create",
+            "--discovery-probe",
+            "--max-discovery-cold-ms",
+            "20",
+            "--min-discovery-cache-hits",
+            "2",
+        ],
+    )
+
+    exit_code = module.main()
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert exit_code == 2
+    assert any("discovery_probe.cold_ms" in item for item in payload["threshold_failures"])
+    assert any("discovery_probe.cache_hit_total" in item for item in payload["threshold_failures"])

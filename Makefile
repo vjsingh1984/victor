@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev test test-definition-boundaries lint format clean build build-binary docker release sync-version check-version
 
 # Default target
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  make install-dev   Install with all dev dependencies"
 	@echo "  make test          Run unit tests"
 	@echo "  make test-all      Run all tests including integration"
+	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
 	@echo "  make lint          Run linters"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
@@ -51,6 +52,9 @@ install-dev:
 
 test:
 	pytest tests/unit -v --tb=short -n auto --dist loadscope
+
+test-definition-boundaries:
+	pytest tests/unit/core/verticals/test_definition_import_boundaries.py -q
 
 test-all:
 	pytest -v --tb=short -n auto --dist loadscope
