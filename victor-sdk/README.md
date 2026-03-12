@@ -11,7 +11,7 @@ Use `victor-sdk` when you want to author or publish a vertical package. Use
 The supported external authoring model is contract-first:
 
 - vertical packages depend on `victor-sdk` only
-- verticals declare tools, capabilities, prompts, and workflow metadata through
+- verticals declare tools, capabilities, prompts, teams, and workflow metadata through
   the SDK contract
 - `victor-ai` remains responsible for runtime concerns such as agent creation,
   capability injection, and tool execution
@@ -123,10 +123,30 @@ class SecurityVertical(VerticalBase):
             }
         }
 
+    @classmethod
+    def get_team_declarations(cls) -> dict[str, dict[str, object]]:
+        return {
+            "security_review_team": {
+                "name": "Security Review Team",
+                "formation": "pipeline",
+                "members": [
+                    {
+                        "role": "researcher",
+                        "goal": "Inspect the target and identify likely risks.",
+                    },
+                    {
+                        "role": "reviewer",
+                        "goal": "Validate findings before escalation.",
+                    },
+                ],
+            }
+        }
+
 
 definition = SecurityVertical.get_definition()
 assert definition.definition_version == "1.0"
 assert definition.tools == [ToolNames.READ, ToolNames.GREP, ToolNames.SHELL, ToolNames.WEB_SEARCH]
+assert definition.team_metadata.teams[0].team_id == "security_review_team"
 ```
 
 ## Definition Contract
@@ -139,6 +159,7 @@ validated `VerticalDefinition` manifest that contains:
 - typed tool and capability requirements
 - system prompt text
 - prompt metadata and task-type hints
+- team metadata such as declarative team layouts and the default team identifier
 - declarative stage definitions
 - workflow metadata such as initial stage, provider hints, and evaluation criteria
 
@@ -178,6 +199,7 @@ verticals = registry.get_verticals()
 - [Vertical Development Guide](VERTICAL_DEVELOPMENT.md)
 - [Migration Guide](MIGRATION_GUIDE.md)
 - [Minimal SDK-only example](examples/minimal_vertical/README.md)
+- [Repository external package example](../examples/external_vertical/README.md)
 
 ## Testing
 

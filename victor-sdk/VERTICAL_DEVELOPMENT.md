@@ -253,6 +253,7 @@ verticals. It includes:
 - canonical tool IDs via `ToolNames`
 - typed tool and capability requirements
 - prompt metadata and task-type hints
+- team metadata for declarative multi-agent layouts
 - declarative stages and workflow metadata
 
 Use the SDK-owned identifiers rather than runtime-owned string registries:
@@ -742,6 +743,7 @@ pytest tests/ --cov=my_vertical --cov-report=html
 - **SDK README**: See `README.md`
 - **Migration Guide**: See `MIGRATION_GUIDE.md`
 - **Examples**: Check `victor-sdk/examples/`
+- **Repository external package example**: See `../examples/external_vertical/README.md`
 - **Issues**: https://github.com/vjsingh1984/victor/issues
 
 ---

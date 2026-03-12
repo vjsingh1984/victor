@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Optional
 from victor_sdk.core.types import (
     CapabilityRequirementLike,
     PromptMetadata,
+    TeamMetadata,
     WorkflowMetadata,
+    TeamDefinitionLike,
     ToolRequirementLike,
     VerticalConfig,
     VerticalDefinition,
@@ -24,6 +26,8 @@ from victor_sdk.core.types import (
     normalize_prompt_metadata,
     normalize_prompt_templates,
     normalize_task_type_hints,
+    normalize_team_metadata,
+    normalize_team_definitions,
     normalize_tool_requirements,
     normalize_workflow_metadata,
 )
@@ -159,6 +163,7 @@ class VerticalBase(ABC):
                 system_prompt=cls.get_system_prompt(),
                 prompt_metadata=cls.get_prompt_metadata(),
                 stages=cls.get_stages(),
+                team_metadata=cls.get_team_metadata(),
                 workflow_metadata=cls.get_workflow_metadata(),
                 tier=cls.get_tier(),
                 metadata=cls.get_metadata(),
@@ -255,6 +260,29 @@ class VerticalBase(ABC):
         return PromptMetadata(
             templates=normalize_prompt_templates(cls.get_prompt_templates()),
             task_type_hints=normalize_task_type_hints(cls.get_task_type_hints()),
+        )
+
+    @classmethod
+    def get_team_declarations(cls) -> Dict[str, TeamDefinitionLike]:
+        """Return declarative team definitions for this vertical."""
+
+        return {}
+
+    @classmethod
+    def get_default_team(cls) -> Optional[str]:
+        """Return the default declarative team for this vertical."""
+
+        return None
+
+    @classmethod
+    def get_team_metadata(cls) -> TeamMetadata:
+        """Return serializable team metadata for this vertical."""
+
+        return normalize_team_metadata(
+            {
+                "teams": normalize_team_definitions(cls.get_team_declarations()),
+                "default_team": cls.get_default_team(),
+            }
         )
 
     @classmethod

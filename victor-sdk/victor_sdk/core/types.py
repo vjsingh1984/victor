@@ -612,6 +612,264 @@ def normalize_workflow_metadata(
 
 
 @dataclass(frozen=True)
+class TeamMemberDefinition:
+    """Serializable declaration for a team member in a definition-layer team."""
+
+    role: str
+    goal: str
+    name: Optional[str] = None
+    tool_budget: Optional[int] = None
+    allowed_tools: List[str] = field(default_factory=list)
+    is_manager: bool = False
+    priority: int = 0
+    backstory: str = ""
+    expertise: List[str] = field(default_factory=list)
+    personality: str = ""
+    max_delegation_depth: int = 0
+    memory: bool = False
+    memory_config: Dict[str, Any] = field(default_factory=dict)
+    cache: bool = True
+    verbose: bool = False
+    max_iterations: Optional[int] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize mutable fields for direct dataclass construction."""
+
+        object.__setattr__(self, "allowed_tools", list(self.allowed_tools))
+        object.__setattr__(self, "expertise", list(self.expertise))
+        object.__setattr__(self, "memory_config", dict(self.memory_config))
+        object.__setattr__(self, "metadata", dict(self.metadata))
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the team member definition."""
+
+        payload: Dict[str, Any] = {
+            "role": self.role,
+            "goal": self.goal,
+            "is_manager": self.is_manager,
+            "priority": self.priority,
+            "backstory": self.backstory,
+            "expertise": self.expertise.copy(),
+            "personality": self.personality,
+            "max_delegation_depth": self.max_delegation_depth,
+            "memory": self.memory,
+            "cache": self.cache,
+            "verbose": self.verbose,
+            "metadata": dict(self.metadata),
+        }
+        if self.name is not None:
+            payload["name"] = self.name
+        if self.tool_budget is not None:
+            payload["tool_budget"] = self.tool_budget
+        if self.allowed_tools:
+            payload["allowed_tools"] = self.allowed_tools.copy()
+        if self.memory_config:
+            payload["memory_config"] = dict(self.memory_config)
+        if self.max_iterations is not None:
+            payload["max_iterations"] = self.max_iterations
+        return payload
+
+
+TeamMemberDefinitionLike: TypeAlias = Union[Dict[str, Any], TeamMemberDefinition]
+
+
+def normalize_team_member_definition(
+    member: TeamMemberDefinitionLike,
+) -> TeamMemberDefinition:
+    """Normalize a team-member declaration to a TeamMemberDefinition."""
+
+    if isinstance(member, TeamMemberDefinition):
+        return member
+    if isinstance(member, dict):
+        return TeamMemberDefinition(
+            role=member.get("role", ""),
+            goal=member.get("goal", ""),
+            name=member.get("name"),
+            tool_budget=member.get("tool_budget"),
+            allowed_tools=list(member.get("allowed_tools", [])),
+            is_manager=bool(member.get("is_manager", False)),
+            priority=int(member.get("priority", 0)),
+            backstory=member.get("backstory", ""),
+            expertise=list(member.get("expertise", [])),
+            personality=member.get("personality", ""),
+            max_delegation_depth=int(member.get("max_delegation_depth", 0)),
+            memory=bool(member.get("memory", False)),
+            memory_config=dict(member.get("memory_config", {})),
+            cache=bool(member.get("cache", True)),
+            verbose=bool(member.get("verbose", False)),
+            max_iterations=member.get("max_iterations"),
+            metadata=dict(member.get("metadata", {})),
+        )
+    raise TypeError(
+        "Team members must be dicts or TeamMemberDefinition objects, "
+        f"got {type(member)!r}"
+    )
+
+
+def normalize_team_member_definitions(
+    members: List[TeamMemberDefinitionLike],
+) -> List[TeamMemberDefinition]:
+    """Normalize team-member declarations to TeamMemberDefinition objects."""
+
+    return [normalize_team_member_definition(member) for member in members]
+
+
+@dataclass(frozen=True)
+class TeamDefinition:
+    """Serializable declaration for a runtime-owned team configuration."""
+
+    team_id: str
+    name: str
+    description: str = ""
+    formation: str = "sequential"
+    members: List[TeamMemberDefinition] = field(default_factory=list)
+    total_tool_budget: int = 100
+    max_iterations: int = 50
+    tags: List[str] = field(default_factory=list)
+    task_types: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize nested member declarations and formation strings."""
+
+        object.__setattr__(self, "formation", _normalize_team_formation(self.formation))
+        object.__setattr__(self, "members", normalize_team_member_definitions(list(self.members)))
+        object.__setattr__(self, "tags", list(self.tags))
+        object.__setattr__(self, "task_types", list(self.task_types))
+        object.__setattr__(self, "metadata", dict(self.metadata))
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the team declaration."""
+
+        return {
+            "team_id": self.team_id,
+            "name": self.name,
+            "description": self.description,
+            "formation": self.formation,
+            "members": [member.to_dict() for member in self.members],
+            "total_tool_budget": self.total_tool_budget,
+            "max_iterations": self.max_iterations,
+            "tags": self.tags.copy(),
+            "task_types": self.task_types.copy(),
+            "metadata": dict(self.metadata),
+        }
+
+
+TeamDefinitionLike: TypeAlias = Union[Dict[str, Any], TeamDefinition]
+
+
+def _normalize_team_formation(formation: Any) -> str:
+    """Normalize a team formation enum/string into the SDK string form."""
+
+    if isinstance(formation, str):
+        return formation.lower()
+    if hasattr(formation, "value"):
+        return str(getattr(formation, "value")).lower()
+    if hasattr(formation, "name"):
+        return str(getattr(formation, "name")).lower()
+    raise TypeError(f"Unsupported team formation type: {type(formation)!r}")
+
+
+def normalize_team_definition(
+    team_id: str,
+    team: TeamDefinitionLike,
+) -> TeamDefinition:
+    """Normalize a team declaration into a TeamDefinition object."""
+
+    if isinstance(team, TeamDefinition):
+        return team
+    if isinstance(team, dict):
+        resolved_team_id = team.get("team_id", team_id)
+        return TeamDefinition(
+            team_id=resolved_team_id,
+            name=team.get("name", resolved_team_id),
+            description=team.get("description", ""),
+            formation=_normalize_team_formation(team.get("formation", "sequential")),
+            members=normalize_team_member_definitions(list(team.get("members", []))),
+            total_tool_budget=int(team.get("total_tool_budget", 100)),
+            max_iterations=int(team.get("max_iterations", 50)),
+            tags=list(team.get("tags", [])),
+            task_types=list(team.get("task_types", [])),
+            metadata=dict(team.get("metadata", {})),
+        )
+    raise TypeError(
+        "Team definitions must be dicts or TeamDefinition objects, "
+        f"got {type(team)!r}"
+    )
+
+
+def normalize_team_definitions(
+    teams: Union[Dict[str, TeamDefinitionLike], List[TeamDefinitionLike]],
+) -> List[TeamDefinition]:
+    """Normalize team declarations into TeamDefinition objects."""
+
+    if isinstance(teams, list):
+        normalized_teams: List[TeamDefinition] = []
+        for item in teams:
+            if isinstance(item, TeamDefinition):
+                normalized_teams.append(item)
+                continue
+            if not isinstance(item, dict):
+                raise TypeError(
+                    "Team definitions must be dicts or TeamDefinition objects, "
+                    f"got {type(item)!r}"
+                )
+            normalized_teams.append(
+                normalize_team_definition(str(item.get("team_id", "")), item)
+            )
+        return normalized_teams
+
+    return [
+        normalize_team_definition(team_id, team)
+        for team_id, team in teams.items()
+    ]
+
+
+@dataclass(frozen=True)
+class TeamMetadata:
+    """Serializable team metadata for a vertical definition."""
+
+    teams: List[TeamDefinition] = field(default_factory=list)
+    default_team: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize nested team declarations for direct dataclass construction."""
+
+        object.__setattr__(self, "teams", normalize_team_definitions(list(self.teams)))
+        object.__setattr__(self, "metadata", dict(self.metadata))
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable representation of the team metadata."""
+
+        payload: Dict[str, Any] = {
+            "teams": [team.to_dict() for team in self.teams],
+            "metadata": dict(self.metadata),
+        }
+        if self.default_team is not None:
+            payload["default_team"] = self.default_team
+        return payload
+
+
+def normalize_team_metadata(metadata: Union[Dict[str, Any], TeamMetadata]) -> TeamMetadata:
+    """Normalize team metadata payloads to TeamMetadata."""
+
+    if isinstance(metadata, TeamMetadata):
+        return metadata
+    if isinstance(metadata, dict):
+        return TeamMetadata(
+            teams=normalize_team_definitions(metadata.get("teams", {})),
+            default_team=metadata.get("default_team"),
+            metadata=dict(metadata.get("metadata", {})),
+        )
+    raise TypeError(
+        "Team metadata must be a dict or TeamMetadata object, "
+        f"got {type(metadata)!r}"
+    )
+
+
+@dataclass(frozen=True)
 class CapabilityRequirement:
     """Serializable requirement for a host/runtime capability.
 
@@ -783,6 +1041,7 @@ class VerticalDefinition:
     capability_requirements: List[CapabilityRequirement] = field(default_factory=list)
     prompt_metadata: PromptMetadata = field(default_factory=PromptMetadata)
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
+    team_metadata: TeamMetadata = field(default_factory=TeamMetadata)
     workflow_metadata: WorkflowMetadata = field(default_factory=WorkflowMetadata)
     tier: Tier = Tier.STANDARD
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -806,6 +1065,7 @@ class VerticalDefinition:
                 ]
             normalized_prompt_metadata = normalize_prompt_metadata(self.prompt_metadata)
             normalized_stages = normalize_stage_definitions(dict(self.stages))
+            normalized_team_metadata = normalize_team_metadata(self.team_metadata)
             normalized_workflow_metadata = normalize_workflow_metadata(
                 self.workflow_metadata
             )
@@ -826,6 +1086,7 @@ class VerticalDefinition:
         object.__setattr__(self, "tools", normalized_tools)
         object.__setattr__(self, "prompt_metadata", normalized_prompt_metadata)
         object.__setattr__(self, "stages", normalized_stages)
+        object.__setattr__(self, "team_metadata", normalized_team_metadata)
         object.__setattr__(self, "workflow_metadata", normalized_workflow_metadata)
         object.__setattr__(self, "metadata", normalized_metadata)
         object.__setattr__(self, "extensions", normalized_extensions)
@@ -938,6 +1199,52 @@ class VerticalDefinition:
                 vertical_name=self.name,
             )
 
+        team_ids = [team.team_id for team in self.team_metadata.teams]
+        if len(team_ids) != len(set(team_ids)):
+            raise VerticalConfigurationError(
+                "Team metadata team identifiers must be unique.",
+                vertical_name=self.name,
+            )
+
+        for team in self.team_metadata.teams:
+            if not isinstance(team.team_id, str) or not team.team_id.strip():
+                raise VerticalConfigurationError(
+                    "Team metadata team_id values must be non-empty strings.",
+                    vertical_name=self.name,
+                )
+            if not isinstance(team.name, str) or not team.name.strip():
+                raise VerticalConfigurationError(
+                    "Team metadata team names must be non-empty strings.",
+                    vertical_name=self.name,
+                    details={"team_id": team.team_id},
+                )
+            if not team.members:
+                raise VerticalConfigurationError(
+                    "Team metadata declarations must include at least one member.",
+                    vertical_name=self.name,
+                    details={"team_id": team.team_id},
+                )
+            for member in team.members:
+                if not isinstance(member.role, str) or not member.role.strip():
+                    raise VerticalConfigurationError(
+                        "Team metadata member roles must be non-empty strings.",
+                        vertical_name=self.name,
+                        details={"team_id": team.team_id},
+                    )
+                if not isinstance(member.goal, str) or not member.goal.strip():
+                    raise VerticalConfigurationError(
+                        "Team metadata member goals must be non-empty strings.",
+                        vertical_name=self.name,
+                        details={"team_id": team.team_id, "role": member.role},
+                    )
+
+        if self.team_metadata.default_team is not None and self.team_metadata.default_team not in team_ids:
+            raise VerticalConfigurationError(
+                "Team metadata default_team must reference a declared team.",
+                vertical_name=self.name,
+                details={"default_team": self.team_metadata.default_team},
+            )
+
     def get_stage_names(self) -> List[str]:
         """Return the stage names present in this definition."""
 
@@ -965,6 +1272,8 @@ class VerticalDefinition:
             or self.workflow_metadata.metadata
         ):
             config_extensions["workflow_metadata"] = self.workflow_metadata.to_dict()
+        if self.team_metadata.teams or self.team_metadata.default_team is not None or self.team_metadata.metadata:
+            config_extensions["team_metadata"] = self.team_metadata.to_dict()
 
         return VerticalConfig(
             name=self.name,
@@ -1002,6 +1311,7 @@ class VerticalDefinition:
                 stage_name: stage_definition.to_dict()
                 for stage_name, stage_definition in self.stages.items()
             },
+            "team_metadata": self.team_metadata.to_dict(),
             "workflow_metadata": self.workflow_metadata.to_dict(),
             "tier": self.tier.value,
             "metadata": dict(self.metadata),
@@ -1033,6 +1343,9 @@ class VerticalDefinition:
         prompt_metadata = normalize_prompt_metadata(
             config_extensions.pop("prompt_metadata", {})
         )
+        team_metadata = normalize_team_metadata(
+            config_extensions.pop("team_metadata", {})
+        )
         workflow_metadata = normalize_workflow_metadata(
             config_extensions.pop("workflow_metadata", {})
         )
@@ -1048,6 +1361,7 @@ class VerticalDefinition:
             system_prompt=config.system_prompt,
             prompt_metadata=prompt_metadata,
             stages=config.stages.copy(),
+            team_metadata=team_metadata,
             workflow_metadata=workflow_metadata,
             tier=config.tier,
             metadata=config_metadata,
@@ -1071,6 +1385,7 @@ class VerticalDefinition:
             system_prompt=payload.get("system_prompt", ""),
             prompt_metadata=payload.get("prompt_metadata", {}),
             stages=payload.get("stages", {}),
+            team_metadata=payload.get("team_metadata", {}),
             workflow_metadata=payload.get("workflow_metadata", {}),
             tier=payload.get("tier", Tier.STANDARD),
             metadata=dict(payload.get("metadata", {})),
