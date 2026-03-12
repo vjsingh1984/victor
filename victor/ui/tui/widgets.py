@@ -537,6 +537,14 @@ class InputWidget(Static):
         self._history_index = -1
         self._draft = ""
 
+    def set_value(self, value: str) -> None:
+        """Set the input field content programmatically."""
+        if self._input:
+            self._input.load_text(value)
+            self._input.cursor_location = (999, 999)
+        self._history_index = -1
+        self._draft = ""
+
     def focus_input(self) -> None:
         """Focus the input field."""
         if self._input:
@@ -584,7 +592,25 @@ class ToolCallWidget(Static):
     during agent tool invocations.
     """
 
-    DEFAULT_CSS = ""
+    DEFAULT_CSS = """
+    ToolCallWidget .tool-follow-ups {
+        margin-top: 1;
+        height: auto;
+    }
+
+    ToolCallWidget .follow-up-button {
+        width: auto;
+        min-width: 18;
+        margin-right: 1;
+    }
+    """
+
+    class FollowUpSelected(Message):
+        """Message emitted when a follow-up suggestion is selected."""
+
+        def __init__(self, command: str) -> None:
+            super().__init__()
+            self.command = command
 
     def __init__(
         self,
@@ -592,6 +618,7 @@ class ToolCallWidget(Static):
         arguments: dict | None = None,
         status: str = "pending",
         elapsed: float | None = None,
+        follow_up_suggestions: list[dict] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -599,7 +626,35 @@ class ToolCallWidget(Static):
         self.arguments = arguments or {}
         self.status = status
         self.elapsed = elapsed
+        self.follow_up_suggestions = self._normalize_follow_up_suggestions(follow_up_suggestions)
         self.add_class(status)
+
+    @staticmethod
+    def _normalize_follow_up_suggestions(suggestions: list[dict] | None) -> list[dict]:
+        """Normalize tool follow-up suggestions for display."""
+        if not suggestions:
+            return []
+        normalized = []
+        for suggestion in suggestions:
+            if not isinstance(suggestion, dict):
+                continue
+            command = suggestion.get("command")
+            if not isinstance(command, str) or not command.strip():
+                continue
+            normalized.append(suggestion)
+        return normalized
+
+    @staticmethod
+    def _follow_up_label(suggestion: dict) -> str:
+        """Build a compact button label for a follow-up suggestion."""
+        description = suggestion.get("description")
+        if isinstance(description, str) and description.strip():
+            label = description.strip()
+        else:
+            label = str(suggestion.get("command", "")).strip()
+        if len(label) > 32:
+            return label[:29] + "..."
+        return label
 
     def compose(self) -> ComposeResult:
         status_icon = {
@@ -629,14 +684,48 @@ class ToolCallWidget(Static):
             ),
             classes="tool-header",
         )
+        if self.follow_up_suggestions:
+            with Horizontal(classes="tool-follow-ups"):
+                for idx, suggestion in enumerate(self.follow_up_suggestions[:2]):
+                    yield Button(
+                        self._follow_up_label(suggestion),
+                        id=f"follow-up-{idx}",
+                        classes="follow-up-button",
+                        variant="primary" if idx == 0 else "default",
+                    )
 
-    def update_status(self, status: str, elapsed: float | None = None) -> None:
+    def update_status(
+        self,
+        status: str,
+        elapsed: float | None = None,
+        follow_up_suggestions: list[dict] | None = None,
+    ) -> None:
         """Update tool call status."""
         self.remove_class(self.status)
         self.status = status
         self.elapsed = elapsed
+        if follow_up_suggestions is not None:
+            self.follow_up_suggestions = self._normalize_follow_up_suggestions(
+                follow_up_suggestions
+            )
         self.add_class(status)
-        self.refresh()
+        self.refresh(recompose=True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle follow-up suggestion buttons."""
+        button_id = event.button.id or ""
+        if not button_id.startswith("follow-up-"):
+            return
+        try:
+            index = int(button_id.rsplit("-", 1)[-1])
+        except ValueError:
+            return
+        if index < 0 or index >= len(self.follow_up_suggestions):
+            return
+        command = self.follow_up_suggestions[index].get("command")
+        if isinstance(command, str) and command.strip():
+            self.post_message(self.FollowUpSelected(command.strip()))
+            event.stop()
 
 
 class ThinkingWidget(Static):

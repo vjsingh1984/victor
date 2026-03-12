@@ -72,6 +72,7 @@ async def stream_response(
                     elapsed=tool_data.get("elapsed", 0),
                     arguments=tool_data.get("arguments", {}),
                     error=tool_data.get("error"),
+                    follow_up_suggestions=tool_data.get("follow_up_suggestions"),
                 )
             # Handle status messages (thinking indicator, etc.)
             elif chunk.metadata and "status" in chunk.metadata:

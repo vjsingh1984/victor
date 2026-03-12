@@ -8,6 +8,8 @@ from textual.messages import UpdateScroll
 
 from victor.ui.tui.app import TUIConsoleAdapter, VictorTUI
 from victor.ui.tui.session import Message
+from victor.ui.tui.widgets import ToolCallWidget
+from victor.providers.base import StreamChunk
 
 
 def test_ctrl_f_binding_maps_to_toggle_follow_mode() -> None:
@@ -319,6 +321,92 @@ def test_input_submit_resumes_follow_when_paused() -> None:
     app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
     app._add_user_message.assert_called_once_with("hello")
     app._process_message_async.assert_awaited_once_with("hello")
+
+
+def test_finish_tool_call_keeps_follow_up_widgets_visible_longer() -> None:
+    """Tool widgets with follow-up actions should stay visible longer."""
+    app = VictorTUI()
+    widget = MagicMock()
+    app._current_tool_widget = widget
+    app._schedule_tool_widget_cleanup = MagicMock()
+    app._prune_tool_widgets = MagicMock()
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+    app._finish_tool_call(success=True, elapsed=0.5, follow_up_suggestions=follow_ups)
+
+    widget.update_status.assert_called_once_with(
+        "success",
+        0.5,
+        follow_up_suggestions=follow_ups,
+    )
+    app._schedule_tool_widget_cleanup.assert_called_once_with(
+        widget,
+        timeout=20.0,
+    )
+
+
+def test_follow_up_selection_prefills_input() -> None:
+    """Selecting a tool follow-up should prefill the prompt input."""
+    app = VictorTUI()
+    app._input_widget = MagicMock()
+    app._add_system_message = MagicMock()
+    event = ToolCallWidget.FollowUpSelected('graph(mode="callers", node="parse_json", depth=1)')
+
+    app.on_tool_call_widget_follow_up_selected(event)
+
+    app._input_widget.set_value.assert_called_once_with(
+        'graph(mode="callers", node="parse_json", depth=1)'
+    )
+    app._input_widget.focus_input.assert_called_once_with()
+    app._add_system_message.assert_called_once()
+
+
+def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None:
+    """Streaming path should handle metadata-based tool results and follow-ups."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "code_search",
+                    "success": True,
+                    "elapsed": 0.5,
+                    "arguments": {"query": "main entry point"},
+                    "follow_up_suggestions": follow_ups,
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("trace main"))
+
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=follow_ups,
+    )
 
 
 def test_input_submit_ignored_while_processing_keeps_draft() -> None:

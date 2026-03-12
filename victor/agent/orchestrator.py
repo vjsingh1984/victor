@@ -3871,12 +3871,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # --- Result formatting + conversation injection ---
             output = exec_result.result if success else None
+            follow_up_suggestions = None
 
             # Check for semantic failure
             semantic_success = success
             if success and isinstance(output, dict) and output.get("success") is False:
                 semantic_success = False
                 error_msg = output.get("error", "Operation returned success=False")
+            elif success and isinstance(output, dict):
+                metadata = output.get("metadata")
+                if isinstance(metadata, dict):
+                    suggestions = metadata.get("follow_up_suggestions")
+                    if isinstance(suggestions, list) and suggestions:
+                        follow_up_suggestions = suggestions
 
             error_display = None if semantic_success else (error_msg or "Unknown error")
 
@@ -3905,6 +3912,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         "success": True,
                         "elapsed": time.monotonic() - start,
                         "args": normalized_args,
+                        "follow_up_suggestions": follow_up_suggestions,
                     }
                 )
             else:

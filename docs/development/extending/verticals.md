@@ -49,6 +49,10 @@ victor-ai verticals during migration.
 For step-by-step migration from the legacy core-coupled pattern to the
 SDK-first contract, see [victor-sdk/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-sdk/MIGRATION_GUIDE.md).
 
+For a complete standalone package example that follows the SDK-only authoring
+model and runtime entry-point discovery, see
+[examples/external_vertical/README.md](/Users/vijaysingh/code/codingagent/examples/external_vertical/README.md).
+
 For the target definition-vs-runtime package split used by the migration plan, see
 [vertical-package-layout-target-2026-03-10.md](/Users/vijaysingh/code/codingagent/docs/development/vertical-package-layout-target-2026-03-10.md).
 
@@ -103,6 +107,8 @@ class MyVertical(VerticalBase):
 | `get_definition()` | Derived from hooks | Returns validated SDK manifest data |
 | `get_tool_requirements()` | `get_tools()` | Typed tool requirements for manifest-first authoring |
 | `get_capability_requirements()` | `[]` | Typed runtime capability requirements |
+| `get_team_declarations()` | `{}` | Declarative team layouts for SDK-first authoring |
+| `get_team_metadata()` | Derived from hooks | Typed team metadata bridge for `get_definition()` |
 | `get_provider_hints()` | Default hints | Provider selection preferences |
 | `get_evaluation_criteria()` | Basic criteria | Quality evaluation criteria |
 | `get_middleware()` | `[]` | Middleware implementations |
@@ -113,7 +119,7 @@ class MyVertical(VerticalBase):
 | `get_workflow_provider()` | `None` | YAML workflow provider |
 | `get_handlers()` | `{}` | Compute handlers for workflows |
 | `get_tool_graph()` | `None` | Tool execution graph |
-| `get_team_specs()` | `None` | Multi-agent team configurations |
+| `get_team_specs()` | `None` | Legacy/runtime team configuration fallback |
 
 ## Creating a Custom Vertical
 

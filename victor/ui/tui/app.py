@@ -861,6 +861,37 @@ class VictorTUI(App):
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
 
+                elif isinstance(getattr(chunk, "metadata", None), dict):
+                    metadata = chunk.metadata or {}
+
+                    if "tool_start" in metadata:
+                        tool_data = metadata["tool_start"]
+                        try:
+                            self._show_tool_call(
+                                tool_data.get("name", "unknown"),
+                                tool_data.get("arguments", {}),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to show tool call: {e}")
+
+                    elif "tool_result" in metadata:
+                        tool_data = metadata["tool_result"]
+                        try:
+                            self._finish_tool_call(
+                                success=tool_data.get("success", True),
+                                elapsed=tool_data.get("elapsed"),
+                                follow_up_suggestions=tool_data.get("follow_up_suggestions"),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to finish tool call: {e}")
+
+                    elif "reasoning_content" in metadata:
+                        try:
+                            self._show_thinking()
+                            self._update_thinking(metadata["reasoning_content"] or "")
+                        except Exception as e:
+                            logger.warning(f"Failed to update thinking content: {e}")
+
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
                     content_buffer += chunk.content
@@ -924,21 +955,31 @@ class VictorTUI(App):
         self,
         success: bool = True,
         elapsed: float | None = None,
+        follow_up_suggestions: list[dict] | None = None,
     ) -> None:
         """Finish current tool call."""
         if self._current_tool_widget:
             status = "success" if success else "error"
             finished_widget = self._current_tool_widget
-            finished_widget.update_status(status, elapsed)
+            finished_widget.update_status(
+                status,
+                elapsed,
+                follow_up_suggestions=follow_up_suggestions,
+            )
             self._current_tool_widget = None
-            self._schedule_tool_widget_cleanup(finished_widget)
+            self._schedule_tool_widget_cleanup(
+                finished_widget,
+                timeout=20.0 if follow_up_suggestions else 6.0,
+            )
             self._prune_tool_widgets()
 
-    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget) -> None:
+    def _schedule_tool_widget_cleanup(
+        self, widget: ToolCallWidget, timeout: float = 6.0
+    ) -> None:
         def _remove() -> None:
             self._remove_tool_widget(widget)
 
-        self.set_timer(6.0, _remove)
+        self.set_timer(timeout, _remove)
 
     def _remove_tool_widget(self, widget: ToolCallWidget) -> None:
         if widget in self._tool_widgets:
@@ -1572,6 +1613,19 @@ Slash Commands:
             else:
                 self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
+
+    def on_tool_call_widget_follow_up_selected(
+        self, event: ToolCallWidget.FollowUpSelected
+    ) -> None:
+        """Prefill the input with a selected tool follow-up command."""
+        command = event.command.strip()
+        if not command or not self._input_widget:
+            return
+        self._input_widget.set_value(command)
+        if not self._is_processing:
+            self._input_widget.focus_input()
+        preview = command if len(command) <= 80 else command[:77] + "..."
+        self._add_system_message(f"Prepared follow-up: {preview}")
 
     def add_message(self, content: str, role: str = "assistant") -> None:
         """Add a message to the conversation log.

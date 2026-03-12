@@ -240,6 +240,30 @@ def helper_function():
         assert 'query="def main"' in result
         assert "SEARCH RESULTS" in result
 
+    def test_format_code_search_includes_follow_up_suggestions(self):
+        """code_search output should surface suggested graph follow-ups."""
+        formatter = ToolOutputFormatter()
+        result = formatter.format_tool_output(
+            tool_name="code_search",
+            args={"query": "entry point for request processing"},
+            output={
+                "success": True,
+                "results": [{"file_path": "src/main.py", "name": "main"}],
+                "metadata": {
+                    "follow_up_suggestions": [
+                        {
+                            "command": 'graph(mode="trace", node="main", depth=3)',
+                            "reason": "Trace execution starting from main.",
+                        }
+                    ]
+                },
+            },
+        )
+
+        assert "SUGGESTED NEXT TOOLS" in result
+        assert 'graph(mode="trace", node="main", depth=3)' in result
+        assert "Trace execution starting from main." in result
+
     def test_format_semantic_code_search(self):
         """Test formatting semantic_code_search tool output."""
         formatter = ToolOutputFormatter()

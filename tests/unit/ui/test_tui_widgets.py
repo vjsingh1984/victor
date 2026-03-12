@@ -7,7 +7,12 @@ from textual import events
 from textual.geometry import Size
 from textual.messages import UpdateScroll
 
-from victor.ui.tui.widgets import EnhancedConversationLog, StatusBar, StreamingMessageBlock
+from victor.ui.tui.widgets import (
+    EnhancedConversationLog,
+    StatusBar,
+    StreamingMessageBlock,
+    ToolCallWidget,
+)
 
 
 def _static_content_text(widget: object) -> str:
@@ -256,6 +261,31 @@ def test_update_scroll_ignores_resize_guard_window() -> None:
         log.on_update_scroll(event)
 
     update_auto_scroll_state.assert_not_called()
+
+
+def test_tool_call_widget_emits_follow_up_selection_message() -> None:
+    """Tool follow-up button should emit a structured selection message."""
+    widget = ToolCallWidget(
+        "code_search",
+        status="success",
+        follow_up_suggestions=[
+            {
+                "command": 'graph(mode="trace", node="main", depth=3)',
+                "description": "Trace execution starting from main.",
+            }
+        ],
+    )
+    widget.post_message = MagicMock()
+    event = MagicMock()
+    event.button.id = "follow-up-0"
+
+    widget.on_button_pressed(event)
+
+    widget.post_message.assert_called_once()
+    message = widget.post_message.call_args.args[0]
+    assert isinstance(message, ToolCallWidget.FollowUpSelected)
+    assert message.command == 'graph(mode="trace", node="main", depth=3)'
+    event.stop.assert_called_once_with()
 
 
 def test_update_scroll_processes_after_resize_guard_window() -> None:
