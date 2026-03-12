@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import './App.css'
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -88,8 +88,11 @@ function formatEventTitle(event: BridgeEvent): string {
 
 function formatEventDetail(event: BridgeEvent): string {
   const preview = event.data.preview
-  if (preview && typeof preview === 'object' && typeof preview.type === 'string') {
-    return `Preview: ${preview.type}`
+  if (preview && typeof preview === 'object') {
+    const previewType = (preview as { type?: unknown }).type
+    if (typeof previewType === 'string') {
+      return `Preview: ${previewType}`
+    }
   }
 
   if (typeof event.data.result_excerpt === 'string' && event.data.result_excerpt.trim()) {
@@ -128,12 +131,10 @@ function App() {
   const [preparedCommand, setPreparedCommand] = useState('')
   const [preparedLabel, setPreparedLabel] = useState('No follow-up selected yet')
   const [copied, setCopied] = useState(false)
-  const socketRef = useRef<WebSocket | null>(null)
   const endpoint = getDefaultWsUrl()
 
   useEffect(() => {
     const socket = new WebSocket(endpoint)
-    socketRef.current = socket
     setConnectionState('connecting')
     setStatusMessage('Connecting to Victor event stream...')
 
@@ -174,7 +175,6 @@ function App() {
 
     return () => {
       socket.close()
-      socketRef.current = null
     }
   }, [endpoint, reconnectToken])
 
