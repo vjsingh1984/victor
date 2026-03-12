@@ -50,6 +50,22 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.ok(!isValidPort(80));
             assert.ok(!isValidPort(70000));
         });
+
+        test('Should validate remote server URLs', () => {
+            const isValidServerUrl = (serverUrl: string): boolean => {
+                try {
+                    const parsed = new URL(serverUrl);
+                    return ['http:', 'https:'].includes(parsed.protocol);
+                } catch {
+                    return false;
+                }
+            };
+
+            assert.ok(isValidServerUrl('http://127.0.0.1:8765'));
+            assert.ok(isValidServerUrl('https://victor.example.com'));
+            assert.ok(!isValidServerUrl('ws://victor.example.com'));
+            assert.ok(!isValidServerUrl('not-a-url'));
+        });
     });
 
     // Test ProviderInfo interface
