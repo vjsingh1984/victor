@@ -198,7 +198,7 @@ class CopyOnWriteState(Generic[StateType]):
         - Subsequent writes: O(1), no additional copy
     """
 
-    __slots__ = ("_source", "_copy", "_modified")
+    __slots__ = ("_source", "_copy", "_modified", "_owner_thread")
 
     def __init__(self, source: StateType):
         """Initialize with source state.
@@ -206,16 +206,32 @@ class CopyOnWriteState(Generic[StateType]):
         Args:
             source: Original state dictionary (not copied until mutation)
         """
+        import threading
+
         self._source: StateType = source
         self._copy: Optional[StateType] = None
         self._modified: bool = False
+        self._owner_thread: int = threading.current_thread().ident or 0
 
     def _ensure_copy(self) -> StateType:
         """Ensure we have a mutable copy of the state.
 
         Returns:
             The mutable copy of the state
+
+        Raises:
+            RuntimeError: In debug mode, if accessed from a different thread
+                than the one that created this wrapper.
         """
+        import threading
+
+        current = threading.current_thread().ident or 0
+        if current != self._owner_thread and __debug__:
+            raise RuntimeError(
+                f"CopyOnWriteState thread violation: created on thread "
+                f"{self._owner_thread}, mutated from thread {current}. "
+                f"Each thread must use its own CopyOnWriteState wrapper."
+            )
         if not self._modified:
             self._copy = copy.deepcopy(self._source)
             self._modified = True

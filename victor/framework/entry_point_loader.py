@@ -166,6 +166,29 @@ def clear_entry_point_loader_cache() -> None:
     _increment_loader_stat("cache_clears")
 
 
+def _resilient_load_entry_point(
+    ep: Any,
+    group: str,
+) -> Optional[Any]:
+    """Load a single entry point with failure isolation.
+
+    Returns the loaded target or None on failure. Logs warnings for
+    individual failures without aborting the entire group scan.
+    """
+    try:
+        return ep.load()
+    except Exception as e:
+        _increment_group_loader_stat(group, "failures")
+        logger.warning(
+            "Failed to load entry point '%s' from group '%s': %s. "
+            "Continuing with remaining entry points.",
+            ep.name,
+            group,
+            e,
+        )
+        return None
+
+
 def load_runtime_extension_from_entry_points(
     vertical: str,
     group: str,
@@ -257,28 +280,39 @@ def load_safety_rules_from_entry_points(
     _increment_loader_stat("safety_calls")
     count = 0
     normalized_verticals = _normalize_vertical_names(vertical_names)
+
     try:
         eps = _cached_entry_points("victor.safety_rules")
-        for ep in eps:
-            # Filter by vertical name if specified
-            if (
-                normalized_verticals is not None
-                and normalize_vertical_name(ep.name) not in normalized_verticals
-            ):
-                continue
-
-            try:
-                register_func = ep.load()
-                register_func(enforcer)
-                count += 1
-                _increment_loader_stat("safety_loaded")
-                logger.debug(f"Loaded safety rules from '{ep.name}' vertical")
-            except Exception as e:
-                _increment_loader_stat("safety_failures")
-                logger.warning(f"Failed to load safety rules from '{ep.name}': {e}")
     except Exception as e:
         _increment_loader_stat("safety_failures")
-        logger.debug(f"No safety rule entry points found: {e}")
+        logger.warning("Failed to discover safety rule entry points: %s", e)
+        return count
+
+    for ep in eps:
+        # Filter by vertical name if specified
+        if (
+            normalized_verticals is not None
+            and normalize_vertical_name(ep.name) not in normalized_verticals
+        ):
+            continue
+
+        register_func = _resilient_load_entry_point(ep, "victor.safety_rules")
+        if register_func is None:
+            continue
+
+        try:
+            register_func(enforcer)
+            count += 1
+            _increment_loader_stat("safety_loaded")
+            logger.debug("Loaded safety rules from '%s' vertical", ep.name)
+        except Exception as e:
+            _increment_loader_stat("safety_failures")
+            logger.warning(
+                "Safety rule registration failed for '%s': %s. "
+                "Other verticals' safety rules remain active.",
+                ep.name,
+                e,
+            )
 
     return count
 
