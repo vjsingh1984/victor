@@ -560,10 +560,11 @@ class TestToolSchemaCaching:
         # Populate cache
         registry.get_tool_schemas(only_enabled=True)
         assert registry._schema_cache[True] is not None
+        cached_version = registry._schema_cache[True][0]
 
-        # Register should invalidate
+        # Register should bump version, making cache stale
         registry.register(DummyTool())
-        assert registry._schema_cache[True] is None
+        assert registry._schema_cache_version > cached_version
 
     def test_schema_cache_invalidation_on_enable_disable(self):
         """Schema cache should be invalidated on enable/disable."""
@@ -592,18 +593,20 @@ class TestToolSchemaCaching:
         # Populate cache
         registry.get_tool_schemas(only_enabled=True)
         assert registry._schema_cache[True] is not None
+        version_after_populate = registry._schema_cache_version
 
-        # Disable should invalidate
+        # Disable should bump version, making cache stale
         registry.disable_tool("dummy2")
-        assert registry._schema_cache[True] is None
+        version_after_disable = registry._schema_cache_version
+        assert version_after_disable > version_after_populate
 
         # Populate cache again
         registry.get_tool_schemas(only_enabled=True)
         assert registry._schema_cache[True] is not None
 
-        # Enable should invalidate
+        # Enable should bump version again
         registry.enable_tool("dummy2")
-        assert registry._schema_cache[True] is None
+        assert registry._schema_cache_version > version_after_disable
 
     def test_schema_cache_hit(self):
         """get_tool_schemas should return cached schemas on hit."""

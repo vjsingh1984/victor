@@ -95,12 +95,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
         self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
-        # Schema cache: (enabled_tool_names_tuple, schemas_list) for both enabled/all modes
-        # Key is (only_enabled: bool), value is (tool_names_tuple, schemas_list)
-        self._schema_cache: Dict[bool, Optional[Tuple[Tuple[str, ...], List[Dict[str, Any]]]]] = {
+        # Schema cache: version-counter based invalidation for O(1) cache checks.
+        # Key is (only_enabled: bool), value is (version_at_cache_time, schemas_list)
+        self._schema_cache: Dict[bool, Optional[Tuple[int, List[Dict[str, Any]]]]] = {
             True: None,  # Cache for only_enabled=True
             False: None,  # Cache for only_enabled=False
         }
+        self._schema_cache_version: int = 0
         self._schema_cache_lock = threading.RLock()
 
         # Strategy pattern support (when flag enabled)
@@ -131,14 +132,14 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._items = value
 
     def _invalidate_schema_cache(self) -> None:
-        """Invalidate the schema cache.
+        """Invalidate the schema cache by bumping the version counter.
 
         Called when tools are registered, unregistered, enabled, or disabled.
-        Thread-safe using the schema cache lock.
+        Thread-safe using the schema cache lock. Uses O(1) version counter
+        instead of rebuilding tool name tuples for validation.
         """
         with self._schema_cache_lock:
-            self._schema_cache[True] = None
-            self._schema_cache[False] = None
+            self._schema_cache_version += 1
 
     def _wrap_hook(
         self, hook: Union[Hook, Callable], critical: bool = False, name: str = ""
@@ -477,9 +478,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
     def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
         """Get JSON schemas for all tools with caching.
 
-        Uses a cache to avoid regenerating schemas when the tool set hasn't changed.
-        The cache is invalidated automatically when tools are registered, unregistered,
-        enabled, or disabled.
+        Uses O(1) version-counter invalidation. The cache is bumped automatically
+        when tools are registered, unregistered, enabled, or disabled.
 
         Args:
             only_enabled: If True, only return schemas for enabled tools (default: True)
@@ -488,22 +488,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
             List of tool JSON schemas
         """
         with self._schema_cache_lock:
-            # Build the current tool names set for cache validation
-            if only_enabled:
-                current_tool_names = tuple(
-                    sorted(
-                        name for name in self._tools.keys() if self._tool_enabled.get(name, False)
-                    )
-                )
-            else:
-                current_tool_names = tuple(sorted(self._tools.keys()))
+            current_version = self._schema_cache_version
 
-            # Check cache
+            # O(1) cache check via version counter
             cache_entry = self._schema_cache.get(only_enabled)
             if cache_entry is not None:
-                cached_names, cached_schemas = cache_entry
-                if cached_names == current_tool_names:
-                    # Cache hit - return cached schemas
+                cached_version, cached_schemas = cache_entry
+                if cached_version == current_version:
                     return cached_schemas
 
             # Cache miss - generate schemas
@@ -516,8 +507,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
 
-            # Update cache
-            self._schema_cache[only_enabled] = (current_tool_names, schemas)
+            # Update cache with current version
+            self._schema_cache[only_enabled] = (current_version, schemas)
 
             return schemas
 
