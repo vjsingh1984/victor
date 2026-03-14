@@ -350,6 +350,11 @@ class InMemoryEventBackend:
         self._overflow_durable_sink = extra.get("overflow_durable_sink")
 
         self._subscriptions: Dict[str, _Subscription] = {}
+        # Topic index: exact topic -> list of subscription IDs for O(1) exact dispatch.
+        # Wildcard subscriptions (containing "*") are stored separately for linear scan.
+        self._exact_topic_index: Dict[str, List[str]] = {}
+        self._wildcard_subscriptions: List[str] = []
+        self._compiled_patterns: Dict[str, Callable[[str], bool]] = {}
         self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(
             maxsize=self._queue_maxsize
         )
@@ -379,6 +384,60 @@ class InMemoryEventBackend:
     def is_connected(self) -> bool:
         """Check if backend is connected and ready."""
         return self._is_connected
+
+    def _index_subscription(self, subscription: "_Subscription") -> None:
+        """Add subscription to the appropriate index."""
+        if "*" in subscription.pattern:
+            self._wildcard_subscriptions.append(subscription.id)
+            self._compiled_patterns[subscription.id] = self._compile_pattern(
+                subscription.pattern
+            )
+        else:
+            # Exact topic match - O(1) lookup
+            if subscription.pattern not in self._exact_topic_index:
+                self._exact_topic_index[subscription.pattern] = []
+            self._exact_topic_index[subscription.pattern].append(subscription.id)
+
+    def _deindex_subscription(self, subscription: "_Subscription") -> None:
+        """Remove subscription from the index."""
+        sid = subscription.id
+        if "*" in subscription.pattern:
+            if sid in self._wildcard_subscriptions:
+                self._wildcard_subscriptions.remove(sid)
+            self._compiled_patterns.pop(sid, None)
+        else:
+            subs = self._exact_topic_index.get(subscription.pattern, [])
+            if sid in subs:
+                subs.remove(sid)
+                if not subs:
+                    del self._exact_topic_index[subscription.pattern]
+
+    @staticmethod
+    def _compile_pattern(pattern: str) -> Callable[[str], bool]:
+        """Compile a topic pattern into an efficient matcher function.
+
+        Avoids repeated string splitting on every event dispatch.
+        """
+        if pattern == "*":
+            return lambda topic: True
+
+        pattern_parts = pattern.split(".")
+        has_trailing_wildcard = pattern_parts[-1] == "*"
+
+        def matcher(topic: str) -> bool:
+            topic_parts = topic.split(".")
+            if has_trailing_wildcard:
+                if len(topic_parts) < len(pattern_parts) - 1:
+                    return False
+                return all(
+                    p == "*" or p == t
+                    for p, t in zip(pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1])
+                )
+            if len(pattern_parts) != len(topic_parts):
+                return False
+            return all(p == "*" or p == t for p, t in zip(pattern_parts, topic_parts))
+
+        return matcher
 
     async def connect(self) -> None:
         """Connect and start the event dispatcher.
@@ -593,6 +652,7 @@ class InMemoryEventBackend:
 
         with self._lock:
             self._subscriptions[subscription_id] = subscription
+            self._index_subscription(subscription)
 
         # Create handle with unsubscribe capability
         handle = SubscriptionHandle(
@@ -624,6 +684,7 @@ class InMemoryEventBackend:
             subscription = self._subscriptions.get(handle.subscription_id)
             if subscription:
                 subscription.is_active = False
+                self._deindex_subscription(subscription)
                 del self._subscriptions[handle.subscription_id]
                 handle.is_active = False
                 logger.debug(f"Unsubscribed from pattern '{handle.pattern}'")
@@ -643,12 +704,22 @@ class InMemoryEventBackend:
                 except asyncio.TimeoutError:
                     continue
 
-                # Get matching subscriptions
+                # Get matching subscriptions via indexed lookup
                 with self._lock:
+                    matched_ids: List[str] = []
+                    # O(1) exact topic match
+                    exact_ids = self._exact_topic_index.get(event.topic, [])
+                    matched_ids.extend(exact_ids)
+                    # O(w) wildcard scan where w << total subscriptions
+                    for sid in self._wildcard_subscriptions:
+                        matcher = self._compiled_patterns.get(sid)
+                        if matcher and matcher(event.topic):
+                            matched_ids.append(sid)
                     subscriptions = [
-                        s
-                        for s in self._subscriptions.values()
-                        if s.is_active and event.matches_pattern(s.pattern)
+                        self._subscriptions[sid]
+                        for sid in matched_ids
+                        if sid in self._subscriptions
+                        and self._subscriptions[sid].is_active
                     ]
 
                 # Dispatch to handlers concurrently
