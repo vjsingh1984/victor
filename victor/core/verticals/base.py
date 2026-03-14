@@ -714,6 +714,7 @@ class VerticalRegistry:
     """
 
     _registry: Dict[str, Type[VerticalBase]] = {}
+    _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
     MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
@@ -729,9 +730,34 @@ class VerticalRegistry:
         Raises:
             ValueError: If vertical has no name.
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         if not vertical.name:
             raise ValueError(f"Vertical {vertical.__name__} has no name defined")
-        cls._registry[vertical.name] = vertical
+
+        name = vertical.name
+        new_module = getattr(vertical, "__module__", "<unknown>")
+
+        if name in cls._registry:
+            existing = cls._registry[name]
+            existing_module = getattr(existing, "__module__", "<unknown>")
+            if existing is not vertical:
+                logger.warning(
+                    "Vertical name collision: '%s' already registered by %s.%s "
+                    "(module: %s). Overwriting with %s.%s (module: %s).",
+                    name,
+                    existing.__name__,
+                    "",
+                    existing_module,
+                    vertical.__name__,
+                    "",
+                    new_module,
+                )
+
+        cls._registry[name] = vertical
+        cls._provenance[name] = new_module
 
     @classmethod
     def unregister(cls, name: str) -> None:
@@ -783,6 +809,7 @@ class VerticalRegistry:
                 test affects other tests that expect built-ins to be available.
         """
         cls._registry.clear()
+        cls._provenance.clear()
         cls._external_discovered = False
 
         if reregister_builtins:
