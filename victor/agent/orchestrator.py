@@ -168,6 +168,7 @@ from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.framework.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
+from victor.agent.session_state_accessor import SessionStateAccessor
 from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
 
 # Recovery - enums and functions used at runtime
@@ -721,6 +722,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
         # failed_tool_signatures, _read_files_session, _required_files, _required_outputs, etc.
         self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
+        self._session_accessor = SessionStateAccessor(self._session_state)
 
         # Gap implementations: Complexity classifier, action authorizer, search router (via factory)
         self.task_classifier = self._factory.create_complexity_classifier()
@@ -1553,7 +1555,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     # =====================================================================
     # Session state delegation properties (TD-002)
-    # These delegate to SessionStateManager for consolidated state tracking
+    # These delegate to SessionStateAccessor for consolidated state tracking
     # =====================================================================
 
     @property
@@ -1563,132 +1565,132 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             SessionStateManager instance for consolidated state tracking
         """
-        return self._session_state
+        return self._session_accessor.session_state
 
     @property
     def tool_calls_used(self) -> int:
         """Get the number of tool calls used in this session.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.tool_calls_used
+        return self._session_accessor.tool_calls_used
 
     @tool_calls_used.setter
     def tool_calls_used(self, value: int) -> None:
         """Set the number of tool calls used (for backward compatibility)."""
-        self._session_state.execution_state.tool_calls_used = value
+        self._session_accessor.tool_calls_used = value
 
     @property
     def observed_files(self) -> Set[str]:
         """Get set of files observed/read during this session.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.observed_files
+        return self._session_accessor.observed_files
 
     @observed_files.setter
     def observed_files(self, value: Set[str]) -> None:
         """Set observed files (for checkpoint restore)."""
-        self._session_state.execution_state.observed_files = set(value) if value else set()
+        self._session_accessor.observed_files = value
 
     @property
     def executed_tools(self) -> List[str]:
         """Get list of executed tool names in order.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.executed_tools
+        return self._session_accessor.executed_tools
 
     @executed_tools.setter
     def executed_tools(self, value: List[str]) -> None:
         """Set executed tools (for checkpoint restore)."""
-        self._session_state.execution_state.executed_tools = list(value) if value else []
+        self._session_accessor.executed_tools = value
 
     @property
     def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
         """Get set of (tool_name, args_hash) tuples for failed calls.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.failed_tool_signatures
+        return self._session_accessor.failed_tool_signatures
 
     @failed_tool_signatures.setter
     def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
-        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
+        self._session_accessor.failed_tool_signatures = value
 
     @property
     def _tool_capability_warned(self) -> bool:
         """Get whether we've warned about tool capability limitations.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.session_flags.tool_capability_warned
+        return self._session_accessor.tool_capability_warned
 
     @_tool_capability_warned.setter
     def _tool_capability_warned(self, value: bool) -> None:
         """Set tool capability warning flag."""
-        self._session_state.session_flags.tool_capability_warned = value
+        self._session_accessor.tool_capability_warned = value
 
     @property
     def _read_files_session(self) -> Set[str]:
         """Get files read during this session for task completion detection.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.read_files_session
+        return self._session_accessor.read_files_session
 
     @property
     def _required_files(self) -> List[str]:
         """Get required files extracted from user prompts.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.required_files
+        return self._session_accessor.required_files
 
     @_required_files.setter
     def _required_files(self, value: List[str]) -> None:
         """Set required files list."""
-        self._session_state.execution_state.required_files = list(value)
+        self._session_accessor.required_files = value
 
     @property
     def _required_outputs(self) -> List[str]:
         """Get required outputs extracted from user prompts.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.execution_state.required_outputs
+        return self._session_accessor.required_outputs
 
     @_required_outputs.setter
     def _required_outputs(self, value: List[str]) -> None:
         """Set required outputs list."""
-        self._session_state.execution_state.required_outputs = list(value)
+        self._session_accessor.required_outputs = value
 
     @property
     def _all_files_read_nudge_sent(self) -> bool:
         """Get whether we've sent a nudge that all required files are read.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.session_flags.all_files_read_nudge_sent
+        return self._session_accessor.all_files_read_nudge_sent
 
     @_all_files_read_nudge_sent.setter
     def _all_files_read_nudge_sent(self, value: bool) -> None:
         """Set all files read nudge flag."""
-        self._session_state.session_flags.all_files_read_nudge_sent = value
+        self._session_accessor.all_files_read_nudge_sent = value
 
     @property
     def _cumulative_token_usage(self) -> Dict[str, int]:
         """Get cumulative token usage for evaluation/benchmarking.
 
-        Delegates to SessionStateManager.
+        Delegates to SessionStateAccessor.
         """
-        return self._session_state.get_token_usage()
+        return self._session_accessor.cumulative_token_usage
 
     @_cumulative_token_usage.setter
     def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
         """Set cumulative token usage (for backward compatibility)."""
-        self._session_state.execution_state.token_usage = dict(value)
+        self._session_accessor.cumulative_token_usage = value
 
     @property
     def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
