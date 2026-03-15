@@ -753,6 +753,54 @@ class PipelineSettings(_BaseModel):
     session_idle_timeout: int = 180
 
 
+class FeatureFlagSettings(_BaseModel):
+    """Feature flags for gradual rollout of architecture components."""
+
+    use_new_chat_service: bool = False
+    use_new_tool_service: bool = False
+    use_new_context_service: bool = False
+    use_new_provider_service: bool = False
+    use_new_recovery_service: bool = False
+    use_new_session_service: bool = False
+    use_composition_over_inheritance: bool = False
+    use_strategy_based_tool_registration: bool = False
+
+
+class PromptEnrichmentSettings(_BaseModel):
+    """Prompt enrichment and optimization configuration."""
+
+    prompt_enrichment_enabled: bool = True
+    prompt_enrichment_max_tokens: int = 2000
+    prompt_enrichment_timeout_ms: float = 500.0
+    prompt_enrichment_cache_enabled: bool = True
+    prompt_enrichment_cache_ttl: int = 300
+    prompt_enrichment_strategies: List[str] = Field(
+        default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
+    )
+    prompt_enrichment_coding: bool = True
+    prompt_enrichment_research: bool = True
+    prompt_enrichment_devops: bool = True
+    prompt_enrichment_data_analysis: bool = True
+
+
+class HITLSettings(_BaseModel):
+    """Human-in-the-loop workflow interrupt configuration."""
+
+    hitl_default_timeout: float = 300.0
+    hitl_default_fallback: str = "abort"
+    hitl_auto_approve_low_risk: bool = False
+    hitl_keyboard_shortcuts_enabled: bool = True
+
+
+class PluginSettings(_BaseModel):
+    """Plugin system configuration."""
+
+    plugin_enabled: bool = True
+    plugin_packages: List[str] = Field(default_factory=list)
+    plugin_disabled: List[str] = Field(default_factory=list)
+    plugin_config: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+
+
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
     "provider": ProviderSettings,
@@ -766,6 +814,10 @@ _NESTED_GROUPS = {
     "context": ContextSettings,
     "checkpoint": CheckpointSettings,
     "ui": UISettings,
+    "feature_flags": FeatureFlagSettings,
+    "enrichment": PromptEnrichmentSettings,
+    "hitl": HITLSettings,
+    "plugins": PluginSettings,
 }
 
 
@@ -846,6 +898,10 @@ class Settings(BaseSettings):
     context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)
     checkpoint: Optional[CheckpointSettings] = Field(default=None, exclude=True, repr=False)
     ui: Optional[UISettings] = Field(default=None, exclude=True, repr=False)
+    feature_flags: Optional[FeatureFlagSettings] = Field(default=None, exclude=True, repr=False)
+    enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
+    hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
+    plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
