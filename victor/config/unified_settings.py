@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
@@ -104,13 +104,13 @@ class VictorSettings(BaseSettings):
     # API Keys
     # ==========================================================================
 
-    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
-    google_api_key: Optional[str] = Field(default=None, description="Google Gemini API key")
-    moonshot_api_key: Optional[str] = Field(
+    anthropic_api_key: Optional[SecretStr] = Field(default=None, description="Anthropic API key")
+    openai_api_key: Optional[SecretStr] = Field(default=None, description="OpenAI API key")
+    google_api_key: Optional[SecretStr] = Field(default=None, description="Google Gemini API key")
+    moonshot_api_key: Optional[SecretStr] = Field(
         default=None, description="Moonshot AI API key (Kimi K2 models)"
     )
-    deepseek_api_key: Optional[str] = Field(
+    deepseek_api_key: Optional[SecretStr] = Field(
         default=None, description="DeepSeek API key (DeepSeek-V3 models)"
     )
 

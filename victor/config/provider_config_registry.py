@@ -156,7 +156,11 @@ class DefaultProviderConfig(ProviderConfigStrategy):
 
         # Try to get API key from settings attribute first (for backwards compat)
         settings_attr = f"{self._provider_name}_api_key"
-        api_key = getattr(settings, settings_attr, None) or get_api_key(self._provider_name)
+        raw_key = getattr(settings, settings_attr, None)
+        if raw_key and hasattr(raw_key, "get_secret_value"):
+            api_key = raw_key.get_secret_value()
+        else:
+            api_key = raw_key or get_api_key(self._provider_name)
 
         if api_key:
             result["api_key"] = api_key
@@ -220,7 +224,8 @@ class OpenAIConfig(ProviderConfigStrategy):
             result.setdefault("base_url", "https://chatgpt.com/backend-api/codex/v1")
         else:
             # API key mode
-            api_key = settings.openai_api_key or get_api_key("openai")
+            raw_key = settings.openai_api_key
+            api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key("openai")
             if api_key:
                 result["api_key"] = api_key
             result.setdefault("base_url", "https://api.openai.com/v1")

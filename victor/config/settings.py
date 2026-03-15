@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -457,11 +457,11 @@ class ProviderSettings(_BaseModel):
     default_model: str = "qwen3-coder:30b"
     default_temperature: float = 0.7
     default_max_tokens: int = 4096
-    anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    moonshot_api_key: Optional[str] = None
-    deepseek_api_key: Optional[str] = None
+    anthropic_api_key: Optional[SecretStr] = None
+    openai_api_key: Optional[SecretStr] = None
+    google_api_key: Optional[SecretStr] = None
+    moonshot_api_key: Optional[SecretStr] = None
+    deepseek_api_key: Optional[SecretStr] = None
     ollama_base_url: str = "http://localhost:11434"
     lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
     vllm_base_url: str = "http://localhost:8000"
@@ -672,6 +672,52 @@ class EventSettings(_BaseModel):
     extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
 
 
+class ObservabilitySettings(_BaseModel):
+    """Logging, observability, and analytics configuration."""
+
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
+    enable_observability_logging: bool = False
+    observability_log_path: Optional[str] = None
+    analytics_enabled: bool = True
+
+
+class ContextSettings(_BaseModel):
+    """Context window management and conversation memory."""
+
+    context_compaction_strategy: str = "tiered"
+    context_min_messages_to_keep: int = 6
+    context_tool_retention_weight: float = 1.5
+    context_recency_weight: float = 2.0
+    context_semantic_threshold: float = 0.3
+    max_context_tokens: int = 100000
+    response_token_reserve: int = 4096
+    conversation_memory_enabled: bool = True
+    conversation_embeddings_enabled: bool = True
+
+
+class CheckpointSettings(_BaseModel):
+    """State checkpointing for time-travel debugging."""
+
+    checkpoint_enabled: bool = True
+    checkpoint_auto_interval: int = 5
+    checkpoint_max_per_session: int = 50
+    checkpoint_compression_enabled: bool = True
+    checkpoint_compression_threshold: int = 1024
+
+
+class UISettings(_BaseModel):
+    """User interface display preferences."""
+
+    theme: str = "monokai"
+    show_token_count: bool = True
+    show_cost_metrics: bool = False
+    stream_responses: bool = True
+    use_emojis: bool = Field(
+        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
+    )
+
+
 class PipelineSettings(_BaseModel):
     """Intelligent agent pipeline, quality scoring, and recovery."""
 
@@ -716,6 +762,10 @@ _NESTED_GROUPS = {
     "security": SecuritySettings,
     "events": EventSettings,
     "pipeline": PipelineSettings,
+    "observability": ObservabilitySettings,
+    "context": ContextSettings,
+    "checkpoint": CheckpointSettings,
+    "ui": UISettings,
 }
 
 
@@ -792,6 +842,10 @@ class Settings(BaseSettings):
     security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
     events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
     pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
+    observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
+    context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)
+    checkpoint: Optional[CheckpointSettings] = Field(default=None, exclude=True, repr=False)
+    ui: Optional[UISettings] = Field(default=None, exclude=True, repr=False)
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
@@ -800,11 +854,11 @@ class Settings(BaseSettings):
     default_max_tokens: int = 4096
 
     # API Keys
-    anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    moonshot_api_key: Optional[str] = None  # Moonshot AI for Kimi K2 models
-    deepseek_api_key: Optional[str] = None  # DeepSeek for DeepSeek-V3 models
+    anthropic_api_key: Optional[SecretStr] = None
+    openai_api_key: Optional[SecretStr] = None
+    google_api_key: Optional[SecretStr] = None
+    moonshot_api_key: Optional[SecretStr] = None  # Moonshot AI for Kimi K2 models
+    deepseek_api_key: Optional[SecretStr] = None  # DeepSeek for DeepSeek-V3 models
 
     # Local server URLs
     # Can be overridden via environment variables:
@@ -1479,7 +1533,6 @@ class Settings(BaseSettings):
                     if field_name in settings_fields:
                         data[field_name] = getattr(self, field_name)
                 object.__setattr__(self, group_name, model_cls(**data))
-        return self
         return self
 
     @model_validator(mode="after")

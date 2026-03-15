@@ -67,7 +67,7 @@ class TestNestedAccess:
 
     def test_nested_provider_api_key(self):
         s = Settings(anthropic_api_key="sk-test")
-        assert s.provider.anthropic_api_key == "sk-test"
+        assert s.provider.anthropic_api_key.get_secret_value() == "sk-test"
 
     def test_nested_tools_access(self):
         s = Settings(tool_retry_max_attempts=5)
