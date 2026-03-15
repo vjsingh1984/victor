@@ -313,13 +313,14 @@ class TestGetExtensionsAsync:
     @pytest.mark.asyncio
     async def test_get_extensions_async_records_pressure_threshold_events(self):
         """Queue/in-flight saturation should increment pressure counters."""
+        pm = VerticalExtensionLoader._pressure_monitor
         old_settings = {
-            "warn_queue": VerticalExtensionLoader._extension_loader_warn_queue_threshold,
-            "error_queue": VerticalExtensionLoader._extension_loader_error_queue_threshold,
-            "warn_in_flight": VerticalExtensionLoader._extension_loader_warn_in_flight_threshold,
-            "error_in_flight": VerticalExtensionLoader._extension_loader_error_in_flight_threshold,
-            "cooldown": VerticalExtensionLoader._extension_loader_pressure_cooldown_seconds,
-            "emit_events": VerticalExtensionLoader._extension_loader_emit_pressure_events,
+            "warn_queue": pm.warn_queue_threshold,
+            "error_queue": pm.error_queue_threshold,
+            "warn_in_flight": pm.warn_in_flight_threshold,
+            "error_in_flight": pm.error_in_flight_threshold,
+            "cooldown": pm.pressure_cooldown_seconds,
+            "emit_events": pm.emit_pressure_events,
         }
         try:
             VerticalExtensionLoader.configure_extension_loader_pressure(
