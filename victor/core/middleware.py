@@ -255,6 +255,79 @@ class Middleware(ABC, Generic[TRequest, TResponse]):
 
 
 # =============================================================================
+# Focused Middleware Protocols (ISP-Compliant)
+# =============================================================================
+# These protocols allow middleware to declare only the hooks they need,
+# following the Interface Segregation Principle. The MiddlewarePipeline
+# detects which protocols a middleware implements and calls only those hooks.
+
+
+class RequestMiddleware(ABC):
+    """Middleware that only needs to inspect/modify requests before handling."""
+
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    @abstractmethod
+    async def before(self, context: MiddlewareContext) -> bool:
+        """Pre-handler hook. Return False to short-circuit."""
+        ...
+
+
+class ResponseMiddleware(ABC):
+    """Middleware that only needs to inspect/modify responses after handling."""
+
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    @abstractmethod
+    async def after(self, context: MiddlewareContext, response: Any) -> Any:
+        """Post-handler hook. Can transform the response."""
+        ...
+
+
+class ErrorMiddleware(ABC):
+    """Middleware that only handles errors."""
+
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    @abstractmethod
+    async def on_error(self, context: MiddlewareContext, error: Exception) -> Any:
+        """Error handler. Can recover or re-raise."""
+        ...
+
+
+class _FocusedMiddlewareAdapter(Middleware):
+    """Internal adapter that wraps focused protocol middleware into the full interface."""
+
+    def __init__(self, focused: Union[RequestMiddleware, ResponseMiddleware, ErrorMiddleware]):
+        self._focused = focused
+
+    @property
+    def name(self) -> str:
+        return self._focused.name
+
+    async def before(self, context: MiddlewareContext) -> bool:
+        if isinstance(self._focused, RequestMiddleware):
+            return await self._focused.before(context)
+        return True
+
+    async def after(self, context: MiddlewareContext, response: Any) -> Any:
+        if isinstance(self._focused, ResponseMiddleware):
+            return await self._focused.after(context, response)
+        return response
+
+    async def on_error(self, context: MiddlewareContext, error: Exception) -> Any:
+        if isinstance(self._focused, ErrorMiddleware):
+            return await self._focused.on_error(context, error)
+        raise error
+
+
+# =============================================================================
 # Middleware Pipeline (Chain of Responsibility)
 # =============================================================================
 
@@ -283,9 +356,18 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
 
     def use(
         self,
-        middleware: Middleware[TRequest, TResponse],
+        middleware: Union[
+            Middleware[TRequest, TResponse],
+            RequestMiddleware,
+            ResponseMiddleware,
+            ErrorMiddleware,
+        ],
     ) -> "MiddlewarePipeline[TRequest, TResponse]":
         """Add middleware to pipeline.
+
+        Accepts both full Middleware instances and focused protocol middleware
+        (RequestMiddleware, ResponseMiddleware, ErrorMiddleware). Focused
+        middleware is automatically wrapped with an adapter.
 
         Args:
             middleware: Middleware to add.
@@ -298,6 +380,9 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         """
         if self._frozen:
             raise RuntimeError("Cannot add middleware to frozen pipeline")
+
+        if isinstance(middleware, (RequestMiddleware, ResponseMiddleware, ErrorMiddleware)):
+            middleware = _FocusedMiddlewareAdapter(middleware)
 
         self._middleware.append(middleware)
         return self

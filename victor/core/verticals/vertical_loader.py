@@ -416,16 +416,30 @@ class VerticalLoader:
                 ):
                     existing = VerticalRegistry.get(vertical_cls.name)
                     if existing is not None and existing is not vertical_cls:
-                        logger.warning(
-                            "External vertical '%s' has name '%s' which conflicts with "
-                            "registered vertical %s. Skipping.",
-                            name,
-                            vertical_cls.name,
-                            existing.__name__,
-                        )
-                        continue
+                        existing_module = getattr(existing, "__module__", "")
+                        new_module = getattr(vertical_cls, "__module__", "")
+                        # External packages (victor_coding, etc.) take priority
+                        # over built-in contrib SDK definitions
+                        if "verticals.contrib" in existing_module and "verticals.contrib" not in new_module:
+                            logger.info(
+                                "External vertical '%s' (from %s) overrides built-in "
+                                "contrib definition %s.",
+                                name,
+                                new_module,
+                                existing.__name__,
+                            )
+                        else:
+                            logger.warning(
+                                "Vertical '%s' has name '%s' which conflicts with "
+                                "registered vertical %s (from %s). Skipping.",
+                                name,
+                                vertical_cls.name,
+                                existing.__name__,
+                                existing_module,
+                            )
+                            continue
                     self._discovered_verticals[name] = vertical_cls
-                    # Also register in the global registry
+                    # Register in the global registry (overrides contrib if applicable)
                     VerticalRegistry.register(vertical_cls)
                     logger.debug("Discovered vertical plugin: %s", name)
                 else:
