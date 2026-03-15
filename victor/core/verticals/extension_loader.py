@@ -107,6 +107,317 @@ _METRICS_REPORTER_LOCK = threading.Lock()
 _METRICS_REPORTER_SINGLETON: Optional["ExtensionLoaderMetricsReporter"] = None
 
 
+class ExtensionLoaderPressureMonitor:
+    """Internal helper that owns all pressure monitoring and metrics state.
+
+    Encapsulates the lightweight loader metrics counters, queue-pressure
+    thresholds, cooldown logic, and event emission so that
+    ``VerticalExtensionLoader`` can delegate to a single instance without
+    spreading metrics bookkeeping across many class variables.
+
+    Not part of the public API -- instantiated once as a class variable on
+    ``VerticalExtensionLoader._pressure_monitor``.
+    """
+
+    def __init__(self) -> None:
+        self._metrics: Dict[str, int] = {
+            "submitted": 0,
+            "completed": 0,
+            "failed": 0,
+            "in_flight": 0,
+            "max_in_flight": 0,
+            "queued": 0,
+            "max_queued": 0,
+            "queue_waits": 0,
+            "pressure_warnings": 0,
+            "pressure_errors": 0,
+        }
+        self._metrics_lock = threading.RLock()
+
+        # Queue pressure policy (P3 reliability).
+        self.warn_queue_threshold: int = 24
+        self.error_queue_threshold: int = 32
+        self.warn_in_flight_threshold: int = 6
+        self.error_in_flight_threshold: int = 8
+        self.pressure_cooldown_seconds: float = 5.0
+        self.emit_pressure_events: bool = False
+        self.last_pressure_level: str = "ok"
+        self.last_pressure_emit_ts: float = 0.0
+
+        # Track optional modules already reported missing (avoid log spam).
+        self._missing_extension_modules: Set[str] = set()
+        self._missing_extension_modules_lock = threading.RLock()
+
+    # ------------------------------------------------------------------
+    # Metric helpers
+    # ------------------------------------------------------------------
+
+    def increment_metric(self, metric: str, delta: int = 1) -> None:
+        """Increment extension loader metric counter."""
+        with self._metrics_lock:
+            self._metrics[metric] = self._metrics.get(metric, 0) + delta
+
+    def update_peak_metric(self, metric: str, value: int) -> None:
+        """Update extension loader metric peak value."""
+        with self._metrics_lock:
+            current = self._metrics.get(metric, 0)
+            if value > current:
+                self._metrics[metric] = value
+
+    def get_metric(self, metric: str) -> int:
+        """Return current value of a single metric under lock."""
+        with self._metrics_lock:
+            return self._metrics.get(metric, 0)
+
+    def get_metrics_snapshot(
+        self,
+        *,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+    ) -> Dict[str, Any]:
+        """Return snapshot of all loader metrics plus threshold config.
+
+        Args:
+            max_workers: Executor max_workers value to include in snapshot.
+            queue_limit: Executor queue_limit value to include in snapshot.
+        """
+        with self._metrics_lock:
+            snapshot: Dict[str, Any] = dict(self._metrics)
+        snapshot["max_workers"] = max_workers
+        snapshot["queue_limit"] = queue_limit
+        snapshot["warn_queue_threshold"] = self.warn_queue_threshold
+        snapshot["error_queue_threshold"] = self.error_queue_threshold
+        snapshot["warn_in_flight_threshold"] = self.warn_in_flight_threshold
+        snapshot["error_in_flight_threshold"] = self.error_in_flight_threshold
+        snapshot["pressure_level"] = self.last_pressure_level
+        return snapshot
+
+    def reset_metrics(self) -> None:
+        """Reset all metric counters and pressure state."""
+        with self._metrics_lock:
+            for key in (
+                "submitted",
+                "completed",
+                "failed",
+                "in_flight",
+                "max_in_flight",
+                "queued",
+                "max_queued",
+                "queue_waits",
+                "pressure_warnings",
+                "pressure_errors",
+            ):
+                self._metrics[key] = 0
+            self.last_pressure_level = "ok"
+            self.last_pressure_emit_ts = 0.0
+
+    # ------------------------------------------------------------------
+    # Pressure level evaluation
+    # ------------------------------------------------------------------
+
+    def pressure_level(self, *, queued: int, in_flight: int) -> str:
+        """Return pressure level for current loader queue and in-flight counts."""
+        if (
+            queued >= self.error_queue_threshold
+            or in_flight >= self.error_in_flight_threshold
+        ):
+            return "error"
+        if (
+            queued >= self.warn_queue_threshold
+            or in_flight >= self.warn_in_flight_threshold
+        ):
+            return "warn"
+        return "ok"
+
+    # ------------------------------------------------------------------
+    # Pressure event emission
+    # ------------------------------------------------------------------
+
+    def emit_pressure_event(
+        self, level: str, snapshot: Dict[str, Any], reason: str
+    ) -> None:
+        """Emit queue-pressure signal for extension loader saturation."""
+        try:
+            from victor.core.events import get_observability_bus
+            from victor.core.events.emit_helper import emit_event_sync
+
+            bus = get_observability_bus()
+            if bus is None:
+                return
+            emit_event_sync(
+                bus,
+                _EXTENSION_LOADER_PRESSURE_TOPIC,
+                {
+                    "level": level,
+                    "reason": reason,
+                    "metrics": snapshot,
+                },
+                source="VerticalExtensionLoader",
+                use_background_loop=True,
+                track_metrics=False,
+            )
+        except Exception as e:
+            logger.debug("Failed emitting extension loader pressure event: %s", e)
+
+    # ------------------------------------------------------------------
+    # Combined pressure check (warn / error / emit)
+    # ------------------------------------------------------------------
+
+    def check_pressure(
+        self,
+        *,
+        reason: str,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+    ) -> None:
+        """Check queue pressure and optionally emit warning/error diagnostics."""
+        snapshot = self.get_metrics_snapshot(
+            max_workers=max_workers,
+            queue_limit=queue_limit,
+        )
+        queued = int(snapshot.get("queued", 0))
+        in_flight = int(snapshot.get("in_flight", 0))
+        level = self.pressure_level(queued=queued, in_flight=in_flight)
+
+        now = time.monotonic()
+        should_emit = False
+        with self._metrics_lock:
+            previous_level = self.last_pressure_level
+            cooldown = self.pressure_cooldown_seconds
+            elapsed = now - self.last_pressure_emit_ts
+
+            if level == "ok":
+                self.last_pressure_level = "ok"
+                return
+
+            if level != previous_level or elapsed >= cooldown:
+                self.last_pressure_level = level
+                self.last_pressure_emit_ts = now
+                should_emit = True
+                if level == "error":
+                    self._metrics["pressure_errors"] += 1
+                else:
+                    self._metrics["pressure_warnings"] += 1
+
+        if not should_emit:
+            return
+
+        message = (
+            "Extension loader pressure %s: queued=%s in_flight=%s "
+            "(reason=%s, thresholds q:%s/%s in_f:%s/%s)"
+        )
+        args = (
+            level.upper(),
+            queued,
+            in_flight,
+            reason,
+            self.warn_queue_threshold,
+            self.error_queue_threshold,
+            self.warn_in_flight_threshold,
+            self.error_in_flight_threshold,
+        )
+
+        if level == "error":
+            logger.error(message, *args)
+        else:
+            logger.warning(message, *args)
+
+        if self.emit_pressure_events:
+            self.emit_pressure_event(level, snapshot, reason)
+
+    # ------------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------------
+
+    def configure(
+        self,
+        *,
+        warn_queue_threshold: Optional[int] = None,
+        error_queue_threshold: Optional[int] = None,
+        warn_in_flight_threshold: Optional[int] = None,
+        error_in_flight_threshold: Optional[int] = None,
+        cooldown_seconds: Optional[float] = None,
+        emit_events: Optional[bool] = None,
+    ) -> None:
+        """Configure queue-pressure warning/error thresholds."""
+        with self._metrics_lock:
+            if warn_queue_threshold is not None:
+                self.warn_queue_threshold = max(0, int(warn_queue_threshold))
+            if error_queue_threshold is not None:
+                self.error_queue_threshold = max(0, int(error_queue_threshold))
+            if warn_in_flight_threshold is not None:
+                self.warn_in_flight_threshold = max(0, int(warn_in_flight_threshold))
+            if error_in_flight_threshold is not None:
+                self.error_in_flight_threshold = max(0, int(error_in_flight_threshold))
+            if cooldown_seconds is not None:
+                self.pressure_cooldown_seconds = max(0.0, float(cooldown_seconds))
+            if emit_events is not None:
+                self.emit_pressure_events = bool(emit_events)
+
+    # ------------------------------------------------------------------
+    # Metrics event emission
+    # ------------------------------------------------------------------
+
+    def emit_metrics_event(
+        self,
+        *,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+        event_bus: Optional[Any] = None,
+        topic: str = _EXTENSION_LOADER_METRICS_TOPIC,
+        source: str = "VerticalExtensionLoader",
+        reset_after_emit: bool = False,
+    ) -> Dict[str, Any]:
+        """Emit current extension-loader metrics as an observability event."""
+        metrics = self.get_metrics_snapshot(
+            max_workers=max_workers,
+            queue_limit=queue_limit,
+        )
+
+        bus = event_bus
+        if bus is None:
+            try:
+                from victor.core.events import get_observability_bus
+
+                bus = get_observability_bus()
+            except Exception as e:
+                logger.debug(
+                    "Failed resolving observability bus for loader metrics: %s", e
+                )
+                bus = None
+
+        if bus is not None:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    bus,
+                    topic,
+                    {"metrics": metrics},
+                    source=source,
+                    use_background_loop=True,
+                    track_metrics=False,
+                )
+            except Exception as e:
+                logger.debug("Failed emitting extension-loader metrics event: %s", e)
+
+        if reset_after_emit:
+            self.reset_metrics()
+        return metrics
+
+    # ------------------------------------------------------------------
+    # Missing module tracking
+    # ------------------------------------------------------------------
+
+    def record_missing_module(self, cache_key: str) -> bool:
+        """Record a missing module key. Return True if this is the first time."""
+        with self._missing_extension_modules_lock:
+            if cache_key not in self._missing_extension_modules:
+                self._missing_extension_modules.add(cache_key)
+                return True
+        return False
+
+
 class VerticalExtensionLoader(ABC):
     """Loader of vertical extensions.
 
@@ -147,35 +458,10 @@ class VerticalExtensionLoader(ABC):
     _extension_executor_lock: ClassVar[threading.RLock] = threading.RLock()
     _extension_executor_semaphores: ClassVar[Dict[int, asyncio.Semaphore]] = {}
 
-    # Lightweight loader metrics for observability.
-    _extension_loader_metrics: ClassVar[Dict[str, int]] = {
-        "submitted": 0,
-        "completed": 0,
-        "failed": 0,
-        "in_flight": 0,
-        "max_in_flight": 0,
-        "queued": 0,
-        "max_queued": 0,
-        "queue_waits": 0,
-        "pressure_warnings": 0,
-        "pressure_errors": 0,
-    }
-    _extension_loader_metrics_lock: ClassVar[threading.RLock] = threading.RLock()
-
-    # Queue pressure policy (P3 reliability): warn/error thresholds and emission controls.
-    _extension_loader_warn_queue_threshold: ClassVar[int] = 24
-    _extension_loader_error_queue_threshold: ClassVar[int] = 32
-    _extension_loader_warn_in_flight_threshold: ClassVar[int] = 6
-    _extension_loader_error_in_flight_threshold: ClassVar[int] = 8
-    _extension_loader_pressure_cooldown_seconds: ClassVar[float] = 5.0
-    _extension_loader_emit_pressure_events: ClassVar[bool] = False
-    _extension_loader_last_pressure_level: ClassVar[str] = "ok"
-    _extension_loader_last_pressure_emit_ts: ClassVar[float] = 0.0
-    # _tiered_tools_deprecation_warned removed (E5 M3) — get_tiered_tools() deleted
-
-    # Track optional modules we have already reported as missing so that we do not spam logs.
-    _missing_extension_modules: ClassVar[Set[str]] = set()
-    _missing_extension_modules_lock: ClassVar[threading.RLock] = threading.RLock()
+    # Pressure monitoring (metrics, thresholds, cooldown, missing-module tracking).
+    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = (
+        ExtensionLoaderPressureMonitor()
+    )
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -231,56 +517,26 @@ class VerticalExtensionLoader(ABC):
     @classmethod
     def _increment_loader_metric(cls, metric: str, delta: int = 1) -> None:
         """Increment extension loader metric counter."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            base._extension_loader_metrics[metric] = (
-                base._extension_loader_metrics.get(metric, 0) + delta
-            )
+        VerticalExtensionLoader._pressure_monitor.increment_metric(metric, delta)
 
     @classmethod
     def _update_loader_peak_metric(cls, metric: str, value: int) -> None:
         """Update extension loader metric peak value."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            current = base._extension_loader_metrics.get(metric, 0)
-            if value > current:
-                base._extension_loader_metrics[metric] = value
+        VerticalExtensionLoader._pressure_monitor.update_peak_metric(metric, value)
 
     @classmethod
     def get_extension_loader_metrics(cls) -> Dict[str, Any]:
         """Return snapshot of shared async extension loader metrics."""
         base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            snapshot = dict(base._extension_loader_metrics)
-        snapshot["max_workers"] = base._extension_executor_max_workers
-        snapshot["queue_limit"] = base._extension_executor_queue_limit
-        snapshot["warn_queue_threshold"] = base._extension_loader_warn_queue_threshold
-        snapshot["error_queue_threshold"] = base._extension_loader_error_queue_threshold
-        snapshot["warn_in_flight_threshold"] = base._extension_loader_warn_in_flight_threshold
-        snapshot["error_in_flight_threshold"] = base._extension_loader_error_in_flight_threshold
-        snapshot["pressure_level"] = base._extension_loader_last_pressure_level
-        return snapshot
+        return base._pressure_monitor.get_metrics_snapshot(
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
+        )
 
     @classmethod
     def reset_extension_loader_metrics(cls) -> None:
         """Reset async extension loader metrics counters."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            for key in (
-                "submitted",
-                "completed",
-                "failed",
-                "in_flight",
-                "max_in_flight",
-                "queued",
-                "max_queued",
-                "queue_waits",
-                "pressure_warnings",
-                "pressure_errors",
-            ):
-                base._extension_loader_metrics[key] = 0
-            base._extension_loader_last_pressure_level = "ok"
-            base._extension_loader_last_pressure_emit_ts = 0.0
+        VerticalExtensionLoader._pressure_monitor.reset_metrics()
 
     @classmethod
     def _extension_module_candidates(cls, module_suffix: str) -> List[str]:
@@ -312,15 +568,13 @@ class VerticalExtensionLoader(ABC):
             )
 
         cache_key = f"{cls.__name__}:{module_path}"
-        with cls._missing_extension_modules_lock:
-            if cache_key not in cls._missing_extension_modules:
-                cls._missing_extension_modules.add(cache_key)
-                logger.debug(
-                    "Optional extension module '%s' not found for vertical '%s'; "
-                    "capability package likely not installed.",
-                    module_path,
-                    getattr(cls, "name", cls.__name__),
-                )
+        if VerticalExtensionLoader._pressure_monitor.record_missing_module(cache_key):
+            logger.debug(
+                "Optional extension module '%s' not found for vertical '%s'; "
+                "capability package likely not installed.",
+                module_path,
+                getattr(cls, "name", cls.__name__),
+            )
         return False
 
     @classmethod
@@ -335,120 +589,36 @@ class VerticalExtensionLoader(ABC):
         emit_events: Optional[bool] = None,
     ) -> None:
         """Configure queue-pressure warning/error thresholds for extension loading."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            if warn_queue_threshold is not None:
-                base._extension_loader_warn_queue_threshold = max(0, int(warn_queue_threshold))
-            if error_queue_threshold is not None:
-                base._extension_loader_error_queue_threshold = max(0, int(error_queue_threshold))
-            if warn_in_flight_threshold is not None:
-                base._extension_loader_warn_in_flight_threshold = max(
-                    0, int(warn_in_flight_threshold)
-                )
-            if error_in_flight_threshold is not None:
-                base._extension_loader_error_in_flight_threshold = max(
-                    0, int(error_in_flight_threshold)
-                )
-            if cooldown_seconds is not None:
-                base._extension_loader_pressure_cooldown_seconds = max(0.0, float(cooldown_seconds))
-            if emit_events is not None:
-                base._extension_loader_emit_pressure_events = bool(emit_events)
+        VerticalExtensionLoader._pressure_monitor.configure(
+            warn_queue_threshold=warn_queue_threshold,
+            error_queue_threshold=error_queue_threshold,
+            warn_in_flight_threshold=warn_in_flight_threshold,
+            error_in_flight_threshold=error_in_flight_threshold,
+            cooldown_seconds=cooldown_seconds,
+            emit_events=emit_events,
+        )
 
     @classmethod
     def _pressure_level(cls, *, queued: int, in_flight: int) -> str:
         """Return pressure level for current loader queue and in-flight counts."""
-        base = VerticalExtensionLoader
-        if (
-            queued >= base._extension_loader_error_queue_threshold
-            or in_flight >= base._extension_loader_error_in_flight_threshold
-        ):
-            return "error"
-        if (
-            queued >= base._extension_loader_warn_queue_threshold
-            or in_flight >= base._extension_loader_warn_in_flight_threshold
-        ):
-            return "warn"
-        return "ok"
+        return VerticalExtensionLoader._pressure_monitor.pressure_level(
+            queued=queued, in_flight=in_flight
+        )
 
     @classmethod
     def _emit_pressure_event(cls, level: str, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
-        try:
-            from victor.core.events import get_observability_bus
-            from victor.core.events.emit_helper import emit_event_sync
-
-            bus = get_observability_bus()
-            if bus is None:
-                return
-            emit_event_sync(
-                bus,
-                _EXTENSION_LOADER_PRESSURE_TOPIC,
-                {
-                    "level": level,
-                    "reason": reason,
-                    "metrics": snapshot,
-                },
-                source="VerticalExtensionLoader",
-                use_background_loop=True,
-                track_metrics=False,
-            )
-        except Exception as e:
-            logger.debug("Failed emitting extension loader pressure event: %s", e)
+        VerticalExtensionLoader._pressure_monitor.emit_pressure_event(level, snapshot, reason)
 
     @classmethod
     def _check_pressure(cls, *, reason: str) -> None:
         """Check queue pressure and optionally emit warning/error diagnostics."""
         base = VerticalExtensionLoader
-        snapshot = base.get_extension_loader_metrics()
-        queued = int(snapshot.get("queued", 0))
-        in_flight = int(snapshot.get("in_flight", 0))
-        level = base._pressure_level(queued=queued, in_flight=in_flight)
-
-        now = time.monotonic()
-        should_emit = False
-        with base._extension_loader_metrics_lock:
-            previous_level = base._extension_loader_last_pressure_level
-            cooldown = base._extension_loader_pressure_cooldown_seconds
-            elapsed = now - base._extension_loader_last_pressure_emit_ts
-
-            if level == "ok":
-                base._extension_loader_last_pressure_level = "ok"
-                return
-
-            if level != previous_level or elapsed >= cooldown:
-                base._extension_loader_last_pressure_level = level
-                base._extension_loader_last_pressure_emit_ts = now
-                should_emit = True
-                if level == "error":
-                    base._extension_loader_metrics["pressure_errors"] += 1
-                else:
-                    base._extension_loader_metrics["pressure_warnings"] += 1
-
-        if not should_emit:
-            return
-
-        message = (
-            "Extension loader pressure %s: queued=%s in_flight=%s "
-            "(reason=%s, thresholds q:%s/%s in_f:%s/%s)"
+        base._pressure_monitor.check_pressure(
+            reason=reason,
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
         )
-        args = (
-            level.upper(),
-            queued,
-            in_flight,
-            reason,
-            base._extension_loader_warn_queue_threshold,
-            base._extension_loader_error_queue_threshold,
-            base._extension_loader_warn_in_flight_threshold,
-            base._extension_loader_error_in_flight_threshold,
-        )
-
-        if level == "error":
-            logger.error(message, *args)
-        else:
-            logger.warning(message, *args)
-
-        if base._extension_loader_emit_pressure_events:
-            base._emit_pressure_event(level, snapshot, reason)
 
     @classmethod
     def emit_extension_loader_metrics_event(
@@ -460,36 +630,15 @@ class VerticalExtensionLoader(ABC):
         reset_after_emit: bool = False,
     ) -> Dict[str, Any]:
         """Emit current extension-loader metrics as an observability event."""
-        metrics = cls.get_extension_loader_metrics()
-
-        bus = event_bus
-        if bus is None:
-            try:
-                from victor.core.events import get_observability_bus
-
-                bus = get_observability_bus()
-            except Exception as e:
-                logger.debug("Failed resolving observability bus for loader metrics: %s", e)
-                bus = None
-
-        if bus is not None:
-            try:
-                from victor.core.events.emit_helper import emit_event_sync
-
-                emit_event_sync(
-                    bus,
-                    topic,
-                    {"metrics": metrics},
-                    source=source,
-                    use_background_loop=True,
-                    track_metrics=False,
-                )
-            except Exception as e:
-                logger.debug("Failed emitting extension-loader metrics event: %s", e)
-
-        if reset_after_emit:
-            cls.reset_extension_loader_metrics()
-        return metrics
+        base = VerticalExtensionLoader
+        return base._pressure_monitor.emit_metrics_event(
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
+            event_bus=event_bus,
+            topic=topic,
+            source=source,
+            reset_after_emit=reset_after_emit,
+        )
 
     # =========================================================================
     # Extension Caching Infrastructure
@@ -1519,8 +1668,7 @@ class VerticalExtensionLoader(ABC):
         ) -> Any:
             cls._increment_loader_metric("submitted")
             cls._increment_loader_metric("queued")
-            with cls._extension_loader_metrics_lock:
-                queued_now = cls._extension_loader_metrics.get("queued", 0)
+            queued_now = cls._pressure_monitor.get_metric("queued")
             cls._update_loader_peak_metric("max_queued", queued_now)
             cls._check_pressure(reason=f"{extension_type}.queued")
 
@@ -1534,8 +1682,7 @@ class VerticalExtensionLoader(ABC):
 
                 cls._increment_loader_metric("queued", -1)
                 cls._increment_loader_metric("in_flight")
-                with cls._extension_loader_metrics_lock:
-                    in_flight_now = cls._extension_loader_metrics.get("in_flight", 0)
+                in_flight_now = cls._pressure_monitor.get_metric("in_flight")
                 cls._update_loader_peak_metric("max_in_flight", in_flight_now)
                 cls._check_pressure(reason=f"{extension_type}.in_flight")
 
