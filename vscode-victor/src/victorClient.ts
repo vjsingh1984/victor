@@ -1111,8 +1111,13 @@ export class VictorClient {
                 return true;
             }
             return status.capabilities.includes(capability);
-        } catch {
-            return true;
+        } catch (error) {
+            if (error instanceof VictorError) {
+                // Older servers may not expose /status yet, but offline/unhealthy servers should
+                // not trigger extra capability-specific requests and noisy connection errors.
+                return error.type === VictorErrorType.NotFound;
+            }
+            return false;
         }
     }
 
