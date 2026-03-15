@@ -29,6 +29,8 @@ Features:
 import asyncio
 import json
 import logging
+import secrets
+import shlex
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -296,21 +298,33 @@ class TerminalCommandRequest(BaseModel):
     timeout: int = Field(default=60, ge=1, le=300)
     require_approval: bool = True
 
+    @field_validator("working_dir")
+    @classmethod
+    def validate_working_dir(cls, v: Optional[str]) -> Optional[str]:
+        """Validate working_dir to prevent path traversal."""
+        if v is None:
+            return None
+        from pathlib import Path
+
+        if ".." in Path(v).parts:
+            raise ValueError("working_dir must not contain '..' components")
+        return str(Path(v).resolve())
+
     @field_validator("command")
     @classmethod
     def validate_command(cls, v: str) -> str:
         """Validate command to prevent obviously dangerous operations."""
-        # Disallow command chaining with shell metacharacters
         dangerous_patterns = [
             "rm -rf /",
             "rm -rf ~",
             "> /dev/sd",
             "mkfs.",
             "dd if=",
-            ":(){:|:&};:",  # Fork bomb
+            ":(){:|:&};:",
         ]
+        cmd_lower = v.lower()
         for pattern in dangerous_patterns:
-            if pattern in v:
+            if pattern in cmd_lower:
                 raise ValueError(f"Command contains dangerous pattern: {pattern}")
         return v
 
@@ -413,7 +427,7 @@ class VictorFastAPIServer:
                 allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|vscode-webview://[a-z0-9-]+)$",
                 allow_credentials=True,
                 allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                allow_headers=["*"],
+                allow_headers=["Content-Type", "Accept", "Authorization", "X-Requested-With"],
             )
 
         # Setup routes
@@ -436,6 +450,17 @@ class VictorFastAPIServer:
         # Setup HITL routes if enabled
         if self.enable_hitl:
             self._setup_hitl_routes()
+
+    async def _verify_api_key(self, request: Request) -> Optional[str]:
+        """Verify API key if authentication is configured. Returns client_id or None."""
+        if not self.api_keys:
+            return None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            api_key = auth_header[7:]
+            if api_key in self.api_keys:
+                return self.api_keys[api_key]
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
     @asynccontextmanager
     async def _lifespan(self, app: FastAPI) -> AsyncIterator[None]:
@@ -901,7 +926,7 @@ class VictorFastAPIServer:
 
             except Exception as e:
                 logger.exception("Capabilities discovery error")
-                return JSONResponse({"error": str(e), "capabilities": {}}, status_code=500)
+                return JSONResponse({"error": "Internal server error", "capabilities": {}}, status_code=500)
 
         # Tools
         @app.get("/tools", tags=["Tools"])
@@ -1119,7 +1144,7 @@ class VictorFastAPIServer:
                 return JSONResponse({"is_git_repo": False, "error": "Git not installed"})
             except Exception as e:
                 logger.exception("Git status error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/git/commit", tags=["Git"])
         async def git_commit(request: GitCommitRequest) -> JSONResponse:
@@ -1177,7 +1202,7 @@ class VictorFastAPIServer:
                 raise
             except Exception as e:
                 logger.exception("Git commit error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/git/log", tags=["Git"])
         async def git_log(limit: int = Query(20, ge=1, le=100)) -> JSONResponse:
@@ -1215,7 +1240,7 @@ class VictorFastAPIServer:
 
             except Exception as e:
                 logger.exception("Git log error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/git/diff", tags=["Git"])
         async def git_diff(
@@ -1250,7 +1275,7 @@ class VictorFastAPIServer:
 
             except Exception as e:
                 logger.exception("Git diff error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         # Terminal Agent endpoints
         @app.post("/terminal/suggest", tags=["Terminal"])
@@ -1306,7 +1331,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Terminal suggest error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/terminal/execute", response_model=TerminalCommandResponse, tags=["Terminal"])
         async def terminal_execute(request: TerminalCommandRequest) -> TerminalCommandResponse:
@@ -1315,6 +1340,20 @@ Respond with just the command to run."""
 
             cmd_id = f"cmd-{int(time.time() * 1000)}"
             working_dir = request.working_dir or self.workspace_root
+
+            # Validate working_dir is within workspace bounds
+            resolved_dir = Path(working_dir).resolve()
+            workspace_resolved = Path(self.workspace_root).resolve()
+            if not str(resolved_dir).startswith(str(workspace_resolved)):
+                return TerminalCommandResponse(
+                    command_id=cmd_id,
+                    command=request.command,
+                    status="failed",
+                    output="Working directory must be within workspace",
+                    exit_code=-1,
+                    is_dangerous=True,
+                    requires_approval=False,
+                )
 
             # Check for dangerous commands
             dangerous_patterns = [
@@ -1339,9 +1378,10 @@ Respond with just the command to run."""
                 )
 
             try:
-                # Execute command asynchronously
-                proc = await asyncio.create_subprocess_shell(
-                    request.command,
+                # Use exec (not shell) to prevent command injection
+                cmd_parts = shlex.split(request.command)
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd_parts,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     cwd=working_dir,
@@ -1468,7 +1508,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Workspace overview error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/workspace/metrics", tags=["Workspace"])
         async def workspace_metrics() -> JSONResponse:
@@ -1540,7 +1580,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Workspace metrics error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/workspace/security", tags=["Workspace"])
         async def workspace_security() -> JSONResponse:
@@ -1598,6 +1638,8 @@ Respond with just the command to run."""
                             continue
 
                         try:
+                            if path.stat().st_size > 1_000_000:
+                                continue
                             content = path.read_text(encoding="utf-8", errors="ignore")
                             for pattern, finding_type in secret_patterns:
                                 for match in re.finditer(pattern, content):
@@ -1608,7 +1650,7 @@ Respond with just the command to run."""
                                             "line": line_num,
                                             "type": finding_type,
                                             "severity": "high",
-                                            "snippet": match.group()[:30] + "...",
+                                            "snippet": "[REDACTED]",
                                         }
                                     )
                         except Exception:
@@ -1629,7 +1671,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Workspace security error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/workspace/dependencies", tags=["Workspace"])
         async def workspace_dependencies() -> JSONResponse:
@@ -1687,7 +1729,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Workspace dependencies error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         # MCP endpoints
         @app.get("/mcp/servers", tags=["MCP"])
@@ -1716,7 +1758,7 @@ Respond with just the command to run."""
                 return JSONResponse({"servers": [], "error": "MCP not available"})
             except Exception as e:
                 logger.exception("MCP servers error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/mcp/connect", tags=["MCP"])
         async def mcp_connect(request: MCPConnectRequest) -> JSONResponse:
@@ -1733,7 +1775,7 @@ Respond with just the command to run."""
                 raise HTTPException(status_code=501, detail="MCP not available")
             except Exception as e:
                 logger.exception("MCP connect error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/mcp/disconnect", tags=["MCP"])
         async def mcp_disconnect(request: MCPConnectRequest) -> JSONResponse:
@@ -1750,7 +1792,7 @@ Respond with just the command to run."""
                 raise HTTPException(status_code=501, detail="MCP not available")
             except Exception as e:
                 logger.exception("MCP disconnect error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         # RL Model Selector endpoints
         @app.get("/rl/stats", tags=["RL"])
@@ -1803,7 +1845,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("RL stats error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/rl/recommend", tags=["RL"])
         async def rl_recommend(task_type: Optional[str] = Query(None)) -> JSONResponse:
@@ -1862,7 +1904,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("RL recommend error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/rl/explore", tags=["RL"])
         async def rl_explore(request: RLExploreRequest) -> JSONResponse:
@@ -1891,7 +1933,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("RL explore error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/rl/strategy", tags=["RL"])
         async def rl_strategy(request: RLStrategyRequest) -> JSONResponse:
@@ -1932,7 +1974,7 @@ Respond with just the command to run."""
                 raise
             except Exception as e:
                 logger.exception("RL strategy error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/rl/reset", tags=["RL"])
         async def rl_reset() -> JSONResponse:
@@ -1969,7 +2011,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("RL reset error")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         # =====================================================================
         # Background Agent Endpoints
@@ -2019,7 +2061,7 @@ Respond with just the command to run."""
                 return JSONResponse({"error": str(e)}, status_code=429)
             except Exception as e:
                 logger.exception("Failed to start agent")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/agents", tags=["Agents"])
         async def list_agents(
@@ -2051,7 +2093,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to list agents")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/agents/{agent_id}", tags=["Agents"])
         async def get_agent(agent_id: str) -> JSONResponse:
@@ -2071,7 +2113,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to get agent")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/agents/{agent_id}/cancel", tags=["Agents"])
         async def cancel_agent(agent_id: str) -> JSONResponse:
@@ -2099,7 +2141,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to cancel agent")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/agents/clear", tags=["Agents"])
         async def clear_agents() -> JSONResponse:
@@ -2122,7 +2164,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to clear agents")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         # =====================================================================
         # Plan Management Endpoints
@@ -2182,7 +2224,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to create plan")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/plans/{plan_id}", tags=["Plans"])
         async def get_plan(plan_id: str) -> JSONResponse:
@@ -2356,7 +2398,7 @@ Respond with just the command to run."""
 
             except Exception as e:
                 logger.exception("Failed to create team")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/teams", tags=["Teams"])
         async def list_teams(
@@ -2618,7 +2660,7 @@ Respond with just the command to run."""
                 return JSONResponse({"templates": []})
             except Exception as e:
                 logger.exception("Failed to list workflow templates")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/workflows/templates/{template_id}", tags=["Workflows"])
         async def get_workflow_template(template_id: str) -> JSONResponse:
@@ -2656,7 +2698,7 @@ Respond with just the command to run."""
                 return JSONResponse({"error": "Workflows module not available"}, status_code=404)
             except Exception as e:
                 logger.exception("Failed to get workflow template")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.post("/workflows/execute", tags=["Workflows"])
         async def execute_workflow(request: Request) -> JSONResponse:
@@ -2791,7 +2833,7 @@ Respond with just the command to run."""
                 return JSONResponse({"error": "Workflows module not available"}, status_code=500)
             except Exception as e:
                 logger.exception("Failed to execute workflow")
-                return JSONResponse({"error": str(e)}, status_code=500)
+                return JSONResponse({"error": "Internal server error"}, status_code=500)
 
         @app.get("/workflows/executions", tags=["Workflows"])
         async def list_workflow_executions(
@@ -3382,16 +3424,19 @@ Respond with just the command to run."""
             await ws.send_json({"type": "pong"})
 
         elif msg_type == "auth":
-            # Handle WebSocket authentication (more secure than URL query params)
-            # API key is sent in first message after connection instead of URL
             api_key = data.get("api_key", "")
-            if api_key:
-                # Store auth state on the websocket scope for future operations
-                if not hasattr(ws, "state"):
-                    ws.state = type("State", (), {})()
-                ws.state.authenticated = True
-                ws.state.api_key = api_key
-                logger.debug("WebSocket client authenticated via message")
+            if api_key and self.api_keys:
+                matched = next((k for k in self.api_keys if secrets.compare_digest(k, api_key)), None)
+                if matched:
+                    if not hasattr(ws, "state"):
+                        ws.state = type("State", (), {})()
+                    ws.state.authenticated = True
+                    ws.state.client_id = self.api_keys[matched]
+                    logger.debug("WebSocket client authenticated via message")
+                    await ws.send_json({"type": "auth_success"})
+                else:
+                    await ws.send_json({"type": "auth_failed", "message": "Invalid API key"})
+            elif not self.api_keys:
                 await ws.send_json({"type": "auth_success"})
             else:
                 await ws.send_json({"type": "auth_failed", "message": "No API key provided"})
