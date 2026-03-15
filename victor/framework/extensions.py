@@ -32,6 +32,7 @@ Usage:
         ComputeNode,
         CodeCorrectionMiddleware,
         ModeConfigRegistry,
+        AgentSpec,
     )
 """
 
@@ -47,16 +48,61 @@ __all__ = [
     "SafetyRule",
     # Conversation coordination
     "ConversationCoordinator",
+    "ConversationStats",
+    "ConversationTurn",
+    "TurnType",
     # Workflow execution
     "WorkflowExecutor",
     "WorkflowContext",
     "ComputeNode",
     "NodeResult",
+    "ExecutorNodeStatus",
+    "register_compute_handler",
+    "get_compute_handler",
+    # Workflow definition
+    "WorkflowBuilder",
+    "WorkflowDefinition",
+    "workflow",
+    "AgentNode",
+    "ConditionNode",
+    "ParallelNode",
     # Code correction
     "CodeCorrectionMiddleware",
+    "CodeCorrectionConfig",
+    "CorrectionResult",
+    # Code validation
+    "CodeValidationResult",
+    "Language",
     # Mode configuration
     "ModeConfigRegistry",
     "ModeDefinition",
+    "ModeConfig",
+    "RegistryBasedModeConfigProvider",
+    # Service container
+    "ServiceContainer",
+    "ServiceLifetime",
+    # Agent specs
+    "AgentSpec",
+    "AgentCapabilities",
+    "AgentConstraints",
+    "ModelPreference",
+    "OutputFormat",
+    "DelegationPolicy",
+    # Sub-agents
+    "SubAgent",
+    "SubAgentConfig",
+    "SubAgentResult",
+    "SubAgentRole",
+    "set_role_tool_provider",
+    # Middleware
+    "MiddlewareChain",
+    "MiddlewareAbortError",
+    "create_middleware_chain",
+    # Vertical context
+    "VerticalContext",
+    "create_vertical_context",
+    "VerticalContextProtocol",
+    "MutableVerticalContextProtocol",
     # Handler registry
     "HandlerRegistry",
     "get_handler_registry",
@@ -77,16 +123,61 @@ def __getattr__(name: str):
         "SafetyRule": "victor.agent.coordinators.safety_coordinator",
         # Conversation
         "ConversationCoordinator": "victor.agent.coordinators.conversation_coordinator",
+        "ConversationStats": "victor.agent.coordinators.conversation_coordinator",
+        "ConversationTurn": "victor.agent.coordinators.conversation_coordinator",
+        "TurnType": "victor.agent.coordinators.conversation_coordinator",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
         "WorkflowContext": "victor.workflows.executor",
-        "ComputeNode": "victor.workflows.definition",
         "NodeResult": "victor.workflows.executor",
+        "ExecutorNodeStatus": "victor.workflows.executor",
+        "register_compute_handler": "victor.workflows.executor",
+        "get_compute_handler": "victor.workflows.executor",
+        # Workflow definition
+        "ComputeNode": "victor.workflows.definition",
+        "WorkflowBuilder": "victor.workflows.definition",
+        "WorkflowDefinition": "victor.workflows.definition",
+        "workflow": "victor.workflows.definition",
+        "AgentNode": "victor.workflows.definition",
+        "ConditionNode": "victor.workflows.definition",
+        "ParallelNode": "victor.workflows.definition",
         # Code correction
         "CodeCorrectionMiddleware": "victor.agent.code_correction_middleware",
+        "CodeCorrectionConfig": "victor.agent.code_correction_middleware",
+        "CorrectionResult": "victor.agent.code_correction_middleware",
+        # Code validation
+        "CodeValidationResult": "victor.evaluation.correction.types",
+        "Language": "victor.evaluation.correction.types",
         # Mode configuration
         "ModeConfigRegistry": "victor.core.mode_config",
         "ModeDefinition": "victor.core.mode_config",
+        "ModeConfig": "victor.core.mode_config",
+        "RegistryBasedModeConfigProvider": "victor.core.mode_config",
+        # Service container
+        "ServiceContainer": "victor.core.container",
+        "ServiceLifetime": "victor.core.container",
+        # Agent specs
+        "AgentSpec": "victor.agent.specs.models",
+        "AgentCapabilities": "victor.agent.specs.models",
+        "AgentConstraints": "victor.agent.specs.models",
+        "ModelPreference": "victor.agent.specs.models",
+        "OutputFormat": "victor.agent.specs.models",
+        "DelegationPolicy": "victor.agent.specs.models",
+        # Sub-agents
+        "SubAgent": "victor.agent.subagents.base",
+        "SubAgentConfig": "victor.agent.subagents.base",
+        "SubAgentResult": "victor.agent.subagents.base",
+        "SubAgentRole": "victor.agent.subagents.base",
+        "set_role_tool_provider": "victor.agent.subagents.protocols",
+        # Middleware
+        "MiddlewareChain": "victor.agent.middleware_chain",
+        "MiddlewareAbortError": "victor.agent.middleware_chain",
+        "create_middleware_chain": "victor.agent.middleware_chain",
+        # Vertical context
+        "VerticalContext": "victor.agent.vertical_context",
+        "create_vertical_context": "victor.agent.vertical_context",
+        "VerticalContextProtocol": "victor.agent.vertical_context",
+        "MutableVerticalContextProtocol": "victor.agent.vertical_context",
         # Handler registry
         "HandlerRegistry": "victor.framework.handler_registry",
         "get_handler_registry": "victor.framework.handler_registry",

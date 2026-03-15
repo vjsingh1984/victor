@@ -68,38 +68,9 @@ FORBIDDEN_PREFIXES = frozenset(
 )
 
 # Known violations to track migration progress (baseline).
-# Remove entries as verticals are migrated to use victor.framework.extensions.
-KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
-    "victor_coding": {
-        "victor.agent.code_correction_middleware",
-        "victor.agent.coordinators.safety_coordinator",
-        "victor.agent.coordinators.conversation_coordinator",
-        "victor.core.container",
-        "victor.core.mode_config",
-        "victor.evaluation.correction",
-        "victor.workflows.definition",
-        "victor.workflows.executor",
-        "victor.processing.completion.protocol",
-        "victor.processing.native",
-        "victor.processing.editing",
-        "victor.protocols.lsp_types",
-    },
-    "victor_research": {
-        "victor.agent.coordinators.safety_coordinator",
-        "victor.agent.coordinators.conversation_coordinator",
-        "victor.core.mode_config",
-        "victor.workflows.definition",
-        "victor.workflows.executor",
-    },
-    "victor_invest": {
-        "victor.workflows.executor",
-        "victor.workflows.definition",
-        "victor.agent.coordinators.safety_coordinator",
-        "victor.agent.coordinators.conversation_coordinator",
-        "victor.agent.subagents",
-        "victor.agent.specs",
-    },
-}
+# All external verticals have been migrated to use victor.framework.extensions,
+# victor.framework.processing, and victor.framework.lsp re-export modules.
+KNOWN_VIOLATIONS: Dict[str, Set[str]] = {}
 
 
 def _find_package_root(package_name: str) -> Path | None:
@@ -252,22 +223,74 @@ def test_framework_extensions_module_exports():
     from victor.framework import extensions
 
     expected_exports = {
+        # Safety coordination
         "SafetyCoordinator",
         "SafetyAction",
         "SafetyCategory",
         "SafetyRule",
+        # Conversation coordination
         "ConversationCoordinator",
+        "ConversationStats",
+        "ConversationTurn",
+        "TurnType",
+        # Workflow execution
         "WorkflowExecutor",
         "WorkflowContext",
         "ComputeNode",
         "NodeResult",
+        "ExecutorNodeStatus",
+        "register_compute_handler",
+        "get_compute_handler",
+        # Workflow definition
+        "WorkflowBuilder",
+        "WorkflowDefinition",
+        "workflow",
+        "AgentNode",
+        "ConditionNode",
+        "ParallelNode",
+        # Code correction
         "CodeCorrectionMiddleware",
+        "CodeCorrectionConfig",
+        "CorrectionResult",
+        # Code validation
+        "CodeValidationResult",
+        "Language",
+        # Mode configuration
         "ModeConfigRegistry",
         "ModeDefinition",
+        "ModeConfig",
+        "RegistryBasedModeConfigProvider",
+        # Service container
+        "ServiceContainer",
+        "ServiceLifetime",
+        # Agent specs
+        "AgentSpec",
+        "AgentCapabilities",
+        "AgentConstraints",
+        "ModelPreference",
+        "OutputFormat",
+        "DelegationPolicy",
+        # Sub-agents
+        "SubAgent",
+        "SubAgentConfig",
+        "SubAgentResult",
+        "SubAgentRole",
+        "set_role_tool_provider",
+        # Middleware
+        "MiddlewareChain",
+        "MiddlewareAbortError",
+        "create_middleware_chain",
+        # Vertical context
+        "VerticalContext",
+        "create_vertical_context",
+        "VerticalContextProtocol",
+        "MutableVerticalContextProtocol",
+        # Handler registry
         "HandlerRegistry",
         "get_handler_registry",
         "register_global_handler",
         "register_vertical_handlers",
+        # Provider access
         "ProviderRegistry",
     }
 
@@ -286,3 +309,84 @@ def test_framework_extensions_lazy_import():
 
     for name in all_names:
         assert hasattr(extensions, name), f"extensions.{name} failed to resolve"
+
+
+def test_framework_processing_module_exports():
+    """Verify victor.framework.processing exports all documented symbols."""
+    from victor.framework import processing
+
+    expected_exports = {
+        "OperationType",
+        "EditOperation",
+        "EditTransaction",
+        "FileEditor",
+        "get_default_text_chunker",
+        "InsertTextFormat",
+        "CompletionTriggerKind",
+        "CompletionContext",
+        "CompletionParams",
+        "CompletionItemLabelDetails",
+        "CompletionItem",
+        "InlineCompletionItem",
+        "InlineCompletionParams",
+        "CompletionList",
+        "InlineCompletionList",
+        "CompletionCapabilities",
+        "CompletionMetrics",
+    }
+
+    assert set(processing.__all__) == expected_exports, (
+        f"victor.framework.processing.__all__ mismatch.\n"
+        f"Missing: {expected_exports - set(processing.__all__)}\n"
+        f"Extra: {set(processing.__all__) - expected_exports}"
+    )
+
+
+def test_framework_processing_lazy_import():
+    """Verify that lazy imports in victor.framework.processing resolve correctly."""
+    from victor.framework.processing import __all__ as all_names
+    from victor.framework import processing
+
+    for name in all_names:
+        assert hasattr(processing, name), f"processing.{name} failed to resolve"
+
+
+def test_framework_lsp_module_exports():
+    """Verify victor.framework.lsp exports all documented symbols."""
+    from victor.framework import lsp
+
+    expected_exports = {
+        "DiagnosticSeverity",
+        "CompletionItemKind",
+        "SymbolKind",
+        "DiagnosticTag",
+        "Position",
+        "Range",
+        "Location",
+        "LocationLink",
+        "DiagnosticRelatedInformation",
+        "Diagnostic",
+        "CompletionItem",
+        "Hover",
+        "DocumentSymbol",
+        "SymbolInformation",
+        "TextEdit",
+        "TextDocumentIdentifier",
+        "VersionedTextDocumentIdentifier",
+        "TextDocumentEdit",
+    }
+
+    assert set(lsp.__all__) == expected_exports, (
+        f"victor.framework.lsp.__all__ mismatch.\n"
+        f"Missing: {expected_exports - set(lsp.__all__)}\n"
+        f"Extra: {set(lsp.__all__) - expected_exports}"
+    )
+
+
+def test_framework_lsp_lazy_import():
+    """Verify that lazy imports in victor.framework.lsp resolve correctly."""
+    from victor.framework.lsp import __all__ as all_names
+    from victor.framework import lsp
+
+    for name in all_names:
+        assert hasattr(lsp, name), f"lsp.{name} failed to resolve"
