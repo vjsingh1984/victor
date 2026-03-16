@@ -1063,18 +1063,10 @@ async def run_benchmark(
         print(f"[{task_id}] {task_def['name']} ({task_def['complexity']})...")
         start_time = time.time()
 
-        # Rate-limit guard: retry once after 60s on 429
+        # Rate-limit retries are handled by BaseProvider's ProviderRetryStrategy
+        # (exponential backoff with Retry-After header respect, controlled by max_retries)
         result = await adapter.execute_task(task_id, task_def)
-        if not result["success"] and "rate_limit" in (result.get("error") or "").lower():
-            print("  ⏳ Rate limited — waiting 60s and retrying...")
-            await asyncio.sleep(60)
-            result = await adapter.execute_task(task_id, task_def)
-
         results.append(result)
-
-        # Pace requests to avoid rate limits (15s between tasks)
-        if task_id != tasks_to_run[-1]:
-            await asyncio.sleep(15)
 
         duration = time.time() - start_time
 

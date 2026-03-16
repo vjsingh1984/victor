@@ -260,6 +260,9 @@ class BaseProvider(ABC):
         self.max_retries = max_retries
         self.extra_config = kwargs
 
+        # Retry strategy (lazily initialized on first rate-limit retry)
+        self._retry_strategy: Any = None
+
         # Circuit breaker for resilience
         self._use_circuit_breaker = use_circuit_breaker
         self._circuit_breaker: Optional[CircuitBreaker] = None
@@ -468,9 +471,11 @@ class BaseProvider(ABC):
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """Execute a function with circuit breaker protection.
+        """Execute a function with circuit breaker and retry-on-rate-limit.
 
-        Use this method in subclass implementations to protect API calls.
+        When ``max_retries > 0``, rate-limit errors (429) are automatically
+        retried with exponential backoff and jitter, respecting ``Retry-After``
+        headers. Set ``max_retries=0`` to raise immediately (old behavior).
 
         Args:
             func: Async function to execute
@@ -482,11 +487,28 @@ class BaseProvider(ABC):
 
         Raises:
             CircuitBreakerError: If circuit is open
-            Exception: If func raises and circuit records failure
+            ProviderRateLimitError: If rate-limit retries are exhausted
+            Exception: If func raises a non-retryable error
         """
-        if self._circuit_breaker:
-            return await self._circuit_breaker.execute(func, *args, **kwargs)
-        return await func(*args, **kwargs)
+        async def _call() -> Any:
+            if self._circuit_breaker:
+                return await self._circuit_breaker.execute(func, *args, **kwargs)
+            return await func(*args, **kwargs)
+
+        if self.max_retries <= 0:
+            return await _call()
+
+        # Use ProviderRetryStrategy for automatic retry on 429/transient errors
+        if self._retry_strategy is None:
+            from victor.providers.resilience import (
+                ProviderRetryConfig,
+                ProviderRetryStrategy,
+            )
+            self._retry_strategy = ProviderRetryStrategy(
+                ProviderRetryConfig(max_retries=self.max_retries)
+            )
+
+        return await self._retry_strategy.execute(_call)
 
     def reset_circuit_breaker(self) -> None:
         """Manually reset the circuit breaker to closed state."""
