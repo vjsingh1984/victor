@@ -557,6 +557,35 @@ jobs:
   # ==========================================================================
   # Generate checksums for all artifacts
   # ==========================================================================
+  generate-sbom:
+    name: Generate SBOM
+    needs: [build-python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install cyclonedx-bom
+        run: pip install cyclonedx-bom
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          pip install -e ".[embeddings]"
+          cyclonedx-py environment -o sbom.json --output-format json
+          cyclonedx-py environment -o sbom.xml --output-format xml
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+
   generate-checksums:
     name: Generate Checksums
     needs: [build-python, build-native, build-binary, build-docker]
@@ -584,7 +613,7 @@ jobs:
   # ==========================================================================
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums]
+    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, generate-sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
