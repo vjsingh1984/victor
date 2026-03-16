@@ -59,6 +59,7 @@ from victor_sdk.core.types import (
     validate_definition_version,
     normalize_workflow_metadata,
 )
+from victor_sdk.core.plugins import PluginContext, VictorPlugin
 
 # Core exceptions
 from victor_sdk.core.exceptions import (
@@ -153,6 +154,9 @@ __all__ = [
     "normalize_tool_requirements",
     "validate_definition_version",
     "normalize_workflow_metadata",
+    # Plugins
+    "PluginContext",
+    "VictorPlugin",
     # Exceptions
     "VerticalException",
     "VerticalConfigurationError",

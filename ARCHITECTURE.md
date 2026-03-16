@@ -121,9 +121,11 @@ flowchart TB
 
 ## Extension Points
 
+- **Plugins** — `VictorPlugin` implementation + `victor.plugins` entry point (registers tools, verticals, commands, and strategies)
 - **Providers** — `BaseProvider` subclass + `ProviderRegistry.register()`
-- **Tools** — `BaseTool` subclass in `victor/tools/`
-- **Verticals** — `VerticalBase` subclass; external via `victor.verticals` entry point
+- **Tools** — `BaseTool` subclass in `victor/tools/` or via Plugin registration
+- **Verticals** — `VerticalBase` subclass; external via `victor.plugins` (recommended) or `victor.verticals` entry point
+- **Chunking** — `ChunkingStrategy` implementation via `victor.chunking_strategies` entry point or Plugin
 - **Workflows** — YAML DSL or programmatic `StateGraph` construction
 - **Middleware** — Pre/post hooks, safety checks, rate limiting
 
@@ -131,9 +133,11 @@ flowchart TB
 
 | Principle | How |
 |-----------|-----|
-| **Facade pattern** | Orchestrator is a thin coordinator; delegates to services (Strangler Fig pattern) or coordinators |
-| **Protocol-based interfaces** | Python Protocols for ISP compliance (`SubAgentContext`, `ChatServiceProtocol`, etc.) |
+| **Unified Plugin System** | All domain-specific logic (verticals, tools, CLI) discovered via `VictorPlugin` protocol |
+| **Facade pattern** | Orchestrator is a thin coordinator; delegates to services or coordinators |
+| **Protocol-based interfaces** | Python Protocols for ISP compliance (`VictorPlugin`, `VerticalBase`, `ChunkingStrategy`, etc.) |
 | **Stratified configuration** | 268 settings grouped into 7 typed nested models; flat access preserved for backward compat |
 | **Provider agnosticism** | 22 backends behind a unified interface; switch mid-conversation |
-| **Opt-in complexity** | Simple `agent.run()` by default; workflows, teams, CQRS when needed |
+| **Opt-in complexity** | Simple `agent.run()` by default; workflows, teams, plugins when needed |
 | **Air-gapped capable** | Full functionality with local models (Ollama, LM Studio, vLLM) |
+| **Dynamic CLI Discovery** | Subcommands discovered from plugins at runtime; no static imports in core CLI |

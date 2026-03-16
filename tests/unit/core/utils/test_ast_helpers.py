@@ -5,7 +5,7 @@ import textwrap
 
 import pytest
 
-from victor.core.utils.ast_helpers import (
+from victor.verticals.contrib.coding.codebase.utils.ast_helpers import (
     STDLIB_MODULES,
     SymbolSummary,
     build_signature,

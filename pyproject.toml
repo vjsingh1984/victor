@@ -440,11 +440,18 @@ victor-examples = "examples.playground.cli:app"
 benchmark = "victor.benchmark:BenchmarkVertical"
 
 # Contrib verticals (migrated from external packages)
-coding = "victor.verticals.contrib.coding:CodingAssistant"
-rag = "victor.verticals.contrib.rag:RAGAssistant"
-devops = "victor.verticals.contrib.devops:DevOpsAssistant"
-dataanalysis = "victor.verticals.contrib.dataanalysis:DataAnalysisAssistant"
-research = "victor.verticals.contrib.research:ResearchAssistant"
+# coding = "victor.verticals.contrib.coding:CodingAssistant"  <-- Registered via plugin now
+# rag = "victor.verticals.contrib.rag:RAGAssistant"
+# devops = "victor.verticals.contrib.devops:DevOpsAssistant"
+# dataanalysis = "victor.verticals.contrib.dataanalysis:DataAnalysisAssistant"
+# research = "victor.verticals.contrib.research:ResearchAssistant"
+
+[project.entry-points."victor.plugins"]
+coding = "victor.verticals.contrib.coding:plugin"
+rag = "victor.verticals.contrib.rag:plugin"
+devops = "victor.verticals.contrib.devops:plugin"
+dataanalysis = "victor.verticals.contrib.dataanalysis:plugin"
+research = "victor.verticals.contrib.research:plugin"
 
 # =============================================================================
 # External Vertical Registration (for third-party packages)
