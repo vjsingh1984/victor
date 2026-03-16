@@ -29,9 +29,10 @@ end of each coding tranche.
 | FND-009 | P1 | Audit-backed roadmap hygiene automation | Implemented + Verified | Workflow syntax, canonical-link drift, wrong-repo metadata, and stale roadmap claims are checked automatically in CI. |
 | FND-006 | P2 | Generic capability promotion from vertical loaders | Not Started | Shared defaults moved to framework providers with compatibility adapters. |
 | FND-010 | P0 | Add tests for untested critical modules | In Progress | `tool_pipeline`, `cqrs`, `workflows/executor`, `sqlite_lancedb` each have ≥5 passing tests. |
-| FND-011 | P1 | Security CI gates: severity-gated blocking | Not Started | `bandit`/`semgrep`/`dependency-audit` block on critical findings instead of `continue-on-error`. |
+| FND-011 | P1 | Security CI baseline hardening | Implemented + Verified | At least one blocking critical-path security scan exists, `SECURITY.md` documents thresholds/exception handling, and remaining advisory scanners have explicit rationale. |
 | FND-012 | P1 | Move heavyweight deps behind extras | Not Started | `sentence-transformers`, `lancedb`, `pyarrow` moved to `[embeddings]` extra; base install <100MB. |
 | FND-013 | P2 | Triage TODO/FIXME markers to issues | Not Started | 81 markers triaged: converted to GitHub issues, resolved, or documented as intentional. |
+| FND-014 | P1 | Security scanner escalation beyond baseline | Not Started | `dependency-audit`, `bandit`, and `semgrep` move from advisory to tuned, merge-blocking thresholds with documented exceptions. |
 
 ## Current Tranche (2026-03-15)
 ### Scope

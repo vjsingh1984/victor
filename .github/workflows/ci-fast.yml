@@ -53,6 +53,24 @@ jobs:
       - name: Lint with Ruff
         run: ruff check victor
 
+  repo-hygiene:
+    name: Repo Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install repo hygiene dependencies
+        run: pip install pyyaml
+
+      - name: Check repo hygiene
+        run: python scripts/ci/repo_hygiene_check.py
+
   typecheck:
     name: Type Check (MyPy, Advisory)
     runs-on: ubuntu-latest
@@ -334,7 +352,7 @@ jobs:
           echo "✓ fallback_max_tools = $val (valid)"
 
   security-quick:
-    name: Security Quick Scan
+    name: Security Critical Scan (Blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -342,19 +360,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Trivy FS scan
+      - name: Run Trivy FS scan for critical findings
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-        continue-on-error: true
+          severity: 'CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-        continue-on-error: true

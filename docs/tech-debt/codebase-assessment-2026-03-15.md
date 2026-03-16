@@ -46,18 +46,16 @@
 
 | # | Finding | Evidence | Severity | Action |
 |---|---------|----------|----------|--------|
-| F-01 | Bare `except:` in production code | `victor/ui/commands/experiments.py` line ~281 swallows timestamp errors | High | Fix: add specific exception type |
-| F-02 | Missing tests for critical modules | `tool_pipeline.py`, `cqrs.py`, `workflows/executor.py`, `sqlite_lancedb.py` have no test files | High | Add test files (estimated 400 LOC) |
-| F-03 | 81 TODO/FIXME/HACK markers | Spread across codebase, concentrated in agents, providers, workflows | Medium | Triage: convert to GitHub issues or resolve |
-| F-04 | 2,192 `Any` type annotations | `orchestrator_factory.py` (102), `service_provider.py` (69), `protocol_adapters.py` (43) | Medium | Gradual reduction target: <500 by Q3 |
-| F-05 | 147 `# type: ignore` comments | 63 files, highest in `proximadb_multi.py` (7), `resilience.py` (8) | Low | Address in strict mypy expansion |
+| F-01 | 81 TODO/FIXME/HACK markers remain untriaged | Spread across codebase, concentrated in agents, providers, workflows | Medium | Triage: convert to GitHub issues, resolve, or record as intentional debt |
+| F-02 | 2,192 `Any` type annotations remain concentrated in factory/service layers | `orchestrator_factory.py` (102), `service_provider.py` (69), `protocol_adapters.py` (43) | Medium | Gradual reduction target: <500 by Q3 |
+| F-03 | 147 `# type: ignore` comments remain across 63 files | Highest in `resilience.py` (8) and `proximadb_multi.py` (7) | Low | Burn down as a follow-on to global strict mypy |
 
 ### Tier 2: Security
 
 | # | Finding | Evidence | Severity | Action |
 |---|---------|----------|----------|--------|
-| S-01 | `eval()`/`exec()` in 30 files | Tool executor, language analyzer, YAML eval, sandbox — mostly intentional | High | Per-file security audit required |
-| S-02 | Security CI steps use `continue-on-error` | `bandit`, `semgrep`, `dependency-audit` don't block PRs | High | Add severity thresholds, block on critical |
+| S-01 | `eval()`/`exec()` usage is narrow but security-sensitive | Real call sites are `victor/workflows/handlers.py` and `victor/ui/slash/commands/debug.py`, both sandboxed with `__builtins__: {}` | Medium | Keep these call sites documented and require explicit review before any expansion |
+| S-02 | Security CI baseline is now mixed by design | `gitleaks` and Trivy `CRITICAL` findings block; `pip-audit`, `bandit`, `semgrep`, and license reporting remain advisory with documented rationale | Medium | Continue from the critical blocking baseline toward dependency and SAST enforcement with tuned exceptions |
 | S-03 | No SBOM generation | No Software Bill of Materials in release pipeline | Medium | Add `syft` or `cyclonedx` to release workflow |
 | S-04 | SecretStr adoption incomplete | 17 occurrences; some provider configs may still use plain `str` for keys | Medium | Audit all `api_key` fields across providers |
 
@@ -121,23 +119,23 @@
 ```
                     HIGH IMPACT
                         │
-            S-01  S-02  │  F-01  F-02  P-01
+            S-03  F-01  │  S-04  P-01  D-01
                         │
      LOW ───────────────┼─────────────── HIGH
      EFFORT             │              EFFORT
                         │
-            F-03  T-05  │  D-01  D-02  D-03
+            T-05  V-02  │  D-02  D-03  X-01
                         │
                     LOW IMPACT
 ```
 
 ## Immediate Actions (Next Tranche)
 
-1. **F-01**: Fix bare `except:` in `experiments.py` (5 min)
-2. **F-02**: Add test stubs for `tool_pipeline`, `cqrs`, `executor`, `sqlite_lancedb` (2 hr)
-3. **S-01**: Audit `eval()`/`exec()` usage in 30 files, document security assumptions (1 hr)
-4. **S-02**: Change `continue-on-error: true` to severity-gated blocking in security CI (30 min)
-5. **P-01**: Move `sentence-transformers`, `lancedb`, `pyarrow` behind `[embeddings]` extra (1 hr)
+1. **F-01**: Triage TODO/FIXME/HACK markers into GitHub issues or an intentional-debt ledger (1 hr)
+2. **S-03**: Add SBOM generation to the release/build pipeline (45 min)
+3. **S-04**: Audit provider/API-key fields for `SecretStr` adoption gaps (1 hr)
+4. **D-01**: Define the first extraction seam for `protocols.py` and convert it into a tracked split plan (1 hr)
+5. **P-01**: Move `sentence-transformers`, `lancedb`, `pyarrow` behind an `[embeddings]` extra (1 hr)
 
 ## Previously Completed (This Tranche)
 
@@ -149,6 +147,7 @@
 - Marked the comprehensive historical roadmap as archived and corrected root roadmap links.
 - Synced canonical roadmap/foundation-plan state to this assessment.
 - Added automated repo-hygiene checks to keep workflow/link/archive/lint drift from recurring.
+- Established a blocking security baseline: `gitleaks` plus Trivy `CRITICAL` findings now fail CI, and `SECURITY.md` documents thresholds plus advisory exceptions.
 - Architecture strengthening: ExtensionManifest, CapabilityNegotiator, OrchestratorPropertyFacade, CallbackCoordinator, ExtensionModuleResolver, ExtensionCacheManager, InitializationPhaseManager.
 - Orchestrator reduced from 4,514 to 3,940 LOC. Extension loader from 2,049 to 1,897 LOC.
 - Duplicate ProviderPool removed and wired with feature flag.

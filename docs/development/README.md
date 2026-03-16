@@ -16,14 +16,16 @@ pytest tests/unit -v
 ```bash
 # Before commits
 make lint           # ruff + black --check + mypy
+make check-repo-hygiene
 make format         # black + ruff --fix
 
-# Or individually
+# Or individually (same mypy gate that `make lint` runs)
 black victor tests
 ruff check --fix victor tests
 mypy victor
+python scripts/ci/repo_hygiene_check.py
 
-# Strict-package gate (matches CI)
+# Historical focused baseline packages for targeted remediation
 mypy --strict \
   victor/config \
   victor/storage/cache \

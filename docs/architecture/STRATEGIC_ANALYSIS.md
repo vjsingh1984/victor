@@ -44,7 +44,7 @@ Victor is a **technically excellent** agentic AI framework with **superior archi
 - **14 CI/CD workflows** with 6 status checks
 
 ### Current Horizon
-From `ROADMAP.md`:
+From `roadmap.md`:
 | Horizon | Focus | Examples |
 |---------|-------|----------|
 | **0-3 months** | Stability + UX | Faster startup, clearer errors, smoother TUI |
@@ -821,7 +821,7 @@ The technical foundation is exceptional, but user-facing polish prevents it from
 - [Competitive Comparison](docs/architecture/COMPETITIVE_COMPARISON.md)
 - [Gemini Analysis Review](docs/architecture/GEMINI_ANALYSIS_REVIEW.md)
 - [External Verticals Migration](docs/architecture/EXTERNAL_VERTICALS_MIGRATION.md)
-- [Roadmap](ROADMAP.md)
+- [Roadmap](../../roadmap.md)
 
 ### B. FEPs Related to This Analysis
 

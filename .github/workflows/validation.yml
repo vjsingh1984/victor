@@ -4,15 +4,15 @@
 name: Validation
 
 on:
-
-permissions:
-  contents: read
-  pull-requests: write
   pull_request:
     paths:
       - 'feps/**'
       - 'victor/**'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +24,6 @@ jobs:
     name: Validate FEPs
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: contains(github.event.head_commit.modified, 'feps/')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,12 +47,13 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ./victor-sdk
           pip install -e ".[dev]"
 
       - name: Find modified FEP files
         id: find-feps
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
+          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
           FEP_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | grep '^feps/fep-.*\.md$' || true)
 
           if [ -z "$FEP_FILES" ]; then
@@ -90,7 +90,6 @@ jobs:
     name: Validate Verticals
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: contains(github.event.head_commit.modified, 'victor/')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,24 +113,15 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ./victor-sdk
           pip install -e ".[dev]"
 
       - name: Find modified vertical directories
         id: find-verticals
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
-          MODIFIED_DIRS=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD | \
-            grep '^victor/[^/]+/' | \
-            sed 's|victor/[^/]*/||' | \
-            cut -d'/' -f1 | \
-            sort -u || true)
-
-          VERTICAL_DIRS=""
-          for dir in $MODIFIED_DIRS; do
-            if [ -f "victor/$dir/victor-vertical.toml" ]; then
-              VERTICAL_DIRS="$VERTICAL_DIRS victor/$dir"
-            fi
-          done
+          BASE_BRANCH="${{ github.base_ref || github.event.repository.default_branch }}"
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${BASE_BRANCH}...HEAD || true)
+          VERTICAL_DIRS=$(printf '%s\n' "$CHANGED_FILES" | python scripts/ci/find_modified_vertical_dirs.py)
 
           if [ -z "$VERTICAL_DIRS" ]; then
             echo "vertical_dirs=" >> $GITHUB_OUTPUT

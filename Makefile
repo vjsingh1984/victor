@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test test-definition-boundaries lint format clean build build-binary docker release sync-version check-version
+.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene format clean build build-binary docker release sync-version check-version
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make test-all      Run all tests including integration"
 	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
 	@echo "  make lint          Run linters"
+	@echo "  make check-repo-hygiene  Validate workflow/link/metadata drift guards"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
 	@echo ""
@@ -71,7 +72,11 @@ test-split:
 lint:
 	ruff check victor tests
 	black --check victor tests
-	mypy victor --ignore-missing-imports || true
+	mypy victor
+	python scripts/ci/repo_hygiene_check.py
+
+check-repo-hygiene:
+	python scripts/ci/repo_hygiene_check.py
 
 format:
 	black victor tests

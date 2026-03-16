@@ -183,7 +183,7 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 - [Operations](docs/operations/)
 - [Development](docs/development/)
 - [Architecture](ARCHITECTURE.md)
-- [Roadmap](ROADMAP.md)
+- [Roadmap](roadmap.md)
 
 ## Contributing
 
