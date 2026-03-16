@@ -12,7 +12,7 @@ This vertical provides:
 import warnings
 
 warnings.warn(
-    "victor.verticals.contrib.research is deprecated. "
+    "victor.verticals.contrib.research is deprecated and will be removed in v0.7.0. "
     "Install the victor-research package instead.",
     DeprecationWarning,
     stacklevel=2,

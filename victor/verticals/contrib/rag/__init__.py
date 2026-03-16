@@ -40,7 +40,7 @@ Usage:
 import warnings
 
 warnings.warn(
-    "victor.verticals.contrib.rag is deprecated. Install the victor-rag package instead.",
+    "victor.verticals.contrib.rag is deprecated and will be removed in v0.7.0. Install the victor-rag package instead.",
     DeprecationWarning,
     stacklevel=2,
 )

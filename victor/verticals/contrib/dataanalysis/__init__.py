@@ -13,7 +13,7 @@ This vertical provides:
 import warnings
 
 warnings.warn(
-    "victor.verticals.contrib.dataanalysis is deprecated. "
+    "victor.verticals.contrib.dataanalysis is deprecated and will be removed in v0.7.0. "
     "Install the victor-dataanalysis package instead.",
     DeprecationWarning,
     stacklevel=2,

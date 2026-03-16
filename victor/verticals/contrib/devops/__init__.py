@@ -17,7 +17,7 @@ Enhanced Features:
 import warnings
 
 warnings.warn(
-    "victor.verticals.contrib.devops is deprecated. Install the victor-devops package instead.",
+    "victor.verticals.contrib.devops is deprecated and will be removed in v0.7.0. Install the victor-devops package instead.",
     DeprecationWarning,
     stacklevel=2,
 )

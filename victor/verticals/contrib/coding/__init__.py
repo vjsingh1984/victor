@@ -53,7 +53,7 @@ Usage:
 import warnings
 
 warnings.warn(
-    "victor.verticals.contrib.coding is deprecated. Install the victor-coding package instead.",
+    "victor.verticals.contrib.coding is deprecated and will be removed in v0.7.0. Install the victor-coding package instead.",
     DeprecationWarning,
     stacklevel=2,
 )
