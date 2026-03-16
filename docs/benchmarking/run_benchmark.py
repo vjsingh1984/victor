@@ -784,47 +784,74 @@ class FrameworkAdapter:
 
 
 class VictorAdapter(FrameworkAdapter):
-    """Victor framework adapter for benchmark execution."""
+    """Victor framework adapter for benchmark execution.
 
-    def __init__(self, timeout: int = 300):
+    Uses victor's keyring-based API key management to authenticate
+    with the configured provider (default: anthropic/claude-sonnet-4-20250514).
+    """
+
+    def __init__(
+        self,
+        timeout: int = 300,
+        provider: str = "anthropic",
+        model: str = "claude-sonnet-4-20250514",
+    ):
         super().__init__(timeout)
-        self.orchestrator = None
+        self.provider = provider
+        self.model = model
 
     async def execute_task(
         self,
         task_id: str,
         task_def: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute task using Victor."""
+        """Execute task using Victor with keyring-based API keys."""
+        start_time = time.time()
         try:
             import psutil
-            from victor import Agent
-            from victor.config import Settings
+            from victor.config.api_keys import get_api_key
+            from victor.config.settings import Settings
+            from victor.providers.registry import ProviderRegistry
+
+            # Resolve API key from keyring/env
+            api_key = get_api_key(self.provider)
+            if not api_key:
+                raise RuntimeError(
+                    f"No API key for '{self.provider}'. "
+                    f"Run: victor keys set {self.provider}"
+                )
 
             # Start resource monitoring
             process = psutil.Process()
             start_memory = process.memory_info().rss / 1024 / 1024  # MB
-            start_time = time.time()
 
-            # Create Victor agent with minimal configuration
-            settings = Settings(
-                model="gpt-4o-mini",  # Use faster model for benchmarks
-                temperature=0.7,
-                max_tokens=task_def.get("max_tokens", 2000),
+            # Create provider from registry with keyring key
+            provider = ProviderRegistry.create(
+                self.provider,
+                api_key=api_key,
                 timeout=self.timeout,
             )
 
-            agent = Agent(settings=settings)
+            # Use the provider directly for chat completion
+            # (avoids full orchestrator overhead for benchmarks)
+            from victor.providers.base import Message
 
-            # Execute the task
-            response = await agent.arun(
-                task_def["prompt"],
-                tools=["file_read", "file_write", "file_search"],
+            messages = [
+                Message(role="user", content=task_def["prompt"]),
+            ]
+
+            response = await provider.chat(
+                messages=messages,
+                model=self.model,
+                temperature=0.7,
+                max_tokens=task_def.get("max_tokens", 2000),
             )
+
+            output = response.content or ""
 
             # Calculate metrics
             duration_ms = (time.time() - start_time) * 1000
-            end_memory = process.memory_info().rss / 1024 / 1024  # MB
+            end_memory = process.memory_info().rss / 1024 / 1024
             memory_mb = end_memory - start_memory
             cpu_percent = process.cpu_percent()
 
@@ -834,10 +861,16 @@ class VictorAdapter(FrameworkAdapter):
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "success": True,
                 "duration_ms": round(duration_ms, 2),
-                "output": response.content or "",
-                "output_quality": None,  # To be human-rated
+                "output": output,
+                "output_quality": None,
                 "memory_mb": round(memory_mb, 2),
                 "cpu_percent": cpu_percent,
+                "model": self.model,
+                "provider": self.provider,
+                "token_usage": {
+                    "input": getattr(response, "input_tokens", 0),
+                    "output": getattr(response, "output_tokens", 0),
+                },
                 "error": None,
                 "notes": "Completed successfully",
             }
@@ -854,6 +887,8 @@ class VictorAdapter(FrameworkAdapter):
                 "output_quality": None,
                 "memory_mb": 0,
                 "cpu_percent": 0,
+                "model": self.model,
+                "provider": self.provider,
                 "error": str(e),
                 "notes": f"Failed: {type(e).__name__}",
             }
