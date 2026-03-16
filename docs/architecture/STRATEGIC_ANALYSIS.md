@@ -15,7 +15,7 @@ Victor is a **technically excellent** agentic AI framework with **superior archi
 
 **TL;DR**:
 - ✅ **Architecture**: Best-in-class (8.30/10), SOLID-compliant, extensible
-- ✅ **Capabilities**: 22 providers, 33 tools, 9 verticals, multi-agent teams
+- ✅ **Capabilities**: 24 providers, 34 tools, 9 verticals, multi-agent teams
 - ⚠️ **User Experience**: Poor error handling, complex configuration, steep learning curve
 - ⚠️ **Product-Market Fit**: Great for power users, too complex for beginners
 - 🎯 **Opportunity**: UX improvements could unlock mainstream adoption
@@ -25,11 +25,11 @@ Victor is a **technically excellent** agentic AI framework with **superior archi
 ## 1. Vision & Current State
 
 ### Vision Statement
-> "Build, orchestrate, and evaluate AI agents across 22 providers." - Victor README
+> "Build, orchestrate, and evaluate AI agents across 24 providers." - Victor README
 
 **Current Position**: Victor is a **feature-complete, production-ready framework** with:
-- 22 LLM provider integrations (cloud + local)
-- 33 tool modules across 9 categories
+- 24 LLM provider integrations (cloud + local)
+- 34 tool modules across 9 categories
 - 9 domain-specific verticals
 - Multi-agent team formations (4 patterns)
 - Stateful workflow engine with YAML DSL
@@ -72,7 +72,7 @@ From `ROADMAP.md`:
 **Design Patterns**:
 - **Facade Pattern**: Orchestrator as thin coordinator with 11 specialized coordinators
 - **Coordinator Pattern**: Each coordinator owns a specific concern (4,279 LOC → 11 focused components)
-- **Strategy Pattern**: ProviderAdapterProtocol for 22 different backends
+- **Strategy Pattern**: ProviderAdapterProtocol for 24 different backends
 - **Template Method**: VerticalBase with extensible hooks
 - **Chain of Responsibility**: ToolPipeline with middleware
 
@@ -82,8 +82,8 @@ victor/
 ├── framework/       # Agent API, StateGraph, WorkflowEngine
 ├── agent/           # Orchestrator, coordinators, conversation
 ├── core/            # Events, CQRS, protocols, DI container
-├── providers/       # 22 provider adapters
-├── tools/           # 33 tool modules
+├── providers/       # 24 provider adapters
+├── tools/           # 34 tool modules
 ├── teams/           # Multi-agent formations
 ├── state/           # 4-scope state management
 ├── verticals/       # 9 built-in + contrib verticals
@@ -117,7 +117,7 @@ my_vertical = "my_package:MyVertical"
 
 ### 2.3 Provider Ecosystem ⭐⭐⭐⭐⭐
 
-**22 Provider Integrations**:
+**24 Provider Integrations**:
 | Category | Providers | Switch Mid-Conversation? |
 |----------|-----------|--------------------------|
 | **Frontier Cloud** | Anthropic, OpenAI, Google Gemini, Azure OpenAI | ✅ Yes |
@@ -357,7 +357,7 @@ except Exception:
 | **Entry Points** | ✅ Plugin system | ⚠️ Some | Extensibility |
 | **StateGraph + Checkpoints** | ✅ YAML DSL | ⚠️ Code-only | Workflow authoring |
 | **Multi-Form Teams** | ✅ 4 formations | ⚠️ 1-2 patterns | Flexibility |
-| **22 Providers** | ✅ Most integrations | ⚠️ 5-10 | Choice |
+| **24 Providers** | ✅ Most integrations | ⚠️ 5-10 | Choice |
 
 **What Competitors Do Better**:
 
@@ -377,7 +377,7 @@ except Exception:
 
 | Segment | Fit | Why |
 |---------|-----|-----|
-| **Enterprise DevOps** | ⭐⭐⭐⭐⭐ | Air-gapped, 22 providers, observability, CI/CD |
+| **Enterprise DevOps** | ⭐⭐⭐⭐⭐ | Air-gapped, 24 providers, observability, CI/CD |
 | **AI Researchers** | ⭐⭐⭐⭐ | Multi-agent teams, experiments, SWE-bench |
 | **Software Engineers** | ⭐⭐⭐ | Coding vertical, but complex setup |
 | **Data Scientists** | ⭐⭐⭐ | Data analysis vertical, but learning curve |
@@ -679,16 +679,16 @@ except Exception:
 ### 8.1 Positioning Statement
 
 **Before** (Current):
-> "Build, orchestrate, and evaluate AI agents across 22 providers."
+> "Build, orchestrate, and evaluate AI agents across 24 providers."
 
 **After** (Recommended):
-> "The only agentic AI framework that's **powerful enough for experts** yet **simple enough for teams**. 22 providers, 9 domain verticals, production-ready from day one."
+> "The only agentic AI framework that's **powerful enough for experts** yet **simple enough for teams**. 24 providers, 9 domain verticals, production-ready from day one."
 
 ### 8.2 Target Markets
 
 **Primary**: Enterprise DevOps teams
 - Need: Air-gapped support, observability, CI/CD
-- Victor advantage: 22 providers including local, full observability
+- Victor advantage: 24 providers including local, full observability
 
 **Secondary**: AI Researchers
 - Need: Multi-agent teams, experiments, SWE-bench
@@ -767,7 +767,7 @@ Victor has **world-class architecture** (8.30/10) that outperforms all competito
 **The Good**:
 - ✅ Best architecture in class
 - ✅ Most extensibility (verticals, protocols, entry points)
-- ✅ 22 providers (switch mid-conversation!)
+- ✅ 24 providers (switch mid-conversation!)
 - ✅ Production-ready (CI/CD, testing, observability)
 - ✅ Multi-agent teams (4 formations)
 

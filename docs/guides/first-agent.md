@@ -55,7 +55,7 @@ async def main():
 asyncio.run(main())
 ```
 
-**Supported providers** (22 available):
+**Supported providers** (24 available):
 - `openai` - GPT-4, GPT-3.5
 - `anthropic` - Claude Opus, Sonnet, Haiku
 - `azure` - Azure OpenAI
@@ -104,7 +104,7 @@ result = await agent.run(
 )
 ```
 
-**Available tools** (33 tool modules):
+**Available tools** (34 tool modules):
 
 | Category | Tools |
 |----------|-------|

@@ -37,7 +37,10 @@ victor/
       base.py           VerticalBase (ABC), VerticalRegistry, VerticalConfig (~900 LOC)
       protocols/        15 @runtime_checkable Protocol interfaces (ISP-compliant)
       metadata.py       VerticalMetadataProvider mixin
-      extension_loader.py  VerticalExtensionLoader mixin
+      extension_loader.py  VerticalExtensionLoader mixin (1,897 LOC)
+      extension_module_resolver.py  ExtensionModuleResolver (module resolution)
+      extension_cache_manager.py    ExtensionCacheManager (cache lifecycle)
+      capability_negotiator.py      CapabilityNegotiator (protocol negotiation)
       vertical_loader.py   load_vertical(), get_active_vertical()
     vertical_types.py   StageDefinition, TaskTypeHint, TieredToolConfig, StageBuilder
     tool_dependency_loader.py  YAMLToolDependencyProvider
@@ -45,7 +48,11 @@ victor/
     registry/base.py    BaseRegistry[K, V] generic template
 
   agent/
-    orchestrator.py     AgentOrchestrator facade (~400 LOC)
+    orchestrator.py     AgentOrchestrator facade (3,940 LOC total, 21 coordinators + 8 runtime boundaries)
+    orchestrator_properties.py  OrchestratorPropertyFacade
+    callback_coordinator.py     CallbackCoordinator
+    runtime/
+      initialization_manager.py InitializationPhaseManager
     coordinators/       ConversationController, ToolPipeline, StreamingController, etc.
     conversation_state.py  ConversationStage enum (canonical stage source)
     shared_tool_registry.py  SharedToolRegistry singleton (double-checked locking)
@@ -67,7 +74,7 @@ victor/
 
   state/                4-scope state managers (workflow, conversation, team, global)
   security/safety/      InfrastructureScanner, SecretScanner, SafetyPattern
-  config/               provider_config_registry.py
+  config/               Settings with 16 nested config groups (flat-access deprecated), provider_config_registry.py
   ui/                   CLI (Typer) + TUI (Textual)
 ```
 
@@ -297,6 +304,12 @@ Plus legacy aliases: `ModeConfigProviderProtocol`, `PromptContributorProtocol`, 
 **Risk:** victor-invest's custom tools require explicit registration call. If the framework doesn't call `register_investment_tools()`, the vertical fails silently (tools listed in `get_tools()` won't resolve).
 
 **Fix:** Add a `"victor.tools"` entry point group. Verticals with custom tools register them there. Framework discovers and registers automatically during vertical activation. Or add `register_tools(registry: ToolRegistry)` to VerticalBase as an optional hook.
+
+---
+
+#### B.3.5 Contrib Verticals Now Emit DeprecationWarning
+
+**Status (updated 2026-03-15):** Built-in contrib verticals (`coding`, `devops`, `rag`, `dataanalysis`, `research`) now emit `DeprecationWarning` on import, signaling migration to the external vertical package pattern. This is a step toward the contract-first architecture described in Section C.
 
 ---
 
@@ -598,7 +611,7 @@ Weights reflect importance for production agentic systems.
 | Extension protocols | `victor/core/verticals/protocols/` | all files |
 | VerticalExtensions | `victor/core/verticals/protocols/__init__.py` | dataclass |
 | StageDefinition | `victor/core/vertical_types.py` | top |
-| AgentOrchestrator | `victor/agent/orchestrator.py` | 1-400 |
+| AgentOrchestrator | `victor/agent/orchestrator.py` | 3,940 total (facade + extracted components) |
 | BaseProvider | `victor/providers/base.py` | 1-500 |
 | ProviderRegistry | `victor/providers/registry.py` | 1-500 |
 | BaseTool | `victor/tools/base.py` | 1-700 |

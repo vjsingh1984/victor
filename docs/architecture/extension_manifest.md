@@ -63,10 +63,31 @@ result = negotiator.negotiate(manifest)
 # result.degraded_features: Set[ExtensionType]
 ```
 
+## Framework Capabilities
+
+The framework declares these as supported at runtime (`FRAMEWORK_CAPABILITIES` in `capability_negotiator.py`):
+`SAFETY`, `TOOLS`, `WORKFLOWS`, `TEAMS`, `MIDDLEWARE`, `MODE_CONFIG`, `RL_CONFIG`, `ENRICHMENT`, `CAPABILITIES`, `SERVICE_PROVIDER`
+
+Note: `API_ROUTER` is defined in `ExtensionType` but not in `FRAMEWORK_CAPABILITIES`, so verticals providing it will receive a degradation warning.
+
 ## Auto-Generated Manifests
 
-`VerticalBase.get_manifest()` automatically builds a manifest by inspecting which protocol hooks the subclass overrides. No manual manifest creation needed for basic verticals.
+`VerticalBase.get_manifest()` automatically builds a manifest by inspecting which protocol hooks the subclass overrides. The detection maps method names to extension types:
+
+| Method Override | Detected ExtensionType |
+|----------------|----------------------|
+| `get_middleware` | MIDDLEWARE |
+| `get_safety_extension` | SAFETY |
+| `get_tool_requirements` | TOOLS |
+| `get_workflow_spec` | WORKFLOWS |
+| `get_team_declarations` | TEAMS |
+| `get_mode_config` | MODE_CONFIG |
+| `get_rl_config` | RL_CONFIG |
+| `get_enrichment_strategy` | ENRICHMENT |
+| `get_capability_requirements` | CAPABILITIES |
+
+`TOOLS` is always included (since `get_tools()` is abstract and always implemented). No manual manifest creation needed for basic verticals.
 
 ## Integration Point
 
-The `VerticalLoader.load()` method calls `_negotiate_manifest()` after resolving the vertical class but before activation. Incompatible manifests raise `ValueError`.
+The `VerticalLoader.load()` method calls `_negotiate_manifest()` after resolving the vertical class but before activation. Incompatible manifests raise `ValueError`. Negotiation failures are gracefully degraded if the manifest/negotiator is unavailable (e.g., during testing).

@@ -89,8 +89,8 @@ CLI/TUI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
 - **CLI/TUI**: User-facing entry point for chat and workflows
 - **Orchestrator**: Coordinates providers, tools, and workflows; delegates to service layer when `USE_SERVICE_LAYER` flag enabled (Strangler Fig pattern)
 - **Service Layer**: 6 focused services (Chat, Tool, Context, Provider, Recovery, Session) behind feature flags
-- **Providers**: Local or cloud LLM backends (22 supported)
-- **Tools**: File ops, git, testing, search, etc. (33 tool modules)
+- **Providers**: Local or cloud LLM backends (24 supported)
+- **Tools**: File ops, git, testing, search, etc. (34 tool modules)
 - **Verticals**: Domain presets (coding, research, devops, data, rag)
 
 ---
