@@ -104,19 +104,22 @@ dependencies = [
     "docstring-parser>=0.15",
     "psutil>=5.9",  # System metrics for observability and health monitoring
 
-    # Semantic Tool Selection (Default: local embeddings)
-    "sentence-transformers>=2.2.0",
+]
 
-    # Vector Storage (conversation embeddings, codebase search)
+[project.optional-dependencies]
+# Semantic embeddings: tool selection, conversation embeddings, codebase search
+embeddings = [
+    "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
 ]
 
-[project.optional-dependencies]
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 
 dev = [
+    # Embeddings (required for full test coverage)
+    "victor[embeddings]",
     # Testing
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
