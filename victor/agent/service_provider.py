@@ -56,6 +56,59 @@ from victor.core.service_specs import AGENT_SINGLETON_SPECS
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
+    from victor.agent.protocols import (
+        ActionAuthorizerProtocol,
+        ArgumentNormalizerProtocol,
+        AutoCommitterProtocol,
+        ChunkGeneratorProtocol,
+        CodeExecutionManagerProtocol,
+        ComplexityClassifierProtocol,
+        ContextCompactorProtocol,
+        ConversationEmbeddingStoreProtocol,
+        ConversationStateMachineProtocol,
+        DebugLoggerProtocol,
+        IntentClassifierProtocol,
+        MCPBridgeProtocol,
+        MessageHistoryProtocol,
+        MetricsCollectorProtocol,
+        ModeControllerProtocol,
+        ObservabilityProtocol,
+        ParallelExecutorProtocol,
+        ProjectContextProtocol,
+        PromptCoordinatorProtocol,
+        ProviderRegistryProtocol,
+        RecoveryHandlerProtocol,
+        ReminderManagerProtocol,
+        ResponseCompleterProtocol,
+        ResponseSanitizerProtocol,
+        RLCoordinatorProtocol,
+        SafetyCheckerProtocol,
+        SearchRouterProtocol,
+        SemanticToolSelectorProtocol,
+        StateCoordinatorProtocol,
+        StreamingHandlerProtocol,
+        StreamingMetricsCollectorProtocol,
+        StreamingRecoveryCoordinatorProtocol,
+        SystemPromptBuilderProtocol,
+        TaskAnalyzerProtocol,
+        TaskCoordinatorProtocol,
+        TaskTrackerProtocol,
+        TaskTypeHinterProtocol,
+        ToolCacheProtocol,
+        ToolCoordinatorProtocol,
+        ToolDeduplicationTrackerProtocol,
+        ToolDependencyGraphProtocol,
+        ToolExecutorProtocol,
+        ToolOutputFormatterProtocol,
+        ToolPlannerProtocol,
+        ToolPluginRegistryProtocol,
+        ToolRegistrarProtocol,
+        ToolSelectorProtocol,
+        ToolSequenceTrackerProtocol,
+        UsageAnalyticsProtocol,
+        UsageLoggerProtocol,
+        WorkflowRegistryProtocol,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +292,7 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
-    def _create_tool_registrar(self, container: ServiceContainer) -> Any:
+    def _create_tool_registrar(self, container: ServiceContainer) -> "ToolRegistrarProtocol":
         """Create ToolRegistrar instance.
 
         ToolRegistrar manages:
@@ -289,7 +342,7 @@ class OrchestratorServiceProvider:
         """Register ObservabilityIntegration as singleton."""
         from victor.agent.protocols import ObservabilityProtocol
 
-        def create_observability(_: ServiceContainer) -> Any:
+        def create_observability(_: ServiceContainer) -> "ObservabilityProtocol":
             enable = getattr(self._settings, "enable_observability", True)
             if not enable:
                 return _NullObservability()
@@ -312,7 +365,7 @@ class OrchestratorServiceProvider:
         """Register TaskAnalyzer as singleton."""
         from victor.agent.protocols import TaskAnalyzerProtocol
 
-        def create_task_analyzer(_: ServiceContainer) -> Any:
+        def create_task_analyzer(_: ServiceContainer) -> "TaskAnalyzerProtocol":
             try:
                 from victor.agent.task_analyzer import get_task_analyzer
 
@@ -337,38 +390,38 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
-    def _create_complexity_classifier(self) -> Any:
+    def _create_complexity_classifier(self) -> "ComplexityClassifierProtocol":
         """Create ComplexityClassifier instance."""
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         return ComplexityClassifier()
 
-    def _create_action_authorizer(self) -> Any:
+    def _create_action_authorizer(self) -> "ActionAuthorizerProtocol":
         """Create ActionAuthorizer instance."""
         from victor.agent.action_authorizer import ActionAuthorizer
 
         return ActionAuthorizer()
 
-    def _create_search_router(self) -> Any:
+    def _create_search_router(self) -> "SearchRouterProtocol":
         """Create SearchRouter instance."""
         from victor.agent.search_router import SearchRouter
 
         return SearchRouter()
 
-    def _create_response_sanitizer(self) -> Any:
+    def _create_response_sanitizer(self) -> "ResponseSanitizerProtocol":
         """Create ResponseSanitizer instance."""
         from victor.agent.response_sanitizer import ResponseSanitizer
 
         return ResponseSanitizer()
 
-    def _create_argument_normalizer(self) -> Any:
+    def _create_argument_normalizer(self) -> "ArgumentNormalizerProtocol":
         """Create ArgumentNormalizer instance."""
         from victor.agent.argument_normalizer import ArgumentNormalizer
 
         # Provider name will be updated when orchestrator is created
         return ArgumentNormalizer(provider_name="unknown")
 
-    def _create_project_context(self) -> Any:
+    def _create_project_context(self) -> "ProjectContextProtocol":
         """Create ProjectContext instance."""
         from victor.context.project_context import ProjectContext
 
@@ -389,7 +442,7 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.protocols import RecoveryHandlerProtocol
 
-        def create_recovery_handler(_: ServiceContainer) -> Any:
+        def create_recovery_handler(_: ServiceContainer) -> "RecoveryHandlerProtocol":
             enabled = getattr(self._settings, "enable_recovery_system", True)
             if not enabled:
                 return _NullRecoveryHandler()
@@ -415,19 +468,19 @@ class OrchestratorServiceProvider:
     # Factory methods for scoped services
     # =========================================================================
 
-    def _create_conversation_state_machine(self) -> Any:
+    def _create_conversation_state_machine(self) -> "ConversationStateMachineProtocol":
         """Create ConversationStateMachine instance."""
         from victor.agent.conversation_state import ConversationStateMachine
 
         return ConversationStateMachine()
 
-    def _create_unified_task_tracker(self) -> Any:
+    def _create_unified_task_tracker(self) -> "TaskTrackerProtocol":
         """Create UnifiedTaskTracker instance."""
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
         return UnifiedTaskTracker()
 
-    def _create_message_history(self) -> Any:
+    def _create_message_history(self) -> "MessageHistoryProtocol":
         """Create MessageHistory instance."""
         from victor.agent.message_history import MessageHistory
 
@@ -459,7 +512,7 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
-        def create_memory_coordinator(_: ServiceContainer) -> Any:
+        def create_memory_coordinator(_: ServiceContainer) -> "UnifiedMemoryCoordinatorProtocol":
             try:
                 from victor.storage.memory.unified import get_memory_coordinator
 
@@ -537,7 +590,7 @@ class OrchestratorServiceProvider:
     # Infrastructure service factory methods
     # =========================================================================
 
-    def _create_code_execution_manager(self) -> Any:
+    def _create_code_execution_manager(self) -> "CodeExecutionManagerProtocol":
         """Create CodeSandbox instance."""
         from victor.tools.code_executor_tool import CodeSandbox
 
@@ -545,13 +598,13 @@ class OrchestratorServiceProvider:
         manager.start()
         return manager
 
-    def _create_workflow_registry(self) -> Any:
+    def _create_workflow_registry(self) -> "WorkflowRegistryProtocol":
         """Create WorkflowRegistry instance."""
         from victor.workflows.base import WorkflowRegistry
 
         return WorkflowRegistry()
 
-    def _create_usage_analytics(self) -> Any:
+    def _create_usage_analytics(self) -> "UsageAnalyticsProtocol":
         """Create UsageAnalytics singleton instance."""
         from victor.agent.usage_analytics import UsageAnalytics, AnalyticsConfig
         from pathlib import Path
@@ -570,7 +623,7 @@ class OrchestratorServiceProvider:
             )
         )
 
-    def _create_tool_sequence_tracker(self) -> Any:
+    def _create_tool_sequence_tracker(self) -> "ToolSequenceTrackerProtocol":
         """Create ToolSequenceTracker instance."""
         from victor.agent.tool_sequence_tracker import create_sequence_tracker
 
@@ -579,7 +632,7 @@ class OrchestratorServiceProvider:
             learning_rate=getattr(self._settings, "sequence_learning_rate", 0.3),
         )
 
-    def _create_context_compactor(self) -> Any:
+    def _create_context_compactor(self) -> "ContextCompactorProtocol | None":
         """Create ContextCompactor instance.
 
         Note: This is a placeholder that will be replaced when the orchestrator
@@ -591,7 +644,7 @@ class OrchestratorServiceProvider:
         # create it via the factory method when the controller is available.
         return None
 
-    def _create_mode_controller(self) -> Any:
+    def _create_mode_controller(self) -> "ModeControllerProtocol":
         """Create AgentModeController instance."""
         from victor.agent.mode_controller import AgentModeController, AgentMode
 
@@ -603,7 +656,7 @@ class OrchestratorServiceProvider:
 
         return AgentModeController(initial_mode=initial_mode)
 
-    def _create_tool_deduplication_tracker(self) -> Any:
+    def _create_tool_deduplication_tracker(self) -> "ToolDeduplicationTrackerProtocol":
         """Create ToolDeduplicationTracker instance."""
         from victor.agent.tool_deduplication import ToolDeduplicationTracker
 
@@ -619,13 +672,13 @@ class OrchestratorServiceProvider:
     # Utility service factory methods
     # =========================================================================
 
-    def _create_debug_logger(self) -> Any:
+    def _create_debug_logger(self) -> "DebugLoggerProtocol":
         """Create DebugLogger instance."""
         from victor.agent.debug_logger import get_debug_logger
 
         return get_debug_logger()
 
-    def _create_task_type_hinter(self) -> Any:
+    def _create_task_type_hinter(self) -> "TaskTypeHinterProtocol":
         """Create TaskTypeHinter wrapper."""
         from victor.core.capability_registry import CapabilityRegistry
         from victor.framework.vertical_protocols import TaskTypeHintProtocol
@@ -639,7 +692,7 @@ class OrchestratorServiceProvider:
 
         return NullTaskTypeHinter()
 
-    def _create_reminder_manager(self) -> Any:
+    def _create_reminder_manager(self) -> "ReminderManagerProtocol":
         """Create ContextReminderManager instance."""
         from victor.agent.context_reminder import create_reminder_manager
 
@@ -653,25 +706,25 @@ class OrchestratorServiceProvider:
             tool_budget=tool_budget,
         )
 
-    def _create_rl_coordinator(self) -> Any:
+    def _create_rl_coordinator(self) -> "RLCoordinatorProtocol":
         """Create RLCoordinator instance."""
         from victor.framework.rl.coordinator import get_rl_coordinator
 
         return get_rl_coordinator()
 
-    def _create_safety_checker(self) -> Any:
+    def _create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create SafetyChecker instance."""
         from victor.agent.safety import get_safety_checker
 
         return get_safety_checker()
 
-    def _create_auto_committer(self) -> Any:
+    def _create_auto_committer(self) -> "AutoCommitterProtocol":
         """Create AutoCommitter instance."""
         from victor.agent.auto_commit import get_auto_committer
 
         return get_auto_committer()
 
-    def _create_mcp_bridge(self) -> Any:
+    def _create_mcp_bridge(self) -> "MCPBridgeProtocol":
         """Create MCP bridge wrapper."""
         from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 
@@ -688,19 +741,19 @@ class OrchestratorServiceProvider:
     # Infrastructure service factory methods
     # =========================================================================
 
-    def _create_tool_dependency_graph(self) -> Any:
+    def _create_tool_dependency_graph(self) -> "ToolDependencyGraphProtocol":
         """Create ToolDependencyGraph instance."""
         from victor.tools.dependency_graph import ToolDependencyGraph
 
         return ToolDependencyGraph()
 
-    def _create_tool_plugin_registry(self) -> Any:
+    def _create_tool_plugin_registry(self) -> "ToolPluginRegistryProtocol":
         """Create ToolPluginRegistry instance."""
         from victor.tools.plugin_registry import ToolPluginRegistry
 
         return ToolPluginRegistry()
 
-    def _create_semantic_tool_selector(self) -> Any:
+    def _create_semantic_tool_selector(self) -> "SemanticToolSelectorProtocol":
         """Create SemanticToolSelector instance."""
         from victor.tools.semantic_selector import SemanticToolSelector
 
@@ -727,7 +780,7 @@ class OrchestratorServiceProvider:
 
         return SemanticToolSelector(embedding_model=embedding_model)
 
-    def _create_provider_registry(self) -> Any:
+    def _create_provider_registry(self) -> "ProviderRegistryProtocol":
         """Create ProviderRegistry wrapper.
 
         Note: ProviderRegistry is a class with class methods,
@@ -742,7 +795,7 @@ class OrchestratorServiceProvider:
     # Analytics & observability service factory methods
     # =========================================================================
 
-    def _create_conversation_embedding_store(self) -> Any:
+    def _create_conversation_embedding_store(self) -> "ConversationEmbeddingStoreProtocol":
         """Create ConversationEmbeddingStore instance."""
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
         from victor.storage.embeddings.service import EmbeddingService
@@ -762,7 +815,7 @@ class OrchestratorServiceProvider:
             sqlite_db_path=sqlite_path,
         )
 
-    def _create_metrics_collector(self) -> Any:
+    def _create_metrics_collector(self) -> "MetricsCollectorProtocol":
         """Create MetricsCollector instance."""
         from victor.agent.metrics_collector import MetricsCollector, MetricsCollectorConfig
         from victor.analytics.logger import UsageLogger
@@ -788,7 +841,7 @@ class OrchestratorServiceProvider:
             usage_logger=usage_logger,
         )
 
-    def _create_tool_cache(self) -> Any:
+    def _create_tool_cache(self) -> "ToolCacheProtocol":
         """Create ToolCache instance."""
         from victor.storage.cache.tool_cache import ToolCache
 
@@ -814,7 +867,7 @@ class OrchestratorServiceProvider:
 
         return ToolCache(ttl=ttl)
 
-    def _create_usage_logger(self) -> Any:
+    def _create_usage_logger(self) -> "UsageLoggerProtocol":
         """Create UsageLogger instance."""
         from victor.analytics.logger import UsageLogger
         from pathlib import Path
@@ -824,7 +877,7 @@ class OrchestratorServiceProvider:
 
         return UsageLogger(log_file=log_file, enabled=enabled)
 
-    def _create_streaming_metrics_collector(self) -> Any:
+    def _create_streaming_metrics_collector(self) -> "StreamingMetricsCollectorProtocol":
         """Create StreamingMetricsCollector instance."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
         from pathlib import Path
@@ -852,7 +905,7 @@ class OrchestratorServiceProvider:
 
         return StreamingMetricsCollector(max_history=max_history, export_path=export_path)
 
-    def _create_intent_classifier(self) -> Any:
+    def _create_intent_classifier(self) -> "IntentClassifierProtocol":
         """Create IntentClassifier instance."""
         from victor.storage.embeddings.intent_classifier import IntentClassifier
         from victor.storage.embeddings.service import EmbeddingService
@@ -875,7 +928,7 @@ class OrchestratorServiceProvider:
     # Helper/adapter service factory methods
     # =========================================================================
 
-    def _create_system_prompt_builder(self) -> Any:
+    def _create_system_prompt_builder(self) -> "SystemPromptBuilderProtocol":
         """Create SystemPromptBuilder instance."""
         from victor.agent.prompt_builder import SystemPromptBuilder
 
@@ -887,7 +940,7 @@ class OrchestratorServiceProvider:
             model=model,
         )
 
-    def _create_tool_selector(self) -> Any:
+    def _create_tool_selector(self) -> "ToolSelectorProtocol":
         """Create ToolSelector instance."""
         from victor.agent.tool_selection import ToolSelector
         from victor.tools.registry import ToolRegistry
@@ -905,7 +958,7 @@ class OrchestratorServiceProvider:
             fallback_max_tools=fallback_max_tools,
         )
 
-    def _create_tool_executor(self) -> Any:
+    def _create_tool_executor(self) -> "ToolExecutorProtocol":
         """Create ToolExecutor instance."""
         from victor.agent.tool_executor import ToolExecutor
         from victor.tools.registry import ToolRegistry
@@ -915,14 +968,14 @@ class OrchestratorServiceProvider:
 
         return ToolExecutor(tool_registry=tool_registry)
 
-    def _create_tool_output_formatter(self) -> Any:
+    def _create_tool_output_formatter(self) -> "ToolOutputFormatterProtocol":
         """Create ToolOutputFormatter instance."""
         from victor.agent.tool_output_formatter import create_tool_output_formatter
 
         # Factory function handles all defaults
         return create_tool_output_formatter()
 
-    def _create_parallel_executor(self) -> Any:
+    def _create_parallel_executor(self) -> "ParallelExecutorProtocol":
         """Create ParallelExecutor instance."""
         from victor.agent.parallel_executor import create_parallel_executor
         from victor.agent.tool_executor import ToolExecutor
@@ -941,7 +994,7 @@ class OrchestratorServiceProvider:
             enable=enable,
         )
 
-    def _create_response_completer(self) -> Any:
+    def _create_response_completer(self) -> "ResponseCompleterProtocol":
         """Create ResponseCompleter instance.
 
         Note: This returns a no-op completer since we don't have access to the provider
@@ -967,7 +1020,7 @@ class OrchestratorServiceProvider:
             force_response=force_response,
         )
 
-    def _create_streaming_handler(self) -> Any:
+    def _create_streaming_handler(self) -> "StreamingHandlerProtocol":
         """Create StreamingHandler instance."""
         from victor.agent.streaming import StreamingChatHandler
 
@@ -987,7 +1040,7 @@ class OrchestratorServiceProvider:
             session_idle_timeout=session_idle_timeout,
         )
 
-    def _create_recovery_coordinator(self) -> Any:
+    def _create_recovery_coordinator(self) -> "StreamingRecoveryCoordinatorProtocol":
         """Create RecoveryCoordinator instance.
 
         The RecoveryCoordinator centralizes all recovery and error handling logic
@@ -1030,7 +1083,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_chunk_generator(self) -> Any:
+    def _create_chunk_generator(self) -> "ChunkGeneratorProtocol":
         """Create ChunkGenerator instance.
 
         The ChunkGenerator provides a centralized interface for generating streaming
@@ -1050,7 +1103,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_tool_planner(self) -> Any:
+    def _create_tool_planner(self) -> "ToolPlannerProtocol":
         """Create ToolPlanner instance.
 
         The ToolPlanner provides a centralized interface for tool planning operations,
@@ -1070,7 +1123,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_task_coordinator(self) -> Any:
+    def _create_task_coordinator(self) -> "TaskCoordinatorProtocol":
         """Create TaskCoordinator instance.
 
         The TaskCoordinator provides a centralized interface for task coordination,
@@ -1105,7 +1158,7 @@ class OrchestratorServiceProvider:
     # New Coordinator Factory Methods (WS-D: Orchestrator SOLID Fixes)
     # =========================================================================
 
-    def _create_tool_coordinator(self) -> Any:
+    def _create_tool_coordinator(self) -> "ToolCoordinatorProtocol | None":
         """Create ToolCoordinator instance.
 
         The ToolCoordinator provides a centralized interface for tool-related
@@ -1153,7 +1206,7 @@ class OrchestratorServiceProvider:
             config=config,
         )
 
-    def _create_state_coordinator(self) -> Any:
+    def _create_state_coordinator(self) -> "StateCoordinatorProtocol | None":
         """Create StateCoordinator instance.
 
         The StateCoordinator provides a centralized interface for conversation
@@ -1194,7 +1247,7 @@ class OrchestratorServiceProvider:
             config=config,
         )
 
-    def _create_prompt_coordinator(self) -> Any:
+    def _create_prompt_coordinator(self) -> "PromptCoordinatorProtocol":
         """Create PromptCoordinator instance.
 
         The PromptCoordinator provides a centralized interface for system
