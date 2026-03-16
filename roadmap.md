@@ -266,12 +266,12 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 
 | Priority | ID | Item | Status |
 |----------|-----|------|--------|
-| P0 | E1 | Complete protocol-based coordinator injection and reduce `orchestrator.py` below 3,800 LOC | In Progress (`#38`) |
+| P0 | E1 | Reduce orchestrator.py below 3,800 LOC | ✅ Done (`c6e63df`) — 3,940→3,783 LOC |
 | P0 | E6 | Execute Victor + 2 competitor benchmark baselines | Blocked on API keys (`#52`) |
 | P1 | S-02 | Baseline Semgrep exclusions so SAST can become merge-blocking | Backlog |
-| P1 | S-04 | Audit provider/API-key fields for `SecretStr` adoption gaps | Backlog |
-| P1 | D-02 | Decompose `victor/context/codebase_analyzer.py` (2,988 LOC) into scanner/index/query layers | Backlog |
-| P1 | D-03 | Decompose `victor/agent/orchestrator_factory.py` (2,773 LOC) into staged builders/config adapters | Backlog |
+| P1 | S-04 | Audit provider/API-key fields for SecretStr adoption | ✅ Done — no gaps found |
+| P1 | D-02 | Decompose codebase_analyzer.py (2,988 LOC) into 5 modules | ✅ Done (`d070486`) |
+| P1 | D-03 | Decompose orchestrator_factory.py (2,773→719 LOC) into 4 builder modules | ✅ Done (`d070486`) |
 | P2 | F-01 | Convert the 19 actionable TODO/FIXME markers into tracked issues | Backlog |
 | P2 | X-01 | Document high-churn settings fields with examples and migration notes | Backlog |
 | P3 | F-04 | Reduce `Any` type annotations: factory 102→11, service_provider 69→32, adapters 31→11 | ✅ Done (top 3 offenders) |
