@@ -43,6 +43,7 @@ Related documents:
 - Validation workflow trigger wiring and modified-vertical discovery had drifted and were repaired in-repo.
 - Local `make lint` now fails on mypy again after re-verifying `mypy victor` clean on the current tree.
 - Repo metadata and PR-helper links were corrected to the canonical GitHub repo.
+- Security now has a real blocking baseline: `gitleaks` plus Trivy `CRITICAL` findings fail CI, while advisory scanners are explicitly documented in `SECURITY.md`.
 - `E1` remains open: `victor/agent/orchestrator.py` is still 3940 LOC and protocol-based injection is not complete.
 - `E5` remains in progress: removal volume exceeded 60%, but migration-note closure still needs to be finished and reflected in issue state.
 
@@ -265,12 +266,12 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 
 | Priority | ID | Item | Status |
 |----------|-----|------|--------|
-| P0 | F-02 | Add tests for `tool_pipeline`, `cqrs`, `executor`, `sqlite_lancedb` | In Progress |
-| P0 | S-02 | Make security CI steps blocking (severity-gated) | Backlog |
-| P1 | D-01 | Decompose `protocols.py` (3,703 LOC) into protocol groups | Backlog |
+| P0 | S-03 | Add SBOM generation to the release/build pipeline | Backlog |
+| P1 | S-02 | Extend security enforcement beyond the Trivy critical baseline (dependency + SAST baselines) | Backlog |
+| P1 | D-01 | Decompose `protocols.py` (3,703 LOC) into 9 domain modules | ✅ Done (`2bcad78`) |
 | P1 | D-02 | Decompose `fastapi_server.py` (3,587 LOC) into route modules | Backlog |
-| P1 | P-01 | Move `sentence-transformers`/`lancedb`/`pyarrow` behind `[embeddings]` extra | Backlog |
-| P2 | F-03 | Triage 81 TODO/FIXME/HACK markers into GitHub issues | Backlog |
+| P1 | P-01 | Move `sentence-transformers`/`lancedb`/`pyarrow` behind `[embeddings]` extra | ✅ Done (`c34ea16`) |
+| P2 | F-01 | Triage 81 TODO/FIXME/HACK markers into GitHub issues | Backlog |
 | P2 | R-02 | Complete E5 migration-note closure (remaining 31%) | In Progress |
 | P2 | V-02 | Generate CHANGELOG.md from conventional commits | Backlog |
 | P2 | T-05 | Set contrib vertical removal target: v0.7.0 | Backlog |
