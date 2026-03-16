@@ -1005,6 +1005,8 @@ async def run_benchmark(
     timeout: int = 300,
     verbose: bool = False,
     dry_run: bool = False,
+    provider: str = "anthropic",
+    model: str = "claude-sonnet-4-20250514",
 ) -> Dict[str, Any]:
     """Run benchmark suite.
 
@@ -1014,6 +1016,8 @@ async def run_benchmark(
         timeout: Per-task timeout in seconds
         verbose: Enable verbose output
         dry_run: Show what would be executed without running
+        provider: LLM provider name (for victor framework)
+        model: Model name (for victor framework)
 
     Returns:
         Summary dictionary with all results
@@ -1031,7 +1035,7 @@ async def run_benchmark(
     if dry_run:
         adapter = MockAdapter()
     elif framework == "victor":
-        adapter = VictorAdapter(timeout=timeout)
+        adapter = VictorAdapter(timeout=timeout, provider=provider, model=model)
     elif framework == "langgraph":
         adapter = LangGraphAdapter(timeout=timeout)
     elif framework == "crewai":
@@ -1044,7 +1048,7 @@ async def run_benchmark(
     failed = 0
 
     print(f"\n{'='*60}")
-    print(f"Benchmark: {framework.upper()}")
+    print(f"Benchmark: {framework.upper()} ({provider}/{model})")
     print(f"Tasks: {len(tasks_to_run)}")
     print(f"Timeout: {timeout}s per task")
     print(f"{'='*60}\n")
@@ -1177,12 +1181,33 @@ def main():
         help="Show what would be executed without running",
     )
     parser.add_argument(
+        "--provider", "-p",
+        type=str,
+        default="anthropic",
+        help="LLM provider (anthropic, openai, deepseek, google)",
+    )
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default=None,
+        help="Model name (default: cheapest for provider)",
+    )
+    parser.add_argument(
         "--output", "-o",
         action="store_true",
         help="Save results to file",
     )
 
     args = parser.parse_args()
+
+    # Default models per provider (cheapest capable)
+    DEFAULT_MODELS = {
+        "anthropic": "claude-haiku-4-5-20251001",
+        "openai": "gpt-4o-mini",
+        "deepseek": "deepseek-chat",
+        "google": "gemini-2.0-flash",
+    }
+    model = args.model or DEFAULT_MODELS.get(args.provider, "gpt-4o-mini")
 
     # Run benchmark
     results = asyncio.run(run_benchmark(
@@ -1191,6 +1216,8 @@ def main():
         timeout=args.timeout,
         verbose=args.verbose,
         dry_run=args.dry_run,
+        provider=args.provider,
+        model=model,
     ))
 
     # Save results if requested

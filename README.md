@@ -28,16 +28,30 @@
 │  chat()   Hierarchical Checkpoints   Code Quality           │
 │           Pipeline                                          │
 │                                                             │
-│  22 Providers │ 33 Tool Modules │ 9 Verticals │ 4 Scopes   │
+│  24 Providers │ 34 Tool Modules │ 9 Verticals │ 4 Scopes   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **22 LLM Providers** — Cloud (Anthropic, OpenAI, Google, Azure, Bedrock, Vertex) + local (Ollama, LM Studio, vLLM)
-- **33 Tool Modules** — File ops, git, shell, web, search, docker, testing, refactoring, analysis
+- **24 LLM Providers** — Cloud (Anthropic, OpenAI, Google, Azure, Bedrock, DeepSeek, Vertex) + local (Ollama, LM Studio, vLLM)
+- **34 Tool Modules** — File ops, git, shell, web, search, docker, testing, refactoring, analysis
 - **9 Domain Verticals** — Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
 - **Multi-Agent Teams** — 4 formations: sequential, parallel, hierarchical, pipeline
 - **Stateful Workflows** — YAML DSL compiled to StateGraph with typed state and checkpointing
 - **Air-Gapped Mode** — Full functionality with local models for secure, offline environments
+- **Built-in Resilience** — Automatic retry with exponential backoff on rate limits, circuit breaker protection
+
+### Benchmark Results (March 2026)
+
+Victor achieves **100% task success rate** across multiple providers:
+
+| Provider | Model | 5-Task Success | Avg Time/Task | Cost/1M tokens |
+|----------|-------|---------------|--------------|----------------|
+| Anthropic | Claude Haiku 4.5 | **100%** | 16.9s | $0.80 in |
+| OpenAI | GPT-4o-mini | **100%** | 14.7s | $0.15 in |
+| DeepSeek | DeepSeek-Chat V3 | **100%** | 35.9s | $0.07 in |
+
+> Tasks: code generation, research synthesis, file operations, security audit, workflow orchestration.
+> See [full results](docs/benchmarking/results/BENCHMARK_RESULTS_2026-03-16.md)
 
 ## At a glance
 
@@ -45,8 +59,8 @@
                               ┌─────────────────────────────────┐
                               │       Agent Orchestrator        │
                               │                                 │
-[You] ──▶ [CLI/TUI/API] ──▶  │  ProviderManager ──▶ 22 LLMs   │ ──▶ [Response]
-                              │  ToolPipeline    ──▶ 33 Tools   │
+[You] ──▶ [CLI/TUI/API] ──▶  │  ProviderManager ──▶ 24 LLMs   │ ──▶ [Response]
+                              │  ToolPipeline    ──▶ 34 Tools   │
                               │  TeamCoordinator ──▶ Agents     │
                               │  StateManager    ──▶ 4 Scopes   │
                               └─────────────────────────────────┘
