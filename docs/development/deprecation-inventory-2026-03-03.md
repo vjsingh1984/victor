@@ -77,3 +77,20 @@ Removed 6 more items (9/13 total = 69%, exceeds 60% target):
 - Sync `switch_provider()`
 - `WorkflowGraph` alias
 - Fragmented event type names
+
+## Architecture Strengthening Update (2026-03-15)
+
+Added to inventory:
+
+| Deprecated API/Symbol | Replacement | Target Removal | Status |
+|---|---|---|---|
+| `victor.verticals.contrib.coding` | `victor-coding` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.rag` | `victor-rag` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.devops` | `victor-devops` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.dataanalysis` | `victor-dataanalysis` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.research` | `victor-research` package | `v0.7.0` | DeprecationWarning active |
+| Settings flat-field access (e.g. `settings.default_provider`) | Nested groups (e.g. `settings.provider.default_provider`) | `v0.8.0` | DeprecationWarning active |
+| `VerticalBase.create_agent()` | `Agent.create(vertical=MyVertical, ...)` | `v0.8.0` | DeprecationWarning active |
+
+**Updated inventory**: 9/13 original items removed (69%). 7 new deprecations added with warnings active.
+**E5 status**: Migration-note closure at 69% for original items. New contrib deprecations are fully documented with v0.7.0 target.
