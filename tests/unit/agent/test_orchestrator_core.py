@@ -1442,7 +1442,7 @@ class TestCallbacks:
         # Should not raise
 
     def test_send_rl_reward_signal(self, orchestrator):
-        """_send_rl_reward_signal handles reward signal gracefully."""
+        """RL reward signal via callback coordinator handles reward gracefully."""
         from victor.agent.streaming_controller import StreamingSession
         import time
 
@@ -1454,7 +1454,7 @@ class TestCallbacks:
         )
         session.end_time = time.time()
         # Should not raise, even if RL module not available
-        orchestrator._send_rl_reward_signal(session)
+        orchestrator._callback_coordinator._send_rl_reward_signal(session)
 
 
 class TestContextLimitCalculation:

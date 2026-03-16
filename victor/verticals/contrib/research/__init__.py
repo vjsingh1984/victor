@@ -9,6 +9,15 @@ This vertical provides:
 - Source verification and citation management
 """
 
+import warnings
+
+warnings.warn(
+    "victor.verticals.contrib.research is deprecated. "
+    "Install the victor-research package instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.verticals.contrib.research.assistant import (
     ResearchAssistant as ResearchAssistantDefinition,

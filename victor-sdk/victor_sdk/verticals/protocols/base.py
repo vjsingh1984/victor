@@ -31,7 +31,9 @@ from victor_sdk.core.types import (
     normalize_tool_requirements,
     normalize_workflow_metadata,
 )
+from victor_sdk.core.api_version import CURRENT_API_VERSION
 from victor_sdk.core.exceptions import VerticalConfigurationError
+from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
 
 
 class VerticalBase(ABC):
@@ -331,6 +333,51 @@ class VerticalBase(ABC):
             Dictionary of metadata key-value pairs
         """
         return {}
+
+    @classmethod
+    def get_manifest(cls) -> ExtensionManifest:
+        """Return an ExtensionManifest describing this vertical's capabilities.
+
+        The default implementation auto-builds the manifest by inspecting which
+        protocol hooks the subclass overrides.  Verticals may override this to
+        declare capabilities explicitly.
+
+        Returns:
+            ExtensionManifest with provides/requires derived from overridden methods.
+        """
+        provides: set[ExtensionType] = set()
+
+        # Detect provided extension types from overridden methods
+        _METHOD_TO_TYPE = {
+            "get_middleware": ExtensionType.MIDDLEWARE,
+            "get_safety_extension": ExtensionType.SAFETY,
+            "get_tool_requirements": ExtensionType.TOOLS,
+            "get_workflow_spec": ExtensionType.WORKFLOWS,
+            "get_team_declarations": ExtensionType.TEAMS,
+            "get_mode_config": ExtensionType.MODE_CONFIG,
+            "get_rl_config": ExtensionType.RL_CONFIG,
+            "get_enrichment_strategy": ExtensionType.ENRICHMENT,
+            "get_capability_requirements": ExtensionType.CAPABILITIES,
+        }
+
+        for method_name, ext_type in _METHOD_TO_TYPE.items():
+            method = getattr(cls, method_name, None)
+            if method is None:
+                continue
+            # Check if the method is overridden from VerticalBase
+            base_method = getattr(VerticalBase, method_name, None)
+            if base_method is not None and method is not base_method:
+                provides.add(ext_type)
+
+        # Tools are always provided if get_tools is implemented (it's abstract)
+        provides.add(ExtensionType.TOOLS)
+
+        return ExtensionManifest(
+            api_version=CURRENT_API_VERSION,
+            name=cls.get_name(),
+            version=cls.get_version(),
+            provides=provides,
+        )
 
     @classmethod
     def _get_toolset(cls) -> ToolSet:

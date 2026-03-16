@@ -150,6 +150,10 @@ class VerticalLoader:
                 raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
             runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical)
+
+            # Capability negotiation: validate manifest before activation
+            self._negotiate_manifest(runtime_vertical)
+
             self._activate(runtime_vertical)
             return runtime_vertical
 
@@ -675,6 +679,34 @@ class VerticalLoader:
             self._discovered_tools = None
             self._vertical_last_discovery_ms = 0.0
             self._tool_last_discovery_ms = 0.0
+
+    def _negotiate_manifest(self, vertical: Type[VerticalBase]) -> None:
+        """Run capability negotiation on the vertical's manifest.
+
+        Logs warnings for degraded features and raises ValueError on
+        incompatible manifests.
+        """
+        try:
+            from victor.core.verticals.capability_negotiator import (
+                CapabilityNegotiator,
+                NegotiationResult,
+            )
+
+            manifest = vertical.get_manifest()
+            negotiator = CapabilityNegotiator()
+            result: NegotiationResult = negotiator.negotiate(manifest)
+
+            for warning in result.warnings:
+                logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
+
+            if not result.compatible:
+                errors = "; ".join(result.errors)
+                raise ValueError(
+                    f"Vertical '{manifest.name}' manifest negotiation failed: {errors}"
+                )
+        except (ImportError, AttributeError) as exc:
+            # Graceful degradation if manifest/negotiator not available
+            logger.debug("Manifest negotiation skipped: %s", exc)
 
     def _activate(self, vertical: Type[VerticalBase]) -> None:
         """Activate a vertical.

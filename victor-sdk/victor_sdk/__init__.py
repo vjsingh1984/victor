@@ -70,6 +70,14 @@ from victor_sdk.core.exceptions import (
 # Vertical protocols
 from victor_sdk.verticals.protocols.base import VerticalBase
 
+# Extension manifest
+from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_sdk.core.api_version import (
+    CURRENT_API_VERSION,
+    MIN_SUPPORTED_API_VERSION,
+    is_compatible,
+)
+
 # Discovery and registration
 from victor_sdk.discovery import (
     ProtocolRegistry,
@@ -151,6 +159,12 @@ __all__ = [
     "VerticalProtocolError",
     # Base class
     "VerticalBase",
+    # Extension manifest
+    "ExtensionManifest",
+    "ExtensionType",
+    "CURRENT_API_VERSION",
+    "MIN_SUPPORTED_API_VERSION",
+    "is_compatible",
     # Discovery (Phase 4)
     "ProtocolRegistry",
     "ProtocolMetadata",

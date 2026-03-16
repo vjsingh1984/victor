@@ -15,6 +15,7 @@
 """Configuration management for CodingAgent."""
 
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
@@ -764,6 +765,7 @@ class FeatureFlagSettings(_BaseModel):
     use_new_session_service: bool = False
     use_composition_over_inheritance: bool = False
     use_strategy_based_tool_registration: bool = False
+    use_provider_pooling: bool = False
 
 
 class PromptEnrichmentSettings(_BaseModel):
@@ -1565,6 +1567,9 @@ class Settings(BaseSettings):
             normalized[pattern] = parsed_timeout
         return normalized
 
+    # Track whether flat-access deprecation warnings have been emitted
+    _flat_access_warned: bool = False
+
     @model_validator(mode="after")
     def _sync_nested_groups(self) -> "Settings":
         """Sync flat field values into nested config groups.
@@ -1575,8 +1580,10 @@ class Settings(BaseSettings):
 
         For backward compatibility, if a nested field is None or was passed
         as a string (legacy behavior), it's populated from the corresponding
-        flat fields.
+        flat fields. A deprecation warning is emitted once to guide migration
+        to the nested access pattern (e.g. settings.provider.xxx).
         """
+        has_nested_overlap = False
         for group_name, model_cls in _NESTED_GROUPS.items():
             # Get current value of the nested field
             nested_obj = getattr(self, group_name)
@@ -1588,7 +1595,18 @@ class Settings(BaseSettings):
                 for field_name in model_cls.model_fields:
                     if field_name in settings_fields:
                         data[field_name] = getattr(self, field_name)
+                        has_nested_overlap = True
                 object.__setattr__(self, group_name, model_cls(**data))
+
+        if has_nested_overlap and not self._flat_access_warned:
+            warnings.warn(
+                "Flat settings field access (e.g. settings.default_provider) is deprecated. "
+                "Use nested groups instead (e.g. settings.provider.default_provider). "
+                "Flat fields will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object.__setattr__(self, "_flat_access_warned", True)
         return self
 
     @model_validator(mode="after")

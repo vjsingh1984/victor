@@ -92,6 +92,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type
 
+from victor.core.verticals.extension_cache_manager import ExtensionCacheManager
+from victor.core.verticals.extension_module_resolver import ExtensionModuleResolver
 from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 if TYPE_CHECKING:
@@ -448,8 +450,7 @@ class VerticalExtensionLoader(ABC):
     _lsp_capability: ClassVar[Optional[Any]] = None
 
     # Extension cache (shared across all verticals)
-    _extensions_cache: Dict[str, Any] = {}
-    _extensions_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+    _cache_manager: ClassVar[ExtensionCacheManager] = ExtensionCacheManager()
 
     # Shared async extension loading infrastructure (P3)
     _extension_executor_max_workers: ClassVar[int] = 8
@@ -461,6 +462,12 @@ class VerticalExtensionLoader(ABC):
     # Pressure monitoring (metrics, thresholds, cooldown, missing-module tracking).
     _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = (
         ExtensionLoaderPressureMonitor()
+    )
+
+    # Module resolver (delegates candidate resolution, availability checks,
+    # attribute loading, and class-name generation).
+    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(
+        _pressure_monitor
     )
 
     @classmethod
@@ -541,41 +548,117 @@ class VerticalExtensionLoader(ABC):
     @classmethod
     def _extension_module_candidates(cls, module_suffix: str) -> List[str]:
         """Return possible module paths for an optional vertical extension."""
-        if not module_suffix:
-            return []
-
-        vertical_name = getattr(cls, "name", None)
-        if not isinstance(vertical_name, str) or not vertical_name:
-            return []
-
-        return vertical_runtime_module_candidates(vertical_name, module_suffix)
+        vertical_name = getattr(cls, "name", None) or ""
+        return cls._module_resolver.resolve_candidates(vertical_name, module_suffix)
 
     @classmethod
     def _extension_module_available(cls, module_path: str) -> bool:
         """Return True when the extension module can be imported."""
-        if not module_path:
-            return False
+        return cls._module_resolver.is_available(
+            module_path,
+            vertical_display_name=getattr(cls, "name", cls.__name__),
+            caller_class_name=cls.__name__,
+        )
 
-        try:
-            spec = importlib.util.find_spec(module_path)
-            if spec is not None:
-                return True
-        except (ImportError, ModuleNotFoundError, AttributeError, ValueError) as e:
-            logger.debug(
-                "Optional extension module lookup failed for '%s': %s",
-                module_path,
-                e,
-            )
+    @classmethod
+    def _find_available_candidates(cls, suffix: str) -> List[str]:
+        """Resolve and filter extension module candidates to available ones."""
+        return [
+            path
+            for path in cls._extension_module_candidates(suffix)
+            if cls._extension_module_available(path)
+        ]
 
-        cache_key = f"{cls.__name__}:{module_path}"
-        if VerticalExtensionLoader._pressure_monitor.record_missing_module(cache_key):
-            logger.debug(
-                "Optional extension module '%s' not found for vertical '%s'; "
-                "capability package likely not installed.",
-                module_path,
-                getattr(cls, "name", cls.__name__),
+    @classmethod
+    def _resolve_factory_extension(
+        cls,
+        extension_key: str,
+        suffix: str,
+        class_name: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Common pattern: find candidates → try _get_extension_factory on each.
+
+        Used by get_safety_extension, get_prompt_contributor, get_team_spec_provider,
+        get_enrichment_strategy, etc. to eliminate repeated candidate iteration.
+
+        Args:
+            extension_key: Cache key for the extension.
+            suffix: Module suffix to resolve candidates for.
+            class_name: Optional explicit class name (auto-generated if None).
+
+        Returns:
+            Extension instance or None if not found.
+        """
+        candidate_paths = cls._find_available_candidates(suffix)
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    extension_key,
+                    module_path,
+                    class_name,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
+
+    @classmethod
+    def _resolve_class_or_factory_extension(
+        cls,
+        extension_key: str,
+        suffix: str,
+        class_name: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Common pattern: find candidates → try direct class import → fallback to factory.
+
+        Used by get_mode_config_provider, get_rl_config_provider, get_rl_hooks,
+        get_capability_provider, get_service_provider, etc.
+
+        Args:
+            extension_key: Cache key for the extension.
+            suffix: Module suffix to resolve candidates for.
+            class_name: Explicit class name to look for. If None, auto-generated.
+
+        Returns:
+            Extension instance or None if not found.
+        """
+        if class_name is None:
+            class_name = cls._module_resolver.auto_generate_class_name(
+                cls.__name__, extension_key
             )
-        return False
+        candidate_paths = cls._find_available_candidates(suffix)
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        # Try direct class import first (using __import__ to match original pattern)
+        for module_path in candidate_paths:
+            try:
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        # Fallback to extension factory
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    extension_key, module_path, class_name,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def configure_extension_loader_pressure(
@@ -672,21 +755,12 @@ class VerticalExtensionLoader(ABC):
                     return [MyMiddleware()]
                 return cls._get_cached_extension("middleware", _create)
         """
-        # Use namespaced composite key to avoid collisions across modules.
-        cache_key = f"{cls._cache_namespace()}:{key}"
-        with cls._extensions_cache_lock:
-            if cache_key not in cls._extensions_cache:
-                cls._extensions_cache[cache_key] = factory()
-            return cls._extensions_cache[cache_key]
+        return cls._cache_manager.get_or_create(cls._cache_namespace(), key, factory)
 
     @classmethod
     def _get_cached_extension_value(cls, key: str) -> tuple[bool, Any]:
         """Return a cached extension value without caching misses."""
-        cache_key = f"{cls._cache_namespace()}:{key}"
-        with cls._extensions_cache_lock:
-            if cache_key in cls._extensions_cache:
-                return True, cls._extensions_cache[cache_key]
-        return False, None
+        return cls._cache_manager.get_if_cached(cls._cache_namespace(), key)
 
     @classmethod
     def _load_cached_optional_extension(
@@ -695,17 +769,8 @@ class VerticalExtensionLoader(ABC):
         loader: Callable[[], Optional[Any]],
     ) -> Optional[Any]:
         """Load an optional extension while caching hits but not misses."""
-        cached, value = cls._get_cached_extension_value(extension_key)
-        if cached:
-            return value
-
-        resolved = loader()
-        if resolved is None:
-            return None
-
-        return cls._get_cached_extension(
-            extension_key,
-            lambda resolved=resolved: resolved,
+        return cls._cache_manager.load_optional(
+            cls._cache_namespace(), extension_key, loader
         )
 
     @classmethod
@@ -766,23 +831,19 @@ class VerticalExtensionLoader(ABC):
                         )
         """
 
+        resolver = cls._module_resolver
+
         def _create():
             # Determine the class name to import
             if attribute_name is None:
-                # Auto-generate class name
-                # Convert "CodingAssistant" -> "Coding"
-                vertical_name = cls.__name__.replace("Assistant", "")
-                # Convert "safety_extension" -> "SafetyExtension"
-                extension_type = extension_key.replace("_", " ").title().replace(" ", "")
-                class_name = f"{vertical_name}{extension_type}"
+                class_name = resolver.auto_generate_class_name(
+                    cls.__name__, extension_key
+                )
             else:
                 class_name = attribute_name
 
-            # Lazy import: only loads module when first called
-            module = __import__(import_path, fromlist=[class_name])
-
-            # Import and instantiate
-            return getattr(module, class_name)()
+            # Lazy import + retrieve attribute, then instantiate
+            return resolver.load_attribute(import_path, class_name)()
 
         # Use existing caching infrastructure
         return cls._get_cached_extension(extension_key, _create)
@@ -799,83 +860,42 @@ class VerticalExtensionLoader(ABC):
         """Get middleware implementations for this vertical.
 
         Default implementation resolves a ``get_middleware()`` factory from the
-        vertical's runtime middleware module when present. Override only when a
-        vertical needs custom behavior beyond the shared loader pattern.
+        vertical's runtime middleware module when present.
 
         Returns:
             List of middleware implementations (MiddlewareProtocol)
         """
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("middleware")
-            if cls._extension_module_available(path)
-        ]
+        candidate_paths = cls._find_available_candidates("middleware")
         if not candidate_paths:
             return []
 
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = importlib.import_module(module_path)
-            except ImportError as exc:
-                last_error = exc
-                continue
-
-            factory = getattr(module, "get_middleware", None)
-            if not callable(factory):
-                continue
-
-            return cls._get_cached_extension(
-                "middleware",
-                lambda factory=factory: list(factory() or []),
+        try:
+            factory = cls._module_resolver.try_load_from_candidates(
+                candidate_paths, "get_middleware"
             )
+        except ImportError:
+            return []
 
-        if last_error:
-            raise last_error
-        return []
+        if factory is None:
+            return []
+
+        return cls._get_cached_extension(
+            "middleware",
+            lambda factory=factory: list(factory() or []),
+        )
 
     @classmethod
     def get_safety_extension(cls) -> Optional[Any]:
         """Get safety extension for this vertical.
 
-        Default implementation uses the extension factory pattern with the vertical's
-        safety module. Override only if custom behavior needed.
-
-        This eliminates ~20 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Safety extension (SafetyExtensionProtocol) or None
         """
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("safety")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "safety_extension",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_factory_extension("safety_extension", "safety")
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[Any]:
         """Get prompt contributor for this vertical.
-
-        Default implementation uses the extension factory pattern with the vertical's
-        prompts module. Override only if custom behavior needed.
-
-        This eliminates ~25 LOC of duplicated wrapper code across verticals.
 
         Returns:
             Prompt contributor (PromptContributorProtocol) or None
@@ -887,79 +907,26 @@ class VerticalExtensionLoader(ABC):
         if contributor is not None:
             return contributor
 
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("prompts")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "prompt_contributor",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_factory_extension("prompt_contributor", "prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
         """Get mode configuration provider for this vertical.
 
-        Default implementation tries direct import pattern, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~6 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Mode config provider (ModeConfigProviderProtocol) or None
         """
         provider = cls._load_named_entry_point_extension(
-            "mode_config_provider",
-            "victor.mode_configs",
+            "mode_config_provider", "victor.mode_configs",
         )
         if provider is not None:
             return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-        class_name = f"{vertical_name}ModeConfigProvider"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("mode_config")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                provider_cls = getattr(module, class_name, None)
-                if provider_cls is not None:
-                    return provider_cls()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "mode_config_provider",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_class_or_factory_extension(
+            "mode_config_provider", "mode_config",
+            class_name=f"{vertical_name}ModeConfigProvider",
+        )
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:
@@ -1110,11 +1077,6 @@ class VerticalExtensionLoader(ABC):
     def get_rl_config_provider(cls) -> Optional[Any]:
         """Get RL configuration provider for this vertical.
 
-        Default implementation tries direct import pattern first, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~25 LOC of duplicated wrapper code across verticals.
-
         Returns:
             RL config provider (RLConfigProviderProtocol) or None
         """
@@ -1133,83 +1095,21 @@ class VerticalExtensionLoader(ABC):
                 return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-        class_name = f"{vertical_name}RLConfig"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("rl")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                provider_cls = getattr(module, class_name, None)
-                if provider_cls is not None:
-                    return provider_cls()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "rl_config_provider",
-                    module_path,
-                    class_name,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_class_or_factory_extension(
+            "rl_config_provider", "rl", class_name=f"{vertical_name}RLConfig",
+        )
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for outcome recording.
 
-        Default implementation tries direct import pattern, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~6 LOC of duplicated wrapper code across verticals.
-
         Returns:
             RLHooks instance or None
         """
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-        class_name = f"{vertical_name}RLHooks"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("rl")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                hooks_cls = getattr(module, class_name, None)
-                if hooks_cls is not None:
-                    return hooks_cls()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "rl_hooks",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_class_or_factory_extension(
+            "rl_hooks", "rl", class_name=f"{vertical_name}RLHooks",
+        )
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -1287,81 +1187,37 @@ class VerticalExtensionLoader(ABC):
     def get_capability_provider(cls) -> Optional[Any]:
         """Get capability provider for this vertical.
 
-        Default implementation tries direct import pattern first, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~20 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Capability provider (BaseCapabilityProvider) or None
         """
         provider = cls._load_named_entry_point_extension(
-            "capability_provider",
-            "victor.capability_providers",
+            "capability_provider", "victor.capability_providers",
         )
         if provider is not None:
             return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-        class_name = f"{vertical_name}CapabilityProvider"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("capabilities")
-            if cls._extension_module_available(path)
-        ]
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                provider_cls = getattr(module, class_name, None)
-                if provider_cls is not None:
-                    return provider_cls()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "capability_provider",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return cls._resolve_class_or_factory_extension(
+            "capability_provider", "capabilities",
+            class_name=f"{vertical_name}CapabilityProvider",
+        )
 
     @classmethod
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 
-        Default implementation first resolves an optional vertical-specific
-        ``service_provider`` module via the shared runtime loader, then falls
-        back to the generic BaseVerticalServiceProviderFactory.
-
-        Override to provide custom service registration logic.
-
         Returns:
             Service provider (ServiceProviderProtocol) or factory-created provider
         """
         provider = cls._load_named_entry_point_extension(
-            "service_provider",
-            "victor.service_providers",
+            "service_provider", "victor.service_providers",
         )
         if provider is not None:
             return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         class_name = f"{vertical_name}ServiceProvider"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("service_provider")
-            if cls._extension_module_available(path)
-        ]
+        candidate_paths = cls._find_available_candidates("service_provider")
         last_error: Optional[Exception] = None
 
         for module_path in candidate_paths:
@@ -1394,11 +1250,7 @@ class VerticalExtensionLoader(ABC):
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
         """Get composed tool chains for this vertical from runtime modules."""
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("composed_chains")
-            if cls._extension_module_available(path)
-        ]
+        candidate_paths = cls._find_available_candidates("composed_chains")
         if not candidate_paths:
             return {}
 
@@ -1432,11 +1284,7 @@ class VerticalExtensionLoader(ABC):
     @classmethod
     def get_personas(cls) -> Dict[str, Any]:
         """Get vertical personas from runtime team modules when available."""
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("teams")
-            if cls._extension_module_available(path)
-        ]
+        candidate_paths = cls._find_available_candidates("teams")
         if not candidate_paths:
             return {}
 
@@ -1527,8 +1375,8 @@ class VerticalExtensionLoader(ABC):
 
         # Return cached extensions if available and caching enabled
         if use_cache:
-            with cls._extensions_cache_lock:
-                cached = cls._extensions_cache.get(cache_key)
+            with cls._cache_manager._lock:
+                cached = cls._cache_manager._cache.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -1625,8 +1473,8 @@ class VerticalExtensionLoader(ABC):
         )
 
         # Cache the extensions
-        with cls._extensions_cache_lock:
-            cls._extensions_cache[cache_key] = extensions
+        with cls._cache_manager._lock:
+            cls._cache_manager._cache[cache_key] = extensions
         return extensions
 
     @classmethod
@@ -1635,8 +1483,8 @@ class VerticalExtensionLoader(ABC):
         if not use_cache:
             return None
         cache_key = cls._cache_namespace()
-        with cls._extensions_cache_lock:
-            return cls._extensions_cache.get(cache_key)
+        with cls._cache_manager._lock:
+            return cls._cache_manager._cache.get(cache_key)
 
     @classmethod
     def _resolve_strict_mode(cls, strict: Optional[bool]) -> bool:
@@ -1781,8 +1629,8 @@ class VerticalExtensionLoader(ABC):
     def _cache_extensions(cls, extensions: "VerticalExtensions") -> None:
         """Store extensions in the shared cache."""
         cache_key = cls._cache_namespace()
-        with cls._extensions_cache_lock:
-            cls._extensions_cache[cache_key] = extensions
+        with cls._cache_manager._lock:
+            cls._cache_manager._cache[cache_key] = extensions
 
     @classmethod
     async def get_extensions_async(
@@ -1925,31 +1773,31 @@ class VerticalExtensionLoader(ABC):
                        If False (default), clear only for this class.
         """
         if clear_all:
-            with cls._extensions_cache_lock:
-                cls._extensions_cache.clear()
+            with cls._cache_manager._lock:
+                cls._cache_manager._cache.clear()
         else:
             namespaced_key = cls._cache_namespace()
             namespaced_prefix = f"{namespaced_key}:"
             legacy_key = cls.__name__
             legacy_prefix = f"{legacy_key}:"
-            with cls._extensions_cache_lock:
+            with cls._cache_manager._lock:
                 # Clear namespaced cache entries
-                cls._extensions_cache.pop(namespaced_key, None)
+                cls._cache_manager._cache.pop(namespaced_key, None)
                 namespaced_keys = [
-                    k for k in cls._extensions_cache if k.startswith(namespaced_prefix)
+                    k for k in cls._cache_manager._cache if k.startswith(namespaced_prefix)
                 ]
                 for key in namespaced_keys:
-                    cls._extensions_cache.pop(key, None)
+                    cls._cache_manager._cache.pop(key, None)
 
                 # Backward compatibility: clear legacy class-name-only keys.
-                cls._extensions_cache.pop(legacy_key, None)
+                cls._cache_manager._cache.pop(legacy_key, None)
                 legacy_keys = [
                     k
-                    for k in cls._extensions_cache
+                    for k in cls._cache_manager._cache
                     if k.startswith(legacy_prefix) and k.count(":") == 1
                 ]
                 for key in legacy_keys:
-                    cls._extensions_cache.pop(key, None)
+                    cls._cache_manager._cache.pop(key, None)
 
 
 class ExtensionLoaderMetricsReporter:

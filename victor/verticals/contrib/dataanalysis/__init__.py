@@ -10,6 +10,15 @@ This vertical provides:
 - CSV/Excel/JSON data processing
 """
 
+import warnings
+
+warnings.warn(
+    "victor.verticals.contrib.dataanalysis is deprecated. "
+    "Install the victor-dataanalysis package instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.verticals.contrib.dataanalysis.assistant import (
     DataAnalysisAssistant as DataAnalysisAssistantDefinition,

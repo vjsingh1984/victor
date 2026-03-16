@@ -14,6 +14,14 @@ Enhanced Features:
 - Enhanced conversation management with ConversationCoordinator (conversation_enhanced.py)
 """
 
+import warnings
+
+warnings.warn(
+    "victor.verticals.contrib.devops is deprecated. Install the victor-devops package instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.verticals.contrib.devops.assistant import DevOpsAssistant as DevOpsAssistantDefinition
 from victor.verticals.contrib.devops.prompts import DevOpsPromptContributor

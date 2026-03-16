@@ -37,6 +37,14 @@ Usage:
     agent = await Agent.create(vertical=RAGAssistant)
 """
 
+import warnings
+
+warnings.warn(
+    "victor.verticals.contrib.rag is deprecated. Install the victor-rag package instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.verticals.contrib.rag.assistant import RAGAssistant as RAGAssistantDefinition
 from victor.verticals.contrib.rag.document_store import (

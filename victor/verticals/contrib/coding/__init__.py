@@ -50,6 +50,14 @@ Usage:
     conv_mgr = EnhancedCodingConversationManager()
 """
 
+import warnings
+
+warnings.warn(
+    "victor.verticals.contrib.coding is deprecated. Install the victor-coding package instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.verticals.contrib.coding.assistant import CodingAssistant as CodingAssistantDefinition
 from victor.verticals.contrib.coding.middleware import (
