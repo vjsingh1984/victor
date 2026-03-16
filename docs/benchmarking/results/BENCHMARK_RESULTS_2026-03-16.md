@@ -55,6 +55,52 @@
 | OpenAI GPT-4o-mini | 10.7s | 2,930 chars | ✅ |
 | DeepSeek Chat | 46.6s | 10,065 chars | ✅ |
 
+## Task Descriptions
+
+| Task | Category | Complexity | What It Tests |
+|------|----------|-----------|---------------|
+| **C1** | Code Generation | Simple | Generate a `DataProcessor` class with CSV I/O, type hints, error handling, PEP 8 |
+| **R1** | Multi-Step Reasoning | Complex | Synthesize research on microservices: benefits, trade-offs, real-world examples |
+| **T1** | Tool Usage | Simple | Create directory structure, read/parse README, organize files by type |
+| **A1** | Analysis | Complex | Security audit: find SQL injection, XSS, auth flaws, OWASP classification, fixes |
+| **W1** | Workflow | Medium | Sequential data pipeline: load → clean → transform → validate → export |
+
+## Output Quality Analysis
+
+### C1: Code Generation
+
+| Provider | Quality | Highlights |
+|----------|---------|-----------|
+| **Anthropic Haiku** | Excellent | Full class with `pandas`, logging, docstrings, `Path` usage, error handling. 7,680 chars — comprehensive |
+| **OpenAI GPT-4o-mini** | Good | Clean implementation with `pandas`, type hints, docstrings. 3,189 chars — concise but complete |
+| **DeepSeek Chat** | Excellent | Full class with logging, `Path`, type hints, error recovery. 8,218 chars — most detailed |
+
+### R1: Research Synthesis
+
+| Provider | Quality | Highlights |
+|----------|---------|-----------|
+| **Anthropic Haiku** | Excellent | Structured with H2/H3 headings, real-world examples (Netflix, Uber), scaling strategies. 8,470 chars |
+| **OpenAI GPT-4o-mini** | Good | Clear synthesis but fewer examples and less depth. 4,838 chars |
+| **DeepSeek Chat** | Very Good | Well-structured with scaling examples, trade-off analysis. 6,679 chars |
+
+### A1: Security Audit
+
+| Provider | Quality | Highlights |
+|----------|---------|-----------|
+| **Anthropic Haiku** | Outstanding | OWASP A03/CWE-89 classification, exploit scenarios, fixed code, severity emojis. 15,868 chars — extremely detailed |
+| **OpenAI GPT-4o-mini** | Good | Identifies key vulns, provides fixes. Less OWASP detail. 5,605 chars |
+| **DeepSeek Chat** | Very Good | OWASP references, severity ratings, code fixes. 9,244 chars |
+
+### Quality Summary
+
+| Provider | Avg Output | Code Quality | Analysis Depth | Structure |
+|----------|-----------|-------------|---------------|-----------|
+| **Anthropic Haiku** | 9,122 chars | Excellent | Deep (OWASP, CWE) | Markdown with headings |
+| **DeepSeek Chat** | 8,356 chars | Excellent | Good | Markdown with code blocks |
+| **OpenAI GPT-4o-mini** | 3,837 chars | Good | Adequate | Concise prose |
+
+> **Takeaway**: Anthropic Haiku delivers the richest analysis at ~2.4x the output of GPT-4o-mini. DeepSeek matches Haiku's depth at 1/10th the cost. GPT-4o-mini is fastest but less detailed.
+
 ## Key Observations
 
 1. **100% success rate** across Anthropic, OpenAI, and DeepSeek — Victor's provider abstraction works seamlessly across all three cloud providers
