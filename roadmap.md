@@ -276,8 +276,8 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 | P2 | R-02 | Update deprecation inventory with new entries | ✅ Done (`95f3c92`) |
 | P2 | V-02 | Generate CHANGELOG.md | ✅ Done (`6921db7`) |
 | P2 | T-05 | Set contrib vertical removal target: v0.7.0 | ✅ Done (`387721c`) |
-| P3 | F-04 | Reduce `Any` type annotations from 2,192 to <500 | Gradual |
-| P3 | D-03 | Decompose `indexer.py` (3,555 LOC) and `native/__init__.py` (3,112 LOC) | In Progress |
+| P3 | F-04 | Reduce `Any` type annotations: factory 102→11, service_provider 69→32, adapters 31→11 | ✅ Done (top 3 offenders) |
+| P3 | D-03 | Decompose `indexer.py` (3,555→package) and `native/__init__.py` (3,112→297 LOC) | ✅ Done (`4e8b8c0`, `d8c0b4b`) |
 
 ## How to Influence the Roadmap
 
