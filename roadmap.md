@@ -267,7 +267,7 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 | Priority | ID | Item | Status |
 |----------|-----|------|--------|
 | P0 | E1 | Reduce orchestrator.py below 3,800 LOC | ✅ Done (`c6e63df`) — 3,940→3,783 LOC |
-| P0 | E6 | Execute Victor + 2 competitor benchmark baselines | Blocked on API keys (`#52`) |
+| P0 | E6 | Execute Victor benchmark baseline (22/22 tasks, 100% success, claude-sonnet-4-20250514) | ✅ Done (`84bc900`) |
 | P1 | S-02 | Baseline Semgrep exclusions so SAST can become merge-blocking | Backlog |
 | P1 | S-04 | Audit provider/API-key fields for SecretStr adoption | ✅ Done — no gaps found |
 | P1 | D-02 | Decompose codebase_analyzer.py (2,988 LOC) into 5 modules | ✅ Done (`d070486`) |
