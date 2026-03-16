@@ -17,107 +17,65 @@
 This package provides segregated protocol interfaces for vertical-framework
 integration, following the Interface Segregation Principle (ISP).
 
-Each module contains protocols focused on a single responsibility:
-- tool_provider: Tool selection and dependency protocols
-- safety_provider: Safety pattern protocols
-- team_provider: Multi-agent team protocols
-- middleware: Tool execution middleware protocols
-- prompt_provider: Prompt contribution protocols
-- mode_provider: Mode configuration protocols
-- workflow_provider: Workflow management protocols
-- service_provider: DI service registration protocols
-- rl_provider: Reinforcement learning protocols
-- enrichment: Prompt enrichment protocols
-- capability_provider: Capability, chain, and persona protocols
+Protocol definitions are now canonically defined in victor-sdk to allow
+external verticals to depend on the SDK only. This module re-exports them
+for backward compatibility.
 
-Usage:
-    # Import from specific module (preferred for ISP)
-    from victor.core.verticals.protocols.tool_provider import (
-        ToolSelectionStrategyProtocol,
+Preferred import path (external verticals):
+    from victor_sdk.verticals.protocols import (
+        MiddlewareProtocol,
+        SafetyExtensionProtocol,
+        PromptContributorProtocol,
+        ModeConfigProviderProtocol,
     )
 
-    # Or import from package root (for convenience)
+Legacy import path (still works):
     from victor.core.verticals.protocols import (
         MiddlewareProtocol,
         SafetyExtensionProtocol,
         PromptContributorProtocol,
+        ModeConfigProviderProtocol,
     )
 """
 
-# Tool Provider
-from victor.core.verticals.protocols.tool_provider import (
-    ToolSelectionContext,
-    ToolSelectionResult,
+# =============================================================================
+# Re-export promoted protocols from SDK (canonical source)
+# =============================================================================
+
+from victor_sdk.verticals.protocols.promoted import (
+    # Tool Selection
     ToolSelectionStrategyProtocol,
     VerticalToolSelectionProviderProtocol,
     TieredToolConfigProviderProtocol,
     VerticalTieredToolProviderProtocol,
-)
-
-# Safety Provider
-from victor.core.verticals.protocols.safety_provider import (
+    # Safety
     SafetyExtensionProtocol,
-    SafetyPattern,
-)
-
-# Team Provider
-from victor.core.verticals.protocols.team_provider import (
+    # Team
     TeamSpecProviderProtocol,
     VerticalTeamProviderProtocol,
-)
-
-# Middleware
-from victor.core.verticals.protocols.middleware import (
+    # Middleware
     MiddlewareProtocol,
-    MiddlewarePriority,
-    MiddlewareResult,
-)
-
-# Prompt Provider
-from victor.core.verticals.protocols.prompt_provider import (
+    # Prompt
     PromptContributorProtocol,
-    TaskTypeHint,
-)
-
-# Mode Provider
-from victor.core.verticals.protocols.mode_provider import (
-    ModeConfig,
+    # Mode
     ModeConfigProviderProtocol,
-)
-
-# Workflow Provider
-from victor.core.verticals.protocols.workflow_provider import (
+    # Workflow
     WorkflowProviderProtocol,
     VerticalWorkflowProviderProtocol,
-)
-
-# Service Provider
-from victor.core.verticals.protocols.service_provider import (
+    # Service
     ServiceProviderProtocol,
-)
-
-# RL Provider
-from victor.core.verticals.protocols.rl_provider import (
+    # RL
     RLConfigProviderProtocol,
     VerticalRLProviderProtocol,
-)
-
-# Enrichment
-from victor.core.verticals.protocols.enrichment import (
+    # Enrichment
     EnrichmentStrategyProtocol,
     VerticalEnrichmentProviderProtocol,
-)
-
-# Capability Provider
-from victor.core.verticals.protocols.capability_provider import (
+    # Capability
     CapabilityProviderProtocol,
     ChainProviderProtocol,
     PersonaProviderProtocol,
     VerticalPersonaProviderProtocol,
-)
-
-# Stage Contract (Phase 2: LSP Compliance)
-from victor.core.verticals.protocols.stages import (
+    # Stage Contract
     StageContract,
     StageValidator,
     StageValidationResult,
@@ -126,8 +84,29 @@ from victor.core.verticals.protocols.stages import (
     StageContractMixin,
 )
 
-# ISP-Compliant Vertical Providers
-from victor.core.verticals.protocols.providers import (
+# Re-export promoted data types from SDK
+from victor_sdk.verticals.protocols.promoted_types import (
+    MiddlewarePriority,
+    MiddlewareResult,
+    ModeConfig,
+    ToolSelectionContext,
+    ToolSelectionResult,
+)
+
+# Re-export SafetyPattern from its original location (dataclass, not Protocol)
+from victor.security.safety.types import SafetyPattern
+
+# Re-export TaskTypeHint from its original location (dataclass)
+from victor.core.vertical_types import TaskTypeHint
+
+# Backward compat alias for ToolSelectionContext
+VerticalToolSelectionContext = ToolSelectionContext
+
+# =============================================================================
+# ISP-Compliant Vertical Providers (re-exported from SDK)
+# =============================================================================
+
+from victor_sdk.verticals.protocols import (
     MiddlewareProvider,
     SafetyProvider,
     WorkflowProvider,
@@ -138,6 +117,10 @@ from victor.core.verticals.protocols.providers import (
     HandlerProvider,
     CapabilityProvider,
     ModeConfigProvider,
+)
+
+# These provider protocols are defined locally (have methods not in SDK versions)
+from victor.core.verticals.protocols.providers import (
     PromptContributorProvider,
     ToolDependencyProvider,
     TieredToolConfigProvider,
