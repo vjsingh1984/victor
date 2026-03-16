@@ -140,9 +140,23 @@ class VerticalLoader:
             # Query VerticalRegistry (includes built-ins registered on import)
             vertical = VerticalRegistry.get(name)
 
-            # Try entry points as fallback
+            # Check entry points for collision detection
+            ep_vertical = self._import_from_entrypoint(name)
+
+            if vertical is not None and ep_vertical is not None and vertical is not ep_vertical:
+                # Both registry and entry point have this name — warn about collision
+                logger.warning(
+                    "Vertical '%s' registered via both VerticalRegistry (%s) and "
+                    "entry point (%s). Using registry version. To use the entry point "
+                    "version, unregister the built-in first.",
+                    name,
+                    f"{vertical.__module__}.{vertical.__qualname__}",
+                    f"{ep_vertical.__module__}.{ep_vertical.__qualname__}",
+                )
+
+            # Use registry first, entry point as fallback
             if vertical is None:
-                vertical = self._import_from_entrypoint(name)
+                vertical = ep_vertical
 
             # Error with available names
             if vertical is None:
@@ -687,12 +701,37 @@ class VerticalLoader:
         incompatible manifests.
         """
         try:
+            manifest = vertical.get_manifest()
+        except (ImportError, AttributeError, NotImplementedError) as exc:
+            logger.debug("Vertical manifest not available: %s", exc)
+            return
+
+        # 1. Version Negotiation (Core Framework v. Vertical Requirement)
+        try:
+            from packaging import version
+            from victor.version import VERSION as FRAMEWORK_VERSION
+
+            required = getattr(manifest, "framework_version_requirement", ">=1.0.0")
+
+            from packaging.specifiers import Specifierset
+            spec = Specifierset(required)
+            if version.parse(FRAMEWORK_VERSION) not in spec:
+                raise ValueError(
+                    f"Incompatible framework version: {FRAMEWORK_VERSION} "
+                    f"does not meet requirement {required} for vertical {manifest.name}"
+                )
+        except (ImportError, AttributeError) as exc:
+            logger.debug("Core version negotiation skipped: %s", exc)
+
+        # 2. Capability/Protocol Negotiation
+        try:
             from victor.core.verticals.capability_negotiator import (
                 CapabilityNegotiator,
+            )
+            from victor.framework.capability_negotiation import (
                 NegotiationResult,
             )
 
-            manifest = vertical.get_manifest()
             negotiator = CapabilityNegotiator()
             result: NegotiationResult = negotiator.negotiate(manifest)
 
