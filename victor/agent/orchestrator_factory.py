@@ -61,6 +61,83 @@ if TYPE_CHECKING:
     from victor.agent.recovery import RecoveryHandler
     from victor.observability.integration import ObservabilityIntegration
 
+    # Additional types for method signatures
+    from victor.tools.registry import ToolRegistry
+    from victor.agent.tool_executor import ToolExecutor
+    from victor.agent.tool_registrar import ToolRegistrar
+    from victor.agent.conversation_memory import ConversationStore
+    from victor.analytics.logger import UsageLogger  # noqa: F811
+    from victor.analytics.streaming_metrics import StreamingMetricsCollector
+    from victor.agent.middleware_chain import MiddlewareChain
+    from victor.agent.parallel_executor import ParallelToolExecutor
+    from victor.agent.response_completer import ResponseCompleter
+    from victor.agent.unified_task_tracker import UnifiedTaskTracker
+    from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
+    from victor.agent.orchestrator_integration import IntegrationConfig
+    from victor.agent.message_history import MessageHistory
+    from victor.agent.tool_selection import ToolSelector
+    from victor.storage.embeddings.intent_classifier import IntentClassifier
+    from victor.agent.debug_logger import DebugLogger
+    from victor.agent.tool_access_controller import ToolAccessController
+    from victor.agent.budget_manager import BudgetManager, ModeCompletionCriteria
+    from victor.agent.task_completion import TaskCompletionDetector
+    from victor.agent.read_cache import ReadResultCache
+    from victor.agent.time_aware_executor import TimeAwareExecutor
+    from victor.agent.thinking_detector import ThinkingPatternDetector
+    from victor.agent.resource_manager import ResourceManager
+    from victor.agent.session_ledger import SessionLedger
+    from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
+    from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
+    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.referential_intent_resolver import ReferentialIntentResolver
+    from victor.agent.response_processor import ResponseProcessor
+    from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
+    from victor.agent.streaming.handler import StreamingChatHandler
+    from victor.agent.streaming.pipeline import StreamingChatPipeline
+    from victor.agent.provider_switch_coordinator import ProviderSwitchCoordinator
+    from victor.agent.lifecycle_manager import LifecycleManager
+    from victor.agent.tool_deduplication import ToolDeduplicationTracker
+    from victor.agent.provider_manager import ProviderManager
+    from victor.agent.presentation.protocols import PresentationProtocol
+    from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
+    from victor.tools.plugin_registry import ToolPluginRegistry
+    from victor.tools.semantic_selector import SemanticToolSelector
+    from victor.storage.cache.tool_cache import ToolCache
+    from victor.storage.checkpoints import ConversationCheckpointManager
+    from victor.observability.tracing import ExecutionTracer, ToolCallTracer
+    from victor.config.model_capabilities import ToolCallingMatrix
+    from victor.agent.argument_normalizer import ArgumentNormalizer
+    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+    from victor.agent.protocols.streaming_protocols import (
+        StreamingMetricsCollectorProtocol,
+        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
+        ChunkGeneratorProtocol as ChunkGeneratorProto,
+    )
+    from victor.agent.protocols.infrastructure_protocols import (
+        SafetyCheckerProtocol,
+        AutoCommitterProtocol,
+        ReminderManagerProtocol,
+        TaskTrackerProtocol,
+        RLCoordinatorProtocol,
+        CodeExecutionManagerProtocol,
+        WorkflowRegistryProtocol,
+        ArgumentNormalizerProtocol,
+        DebugLoggerProtocol,
+    )
+    from victor.agent.protocols.coordination_protocols import (
+        ToolPlannerProtocol,
+        TaskCoordinatorProtocol,
+    )
+    from victor.agent.protocols.budget_protocols import (
+        IBudgetManager,
+        IModeCompletionChecker,
+    )
+    from victor.agent.protocols.provider_protocols import (
+        IProviderSwitcher,
+        IProviderHealthMonitor,
+    )
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,21 +169,21 @@ class ConversationComponents:
     """Components for conversation management."""
 
     conversation_controller: "ConversationController"
-    memory_manager: Optional[Any] = None
+    memory_manager: Optional["ConversationStore"] = None
     memory_session_id: Optional[str] = None
-    conversation_state: Optional[Any] = None
+    conversation_state: Optional["ConversationStateMachine"] = None
 
 
 @dataclass
 class ToolComponents:
     """Components for tool management and execution."""
 
-    tool_registry: Any
-    tool_registrar: Any
-    tool_executor: Any
-    tool_cache: Optional[Any] = None
-    tool_graph: Optional[Any] = None
-    plugin_manager: Optional[Any] = None
+    tool_registry: "ToolRegistry"
+    tool_registrar: "ToolRegistrar"
+    tool_executor: "ToolExecutor"
+    tool_cache: Optional["ToolCache"] = None
+    tool_graph: Optional["ToolDependencyGraphProtocol"] = None
+    plugin_manager: Optional["ToolPluginRegistry"] = None
 
 
 @dataclass
@@ -114,9 +191,9 @@ class StreamingComponents:
     """Components for streaming and metrics."""
 
     streaming_controller: "StreamingController"
-    streaming_handler: Any
+    streaming_handler: "StreamingChatHandler"
     metrics_collector: "MetricsCollector"
-    streaming_metrics_collector: Optional[Any] = None
+    streaming_metrics_collector: Optional["StreamingMetricsCollector"] = None
 
 
 @dataclass
@@ -125,7 +202,7 @@ class AnalyticsComponents:
 
     usage_analytics: "UsageAnalytics"
     sequence_tracker: "ToolSequenceTracker"
-    unified_tracker: Any
+    unified_tracker: "UnifiedTaskTracker"
 
 
 @dataclass
@@ -133,7 +210,7 @@ class RecoveryComponents:
     """Components for error recovery and resilience."""
 
     recovery_handler: Optional["RecoveryHandler"]
-    recovery_integration: Any
+    recovery_integration: "OrchestratorRecoveryIntegration"
     context_compactor: "ContextCompactor"
 
 
@@ -150,12 +227,12 @@ class WorkflowOptimizationComponents:
     - ModeCompletionCriteria: Mode-specific early exit detection
     """
 
-    task_completion_detector: Optional[Any] = None
-    read_cache: Optional[Any] = None
-    time_aware_executor: Optional[Any] = None
-    thinking_detector: Optional[Any] = None
-    resource_manager: Optional[Any] = None
-    mode_completion_criteria: Optional[Any] = None
+    task_completion_detector: Optional["TaskCompletionDetector"] = None
+    read_cache: Optional["ReadResultCache"] = None
+    time_aware_executor: Optional["TimeAwareExecutor"] = None
+    thinking_detector: Optional["ThinkingPatternDetector"] = None
+    resource_manager: Optional["ResourceManager"] = None
+    mode_completion_criteria: Optional["ModeCompletionCriteria"] = None
 
 
 @dataclass
@@ -335,7 +412,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return self.container.get(SearchRouterProtocol)
 
-    def create_presentation_adapter(self) -> Any:
+    def create_presentation_adapter(self) -> "PresentationProtocol":
         """Create presentation adapter for icon/emoji rendering.
 
         The presentation adapter provides a clean abstraction for presentation
@@ -371,7 +448,7 @@ class OrchestratorFactory(ModeAwareMixin):
             search_router=self.create_search_router(),
         )
 
-    def create_streaming_metrics_collector(self) -> Optional[Any]:
+    def create_streaming_metrics_collector(self) -> Optional["StreamingMetricsCollector"]:
         """Create streaming metrics collector if enabled."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
 
@@ -383,10 +460,10 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_metrics_collector(
         self,
-        streaming_metrics_collector: Optional[Any],
-        usage_logger: Any,
-        debug_logger: Any,
-        tool_cost_lookup: Callable[[str], Any],
+        streaming_metrics_collector: Optional["StreamingMetricsCollector"],
+        usage_logger: "UsageLogger",
+        debug_logger: "DebugLogger",
+        tool_cost_lookup: Callable[[str], str],
     ) -> "MetricsCollector":
         """Create metrics collector.
 
@@ -443,7 +520,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("Observability integration created")
         return observability
 
-    def create_tracers(self) -> tuple:
+    def create_tracers(self) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
         """Create execution and tool call tracers for debugging.
 
         Returns:
@@ -469,7 +546,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ExecutionTracer and ToolCallTracer created")
         return (execution_tracer, tool_call_tracer)
 
-    def create_tool_cache(self) -> Optional[Any]:
+    def create_tool_cache(self) -> Optional["ToolCache"]:
         """Create tool cache if enabled.
 
         Returns:
@@ -497,7 +574,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ToolCache created with TTL={cache.ttl}s")
         return cache
 
-    def create_reminder_manager(self, provider: str, task_complexity: str, tool_budget: int) -> Any:
+    def create_reminder_manager(self, provider: str, task_complexity: str, tool_budget: int) -> "ReminderManagerProtocol":
         """Create context reminder manager from DI container.
 
         Args:
@@ -517,7 +594,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ReminderManager created for {provider} with complexity {task_complexity}")
         return reminder_manager
 
-    def create_tool_dependency_graph(self) -> Any:
+    def create_tool_dependency_graph(self) -> "ToolDependencyGraphProtocol":
         """Create tool dependency graph from DI container.
 
         Returns:
@@ -533,7 +610,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_memory_components(
         self, provider_name: str, tool_capable: bool = True
-    ) -> Tuple[Optional[Any], Optional[str]]:
+    ) -> Tuple[Optional["ConversationStore"], Optional[str]]:
         """Create conversation memory components.
 
         Args:
@@ -584,7 +661,7 @@ class OrchestratorFactory(ModeAwareMixin):
             logger.warning(f"Failed to initialize ConversationStore: {e}")
             return None, None
 
-    def create_usage_logger(self) -> Any:
+    def create_usage_logger(self) -> "UsageLogger":
         """Create usage logger (DI with fallback).
 
         Returns:
@@ -607,13 +684,13 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("Using basic usage logger (enhanced version not available)")
         return usage_logger
 
-    def create_middleware_chain(self) -> Tuple[Optional[Any], Optional[Any]]:
+    def create_middleware_chain(self) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
         """Create middleware chain with vertical extensions.
 
         Returns:
             Tuple of (MiddlewareChain or None, CodeCorrectionMiddleware or None)
         """
-        middleware_chain: Optional[Any] = None
+        middleware_chain: Optional["MiddlewareChain"] = None
         code_correction_middleware: Optional[Any] = None
         code_correction_enabled = getattr(self.settings, "code_correction_enabled", True)
 
@@ -666,7 +743,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return middleware_chain, code_correction_middleware
 
-    def create_safety_checker(self) -> Any:
+    def create_safety_checker(self) -> "SafetyCheckerProtocol":
         """Create safety checker with vertical safety patterns.
 
         Returns:
@@ -700,7 +777,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return safety_checker
 
-    def create_auto_committer(self) -> Optional[Any]:
+    def create_auto_committer(self) -> Optional["AutoCommitterProtocol"]:
         """Create auto committer for AI-assisted commits.
 
         Returns:
@@ -720,7 +797,7 @@ class OrchestratorFactory(ModeAwareMixin):
             # Still create instance for manual use, just not auto-commit
             return get_auto_committer()
 
-    def create_semantic_selector(self) -> Optional[Any]:
+    def create_semantic_selector(self) -> Optional["SemanticToolSelector"]:
         """Create semantic tool selector if enabled.
 
         Returns:
@@ -748,7 +825,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("SemanticToolSelector created")
         return semantic_selector
 
-    def create_parallel_executor(self, tool_executor: Any) -> Any:
+    def create_parallel_executor(self, tool_executor: "ToolExecutor") -> "ParallelToolExecutor":
         """Create parallel tool executor for concurrent independent tool calls.
 
         Args:
@@ -772,7 +849,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return parallel_executor
 
-    def create_response_completer(self) -> Any:
+    def create_response_completer(self) -> "ResponseCompleter":
         """Create response completer for ensuring complete responses after tool calls.
 
         Returns:
@@ -788,7 +865,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ResponseCompleter created")
         return response_completer
 
-    def create_unified_tracker(self, tool_calling_caps: "ToolCallingCapabilities") -> Any:
+    def create_unified_tracker(self, tool_calling_caps: "ToolCallingCapabilities") -> "UnifiedTaskTracker":
         """Create unified task tracker with model-specific exploration settings.
 
         The UnifiedTaskTracker is the single source of truth for task progress,
@@ -838,7 +915,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return unified_tracker
 
-    def create_tool_output_formatter(self, context_compactor: Any) -> Any:
+    def create_tool_output_formatter(self, context_compactor: "ContextCompactor") -> "ToolOutputFormatter":
         """Create tool output formatter for LLM-context-aware output formatting.
 
         Args:
@@ -862,7 +939,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ToolOutputFormatter created")
         return formatter
 
-    def create_recovery_integration(self, recovery_handler: Optional[Any]) -> Any:
+    def create_recovery_integration(self, recovery_handler: Optional["RecoveryHandler"]) -> "OrchestratorRecoveryIntegration":
         """Create recovery integration submodule for clean delegation.
 
         Args:
@@ -880,7 +957,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("RecoveryIntegration created")
         return integration
 
-    def create_recovery_coordinator(self) -> Any:
+    def create_recovery_coordinator(self) -> "StreamingRecoveryCoordinatorProto":
         """Create RecoveryCoordinator via DI container.
 
         The RecoveryCoordinator centralizes all recovery and error handling logic
@@ -896,7 +973,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
-    def create_chunk_generator(self) -> Any:
+    def create_chunk_generator(self) -> "ChunkGeneratorProto":
         """Create ChunkGenerator via DI container.
 
         The ChunkGenerator provides a centralized interface for generating streaming
@@ -913,7 +990,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ChunkGenerator created via DI")
         return chunk_generator
 
-    def create_tool_planner(self) -> Any:
+    def create_tool_planner(self) -> "ToolPlannerProtocol":
         """Create ToolPlanner via DI container.
 
         The ToolPlanner provides a centralized interface for tool planning operations,
@@ -930,7 +1007,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ToolPlanner created via DI")
         return tool_planner
 
-    def create_task_coordinator(self) -> Any:
+    def create_task_coordinator(self) -> "TaskCoordinatorProtocol":
         """Create TaskCoordinator via DI container.
 
         The TaskCoordinator provides a centralized interface for task coordination,
@@ -949,9 +1026,9 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_streaming_controller(
         self,
-        streaming_metrics_collector: Optional[Any],
+        streaming_metrics_collector: Optional["StreamingMetricsCollector"],
         on_session_complete: Callable,
-    ) -> Any:
+    ) -> "StreamingController":
         """Create streaming controller for managing streaming sessions and metrics.
 
         Args:
@@ -979,8 +1056,8 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_streaming_coordinator(
         self,
-        streaming_controller: Any,
-    ) -> Any:
+        streaming_controller: "StreamingController",
+    ) -> "StreamingCoordinator":
         """Create streaming coordinator for response processing.
 
         Args:
@@ -999,9 +1076,9 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_provider_switch_coordinator(
         self,
-        provider_switcher: Any,
-        health_monitor: Optional[Any] = None,
-    ) -> Any:
+        provider_switcher: "IProviderSwitcher",
+        health_monitor: Optional["IProviderHealthMonitor"] = None,
+    ) -> "ProviderSwitchCoordinator":
         """Create provider switch coordinator for switching workflow.
 
         Args:
@@ -1022,13 +1099,13 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_lifecycle_manager(
         self,
-        conversation_controller: Any,
-        metrics_collector: Optional[Any] = None,
-        context_compactor: Optional[Any] = None,
-        sequence_tracker: Optional[Any] = None,
-        usage_analytics: Optional[Any] = None,
-        reminder_manager: Optional[Any] = None,
-    ) -> Any:
+        conversation_controller: "ConversationController",
+        metrics_collector: Optional["MetricsCollector"] = None,
+        context_compactor: Optional["ContextCompactor"] = None,
+        sequence_tracker: Optional["ToolSequenceTracker"] = None,
+        usage_analytics: Optional["UsageAnalytics"] = None,
+        reminder_manager: Optional["ReminderManagerProtocol"] = None,
+    ) -> "LifecycleManager":
         """Create lifecycle manager for session lifecycle and resource cleanup.
 
         Args:
@@ -1057,19 +1134,19 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_tool_pipeline(
         self,
-        tools: Any,
-        tool_executor: Any,
+        tools: "ToolRegistry",
+        tool_executor: "ToolExecutor",
         tool_budget: int,
-        tool_cache: Optional[Any],
-        argument_normalizer: Any,
+        tool_cache: Optional["ToolCache"],
+        argument_normalizer: "ArgumentNormalizer",
         on_tool_start: Callable,
         on_tool_complete: Callable,
         on_tool_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        deduplication_tracker: Optional[Any] = None,
-        middleware_chain: Optional[Any] = None,
+        deduplication_tracker: Optional["ToolDeduplicationTracker"] = None,
+        middleware_chain: Optional["MiddlewareChain"] = None,
         semantic_cache: Optional[Any] = None,
-        search_router: Optional[Any] = None,
-    ) -> Any:
+        search_router: Optional["SearchRouter"] = None,
+    ) -> "ToolPipeline":
         """Create tool pipeline for coordinating tool execution flow.
 
         Args:
@@ -1120,9 +1197,9 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_streaming_tool_adapter(
         self,
-        tool_pipeline: Any,
+        tool_pipeline: "ToolPipeline",
         on_chunk: Optional[Callable] = None,
-    ) -> Any:
+    ) -> None:
         """⚠️ OBSOLETE - NOT IN USE - DEAD CODE ⚠️
 
         This factory method is NO LONGER CALLED in the codebase.
@@ -1198,12 +1275,12 @@ class OrchestratorFactory(ModeAwareMixin):
         self,
         provider: "BaseProvider",
         model: str,
-        conversation: Any,
-        conversation_state: Any,
-        memory_manager: Any,
+        conversation: List[Dict[str, Any]],
+        conversation_state: "ConversationStateMachine",
+        memory_manager: Optional["ConversationStore"],
         memory_session_id: str,
         system_prompt: str,
-    ) -> Any:
+    ) -> "ConversationController":
         """Create conversation controller for managing message history and state.
 
         Args:
@@ -1273,7 +1350,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return controller
 
-    def create_tool_deduplication_tracker(self) -> Optional[Any]:
+    def create_tool_deduplication_tracker(self) -> Optional["ToolDeduplicationTracker"]:
         """Create tool deduplication tracker for preventing redundant calls.
 
         Returns None if deduplication is disabled in settings, otherwise returns
@@ -1298,7 +1375,7 @@ class OrchestratorFactory(ModeAwareMixin):
             logger.warning(f"Failed to initialize ToolDeduplicationTracker: {e}")
             return None
 
-    def create_streaming_chat_handler(self, message_adder: Any) -> Any:
+    def create_streaming_chat_handler(self, message_adder: Any) -> "StreamingChatHandler":
         """Create streaming chat handler for testable streaming loop logic.
 
         This component encapsulates limit checking, response processing, and
@@ -1324,7 +1401,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_pipeline(self, coordinator: Any) -> Any:
+    def create_streaming_chat_pipeline(self, coordinator: Any) -> "StreamingChatPipeline":
         """Create the canonical StreamingChatPipeline bound to a coordinator."""
         from victor.agent.streaming import create_streaming_chat_pipeline
 
@@ -1332,7 +1409,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("StreamingChatPipeline created and bound to coordinator")
         return pipeline
 
-    def create_rl_coordinator(self) -> Optional[Any]:
+    def create_rl_coordinator(self) -> Optional["RLCoordinatorProtocol"]:
         """Create RL coordinator for reinforcement learning framework.
 
         The RL coordinator manages all learners (continuation_prompts,
@@ -1363,9 +1440,9 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_context_compactor(
         self,
-        conversation_controller: Any,
+        conversation_controller: "ConversationController",
         pruning_learner: Optional[Any] = None,
-    ) -> Any:
+    ) -> "ContextCompactor":
         """Create context compactor for proactive context management.
 
         This component provides:
@@ -1429,7 +1506,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return compactor
 
-    def create_argument_normalizer(self, provider: "BaseProvider") -> Any:
+    def create_argument_normalizer(self, provider: "BaseProvider") -> "ArgumentNormalizer":
         """Create argument normalizer for handling malformed tool arguments.
 
         Uses DI-first resolution with fallback to direct instantiation.
@@ -1447,12 +1524,12 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_tool_executor(
         self,
-        tools: Any,
-        argument_normalizer: Any,
-        tool_cache: Optional[Any],
-        safety_checker: Any,
+        tools: "ToolRegistry",
+        argument_normalizer: "ArgumentNormalizer",
+        tool_cache: Optional["ToolCache"],
+        safety_checker: "SafetyCheckerProtocol",
         code_correction_middleware: Optional[Any],
-    ) -> Any:
+    ) -> "ToolExecutor":
         """Create tool executor for centralized tool execution.
 
         Handles retry logic, caching, validation, and metrics collection.
@@ -1542,7 +1619,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ToolExecutor created with validation_mode={validation_mode}")
         return executor
 
-    def create_code_execution_manager(self) -> Any:
+    def create_code_execution_manager(self) -> "CodeExecutionManagerProtocol":
         """Create code execution manager for Docker-based code execution.
 
         Uses DI-first resolution with fallback to direct instantiation.
@@ -1556,7 +1633,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Resolve from DI container (guaranteed to be registered and started)
         return self.container.get(CodeExecutionManagerProtocol)
 
-    def create_workflow_registry(self) -> Any:
+    def create_workflow_registry(self) -> "WorkflowRegistryProtocol":
         """Create workflow registry for managing workflow patterns.
 
         Uses DI-first resolution with fallback to direct instantiation.
@@ -1569,7 +1646,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Resolve from DI container (guaranteed to be registered)
         return self.container.get(WorkflowRegistryProtocol)
 
-    def create_conversation_state_machine(self) -> Any:
+    def create_conversation_state_machine(self) -> "ConversationStateMachine":
         """Create conversation state machine for intelligent stage detection.
 
         Uses DI-first resolution with fallback to direct instantiation.
@@ -1582,7 +1659,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Resolve from DI container (guaranteed to be registered)
         return self.container.get(ConversationStateMachineProtocol)
 
-    def create_integration_config(self) -> Any:
+    def create_integration_config(self) -> "IntegrationConfig":
         """Create intelligent pipeline integration configuration.
 
         Extracts all intelligent_* settings from Settings and constructs
@@ -1613,8 +1690,8 @@ class OrchestratorFactory(ModeAwareMixin):
         return config
 
     def create_tool_registrar(
-        self, tools: Any, tool_graph: Any, provider: "BaseProvider", model: str
-    ) -> Any:
+        self, tools: "ToolRegistry", tool_graph: "ToolDependencyGraphProtocol", provider: "BaseProvider", model: str
+    ) -> "ToolRegistrar":
         """Create tool registrar for dynamic tool discovery and registration.
 
         Encapsulates dynamic tool discovery, plugin loading, and MCP integration.
@@ -1655,7 +1732,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return registrar
 
-    def create_message_history(self, system_prompt: str) -> Any:
+    def create_message_history(self, system_prompt: str) -> "MessageHistory":
         """Create message history for conversation tracking.
 
         Args:
@@ -1675,7 +1752,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"MessageHistory created with max_history={max_history}")
         return history
 
-    def create_tool_registry(self) -> Any:
+    def create_tool_registry(self) -> "ToolRegistry":
         """Create tool registry for managing available tools.
 
         Returns:
@@ -1687,7 +1764,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ToolRegistry created")
         return registry
 
-    def initialize_plugin_system(self, tool_registrar: Any) -> Optional[Any]:
+    def initialize_plugin_system(self, tool_registrar: "ToolRegistrar") -> Optional["ToolPluginRegistry"]:
         """Initialize plugin system for extensible tools.
 
         Delegates to ToolRegistrar for plugin discovery and loading.
@@ -1716,15 +1793,15 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_tool_selector(
         self,
-        tools: Any,
-        semantic_selector: Any,
-        conversation_state: Any,
-        unified_tracker: Any,
+        tools: "ToolRegistry",
+        semantic_selector: Optional["SemanticToolSelector"],
+        conversation_state: "ConversationStateMachine",
+        unified_tracker: "UnifiedTaskTracker",
         model: str,
         provider_name: str,
-        tool_selection: Any,
-        on_selection_recorded: Any,
-    ) -> Any:
+        tool_selection: Dict[str, Any],
+        on_selection_recorded: Optional[Callable],
+    ) -> "ToolSelector":
         """Create unified tool selector for semantic and keyword-based selection.
 
         Args:
@@ -1759,7 +1836,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")
         return selector
 
-    def create_intent_classifier(self) -> Any:
+    def create_intent_classifier(self) -> "IntentClassifier":
         """Create intent classifier for semantic continuation/completion detection.
 
         Uses singleton pattern via get_instance(). Intent classifier uses
@@ -1804,10 +1881,10 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def wire_component_dependencies(
         self,
-        recovery_handler: Any,
-        context_compactor: Any,
-        observability: Any,
-        conversation_state: Any,
+        recovery_handler: Optional["RecoveryHandler"],
+        context_compactor: "ContextCompactor",
+        observability: Optional["ObservabilityIntegration"],
+        conversation_state: Optional["ConversationStateMachine"],
     ) -> None:
         """Wire component dependencies after initialization.
 
@@ -1836,7 +1913,7 @@ class OrchestratorFactory(ModeAwareMixin):
         provider: "BaseProvider",
         model: str,
         provider_name: str,
-    ) -> tuple[Any, Any, str, str, Any, Any]:
+    ) -> tuple["ProviderManager", "BaseProvider", str, str, "BaseToolCallingAdapter", "ToolCallingCapabilities"]:
         """Create ProviderManager and initialize tool adapter.
 
         Creates ProviderManager for unified provider/model management,
@@ -1886,7 +1963,7 @@ class OrchestratorFactory(ModeAwareMixin):
             manager.capabilities,
         )
 
-    def create_tool_calling_matrix(self) -> tuple[Any, Any]:
+    def create_tool_calling_matrix(self) -> tuple[Dict[str, Any], "ToolCallingMatrix"]:
         """Create ToolCallingMatrix for managing tool calling capabilities.
 
         Extracts tool_calling_models from settings and creates matrix with
@@ -1926,9 +2003,9 @@ class OrchestratorFactory(ModeAwareMixin):
         self,
         provider_name: str,
         model: str,
-        tool_adapter: Any,
-        tool_calling_caps: Any,
-    ) -> Any:
+        tool_adapter: "BaseToolCallingAdapter",
+        tool_calling_caps: "ToolCallingCapabilities",
+    ) -> "SystemPromptBuilder":
         """Create SystemPromptBuilder with vertical prompt contributors.
 
         Extracts prompt contributors from vertical extensions and creates
@@ -1971,7 +2048,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")
         return prompt_builder
 
-    def initialize_tool_budget(self, tool_calling_caps: Any) -> int:
+    def initialize_tool_budget(self, tool_calling_caps: "ToolCallingCapabilities") -> int:
         """Initialize tool call budget with adapter recommendations.
 
         Uses adapter's recommended budget with settings override and ensures
@@ -2020,7 +2097,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("Execution state containers initialized")
         return (observed_files, executed_tools, failed_tool_signatures, tool_capability_warned)
 
-    def create_debug_logger_configured(self) -> Any:
+    def create_debug_logger_configured(self) -> "DebugLogger":
         """Create and configure debug logger for conversation tracking.
 
         Creates debug logger with enabled flag based on settings or log level.
@@ -2044,7 +2121,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"Debug logger initialized: enabled={debug_logger.enabled}")
         return debug_logger
 
-    def create_tool_access_controller(self, registry: Any = None) -> Any:
+    def create_tool_access_controller(self, registry: Optional["ToolRegistry"] = None) -> "ToolAccessController":
         """Create ToolAccessController for unified tool access control.
 
         Creates a layered tool access controller that consolidates 6 independent
@@ -2069,7 +2146,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return controller
 
-    def create_budget_manager(self) -> Any:
+    def create_budget_manager(self) -> "BudgetManager":
         """Create BudgetManager for unified budget tracking.
 
         Creates a budget manager that centralizes all budget tracking with
@@ -2112,7 +2189,7 @@ class OrchestratorFactory(ModeAwareMixin):
     # Workflow Optimization Components
     # =========================================================================
 
-    def create_task_completion_detector(self) -> Any:
+    def create_task_completion_detector(self) -> "TaskCompletionDetector":
         """Create TaskCompletionDetector for detecting task completion.
 
         Issue Reference: workflow-test-issues-v2.md Issue #1
@@ -2126,7 +2203,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("TaskCompletionDetector created")
         return detector
 
-    def create_read_cache(self) -> Any:
+    def create_read_cache(self) -> "ReadResultCache":
         """Create ReadResultCache for file read deduplication.
 
         Issue Reference: workflow-test-issues-v2.md Issue #2
@@ -2144,7 +2221,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug(f"ReadResultCache created (ttl={ttl_seconds}s, max={max_entries})")
         return cache
 
-    def create_time_aware_executor(self, timeout_seconds: Optional[float] = None) -> Any:
+    def create_time_aware_executor(self, timeout_seconds: Optional[float] = None) -> "TimeAwareExecutor":
         """Create TimeAwareExecutor for time-aware execution management.
 
         Issue Reference: workflow-test-issues-v2.md Issue #3
@@ -2168,7 +2245,7 @@ class OrchestratorFactory(ModeAwareMixin):
             logger.debug("TimeAwareExecutor created (no timeout)")
         return executor
 
-    def create_thinking_detector(self) -> Any:
+    def create_thinking_detector(self) -> "ThinkingPatternDetector":
         """Create ThinkingPatternDetector for detecting thinking loops.
 
         Issue Reference: workflow-test-issues-v2.md Issue #4
@@ -2192,7 +2269,7 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         return detector
 
-    def create_resource_manager(self) -> Any:
+    def create_resource_manager(self) -> "ResourceManager":
         """Get ResourceManager for resource lifecycle management.
 
         Issue Reference: workflow-test-issues-v2.md Issue #5
@@ -2206,7 +2283,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ResourceManager retrieved (singleton)")
         return manager
 
-    def create_mode_completion_criteria(self) -> Any:
+    def create_mode_completion_criteria(self) -> "ModeCompletionCriteria":
         """Create ModeCompletionCriteria for mode-specific early exit.
 
         Issue Reference: workflow-test-issues-v2.md Issue #6
@@ -2220,7 +2297,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("ModeCompletionCriteria created")
         return criteria
 
-    def create_checkpoint_manager(self) -> Optional[Any]:
+    def create_checkpoint_manager(self) -> Optional["ConversationCheckpointManager"]:
         """Create ConversationCheckpointManager for time-travel debugging.
 
         Creates the checkpoint manager based on settings configuration.
@@ -2290,14 +2367,14 @@ class OrchestratorFactory(ModeAwareMixin):
             mode_completion_criteria=self.create_mode_completion_criteria(),
         )
 
-    def create_session_ledger(self) -> Any:
+    def create_session_ledger(self) -> "SessionLedger":
         """Create SessionLedger for structured session state tracking."""
         from victor.agent.session_ledger import SessionLedger
 
         logger.debug("SessionLedger created")
         return SessionLedger()
 
-    def create_compaction_summarizer(self, ledger: Any = None) -> Any:
+    def create_compaction_summarizer(self, ledger: Optional["SessionLedger"] = None) -> "LedgerAwareCompactionSummarizer":
         """Create ledger-aware compaction summarizer strategy."""
         from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
 
@@ -2305,14 +2382,14 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("LedgerAwareCompactionSummarizer created")
         return summarizer
 
-    def create_tool_result_deduplicator(self) -> Any:
+    def create_tool_result_deduplicator(self) -> "ToolResultDeduplicator":
         """Create ToolResultDeduplicator for file read deduplication."""
         from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
 
         logger.debug("ToolResultDeduplicator created")
         return ToolResultDeduplicator()
 
-    def create_context_assembler(self, ledger: Any = None, controller: Any = None) -> Any:
+    def create_context_assembler(self, ledger: Optional["SessionLedger"] = None, controller: Optional["ConversationController"] = None) -> "TurnBoundaryContextAssembler":
         """Create TurnBoundaryContextAssembler for context selection.
 
         Args:
@@ -2332,7 +2409,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
 
-    def create_referential_intent_resolver(self, ledger: Any = None) -> Any:
+    def create_referential_intent_resolver(self, ledger: Optional["SessionLedger"] = None) -> "ReferentialIntentResolver":
         """Create ReferentialIntentResolver for anaphoric reference resolution."""
         from victor.agent.referential_intent_resolver import ReferentialIntentResolver
 
@@ -2343,7 +2420,7 @@ class OrchestratorFactory(ModeAwareMixin):
     def create_mode_workflow_team_coordinator(
         self,
         vertical_context: Any,
-    ) -> Any:
+    ) -> "ModeWorkflowTeamCoordinator":
         """Create ModeWorkflowTeamCoordinator for intelligent task coordination.
 
         The coordinator bridges agent modes, team specifications, and workflows
@@ -2395,7 +2472,7 @@ class OrchestratorFactory(ModeAwareMixin):
         chunk_generator: Any,
         intent_classifier: Any,
         continuation_strategy: Any,
-    ) -> Any:
+    ) -> None:
         """ARCHIVED: StreamingLoopCoordinator was extracted but never integrated.
 
         The streaming loop functionality remains in AgentOrchestrator.
@@ -2412,12 +2489,12 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_response_processor(
         self,
-        tool_adapter: Any,
-        tool_registry: Any,
-        sanitizer: Any,
+        tool_adapter: "BaseToolCallingAdapter",
+        tool_registry: "ToolRegistry",
+        sanitizer: "ResponseSanitizer",
         shell_resolver: Optional[Any] = None,
-        output_formatter: Optional[Any] = None,
-    ) -> Any:
+        output_formatter: Optional["ToolOutputFormatter"] = None,
+    ) -> "ResponseProcessor":
         """Create ResponseProcessor for tool call parsing and response handling.
 
         This processor is extracted from AgentOrchestrator to reduce class size
