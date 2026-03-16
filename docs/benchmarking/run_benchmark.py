@@ -825,11 +825,12 @@ class VictorAdapter(FrameworkAdapter):
             process = psutil.Process()
             start_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-            # Create provider from registry with keyring key
+            # Create provider from registry with keyring key and retry support
             provider = ProviderRegistry.create(
                 self.provider,
                 api_key=api_key,
                 timeout=self.timeout,
+                max_retries=3,  # Use BaseProvider's built-in retry with backoff
             )
 
             # Use the provider directly for chat completion
@@ -1062,8 +1063,18 @@ async def run_benchmark(
         print(f"[{task_id}] {task_def['name']} ({task_def['complexity']})...")
         start_time = time.time()
 
+        # Rate-limit guard: retry once after 60s on 429
         result = await adapter.execute_task(task_id, task_def)
+        if not result["success"] and "rate_limit" in (result.get("error") or "").lower():
+            print("  ⏳ Rate limited — waiting 60s and retrying...")
+            await asyncio.sleep(60)
+            result = await adapter.execute_task(task_id, task_def)
+
         results.append(result)
+
+        # Pace requests to avoid rate limits (15s between tasks)
+        if task_id != tasks_to_run[-1]:
+            await asyncio.sleep(15)
 
         duration = time.time() - start_time
 
