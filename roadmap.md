@@ -266,16 +266,14 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 
 | Priority | ID | Item | Status |
 |----------|-----|------|--------|
-| P0 | S-03 | Add SBOM generation to the release/build pipeline | ✅ Done (`4647897`) |
-| P0 | S-03 | Add SBOM generation to the release/build pipeline | ✅ Done (`4647897`) |
-| P1 | S-02 | Extend security enforcement (pip-audit + bandit blocking) | ✅ Done (`387721c`) |
-| P1 | D-01 | Decompose `protocols.py` (3,703 LOC) into 9 domain modules | ✅ Done (`2bcad78`) |
-| P1 | D-02 | Decompose `fastapi_server.py` (3,587→883 LOC, 16 route modules) | ✅ Done (`e87d392`, `b87b129`) |
-| P1 | P-01 | Move `sentence-transformers`/`lancedb`/`pyarrow` behind `[embeddings]` extra | ✅ Done (`c34ea16`) |
-| P2 | F-01 | Triage 81 TODO/FIXME/HACK markers | ✅ Done (`6921db7`) — 19 actionable, rest intentional |
-| P2 | R-02 | Update deprecation inventory with new entries | ✅ Done (`95f3c92`) |
-| P2 | V-02 | Generate CHANGELOG.md | ✅ Done (`6921db7`) |
-| P2 | T-05 | Set contrib vertical removal target: v0.7.0 | ✅ Done (`387721c`) |
+| P0 | E1 | Complete protocol-based coordinator injection and reduce `orchestrator.py` below 3,800 LOC | In Progress (`#38`) |
+| P0 | E6 | Execute Victor + 2 competitor benchmark baselines | Blocked on API keys (`#52`) |
+| P1 | S-02 | Baseline Semgrep exclusions so SAST can become merge-blocking | Backlog |
+| P1 | S-04 | Audit provider/API-key fields for `SecretStr` adoption gaps | Backlog |
+| P1 | D-02 | Decompose `victor/context/codebase_analyzer.py` (2,988 LOC) into scanner/index/query layers | Backlog |
+| P1 | D-03 | Decompose `victor/agent/orchestrator_factory.py` (2,773 LOC) into staged builders/config adapters | Backlog |
+| P2 | F-01 | Convert the 19 actionable TODO/FIXME markers into tracked issues | Backlog |
+| P2 | X-01 | Document high-churn settings fields with examples and migration notes | Backlog |
 | P3 | F-04 | Reduce `Any` type annotations: factory 102→11, service_provider 69→32, adapters 31→11 | ✅ Done (top 3 offenders) |
 | P3 | D-03 | Decompose `indexer.py` (3,555→package) and `native/__init__.py` (3,112→297 LOC) | ✅ Done (`4e8b8c0`, `d8c0b4b`) |
 

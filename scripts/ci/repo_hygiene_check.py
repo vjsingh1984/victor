@@ -32,6 +32,13 @@ ARCHIVED_DOC_BANNERS = {
     Path("docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md"): "Archived planning document",
 }
 
+LEGACY_PATHS_THAT_MUST_STAY_REMOVED = {
+    Path("victor/agent/protocols.py"): (
+        "legacy monolithic protocol module reintroduced; keep victor/agent/protocols/ as the"
+        " canonical source"
+    ),
+}
+
 ROADMAP_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]*ROADMAP\.md(?:#[^)]+)?)\)")
 TARGET_HEADER_RE = re.compile(r"^[A-Za-z0-9_.-]+:\s*(?:#.*)?$")
 
@@ -144,6 +151,15 @@ def check_archived_doc_banners(root: Path) -> list[HygieneFinding]:
     return findings
 
 
+def check_removed_legacy_paths(root: Path) -> list[HygieneFinding]:
+    """Prevent removed duplicate-source files from quietly returning."""
+    findings: list[HygieneFinding] = []
+    for rel_path, message in LEGACY_PATHS_THAT_MUST_STAY_REMOVED.items():
+        if (root / rel_path).exists():
+            findings.append(HygieneFinding(rel_path, message))
+    return findings
+
+
 def _extract_make_target(lines: list[str], target_name: str) -> list[str]:
     start_index: int | None = None
     for index, line in enumerate(lines):
@@ -228,6 +244,72 @@ def _workflow_has_blocking_trivy_step(path: Path) -> bool:
     return False
 
 
+def _workflow_has_blocking_pip_audit_step(path: Path) -> bool:
+    try:
+        loaded = yaml.safe_load(path.read_text())
+    except yaml.YAMLError:
+        return False
+
+    if not isinstance(loaded, dict):
+        return False
+
+    jobs = loaded.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            continue
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            uses = step.get("uses")
+            if not isinstance(uses, str) or "pypa/gh-action-pip-audit" not in uses:
+                continue
+            if bool(step.get("continue-on-error", False)):
+                continue
+            return True
+    return False
+
+
+def _workflow_has_blocking_bandit_high_step(path: Path) -> bool:
+    try:
+        loaded = yaml.safe_load(path.read_text())
+    except yaml.YAMLError:
+        return False
+
+    if not isinstance(loaded, dict):
+        return False
+
+    jobs = loaded.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            continue
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            run = step.get("run")
+            if not isinstance(run, str):
+                continue
+            if "bandit -r victor/" not in run:
+                continue
+            if "--severity-level high" not in run or "--confidence-level high" not in run:
+                continue
+            if bool(step.get("continue-on-error", False)):
+                continue
+            return True
+    return False
+
+
 def check_security_baseline(root: Path) -> list[HygieneFinding]:
     """Ensure the documented security baseline matches enforced workflow reality."""
     findings: list[HygieneFinding] = []
@@ -243,6 +325,23 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
                 "missing a blocking Trivy step for CRITICAL findings (`exit-code: 1` without continue-on-error)",
             )
         )
+
+    security_workflow = root / ".github" / "workflows" / "security.yml"
+    if security_workflow.is_file():
+        if not _workflow_has_blocking_pip_audit_step(security_workflow):
+            findings.append(
+                HygieneFinding(
+                    Path(".github/workflows/security.yml"),
+                    "missing a blocking pip-audit step in the security baseline",
+                )
+            )
+        if not _workflow_has_blocking_bandit_high_step(security_workflow):
+            findings.append(
+                HygieneFinding(
+                    Path(".github/workflows/security.yml"),
+                    "missing a blocking Bandit step for HIGH severity + HIGH confidence findings",
+                )
+            )
 
     security_doc = root / "SECURITY.md"
     if security_doc.is_file():
@@ -267,6 +366,14 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
             findings.append(
                 HygieneFinding(Path("SECURITY.md"), "missing Trivy filesystem scan threshold documentation"),
             )
+        if "| Dependency audit | Blocking |" not in text:
+            findings.append(
+                HygieneFinding(Path("SECURITY.md"), "missing blocking dependency-audit threshold documentation"),
+            )
+        if "| Bandit (SAST) | Blocking |" not in text:
+            findings.append(
+                HygieneFinding(Path("SECURITY.md"), "missing blocking Bandit threshold documentation"),
+            )
     else:
         findings.append(HygieneFinding(Path("SECURITY.md"), "security policy document is missing"))
 
@@ -280,6 +387,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_banned_repo_urls(root))
     findings.extend(check_uppercase_roadmap_links(root))
     findings.extend(check_archived_doc_banners(root))
+    findings.extend(check_removed_legacy_paths(root))
     findings.extend(check_makefile_lint_gate(root))
     findings.extend(check_security_baseline(root))
     return findings

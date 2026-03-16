@@ -1,7 +1,8 @@
 # Protocols.py Decomposition Plan
 
-**Target**: `victor/agent/protocols.py` (3,703 LOC, 85 protocol classes)
-**Goal**: Split into domain-grouped modules under `victor/agent/protocols/`
+**Status**: Completed
+**Canonical target**: `victor/agent/protocols/`
+**Historical source**: legacy `victor/agent/protocols.py` monolith (removed)
 **Priority**: D-01 (Tier 3 Design)
 
 ## Proposed Split
@@ -18,19 +19,18 @@
 | `infrastructure_protocols.py` | ObservabilityProtocol, MetricsCollectorProtocol, RecoveryHandlerProtocol, ResponseSanitizerProtocol, ArgumentNormalizerProtocol, ProjectContextProtocol, CodeExecutionManagerProtocol, WorkflowRegistryProtocol, UsageAnalyticsProtocol, ContextCompactorProtocol, DebugLoggerProtocol, ReminderManagerProtocol, RLCoordinatorProtocol, SafetyCheckerProtocol, AutoCommitterProtocol, MCPBridgeProtocol, UsageLoggerProtocol, SystemPromptBuilderProtocol, ParallelExecutorProtocol, ResponseCompleterProtocol, VerticalStorageProtocol | ~600 | Infrastructure |
 | `budget_protocols.py` | ModeControllerProtocol, BudgetType, BudgetStatus, BudgetConfig, IBudgetManager, IBudgetTracker, IMultiplierCalculator, IModeCompletionChecker | ~250 | Budget/Mode |
 
-## Migration Strategy
+## Outcome
 
-1. Create `victor/agent/protocols/` package
-2. Move classes into domain modules
-3. Keep `victor/agent/protocols.py` as a re-export shim:
-   ```python
-   from victor.agent.protocols.tool_protocols import *
-   from victor.agent.protocols.conversation_protocols import *
-   # ... etc
-   ```
-4. All existing imports continue to work via the shim
-5. Gradually update imports to use specific modules
-6. Remove shim when all imports migrated
+1. `victor/agent/protocols/` is the canonical import surface.
+2. Domain-grouped modules exist for tool, conversation, streaming, provider, analysis, coordination, infrastructure, and budget protocols.
+3. `victor.agent.protocols` resolves to the package `__init__.py`, which re-exports the grouped modules for backward compatibility.
+4. The legacy monolithic module is removed, eliminating the duplicate source-of-truth risk.
+
+## Remaining Follow-On
+
+- Gradually migrate internal imports to narrower submodules where that improves clarity.
+- Keep the package import path stable for external consumers.
+- Prevent reintroduction of `victor/agent/protocols.py` via repo-hygiene checks.
 
 ## Risk
 

@@ -76,6 +76,17 @@ def test_archived_doc_requires_banner(tmp_path: Path) -> None:
     assert any("required banner text" in finding.message for finding in findings)
 
 
+def test_legacy_monolithic_protocol_module_is_flagged(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n")
+    write_file(tmp_path, "victor/agent/protocols.py", "class Legacy: ...\n")
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("legacy monolithic protocol module" in finding.message for finding in findings)
+
+
 def test_makefile_lint_gate_rejects_advisory_mypy(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
@@ -112,6 +123,48 @@ def test_security_baseline_requires_blocking_trivy_path(tmp_path: Path) -> None:
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any("blocking Trivy step" in finding.message for finding in findings)
+
+
+def test_security_baseline_requires_blocking_pip_audit_path(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
+    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n")
+    write_file(
+        tmp_path,
+        "SECURITY.md",
+        "## Current CI Enforcement Baseline\n**Blocking today**\n**Advisory today**\n### Current Thresholds\nTrivy filesystem scan\n| Dependency audit | Blocking |\n| Bandit (SAST) | Blocking |\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("blocking pip-audit step" in finding.message for finding in findings)
+
+
+def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n      - uses: pypa/gh-action-pip-audit@v1.0.8\n",
+    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n")
+    write_file(
+        tmp_path,
+        "SECURITY.md",
+        "## Current CI Enforcement Baseline\n**Blocking today**\n**Advisory today**\n### Current Thresholds\nTrivy filesystem scan\n| Dependency audit | Blocking |\n| Bandit (SAST) | Blocking |\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("blocking Bandit step" in finding.message for finding in findings)
 
 
 def test_security_baseline_requires_ignore_unfixed_for_blocking_trivy_path(tmp_path: Path) -> None:
