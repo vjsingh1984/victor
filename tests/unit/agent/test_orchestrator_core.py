@@ -716,15 +716,21 @@ class TestFromSettings:
         mock_provider.supports_tools.return_value = True
         mock_provider.get_context_window.return_value = 100000
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
-            mock_registry.create.return_value = mock_provider
-            with patch("victor.agent.orchestrator.UsageLogger"):
-                orch = await AgentOrchestrator.from_settings(
-                    settings=orchestrator_settings, profile_name="default"
-                )
+        with (
+            patch("victor.providers.registry.ProviderRegistry.create") as mock_create,
+            patch(
+                "victor.agent.tool_calling.capabilities.ModelCapabilityLoader"
+            ) as mock_caps,
+            patch("victor.agent.orchestrator.UsageLogger"),
+        ):
+            mock_create.return_value = mock_provider
+            mock_caps.return_value.get_capabilities.return_value = None
+            orch = await AgentOrchestrator.from_settings(
+                settings=orchestrator_settings, profile_name="default"
+            )
 
-                assert orch is not None
-                assert orch.model == "test-model"
+            assert orch is not None
+            assert orch.model == "test-model"
 
 
 class TestToolPlanning:

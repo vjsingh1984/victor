@@ -2517,79 +2517,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"Failed to emit prompt_used event: {e}")
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
-        """Resolve shell aliases to the appropriate enabled shell variant.
+        """Resolve shell aliases to the appropriate enabled shell variant."""
+        from victor.agent.shell_resolver import resolve_shell_variant
 
-        LLMs often hallucinate shell tool names like 'run', 'bash', 'execute'.
-        These map to 'shell' canonically, but in INITIAL stage only 'shell_readonly'
-        may be enabled. This method resolves to whichever shell variant is available.
-
-        This method now delegates to ToolAliasResolver for extensibility while
-        maintaining backward compatibility with existing behavior.
-
-        Args:
-            tool_name: Original tool name (may be alias like 'run')
-
-        Returns:
-            The appropriate enabled shell tool name, or original if not a shell alias
-        """
-        # Shell-related aliases that should resolve intelligently
-        # Also include shell_readonly so it can be upgraded to shell in BUILD mode
-        shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
-
-        if tool_name not in shell_aliases:
-            return tool_name
-
-        # Get alias resolver and register shell aliases with our custom resolver
-        # We always register to ensure this orchestrator's resolver is used (handles
-        # multiple orchestrator instances correctly by updating the resolver reference)
-        resolver = get_alias_resolver()
-        resolver.register(
-            ToolNames.SHELL,
-            aliases=list(shell_aliases - {ToolNames.SHELL}),
-            resolver=self._shell_alias_resolver,
-        )
-
-        # Use the alias resolver - it will call our custom resolver
-        return resolver.resolve(tool_name, enabled_tools=[])
-
-    def _shell_alias_resolver(self, tool_name: str) -> str:
-        """Custom resolver for shell aliases that checks mode and tool availability.
-
-        This is registered with ToolAliasResolver to handle shell-related resolution.
-        It encapsulates the mode-aware logic for choosing between shell and shell_readonly.
-
-        Args:
-            tool_name: The shell-related tool name being resolved.
-
-        Returns:
-            The appropriate shell variant based on mode and tool availability.
-        """
-        from victor.tools.tool_names import get_canonical_name
-
-        # Check mode controller for BUILD mode (allows all tools including shell)
-        # Uses ModeAwareMixin for consistent access
-        mc = self.mode_controller
-        if mc is not None:
-            config = mc.config
-            # If mode allows all tools and shell isn't explicitly disallowed, use full shell
-            if config.allow_all_tools and "shell" not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
-                return ToolNames.SHELL
-
-        # Check if full shell is enabled first
-        if self.tools.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
-            return ToolNames.SHELL
-
-        # Fall back to shell_readonly if enabled
-        if self.tools.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
-            return ToolNames.SHELL_READONLY
-
-        # Neither enabled - return canonical name (will fail validation)
-        canonical = get_canonical_name(tool_name)
-        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
-        return canonical
+        return resolve_shell_variant(tool_name, self.tools, self.mode_controller)
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Prefix a prompt with the thinking disable prefix if supported.
@@ -3836,100 +3767,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         profile_name: str = "default",
         thinking: bool = False,
     ) -> "AgentOrchestrator":
-        """Create orchestrator from settings.
+        """Create orchestrator from settings. Delegates to orchestrator_creation module."""
+        from victor.agent.orchestrator_creation import create_orchestrator_from_settings
 
-        Args:
-            settings: Application settings
-            profile_name: Profile to use
-            thinking: Enable extended thinking mode (Claude models only)
-
-        Returns:
-            Configured AgentOrchestrator instance
-
-        Note:
-            The orchestrator reads settings.one_shot_mode to determine whether to
-            auto-continue on ASKING_INPUT (one-shot) or return to user (interactive).
-        """
-        # Load profile
-        profiles = settings.load_profiles()
-        profile = profiles.get(profile_name)
-
-        if not profile:
-            available = list(profiles.keys())
-            # Use difflib for similar name suggestions
-            import difflib
-
-            suggestions = difflib.get_close_matches(profile_name, available, n=3, cutoff=0.4)
-
-            error_msg = f"Profile not found: '{profile_name}'"
-            if suggestions:
-                error_msg += f"\n  Did you mean: {', '.join(suggestions)}?"
-            if available:
-                error_msg += f"\n  Available profiles: {', '.join(sorted(available))}"
-            else:
-                error_msg += "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml"
-            raise ValueError(error_msg)
-
-        # Get provider-level settings
-        # Pass profile extras to get_settings so strategies can see them (e.g., auth_mode)
-        profile_extras = (
-            profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
+        return await create_orchestrator_from_settings(
+            cls, settings, profile_name=profile_name, thinking=thinking
         )
-        provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
-
-        # Note: profile_extras are already merged by get_provider_settings for strategy decisions
-        # The debug log below shows what was passed (for transparency)
-        if profile_extras:
-            logger.debug(
-                f"Profile '{profile_name}' extras passed to provider config: {list(profile_extras.keys())}"
-            )
-
-        # Apply timeout multiplier from model capabilities
-        # Slow local models (Ollama, LMStudio) get longer timeouts
-        from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
-
-        cap_loader = ModelCapabilityLoader()
-        caps = cap_loader.get_capabilities(profile.provider, profile.model)
-        if caps and caps.timeout_multiplier > 1.0:
-            base_timeout = provider_settings.get("timeout", 300)
-            adjusted_timeout = int(base_timeout * caps.timeout_multiplier)
-            provider_settings["timeout"] = adjusted_timeout
-            logger.info(
-                f"Adjusted timeout for {profile.provider}/{profile.model}: "
-                f"{base_timeout}s -> {adjusted_timeout}s (multiplier: {caps.timeout_multiplier}x)"
-            )
-
-        # Create provider instance using registry
-        provider = ProviderRegistry.create(profile.provider, **provider_settings)
-
-        orchestrator = cls(
-            settings=settings,
-            provider=provider,
-            model=profile.model,
-            temperature=profile.temperature,
-            max_tokens=profile.max_tokens,
-            tool_selection=profile.tool_selection,
-            thinking=thinking,
-            provider_name=profile.provider,
-            profile_name=profile_name,
-        )
-
-        # Setup JSONL exporter if enabled
-        if getattr(settings, "enable_observability_logging", False):
-            from victor.observability.bridge import ObservabilityBridge
-            from victor.core.events import get_observability_bus
-
-            try:
-                bridge = ObservabilityBridge.get_instance()
-                log_path = getattr(settings, "observability_log_path", None)
-                bridge.setup_jsonl_exporter(log_path=log_path)
-                logger.info(
-                    f"JSONL event logging enabled: {log_path or '~/.victor/metrics/victor.jsonl'}"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to setup JSONL exporter: {e}")
-
-        return orchestrator
 
 
 # Install extracted property descriptors onto the class.
