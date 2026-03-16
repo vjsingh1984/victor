@@ -267,17 +267,17 @@ Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-
 | Priority | ID | Item | Status |
 |----------|-----|------|--------|
 | P0 | S-03 | Add SBOM generation to the release/build pipeline | ✅ Done (`4647897`) |
-| P1 | S-02 | Extend security enforcement beyond the Trivy critical baseline | Backlog |
+| P0 | S-03 | Add SBOM generation to the release/build pipeline | ✅ Done (`4647897`) |
+| P1 | S-02 | Extend security enforcement (pip-audit + bandit blocking) | ✅ Done (`387721c`) |
 | P1 | D-01 | Decompose `protocols.py` (3,703 LOC) into 9 domain modules | ✅ Done (`2bcad78`) |
-| P1 | D-02 | Extract API route modules from `fastapi_server.py` (16 modules, 3,387 LOC) | ✅ Done (`e87d392`) |
+| P1 | D-02 | Decompose `fastapi_server.py` (3,587→883 LOC, 16 route modules) | ✅ Done (`e87d392`, `b87b129`) |
 | P1 | P-01 | Move `sentence-transformers`/`lancedb`/`pyarrow` behind `[embeddings]` extra | ✅ Done (`c34ea16`) |
 | P2 | F-01 | Triage 81 TODO/FIXME/HACK markers | ✅ Done (`6921db7`) — 19 actionable, rest intentional |
-| P2 | R-02 | Complete E5 migration-note closure (remaining 31%) | In Progress |
+| P2 | R-02 | Update deprecation inventory with new entries | ✅ Done (`95f3c92`) |
 | P2 | V-02 | Generate CHANGELOG.md | ✅ Done (`6921db7`) |
-| P2 | T-05 | Set contrib vertical removal target: v0.7.0 | Backlog |
-| P2 | D-02b | Wire route modules into fastapi_server.py (incremental migration) | Backlog |
+| P2 | T-05 | Set contrib vertical removal target: v0.7.0 | ✅ Done (`387721c`) |
 | P3 | F-04 | Reduce `Any` type annotations from 2,192 to <500 | Gradual |
-| P3 | D-03 | Decompose `indexer.py` (3,555 LOC) and `native/__init__.py` (3,112 LOC) | Backlog |
+| P3 | D-03 | Decompose `indexer.py` (3,555 LOC) and `native/__init__.py` (3,112 LOC) | In Progress |
 
 ## How to Influence the Roadmap
 
