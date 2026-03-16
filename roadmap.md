@@ -1,7 +1,7 @@
 # Victor Roadmap (Canonical)
 
 **Status**: Single source of truth for all roadmap priorities
-**Last Updated**: 2026-03-10
+**Last Updated**: 2026-03-15
 **Next Review**: 2026-03-17 (weekly)
 
 > ⚠️ **All other planning documents are considered non-canonical** unless explicitly
@@ -36,16 +36,25 @@ Related documents:
 - Detailed strategy archive: [`docs/roadmap/improvement-plan-v1.md`](docs/roadmap/improvement-plan-v1.md)
 - Tracker template: [`docs/planning/GITHUB_PROJECT_90_DAY_TEMPLATE.md`](docs/planning/GITHUB_PROJECT_90_DAY_TEMPLATE.md)
 - Release review logs: [`docs/roadmap/release-reviews/2026q2/README.md`](docs/roadmap/release-reviews/2026q2/README.md)
+- Evidence-based assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-debt/codebase-assessment-2026-03-15.md)
+
+## 2026-03-15 Audit Refresh
+
+- Validation workflow trigger wiring and modified-vertical discovery had drifted and were repaired in-repo.
+- Local `make lint` now fails on mypy again after re-verifying `mypy victor` clean on the current tree.
+- Repo metadata and PR-helper links were corrected to the canonical GitHub repo.
+- `E1` remains open: `victor/agent/orchestrator.py` is still 3940 LOC and protocol-based injection is not complete.
+- `E5` remains in progress: removal volume exceeded 60%, but migration-note closure still needs to be finished and reflected in issue state.
 
 ## Current 90-Day Priorities (2026Q2)
 
 | Epic | Focus | Current Milestone |
 |------|-------|-------------------|
-| `E1` | Orchestration tech-debt burn-down | `M3` in progress (ToolCoordinator ✅) |
-| `E2` | Roadmap governance consolidation | `M2` complete |
+| `E1` | Orchestration tech-debt burn-down | `M3` in progress (orchestrator 3,940 LOC; 37 properties + callbacks + session state extracted; protocol injection pending) |
+| `E2` | Roadmap governance consolidation | `M3` in progress (audit corrections + drift guardrails) |
 | `E3` | Type-safety + quality gates | `M3` complete |
 | `E4` | Event bridge reliability | `M3` complete |
-| `E5` | Legacy compatibility debt reduction | `M3` complete (9/13 = 69% removed) |
+| `E5` | Legacy compatibility debt reduction | `M3` in progress (9/13 = 69% removed; migration notes still open) |
 | `E6` | Competitive benchmark ground-truth | `M2` in progress |
 
 Milestone targets:
@@ -58,7 +67,7 @@ Milestone targets:
 | Horizon | Focus | Example Outcomes |
 |---------|-------|------------------|
 | **0-3 months** | Stability + execution rigor | Coordinator extraction, roadmap governance, baseline quality gates |
-| **3-6 months** | Reliability + scale | Event delivery SLOs, strict-package CI enforcement, midpoint benchmark runs |
+| **3-6 months** | Reliability + scale | Event delivery SLOs, global strict CI enforcement, midpoint benchmark runs |
 | **6-12 months** | Platform maturity | Broader ecosystem growth, advanced multi-agent and workflow capabilities |
 
 ## Recently Delivered
@@ -110,7 +119,7 @@ Milestone targets:
 - Backward-compatible thin delegation methods preserved
 
 ### E2: Roadmap Governance Consolidation
-**Status**: M1 complete, M2 complete
+**Status**: M1 complete, M2 complete, M3 in progress
 **Owner**: Product/Program Lead (assigned 2026-03-10)
 **Progress**:
 - ✅ M1: Canonical roadmap established (roadmap.md)
@@ -121,6 +130,8 @@ Milestone targets:
 - ✅ M2: Active work mapping to owner/date/KPI - 100% complete (6/6 epics)
 - ✅ M2: Weekly update cadence setup - Template ready, tracking defined
 - ✅ M2: GitHub labels and milestones documented
+- ✅ 2026-03-15: Workflow validation/governance drift corrected in-repo
+- ✅ 2026-03-15: Automation added for workflow syntax, repo-link, roadmap-link, archive-banner, and local lint-gate drift checks
 
 ### E3: Type-Safety + Quality Gates
 **Status**: M3 complete
@@ -132,9 +143,10 @@ Milestone targets:
 - ✅ M2: Expanded to 15 modules (+4: victor.state, victor.workflows, victor.teams, victor.integrations.api)
 - ✅ M2: All new modules pass strict mypy checks
 - ✅ M2: CI workflow updated to enforce strict checking on all 15 modules
-- ✅ M3: Global strict mode enabled (all 1,456 files)
+- ✅ M3: Global strict mode enabled across the full `victor/` tree
 - ✅ M3: Zero mypy findings maintained
 - ✅ M3: CI updated to enforce global strict (`mypy victor --strict`)
+- ✅ 2026-03-15: `make lint` realigned with the current mypy gate after local verification (`mypy victor`)
 - 📄 Baseline report: [`docs/quality/mypy_baseline_report.md`](docs/quality/mypy_baseline_report.md)
 
 **Strict Module Timeline**:
@@ -234,6 +246,36 @@ Milestone targets:
 - Developer Experience (5%)
 
 **Documentation**: [`docs/benchmarking/`](docs/benchmarking/)
+
+## Deep Audit Findings (2026-03-15)
+
+Full assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-debt/codebase-assessment-2026-03-15.md)
+
+### Completed in This Tranche
+- ✅ Architecture strengthening: orchestrator 4,514→3,940 LOC, extension loader 2,049→1,897 LOC
+- ✅ SDK contract: ExtensionManifest, CapabilityNegotiator, API versioning (v2)
+- ✅ ProviderPool deduplicated and wired with `use_provider_pooling` feature flag
+- ✅ Contrib verticals emit DeprecationWarning; external packages preferred
+- ✅ Victor-devops: 0 forbidden imports (migrated to `victor.framework.extensions`)
+- ✅ 32 documentation files reconciled with current metrics (24 providers, 34 tools)
+- ✅ Bare `except:` fixed in `experiments.py`
+- ✅ `eval()`/`exec()` audit: only 2 real calls (both sandboxed with `__builtins__: {}`)
+
+### Remaining Priority Queue
+
+| Priority | ID | Item | Status |
+|----------|-----|------|--------|
+| P0 | F-02 | Add tests for `tool_pipeline`, `cqrs`, `executor`, `sqlite_lancedb` | In Progress |
+| P0 | S-02 | Make security CI steps blocking (severity-gated) | Backlog |
+| P1 | D-01 | Decompose `protocols.py` (3,703 LOC) into protocol groups | Backlog |
+| P1 | D-02 | Decompose `fastapi_server.py` (3,587 LOC) into route modules | Backlog |
+| P1 | P-01 | Move `sentence-transformers`/`lancedb`/`pyarrow` behind `[embeddings]` extra | Backlog |
+| P2 | F-03 | Triage 81 TODO/FIXME/HACK markers into GitHub issues | Backlog |
+| P2 | R-02 | Complete E5 migration-note closure (remaining 31%) | In Progress |
+| P2 | V-02 | Generate CHANGELOG.md from conventional commits | Backlog |
+| P2 | T-05 | Set contrib vertical removal target: v0.7.0 | Backlog |
+| P3 | F-04 | Reduce `Any` type annotations from 2,192 to <500 | Gradual |
+| P3 | D-03 | Decompose `indexer.py` (3,555 LOC) and `native/__init__.py` (3,112 LOC) | Backlog |
 
 ## How to Influence the Roadmap
 
