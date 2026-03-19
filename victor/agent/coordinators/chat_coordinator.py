@@ -677,8 +677,8 @@ class ChatCoordinator:
             container = getattr(self._orchestrator, "_container", None)
             if container is not None:
                 return container.get(LLMDecisionServiceProtocol)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to resolve LLM decision service: %s", e)
         return None
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:

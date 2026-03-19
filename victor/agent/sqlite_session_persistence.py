@@ -125,6 +125,7 @@ class SQLiteSessionPersistence:
         tags: Optional[List[str]] = None,
         conversation_state: Optional[Any] = None,
         tool_selection_stats: Optional[Dict[str, Any]] = None,
+        execution_state: Optional[Any] = None,
     ) -> str:
         """Save a session to SQLite database.
 
@@ -187,6 +188,11 @@ class SQLiteSessionPersistence:
                 else conversation_state
             ),
             "tool_selection_stats": tool_selection_stats,
+            "execution_state": (
+                execution_state.to_dict()
+                if hasattr(execution_state, "to_dict")
+                else execution_state
+            ),
         }
 
         try:

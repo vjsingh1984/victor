@@ -120,43 +120,8 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-@runtime_checkable
-class VerticalContextProtocol(Protocol):
-    """Protocol for accessing vertical context.
-
-    This protocol defines the read-only interface for accessing
-    vertical configuration from orchestrator components.
-    """
-
-    @property
-    def vertical_name(self) -> Optional[str]:
-        """Get the vertical name."""
-        ...
-
-    @property
-    def has_vertical(self) -> bool:
-        """Check if a vertical is configured."""
-        ...
-
-    @property
-    def middleware(self) -> List["MiddlewareProtocol"]:
-        """Get middleware list."""
-        ...
-
-    @property
-    def safety_patterns(self) -> List["SafetyPattern"]:
-        """Get safety patterns."""
-        ...
-
-    @property
-    def task_hints(self) -> Dict[str, "TaskTypeHint"]:
-        """Get task type hints."""
-        ...
-
-    @property
-    def mode_configs(self) -> Dict[str, "ModeConfig"]:
-        """Get mode configurations."""
-        ...
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import VerticalContextProtocol  # noqa: F401
 
 
 @runtime_checkable

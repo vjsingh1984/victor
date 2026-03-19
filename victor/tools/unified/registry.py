@@ -300,8 +300,8 @@ class UnifiedToolRegistry:
                 if cls._instance._selector:
                     try:
                         asyncio.run(cls._instance._selector.close())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to close selector during registry reset: %s", e)
             cls._instance = None
         logger.debug("UnifiedToolRegistry instance reset")
 

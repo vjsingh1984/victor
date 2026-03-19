@@ -270,6 +270,9 @@ class ToolCoordinator:
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
 
+        # Known tool names for hallucination pre-filtering
+        self._known_tool_names: Optional[Set[str]] = None
+
         logger.debug(
             f"ToolCoordinator initialized with budget={self._total_budget}, "
             f"caching={self._config.enable_caching}"
@@ -611,6 +614,54 @@ class ToolCoordinator:
     # Tool Execution
     # =====================================================================
 
+    def _get_known_tool_names(self) -> Set[str]:
+        """Get the set of known/valid tool names from the registry."""
+        if self._known_tool_names is not None:
+            return self._known_tool_names
+        try:
+            if hasattr(self._registry, "get_tool_names"):
+                self._known_tool_names = set(self._registry.get_tool_names())
+            elif hasattr(self._registry, "list_tools"):
+                self._known_tool_names = {t.name for t in self._registry.list_tools()}
+            else:
+                self._known_tool_names = set()
+        except Exception:
+            self._known_tool_names = set()
+        return self._known_tool_names
+
+    def _pre_filter_tool_calls(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Pre-filter tool calls, removing hallucinated tool names.
+
+        Args:
+            tool_calls: Raw tool calls from the model
+
+        Returns:
+            Tuple of (valid_calls, filtered_names)
+        """
+        known = self._get_known_tool_names()
+        if not known:
+            return tool_calls, []
+
+        valid = []
+        filtered_names = []
+        for call in tool_calls:
+            name = call.get("name", "")
+            if name in known:
+                valid.append(call)
+            else:
+                filtered_names.append(name)
+
+        if filtered_names:
+            logger.warning(
+                "Filtered %d hallucinated tool call(s): %s",
+                len(filtered_names),
+                ", ".join(filtered_names),
+            )
+
+        return valid, filtered_names
+
     async def execute_tool_calls(
         self,
         tool_calls: List[Dict[str, Any]],
@@ -619,7 +670,7 @@ class ToolCoordinator:
         """Execute tool calls through the pipeline.
 
         Delegates to ToolPipeline for actual execution, handling budget
-        tracking and caching coordination.
+        tracking and caching coordination. Pre-filters hallucinated tool names.
 
         Args:
             tool_calls: List of tool calls to execute
@@ -628,6 +679,19 @@ class ToolCoordinator:
         Returns:
             PipelineExecutionResult with execution details
         """
+        # Pre-filter hallucinated tool names
+        tool_calls, filtered = self._pre_filter_tool_calls(tool_calls)
+
+        if not tool_calls:
+            # All calls were hallucinated — return empty result
+            from victor.agent.tool_pipeline import PipelineExecutionResult
+            return PipelineExecutionResult(
+                results=[],
+                successful_calls=0,
+                failed_calls=len(filtered),
+                total_duration_ms=0,
+            )
+
         # Check budget before execution
         remaining = self.get_remaining_budget()
         call_count = len(tool_calls)

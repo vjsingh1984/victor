@@ -504,7 +504,7 @@ class TeamNode:
         Returns:
             TeamNode instance
         """
-        from victor.agent.subagents import SubAgentRole
+        from victor.core.shared_types import SubAgentRole
 
         # Deserialize members
         members = []

@@ -2705,8 +2705,8 @@ class ConversationStore:
             from victor.processing.native import cosine_similarity
 
             return cosine_similarity(vec1, vec2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cosine similarity computation failed, returning 0.0: %s", e)
         return 0.0
 
 

@@ -72,23 +72,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SubAgentRole(Enum):
-    """Role specialization for sub-agents.
-
-    Each role has specific capabilities and constraints:
-
-    - RESEARCHER: Read-only exploration (read, search, code_search, web_search)
-    - PLANNER: Task breakdown and planning (read, ls, search, plan_files)
-    - EXECUTOR: Code changes and execution (read, write, edit, shell, test, git)
-    - REVIEWER: Quality checks and testing (read, search, test, git_diff, shell)
-    - TESTER: Test writing and running (read, write to tests/, test, shell)
-    """
-
-    RESEARCHER = "researcher"
-    PLANNER = "planner"
-    EXECUTOR = "executor"
-    REVIEWER = "reviewer"
-    TESTER = "tester"
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import SubAgentRole  # noqa: F401
 
 
 @dataclass
@@ -542,8 +527,8 @@ class SubAgent(IAgent):
                 tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute sub-agent context size: %s", e)
 
             return SubAgentResult(
                 success=False,
@@ -640,8 +625,8 @@ class SubAgent(IAgent):
                 tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

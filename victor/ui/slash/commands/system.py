@@ -168,7 +168,7 @@ class StatusCommand(BaseSlashCommand):
 
         agent = ctx.agent
         history = agent.conversation
-        tool_calls = getattr(agent, "_tool_calls", 0)
+        tool_calls = getattr(agent, "tool_calls_used", 0)
         tool_budget = ctx.settings.tool_call_budget
 
         content = (
@@ -185,7 +185,7 @@ class StatusCommand(BaseSlashCommand):
             content += f"[bold]Stage:[/] {stage.name}\n"
 
         # Add mode controller info
-        mode_controller = getattr(agent, "_mode_controller", None)
+        mode_controller = getattr(agent, "mode_controller", None)
         if mode_controller:
             current_mode = mode_controller.get_current_mode()
             content += f"[bold]Mode:[/] {current_mode.value}\n"

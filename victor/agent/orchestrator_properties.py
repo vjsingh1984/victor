@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 # Group 1: Simple component accessor properties
 # =====================================================================
 
+
 def _conversation_controller(self: "AgentOrchestrator") -> "ConversationController":
     """Get the conversation controller component."""
     return self._conversation_controller
@@ -147,6 +148,7 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
 # Group 2: Lazy coordinator constructor properties
 # =====================================================================
 
+
 def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     """Get the protocol adapter for DIP compliance (lazy init)."""
     if self._protocol_adapter is None:
@@ -175,12 +177,15 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
     if self._sync_chat_coordinator is None:
         from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
 
+        from victor.agent.query_classifier import QueryClassifier
+
         self._sync_chat_coordinator = SyncChatCoordinator(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
             execution_coordinator=self.execution_coordinator,
             orchestrator=self,
+            query_classifier=QueryClassifier(),
         )
     return self._sync_chat_coordinator
 
@@ -250,16 +255,13 @@ def _intelligent_integration(self: "AgentOrchestrator") -> Optional["Orchestrato
                 config=self._intelligent_integration_config,
             )
             logger.info(
-                f"IntelligentPipeline initialized for "
-                f"{self.provider_name}:{self.model}"
+                f"IntelligentPipeline initialized for " f"{self.provider_name}:{self.model}"
             )
         except ImportError as e:
             logger.debug(f"IntelligentPipeline dependencies not available: {e}")
             self._intelligent_pipeline_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(
-                f"Failed to initialize IntelligentPipeline (config error): {e}"
-            )
+            logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
             self._intelligent_pipeline_enabled = False
 
     return self._intelligent_integration
@@ -280,9 +282,7 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
             logger.debug(f"SubAgentOrchestrator module not available: {e}")
             self._subagent_orchestration_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(
-                f"Failed to initialize SubAgentOrchestrator (config error): {e}"
-            )
+            logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
             self._subagent_orchestration_enabled = False
 
     return self._subagent_orchestrator
@@ -291,10 +291,8 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
 def _coordination(self: "AgentOrchestrator") -> Any:
     """Get the mode-workflow-team coordinator (lazy init)."""
     if self._mode_workflow_team_coordinator is None:
-        self._mode_workflow_team_coordinator = (
-            self._factory.create_mode_workflow_team_coordinator(
-                self._vertical_context
-            )
+        self._mode_workflow_team_coordinator = self._factory.create_mode_workflow_team_coordinator(
+            self._vertical_context
         )
         logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
 
@@ -304,6 +302,7 @@ def _coordination(self: "AgentOrchestrator") -> Any:
 # =====================================================================
 # Group 3: Recovery properties (lazy resolution via get_instance)
 # =====================================================================
+
 
 def _recovery_handler(self: "AgentOrchestrator") -> Optional["RecoveryHandler"]:
     """Get the recovery handler for model failure recovery."""
@@ -328,6 +327,7 @@ def _recovery_integration(self: "AgentOrchestrator") -> "OrchestratorRecoveryInt
 # =====================================================================
 # Group 4: Session state delegation properties (with setters)
 # =====================================================================
+
 
 def _session_state_get(self: "AgentOrchestrator") -> "SessionStateManager":
     """Get the session state manager."""

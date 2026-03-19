@@ -148,6 +148,7 @@ from victor.agent.unified_task_tracker import TrackerTaskType, UnifiedTaskTracke
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
 # Decomposed components - configs, strategies, functions
+from victor.core.context import session_id as ctx_session_id, set_session_id
 from victor.agent.conversation_controller import (
     ConversationConfig,
     ContextMetrics,
@@ -1100,6 +1101,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Set callbacks for orchestrator-specific shutdown logic
         self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
         self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
+
+        # Initialize session context for tracing/propagation
+        set_session_id(self.active_session_id or "")
 
         # Debug-mode conformance assertion for ChatOrchestratorProtocol
         # Placed at end of __init__ so all attributes are initialized
@@ -2445,6 +2449,25 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return result
 
+    def update_system_prompt_for_query(self, query_classification=None) -> None:
+        """Rebuild system prompt with query-specific classification context.
+
+        Called by coordinators when a query classification is available,
+        injecting task-aware guidance and tool constraints into the prompt.
+
+        Args:
+            query_classification: Optional QueryClassification for task-aware prompting
+        """
+        if query_classification is not None:
+            self.prompt_builder.query_classification = query_classification
+        base_system_prompt = self._build_system_prompt_with_adapter()
+        if self.project_context and self.project_context.content:
+            self._system_prompt = (
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+        else:
+            self._system_prompt = base_system_prompt
+
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
 
@@ -2721,7 +2744,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         elif role == "assistant":
             self.usage_logger.log_event("assistant_response", {"content": content})
 
-    async def chat(self, user_message: str) -> CompletionResponse:
+    async def chat(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = False,
+    ) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
         Delegates to service layer when USE_SERVICE_LAYER is enabled,
@@ -2729,13 +2756,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Args:
             user_message: User's message
+            use_planning: Whether to use planning. None = auto-detect,
+                True = always, False = never.
 
         Returns:
             CompletionResponse from the model with complete response
         """
         if self._use_service_layer and self._chat_service:
             return await self._chat_service.chat(user_message)
-        return await self._chat_coordinator.chat(user_message)
+        return await self._chat_coordinator.chat(user_message, use_planning=use_planning)
 
     async def chat_with_planning(
         self,
@@ -3140,21 +3169,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             normalized_args = norm.args
 
-            # Skip repeated failing calls
+            # Skip repeated failing calls (suppress from user output)
             if norm.is_repeated_failure:
-                self.console.print(
-                    f"[yellow]{warn_icon} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
+                logger.debug(
+                    "Skipping repeated failing call to '%s' with same arguments",
+                    tool_name,
                 )
                 continue
 
-            # Log normalization if applied
+            # Log normalization if applied (debug-only, not user-facing)
             if norm.strategy != NormalizationStrategy.DIRECT:
-                logger.warning(
-                    f"Applied {norm.strategy.value} normalization to {tool_name} arguments"
-                )
-                gear_icon = self._presentation.icon("gear", with_color=False)
-                self.console.print(
-                    f"[yellow]{gear_icon} Normalized arguments via {norm.strategy.value}[/]"
+                logger.debug(
+                    "Applied %s normalization to %s arguments",
+                    norm.strategy.value,
+                    tool_name,
                 )
 
             # --- Execution (uses orchestrator context) ---
@@ -3268,9 +3296,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 )
             else:
                 self.failed_tool_signatures.add(norm.signature)
-                self.console.print(
-                    f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
-                )
+                # Only show "Tool not found" errors once per tool name
+                _not_found = "not found" in str(error_display).lower()
+                _shown_key = f"notfound:{tool_name}" if _not_found else None
+                if not hasattr(self, "_shown_tool_errors"):
+                    self._shown_tool_errors: set = set()
+                if _shown_key and _shown_key in self._shown_tool_errors:
+                    logger.debug("Suppressed repeated '%s' error display", tool_name)
+                else:
+                    if _shown_key:
+                        self._shown_tool_errors.add(_shown_key)
+                    self.console.print(
+                        f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
+                    )
 
                 error_output = output if isinstance(output, dict) else {"error": error_display}
                 formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)

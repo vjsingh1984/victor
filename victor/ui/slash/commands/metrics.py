@@ -33,6 +33,20 @@ from victor.ui.slash.registry import register_command
 logger = logging.getLogger(__name__)
 
 
+def _get_capability(agent, capability_name: str, default=None):
+    """Get a capability value from the agent via CapabilityRegistry or fallback.
+
+    Replaces scattered hasattr/getattr chains with a single lookup path.
+    """
+    # Primary: CapabilityRegistryMixin.get_capability_value()
+    try:
+        return agent.get_capability_value(capability_name)
+    except (KeyError, TypeError, AttributeError):
+        pass
+    # Fallback: direct attribute access
+    return getattr(agent, capability_name, default)
+
+
 @register_command
 class CostCommand(BaseSlashCommand):
     """Show estimated token usage and cost for this session."""
@@ -52,17 +66,7 @@ class CostCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        # Try capability registry first (DIP compliant)
-        if hasattr(ctx.agent, "get_capability_value"):
-            try:
-                analytics = ctx.agent.get_capability_value("usage_analytics")
-            except (KeyError, TypeError):
-                analytics = None
-        elif hasattr(ctx.agent, "usage_analytics"):
-            # Public property fallback
-            analytics = ctx.agent.usage_analytics
-        else:
-            analytics = None
+        analytics = _get_capability(ctx.agent, "usage_analytics")
 
         if analytics:
             summary = analytics.get_session_summary()
@@ -79,14 +83,11 @@ class CostCommand(BaseSlashCommand):
                 for provider, stats in summary["provider_breakdown"].items():
                     content += f"  {provider}: {stats.get('tokens', 0):,} tokens\n"
         else:
-            # Get tool call count via capability or public method
-            tool_calls = 0
-            if hasattr(ctx.agent, "get_capability_value"):
-                tool_calls = ctx.agent.get_capability_value("tool_metrics", {}).get("call_count", 0)
-            elif hasattr(ctx.agent, "get_tool_call_count"):
-                tool_calls = ctx.agent.get_tool_call_count()
-            elif hasattr(ctx.agent, "tool_call_count"):
-                tool_calls = ctx.agent.tool_call_count
+            # Get tool call count via capability or public attribute
+            tool_metrics = _get_capability(ctx.agent, "tool_metrics", {})
+            tool_calls = tool_metrics.get("call_count", 0) if isinstance(tool_metrics, dict) else 0
+            if not tool_calls:
+                tool_calls = getattr(ctx.agent, "tool_calls_used", 0)
 
             content = (
                 f"[bold]Session Statistics[/]\n\n"

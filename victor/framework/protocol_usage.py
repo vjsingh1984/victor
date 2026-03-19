@@ -138,8 +138,8 @@ from __future__ import annotations
 from typing import Any, Dict
 
 # Import all protocols for easy access
-from victor.agent.subagents.protocols import SubAgentContext
-from victor.agent.vertical_context import VerticalContext, VerticalContextProtocol
+from victor.core.shared_types import SubAgentContext, VerticalContextProtocol
+from victor.agent.vertical_context import VerticalContext
 from victor.core.protocols import OrchestratorProtocol as CoreOrchestratorProtocol
 from victor.framework.protocols import (
     CapabilityRegistryProtocol,

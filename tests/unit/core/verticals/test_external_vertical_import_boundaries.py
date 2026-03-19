@@ -70,7 +70,10 @@ FORBIDDEN_PREFIXES = frozenset(
 # Known violations to track migration progress (baseline).
 # All external verticals have been migrated to use victor.framework.extensions,
 # victor.framework.processing, and victor.framework.lsp re-export modules.
-KNOWN_VIOLATIONS: Dict[str, Set[str]] = {}
+KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
+    # victor_invest uses victor.workflows.executor directly; migration deferred
+    "victor_invest": {"victor.workflows.executor"},
+}
 
 
 def _find_package_root(package_name: str) -> Path | None:
@@ -184,9 +187,7 @@ def test_external_vertical_import_boundaries(package_name: str):
         for filepath, file_violations in sorted(new_violations.items()):
             for imp, reason in file_violations:
                 lines.append(f"  {filepath}: {reason}")
-        lines.append(
-            "\nFix: import from victor.framework.extensions instead of internal modules."
-        )
+        lines.append("\nFix: import from victor.framework.extensions instead of internal modules.")
         lines.append("Or add to KNOWN_VIOLATIONS baseline if migration is deferred.")
         pytest.fail("\n".join(lines))
 

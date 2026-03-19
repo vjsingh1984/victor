@@ -31,6 +31,7 @@ from victor.agent.provider_tool_guidance import (
 from victor.agent.prompt_normalizer import get_prompt_normalizer
 
 if TYPE_CHECKING:
+    from victor.agent.query_classifier import QueryClassification
     from victor.framework.enrichment import (
         PromptEnrichmentService,
         EnrichmentContext,
@@ -226,6 +227,7 @@ class SystemPromptBuilder:
         enrichment_service: Optional["PromptEnrichmentService"] = None,
         vertical: Optional[str] = None,
         concise_mode: bool = False,
+        query_classification: Optional["QueryClassification"] = None,
     ):
         """Initialize the prompt builder.
 
@@ -262,6 +264,7 @@ class SystemPromptBuilder:
         self.enrichment_service = enrichment_service
         self.vertical = vertical or "coding"
         self.concise_mode = concise_mode
+        self.query_classification = query_classification
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -488,6 +491,47 @@ class SystemPromptBuilder:
                 enriched_prompt=prompt,
             )
 
+    def _get_task_guidance_section(self) -> str:
+        """Get task-specific guidance based on query classification."""
+        if not self.query_classification:
+            return ""
+
+        from victor.agent.query_classifier import QueryType
+
+        guidance_map = {
+            QueryType.EXPLORATION: (
+                "TASK GUIDANCE: Explore systematically. List directories before reading files. "
+                "Map structure first. Build a mental model of the codebase before diving deep."
+            ),
+            QueryType.IMPLEMENTATION: (
+                "TASK GUIDANCE: Plan before coding. Break into discrete steps. "
+                "Test incrementally. Verify each step before proceeding."
+            ),
+            QueryType.DEBUGGING: (
+                "TASK GUIDANCE: Focus on error messages and stack traces. "
+                "Check recent changes first. Reproduce the issue before fixing."
+            ),
+            QueryType.REVIEW: (
+                "TASK GUIDANCE: Examine for correctness, style, and security. "
+                "Reference specific line numbers. Be thorough but constructive."
+            ),
+            QueryType.QUICK_QUESTION: (
+                "TASK GUIDANCE: Answer directly and concisely. "
+                "Only use tools if the answer requires checking the codebase."
+            ),
+        }
+        return guidance_map.get(self.query_classification.query_type, "")
+
+    def _get_tool_constraint_section(self) -> str:
+        """Get tool constraint section listing available tools."""
+        if not self.available_tools:
+            return ""
+        tool_list = ", ".join(sorted(self.available_tools))
+        return (
+            f"IMPORTANT: Only use tools from this list: {tool_list}. "
+            "Do not attempt to call unlisted tools."
+        )
+
     def build(self) -> str:
         """Build the system prompt.
 
@@ -498,8 +542,10 @@ class SystemPromptBuilder:
         The prompt is built in this order:
         1. Concise mode guidance (if enabled)
         2. Base prompt (provider-specific)
-        3. Completion guidance (always included for deterministic task completion)
-        4. Provider-specific tool guidance (GAP-5)
+        3. Task-specific guidance (based on query classification)
+        4. Tool constraint section (available tools list)
+        5. Completion guidance (always included for deterministic task completion)
+        6. Provider-specific tool guidance (GAP-5)
 
         Returns:
             System prompt string tailored to the provider/model
@@ -515,6 +561,16 @@ class SystemPromptBuilder:
         if self.concise_mode:
             base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
+
+        # Append task-specific guidance if classification provided
+        task_guidance = self._get_task_guidance_section()
+        if task_guidance:
+            base_prompt = f"{base_prompt}\n\n{task_guidance}"
+
+        # Append tool constraint section
+        tool_constraint = self._get_tool_constraint_section()
+        if tool_constraint:
+            base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
         # Append completion guidance (always included for deterministic task completion)
         base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"

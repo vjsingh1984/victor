@@ -383,8 +383,8 @@ def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
             from victor.providers.base import BaseProvider
 
             provider = container.get(BaseProvider)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to resolve provider from container: %s", e)
 
         if provider is None:
             logger.warning("No provider available for LLMDecisionService, skipping")

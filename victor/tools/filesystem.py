@@ -1505,16 +1505,17 @@ async def read(
                         )  # Ensure at least 100 lines
                         max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute context-aware truncation limits: %s", e)
                 return 1500, 65536  # Fallback for local models: 1500, 64KB
 
             # Cloud models get higher limits (large context windows)
             # Anthropic: 200K tokens, GPT-4: 128K tokens
             # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
             return 1500, 65536  # ~2500 lines, 100KB for cloud models
-        except Exception:
+        except Exception as e:
             # Default to cloud limits if settings unavailable
+            logger.debug("Settings unavailable for truncation limits, using defaults: %s", e)
             return 1500, 65536  # ~1500 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()

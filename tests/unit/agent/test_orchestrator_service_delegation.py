@@ -134,7 +134,7 @@ class TestDualDelegation:
 
         result = await obj.chat("hello")
         assert result == "coordinator_response"
-        obj._chat_coordinator.chat.assert_called_once_with("hello")
+        obj._chat_coordinator.chat.assert_called_once_with("hello", use_planning=False)
 
     async def test_chat_uses_service_when_flag_on(self):
         obj = self._make_orchestrator_stub(use_service_layer=True)

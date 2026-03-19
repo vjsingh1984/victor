@@ -579,8 +579,8 @@ class RecoveryCoordinator:
                 diagnostics["context_utilization"] = (
                     self._context_compactor.get_context_utilization()
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to get context utilization for diagnostics: %s", e)
 
         return diagnostics
 

@@ -317,14 +317,14 @@ class OrchestratorIntegration:
             for observer in self._quality_observers:
                 try:
                     observer(result.quality_score, result.quality_details)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Quality observer failed: %s", e)
         if self._grounding_observers:
             for observer in self._grounding_observers:
                 try:
                     observer(result.is_grounded, result.grounding_issues)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Grounding observer failed: %s", e)
 
         if self._config.log_quality_scores:
             logger.debug(
@@ -555,11 +555,13 @@ class OrchestratorIntegration:
                 task_type=task_type,
             )
 
-            # Log quality warnings if below threshold
+            # Log quality info (debug-level; internal pipeline detail)
             if not result.is_valid:
-                logger.warning(
-                    f"IntelligentPipeline: Response below quality threshold "
-                    f"(quality={result.quality_score:.2f}, grounded={result.is_grounded})"
+                logger.debug(
+                    "IntelligentPipeline: Response below quality threshold "
+                    "(quality=%.2f, grounded=%s)",
+                    result.quality_score,
+                    result.is_grounded,
                 )
 
             return {

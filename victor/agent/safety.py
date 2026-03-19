@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -653,8 +655,8 @@ def create_hitl_confirmation_callback(
         settings = load_settings()
         default_timeout = getattr(settings, "hitl_default_timeout", 300.0)
         default_fallback = getattr(settings, "hitl_default_fallback", "abort")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to load HITL settings, using defaults: %s", e)
 
     effective_timeout = timeout if timeout is not None else default_timeout
     effective_fallback = fallback if fallback is not None else default_fallback

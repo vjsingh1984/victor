@@ -312,6 +312,9 @@ class ContinuationStrategy:
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
         task_completion_signals: Optional[Dict[str, Any]] = None,
+        # Dynamic budget parameters
+        query_classification: Any = None,  # Optional[QueryClassification]
+        plan_step_count: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -570,6 +573,20 @@ class ContinuationStrategy:
         max_cont_analysis = getattr(settings, "max_continuation_prompts_analysis", 6)
         max_cont_action = getattr(settings, "max_continuation_prompts_action", 5)
         max_cont_default = getattr(settings, "max_continuation_prompts_default", 3)
+
+        # Apply dynamic budget hints from query classification (before RL/manual overrides)
+        if query_classification and hasattr(query_classification, "continuation_budget_hint"):
+            budget_hint = query_classification.continuation_budget_hint
+            max_cont_default = max(max_cont_default, budget_hint)
+            max_cont_analysis = max(max_cont_analysis, budget_hint)
+            max_cont_action = max(max_cont_action, budget_hint)
+
+        # Increase budget based on plan step count
+        if plan_step_count is not None and plan_step_count > 0:
+            plan_budget = plan_step_count * 2
+            max_cont_default = max(max_cont_default, plan_budget)
+            max_cont_analysis = max(max_cont_analysis, plan_budget)
+            max_cont_action = max(max_cont_action, plan_budget)
 
         # Check for provider/model-specific overrides (RL-learned or manually configured)
         provider_model_key = f"{provider_name}:{model}"

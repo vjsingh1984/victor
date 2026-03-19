@@ -220,10 +220,10 @@ def chat(
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
     ),
-    enable_planning: bool = typer.Option(
-        False,
+    enable_planning: Optional[bool] = typer.Option(
+        None,
         "--planning/--no-planning",
-        help="Enable structured planning for complex multi-step tasks. Auto-detects when to use planning vs direct chat.",
+        help="Enable structured planning for complex multi-step tasks. Default: auto-detect via query classification.",
     ),
     planning_model: Optional[str] = typer.Option(
         None,
@@ -530,7 +530,7 @@ async def run_oneshot(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
-    enable_planning: bool = False,
+    enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
     legacy_mode: bool = False,
 ) -> None:
@@ -630,41 +630,27 @@ async def run_oneshot(
         usage_stats = None
         model_name = None
 
-        if stream and agent.provider.supports_streaming():
-            # Planning mode requires non-streaming execution (plan generation → step execution → summary)
-            # Fall back to non-streaming when planning is enabled
-            if enable_planning and hasattr(agent, "chat_with_planning"):
-                response = await agent.chat_with_planning(message)
-                content_buffer = response.content
-                usage_stats = response.usage
-                model_name = response.model
-                formatter.response(
-                    content=content_buffer,
-                    usage=usage_stats,
-                    model=model_name,
-                )
-            else:
-                from victor.ui.rendering import (
-                    FormatterRenderer,
-                    LiveDisplayRenderer,
-                    stream_response,
-                )
+        # Planning mode requires non-streaming (plan generation → step execution → summary)
+        use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
 
-                use_live = renderer_choice in {"rich", "auto"}
-                if renderer_choice in {"rich-text", "text"}:
-                    use_live = False
-                renderer = (
-                    LiveDisplayRenderer(console)
-                    if use_live
-                    else FormatterRenderer(formatter, console)
-                )
-                content_buffer = await stream_response(agent, message, renderer)
+        if use_streaming:
+            from victor.ui.rendering import (
+                FormatterRenderer,
+                LiveDisplayRenderer,
+                stream_response,
+            )
+
+            use_live = renderer_choice in {"rich", "auto"}
+            if renderer_choice in {"rich-text", "text"}:
+                use_live = False
+            renderer = (
+                LiveDisplayRenderer(console)
+                if use_live
+                else FormatterRenderer(formatter, console)
+            )
+            content_buffer = await stream_response(agent, message, renderer)
         else:
-            # Use planning mode if enabled and available
-            if enable_planning and hasattr(agent, "chat_with_planning"):
-                response = await agent.chat_with_planning(message)
-            else:
-                response = await agent.chat(message)
+            response = await agent.chat(message, use_planning=enable_planning)
             content_buffer = response.content
             usage_stats = response.usage
             model_name = response.model
@@ -706,7 +692,7 @@ async def run_interactive(
     max_iterations: Optional[int] = None,
     vertical: Optional[str] = None,
     enable_observability: bool = True,
-    enable_planning: bool = False,
+    enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
     legacy_mode: bool = False,
     use_tui: bool = True,
@@ -885,6 +871,57 @@ async def run_interactive(
             await graceful_shutdown(agent)
 
 
+def _create_cli_prompt_session():
+    """Create a prompt_toolkit PromptSession with persistent history.
+
+    Loads previous user messages from the conversation database and persists
+    new input to ~/.victor/chat_history for cross-session Up/Down navigation.
+    """
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.history import FileHistory, InMemoryHistory
+
+    # Use a persistent history file in ~/.victor/
+    try:
+        from victor.config.settings import get_project_paths
+
+        history_file = get_project_paths().global_victor_dir / "chat_history"
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        history = FileHistory(str(history_file))
+
+        # Seed from conversation DB if history file is empty/new
+        if not history_file.exists() or history_file.stat().st_size == 0:
+            try:
+                import sqlite3
+
+                db_path = get_project_paths().conversation_db
+                if db_path.exists():
+                    with sqlite3.connect(db_path) as conn:
+                        cursor = conn.execute(
+                            """
+                            SELECT DISTINCT content
+                            FROM messages
+                            WHERE role = 'user'
+                              AND content IS NOT NULL
+                              AND content != ''
+                              AND LENGTH(content) < 4000
+                              AND content NOT LIKE '<TOOL_OUTPUT%'
+                              AND content NOT LIKE '<%'
+                              AND content NOT LIKE '{%'
+                            ORDER BY timestamp ASC
+                            LIMIT 100
+                            """
+                        )
+                        for (msg,) in cursor.fetchall():
+                            history.store_string(msg)
+            except Exception:
+                pass  # DB seeding is best-effort
+
+    except Exception:
+        history = InMemoryHistory()
+
+    return PromptSession(history=history)
+
+
 async def _run_cli_repl(
     agent: AgentOrchestrator,
     settings: Any,
@@ -894,7 +931,7 @@ async def _run_cli_repl(
     rl_suggestion: Optional[tuple[str, str, float]] = None,
     renderer_choice: str = "auto",
     vertical_name: Optional[str] = None,
-    enable_planning: bool = False,
+    enable_planning: Optional[bool] = None,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
@@ -902,7 +939,8 @@ async def _run_cli_repl(
         f"[bold blue]Victor[/] - Open-source agentic AI framework\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
         f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
-        f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."
+        f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit.\n"
+        f"Use [bold]Up/Down[/] arrows to browse conversation history."
     )
 
     if rl_suggestion:
@@ -920,9 +958,12 @@ async def _run_cli_repl(
         )
     )
 
+    # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
+    prompt_session = _create_cli_prompt_session()
+
     while True:
         try:
-            user_input = Prompt.ask("[green]You[/]")
+            user_input = prompt_session.prompt("You> ")
 
             if not user_input.strip():
                 continue
@@ -942,33 +983,27 @@ async def _run_cli_repl(
 
             console.print("[blue]Assistant:[/]")
 
-            if stream:
-                # Planning mode requires non-streaming execution
-                if enable_planning and hasattr(agent, "chat_with_planning"):
-                    response = await agent.chat_with_planning(user_input)
-                    console.print(Markdown(response.content))
-                else:
-                    from victor.agent.response_sanitizer import sanitize_response
-                    from victor.ui.rendering import (
-                        LiveDisplayRenderer,
-                        FormatterRenderer,
-                        stream_response,
-                    )
+            # Planning mode requires non-streaming execution
+            use_streaming = stream and not enable_planning
 
-                    use_live = renderer_choice in {"rich", "auto"}
-                    renderer = (
-                        LiveDisplayRenderer(console)
-                        if use_live
-                        else FormatterRenderer(create_formatter(), console)
-                    )
-                    content_buffer = await stream_response(agent, user_input, renderer)
-                    content_buffer = sanitize_response(content_buffer)
+            if use_streaming:
+                from victor.agent.response_sanitizer import sanitize_response
+                from victor.ui.rendering import (
+                    LiveDisplayRenderer,
+                    FormatterRenderer,
+                    stream_response,
+                )
+
+                use_live = renderer_choice in {"rich", "auto"}
+                renderer = (
+                    LiveDisplayRenderer(console)
+                    if use_live
+                    else FormatterRenderer(create_formatter(), console)
+                )
+                content_buffer = await stream_response(agent, user_input, renderer)
+                content_buffer = sanitize_response(content_buffer)
             else:
-                # Use planning mode if enabled and available
-                if enable_planning and hasattr(agent, "chat_with_planning"):
-                    response = await agent.chat_with_planning(user_input)
-                else:
-                    response = await agent.chat(user_input)
+                response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
 
         except KeyboardInterrupt:

@@ -53,7 +53,10 @@ def test_get_handlers_falls_back_to_legacy_module(monkeypatch) -> None:
 
     with patch(
         "victor.core.verticals.workflow_provider.vertical_runtime_module_candidates",
-        return_value=["victor_research.handlers", "victor.research.handlers"],
+        return_value=[
+            "victor_research_nonexistent.handlers",  # fails import → fallback
+            "victor.research.handlers",  # legacy fallback (monkeypatched)
+        ],
     ):
         handlers = _ResearchVertical.get_handlers()
 
