@@ -110,15 +110,11 @@ def test_research_migration_behavior_parity_uses_shared_runtime_helper_defaults(
     rl_config = RuntimeResearchAssistant.get_rl_config_provider()
     team_spec_provider = RuntimeResearchAssistant.get_team_spec_provider()
 
-    assert isinstance(
-        RuntimeResearchAssistant.get_prompt_contributor(), ResearchPromptContributor
-    )
+    assert isinstance(RuntimeResearchAssistant.get_prompt_contributor(), ResearchPromptContributor)
     assert isinstance(
         RuntimeResearchAssistant.get_mode_config_provider(), ResearchModeConfigProvider
     )
-    assert isinstance(
-        RuntimeResearchAssistant.get_safety_extension(), ResearchSafetyExtension
-    )
+    assert isinstance(RuntimeResearchAssistant.get_safety_extension(), ResearchSafetyExtension)
     assert isinstance(workflow_provider, ResearchWorkflowProvider)
     assert isinstance(rl_config, ResearchRLConfig)
     assert isinstance(team_spec_provider, ResearchTeamSpecProvider)

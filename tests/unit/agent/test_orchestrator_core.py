@@ -718,9 +718,7 @@ class TestFromSettings:
 
         with (
             patch("victor.providers.registry.ProviderRegistry.create") as mock_create,
-            patch(
-                "victor.agent.tool_calling.capabilities.ModelCapabilityLoader"
-            ) as mock_caps,
+            patch("victor.agent.tool_calling.capabilities.ModelCapabilityLoader") as mock_caps,
             patch("victor.agent.orchestrator.UsageLogger"),
         ):
             mock_create.return_value = mock_provider

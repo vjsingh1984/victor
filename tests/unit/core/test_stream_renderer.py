@@ -371,7 +371,9 @@ class TestLiveDisplayRenderer:
 
         printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
         assert any("next:" in call_str for call_str in printed_calls)
-        assert any('graph(mode="trace", node="main", depth=3)' in call_str for call_str in printed_calls)
+        assert any(
+            'graph(mode="trace", node="main", depth=3)' in call_str for call_str in printed_calls
+        )
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_status_prints_dim(self, mock_live_class, renderer, mock_console):

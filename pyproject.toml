@@ -436,7 +436,8 @@ victor-examples = "examples.playground.cli:app"
 # All contrib verticals are now bundled with the main victor package.
 # =============================================================================
 [project.entry-points."victor.verticals"]
-# Built-in vertical
+# Legacy group — new entries should use victor.plugins instead
+# Existing entries here are auto-wrapped via _LegacyVerticalPluginAdapter
 benchmark = "victor.benchmark:BenchmarkVertical"
 
 # Contrib verticals (migrated from external packages)

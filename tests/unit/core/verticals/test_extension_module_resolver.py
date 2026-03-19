@@ -40,11 +40,15 @@ class TestExtensionModuleResolver:
         assert name == "MyVerticalModeConfig"
 
     def test_load_attribute_success(self):
-        result = self.resolver.load_attribute("victor.core.verticals.extension_module_resolver", "ExtensionModuleResolver")
+        result = self.resolver.load_attribute(
+            "victor.core.verticals.extension_module_resolver", "ExtensionModuleResolver"
+        )
         assert result is ExtensionModuleResolver
 
     def test_load_attribute_missing_raises(self):
         import pytest
 
         with pytest.raises((ImportError, AttributeError)):
-            self.resolver.load_attribute("victor.core.verticals.extension_module_resolver", "NonExistent")
+            self.resolver.load_attribute(
+                "victor.core.verticals.extension_module_resolver", "NonExistent"
+            )

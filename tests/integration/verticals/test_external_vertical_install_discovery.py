@@ -25,7 +25,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VICTOR_SDK_DIR = REPO_ROOT / "victor-sdk"
 EXTERNAL_EXAMPLE_DIR = REPO_ROOT / "examples" / "external_vertical"
@@ -151,7 +150,9 @@ def _build_wheel(venv_dir: Path, env: dict[str, str], package_dir: Path, output_
     return wheels[-1]
 
 
-def _run_python(venv_dir: Path, env: dict[str, str], script: str) -> subprocess.CompletedProcess[str]:
+def _run_python(
+    venv_dir: Path, env: dict[str, str], script: str
+) -> subprocess.CompletedProcess[str]:
     """Execute Python in the validation venv."""
 
     return _run(
@@ -168,7 +169,9 @@ def _json_from_stdout(stdout: str) -> dict[str, object]:
 
 
 @pytest.mark.slow
-def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(tmp_path: Path) -> None:
+def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(
+    tmp_path: Path,
+) -> None:
     """The example should install cleanly and expose its SDK definition contract."""
 
     env = _subprocess_env(tmp_path)
@@ -185,8 +188,7 @@ def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(t
     completed = _run_python(
         venv_dir,
         env,
-        textwrap.dedent(
-            """
+        textwrap.dedent("""
             import json
             from importlib.metadata import entry_points
 
@@ -210,8 +212,7 @@ def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(t
                     }
                 )
             )
-            """
-        ).strip(),
+            """).strip(),
     )
 
     payload = _json_from_stdout(completed.stdout)
@@ -253,8 +254,7 @@ def test_external_vertical_runtime_install_is_discoverable_by_vertical_loader(
     completed = _run_python(
         venv_dir,
         env,
-        textwrap.dedent(
-            f"""
+        textwrap.dedent(f"""
             import json
             from pathlib import Path
 
@@ -286,8 +286,7 @@ def test_external_vertical_runtime_install_is_discoverable_by_vertical_loader(
                     }}
                 )
             )
-            """
-        ).strip(),
+            """).strip(),
     )
 
     payload = _json_from_stdout(completed.stdout)

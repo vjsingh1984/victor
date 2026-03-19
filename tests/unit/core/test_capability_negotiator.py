@@ -74,9 +74,7 @@ class TestCapabilityNegotiator:
             name="exotic",
             provides={ExtensionType.API_ROUTER},
         )
-        negotiator = CapabilityNegotiator(
-            framework_capabilities={ExtensionType.SAFETY}
-        )
+        negotiator = CapabilityNegotiator(framework_capabilities={ExtensionType.SAFETY})
         result = negotiator.negotiate(manifest)
         assert result.compatible is True
         assert len(result.warnings) == 1

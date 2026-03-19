@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FORBIDDEN_DEFINITION_IMPORT_PREFIXES = (
     "victor.framework",
@@ -57,9 +56,7 @@ DEFINITION_BOUNDARY_TARGETS = [
     DefinitionBoundaryTarget(
         label="dataanalysis assistant",
         path=REPO_ROOT / "victor/verticals/contrib/dataanalysis/assistant.py",
-        allowed_victor_import_prefixes=(
-            "victor.verticals.contrib.dataanalysis.prompt_metadata",
-        ),
+        allowed_victor_import_prefixes=("victor.verticals.contrib.dataanalysis.prompt_metadata",),
         requires_sdk_import=True,
     ),
     DefinitionBoundaryTarget(
@@ -180,6 +177,5 @@ def test_migrated_definition_entrypoints_import_victor_sdk(
     imports = _collect_imports(target.path)
 
     assert any(
-        module == "victor_sdk" or module.startswith("victor_sdk.")
-        for module in imports
+        module == "victor_sdk" or module.startswith("victor_sdk.") for module in imports
     ), f"{target.label} should import victor_sdk"

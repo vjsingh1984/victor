@@ -76,9 +76,7 @@ class TestWorkflowContext:
         ctx.add_result(
             NodeResult(node_id="n1", status=ExecutorNodeStatus.COMPLETED, output="data1")
         )
-        ctx.add_result(
-            NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e")
-        )
+        ctx.add_result(NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e"))
         outputs = ctx.get_outputs()
         assert "n1" in outputs
         assert "n2" not in outputs

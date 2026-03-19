@@ -294,7 +294,11 @@ def test_discover_verticals_logs_structured_telemetry(monkeypatch, caplog):
     with caplog.at_level(logging.INFO, logger="victor.core.verticals.vertical_loader"):
         loader.discover_verticals(force_refresh=True)
 
-    records = [record for record in caplog.records if getattr(record, "event", None) == "VERTICAL_DISCOVERY"]
+    records = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "VERTICAL_DISCOVERY"
+    ]
     assert len(records) == 1
     record = records[0]
     assert record.discovery_kind == "vertical"
@@ -353,7 +357,9 @@ def test_refresh_plugins_logs_structured_telemetry(monkeypatch, caplog):
         loader.refresh_plugins()
 
     records = [
-        record for record in caplog.records if getattr(record, "event", None) == "VERTICAL_PLUGIN_REFRESH"
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "VERTICAL_PLUGIN_REFRESH"
     ]
     assert len(records) == 1
     record = records[0]

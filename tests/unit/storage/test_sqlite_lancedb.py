@@ -68,21 +68,30 @@ class TestClose:
 class TestCombineScores:
     def test_semantic_only(self, store):
         score = store._combine_scores(
-            semantic=0.8, keyword=None, graph=None,
-            semantic_weight=0.6, graph_weight=0.2,
+            semantic=0.8,
+            keyword=None,
+            graph=None,
+            semantic_weight=0.6,
+            graph_weight=0.2,
         )
         assert 0.7 < score < 0.9
 
     def test_all_scores(self, store):
         score = store._combine_scores(
-            semantic=1.0, keyword=1.0, graph=1.0,
-            semantic_weight=0.5, graph_weight=0.3,
+            semantic=1.0,
+            keyword=1.0,
+            graph=1.0,
+            semantic_weight=0.5,
+            graph_weight=0.3,
         )
         assert 0.9 < score <= 1.0
 
     def test_no_scores(self, store):
         score = store._combine_scores(
-            semantic=None, keyword=None, graph=None,
-            semantic_weight=0.5, graph_weight=0.3,
+            semantic=None,
+            keyword=None,
+            graph=None,
+            semantic_weight=0.5,
+            graph_weight=0.3,
         )
         assert score == 0.0

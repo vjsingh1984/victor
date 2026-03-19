@@ -460,7 +460,11 @@ class TestEventBridgeFiltering:
     @pytest.mark.asyncio
     async def test_broadcaster_filters_events_by_correlation_id(self):
         """Clients with a correlation filter should only receive matching events."""
-        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBroadcaster
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBroadcaster,
+        )
 
         broadcaster = EventBroadcaster()
         broadcaster._clients.clear()
@@ -516,9 +520,7 @@ class TestEventBridgeFiltering:
             ),
         )
 
-        broadcaster.normalize_subscriptions.assert_called_once_with(
-            ["tool.complete", "tool.error"]
-        )
+        broadcaster.normalize_subscriptions.assert_called_once_with(["tool.complete", "tool.error"])
         broadcaster.update_subscriptions.assert_called_once_with(
             "client-1",
             broadcaster.normalize_subscriptions.return_value,
@@ -527,7 +529,11 @@ class TestEventBridgeFiltering:
 
     def test_broadcaster_recent_events_supports_same_filters(self):
         """Recent-event snapshots should use the same category/correlation matching rules."""
-        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBroadcaster
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBroadcaster,
+        )
 
         broadcaster = EventBroadcaster()
         broadcaster._recent_events.clear()

@@ -11,7 +11,6 @@ import zipfile
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VICTOR_SDK_DIR = REPO_ROOT / "victor-sdk"
 EXTERNAL_EXAMPLE_DIR = REPO_ROOT / "examples" / "external_vertical"
@@ -87,9 +86,7 @@ def _assert_archive_contains_suffixes(names: set[str], required_suffixes: set[st
     """Assert an archive contains paths ending in the required suffixes."""
 
     missing = sorted(
-        suffix
-        for suffix in required_suffixes
-        if not any(name.endswith(suffix) for name in names)
+        suffix for suffix in required_suffixes if not any(name.endswith(suffix) for name in names)
     )
     assert not missing, f"Missing required archive paths: {missing}"
 

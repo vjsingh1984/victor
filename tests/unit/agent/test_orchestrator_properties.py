@@ -35,9 +35,9 @@ class TestOrchestratorPropertyInstallation:
             "vertical_context",
         ]
         for prop_name in simple_props:
-            assert hasattr(AgentOrchestrator, prop_name), (
-                f"Property '{prop_name}' not found on AgentOrchestrator"
-            )
+            assert hasattr(
+                AgentOrchestrator, prop_name
+            ), f"Property '{prop_name}' not found on AgentOrchestrator"
             assert isinstance(
                 getattr(AgentOrchestrator, prop_name), property
             ), f"'{prop_name}' should be a property descriptor"
@@ -57,9 +57,9 @@ class TestOrchestratorPropertyInstallation:
             "coordination",
         ]
         for prop_name in lazy_props:
-            assert hasattr(AgentOrchestrator, prop_name), (
-                f"Lazy property '{prop_name}' not found on AgentOrchestrator"
-            )
+            assert hasattr(
+                AgentOrchestrator, prop_name
+            ), f"Lazy property '{prop_name}' not found on AgentOrchestrator"
             assert isinstance(
                 getattr(AgentOrchestrator, prop_name), property
             ), f"'{prop_name}' should be a property descriptor"
