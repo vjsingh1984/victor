@@ -375,7 +375,14 @@ class RuntimeBuildersMixin:
         provider: "BaseProvider",
         model: str,
         provider_name: str,
-    ) -> tuple["ProviderManager", "BaseProvider", str, str, "BaseToolCallingAdapter", "ToolCallingCapabilities"]:
+    ) -> tuple[
+        "ProviderManager",
+        "BaseProvider",
+        str,
+        str,
+        "BaseToolCallingAdapter",
+        "ToolCallingCapabilities",
+    ]:
         """Create ProviderManager and initialize tool adapter.
 
         Args:

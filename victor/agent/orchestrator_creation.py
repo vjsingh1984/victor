@@ -56,9 +56,7 @@ async def create_orchestrator_from_settings(
         raise ValueError(error_msg)
 
     # Get provider-level settings
-    profile_extras = (
-        profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
-    )
+    profile_extras = profile.__pydantic_extra__ if hasattr(profile, "__pydantic_extra__") else {}
     provider_settings = settings.get_provider_settings(profile.provider, profile_extras)
 
     if profile_extras:

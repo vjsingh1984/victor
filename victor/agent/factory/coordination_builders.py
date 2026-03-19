@@ -81,7 +81,9 @@ class CoordinationBuildersMixin:
 
         return self.container.get(RecoveryHandlerProtocol)
 
-    def create_recovery_integration(self, recovery_handler: Optional["RecoveryHandler"]) -> "OrchestratorRecoveryIntegration":
+    def create_recovery_integration(
+        self, recovery_handler: Optional["RecoveryHandler"]
+    ) -> "OrchestratorRecoveryIntegration":
         """Create recovery integration submodule for clean delegation.
 
         Args:
@@ -327,7 +329,9 @@ class CoordinationBuildersMixin:
             logger.warning(f"RL: Failed to initialize RL coordinator: {e}")
             return None
 
-    def create_reminder_manager(self, provider: str, task_complexity: str, tool_budget: int) -> "ReminderManagerProtocol":
+    def create_reminder_manager(
+        self, provider: str, task_complexity: str, tool_budget: int
+    ) -> "ReminderManagerProtocol":
         """Create context reminder manager from DI container.
 
         Args:
@@ -479,7 +483,9 @@ class CoordinationBuildersMixin:
         logger.debug(f"ReadResultCache created (ttl={ttl_seconds}s, max={max_entries})")
         return cache
 
-    def create_time_aware_executor(self, timeout_seconds: Optional[float] = None) -> "TimeAwareExecutor":
+    def create_time_aware_executor(
+        self, timeout_seconds: Optional[float] = None
+    ) -> "TimeAwareExecutor":
         """Create TimeAwareExecutor for time-aware execution management.
 
         Args:
@@ -545,7 +551,11 @@ class CoordinationBuildersMixin:
         logger.debug("ModeCompletionCriteria created")
         return criteria
 
-    def create_context_assembler(self, ledger: Optional["SessionLedger"] = None, controller: Optional["ConversationController"] = None) -> "TurnBoundaryContextAssembler":
+    def create_context_assembler(
+        self,
+        ledger: Optional["SessionLedger"] = None,
+        controller: Optional["ConversationController"] = None,
+    ) -> "TurnBoundaryContextAssembler":
         """Create TurnBoundaryContextAssembler for context selection.
 
         Args:
@@ -565,7 +575,9 @@ class CoordinationBuildersMixin:
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
 
-    def create_referential_intent_resolver(self, ledger: Optional["SessionLedger"] = None) -> "ReferentialIntentResolver":
+    def create_referential_intent_resolver(
+        self, ledger: Optional["SessionLedger"] = None
+    ) -> "ReferentialIntentResolver":
         """Create ReferentialIntentResolver for anaphoric reference resolution."""
         from victor.agent.referential_intent_resolver import ReferentialIntentResolver
 

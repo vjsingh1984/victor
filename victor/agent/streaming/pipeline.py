@@ -326,8 +326,9 @@ class StreamingChatPipeline:
                 if quality_result and not quality_result.get("is_grounded", True):
                     issues = quality_result.get("grounding_issues", [])
                     if issues:
-                        logger.warning(
-                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
+                        logger.debug(
+                            "IntelligentPipeline detected grounding issues: %s",
+                            issues[:3],
                         )
                     if quality_result.get("should_retry"):
                         grounding_feedback = quality_result.get("grounding_feedback", "")
@@ -345,9 +346,10 @@ class StreamingChatPipeline:
                     finalize_reason = quality_result.get(
                         "finalize_reason", "grounding limit exceeded"
                     )
-                    logger.warning(
-                        f"Force finalize triggered: {finalize_reason}. "
-                        "Stopping continuation to prevent infinite loop."
+                    logger.debug(
+                        "Force finalize triggered: %s. "
+                        "Stopping continuation to prevent infinite loop.",
+                        finalize_reason,
                     )
                     orch._force_finalize = True
 

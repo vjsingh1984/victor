@@ -182,7 +182,9 @@ class InfrastructureBuildersMixin:
 
         return self.container.get(ToolSequenceTrackerProtocol)
 
-    def create_unified_tracker(self, tool_calling_caps: "ToolCallingCapabilities") -> "UnifiedTaskTracker":
+    def create_unified_tracker(
+        self, tool_calling_caps: "ToolCallingCapabilities"
+    ) -> "UnifiedTaskTracker":
         """Create unified task tracker with model-specific exploration settings.
 
         Args:
@@ -303,7 +305,9 @@ class InfrastructureBuildersMixin:
         logger.debug("SessionLedger created")
         return SessionLedger()
 
-    def create_compaction_summarizer(self, ledger: Optional["SessionLedger"] = None) -> "LedgerAwareCompactionSummarizer":
+    def create_compaction_summarizer(
+        self, ledger: Optional["SessionLedger"] = None
+    ) -> "LedgerAwareCompactionSummarizer":
         """Create ledger-aware compaction summarizer strategy."""
         from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
 

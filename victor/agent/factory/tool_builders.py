@@ -313,7 +313,11 @@ class ToolBuildersMixin:
         return cache
 
     def create_tool_registrar(
-        self, tools: "ToolRegistry", tool_graph: "ToolDependencyGraphProtocol", provider: "BaseProvider", model: str
+        self,
+        tools: "ToolRegistry",
+        tool_graph: "ToolDependencyGraphProtocol",
+        provider: "BaseProvider",
+        model: str,
     ) -> "ToolRegistrar":
         """Create tool registrar for dynamic tool discovery and registration.
 
@@ -366,7 +370,9 @@ class ToolBuildersMixin:
         logger.debug("ToolDependencyGraph created")
         return tool_graph
 
-    def create_tool_output_formatter(self, context_compactor: "ContextCompactor") -> "ToolOutputFormatter":
+    def create_tool_output_formatter(
+        self, context_compactor: "ContextCompactor"
+    ) -> "ToolOutputFormatter":
         """Create tool output formatter for LLM-context-aware output formatting.
 
         Args:
@@ -411,7 +417,9 @@ class ToolBuildersMixin:
             logger.warning(f"Failed to initialize ToolDeduplicationTracker: {e}")
             return None
 
-    def create_tool_access_controller(self, registry: Optional["ToolRegistry"] = None) -> "ToolAccessController":
+    def create_tool_access_controller(
+        self, registry: Optional["ToolRegistry"] = None
+    ) -> "ToolAccessController":
         """Create ToolAccessController for unified tool access control.
 
         Args:
@@ -522,7 +530,9 @@ class ToolBuildersMixin:
         logger.debug(f"ToolCallingMatrix created with {len(tool_calling_models)} model configs")
         return (tool_calling_models, tool_capabilities)
 
-    def initialize_plugin_system(self, tool_registrar: "ToolRegistrar") -> Optional["ToolPluginRegistry"]:
+    def initialize_plugin_system(
+        self, tool_registrar: "ToolRegistrar"
+    ) -> Optional["ToolPluginRegistry"]:
         """Initialize plugin system for extensible tools.
 
         Args:

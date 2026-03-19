@@ -82,9 +82,7 @@ class SessionStateAccessor:
     @failed_tool_signatures.setter
     def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
-        self._session_state.execution_state.failed_tool_signatures = (
-            set(value) if value else set()
-        )
+        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
 
     @property
     def tool_capability_warned(self) -> bool:
