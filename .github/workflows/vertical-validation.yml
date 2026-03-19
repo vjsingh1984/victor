@@ -343,6 +343,11 @@ jobs:
             echo ""
           done
 
+      - name: Check vertical compliance levels
+        run: |
+          python scripts/ci/check_vertical_compliance.py | tee compliance-report.md
+          cat compliance-report.md >> $GITHUB_STEP_SUMMARY
+
       - name: Generate validation report
         if: always() && steps.find-verticals.outputs.vertical_dirs != ''
         run: |
