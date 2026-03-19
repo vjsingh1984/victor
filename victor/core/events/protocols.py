@@ -130,10 +130,23 @@ class MessagingEvent:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
     timestamp: float = field(default_factory=time.time)
     source: str = "victor"
-    correlation_id: Optional[str] = None
+    correlation_id: Optional[str] = field(default=None)
     partition_key: Optional[str] = None
     headers: Dict[str, str] = field(default_factory=dict)
     delivery_guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_MOST_ONCE
+
+    def __post_init__(self):
+        """Initialize correlation ID and headers from context if not provided."""
+        from victor.core.context import get_trace_id, get_session_id
+
+        # Auto-propagate trace ID as correlation ID
+        if self.correlation_id is None:
+            self.correlation_id = get_trace_id()
+
+        # Auto-propagate session ID in headers
+        sid = get_session_id()
+        if sid and "session_id" not in self.headers:
+            self.headers["session_id"] = sid
 
     @property
     def category(self) -> str:

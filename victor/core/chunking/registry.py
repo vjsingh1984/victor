@@ -52,19 +52,57 @@ class ChunkingRegistry:
         self._register_defaults()
 
     def _register_defaults(self) -> None:
-        """Register default chunking strategies."""
+        """Register default chunking strategies and discover external ones."""
         from victor.core.chunking.strategies.code import CodeChunkingStrategy
         from victor.core.chunking.strategies.html import HTMLChunkingStrategy
         from victor.core.chunking.strategies.json import JSONChunkingStrategy
         from victor.core.chunking.strategies.markdown import MarkdownChunkingStrategy
         from victor.core.chunking.strategies.text import TextChunkingStrategy
 
-        # Register strategies
+        # Register builtin strategies
         self.register(TextChunkingStrategy(self.config))
         self.register(HTMLChunkingStrategy(self.config))
         self.register(JSONChunkingStrategy(self.config))
         self.register(MarkdownChunkingStrategy(self.config))
         self.register(CodeChunkingStrategy(self.config))
+
+        # Discover external strategies via plugin system
+        try:
+            from victor.core.plugins.registry import PluginRegistry
+
+            plugin_registry = PluginRegistry.get_instance()
+            for plugin in plugin_registry.list_plugins():
+                # Plugins can register strategies during their register() call
+                # which would call chunking_registry.register(strategy)
+                pass
+        except ImportError:
+            pass
+
+        # Also support direct entry points for strategies
+        self._discover_external_strategies()
+
+    def _discover_external_strategies(self) -> None:
+        """Discover strategies via 'victor.chunking_strategies' entry point."""
+        import logging
+        from importlib.metadata import entry_points
+
+        try:
+            eps = entry_points(group="victor.chunking_strategies")
+            for ep in eps:
+                try:
+                    strategy_cls = ep.load()
+                    if isinstance(strategy_cls, type):
+                        strategy = strategy_cls(self.config)
+                    else:
+                        strategy = strategy_cls
+
+                    if isinstance(strategy, ChunkingStrategy):
+                        self.register(strategy)
+                        logger.debug(f"Discovered external strategy: {strategy.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to load chunking strategy '{ep.name}': {e}")
+        except Exception:
+            pass
 
     def register(self, strategy: ChunkingStrategy) -> None:
         """Register a chunking strategy.

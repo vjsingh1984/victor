@@ -144,15 +144,27 @@ class VerticalLoader:
             ep_vertical = self._import_from_entrypoint(name)
 
             if vertical is not None and ep_vertical is not None and vertical is not ep_vertical:
-                # Both registry and entry point have this name — warn about collision
-                logger.warning(
-                    "Vertical '%s' registered via both VerticalRegistry (%s) and "
-                    "entry point (%s). Using registry version. To use the entry point "
-                    "version, unregister the built-in first.",
-                    name,
-                    f"{vertical.__module__}.{vertical.__qualname__}",
-                    f"{ep_vertical.__module__}.{ep_vertical.__qualname__}",
+                # Both registry and entry point have this name.
+                # Only warn for genuine collisions, not expected external/contrib coexistence.
+                reg_module = getattr(vertical, "__module__", "")
+                ep_module = getattr(ep_vertical, "__module__", "")
+                is_expected_override = (
+                    ("verticals.contrib" in reg_module) != ("verticals.contrib" in ep_module)
                 )
+                if not is_expected_override:
+                    logger.warning(
+                        "Vertical '%s' registered via both VerticalRegistry (%s) and "
+                        "entry point (%s). Using registry version. To use the entry point "
+                        "version, unregister the built-in first.",
+                        name,
+                        f"{vertical.__module__}.{vertical.__qualname__}",
+                        f"{ep_vertical.__module__}.{ep_vertical.__qualname__}",
+                    )
+                else:
+                    # Expected: external package and deprecated contrib coexist.
+                    # Prefer whichever is external.
+                    if "verticals.contrib" in reg_module and "verticals.contrib" not in ep_module:
+                        vertical = ep_vertical
 
             # Use registry first, entry point as fallback
             if vertical is None:
@@ -254,7 +266,11 @@ class VerticalLoader:
                 if isinstance(raw_group_stats, dict):
                     entry_point_group_stats = raw_group_stats
 
-        level = logging.DEBUG if payload.get("cache_hit") and not payload.get("force_refresh") else logging.INFO
+        level = (
+            logging.DEBUG
+            if payload.get("cache_hit") and not payload.get("force_refresh")
+            else logging.INFO
+        )
         logger.log(
             level,
             "%s kind=%s count=%s cache_hit=%s force_refresh=%s duration_ms=%.2f",
@@ -274,11 +290,11 @@ class VerticalLoader:
                 "loader_stats": kind_stats,
                 "entry_point_cache_group": entry_point_group,
                 "entry_point_cache_group_stats": entry_point_group_stats,
-                "entry_point_groups_cached": int(
-                    entry_point_cache.get("groups_cached", 0) or 0
-                )
-                if isinstance(entry_point_cache, dict)
-                else 0,
+                "entry_point_groups_cached": (
+                    int(entry_point_cache.get("groups_cached", 0) or 0)
+                    if isinstance(entry_point_cache, dict)
+                    else 0
+                ),
             },
         )
 
@@ -296,11 +312,11 @@ class VerticalLoader:
                 "refresh_count": int(refresh_stats.get("count", 0) or 0),
                 "duration_ms": float(refresh_stats.get("last_refresh_ms", 0.0) or 0.0),
                 "refresh_stats": refresh_stats,
-                "entry_point_groups_cached": int(
-                    entry_point_cache.get("groups_cached", 0) or 0
-                )
-                if isinstance(entry_point_cache, dict)
-                else 0,
+                "entry_point_groups_cached": (
+                    int(entry_point_cache.get("groups_cached", 0) or 0)
+                    if isinstance(entry_point_cache, dict)
+                    else 0
+                ),
                 "entry_point_cache": entry_point_cache,
             },
         )
@@ -436,17 +452,13 @@ class VerticalLoader:
                     if existing is not None and existing is not vertical_cls:
                         existing_module = getattr(existing, "__module__", "")
                         new_module = getattr(vertical_cls, "__module__", "")
-                        # External packages (victor_coding, etc.) take priority
-                        # over built-in contrib SDK definitions
-                        if "verticals.contrib" in existing_module and "verticals.contrib" not in new_module:
-                            logger.info(
-                                "External vertical '%s' (from %s) overrides built-in "
-                                "contrib definition %s.",
-                                name,
-                                new_module,
-                                existing.__name__,
-                            )
-                        else:
+                        existing_is_contrib = "verticals.contrib" in existing_module
+                        new_is_contrib = "verticals.contrib" in new_module
+                        if not existing_is_contrib and new_is_contrib:
+                            # External already registered; skip contrib
+                            continue
+                        if existing_is_contrib == new_is_contrib:
+                            # Genuine collision (both external or both contrib)
                             logger.warning(
                                 "Vertical '%s' has name '%s' which conflicts with "
                                 "registered vertical %s (from %s). Skipping.",
@@ -456,8 +468,8 @@ class VerticalLoader:
                                 existing_module,
                             )
                             continue
+                        # External overriding contrib — let register() handle it
                     self._discovered_verticals[name] = vertical_cls
-                    # Register in the global registry (overrides contrib if applicable)
                     VerticalRegistry.register(vertical_cls)
                     logger.debug("Discovered vertical plugin: %s", name)
                 else:
@@ -713,8 +725,9 @@ class VerticalLoader:
 
             required = getattr(manifest, "framework_version_requirement", ">=1.0.0")
 
-            from packaging.specifiers import Specifierset
-            spec = Specifierset(required)
+            from packaging.specifiers import SpecifierSet
+
+            spec = SpecifierSet(required)
             if version.parse(FRAMEWORK_VERSION) not in spec:
                 raise ValueError(
                     f"Incompatible framework version: {FRAMEWORK_VERSION} "
@@ -747,6 +760,23 @@ class VerticalLoader:
             # Graceful degradation if manifest/negotiator not available
             logger.debug("Manifest negotiation skipped: %s", exc)
 
+    def _fire_plugin_lifecycle(self, hook: str, vertical_name: str) -> None:
+        """Fire a lifecycle hook on the plugin associated with a vertical name."""
+        try:
+            from victor.core.plugins.registry import PluginRegistry, call_lifecycle_hook
+
+            registry = PluginRegistry.get_instance()
+            plugin = registry.get_plugin(vertical_name)
+            if plugin is not None:
+                call_lifecycle_hook(plugin, hook)
+        except Exception as e:
+            logger.debug(
+                "Failed to fire lifecycle hook '%s' for vertical '%s': %s",
+                hook,
+                vertical_name,
+                e,
+            )
+
     def _activate(self, vertical: Type[VerticalBase]) -> None:
         """Activate a vertical.
 
@@ -754,9 +784,19 @@ class VerticalLoader:
             vertical: Vertical class to activate
         """
         with self._lock:
+            previous_vertical = self._active_vertical
+
+            # Fire on_deactivate for outgoing vertical's plugin
+            if previous_vertical is not None:
+                self._fire_plugin_lifecycle("on_deactivate", previous_vertical.name)
+
             self._active_vertical = vertical
             self._extensions = None  # Clear cached extensions
             self._registered_services = False
+
+            # Fire on_activate for incoming vertical's plugin
+            self._fire_plugin_lifecycle("on_activate", vertical.name)
+
             logger.info("Activated vertical: %s", vertical.name)
 
     def _get_available_names(self) -> List[str]:

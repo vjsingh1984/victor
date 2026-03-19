@@ -389,9 +389,7 @@ class InMemoryEventBackend:
         """Add subscription to the appropriate index."""
         if "*" in subscription.pattern:
             self._wildcard_subscriptions.append(subscription.id)
-            self._compiled_patterns[subscription.id] = self._compile_pattern(
-                subscription.pattern
-            )
+            self._compiled_patterns[subscription.id] = self._compile_pattern(subscription.pattern)
         else:
             # Exact topic match - O(1) lookup
             if subscription.pattern not in self._exact_topic_index:
@@ -718,8 +716,7 @@ class InMemoryEventBackend:
                     subscriptions = [
                         self._subscriptions[sid]
                         for sid in matched_ids
-                        if sid in self._subscriptions
-                        and self._subscriptions[sid].is_active
+                        if sid in self._subscriptions and self._subscriptions[sid].is_active
                     ]
 
                 # Dispatch to handlers concurrently
@@ -901,6 +898,7 @@ def create_event_backend(
     *,
     backend_type: Optional[BackendType] = None,
     lazy_init: bool = False,
+    enable_batching: bool = False,
 ) -> IEventBackend:
     """Factory function to create event backends.
 
@@ -912,23 +910,10 @@ def create_event_backend(
         backend_type: Override backend type (uses config.backend_type if not set)
         lazy_init: If True, defer backend object construction until first operation.
             Recommended for heavyweight distributed backends.
+        enable_batching: If True, wrap the backend in a BatchingEventBackend decorator.
 
     Returns:
         IEventBackend implementation
-
-    Example:
-        # Default in-memory backend
-        backend = create_event_backend()
-
-        # With config
-        config = BackendConfig(
-            backend_type=BackendType.KAFKA,
-            extra={"bootstrap_servers": "localhost:9092"}
-        )
-        backend = create_event_backend(config)
-
-        # Override type
-        backend = create_event_backend(backend_type=BackendType.REDIS)
     """
     config = config or BackendConfig()
     selected_type = backend_type or config.backend_type
@@ -950,13 +935,21 @@ def create_event_backend(
 
     # In-memory backend is lightweight; instantiate directly.
     if selected_type == BackendType.IN_MEMORY or not lazy_init:
-        return factory(config)
+        backend = factory(config)
+    else:
+        backend = LazyInitEventBackend(
+            config=config,
+            backend_type=selected_type,
+            factory=factory,
+        )
 
-    return LazyInitEventBackend(
-        config=config,
-        backend_type=selected_type,
-        factory=factory,
-    )
+    # Wrap in batching decorator if requested
+    if enable_batching:
+        from victor.core.events.batching_backend import BatchingEventBackend
+
+        return BatchingEventBackend(backend, config)
+
+    return backend
 
 
 # Register built-in backend
@@ -1450,8 +1443,13 @@ def get_observability_bus() -> ObservabilityBus:
             # Read settings to determine backend
             settings = get_settings()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
+            enable_batching = bool(getattr(settings, "event_batching_enabled", False))
             backend_config = build_backend_config_from_settings(settings)
-            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
+            backend = create_event_backend(
+                config=backend_config,
+                lazy_init=lazy_init,
+                enable_batching=enable_batching,
+            )
 
             return ObservabilityBus(backend=backend)
 
@@ -1517,8 +1515,15 @@ def get_agent_message_bus() -> AgentMessageBus:
             # Read settings to determine backend
             settings = get_settings()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
+            enable_batching = bool(
+                getattr(settings, "event_agent_messaging_batching_enabled", False)
+            )
             backend_config = build_backend_config_from_settings(settings)
-            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
+            backend = create_event_backend(
+                config=backend_config,
+                lazy_init=lazy_init,
+                enable_batching=enable_batching,
+            )
 
             return AgentMessageBus(backend=backend)
 

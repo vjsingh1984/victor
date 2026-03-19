@@ -721,8 +721,20 @@ class VerticalRegistry:
     CURRENT_API_VERSION: ClassVar[int] = 1
 
     @classmethod
+    def _is_contrib_module(cls, module_path: str) -> bool:
+        """Check if a module path belongs to a built-in contrib vertical."""
+        return "verticals.contrib" in module_path
+
+    @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
-        """Register a vertical.
+        """Register a vertical with external-over-contrib priority.
+
+        Priority rules:
+        - External packages always take priority over built-in contrib verticals.
+        - If an external vertical is already registered and a contrib version
+          tries to register, the contrib is silently skipped.
+        - If a contrib vertical is already registered and an external version
+          registers, the external quietly overrides it.
 
         Args:
             vertical: Vertical class to register.
@@ -744,17 +756,39 @@ class VerticalRegistry:
             existing = cls._registry[name]
             existing_module = getattr(existing, "__module__", "<unknown>")
             if existing is not vertical:
-                logger.warning(
-                    "Vertical name collision: '%s' already registered by %s.%s "
-                    "(module: %s). Overwriting with %s.%s (module: %s).",
-                    name,
-                    existing.__name__,
-                    "",
-                    existing_module,
-                    vertical.__name__,
-                    "",
-                    new_module,
-                )
+                existing_is_contrib = cls._is_contrib_module(existing_module)
+                new_is_contrib = cls._is_contrib_module(new_module)
+
+                if not existing_is_contrib and new_is_contrib:
+                    # External already registered; contrib trying to overwrite — skip
+                    logger.debug(
+                        "Skipping contrib vertical '%s' (%s) — external version "
+                        "already registered from %s.",
+                        name,
+                        new_module,
+                        existing_module,
+                    )
+                    return
+                elif existing_is_contrib and not new_is_contrib:
+                    # External overriding contrib — expected upgrade
+                    logger.info(
+                        "External vertical '%s' (%s) overrides deprecated "
+                        "contrib version (%s).",
+                        name,
+                        new_module,
+                        existing_module,
+                    )
+                else:
+                    # Genuine collision (both external or both contrib)
+                    logger.warning(
+                        "Vertical name collision: '%s' already registered by %s "
+                        "(module: %s). Overwriting with %s (module: %s).",
+                        name,
+                        existing.__name__,
+                        existing_module,
+                        vertical.__name__,
+                        new_module,
+                    )
 
         cls._registry[name] = vertical
         cls._provenance[name] = new_module

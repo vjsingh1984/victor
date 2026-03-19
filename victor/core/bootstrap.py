@@ -190,7 +190,7 @@ def bootstrap_container(
     Args:
         settings: Optional Settings instance (loads from config if None)
         vertical: Optional vertical name to activate (e.g., "coding", "research")
-                 If None, uses settings.default_vertical or "coding"
+                 If None, uses settings.default_vertical or None (base mode)
         override_services: Optional dict of service type -> instance for testing
 
     Returns:
@@ -217,6 +217,12 @@ def bootstrap_container(
 
     # Register embedding services
     _register_embedding_services(container, settings)
+
+    # Register and initialize plugins (dynamic capabilities)
+    from victor.core.plugins.registry import PluginRegistry
+
+    plugin_registry = PluginRegistry.get_instance()
+    plugin_registry.register_all(container)
 
     # Bootstrap capability registry (stubs + entry point discovery)
     bootstrap_capabilities()
@@ -505,19 +511,52 @@ def bootstrap_capabilities() -> None:
     # capabilities.get() returns None when not available, which callers already handle.
 
     # 2. Discover enhanced providers from entry points
+    #    Scan both 'victor.capabilities' (legacy) and 'victor.sdk.capabilities'
+    #    to bridge framework and SDK capability registration systems.
     try:
         from importlib.metadata import entry_points
 
-        eps = entry_points(group="victor.capabilities")
-        for ep in eps:
-            try:
-                register_func = ep.load()
-                register_func(registry)
-                logger.debug(f"Loaded capability entry point: {ep.name}")
-            except Exception as e:
-                logger.warning(f"Failed to load capability {ep.name}: {e}")
+        for group in ("victor.capabilities", "victor.sdk.capabilities"):
+            eps = entry_points(group=group)
+            for ep in eps:
+                try:
+                    register_func = ep.load()
+                    register_func(registry)
+                    logger.debug(f"Loaded capability entry point: {group}:{ep.name}")
+                except Exception as e:
+                    logger.debug(f"Skipped capability {group}:{ep.name}: {e}")
     except Exception as e:
         logger.debug(f"Entry point discovery failed: {e}")
+
+    # 3. Auto-detect installed vertical packages that provide enhanced capabilities
+    #    but haven't registered via entry points (e.g., victor-coding's CodebaseIndex).
+    _auto_detect_package_capabilities(registry, CodebaseIndexFactoryProtocol)
+
+
+def _auto_detect_package_capabilities(registry: Any, index_factory_protocol: type) -> None:
+    """Auto-detect enhanced capabilities from installed vertical packages.
+
+    Checks for installed packages that provide enhanced implementations
+    but may not have registered them via 'victor.capabilities' entry points.
+    This bridges the gap when external packages use different registration
+    mechanisms (e.g., victor.sdk.capabilities vs victor.capabilities).
+    """
+    from victor.core.capability_registry import CapabilityStatus
+
+    # Skip if an enhanced provider is already registered
+    if registry.is_enhanced(index_factory_protocol):
+        return
+
+    # Try to detect victor-coding's CodebaseIndex
+    try:
+        from victor.core.search.indexer import detect_enhanced_index_factory
+
+        factory = detect_enhanced_index_factory()
+        if factory is not None:
+            registry.register(index_factory_protocol, factory, CapabilityStatus.ENHANCED)
+            logger.info("Auto-detected victor-coding: registered enhanced CodebaseIndexFactory")
+    except Exception as e:
+        logger.debug(f"CodebaseIndex auto-detection skipped: {e}")
 
 
 def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
@@ -732,8 +771,12 @@ def _register_workflow_compiler_plugins(
         logger.warning(f"Failed to register workflow compiler plugins: {e}")
 
 
-def _resolve_vertical_name(settings: Settings, requested_vertical: Optional[str]) -> str:
-    """Resolve which vertical name should be activated for this bootstrap."""
+def _resolve_vertical_name(settings: Settings, requested_vertical: Optional[str]) -> Optional[str]:
+    """Resolve which vertical name should be activated for this bootstrap.
+
+    Returns:
+        Vertical name string or None if no vertical should be activated.
+    """
     if isinstance(requested_vertical, str) and requested_vertical.strip():
         return requested_vertical.strip()
 
@@ -741,7 +784,7 @@ def _resolve_vertical_name(settings: Settings, requested_vertical: Optional[str]
     if isinstance(default_vertical, str) and default_vertical.strip():
         return default_vertical.strip()
 
-    return "coding"
+    return None
 
 
 def _report_capability_health(
@@ -846,6 +889,9 @@ def _register_vertical_services(
                        If settings.default_vertical is also not set, defaults to "coding".
     """
     target_vertical = _resolve_vertical_name(settings, vertical_name)
+    if target_vertical is None:
+        logger.debug("No vertical requested; skipping vertical service registration")
+        return
 
     try:
         from victor.core.verticals.vertical_loader import activate_vertical_services

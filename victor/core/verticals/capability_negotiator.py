@@ -79,6 +79,9 @@ class CapabilityNegotiator:
                 f"current framework version {self._current_api}."
             )
 
+        # 1b. SDK / framework version skew check
+        self._check_sdk_version_skew(manifest, result)
+
         # 2. Required capabilities
         unmet = manifest.unmet_requirements(self._capabilities)
         if unmet:
@@ -90,9 +93,7 @@ class CapabilityNegotiator:
         unknown_provided = manifest.provides - self._capabilities
         if unknown_provided:
             names = ", ".join(sorted(e.value for e in unknown_provided))
-            result.warnings.append(
-                f"Vertical provides unknown extension types (ignored): {names}"
-            )
+            result.warnings.append(f"Vertical provides unknown extension types (ignored): {names}")
             result.degraded_features.update(unknown_provided)
 
         if result.compatible:
@@ -109,3 +110,39 @@ class CapabilityNegotiator:
             )
 
         return result
+
+    def _check_sdk_version_skew(
+        self, manifest: ExtensionManifest, result: NegotiationResult
+    ) -> None:
+        """Check framework version against manifest's min_framework_version."""
+        min_ver = manifest.min_framework_version
+        if not min_ver:
+            return
+
+        try:
+            from packaging.specifiers import SpecifierSet
+            from packaging.version import parse as parse_version
+        except ImportError:
+            logger.debug("packaging not installed; skipping version skew check")
+            return
+
+        try:
+            from importlib.metadata import version as get_version
+
+            framework_version = get_version("victor-ai")
+        except Exception:
+            logger.debug("Cannot determine victor-ai version; skipping version skew check")
+            return
+
+        # Treat plain version strings as >=X.Y.Z
+        specifier_str = min_ver if any(c in min_ver for c in "<>=!~") else f">={min_ver}"
+        try:
+            spec = SpecifierSet(specifier_str)
+            if parse_version(framework_version) not in spec:
+                result.compatible = False
+                result.errors.append(
+                    f"Framework version {framework_version} does not satisfy "
+                    f"min_framework_version {specifier_str} for vertical '{manifest.name}'"
+                )
+        except Exception as exc:
+            result.warnings.append(f"Could not parse min_framework_version '{min_ver}': {exc}")

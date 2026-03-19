@@ -219,15 +219,9 @@ class ExtensionLoaderPressureMonitor:
 
     def pressure_level(self, *, queued: int, in_flight: int) -> str:
         """Return pressure level for current loader queue and in-flight counts."""
-        if (
-            queued >= self.error_queue_threshold
-            or in_flight >= self.error_in_flight_threshold
-        ):
+        if queued >= self.error_queue_threshold or in_flight >= self.error_in_flight_threshold:
             return "error"
-        if (
-            queued >= self.warn_queue_threshold
-            or in_flight >= self.warn_in_flight_threshold
-        ):
+        if queued >= self.warn_queue_threshold or in_flight >= self.warn_in_flight_threshold:
             return "warn"
         return "ok"
 
@@ -235,9 +229,7 @@ class ExtensionLoaderPressureMonitor:
     # Pressure event emission
     # ------------------------------------------------------------------
 
-    def emit_pressure_event(
-        self, level: str, snapshot: Dict[str, Any], reason: str
-    ) -> None:
+    def emit_pressure_event(self, level: str, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
         try:
             from victor.core.events import get_observability_bus
@@ -383,9 +375,7 @@ class ExtensionLoaderPressureMonitor:
 
                 bus = get_observability_bus()
             except Exception as e:
-                logger.debug(
-                    "Failed resolving observability bus for loader metrics: %s", e
-                )
+                logger.debug("Failed resolving observability bus for loader metrics: %s", e)
                 bus = None
 
         if bus is not None:
@@ -460,15 +450,11 @@ class VerticalExtensionLoader(ABC):
     _extension_executor_semaphores: ClassVar[Dict[int, asyncio.Semaphore]] = {}
 
     # Pressure monitoring (metrics, thresholds, cooldown, missing-module tracking).
-    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = (
-        ExtensionLoaderPressureMonitor()
-    )
+    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = ExtensionLoaderPressureMonitor()
 
     # Module resolver (delegates candidate resolution, availability checks,
     # attribute loading, and class-name generation).
-    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(
-        _pressure_monitor
-    )
+    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(_pressure_monitor)
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -629,9 +615,7 @@ class VerticalExtensionLoader(ABC):
             Extension instance or None if not found.
         """
         if class_name is None:
-            class_name = cls._module_resolver.auto_generate_class_name(
-                cls.__name__, extension_key
-            )
+            class_name = cls._module_resolver.auto_generate_class_name(cls.__name__, extension_key)
         candidate_paths = cls._find_available_candidates(suffix)
         if not candidate_paths:
             return None
@@ -651,7 +635,9 @@ class VerticalExtensionLoader(ABC):
         for module_path in candidate_paths:
             try:
                 return cls._get_extension_factory(
-                    extension_key, module_path, class_name,
+                    extension_key,
+                    module_path,
+                    class_name,
                 )
             except (ImportError, AttributeError) as exc:
                 last_error = exc
@@ -769,9 +755,7 @@ class VerticalExtensionLoader(ABC):
         loader: Callable[[], Optional[Any]],
     ) -> Optional[Any]:
         """Load an optional extension while caching hits but not misses."""
-        return cls._cache_manager.load_optional(
-            cls._cache_namespace(), extension_key, loader
-        )
+        return cls._cache_manager.load_optional(cls._cache_namespace(), extension_key, loader)
 
     @classmethod
     def _load_named_entry_point_extension(
@@ -836,9 +820,7 @@ class VerticalExtensionLoader(ABC):
         def _create():
             # Determine the class name to import
             if attribute_name is None:
-                class_name = resolver.auto_generate_class_name(
-                    cls.__name__, extension_key
-                )
+                class_name = resolver.auto_generate_class_name(cls.__name__, extension_key)
             else:
                 class_name = attribute_name
 
@@ -917,14 +899,16 @@ class VerticalExtensionLoader(ABC):
             Mode config provider (ModeConfigProviderProtocol) or None
         """
         provider = cls._load_named_entry_point_extension(
-            "mode_config_provider", "victor.mode_configs",
+            "mode_config_provider",
+            "victor.mode_configs",
         )
         if provider is not None:
             return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         return cls._resolve_class_or_factory_extension(
-            "mode_config_provider", "mode_config",
+            "mode_config_provider",
+            "mode_config",
             class_name=f"{vertical_name}ModeConfigProvider",
         )
 
@@ -1096,7 +1080,9 @@ class VerticalExtensionLoader(ABC):
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         return cls._resolve_class_or_factory_extension(
-            "rl_config_provider", "rl", class_name=f"{vertical_name}RLConfig",
+            "rl_config_provider",
+            "rl",
+            class_name=f"{vertical_name}RLConfig",
         )
 
     @classmethod
@@ -1108,7 +1094,9 @@ class VerticalExtensionLoader(ABC):
         """
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         return cls._resolve_class_or_factory_extension(
-            "rl_hooks", "rl", class_name=f"{vertical_name}RLHooks",
+            "rl_hooks",
+            "rl",
+            class_name=f"{vertical_name}RLHooks",
         )
 
     @classmethod
@@ -1191,14 +1179,16 @@ class VerticalExtensionLoader(ABC):
             Capability provider (BaseCapabilityProvider) or None
         """
         provider = cls._load_named_entry_point_extension(
-            "capability_provider", "victor.capability_providers",
+            "capability_provider",
+            "victor.capability_providers",
         )
         if provider is not None:
             return provider
 
         vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
         return cls._resolve_class_or_factory_extension(
-            "capability_provider", "capabilities",
+            "capability_provider",
+            "capabilities",
             class_name=f"{vertical_name}CapabilityProvider",
         )
 
@@ -1210,7 +1200,8 @@ class VerticalExtensionLoader(ABC):
             Service provider (ServiceProviderProtocol) or factory-created provider
         """
         provider = cls._load_named_entry_point_extension(
-            "service_provider", "victor.service_providers",
+            "service_provider",
+            "victor.service_providers",
         )
         if provider is not None:
             return provider
