@@ -30,7 +30,7 @@ from typing import Dict, List, Optional, Set
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
 
-from victor.context.codebase_analyzer.scanner import (
+from .scanner import (
     DEFAULT_SKIP_DIRS,
     should_ignore_path,
 )
@@ -146,7 +146,7 @@ def generate_smart_victor_md(
     language-agnostic analysis for non-Python projects.
     """
     # Import here to avoid circular imports
-    from victor.context.codebase_analyzer import CodebaseAnalyzer
+    from . import CodebaseAnalyzer
 
     analyzer = CodebaseAnalyzer(root_path, include_dirs=include_dirs, exclude_dirs=exclude_dirs)
     analysis = analyzer.analyze()
@@ -989,7 +989,7 @@ async def generate_enhanced_init_md(
     import time
 
     from victor.providers.base import Message
-    from victor.context.codebase_analyzer.query import (
+    from .query import (
         extract_conversation_insights,
         extract_graph_insights,
     )

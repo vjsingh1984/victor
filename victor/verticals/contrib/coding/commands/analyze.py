@@ -50,7 +50,7 @@ def analyze(
     project_path: str = typer.Option(".", "--project", "-p", help="Project path"),
 ) -> None:
     """Analyze codebase structure and identify priorities."""
-    from victor.analysis.module_analyzer import ModuleAnalyzer
+    from victor.core.analysis.module_analyzer import ModuleAnalyzer
 
     project = Path(project_path).resolve()
     analyzer = ModuleAnalyzer(project_path=project)

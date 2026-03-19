@@ -34,8 +34,8 @@ from typing import Dict, FrozenSet, List, Optional, Tuple
 
 from victor.core.utils.ast_helpers import extract_imports, is_stdlib_module
 
-from victor.context.codebase_analyzer.models import ClassInfo, CodebaseAnalysis
-from victor.context.codebase_analyzer.scanner import (
+from .models import ClassInfo, CodebaseAnalysis
+from .scanner import (
     CONFIG_EXTENSIONS,
     LANGUAGE_EXTENSIONS,
     should_ignore_path,

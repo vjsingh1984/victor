@@ -31,7 +31,7 @@ from typing import Dict, FrozenSet, List, Optional
 from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.core.utils.ast_helpers import extract_base_classes
 
-from victor.context.codebase_analyzer.models import ClassInfo, ModuleInfo
+from .models import ClassInfo, ModuleInfo
 
 # Lazy load ignore patterns from external coding vertical package
 _ignore_module, _ = import_module_with_fallback("victor.coding.codebase.ignore_patterns")
@@ -184,9 +184,7 @@ class CodebaseScanner:
         # Prioritize Python packages, then common source dirs
         if python_packages:
             main_candidates = [p for p in python_packages if not p.startswith("test")]
-            analysis.main_package = (
-                main_candidates[0] if main_candidates else python_packages[0]
-            )
+            analysis.main_package = main_candidates[0] if main_candidates else python_packages[0]
             if has_src and "src" not in python_packages:
                 analysis.deprecated_paths.append("src/")
         elif has_src:

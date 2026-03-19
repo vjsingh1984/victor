@@ -36,14 +36,14 @@ from pathlib import Path
 from typing import List, Optional
 
 # --- Data models ---
-from victor.context.codebase_analyzer.models import (
+from .models import (
     ClassInfo,
     CodebaseAnalysis,
     ModuleInfo,
 )
 
 # --- Scanner ---
-from victor.context.codebase_analyzer.scanner import (
+from .scanner import (
     CONFIG_EXTENSIONS,
     DEFAULT_SKIP_DIRS,
     KEY_CLASS_PATTERNS,
@@ -55,12 +55,12 @@ from victor.context.codebase_analyzer.scanner import (
 )
 
 # --- Metrics ---
-from victor.context.codebase_analyzer.metrics import (
+from .metrics import (
     CodebaseMetrics,
 )
 
 # --- Query ---
-from victor.context.codebase_analyzer.query import (
+from .query import (
     _build_analyzer_section,
     _collect_embedding_status,
     extract_conversation_insights,
@@ -68,7 +68,7 @@ from victor.context.codebase_analyzer.query import (
 )
 
 # --- Generator ---
-from victor.context.codebase_analyzer.generator import (
+from .generator import (
     CONTEXT_FILE_ALIASES,
     VictorMDBuilder,
     _build_quick_start,

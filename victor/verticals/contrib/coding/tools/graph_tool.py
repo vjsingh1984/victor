@@ -2271,7 +2271,7 @@ async def graph(
         # Module-level metrics modes (WS-1: SQLite-backed analysis)
         elif mode in ("coupling", "cohesion", "hotspots", "tdd_priority"):
             try:
-                from victor.analysis.module_analyzer import ModuleAnalyzer
+                from victor.core.analysis.module_analyzer import ModuleAnalyzer
 
                 analyzer_mod = ModuleAnalyzer(project_path=Path.cwd())
                 order_map = {
