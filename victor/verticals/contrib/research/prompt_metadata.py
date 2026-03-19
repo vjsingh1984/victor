@@ -95,8 +95,10 @@ Before finalizing any research output:
 Avoid: Social media posts, anonymous forums, outdated content (>2 years for fast-moving topics)
 """.strip()
 
-RESEARCH_GROUNDING_RULES = """GROUNDING: Base ALL responses on tool output only. Never fabricate sources or statistics.
+RESEARCH_GROUNDING_RULES = (
+    """GROUNDING: Base ALL responses on tool output only. Never fabricate sources or statistics.
 Always cite URLs for claims. Acknowledge uncertainty when sources conflict.""".strip()
+)
 
 RESEARCH_PROMPT_PRIORITY = 5
 

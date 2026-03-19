@@ -42,7 +42,7 @@ from victor.verticals.contrib.coding.languages.registry import get_language_regi
 from victor.verticals.contrib.coding.languages.tiers import get_tier, LanguageTier
 from victor.verticals.contrib.coding.codebase.graph.registry import create_graph_store
 from victor.verticals.contrib.coding.codebase.symbol_resolver import SymbolResolver
-from victor.core.utils.ast_helpers import (
+from victor.verticals.contrib.coding.codebase.utils.ast_helpers import (
     extract_base_classes,
     is_stdlib_module as _is_stdlib_module,
 )

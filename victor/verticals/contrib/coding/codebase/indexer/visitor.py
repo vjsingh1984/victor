@@ -17,7 +17,10 @@
 import ast
 from typing import List, Optional
 
-from victor.core.utils.ast_helpers import build_signature, extract_base_classes
+from victor.verticals.contrib.coding.codebase.utils.ast_helpers import (
+    build_signature,
+    extract_base_classes,
+)
 from victor.verticals.contrib.coding.codebase.indexer.models import FileMetadata, Symbol
 
 

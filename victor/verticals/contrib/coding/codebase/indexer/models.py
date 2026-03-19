@@ -22,7 +22,6 @@ import logging
 
 from pydantic import BaseModel, Field
 
-
 logger = logging.getLogger(__name__)
 
 # Try to import watchdog for file watching

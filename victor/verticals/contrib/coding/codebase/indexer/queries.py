@@ -26,7 +26,6 @@ Migration path:
 
 from typing import Dict, List
 
-
 # =============================================================================
 # PRIMITIVE / CONTAINER TYPES (exclude from COMPOSED_OF phantom nodes)
 # =============================================================================

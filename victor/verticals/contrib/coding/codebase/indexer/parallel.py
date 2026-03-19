@@ -323,7 +323,7 @@ def _process_file_parallel(
     # Python-specific: extract imports via ast (more reliable than tree-sitter)
     if language == "python":
         try:
-            from victor.core.utils.ast_helpers import (
+            from victor.verticals.contrib.coding.codebase.utils.ast_helpers import (
                 extract_base_classes as _extract_bases,
             )
 
@@ -431,7 +431,9 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
         rel_path = str(file_path.relative_to(root_path))
 
-        from victor.core.utils.ast_helpers import extract_symbols as _extract_syms
+        from victor.verticals.contrib.coding.codebase.utils.ast_helpers import (
+            extract_symbols as _extract_syms,
+        )
 
         raw_symbols = _extract_syms(tree)
         symbols = [

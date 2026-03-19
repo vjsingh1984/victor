@@ -14,102 +14,203 @@
 
 """RAG (Retrieval-Augmented Generation) Vertical Package.
 
-This vertical provides a complete RAG implementation showcasing:
-- Document ingestion from multiple formats (PDF, Markdown, Text, Code)
-- Vector storage with LanceDB (embedded, no server needed)
-- Hybrid search (vector + full-text)
-- Semantic chunking with overlap
-- Interactive TUI for document management and querying
-- Reranking for improved relevance
-
-Package Structure:
-    assistant.py        - SDK definition-layer RAGAssistant class
-    document_store.py   - LanceDB-based document storage
-    chunker.py          - Intelligent document chunking
-    tools/              - RAG-specific tools (ingest, search, query)
-    ui/                 - Interactive TUI components
-    workflows/          - RAG-specific workflows
-
-Usage:
-    from victor.rag import RAGAssistant
-
-    # Create agent with RAG vertical
-    agent = await Agent.create(vertical=RAGAssistant)
+This vertical provides a complete RAG implementation.
 """
 
 import warnings
+from typing import Optional
 
-warnings.warn(
-    "victor.verticals.contrib.rag is deprecated and will be removed in v0.7.0. Install the victor-rag package instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+import typer
+from victor_sdk import PluginContext, VictorPlugin
 
-from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-from victor.verticals.contrib.rag.assistant import RAGAssistant as RAGAssistantDefinition
-from victor.verticals.contrib.rag.document_store import (
-    Document,
-    DocumentChunk,
-    DocumentSearchResult,
-    DocumentStore,
-    DocumentStoreConfig,
-)
-from victor.verticals.contrib.rag.chunker import DocumentChunker, ChunkingConfig
-from victor.verticals.contrib.rag.prompts import RAGPromptContributor
-from victor.verticals.contrib.rag.runtime.mode_config import RAGModeConfigProvider
-from victor.verticals.contrib.rag.runtime.capabilities import RAGCapabilityProvider
-from victor.verticals.contrib.rag.tools import (
-    RAGIngestTool,
-    RAGSearchTool,
-    RAGQueryTool,
-    RAGListTool,
-    RAGDeleteTool,
-    RAGStatsTool,
-)
+# Deprecation warning deferred to register() to avoid firing during discovery scan
+
+
+class RAGPlugin(VictorPlugin):
+    """Victor Plugin for RAG vertical."""
+
+    @property
+    def name(self) -> str:
+        return "rag"
+
+    def register(self, context: PluginContext) -> None:
+        """Register RAG vertical and its specialized strategies."""
+        from victor.verticals.contrib._compat import external_package_installed
+
+        if external_package_installed("victor_rag"):
+            return
+
+        warnings.warn(
+            "victor.verticals.contrib.rag is deprecated and will be removed in v0.7.0. "
+            "Install the victor-rag package instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # Use lazy imports inside register to minimize startup overhead
+        from victor.verticals.contrib.rag.assistant import RAGAssistant
+        from victor.verticals.contrib.rag.chunker import RAGChunkingStrategy
+
+        # Register vertical
+        context.register_vertical(RAGAssistant)
+
+        # Register specialized chunker
+        context.register_chunker(RAGChunkingStrategy())
+
+        # Register RAG-specific tools
+        try:
+            from victor.verticals.contrib.rag.tools.rag_tools import (
+                rag_search,
+                rag_index,
+                rag_list,
+                rag_delete,
+                rag_stats,
+            )
+
+            context.register_tool(rag_search)
+            context.register_tool(rag_index)
+            context.register_tool(rag_list)
+            context.register_tool(rag_delete)
+            context.register_tool(rag_stats)
+        except ImportError:
+            pass
+
+        # Register domain command
+        try:
+            from victor.verticals.contrib.rag.commands.rag import rag_app
+
+            context.register_command("rag", rag_app)
+        except ImportError:
+            pass
+
+    def get_cli_app(self) -> Optional[typer.Typer]:
+        """Return the RAG-specific CLI application (legacy hook)."""
+        try:
+            from victor.verticals.contrib.rag.commands.rag import rag_app
+
+            return rag_app
+        except ImportError:
+            return None
+
+
+# Instantiate plugin for discovery
+plugin = RAGPlugin()
+
+
+# Lazy loading for members to avoid heavy imports on package discovery
+def __getattr__(name: str):
+    if name == "RAGAssistant":
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+        from victor.verticals.contrib.rag.assistant import RAGAssistant as Definition
+
+        return VerticalRuntimeAdapter.as_runtime_vertical_class(Definition)
+
+    if name == "RAGAssistantDefinition":
+        from victor.verticals.contrib.rag.assistant import RAGAssistant
+
+        return RAGAssistant
+
+    if name in [
+        "Document",
+        "DocumentChunk",
+        "DocumentSearchResult",
+        "DocumentStore",
+        "DocumentStoreConfig",
+    ]:
+        from victor.verticals.contrib.rag.document_store import (
+            Document,
+            DocumentChunk,
+            DocumentSearchResult,
+            DocumentStore,
+            DocumentStoreConfig,
+        )
+
+        return locals()[name]
+
+    if name in ["DocumentChunker", "ChunkingConfig"]:
+        from victor.verticals.contrib.rag.chunker import DocumentChunker, ChunkingConfig
+
+        return locals()[name]
+
+    if name == "RAGPromptContributor":
+        from victor.verticals.contrib.rag.prompts import RAGPromptContributor
+
+        return RAGPromptContributor
+
+    if name == "RAGModeConfigProvider":
+        from victor.verticals.contrib.rag.runtime.mode_config import RAGModeConfigProvider
+
+        return RAGModeConfigProvider
+
+    if name == "RAGCapabilityProvider":
+        from victor.verticals.contrib.rag.runtime.capabilities import RAGCapabilityProvider
+
+        return RAGCapabilityProvider
+
+    if name in [
+        "RAGIngestTool",
+        "RAGSearchTool",
+        "RAGQueryTool",
+        "RAGListTool",
+        "RAGDeleteTool",
+        "RAGStatsTool",
+    ]:
+        from victor.verticals.contrib.rag.tools import (
+            RAGIngestTool,
+            RAGSearchTool,
+            RAGQueryTool,
+            RAGListTool,
+            RAGDeleteTool,
+            RAGStatsTool,
+        )
+
+        return locals()[name]
+
+    if name == "RAGSafetyRules":
+        from victor.verticals.contrib.rag.runtime.safety_enhanced import RAGSafetyRules
+
+        return RAGSafetyRules
+
+    if name == "EnhancedRAGSafetyExtension":
+        from victor.verticals.contrib.rag.runtime.safety_enhanced import EnhancedRAGSafetyExtension
+
+        return EnhancedRAGSafetyExtension
+
+    if name == "RAGContext":
+        from victor.verticals.contrib.rag.conversation_enhanced import RAGContext
+
+        return RAGContext
+
+    if name == "EnhancedRAGConversationManager":
+        from victor.verticals.contrib.rag.conversation_enhanced import (
+            EnhancedRAGConversationManager,
+        )
+
+        return EnhancedRAGConversationManager
+
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 __all__ = [
-    # Main vertical
     "RAGAssistant",
-    # Document store
+    "RAGAssistantDefinition",
     "Document",
     "DocumentChunk",
     "DocumentSearchResult",
     "DocumentStore",
     "DocumentStoreConfig",
-    # Chunking
     "DocumentChunker",
     "ChunkingConfig",
-    # Extensions
     "RAGPromptContributor",
     "RAGModeConfigProvider",
     "RAGCapabilityProvider",
-    # Tools
     "RAGIngestTool",
     "RAGSearchTool",
     "RAGQueryTool",
     "RAGListTool",
     "RAGDeleteTool",
     "RAGStatsTool",
+    "RAGSafetyRules",
+    "EnhancedRAGSafetyExtension",
+    "RAGContext",
+    "EnhancedRAGConversationManager",
 ]
-
-# Enhanced features with new coordinators
-from victor.verticals.contrib.rag.runtime.safety_enhanced import (
-    RAGSafetyRules,
-    EnhancedRAGSafetyExtension,
-)
-from victor.verticals.contrib.rag.conversation_enhanced import (
-    RAGContext,
-    EnhancedRAGConversationManager,
-)
-
-RAGAssistant = VerticalRuntimeAdapter.as_runtime_vertical_class(RAGAssistantDefinition)
-
-__all__.extend(
-    [
-        "RAGSafetyRules",
-        "EnhancedRAGSafetyExtension",
-        "RAGContext",
-        "EnhancedRAGConversationManager",
-        "RAGAssistantDefinition",
-    ]
-)
