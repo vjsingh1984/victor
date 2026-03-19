@@ -60,9 +60,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     "name": m.get("name", f"Agent {i+1}"),
                     "goal": m.get("goal", ""),
                     "status": "pending",
-                    "tool_budget": total_tool_budget // len(members)
-                    if members
-                    else 0,
+                    "tool_budget": total_tool_budget // len(members) if members else 0,
                     "tools_used": 0,
                     "discoveries": [],
                     "is_manager": m.get("is_manager", False),
@@ -106,7 +104,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to create team")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -200,9 +198,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     name=team["name"],
                     goal=team["goal"],
                     members=members,
-                    formation=formation_map.get(
-                        team["formation"], TeamFormation.SEQUENTIAL
-                    ),
+                    formation=formation_map.get(team["formation"], TeamFormation.SEQUENTIAL),
                     total_tool_budget=team["total_tool_budget"],
                 )
 
@@ -210,9 +206,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 result = await coordinator.execute_team(config)
 
                 if team_id in _teams:
-                    team["status"] = (
-                        "completed" if result.success else "failed"
-                    )
+                    team["status"] = "completed" if result.success else "failed"
                     team["end_time"] = time.time()
                     team["output"] = result.final_output
                     team["total_tools_used"] = result.total_tool_calls
@@ -220,20 +214,14 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     for member in team["members"]:
                         if member["id"] in result.member_results:
                             mr = result.member_results[member["id"]]
-                            member["status"] = (
-                                "completed" if mr.success else "failed"
-                            )
+                            member["status"] = "completed" if mr.success else "failed"
                             member["tools_used"] = mr.tool_calls_used
                             member["discoveries"] = mr.discoveries
 
                     await server._broadcast_ws(
                         {
                             "type": "agent_event",
-                            "event": (
-                                "team_completed"
-                                if result.success
-                                else "team_failed"
-                            ),
+                            "event": ("team_completed" if result.success else "team_failed"),
                             "data": team,
                             "timestamp": time.time(),
                         }

@@ -33,7 +33,7 @@ Migration Path:
         orchestrator = await Agent.create(
             settings=settings,
             profile="default",
-            vertical=CodingAssistant,
+            vertical="coding",
         )
 
 Design Pattern: Adapter
@@ -86,16 +86,15 @@ class FrameworkShim:
             )
 
         **With vertical (deprecated):**
-            shim = FrameworkShim(settings, "default", vertical=CodingAssistant)
+            shim = FrameworkShim(settings, "default", vertical="coding")
 
         **With vertical (Framework API):**
             from victor.framework import Agent
-            from victor.verticals.coding import CodingAssistant
 
             orchestrator = await Agent.create(
                 settings=settings,
                 profile="default",
-                vertical=CodingAssistant,
+                vertical="coding",
             )
 
     Features:

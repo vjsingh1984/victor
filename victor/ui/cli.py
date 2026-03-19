@@ -38,7 +38,6 @@ from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app
-from victor.ui.commands.rag import rag_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
 from victor.ui.commands.test_provider import test_provider_app
@@ -47,7 +46,6 @@ from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.sessions import sessions_app
 from victor.ui.commands.vertical import vertical_app
-from victor.ui.commands.analyze import app as analyze_app
 from victor.ui.commands.workflow import workflow_app
 
 # Import new unified auth command
@@ -85,7 +83,6 @@ def doctor_command(
 
 
 # Register all the subcommands
-app.add_typer(analyze_app)
 # Register unified auth command (comprehensive account management)
 app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
 app.add_typer(benchmark_app)
@@ -106,17 +103,67 @@ app.add_typer(mcp_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app)
 app.add_typer(providers_app)
-app.add_typer(rag_app)
 app.add_typer(security_app)
 app.add_typer(serve_app)
 app.add_typer(test_provider_app)
 app.add_typer(tools_app)
 # Register scaffold_app as "vertical scaffold" subcommand under vertical_app
 vertical_app.add_typer(scaffold_app, name="scaffold")
-app.add_typer(scheduler_app)
 app.add_typer(sessions_app)
 app.add_typer(vertical_app)
+# Register workflow_app
 app.add_typer(workflow_app)
+
+# Create coding sub-command for plugin registration
+coding_app = typer.Typer(name="coding", help="Coding vertical specialized commands.")
+app.add_typer(coding_app)
+
+
+def _register_plugin_commands():
+    """Discover and register CLI commands from plugins."""
+    try:
+        from victor.core.plugins.registry import PluginRegistry
+        from victor.core.bootstrap import ensure_bootstrapped
+
+        # Ensure the framework is bootstrapped, which triggers plugin registration
+        ensure_bootstrapped()
+
+        registry = PluginRegistry.get_instance()
+
+        # 1. Register commands from PluginContext (New method)
+        if registry.context:
+            for name, sub_app in registry.context.commands.items():
+                try:
+                    if name == "analyze":
+                        # Coding-specific command
+                        coding_app.add_typer(sub_app, name=name)
+                    else:
+                        # Register command under its specified name at top level
+                        app.add_typer(sub_app, name=name)
+                except Exception as e:
+                    console.print(f"[yellow]Warning:[/] Failed to load CLI command '{name}': {e}")
+
+        # 2. Register apps from get_cli_app (Legacy method)
+        for plugin in registry.discover():
+            if plugin.name == "coding":
+                # Skip coding as it's already registered via the new method
+                continue
+
+            try:
+                sub_app = plugin.get_cli_app()
+                if sub_app:
+                    # Legacy hook often doesn't specify name, uses app name or plugin name
+                    app.add_typer(sub_app)
+            except Exception as e:
+                console.print(
+                    f"[yellow]Warning:[/] Failed to load legacy CLI app from plugin '{plugin.name}': {e}"
+                )
+    except Exception:
+        pass
+
+
+# Register plugin commands after builtin ones
+_register_plugin_commands()
 
 
 def version_callback(value: bool) -> None:

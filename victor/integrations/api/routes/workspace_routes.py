@@ -87,9 +87,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             result["children"].append(scan_dir(entry, d + 1))
                         else:
                             ext = entry.suffix.lower()
-                            overview["file_counts"][ext] = (
-                                overview["file_counts"].get(ext, 0) + 1
-                            )
+                            overview["file_counts"][ext] = overview["file_counts"].get(ext, 0) + 1
                             overview["total_files"] += 1
                             try:
                                 overview["total_size"] += entry.stat().st_size
@@ -114,7 +112,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
             return JSONResponse(overview)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Workspace overview error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -125,9 +123,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             orchestrator = await server._get_orchestrator()
 
             try:
-                tool_result = await orchestrator.execute_tool(
-                    "metrics", path=server.workspace_root
-                )
+                tool_result = await orchestrator.execute_tool("metrics", path=server.workspace_root)
                 if tool_result.success:
                     return JSONResponse(tool_result.data)
             except Exception:
@@ -162,9 +158,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     ext = path.suffix.lower()
                     if ext in code_extensions:
                         try:
-                            with open(
-                                path, "r", encoding="utf-8", errors="ignore"
-                            ) as f:
+                            with open(path, "r", encoding="utf-8", errors="ignore") as f:
                                 lines = len(f.readlines())
                                 metrics["lines_of_code"] += lines
                                 metrics["files_by_type"][ext] = (
@@ -185,7 +179,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
             return JSONResponse(metrics)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Workspace metrics error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -202,9 +196,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     scan_type="secrets",
                 )
                 if tool_result.success:
-                    return JSONResponse(
-                        {"scan_completed": True, "results": tool_result.data}
-                    )
+                    return JSONResponse({"scan_completed": True, "results": tool_result.data})
             except Exception:
                 pass
 
@@ -251,9 +243,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                         content = path.read_text(encoding="utf-8", errors="ignore")
                         for pattern, finding_type in secret_patterns:
                             for match in re.finditer(pattern, content):
-                                line_num = (
-                                    content[: match.start()].count("\n") + 1
-                                )
+                                line_num = content[: match.start()].count("\n") + 1
                                 findings.append(
                                     {
                                         "file": str(path.relative_to(root)),
@@ -272,16 +262,14 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     "findings": findings[:50],
                     "total_findings": len(findings),
                     "severity_counts": {
-                        "high": len(
-                            [f for f in findings if f["severity"] == "high"]
-                        ),
+                        "high": len([f for f in findings if f["severity"] == "high"]),
                         "medium": 0,
                         "low": 0,
                     },
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Workspace security error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -300,11 +288,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                         for line in req_path.read_text().splitlines():
                             line = line.strip()
                             if line and not line.startswith("#"):
-                                deps.append(
-                                    line.split("==")[0]
-                                    .split(">=")[0]
-                                    .split("<")[0]
-                                )
+                                deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
                         dependencies["python"] = {
                             "file": req_file,
                             "count": len(deps),
@@ -335,11 +319,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             if go_mod.exists():
                 dependencies["go"] = {"file": "go.mod", "exists": True}
 
-            return JSONResponse(
-                {"workspace": str(root), "dependencies": dependencies}
-            )
+            return JSONResponse({"workspace": str(root), "dependencies": dependencies})
 
-        except Exception as e:
+        except Exception:
             logger.exception("Workspace dependencies error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 

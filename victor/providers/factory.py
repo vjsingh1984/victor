@@ -377,9 +377,7 @@ class ProviderPool:
         logger.debug("Created new provider for %s/%s", provider_name, model)
         return provider
 
-    async def release(
-        self, provider_name: str, model: str, provider: "ManagedProvider"
-    ) -> None:
+    async def release(self, provider_name: str, model: str, provider: "ManagedProvider") -> None:
         """Return a provider to the pool."""
         key = (provider_name, model)
         async with self._lock:

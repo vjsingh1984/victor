@@ -57,9 +57,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                         "description": tool.description or "",
                         "category": category,
                         "cost_tier": cost_tier,
-                        "parameters": (
-                            tool.parameters if hasattr(tool, "parameters") else {}
-                        ),
+                        "parameters": (tool.parameters if hasattr(tool, "parameters") else {}),
                         "is_dangerous": server._is_dangerous_tool(tool.name),
                         "requires_approval": cost_tier in ("medium", "high")
                         or server._is_dangerous_tool(tool.name),

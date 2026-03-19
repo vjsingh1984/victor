@@ -144,7 +144,7 @@ class Agent:
             profile: Profile name from ~/.victor/profiles.yaml
             workspace: Working directory for file operations
             config: Advanced configuration (overrides other options)
-            vertical: Optional vertical class (e.g., CodingAssistant, ResearchAssistant).
+            vertical: Optional vertical class or name (e.g., 'coding', 'research').
                 When provided, the vertical's configuration (tools, system_prompt,
                 stages) is automatically applied.
             enable_observability: Auto-initialize ObservabilityIntegration for
@@ -171,8 +171,7 @@ class Agent:
             # With vertical (domain-specific assistant)
             # Note: External vertical packages must be installed separately
             # pip install victor-coding  # or victor-ai[coding]
-            # from victor_coding import CodingAssistant
-            # agent = await Agent.create(vertical=CodingAssistant)
+            agent = await Agent.create(vertical="coding")
 
             # With observability events
             agent = await Agent.create(session_id="my-session")

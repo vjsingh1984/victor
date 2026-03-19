@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh
 # SPDX-License-Identifier: Apache-2.0
 """SWE-bench dataset loader for agentic benchmark evaluation.

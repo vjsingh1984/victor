@@ -73,7 +73,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         except RuntimeError as e:
             return JSONResponse({"error": str(e)}, status_code=429)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to start agent")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -108,7 +108,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to list agents")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -128,7 +128,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
             return JSONResponse(agent_data)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to get agent")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -156,7 +156,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     status_code=404,
                 )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to cancel agent")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -179,7 +179,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to clear agents")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 

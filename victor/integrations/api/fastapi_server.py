@@ -722,7 +722,9 @@ class VictorFastAPIServer:
         elif msg_type == "auth":
             api_key = data.get("api_key", "")
             if api_key and self.api_keys:
-                matched = next((k for k in self.api_keys if secrets.compare_digest(k, api_key)), None)
+                matched = next(
+                    (k for k in self.api_keys if secrets.compare_digest(k, api_key)), None
+                )
                 if matched:
                     if not hasattr(ws, "state"):
                         ws.state = type("State", (), {})()

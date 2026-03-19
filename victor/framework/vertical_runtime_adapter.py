@@ -406,20 +406,22 @@ class VerticalRuntimeAdapter:
         LegacyRuntimeShim.__victor_sdk_source__ = source
 
         if team_provider is not None and not callable(source_team_provider):
+
             @classmethod
             def _get_team_spec_provider(
                 cls,
             ) -> Optional[DefinitionBackedTeamSpecProvider]:
                 return team_provider
 
-            setattr(LegacyRuntimeShim, "get_team_spec_provider", _get_team_spec_provider)
+            LegacyRuntimeShim.get_team_spec_provider = _get_team_spec_provider
 
         if team_provider is not None and not callable(source_team_specs):
+
             @classmethod
             def _get_team_specs(cls) -> Dict[str, Any]:
                 return team_provider.get_team_specs()
 
-            setattr(LegacyRuntimeShim, "get_team_specs", _get_team_specs)
+            LegacyRuntimeShim.get_team_specs = _get_team_specs
 
         for hook_name in cls._FORWARDED_SDK_HOOKS:
             if hook_name in LegacyRuntimeShim.__dict__:
@@ -452,9 +454,7 @@ class VerticalRuntimeAdapter:
             members = []
             for member in team.members:
                 memory_config = (
-                    MemoryConfig(**member.memory_config)
-                    if member.memory_config
-                    else None
+                    MemoryConfig(**member.memory_config) if member.memory_config else None
                 )
                 members.append(
                     TeamMemberSpec(

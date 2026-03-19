@@ -54,8 +54,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             task_q_summary = {}
             for provider, task_q_table in learner._q_table_by_task.items():
                 task_q_summary[provider] = {
-                    task_type: round(q_val, 3)
-                    for task_type, q_val in task_q_table.items()
+                    task_type: round(q_val, 3) for task_type, q_val in task_q_table.items()
                 }
 
             stats = {
@@ -64,9 +63,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 "total_selections": learner._total_selections,
                 "num_providers": len(learner._q_table),
                 "top_provider": rankings[0]["provider"] if rankings else None,
-                "top_q_value": round(rankings[0]["q_value"], 3)
-                if rankings
-                else 0.0,
+                "top_q_value": round(rankings[0]["q_value"], 3) if rankings else 0.0,
                 "learning_rate": learner.learning_rate,
                 "ucb_c": learner.ucb_c,
                 "provider_rankings": [
@@ -84,7 +81,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
             return JSONResponse(stats)
 
-        except Exception as e:
+        except Exception:
             logger.exception("RL stats error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -106,9 +103,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     status_code=503,
                 )
 
-            available = (
-                list(learner._q_table.keys()) if learner._q_table else ["ollama"]
-            )
+            available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
 
             recommendation = coordinator.get_recommendation(
                 "model_selector",
@@ -134,18 +129,14 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             for provider in available:
                 if provider != recommendation.value:
                     q_val = learner._get_q_value(provider, task_type)
-                    alternatives.append(
-                        {"provider": provider, "q_value": round(q_val, 3)}
-                    )
+                    alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
             alternatives.sort(key=lambda x: x["q_value"], reverse=True)
 
             return JSONResponse(
                 {
                     "provider": recommendation.value,
                     "model": None,
-                    "q_value": round(
-                        learner._get_q_value(recommendation.value, task_type), 3
-                    ),
+                    "q_value": round(learner._get_q_value(recommendation.value, task_type), 3),
                     "confidence": round(recommendation.confidence, 3),
                     "reason": recommendation.reason,
                     "task_type": task_type,
@@ -153,7 +144,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("RL recommend error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -183,7 +174,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("RL explore error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -227,7 +218,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             logger.exception("RL strategy error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -266,7 +257,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("RL reset error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 

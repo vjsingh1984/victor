@@ -54,7 +54,6 @@ from victor.integrations.api.routes.websocket_routes import (
     create_router as create_websocket_router,
 )
 
-
 _ROUTER_FACTORIES = [
     create_system_router,
     create_chat_router,

@@ -18,7 +18,6 @@ from typing import List, Tuple
 
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
-
 # =============================================================================
 # STREAMING FILTER (Thinking Token Detection)
 # =============================================================================

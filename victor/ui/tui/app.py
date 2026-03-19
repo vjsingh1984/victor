@@ -973,9 +973,7 @@ class VictorTUI(App):
             )
             self._prune_tool_widgets()
 
-    def _schedule_tool_widget_cleanup(
-        self, widget: ToolCallWidget, timeout: float = 6.0
-    ) -> None:
+    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget, timeout: float = 6.0) -> None:
         def _remove() -> None:
             self._remove_tool_widget(widget)
 

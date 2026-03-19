@@ -59,15 +59,11 @@ Respond with just the command to run."""
 
             if command.startswith("```"):
                 lines = command.split("\n")
-                command = "\n".join(
-                    lines[1:-1] if lines[-1] == "```" else lines[1:]
-                )
+                command = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
             command = command.strip()
 
             if not command:
-                return JSONResponse(
-                    {"error": "Could not generate command"}, status_code=400
-                )
+                return JSONResponse({"error": "Could not generate command"}, status_code=400)
 
             dangerous_patterns = [
                 "rm -rf /",
@@ -94,7 +90,7 @@ Respond with just the command to run."""
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Terminal suggest error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -150,9 +146,7 @@ Respond with just the command to run."""
             )
 
             try:
-                stdout, _ = await asyncio.wait_for(
-                    proc.communicate(), timeout=request.timeout
-                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=request.timeout)
                 output = stdout.decode("utf-8", errors="replace")
                 exit_code = proc.returncode
 

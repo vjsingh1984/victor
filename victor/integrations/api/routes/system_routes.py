@@ -55,10 +55,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 provider_name = getattr(orchestrator.provider, "name", "unknown")
                 model_name = getattr(orchestrator.provider, "model", "unknown")
 
-            if (
-                hasattr(orchestrator, "adaptive_controller")
-                and orchestrator.adaptive_controller
-            ):
+            if hasattr(orchestrator, "adaptive_controller") and orchestrator.adaptive_controller:
                 mode = orchestrator.adaptive_controller.current_mode.value
 
             return StatusResponse(
@@ -110,9 +107,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     @router.post("/session/token")
     async def session_token() -> JSONResponse:
         """Placeholder session token endpoint."""
-        return JSONResponse(
-            {"session_token": str(uuid.uuid4()), "session_id": str(uuid.uuid4())}
-        )
+        return JSONResponse({"session_token": str(uuid.uuid4()), "session_id": str(uuid.uuid4())})
 
     @router.post("/shutdown")
     async def shutdown() -> JSONResponse:

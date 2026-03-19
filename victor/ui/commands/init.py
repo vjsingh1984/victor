@@ -356,7 +356,15 @@ providers:
                 console.print(f"[dim]  {msg}[/]")
 
             if deep or learn:
-                from victor.context.codebase_analyzer import generate_enhanced_init_md
+                try:
+                    from victor.verticals.contrib.coding.codebase_analyzer import (
+                        generate_enhanced_init_md,
+                    )
+                except ImportError:
+                    console.print(
+                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                    )
+                    return
 
                 new_content = asyncio.run(
                     generate_enhanced_init_md(
@@ -369,7 +377,15 @@ providers:
                     )
                 )
             elif index:
-                from victor.context.codebase_analyzer import generate_victor_md_from_index
+                try:
+                    from victor.verticals.contrib.coding.codebase_analyzer import (
+                        generate_victor_md_from_index,
+                    )
+                except ImportError:
+                    console.print(
+                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                    )
+                    return
 
                 console.print("[dim]  Building symbol index...[/]")
                 new_content = asyncio.run(
@@ -380,7 +396,15 @@ providers:
                     )
                 )
             else:
-                from victor.context.codebase_analyzer import generate_smart_victor_md
+                try:
+                    from victor.verticals.contrib.coding.codebase_analyzer import (
+                        generate_smart_victor_md,
+                    )
+                except ImportError:
+                    console.print(
+                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                    )
+                    return
 
                 new_content = generate_smart_victor_md(
                     include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None
@@ -405,10 +429,16 @@ providers:
             console.print(f"[dim]  - Found {pattern_count} architecture patterns[/]")
 
             if symlinks:
-                from victor.context.codebase_analyzer import (
-                    CONTEXT_FILE_ALIASES,
-                    create_context_symlinks,
-                )
+                try:
+                    from victor.verticals.contrib.coding.codebase_analyzer import (
+                        CONTEXT_FILE_ALIASES,
+                        create_context_symlinks,
+                    )
+                except ImportError:
+                    console.print(
+                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                    )
+                    return
 
                 console.print("\n[dim]Creating symlinks for other AI tools...[/]")
                 results = create_context_symlinks()

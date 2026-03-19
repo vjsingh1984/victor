@@ -125,13 +125,11 @@ class BuilderPreset(str, Enum):
 
         # For coding tasks:
         pip install victor-coding
-        from victor_coding import CodingAssistant
-        agent = await Agent.create(vertical=CodingAssistant)
+        agent = await Agent.create(vertical="coding")
 
         # For research tasks:
         pip install victor-research
-        from victor_research import ResearchAssistant
-        agent = await Agent.create(vertical=ResearchAssistant)
+        agent = await Agent.create(vertical="research")
     """
 
     DEFAULT = "default"  # Balanced configuration
@@ -564,7 +562,7 @@ class AgentBuilder:
         """Use a domain-specific vertical.
 
         Args:
-            vertical_class: Vertical class (CodingAssistant, ResearchAssistant, etc.)
+            vertical_class: Vertical class or name string
 
         Returns:
             Self for chaining

@@ -191,11 +191,14 @@ class InitCommand(BaseSlashCommand):
             ctx.console.print("[dim]Analyzing codebase (quick mode)...[/]")
 
         try:
-            from victor.context.codebase_analyzer import (
+            from victor.verticals.contrib.coding.codebase_analyzer import (
                 generate_enhanced_init_md,
                 generate_smart_victor_md,
                 generate_victor_md_from_index,
             )
+        except ImportError:
+            ctx.console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
+            return
 
             if deep or use_learn:
                 new_content = await generate_enhanced_init_md(

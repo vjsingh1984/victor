@@ -37,9 +37,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         """Handle WebSocket connections."""
         await websocket.accept()
         server._ws_clients.append(websocket)
-        logger.info(
-            f"WebSocket client connected. Total: {len(server._ws_clients)}"
-        )
+        logger.info(f"WebSocket client connected. Total: {len(server._ws_clients)}")
 
         try:
             while True:
@@ -50,9 +48,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         finally:
             if websocket in server._ws_clients:
                 server._ws_clients.remove(websocket)
-            logger.info(
-                f"WebSocket client disconnected. Total: {len(server._ws_clients)}"
-            )
+            logger.info(f"WebSocket client disconnected. Total: {len(server._ws_clients)}")
 
     @router.websocket("/ws/events")
     async def events_websocket_handler(websocket: WebSocket) -> None:
@@ -61,8 +57,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         server._event_clients.append(websocket)
         client_id = uuid.uuid4().hex[:12]
         logger.info(
-            f"EventBridge client {client_id} connected. "
-            f"Total: {len(server._event_clients)}"
+            f"EventBridge client {client_id} connected. " f"Total: {len(server._event_clients)}"
         )
 
         async def send_event(message: str) -> None:
@@ -81,32 +76,24 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
                 if msg_type == "subscribe":
                     categories = data.get("categories", ["all"])
-                    normalized = (
-                        server._event_bridge._broadcaster.normalize_subscriptions(
-                            categories
-                        )
+                    normalized = server._event_bridge._broadcaster.normalize_subscriptions(
+                        categories
                     )
                     correlation_id = data.get("correlation_id")
                     server._event_bridge._broadcaster.update_subscriptions(
                         client_id,
                         normalized,
                         correlation_id=(
-                            correlation_id
-                            if isinstance(correlation_id, str)
-                            else None
+                            correlation_id if isinstance(correlation_id, str) else None
                         ),
                     )
-                    logger.debug(
-                        f"Client {client_id} subscribed to: {categories}"
-                    )
+                    logger.debug(f"Client {client_id} subscribed to: {categories}")
                     await websocket.send_json(
                         {
                             "type": "subscribed",
                             "categories": categories,
                             "correlation_id": (
-                                correlation_id
-                                if isinstance(correlation_id, str)
-                                else None
+                                correlation_id if isinstance(correlation_id, str) else None
                             ),
                         }
                     )

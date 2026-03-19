@@ -55,9 +55,8 @@ This module contains two distinct components with different responsibilities:
    - Usage: Called by FrameworkShim, Agent.create(), SDK initialization
    - Pattern: Facade + Template Method with step handlers
    - Example:
-        pipeline = VerticalIntegrationPipeline()
-        result = pipeline.apply(orchestrator, CodingAssistant)
-
+       pipeline = VerticalIntegrationPipeline()
+       result = pipeline.apply(orchestrator, vertical)
 2. **VerticalIntegrationAdapter** (victor/agent/vertical_integration_adapter.py):
    - Purpose: Provide runtime implementation for middleware/safety application
    - Phase: Runtime (during request processing)
@@ -102,7 +101,7 @@ Usage:
     pipeline = VerticalIntegrationPipeline()
 
     # Apply vertical
-    result = pipeline.apply(orchestrator, CodingAssistant)
+    result = pipeline.apply(orchestrator, vertical)
 
     # Check result
     if result.success:
@@ -802,7 +801,7 @@ class VerticalIntegrationPipeline:
         pipeline = VerticalIntegrationPipeline()
 
         # Apply with full vertical class
-        result = pipeline.apply(orchestrator, CodingAssistant)
+        result = pipeline.apply(orchestrator, vertical)
 
         # Apply with vertical name (from registry)
         result = pipeline.apply(orchestrator, "coding")
@@ -810,7 +809,7 @@ class VerticalIntegrationPipeline:
         # Apply with custom configuration
         result = pipeline.apply(
             orchestrator,
-            CodingAssistant,
+            "coding",
             config_overrides={"tool_budget": 30},
         )
 
@@ -1726,7 +1725,7 @@ class VerticalIntegrationPipeline:
 
         Example:
             pipeline = VerticalIntegrationPipeline()
-            result = await pipeline.apply_async(orchestrator, CodingAssistant)
+            result = await pipeline.apply_async(orchestrator, "coding")
         """
 
         # Resolve vertical
@@ -2393,7 +2392,7 @@ def create_integration_pipeline(
         # With parallel execution (Phase 2.2)
         pipeline = create_integration_pipeline(enable_parallel=True)
 
-        result = await pipeline.apply_async(orchestrator, CodingAssistant)
+        result = await pipeline.apply_async(orchestrator, "coding")
     """
     return VerticalIntegrationPipeline(
         strict_mode=strict,

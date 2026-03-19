@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional
 
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
-
 # =============================================================================
 # SECRET DETECTION
 # =============================================================================

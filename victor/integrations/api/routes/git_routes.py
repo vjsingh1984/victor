@@ -116,9 +116,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     "staged": staged,
                     "unstaged": unstaged,
                     "untracked": untracked,
-                    "is_clean": len(staged) == 0
-                    and len(unstaged) == 0
-                    and len(untracked) == 0,
+                    "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
                 }
             )
 
@@ -126,7 +124,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             return JSONResponse({"error": "Git command timed out"}, status_code=500)
         except FileNotFoundError:
             return JSONResponse({"is_git_repo": False, "error": "Git not installed"})
-        except Exception as e:
+        except Exception:
             logger.exception("Git status error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -176,17 +174,13 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             )
 
             if result.returncode != 0:
-                return JSONResponse(
-                    {"success": False, "error": result.stderr or "Commit failed"}
-                )
+                return JSONResponse({"success": False, "error": result.stderr or "Commit failed"})
 
-            return JSONResponse(
-                {"success": True, "message": message, "output": result.stdout}
-            )
+            return JSONResponse({"success": True, "message": message, "output": result.stdout})
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             logger.exception("Git commit error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -229,7 +223,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
             return JSONResponse({"commits": commits})
 
-        except Exception as e:
+        except Exception:
             logger.exception("Git log error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -264,7 +258,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Git diff error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 

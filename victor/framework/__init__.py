@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Victor Framework - Simplified API for AI coding agents.
 
 This module provides a "golden path" API that covers 90% of use cases

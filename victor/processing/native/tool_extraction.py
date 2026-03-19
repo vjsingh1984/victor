@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 from victor.processing.native.streaming import strip_thinking_tokens
 
-
 # =============================================================================
 # TOOL CALL EXTRACTION
 # =============================================================================

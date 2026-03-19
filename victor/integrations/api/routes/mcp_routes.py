@@ -58,7 +58,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         except ImportError:
             return JSONResponse({"servers": [], "error": "MCP not available"})
-        except Exception as e:
+        except Exception:
             logger.exception("MCP servers error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -69,15 +69,13 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             from victor.integrations.mcp.registry import get_mcp_registry
 
             registry = get_mcp_registry()
-            success = await registry.connect(
-                request.server, endpoint=request.endpoint
-            )
+            success = await registry.connect(request.server, endpoint=request.endpoint)
 
             return JSONResponse({"success": success, "server": request.server})
 
         except ImportError:
             raise HTTPException(status_code=501, detail="MCP not available")
-        except Exception as e:
+        except Exception:
             logger.exception("MCP connect error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
@@ -94,7 +92,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
         except ImportError:
             raise HTTPException(status_code=501, detail="MCP not available")
-        except Exception as e:
+        except Exception:
             logger.exception("MCP disconnect error")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 

@@ -20,7 +20,6 @@ from typing import Any, List, Optional, Tuple
 from victor.core.json_utils import json_loads
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
-
 # =============================================================================
 # JSON REPAIR FUNCTIONS
 # =============================================================================

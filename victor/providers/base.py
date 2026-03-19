@@ -490,6 +490,7 @@ class BaseProvider(ABC):
             ProviderRateLimitError: If rate-limit retries are exhausted
             Exception: If func raises a non-retryable error
         """
+
         async def _call() -> Any:
             if self._circuit_breaker:
                 return await self._circuit_breaker.execute(func, *args, **kwargs)
@@ -504,6 +505,7 @@ class BaseProvider(ABC):
                 ProviderRetryConfig,
                 ProviderRetryStrategy,
             )
+
             self._retry_strategy = ProviderRetryStrategy(
                 ProviderRetryConfig(max_retries=self.max_retries)
             )
