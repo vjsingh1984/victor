@@ -24,68 +24,64 @@ class ToolNameEntry:
 class ToolNames:
     """Registry of canonical tool names."""
 
+    # Core Primitives (Cross-domain)
     READ = "read"
     WRITE = "write"
     EDIT = "edit"
     LS = "ls"
     PLAN = "plan"
-
     SHELL = "shell"
     SHELL_READONLY = "shell_readonly"
     SANDBOX = "sandbox"
     SANDBOX_UPLOAD = "sandbox_upload"
-
     GREP = "grep"
     CODE_SEARCH = "code_search"
     WEB_SEARCH = "web_search"
     WEB_FETCH = "web_fetch"
-    SUMMARIZE = "summarize"
+    PATCH = "patch"
+    DIFF = "diff"
+    TEST = "test"
+    HTTP = "http"
+    MCP = "mcp"
+    WORKFLOW = "workflow"
+    OVERVIEW = "overview"
+    SCAFFOLD = "scaffold"
 
+    # Coding Vertical Specific (To be migrated)
     SYMBOL = "symbol"
     REFS = "refs"
     LSP = "lsp"
-
     RENAME = "rename"
     EXTRACT = "extract"
     INLINE = "inline"
     IMPORTS = "imports"
-
     GIT = "git"
     PR = "pr"
     COMMIT_MSG = "commit_msg"
     CONFLICTS = "conflicts"
-
-    PATCH = "patch"
-    DIFF = "diff"
-
-    DOCS = "docs"
-    DOCS_COVERAGE = "docs_coverage"
-
     REVIEW = "review"
     METRICS = "metrics"
     SCAN = "scan"
-    TEST = "test"
+    DEPS = "deps"
 
+    # Research/Analysis Specific (To be migrated)
+    SUMMARIZE = "summarize"
+    DOCS = "docs"
+    DOCS_COVERAGE = "docs_coverage"
+    GRAPH = "graph"
+    ARCH_SUMMARY = "arch_summary"
+
+    # DevOps/Infrastructure Specific (To be migrated)
     DB = "db"
     DOCKER = "docker"
     CICD = "cicd"
-    DEPS = "deps"
-    HTTP = "http"
     API_TEST = "api_test"
-
     BATCH = "batch"
     CACHE = "cache"
-    MCP = "mcp"
-    WORKFLOW = "workflow"
-    SCAFFOLD = "scaffold"
-    OVERVIEW = "overview"
-
     MERGE = "merge"
     PIPELINE = "pipeline"
     AUDIT = "audit"
     IAC = "iac"
-    GRAPH = "graph"
-    ARCH_SUMMARY = "arch_summary"
 
     @classmethod
     def file_operations(cls) -> tuple[str, str, str, str]:

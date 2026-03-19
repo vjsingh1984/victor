@@ -10,7 +10,6 @@ from typing import (
     runtime_checkable,
 )
 
-
 __all__ = [
     "TaskAnalyzerProtocol",
     "ComplexityClassifierProtocol",
@@ -20,6 +19,7 @@ __all__ = [
     "TaskTypeHinterProtocol",
     "IToolCallClassifier",
 ]
+
 
 @runtime_checkable
 class TaskAnalyzerProtocol(Protocol):
@@ -174,4 +174,3 @@ class IToolCallClassifier(Protocol):
             tool_name: Name of the tool to add
         """
         ...
-

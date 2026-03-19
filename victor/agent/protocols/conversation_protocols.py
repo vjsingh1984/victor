@@ -28,6 +28,7 @@ __all__ = [
     "IEmbeddingManager",
 ]
 
+
 @runtime_checkable
 class ConversationControllerProtocol(Protocol):
     """Protocol for conversation management.
@@ -280,4 +281,3 @@ class IEmbeddingManager(Protocol):
             List of search results
         """
         ...
-

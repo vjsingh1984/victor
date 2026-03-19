@@ -48,6 +48,7 @@ class ExtensionManifest:
     name: str = ""
     version: str = "0.0.0"
     min_framework_version: Optional[str] = None
+    sdk_version: Optional[str] = None
     provides: Set[ExtensionType] = field(default_factory=set)
     requires: Set[ExtensionType] = field(default_factory=set)
 

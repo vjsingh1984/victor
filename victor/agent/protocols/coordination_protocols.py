@@ -27,6 +27,7 @@ __all__ = [
     "UnifiedMemoryCoordinatorProtocol",
 ]
 
+
 @runtime_checkable
 class ToolPlannerProtocol(Protocol):
     """Protocol for tool planning and intent-based filtering.
@@ -492,4 +493,3 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
             Dictionary with query counts, errors, registered providers
         """
         ...
-

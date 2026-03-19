@@ -16,7 +16,6 @@ from typing import (
 
 from dataclasses import dataclass, field
 
-
 __all__ = [
     "StreamingToolChunk",
     "StreamingToolAdapterProtocol",
@@ -26,6 +25,7 @@ __all__ = [
     "StreamingHandlerProtocol",
     "StreamingMetricsCollectorProtocol",
 ]
+
 
 @dataclass
 class StreamingToolChunk:
@@ -627,4 +627,3 @@ class StreamingMetricsCollectorProtocol(Protocol):
     def reset(self) -> None:
         """Reset metrics for new session."""
         ...
-

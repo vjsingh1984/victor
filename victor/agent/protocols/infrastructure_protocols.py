@@ -14,7 +14,6 @@ from typing import (
     runtime_checkable,
 )
 
-
 __all__ = [
     "ObservabilityProtocol",
     "MetricsCollectorProtocol",
@@ -39,6 +38,7 @@ __all__ = [
     "VerticalStorageProtocol",
     "TaskTrackerProtocol",
 ]
+
 
 @runtime_checkable
 class ObservabilityProtocol(Protocol):
@@ -682,4 +682,3 @@ class TaskTrackerProtocol(Protocol):
     def is_loop_detected(self) -> bool:
         """Check if execution loop is detected."""
         ...
-

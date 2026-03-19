@@ -11,11 +11,11 @@ from typing import (
     runtime_checkable,
 )
 
-
 __all__ = [
     "IAgentFactory",
     "IAgent",
 ]
+
 
 @runtime_checkable
 class IAgentFactory(Protocol):
@@ -120,4 +120,3 @@ class IAgent(Protocol):
             Execution result
         """
         ...
-

@@ -16,7 +16,6 @@ from typing import (
 from dataclasses import dataclass
 from enum import Enum
 
-
 __all__ = [
     "ModeControllerProtocol",
     "BudgetType",
@@ -27,6 +26,7 @@ __all__ = [
     "IMultiplierCalculator",
     "IModeCompletionChecker",
 ]
+
 
 @runtime_checkable
 class ModeControllerProtocol(Protocol):
@@ -361,4 +361,3 @@ class IModeCompletionChecker(Protocol):
             Tuple of (should_exit, reason)
         """
         ...
-

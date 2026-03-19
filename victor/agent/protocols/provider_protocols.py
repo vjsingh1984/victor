@@ -14,7 +14,6 @@ from typing import (
     runtime_checkable,
 )
 
-
 __all__ = [
     "ProviderManagerProtocol",
     "ProviderRegistryProtocol",
@@ -23,6 +22,7 @@ __all__ = [
     "IProviderEventEmitter",
     "IProviderClassificationStrategy",
 ]
+
 
 @runtime_checkable
 class ProviderManagerProtocol(Protocol):
@@ -307,4 +307,3 @@ class IProviderClassificationStrategy(Protocol):
             Provider type ("cloud", "local", "unknown")
         """
         ...
-

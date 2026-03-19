@@ -46,6 +46,7 @@ __all__ = [
     "IToolAccessController",
 ]
 
+
 @dataclass
 class AgentToolSelectionContext:
     """Agent-level context for tool selection decisions.
@@ -697,4 +698,3 @@ class IToolAccessController(Protocol):
             Human-readable explanation
         """
         ...
-

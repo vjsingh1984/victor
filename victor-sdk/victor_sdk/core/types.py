@@ -1037,6 +1037,7 @@ class VerticalDefinition:
     system_prompt: str
     version: str = "1.0.0"
     definition_version: str = CURRENT_DEFINITION_VERSION
+    framework_version_requirement: str = ">=1.0.0"
     tool_requirements: List[ToolRequirement] = field(default_factory=list)
     capability_requirements: List[CapabilityRequirement] = field(default_factory=list)
     prompt_metadata: PromptMetadata = field(default_factory=PromptMetadata)
@@ -1298,6 +1299,7 @@ class VerticalDefinition:
             "description": self.description,
             "version": self.version,
             "definition_version": self.definition_version,
+            "framework_version_requirement": self.framework_version_requirement,
             "tools": self.get_tool_names(),
             "tool_requirements": [
                 requirement.to_dict() for requirement in self.tool_requirements

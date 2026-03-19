@@ -20,7 +20,7 @@ implement to register themselves with the Victor framework.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol, Type, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, Type, runtime_checkable
 
 import typer
 
@@ -114,5 +114,32 @@ class VictorPlugin(Protocol):
 
         .. deprecated::
             Use context.register_command() inside register() instead.
+        """
+        ...
+
+    def on_activate(self) -> None:
+        """Called when this plugin's vertical is activated.
+
+        Optional lifecycle hook. Implement to perform setup when the
+        vertical associated with this plugin becomes active.
+        """
+        ...
+
+    def on_deactivate(self) -> None:
+        """Called when this plugin's vertical is being deactivated.
+
+        Optional lifecycle hook. Implement to perform cleanup when
+        switching away from this plugin's vertical.
+        """
+        ...
+
+    def health_check(self) -> Dict[str, Any]:
+        """Return health status for this plugin.
+
+        Optional lifecycle hook. Returns a dictionary with at minimum
+        a 'healthy' boolean key.
+
+        Returns:
+            Dict with 'healthy' key and optional detail keys.
         """
         ...
