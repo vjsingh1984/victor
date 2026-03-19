@@ -25,6 +25,15 @@ Features:
 """
 
 import asyncio
+
+# Install uvloop for ~20% faster async I/O (if available)
+try:
+    import uvloop
+
+    uvloop.install()
+except ImportError:
+    pass
+
 import json
 import logging
 import uuid
@@ -35,6 +44,13 @@ from aiohttp import web
 from aiohttp.web import Request, Response, StreamResponse
 
 # Import middleware stack for optional rate limiting and auth
+from victor.integrations.api.change_tracker_ops import (
+    apply_patch_request,
+    change_history,
+    create_patch_request,
+    redo_last_change,
+    undo_last_change,
+)
 from victor.integrations.api.middleware import APIMiddlewareStack
 
 logger = logging.getLogger(__name__)
@@ -719,18 +735,7 @@ class VictorAPIServer:
     async def _undo(self, request: Request) -> Response:
         """Undo last change."""
         try:
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.undo()
-
-            return web.json_response(
-                {
-                    "success": success,
-                    "message": message,
-                    "files": files,
-                }
-            )
+            return web.json_response(undo_last_change())
 
         except Exception as e:
             logger.exception("Undo error")
@@ -739,18 +744,7 @@ class VictorAPIServer:
     async def _redo(self, request: Request) -> Response:
         """Redo last undone change."""
         try:
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            success, message, files = tracker.redo()
-
-            return web.json_response(
-                {
-                    "success": success,
-                    "message": message,
-                    "files": files,
-                }
-            )
+            return web.json_response(redo_last_change())
 
         except Exception as e:
             logger.exception("Redo error")
@@ -761,12 +755,7 @@ class VictorAPIServer:
         try:
             limit = int(request.query.get("limit", "10"))
 
-            from victor.agent.change_tracker import get_change_tracker
-
-            tracker = get_change_tracker()
-            history = tracker.get_history(limit=limit)
-
-            return web.json_response({"history": history})
+            return web.json_response(change_history(limit))
 
         except Exception as e:
             logger.exception("History error")
@@ -782,10 +771,7 @@ class VictorAPIServer:
             if not patch_content:
                 return web.json_response({"error": "patch required"}, status=400)
 
-            from victor.tools import patch_tool
-
-            result = await patch_tool.apply_patch(patch=patch_content, dry_run=dry_run)
-
+            result = await apply_patch_request(patch=patch_content, dry_run=dry_run)
             return web.json_response(result)
 
         except Exception as e:
@@ -804,10 +790,7 @@ class VictorAPIServer:
                     {"error": "file_path and new_content required"}, status=400
                 )
 
-            from victor.tools import patch_tool
-
-            result = await patch_tool.create_patch(file_path=target_file, new_content=new_content)
-
+            result = await create_patch_request(file_path=target_file, new_content=new_content)
             return web.json_response(result)
 
         except Exception as e:
@@ -822,9 +805,13 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            manager = get_lsp_manager()
+            provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+            if provider is None:
+                return web.json_response({"completions": [], "error": "LSP not available"})
+            manager = provider.get_lsp_manager()
             completions = await manager.get_completions(file_path, line, character)
 
             return web.json_response(
@@ -853,9 +840,13 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            manager = get_lsp_manager()
+            provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+            if provider is None:
+                return web.json_response({"contents": None, "error": "LSP not available"})
+            manager = provider.get_lsp_manager()
             hover = await manager.get_hover(file_path, line, character)
 
             return web.json_response(
@@ -876,9 +867,13 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            manager = get_lsp_manager()
+            provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+            if provider is None:
+                return web.json_response({"locations": [], "error": "LSP not available"})
+            manager = provider.get_lsp_manager()
             locations = await manager.get_definition(file_path, line, character)
 
             return web.json_response({"locations": locations})
@@ -895,9 +890,13 @@ class VictorAPIServer:
             line = data.get("line", 0)
             character = data.get("character", 0)
 
-            from victor_coding.lsp.manager import get_lsp_manager
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            manager = get_lsp_manager()
+            provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+            if provider is None:
+                return web.json_response({"locations": [], "error": "LSP not available"})
+            manager = provider.get_lsp_manager()
             locations = await manager.get_references(file_path, line, character)
 
             return web.json_response({"locations": locations})
@@ -912,9 +911,13 @@ class VictorAPIServer:
             data = await request.json()
             file_path = data.get("file", "")
 
-            from victor_coding.lsp.manager import get_lsp_manager
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import LSPManagerProtocol
 
-            manager = get_lsp_manager()
+            provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
+            if provider is None:
+                return web.json_response({"diagnostics": [], "error": "LSP not available"})
+            manager = provider.get_lsp_manager()
             diagnostics = manager.get_diagnostics(file_path)
 
             return web.json_response({"diagnostics": diagnostics})

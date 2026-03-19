@@ -49,6 +49,20 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
+      - name: Install build tools
+        run: |
+          pip install build twine
+
+      - name: Build victor-sdk
+        working-directory: victor-sdk
+        run: |
+          python -m build
+
+      - name: Install victor-sdk from local wheel
+        run: |
+          pip install victor-sdk/dist/*.whl
+          python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
+
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
@@ -62,11 +76,26 @@ jobs:
           ruff check victor
 
   # ==========================================================================
-  # Build Python package
+  # Verify version sync
+  # ==========================================================================
+  version-check:
+    name: Version Sync Check
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Check version consistency
+        run: python scripts/check_version_sync.py
+
+  # ==========================================================================
+  # Build Python packages (SDK + AI)
   # ==========================================================================
   build-python:
-    name: Build Python Package
-    needs: test
+    name: Build Python Packages
+    needs: version-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,15 +109,30 @@ jobs:
         run: |
           pip install build twine
 
-      - name: Build package
+      - name: Build victor-sdk
+        working-directory: victor-sdk
         run: |
           python -m build
 
-      - name: Check package
+      - name: Check victor-sdk package
+        run: |
+          twine check victor-sdk/dist/*
+
+      - name: Upload SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-package
+          path: victor-sdk/dist/
+
+      - name: Build victor-ai
+        run: |
+          python -m build
+
+      - name: Check victor-ai package
         run: |
           twine check dist/*
 
-      - name: Upload artifacts
+      - name: Upload victor-ai artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-package
@@ -132,6 +176,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Update rustup to stable
+        run: |
+          rustup update stable
+          rustup default stable
+          rustc --version
+          cargo --version
 
       - name: Install maturin
         run: pip install maturin
@@ -393,7 +444,67 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/victor/
+      url: https://test.pypi.org/project/victor-ai/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-package
+          path: sdk-dist/
+
+      - name: Publish victor-sdk to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: sdk-dist/
+          skip-existing: true
+
+      - name: Download victor-ai artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
+      - name: Publish victor-ai to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+          skip-existing: true
+
+  # ==========================================================================
+  # Publish to PyPI (Trusted Publishing - no API token needed)
+  # IMPORTANT: SDK must be published BEFORE victor-ai (dependency order)
+  # ==========================================================================
+  publish-sdk-pypi:
+    name: Publish victor-sdk to PyPI
+    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
+    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-package
+          path: dist/
+
+      - name: Publish victor-sdk to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish victor-ai to PyPI
+    needs: [publish-sdk-pypi]
+    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
 
@@ -404,33 +515,7 @@ jobs:
           name: python-package
           path: dist/
 
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
-  # ==========================================================================
-  # Publish to PyPI (Trusted Publishing - no API token needed)
-  # IMPORTANT: This runs LAST after all builds pass and release is created
-  # ==========================================================================
-  publish-pypi:
-    name: Publish to PyPI
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
-    # Skip PyPI for pre-releases (they go to TestPyPI only)
-    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
-    runs-on: ubuntu-latest
-    # No environment required - trusted publisher configured without environment
-    permissions:
-      id-token: write  # Required for OIDC trusted publishing
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package
-          path: dist/
-
-      - name: Publish to PyPI
+      - name: Publish victor-ai to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
@@ -472,6 +557,35 @@ jobs:
   # ==========================================================================
   # Generate checksums for all artifacts
   # ==========================================================================
+  generate-sbom:
+    name: Generate SBOM
+    needs: [build-python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install cyclonedx-bom
+        run: pip install cyclonedx-bom
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          pip install -e ".[embeddings]"
+          cyclonedx-py environment -o sbom.json --output-format json
+          cyclonedx-py environment -o sbom.xml --output-format xml
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+
   generate-checksums:
     name: Generate Checksums
     needs: [build-python, build-native, build-binary, build-docker]
@@ -499,7 +613,7 @@ jobs:
   # ==========================================================================
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums]
+    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, generate-sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -576,6 +690,7 @@ jobs:
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           files: |
             artifacts/python-package/*
+            artifacts/sdk-package/*
             artifacts/binary-*/*
             artifacts/checksums/checksums.txt
         env:

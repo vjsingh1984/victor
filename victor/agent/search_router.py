@@ -15,9 +15,10 @@
 """Search query routing for optimal tool selection.
 
 This module analyzes search queries and routes them to the most
-appropriate search tool:
+appropriate search or graph tool:
 - Keyword search: Exact patterns, code identifiers, literal strings
 - Semantic search: Conceptual queries, explanations, pattern finding
+- Graph traversal: Caller/callee tracing and execution-path questions
 
 Design Principles:
 - Fast routing decisions (no LLM calls)
@@ -28,9 +29,9 @@ Design Principles:
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ class SearchRoute:
     reason: str
     transformed_query: Optional[str]
     matched_patterns: List[str]
+    tool_name: Optional[str] = None
+    tool_arguments: Dict[str, Any] = field(default_factory=dict)
 
 
 # Patterns that indicate KEYWORD search is better
@@ -128,6 +131,78 @@ SEMANTIC_SIGNALS: List[Tuple[str, float, str, bool]] = [
     (r"\bgoal(s)?\b", 0.7, "goals", False),
 ]
 
+# Patterns that indicate bug similarity search is better than generic semantic search.
+# These queries still map to code_search, but with mode="bugs" so providers can
+# use graph-enriched bug similarity when available.
+BUG_SIMILARITY_SIGNALS: List[Tuple[str, float, str, bool]] = [
+    (
+        r"\bsimilar\s+(bug|bugs|issue|issues|failure|failures|regression|regressions)\b",
+        1.0,
+        "similar_bug",
+        False,
+    ),
+    (r"\b(regression|regressions)\b", 0.9, "regression", False),
+    (r"\b(crash|crashes|crashed|panic|panics|panicked|segfault)\b", 0.9, "crash", False),
+    (r"\b(traceback|stack\s*trace)\b", 0.8, "stacktrace", False),
+    (r"\b(bug|bugs|failing|failure|failures|broken)\b", 0.7, "bug_symptom", False),
+]
+
+_GRAPH_SYMBOL_FRAGMENT = (
+    r"(?:[`'\"](?P<quoted>[^`'\"]+)[`'\"]|(?P<bare>[A-Za-z_][A-Za-z0-9_:.<>/-]*))"
+)
+
+# Patterns that indicate a graph traversal is more appropriate than plain search.
+# Format: (regex_pattern, mode, depth, description, case_sensitive)
+GRAPH_TRAVERSAL_SIGNALS: List[Tuple[str, str, int, str, bool]] = [
+    (
+        rf"\b(?:who|what|which(?:\s+functions?)?)\s+call(?:s)?\s+"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "callers",
+        2,
+        "who_calls",
+        False,
+    ),
+    (
+        rf"\b(?:find|show|get|list)\s+(?:all\s+)?callers?\s+of\s+"
+        rf"(?:the\s+)?(?:function\s+|method\s+)?{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "callers",
+        2,
+        "find_callers",
+        False,
+    ),
+    (
+        rf"\bwhat\s+(?:functions?\s+)?does\s+{_GRAPH_SYMBOL_FRAGMENT}\s+call\b",
+        "callees",
+        2,
+        "what_does_call",
+        False,
+    ),
+    (
+        rf"\b(?:find|show|get|list)\s+(?:all\s+)?callees?\s+of\s+"
+        rf"(?:the\s+)?(?:function\s+|method\s+)?{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "callees",
+        2,
+        "find_callees",
+        False,
+    ),
+    (
+        rf"\btrace\s+(?:the\s+)?execution(?:\s+path)?\s+(?:from|for|of)\s+"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "trace",
+        3,
+        "trace_execution",
+        False,
+    ),
+    (
+        rf"\b(?:show|get|find)\s+(?:the\s+)?execution(?:\s+path)?\s+(?:from|for|of)\s+"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "trace",
+        3,
+        "execution_path",
+        False,
+    ),
+]
+
 
 class SearchRouter:
     """Routes search queries to appropriate search tools.
@@ -149,7 +224,7 @@ class SearchRouter:
         keyword_threshold: float = 0.5,
         semantic_threshold: float = 0.5,
         hybrid_threshold: float = 0.3,
-        custom_signals: Optional[dict[str, List[Tuple[str, float, str, bool]]]] = None,
+        custom_signals: Optional[dict[str, List[Tuple[Any, ...]]]] = None,
         custom_routers: Optional[List[Callable[[str], Optional[SearchRoute]]]] = None,
     ):
         """Initialize the search router.
@@ -169,9 +244,13 @@ class SearchRouter:
         # Compile patterns
         self._keyword_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._semantic_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._bug_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
 
         self._compile_patterns(KEYWORD_SIGNALS, self._keyword_patterns)
         self._compile_patterns(SEMANTIC_SIGNALS, self._semantic_patterns)
+        self._compile_patterns(BUG_SIMILARITY_SIGNALS, self._bug_patterns)
+        self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
 
         # Add custom signals
         if custom_signals:
@@ -179,6 +258,10 @@ class SearchRouter:
                 self._compile_patterns(custom_signals["keyword"], self._keyword_patterns)
             if "semantic" in custom_signals:
                 self._compile_patterns(custom_signals["semantic"], self._semantic_patterns)
+            if "bug" in custom_signals:
+                self._compile_patterns(custom_signals["bug"], self._bug_patterns)
+            if "graph" in custom_signals:
+                self._compile_graph_patterns(custom_signals["graph"], self._graph_patterns)
 
     def _compile_patterns(
         self,
@@ -199,6 +282,20 @@ class SearchRouter:
             except re.error as e:
                 logger.warning(f"Invalid pattern '{pattern_str}': {e}")
 
+    def _compile_graph_patterns(
+        self,
+        signals: List[Tuple[str, str, int, str, bool]],
+        target: List[Tuple[re.Pattern, str, int, str]],
+    ) -> None:
+        """Compile graph-routing regex patterns."""
+        for pattern_str, mode, depth, name, case_sensitive in signals:
+            try:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                compiled = re.compile(pattern_str, flags)
+                target.append((compiled, mode, depth, name))
+            except re.error as e:
+                logger.warning(f"Invalid graph pattern '{pattern_str}': {e}")
+
     def route(self, query: str) -> SearchRoute:
         """Route a search query to appropriate search type.
 
@@ -213,6 +310,14 @@ class SearchRouter:
             result = router(query)
             if result is not None:
                 return result
+
+        graph_route = self._route_graph_query(query)
+        if graph_route is not None:
+            return graph_route
+
+        bug_route = self._route_bug_similarity_query(query)
+        if bug_route is not None:
+            return bug_route
 
         # Check for quoted strings (always keyword)
         if self._has_quoted_string(query):
@@ -269,6 +374,60 @@ class SearchRouter:
                 matched_patterns=[],
             )
 
+    def _route_graph_query(self, query: str) -> Optional[SearchRoute]:
+        """Return a graph-tool route for caller/callee/trace style queries."""
+        for pattern, mode, depth, name in self._graph_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            symbol = self._normalize_graph_symbol(
+                match.groupdict().get("quoted") or match.groupdict().get("bare")
+            )
+            if not symbol:
+                continue
+
+            mode_reason = {
+                "callers": "reverse call-graph traversal",
+                "callees": "forward call-graph traversal",
+                "trace": "execution-path tracing",
+            }.get(mode, "graph traversal")
+
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.95,
+                reason=f"Query is a {mode_reason} question suited for graph traversal",
+                transformed_query=symbol,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={"mode": mode, "node": symbol, "depth": depth},
+            )
+
+        return None
+
+    def _route_bug_similarity_query(self, query: str) -> Optional[SearchRoute]:
+        """Return a code_search bug-similarity route for bug/regression style queries."""
+        if self._has_quoted_string(query):
+            return None
+
+        bug_score, bug_matches = self._score_patterns(query, self._bug_patterns)
+        if bug_score < 0.7:
+            return None
+
+        keyword_score, _ = self._score_patterns(query, self._keyword_patterns)
+        if keyword_score >= 1.0:
+            return None
+
+        return SearchRoute(
+            search_type=SearchType.SEMANTIC,
+            confidence=min(1.0, 0.45 + bug_score / 2.0),
+            reason="Query describes a bug/regression pattern suited for bug similarity search",
+            transformed_query=None,
+            matched_patterns=bug_matches,
+            tool_name="code_search",
+            tool_arguments={"mode": "bugs"},
+        )
+
     def _score_patterns(
         self,
         query: str,
@@ -297,6 +456,31 @@ class SearchRouter:
             return match.group(1)
         return query
 
+    def _normalize_graph_symbol(self, symbol: Optional[str]) -> Optional[str]:
+        """Normalize a graph symbol extracted from a natural-language query."""
+        if not symbol:
+            return None
+
+        normalized = symbol.strip().strip("`'\"").strip().rstrip("?.!,:;")
+        normalized = normalized.strip("()[]{}")
+        if not normalized:
+            return None
+
+        if normalized.lower() in {
+            "this",
+            "that",
+            "it",
+            "function",
+            "method",
+            "class",
+            "module",
+            "symbol",
+            "file",
+        }:
+            return None
+
+        return normalized
+
     def suggest_tool(self, query: str) -> str:
         """Suggest the best search tool for a query.
 
@@ -304,9 +488,11 @@ class SearchRouter:
             query: The search query
 
         Returns:
-            Tool name: "code_search" or "semantic_code_search"
+            Tool name: "code_search", "semantic_code_search", or "graph"
         """
         route = self.route(query)
+        if route.tool_name:
+            return route.tool_name
         if route.search_type == SearchType.SEMANTIC:
             return "semantic_code_search"
         return "code_search"
@@ -332,7 +518,7 @@ def suggest_search_tool(query: str) -> str:
         query: Search query
 
     Returns:
-        Tool name: "code_search" or "semantic_code_search"
+        Tool name: "code_search", "semantic_code_search", or "graph"
     """
     router = SearchRouter()
     return router.suggest_tool(query)

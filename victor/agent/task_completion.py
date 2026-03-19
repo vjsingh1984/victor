@@ -172,21 +172,37 @@ class TaskCompletionDetector:
     """
 
     # Priority 1: Active signals - deterministic, instructed in system prompt
-    # These are checked first and if detected, immediately signal completion
-    # Using underscore-prefixed signals to avoid confusion with natural language
-    ACTIVE_SIGNALS: frozenset = frozenset(
+    # The prompt instructs models to use bold-wrapped markers: **DONE**: description
+    # Markdown rendering strips ** or __ leaving "DONE: description"
+    # Detection strategy: strip markdown formatting, then match "KEYWORD:" or "KEYWORD -"
+    #
+    # Canonical markers (case-insensitive after markdown stripping):
+    #   DONE:         - file operations complete
+    #   TASK_DONE:    - bug fix / task complete
+    #   SUMMARY:      - analysis / research complete
+    #   BLOCKED:      - cannot proceed
+    ACTIVE_SIGNAL_KEYWORDS: frozenset = frozenset(
         {
-            "_task_done_",
+            "done:",
+            "task_done:",
+            "task done:",
+            "summary:",
+            "blocked:",
+            "cannot_complete:",
+            # Legacy underscore-wrapped forms (backward compat)
             "_done_",
+            "_task_done_",
             "_summary_",
             "_blocked_",
             "_cannot_complete_",
-            # Also accept natural language variants for models that don't follow exactly
+            # Additional natural language variants
             "task complete:",
-            "done:",
-            "summary:",
         }
     )
+
+    # Regex for stripping markdown bold/italic wrapping from text
+    # Handles: **text**, __text__, *text*, _text_, `text`
+    _MARKDOWN_STRIP_RE = re.compile(r"\*\*|__|\*|_|`")
 
     # Priority 3: Passive phrases indicating task completion (fallback)
     COMPLETION_PHRASES: frozenset = frozenset(
@@ -306,13 +322,19 @@ class TaskCompletionDetector:
         }
     )
 
-    def __init__(self, presentation: Optional["PresentationProtocol"] = None):
+    def __init__(
+        self,
+        presentation: Optional["PresentationProtocol"] = None,
+        decision_service: Optional[Any] = None,
+    ):
         """Initialize the task completion detector.
 
         Args:
             presentation: Optional presentation adapter for icons (creates default if None)
+            decision_service: Optional LLMDecisionService for low-confidence augmentation
         """
         self._state = TaskCompletionState()
+        self._decision_service = decision_service
         # Lazy init for backward compatibility
         if presentation is None:
             from victor.agent.presentation import create_presentation_adapter
@@ -426,9 +448,13 @@ class TaskCompletionDetector:
         """
         response_lower = response_text.lower()
 
-        # Priority 1: Check active signals first (deterministic, instructed)
-        for signal in self.ACTIVE_SIGNALS:
-            if signal in response_lower:
+        # Priority 1: Check active signals with markdown stripping
+        # The model outputs **DONE**: or __SUMMARY__: which markdown renders
+        # by stripping bold/italic markers. We strip them here to match reliably.
+        stripped_lower = self._MARKDOWN_STRIP_RE.sub("", response_lower)
+
+        for signal in self.ACTIVE_SIGNAL_KEYWORDS:
+            if signal in stripped_lower or signal in response_lower:
                 self._state.completion_signals.add(f"active:{signal}")
                 self._state.active_signal_detected = True
                 logger.info(f"Active completion signal detected: {signal}")
@@ -450,33 +476,88 @@ class TaskCompletionDetector:
                 )
                 break
 
-        # Infer deliverables from response content
-        if not self._state.expected_deliverables:
-            # If we see plan-like content, record as plan provided
-            if any(
-                marker in response_lower
-                for marker in ["steps:", "step 1", "## implementation", "here's how"]
-            ):
-                self._state.completed_deliverables.append(
-                    TaskDeliverable(
-                        type=DeliverableType.PLAN_PROVIDED,
-                        description="Implementation plan provided",
-                        verified=True,
-                    )
-                )
+        # LLM augmentation: if no active signal found and service available,
+        # consult LLM for completion detection
+        if (
+            not self._state.active_signal_detected
+            and not self._state.completion_signals
+            and self._decision_service is not None
+        ):
+            try:
+                from victor.agent.decisions.schemas import DecisionType
 
-            # If we see explanation content
-            if any(
-                marker in response_lower
-                for marker in ["this file", "the function", "it handles", "this class"]
-            ):
-                self._state.completed_deliverables.append(
-                    TaskDeliverable(
-                        type=DeliverableType.ANSWER_PROVIDED,
-                        description="Explanation provided",
-                        verified=True,
-                    )
+                decision = self._decision_service.decide_sync(
+                    DecisionType.TASK_COMPLETION,
+                    context={
+                        "response_tail": response_text[-500:],
+                        "deliverable_count": len(self._state.completed_deliverables),
+                        "signal_count": len(self._state.completion_signals),
+                    },
+                    heuristic_confidence=0.0,
                 )
+                if decision.source == "llm" and hasattr(decision.result, "is_complete"):
+                    if decision.result.is_complete and decision.confidence >= 0.7:
+                        self._state.completion_signals.add("llm:task_complete")
+                        logger.debug("LLM detected task completion")
+                    if decision.result.phase == "stuck":
+                        self._state.continuation_requests += 1
+                        logger.debug("LLM detected stuck phase")
+            except Exception:
+                logger.debug("LLM decision augmentation failed in analyze_response", exc_info=True)
+
+        # Infer deliverables from response content
+        # Check both when no expected deliverables AND when expected ones aren't yet met
+        completed_types = {d.type for d in self._state.completed_deliverables}
+
+        # If we see plan-like content, record as plan provided
+        if DeliverableType.PLAN_PROVIDED not in completed_types and any(
+            marker in response_lower
+            for marker in ["steps:", "step 1", "## implementation", "here's how"]
+        ):
+            self._state.completed_deliverables.append(
+                TaskDeliverable(
+                    type=DeliverableType.PLAN_PROVIDED,
+                    description="Implementation plan provided",
+                    verified=True,
+                )
+            )
+
+        # If we see explanation content
+        if DeliverableType.ANSWER_PROVIDED not in completed_types and any(
+            marker in response_lower
+            for marker in ["this file", "the function", "it handles", "this class"]
+        ):
+            self._state.completed_deliverables.append(
+                TaskDeliverable(
+                    type=DeliverableType.ANSWER_PROVIDED,
+                    description="Explanation provided",
+                    verified=True,
+                )
+            )
+
+        # If we see structured analysis content (tables, bullet lists, findings)
+        # record as analysis provided - this handles "review" tasks that expect
+        # ANALYSIS_PROVIDED but never trigger it through tool results alone
+        if DeliverableType.ANALYSIS_PROVIDED not in completed_types and any(
+            marker in response_lower
+            for marker in [
+                "summary",
+                "in summary",
+                "findings",
+                "analysis",
+                "key points",
+                "conclusion",
+                "exit criteria",
+                "## ",  # markdown headers indicate structured output
+            ]
+        ):
+            self._state.completed_deliverables.append(
+                TaskDeliverable(
+                    type=DeliverableType.ANALYSIS_PROVIDED,
+                    description="Analysis provided in response",
+                    verified=True,
+                )
+            )
 
     def should_stop(self) -> bool:
         """Check if task objectives are met and agent should stop.
@@ -613,26 +694,32 @@ class TaskCompletionDetector:
             Detected ResponsePhase
         """
         response_lower = response_text.lower()
+        # Strip markdown formatting for reliable signal detection
+        stripped_lower = self._MARKDOWN_STRIP_RE.sub("", response_lower)
 
         # Check for blocked signals first
         blocked_signals = [
+            "blocked:",
+            "cannot_complete:",
             "_blocked_",
             "_cannot_complete_",
             "i cannot",
             "i'm unable to",
             "unable to complete",
         ]
-        if any(signal in response_lower for signal in blocked_signals):
+        if any(signal in stripped_lower for signal in blocked_signals):
             return ResponsePhase.BLOCKED
 
         # Check for final output signals (active completion signals + delivery phrases)
         final_output_indicators = [
+            "done:",
+            "task_done:",
+            "task done:",
+            "summary:",
+            "task complete:",
             "_done_",
             "_task_done_",
             "_summary_",
-            "task complete:",
-            "done:",
-            "summary:",
             "here's the",
             "here is the",
             "i've created",
@@ -641,7 +728,7 @@ class TaskCompletionDetector:
             "the implementation is",
             "successfully created",
         ]
-        if any(indicator in response_lower for indicator in final_output_indicators):
+        if any(indicator in stripped_lower for indicator in final_output_indicators):
             return ResponsePhase.FINAL_OUTPUT
 
         # Check for synthesis phase (summarizing, preparing output)
@@ -714,7 +801,34 @@ class TaskCompletionDetector:
                 return CompletionConfidence.LOW
 
         # Priority 4: No completion signals (NONE confidence)
-        return CompletionConfidence.NONE
+        heuristic_confidence = CompletionConfidence.NONE
+
+        # LLM augmentation: if confidence is LOW or NONE and service is available
+        if (
+            heuristic_confidence in (CompletionConfidence.LOW, CompletionConfidence.NONE)
+            and self._decision_service is not None
+        ):
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                conf_value = 0.3 if heuristic_confidence == CompletionConfidence.LOW else 0.0
+                decision = self._decision_service.decide_sync(
+                    DecisionType.TASK_COMPLETION,
+                    context={
+                        "response_tail": "",  # Caller can set via analyze_response
+                        "deliverable_count": len(self._state.completed_deliverables),
+                        "signal_count": len(self._state.completion_signals),
+                    },
+                    heuristic_result=heuristic_confidence,
+                    heuristic_confidence=conf_value,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "is_complete"):
+                    if decision.result.is_complete and decision.confidence >= 0.7:
+                        return CompletionConfidence.MEDIUM
+            except Exception:
+                logger.debug("LLM decision augmentation failed", exc_info=True)
+
+        return heuristic_confidence
 
 
 def create_task_completion_detector() -> TaskCompletionDetector:

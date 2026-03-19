@@ -318,7 +318,17 @@ class GroqProvider(BaseProvider):
                     raise
 
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                if any(
+                    term in error_str
+                    for term in [
+                        "auth",
+                        "unauthorized",
+                        "invalid key",
+                        "invalid api",
+                        "api_key",
+                        "401",
+                    ]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,
@@ -460,7 +470,10 @@ class GroqProvider(BaseProvider):
                 raise
 
             error_str = str(e).lower()
-            if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+            if any(
+                term in error_str
+                for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]
+            ):
                 raise ProviderAuthError(
                     message=f"Authentication failed: {str(e)}",
                     provider=self.name,
@@ -737,9 +750,7 @@ class GroqProvider(BaseProvider):
                 result = response.json()
                 return result.get("data", [])
         except Exception as e:
-            self._provider_logger.logger.debug(
-                f"Failed to fetch models from Groq API: {e}"
-            )
+            self._provider_logger.logger.debug(f"Failed to fetch models from Groq API: {e}")
 
         # Return static list as fallback
         return [

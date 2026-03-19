@@ -29,7 +29,10 @@ from victor.verticals.contrib.coding.languages.base import (
     LanguageCapabilities,
     LanguageConfig,
 )
-from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.registry import (
+    LanguageRegistry,
+    get_language_registry,
+)
 
 logger = logging.getLogger(__name__)
 

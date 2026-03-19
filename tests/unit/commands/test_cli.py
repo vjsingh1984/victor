@@ -453,7 +453,7 @@ class TestCheckCodebaseIndex:
         from victor.ui.commands.utils import check_codebase_index
 
         # Patch the import inside the function
-        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": None}):
+        with patch.dict("sys.modules", {"victor_coding.codebase.indexer": None}):
             # Should not raise
             await check_codebase_index("/tmp", mock_console)
 
@@ -465,7 +465,7 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.side_effect = Exception("Test error")
 
-        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": MagicMock()}):
+        with patch.dict("sys.modules", {"victor_coding.codebase.indexer": MagicMock()}):
             with patch(
                 "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
             ):

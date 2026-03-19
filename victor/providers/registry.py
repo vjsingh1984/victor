@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +21,7 @@ import os
 import platform
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
@@ -42,6 +45,7 @@ class _LazyProviderSpec:
 
 
 _lazy_provider_specs: Dict[str, _LazyProviderSpec] = {}
+_lazy_provider_lock = threading.Lock()
 _mlx_preflight_result: Optional[Tuple[bool, str]] = None
 
 
@@ -147,34 +151,45 @@ def _mlx_preflight(provider_name: str) -> Optional[str]:
 
 
 def _materialize_lazy_provider(name: str) -> Optional[Type[BaseProvider]]:
-    """Import and register a lazily-declared provider."""
+    """Import and register a lazily-declared provider.
+
+    Uses double-checked locking to ensure thread-safe materialization:
+    only one thread imports the module while others wait and reuse the result.
+    """
+    # First check (no lock) — fast path when already materialized
     spec = _lazy_provider_specs.get(name)
     if spec is None:
-        return None
+        return _registry_instance.get(name)
 
-    if spec.preflight:
-        preflight_error = spec.preflight(name)
-        if preflight_error:
-            raise ProviderNotFoundError(message=preflight_error, provider=name)
+    with _lazy_provider_lock:
+        # Second check (under lock) — another thread may have materialized
+        spec = _lazy_provider_specs.get(name)
+        if spec is None:
+            return _registry_instance.get(name)
 
-    try:
-        module = importlib.import_module(spec.module_path)
-        provider_class = getattr(module, spec.class_name)
-    except Exception as exc:
-        raise ProviderNotFoundError(
-            message=(
-                f"Provider '{name}' failed to load from "
-                f"{spec.module_path}.{spec.class_name}: {exc}"
-            ),
-            provider=name,
-        ) from exc
+        if spec.preflight:
+            preflight_error = spec.preflight(name)
+            if preflight_error:
+                raise ProviderNotFoundError(message=preflight_error, provider=name)
 
-    for alias, alias_spec in list(_lazy_provider_specs.items()):
-        if alias_spec == spec:
-            _registry_instance.register(alias, provider_class)
-            del _lazy_provider_specs[alias]
+        try:
+            module = importlib.import_module(spec.module_path)
+            provider_class = getattr(module, spec.class_name)
+        except Exception as exc:
+            raise ProviderNotFoundError(
+                message=(
+                    f"Provider '{name}' failed to load from "
+                    f"{spec.module_path}.{spec.class_name}: {exc}"
+                ),
+                provider=name,
+            ) from exc
 
-    return provider_class
+        for alias, alias_spec in list(_lazy_provider_specs.items()):
+            if alias_spec == spec:
+                _registry_instance.register(alias, provider_class)
+                del _lazy_provider_specs[alias]
+
+        return provider_class
 
 
 class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,13 +60,14 @@ except ImportError:
 
     class ToolExecutionError(RuntimeError):  # type: ignore
         def __init__(self, tool_name, operation, suggestion=None, **kwargs):
-            message = f"Execution session not started. Call start() first."
+            message = "Execution session not started. Call start() first."
             if suggestion:
                 message += f"\n\n💡 Suggestion: {suggestion}"
             super().__init__(message)
 
     def create_contextual_error(msg, **kwargs):  # type: ignore
         return RuntimeError(msg)
+
 
 # Optional docker import
 try:
@@ -334,7 +337,7 @@ class CodeSandbox:
         try:
             self.docker_client = docker.from_env()
             self.docker_available = True
-        except DockerException as e:
+        except DockerException:
             if require_docker:
                 # Maintain backward compatibility with existing tests
                 # while providing helpful context

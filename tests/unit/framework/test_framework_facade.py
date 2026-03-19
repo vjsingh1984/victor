@@ -310,12 +310,25 @@ class TestHealthFacade:
 
         assert FacadeChecker is OriginalChecker
 
-    def test_health_check_result_reexport_identity(self):
-        """Verify HealthCheckResult is same object from both modules."""
-        from victor.framework.health import HealthCheckResult as FacadeResult
-        from victor.providers.health import HealthCheckResult as OriginalResult
+    def test_provider_health_result_reexport_identity(self):
+        """Verify ProviderHealthResult is same object from both modules."""
+        from victor.framework.health import ProviderHealthResult as FacadeResult
+        from victor.providers.health import ProviderHealthResult as OriginalResult
 
         assert FacadeResult is OriginalResult
+
+    def test_health_check_result_alias(self):
+        """Verify HealthCheckResult is an alias for ProviderHealthResult."""
+        from victor.framework.health import HealthCheckResult, ProviderHealthResult
+
+        assert HealthCheckResult is ProviderHealthResult
+
+    def test_check_provider_health_reexport_identity(self):
+        """Verify check_provider_health is same function from both modules."""
+        from victor.framework.health import check_provider_health as facade_func
+        from victor.providers.health import check_provider_health as original_func
+
+        assert facade_func is original_func
 
     def test_all_exports_present(self):
         """Verify all declared exports are present in the module."""
@@ -337,11 +350,9 @@ class TestHealthFacade:
             "create_default_health_checker",
             # Provider-Specific Health
             "HealthCheckResult",
-            "ProviderHealthStatus",
             "ProviderHealthChecker",
-            "ProviderHealthReport",
-            "get_provider_health_checker",
-            "reset_provider_health_checker",
+            "ProviderHealthResult",
+            "check_provider_health",
         ]
 
         for name in expected_exports:
@@ -523,6 +534,7 @@ class TestFrameworkMainExports:
             HealthChecker,
             HealthStatus,
             ProviderHealthChecker,
+            ProviderHealthResult,
             create_default_health_checker,
         )
 
@@ -555,11 +567,11 @@ class TestFrameworkMainExports:
         assert (
             len(_RESILIENCE_EXPORTS) == 26
         ), f"Expected 26 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
-        assert len(_HEALTH_EXPORTS) == 18, f"Expected 18 health exports, got {len(_HEALTH_EXPORTS)}"
+        assert len(_HEALTH_EXPORTS) == 19, f"Expected 19 health exports, got {len(_HEALTH_EXPORTS)}"
         assert (
             len(_METRICS_EXPORTS) == 13
         ), f"Expected 13 metrics exports, got {len(_METRICS_EXPORTS)}"
 
         # Total new exports from Phase 9
         total = len(_RESILIENCE_EXPORTS) + len(_HEALTH_EXPORTS) + len(_METRICS_EXPORTS)
-        assert total == 57, f"Expected 57 total Phase 9 exports, got {total}"
+        assert total == 58, f"Expected 58 total Phase 9 exports, got {total}"

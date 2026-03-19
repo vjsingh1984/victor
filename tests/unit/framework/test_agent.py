@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
+from victor_sdk.core.types import VerticalDefinition
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -84,6 +86,18 @@ def mock_vertical():
     """Create a mock vertical class for testing."""
     vertical = MagicMock()
     vertical.name = "test_vertical"
+    vertical.description = "Test vertical"
+    vertical.version = "1.0.0"
+    vertical.get_definition = MagicMock(
+        return_value=VerticalDefinition(
+            name="test_vertical",
+            description="Test vertical",
+            version="1.0.0",
+            tools=["tool1", "tool2"],
+            system_prompt="Test system prompt",
+            workflow_metadata={"provider_hints": {"preferred_providers": ["anthropic"]}},
+        )
+    )
     vertical.get_config = MagicMock(
         return_value=MagicMock(
             tools=["tool1", "tool2"],
@@ -1541,12 +1555,16 @@ class TestAgentCreate:
 
         mock_orchestrator = MagicMock()
 
-        # Set up vertical config with provider hints preferring openai
-        mock_config = MagicMock()
-        mock_config.tools = []
-        mock_config.system_prompt = "Test prompt"
-        mock_config.provider_hints = {"preferred_providers": ["openai", "google"]}
-        mock_vertical.get_config = MagicMock(return_value=mock_config)
+        mock_vertical.get_definition = MagicMock(
+            return_value=VerticalDefinition(
+                name="test_vertical",
+                description="Test vertical",
+                version="1.0.0",
+                tools=[],
+                system_prompt="Test prompt",
+                workflow_metadata={"provider_hints": {"preferred_providers": ["openai", "google"]}},
+            )
+        )
 
         with patch(
             "victor.framework._internal.create_orchestrator_from_options",
@@ -1560,6 +1578,43 @@ class TestAgentCreate:
 
         # Agent should still use anthropic (hints are just hints)
         assert agent._provider == "anthropic"
+
+    @pytest.mark.asyncio
+    async def test_create_with_vertical_uses_definition_runtime_adapter(self):
+        """create should translate verticals through the runtime adapter, not get_config()."""
+        from victor.core.verticals.base import VerticalBase
+        from victor.framework.agent import Agent
+
+        class DefinitionOnlyVertical(VerticalBase):
+            name = "definition_only"
+            description = "Definition-only vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Use definition path."
+
+            @classmethod
+            def get_config(cls, *args, **kwargs):
+                raise AssertionError("Agent.create should not call legacy get_config().")
+
+        mock_orchestrator = MagicMock()
+
+        with patch(
+            "victor.framework._internal.create_orchestrator_from_options",
+            new=AsyncMock(return_value=mock_orchestrator),
+        ):
+            agent = await Agent.create(
+                provider="anthropic",
+                vertical=DefinitionOnlyVertical,
+            )
+
+        assert agent._vertical is DefinitionOnlyVertical
+        assert agent._vertical_config.system_prompt == "Use definition path."
+        assert agent._vertical_config.tools.tools == {"read", "write"}
 
     @pytest.mark.asyncio
     async def test_create_provider_error(self):

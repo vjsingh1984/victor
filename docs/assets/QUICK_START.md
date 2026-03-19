@@ -94,7 +94,7 @@ graph TD
     B --> C[Providers]
     B --> D[Tools]
     B --> E[Workflows]
-    C --> F[22 LLM Providers]
+    C --> F[24 LLM Providers]
     D --> G[33 Tool Modules]
 ```
 ```

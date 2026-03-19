@@ -146,13 +146,14 @@ async def test_queue_overflow_topic_defaults_apply_blocking_only_to_critical_top
 @pytest.mark.asyncio
 async def test_extension_loader_saturation_surfaces_pressure_with_default_thresholds():
     """Concurrent async extension loads should trigger queue wait/pressure telemetry."""
+    pm = VerticalExtensionLoader._pressure_monitor
     original: dict[str, Any] = {
-        "warn_queue": VerticalExtensionLoader._extension_loader_warn_queue_threshold,
-        "error_queue": VerticalExtensionLoader._extension_loader_error_queue_threshold,
-        "warn_in_flight": VerticalExtensionLoader._extension_loader_warn_in_flight_threshold,
-        "error_in_flight": VerticalExtensionLoader._extension_loader_error_in_flight_threshold,
-        "cooldown": VerticalExtensionLoader._extension_loader_pressure_cooldown_seconds,
-        "emit_events": VerticalExtensionLoader._extension_loader_emit_pressure_events,
+        "warn_queue": pm.warn_queue_threshold,
+        "error_queue": pm.error_queue_threshold,
+        "warn_in_flight": pm.warn_in_flight_threshold,
+        "error_in_flight": pm.error_in_flight_threshold,
+        "cooldown": pm.pressure_cooldown_seconds,
+        "emit_events": pm.emit_pressure_events,
     }
 
     try:

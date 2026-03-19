@@ -250,6 +250,7 @@ class ThinkingPatternDetector:
         window_size: int = WINDOW_SIZE,
         stalling_threshold: int = STALLING_THRESHOLD,
         presentation: Optional["PresentationProtocol"] = None,
+        decision_service: Optional[Any] = None,
     ):
         """Initialize the thinking detector.
 
@@ -259,6 +260,7 @@ class ThinkingPatternDetector:
             window_size: Number of recent patterns to track
             stalling_threshold: Count for consecutive stalling detection
             presentation: Optional presentation adapter for icons (creates default if None)
+            decision_service: Optional LLMDecisionService for ambiguous loop detection
         """
         self._history: Deque[ThinkingPattern] = deque(maxlen=window_size)
         self._pattern_counts: Dict[str, int] = {}
@@ -267,6 +269,7 @@ class ThinkingPatternDetector:
         self._stalling_threshold = stalling_threshold
         self._iteration = 0
         self._consecutive_stalls = 0  # Track consecutive stalling
+        self._decision_service = decision_service
 
         # Statistics
         self._total_analyzed = 0
@@ -493,6 +496,32 @@ class ThinkingPatternDetector:
             )
             if recent_circular >= 2:
                 logger.debug("Circular phrases detected but not yet a loop")
+
+        # LLM augmentation: if ambiguous (near threshold), consult LLM
+        if self._decision_service is not None and len(self._history) > 2:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = self._decision_service.decide_sync(
+                    DecisionType.LOOP_DETECTION,
+                    context={
+                        "content_excerpt": content[:300],
+                        "recent_blocks": str(len(self._history)),
+                    },
+                    heuristic_confidence=0.4,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "is_loop"):
+                    if decision.result.is_loop:
+                        self._loops_detected += 1
+                        guidance = self._generate_guidance(
+                            decision.result.loop_type,
+                            1,
+                            pattern.category,
+                        )
+                        logger.debug("LLM detected loop: %s", decision.result.loop_type)
+                        return True, guidance
+            except Exception:
+                logger.debug("LLM loop detection failed", exc_info=True)
 
         return False, ""
 

@@ -354,7 +354,9 @@ class XAIProvider(BaseProvider):
                                     has_sent_final = True
                                 yield chunk
                         except json.JSONDecodeError:
-                            self._provider_logger.logger.warning(f"xAI JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(
+                                f"xAI JSON decode error on line: {line[:100]}"
+                            )
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(

@@ -73,6 +73,11 @@ class SaveCommand(BaseSlashCommand):
                 action = "Created new session"
 
             # Save to SQLite
+            # Get execution state for restoration on resume
+            execution_state = None
+            if hasattr(ctx.agent, "session_state_accessor"):
+                execution_state = ctx.agent.session_state_accessor.session_state.execution_state
+
             session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation,
                 model=ctx.agent.model,
@@ -81,6 +86,7 @@ class SaveCommand(BaseSlashCommand):
                 session_id=session_id,  # Use existing or None for new
                 title=title,
                 conversation_state=getattr(ctx.agent, "conversation_state", None),
+                execution_state=execution_state,
             )
 
             if session_id:
@@ -364,6 +370,24 @@ class ResumeCommand(BaseSlashCommand):
                     )
                 except Exception as e:
                     logger.warning(f"Failed to restore conversation state: {e}")
+
+            # Restore execution state (observed_files, tool_calls_used, etc.)
+            execution_state_dict = session_data.get("execution_state")
+            if execution_state_dict and hasattr(ctx.agent, "session_state_accessor"):
+                try:
+                    from victor.agent.session_state_manager import ExecutionState
+
+                    restored = ExecutionState.from_dict(execution_state_dict)
+                    accessor = ctx.agent.session_state_accessor
+                    accessor.observed_files = restored.observed_files
+                    accessor.executed_tools = restored.executed_tools
+                    accessor.tool_calls_used = restored.tool_calls_used
+                    logger.info(
+                        f"Restored execution state: {len(restored.observed_files)} files, "
+                        f"{restored.tool_calls_used} tool calls"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to restore execution state: {e}")
 
             ctx.console.print(
                 Panel(

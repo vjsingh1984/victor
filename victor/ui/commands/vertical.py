@@ -120,8 +120,9 @@ def install_vertical(
         console.print(f"[green]Success:[/] {message}")
         console.print()
         console.print("[bold]Next steps:[/]")
-        console.print(f"  1. Restart Victor to load the new vertical")
-        console.print(f"  2. Use 'victor vertical info {spec.name}' to see details")
+        console.print(f"  1. Victor refreshed package caches for this process")
+        console.print(f"  2. Restart other Victor sessions to load the new vertical")
+        console.print(f"  3. Use 'victor vertical info {spec.name}' to see details")
         console.print()
     else:
         console.print(f"[red]Error:[/] {message}")
@@ -174,7 +175,8 @@ def uninstall_vertical(
         console.print(f"[green]Success:[/] {message}")
         console.print()
         console.print("[bold]Next steps:[/]")
-        console.print(f"  1. Restart Victor to complete removal")
+        console.print(f"  1. Victor refreshed package caches for this process")
+        console.print(f"  2. Restart other Victor sessions to complete removal")
         console.print()
     else:
         console.print(f"[red]Error:[/] {message}")

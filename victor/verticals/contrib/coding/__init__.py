@@ -14,93 +14,129 @@
 
 """Coding Vertical Package.
 
-Victor's primary vertical for software development, providing:
-- Code exploration and understanding
-- Bug fixing and refactoring
-- Feature implementation
-- Testing and verification
-- Git operations and version control
-
-This package contains all coding-specific logic extracted from the framework,
-enabling the framework to remain domain-agnostic while providing rich
-coding assistant functionality.
-
-Package Structure:
-    assistant.py              - CodingAssistant vertical class
-    middleware.py             - Code correction middleware
-    safety.py                  - Coding-specific safety patterns (legacy)
-    safety_enhanced.py        - Enhanced safety with SafetyCoordinator
-    conversation_enhanced.py  - Enhanced conversation with ConversationCoordinator
-    prompts.py                - Task type hints and prompt contributions
-    mode_config.py            - Mode configurations and tool budgets
-    tool_dependencies.py      - Code tool dependency graph
-    service_provider.py       - DI service registration
-    workflows/                - Coding-specific workflows
-
-Usage:
-    from victor.coding import CodingAssistant
-
-    # Get vertical configuration
-    config = CodingAssistant.get_config()
-
-    # Get extensions for framework integration
-    extensions = CodingAssistant.get_extensions()
-
-    # Use enhanced features
-    from victor.coding import EnhancedCodingSafetyExtension, EnhancedCodingConversationManager
-
-    safety_ext = EnhancedCodingSafetyExtension()
-    conv_mgr = EnhancedCodingConversationManager()
+Victor's primary vertical for software development.
 """
 
-from victor.verticals.contrib.coding.assistant import CodingAssistant
-from victor.verticals.contrib.coding.middleware import (
-    CodingMiddleware,
-    CodeCorrectionMiddleware,
-)
-from victor.verticals.contrib.coding.safety import CodingSafetyExtension
-from victor.verticals.contrib.coding.safety_enhanced import (
-    CodingSafetyRules,
-    EnhancedCodingSafetyExtension,
-)
-from victor.verticals.contrib.coding.conversation_enhanced import (
-    CodingContext,
-    EnhancedCodingConversationManager,
-)
-from victor.verticals.contrib.coding.prompts import CodingPromptContributor
-from victor.verticals.contrib.coding.mode_config import CodingModeConfigProvider
-from victor.verticals.contrib.coding.service_provider import CodingServiceProvider
-from victor.verticals.contrib.coding.capabilities import (
-    CodingCapabilityProvider,
-    get_coding_capabilities,
-    create_coding_capability_loader,
-)
+import warnings
+from typing import Optional
 
-# Import canonical tool dependency provider instead of deprecated class
-from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+import typer
+from victor_sdk import PluginContext, VictorPlugin
 
-# Create canonical provider for coding vertical
-CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding")
+# Deprecation warning deferred to register() to avoid firing during discovery scan
+
+
+class CodingPlugin(VictorPlugin):
+    """Victor Plugin for Coding vertical."""
+
+    @property
+    def name(self) -> str:
+        return "coding"
+
+    def register(self, context: PluginContext) -> None:
+        """Register coding vertical and its specialized strategies."""
+        from victor.verticals.contrib._compat import external_package_installed
+
+        if external_package_installed("victor_coding"):
+            return
+
+        warnings.warn(
+            "victor.verticals.contrib.coding is deprecated and will be removed in v0.7.0. "
+            "Install the victor-coding package instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # Use lazy imports inside register to minimize startup overhead
+        from victor.verticals.contrib.coding.assistant import CodingAssistant
+        from victor.verticals.contrib.coding.codebase.chunker import CodeChunker
+
+        # Register vertical
+        context.register_vertical(CodingAssistant)
+
+        # Register specialized chunker
+        context.register_chunker(CodeChunker())
+
+        # Register coding-specific tools
+        try:
+            from victor.verticals.contrib.coding.tools.language_analyzer import language_analyzer
+            from victor.verticals.contrib.coding.tools.graph_tool import graph
+            from victor.verticals.contrib.coding.tools.code_review_tool import code_review
+            from victor.verticals.contrib.coding.tools.architecture_summary import (
+                architecture_summary,
+            )
+
+            context.register_tool(language_analyzer)
+            context.register_tool(graph)
+            context.register_tool(code_review)
+            context.register_tool(architecture_summary)
+        except ImportError:
+            pass
+
+        # Register domain command
+        from victor.verticals.contrib.coding.commands.analyze import app as analyze_app
+
+        context.register_command("analyze", analyze_app)
+
+    def get_cli_app(self) -> Optional[typer.Typer]:
+        """Return the coding-specific CLI application (legacy hook)."""
+        from victor.verticals.contrib.coding.commands.analyze import app as analyze_app
+
+        return analyze_app
+
+
+# Instantiate plugin for discovery
+plugin = CodingPlugin()
+
+
+# Lazy loading for members to avoid heavy imports on package discovery
+def __getattr__(name: str):
+    if name == "CodingAssistant":
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+        from victor.verticals.contrib.coding.assistant import CodingAssistant as Definition
+
+        return VerticalRuntimeAdapter.as_runtime_vertical_class(Definition)
+
+    if name == "CodingMiddleware":
+        from victor.verticals.contrib.coding.middleware import CodingMiddleware
+
+        return CodingMiddleware
+
+    if name == "CodeCorrectionMiddleware":
+        from victor.verticals.contrib.coding.middleware import CodeCorrectionMiddleware
+
+        return CodeCorrectionMiddleware
+
+    if name == "CodingSafetyExtension":
+        from victor.verticals.contrib.coding.safety import CodingSafetyExtension
+
+        return CodingSafetyExtension
+
+    if name == "EnhancedCodingSafetyExtension":
+        from victor.verticals.contrib.coding.safety_enhanced import EnhancedCodingSafetyExtension
+
+        return EnhancedCodingSafetyExtension
+
+    if name == "EnhancedCodingConversationManager":
+        from victor.verticals.contrib.coding.conversation_enhanced import (
+            EnhancedCodingConversationManager,
+        )
+
+        return EnhancedCodingConversationManager
+
+    if name == "CodingToolDependencyProvider":
+        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+
+        return create_vertical_tool_dependency_provider("coding")
+
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 __all__ = [
-    # Main vertical
     "CodingAssistant",
-    # Extensions
     "CodingMiddleware",
     "CodeCorrectionMiddleware",
     "CodingSafetyExtension",
-    # Enhanced Extensions (with new coordinators)
     "EnhancedCodingSafetyExtension",
     "EnhancedCodingConversationManager",
-    "CodingSafetyRules",
-    "CodingContext",
-    # Other extensions
-    "CodingPromptContributor",
-    "CodingModeConfigProvider",
-    "CodingToolDependencyProvider",  # Now uses canonical provider
-    "CodingServiceProvider",
-    # Phase 4 - Dynamic Capabilities
-    "CodingCapabilityProvider",
-    "get_coding_capabilities",
-    "create_coding_capability_loader",
+    "CodingToolDependencyProvider",
 ]

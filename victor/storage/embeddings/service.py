@@ -121,6 +121,9 @@ class EmbeddingService:
         # Shutdown flag to prevent new operations after shutdown initiated
         self._shutdown = False
 
+        # Fast hash for cache keys (xxhash if available, else SHA-256)
+        self._hash_fn = self._init_hash_fn()
+
     @classmethod
     def get_instance(
         cls,
@@ -242,8 +245,22 @@ class EmbeddingService:
         return self._model is not None
 
     def _get_cache_key(self, text: str) -> str:
-        """Generate cache key for text."""
-        return hashlib.sha256(text.encode()).hexdigest()[:16]
+        """Generate cache key for text.
+
+        Uses xxhash (C-backed, ~10x faster than SHA-256) for cache keys
+        where cryptographic strength is unnecessary.
+        """
+        return self._hash_fn(text.encode()).hexdigest()
+
+    @staticmethod
+    def _init_hash_fn():
+        """Select fastest available hash function for cache keys."""
+        try:
+            import xxhash
+
+            return xxhash.xxh64
+        except ImportError:
+            return lambda data: hashlib.sha256(data)
 
     def _estimate_embedding_memory(self, embedding: np.ndarray) -> int:
         """Estimate memory usage of an embedding in bytes.
@@ -550,6 +567,16 @@ class EmbeddingService:
             Similarity scores (shape: [n_items])
         """
         if corpus.size == 0:
+            return np.array([])
+
+        # Ensure corpus is at least 2D for axis operations
+        # Handle edge case where corpus might be 1D (malformed embeddings)
+        if corpus.ndim == 1:
+            # If corpus is 1D, it's a single vector - reshape to 2D
+            corpus = corpus.reshape(1, -1)
+        elif corpus.ndim != 2:
+            # Unexpected dimensionality - return empty
+            logger.warning(f"Unexpected corpus shape: {corpus.shape}, returning empty similarities")
             return np.array([])
 
         # NumPy with BLAS is faster than Rust for vectorized operations

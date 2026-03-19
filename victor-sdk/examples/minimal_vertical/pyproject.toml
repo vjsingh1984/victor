@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-minimal-vertical"
+version = "0.1.0"
+description = "Example minimal vertical using victor-sdk (zero runtime dependencies)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+
+# ONLY depends on victor-sdk - zero runtime dependencies!
+dependencies = [
+    "victor-sdk>=1.0.0a1",
+]
+
+[project.optional-dependencies]
+# Optional: install victor-ai to actually run the vertical
+runtime = [
+    "victor-ai>=0.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor"
+Repository = "https://github.com/vjsingh1984/victor"
+Documentation = "https://docs.victor.dev/sdk"
+
+[tool.setuptools]
+packages = ["victor_minimal_vertical"]
+
+# ============================================================================
+# ENTRY POINT REGISTRATIONS
+# ============================================================================
+
+# Vertical registration (standard)
+[project.entry-points."victor.verticals"]
+minimal = "victor_minimal_vertical:MinimalVertical"
+
+# Protocol implementations (NEW - Phase 4)
+[project.entry-points."victor.sdk.protocols"]
+minimal-tools = "victor_minimal_vertical.protocols:MinimalToolProvider"
+minimal-safety = "victor_minimal_vertical.protocols:MinimalSafetyProvider"
+
+# Capability providers (NEW - Phase 4)
+[project.entry-points."victor.sdk.capabilities"]
+minimal-search = "victor_minimal_vertical.capabilities:MinimalSearchCapability"
+minimal-validation = "victor_minimal_vertical.capabilities:MinimalValidationCapability"
+
+# Validators (NEW - Phase 4)
+[project.entry-points."victor.sdk.validators"]
+file-path = "victor_minimal_vertical.validators:validate_file_path"
+code-content = "victor_minimal_vertical.validators:validate_code_content"

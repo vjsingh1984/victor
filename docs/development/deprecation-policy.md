@@ -22,6 +22,30 @@ whichever is longer.
 4. Removal gates:
 - no removal without an inventory entry
 - no removal without migration notes in release documentation
+- no release may remove a deprecated API or shim unless the release notes call out
+  the replacement path, target removal version/date, and migration guidance
+
+## Release Note Requirements
+
+For every release that introduces, carries forward, or removes a deprecation:
+
+- update `CHANGELOG.md` or the release notes with:
+  - deprecated API/shim name
+  - replacement API/path
+  - target removal version and target removal date
+  - migration guide or migration snippet
+- if the release keeps a temporary compatibility shim, note that the shim remains
+  supported only through its published removal milestone
+- if the release removes a deprecated surface, include the removal in the
+  `Breaking Changes` section and link the migration guidance
+
+For `VerticalBase.create_agent()` and legacy config-only vertical activation shims:
+
+- deprecated in `Unreleased` on `2026-03-10`
+- earliest removal release remains `v0.8.0`
+- target removal date remains `2026-12-31`
+- every release before removal must restate the migration path to
+  `Agent.create(vertical=MyVertical, ...)`
 
 ## Current Removal Targets
 

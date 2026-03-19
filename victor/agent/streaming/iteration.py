@@ -147,18 +147,20 @@ class ToolExecutionResult:
         error: Optional[str] = None,
         elapsed: float = 0.0,
         args: Optional[Dict[str, Any]] = None,
+        follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """Add a tool result."""
-        self.results.append(
-            {
-                "name": name,
-                "success": success,
-                "result": result,
-                "error": error,
-                "elapsed": elapsed,
-                "args": args or {},
-            }
-        )
+        payload = {
+            "name": name,
+            "success": success,
+            "result": result,
+            "error": error,
+            "elapsed": elapsed,
+            "args": args or {},
+        }
+        if follow_up_suggestions:
+            payload["follow_up_suggestions"] = follow_up_suggestions
+        self.results.append(payload)
         if not success:
             self.all_succeeded = False
 

@@ -44,9 +44,10 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
-import json
 import logging
 import sqlite3
+
+from victor.core.json_utils import json_dumps, json_loads
 import uuid
 
 if TYPE_CHECKING:
@@ -1781,7 +1782,7 @@ class ConversationStore:
                     session.profile,
                     session.max_tokens,
                     session.reserved_tokens,
-                    json.dumps(
+                    json_dumps(
                         {
                             "active_files": session.active_files,
                             "tool_usage_count": session.tool_usage_count,
@@ -1821,7 +1822,7 @@ class ConversationStore:
                     message.priority.value,
                     message.tool_name,
                     message.tool_call_id,
-                    json.dumps(message.metadata),
+                    json_dumps(message.metadata),
                 ),
             )
 
@@ -1881,7 +1882,7 @@ class ConversationStore:
 
     def _session_from_row(self, row: sqlite3.Row) -> ConversationSession:
         """Create session from database row with normalized FK lookups."""
-        metadata = json.loads(row["metadata"] or "{}")
+        metadata = json_loads(row["metadata"] or "{}")
         row_keys = row.keys()
 
         # Get provider from joined table or NULL
@@ -1947,7 +1948,7 @@ class ConversationStore:
             priority=MessagePriority(row["priority"]),
             tool_name=row["tool_name"],
             tool_call_id=row["tool_call_id"],
-            metadata=json.loads(row["metadata"] or "{}"),
+            metadata=json_loads(row["metadata"] or "{}"),
         )
 
     @staticmethod
@@ -2266,7 +2267,7 @@ class ConversationStore:
                     session_id,
                     summary,
                     token_count,
-                    json.dumps(messages_summarized),
+                    json_dumps(messages_summarized),
                     datetime.now().isoformat(),
                 ),
             )
@@ -2704,8 +2705,8 @@ class ConversationStore:
             from victor.processing.native import cosine_similarity
 
             return cosine_similarity(vec1, vec2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cosine similarity computation failed, returning 0.0: %s", e)
         return 0.0
 
 

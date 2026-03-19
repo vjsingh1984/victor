@@ -14,35 +14,33 @@
 
 """Backward-compatible shim bridging legacy CLI to Framework API.
 
+.. deprecated::
+    This module is deprecated and will be removed in Victor 2.0.
+    Migrate to using ``Agent.create()`` directly from the Framework API.
+
 This module provides a transition layer that allows existing code using
 AgentOrchestrator.from_settings() to benefit from framework features
 (observability, verticals, unified events) without modification.
+
+Migration Path:
+    **OLD (deprecated):**
+        shim = FrameworkShim(settings, profile)
+        orchestrator = await shim.create_orchestrator()
+
+    **NEW (Framework API):**
+        from victor.framework import Agent
+
+        orchestrator = await Agent.create(
+            settings=settings,
+            profile="default",
+            vertical="coding",
+        )
 
 Design Pattern: Adapter
 - Wraps legacy creation with framework wiring
 - Adds framework features without breaking existing callers
 
-Migration Path:
-    1. Phase 1: FrameworkShim wraps from_settings (current)
-    2. Phase 2: CLI uses FrameworkShim instead of direct calls
-    3. Phase 3: Observability wired by default
-    4. Phase 4: Clean migration to Agent.create() path
-
-Example:
-    # Before:
-    orchestrator = await AgentOrchestrator.from_settings(settings, profile)
-
-    # After (drop-in replacement):
-    shim = FrameworkShim(settings, profile)
-    orchestrator = await shim.create_orchestrator()
-
-    # With vertical:
-    shim = FrameworkShim(settings, profile, vertical=CodingAssistant)
-    orchestrator = await shim.create_orchestrator()
-
-    # Access observability
-    if shim.observability:
-        shim.observability.on_session_start({"mode": "cli"})
+For migration examples, see: ``docs/MIGRATION_GUIDE.md``
 """
 
 from __future__ import annotations
@@ -65,10 +63,39 @@ logger = logging.getLogger(__name__)
 class FrameworkShim:
     """Shim layer for framework-enhanced orchestrator creation.
 
+    .. deprecated::
+        ``FrameworkShim`` is deprecated and will be removed in Victor 2.0.
+        Use ``Agent.create()`` from the Framework API instead.
+
     This class bridges the gap between the legacy CLI path (which uses
     AgentOrchestrator.from_settings()) and the new Framework API (which
     uses Agent.create()). It allows the CLI to gain framework features
     like observability and vertical configuration without breaking changes.
+
+    Migration Path:
+        **OLD (deprecated):**
+            shim = FrameworkShim(settings, "default")
+            orchestrator = await shim.create_orchestrator()
+
+        **NEW (Framework API):**
+            from victor.framework import Agent
+
+            orchestrator = await Agent.create(
+                settings=settings,
+                profile="default",
+            )
+
+        **With vertical (deprecated):**
+            shim = FrameworkShim(settings, "default", vertical="coding")
+
+        **With vertical (Framework API):**
+            from victor.framework import Agent
+
+            orchestrator = await Agent.create(
+                settings=settings,
+                profile="default",
+                vertical="coding",
+            )
 
     Features:
         - Wraps AgentOrchestrator.from_settings() transparently
@@ -81,19 +108,6 @@ class FrameworkShim:
         orchestrator: Created orchestrator instance (after create_orchestrator())
         observability: ObservabilityIntegration instance (if enabled)
         session_id: Session ID for event correlation
-
-    Usage:
-        # Basic usage (same as from_settings)
-        shim = FrameworkShim(settings, "default")
-        orchestrator = await shim.create_orchestrator()
-
-        # With vertical
-        shim = FrameworkShim(settings, "default", vertical=CodingAssistant)
-        orchestrator = await shim.create_orchestrator()
-
-        # With explicit session ID
-        shim = FrameworkShim(settings, session_id="user-session-123")
-        orchestrator = await shim.create_orchestrator()
     """
 
     def __init__(
@@ -108,6 +122,9 @@ class FrameworkShim:
     ) -> None:
         """Initialize the FrameworkShim.
 
+        .. deprecated::
+            ``FrameworkShim`` is deprecated. Use ``Agent.create()`` instead.
+
         Args:
             settings: Victor settings object.
             profile_name: Profile name from profiles.yaml.
@@ -119,6 +136,17 @@ class FrameworkShim:
                 If not provided, a new UUID will be generated.
             enable_cqrs_bridge: Whether to enable CQRS event bridging.
         """
+        import warnings
+
+        warnings.warn(
+            "FrameworkShim is deprecated and will be removed in Victor 2.0. "
+            "Use Agent.create() from the Framework API instead. "
+            "See docs/MIGRATION_GUIDE.md for migration examples. "
+            "Example: orchestrator = await Agent.create(settings, profile='default')",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self._settings = settings
         self._profile_name = profile_name
         self._thinking = thinking

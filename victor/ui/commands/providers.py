@@ -114,7 +114,9 @@ def _list_providers_impl() -> None:
 def check_provider(
     provider: str = typer.Argument(..., help="Provider name (e.g., deepseek, anthropic, ollama)"),
     model: str = typer.Option("deepseek-chat", help="Model to check"),
-    connectivity: bool = typer.Option(False, "--connectivity", "-c", help="Perform connectivity test (slower)"),
+    connectivity: bool = typer.Option(
+        False, "--connectivity", "-c", help="Perform connectivity test (slower)"
+    ),
     timeout: float = typer.Option(5.0, help="Timeout for connectivity check (seconds)"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
@@ -125,6 +127,7 @@ def check_provider(
         victor providers check anthropic --connectivity
         victor providers check ollama
     """
+
     async def run_check():
         checker = ProviderHealthChecker()
         result = await checker.check_provider(
@@ -136,13 +139,14 @@ def check_provider(
 
         if json_output:
             import json
+
             console.print(json.dumps(result.to_dict(), indent=2))
             return
 
         # Display results in a nice format
         if result.healthy:
             status_panel = Panel(
-                f"[bold green]✓ HEALTHY[/bold green]",
+                "[bold green]✓ HEALTHY[/bold green]",
                 title=f"[bold]{provider.upper()}[/bold]",
                 subtitle=f"Model: {model}",
             )
@@ -166,7 +170,7 @@ def check_provider(
                     console.print(f"  ⚠️  {warning}")
         else:
             status_panel = Panel(
-                f"[bold red]✗ UNHEALTHY[/bold red]",
+                "[bold red]✗ UNHEALTHY[/bold red]",
                 title=f"[bold]{provider.upper()}[/bold]",
                 subtitle=f"Model: {model}",
             )
@@ -221,7 +225,7 @@ def verify_provider(
         resolver = UnifiedApiKeyResolver()
         key_result = resolver.get_api_key(provider, explicit_key=api_key)
 
-        console.print(f"\n[bold]API Key Resolution:[/bold]")
+        console.print("\n[bold]API Key Resolution:[/bold]")
         for i, source in enumerate(key_result.sources_attempted, 1):
             status = "[green]✓[/green]" if source.found else "[red]✗[/red]"
             console.print(f"  {i}. {status} {source.description}")
@@ -240,7 +244,7 @@ def verify_provider(
             raise typer.Exit(1)
 
         # Run health check
-        console.print(f"\n[bold]Health Check:[/bold]")
+        console.print("\n[bold]Health Check:[/bold]")
         checker = ProviderHealthChecker()
         health_result = await checker.check_provider(
             provider=provider,
@@ -311,9 +315,7 @@ def auth_login(
             token = await mgr.get_valid_token()
             if token:
                 console.print(f"[green]✓[/] Successfully authenticated with {provider}")
-                console.print(
-                    f"  Token saved to ~/.victor/oauth_tokens.yaml"
-                )
+                console.print("  Token saved to ~/.victor/oauth_tokens.yaml")
             else:
                 console.print(f"[red]✗[/] Authentication failed for {provider}")
                 raise typer.Exit(1)
@@ -365,9 +367,7 @@ def auth_status(
     """
     from victor.providers.oauth_manager import OAuthTokenManager
 
-    providers_to_check = (
-        [provider.lower()] if provider else OAUTH_SUPPORTED_PROVIDERS
-    )
+    providers_to_check = [provider.lower()] if provider else OAUTH_SUPPORTED_PROVIDERS
 
     table = Table(title="OAuth Authentication Status", show_header=True)
     table.add_column("Provider", style="cyan")
@@ -402,9 +402,5 @@ def auth_status(
             )
 
     console.print(table)
-    console.print(
-        "\n[dim]Login:  victor providers auth login <provider>[/]"
-    )
-    console.print(
-        "[dim]Logout: victor providers auth logout <provider>[/]"
-    )
+    console.print("\n[dim]Login:  victor providers auth login <provider>[/]")
+    console.print("[dim]Logout: victor providers auth logout <provider>[/]")

@@ -16,7 +16,7 @@ This document provides a comprehensive overview of Victor's architecture, coveri
 
 ## High-Level Architecture
 
-Victor is an open-source agentic AI framework supporting 22 LLM providers with 33 tool modules across 9 domain verticals. The architecture follows a layered design with clear separation of concerns.
+Victor is an open-source agentic AI framework supporting 24 LLM providers with 34 tool modules across 9 domain verticals. The architecture follows a layered design with clear separation of concerns.
 
 ### System Architecture Diagram
 
@@ -40,6 +40,14 @@ Victor is an open-source agentic AI framework supporting 22 LLM providers with 3
 |   +---------------+  +---------------+  +-----------------+              |
 |   |ProviderManager|  | ToolRegistrar |  |  TaskAnalyzer   |              |
 |   +---------------+  +---------------+  +-----------------+              |
+|   +---------------------+  +---------------------+  +-----------------+  |
+|   |PropertyFacade (37)   |  |CallbackCoordinator  |  | InitPhaseManager|  |
+|   +---------------------+  +---------------------+  +-----------------+  |
+|   +---------------------+  +---------------------+                       |
+|   |SessionStateAccessor  |  |21 Coordinators      |                       |
+|   +---------------------+  +---------------------+                       |
+|   8 Runtime Boundaries: provider, metrics, workflow, memory,             |
+|   resilience, coordination, interaction, services                        |
 +-----------------------------+--------------------------------------------+
                               |
          +--------------------+--------------------+
@@ -47,14 +55,14 @@ Victor is an open-source agentic AI framework supporting 22 LLM providers with 3
          v                    v                    v
 +----------------+   +----------------+   +-------------------+
 |   PROVIDERS    |   |     TOOLS      |   |    WORKFLOWS      |
-|      (22)      |   |  (33 modules)  |   |    StateGraph     |
+|      (24)      |   |  (34 modules)  |   |    StateGraph     |
 |                |   |                |   |    + YAML         |
 | - Anthropic    |   | - File Ops     |   |                   |
 | - OpenAI       |   | - Git          |   | +---------------+ |
 | - Google       |   | - Shell        |   | |UnifiedCompiler| |
 | - Ollama       |   | - Web          |   | +---------------+ |
 | - DeepSeek     |   | - Search       |   |                   |
-| - 17 more...   |   | - Analysis     |   | +---------------+ |
+| - 19 more...   |   | - Analysis     |   | +---------------+ |
 +----------------+   +----------------+   | |WorkflowEngine | |
                                           | +---------------+ |
     +-------------------------------------+-------------------+
@@ -97,17 +105,22 @@ flowchart TB
         SC["StreamingController"]
         PM["ProviderManager"]
         TR["ToolRegistrar"]
+        PF["PropertyFacade (37 props)"]
+        CBC["CallbackCoordinator"]
+        IPM["InitPhaseManager (8 phases)"]
+        SSA["SessionStateAccessor"]
+        COORD["21 Coordinators"]
     end
 
-    subgraph Providers["PROVIDERS (22)"]
+    subgraph Providers["PROVIDERS (24)"]
         ANT["Anthropic"]
         OAI["OpenAI"]
         GGL["Google"]
         OLL["Ollama"]
-        MORE["+ 18 more"]
+        MORE["+ 20 more"]
     end
 
-    subgraph Tools["TOOLS (33 modules)"]
+    subgraph Tools["TOOLS (34 modules)"]
         FILE["File Ops"]
         GIT["Git"]
         SHELL["Shell"]
@@ -153,6 +166,11 @@ flowchart TB
     ORC --> SC
     ORC --> PM
     ORC --> TR
+    ORC --> PF
+    ORC --> CBC
+    ORC --> IPM
+    ORC --> SSA
+    ORC --> COORD
     Orchestrator --> Providers
     Orchestrator --> Tools
     Orchestrator --> Workflows
@@ -176,9 +194,16 @@ flowchart TB
 
 ### AgentOrchestrator
 
-**Location:** `victor/agent/orchestrator.py`
+**Location:** `victor/agent/orchestrator.py` (~3,940 LOC)
 
-Central **Facade** — thin coordination layer delegating to specialized components. Manages chat flow, configuration, session lifecycle, and provider switching.
+Central **Facade** — thin coordination layer delegating to specialized components. Manages chat flow, configuration, session lifecycle, and provider switching. The orchestrator has been decomposed into several extracted modules:
+
+- **OrchestratorPropertyFacade** (`orchestrator_properties.py`) — 37 properties installed via `install_properties()`, keeping the main orchestrator class slim
+- **CallbackCoordinator** (`callback_coordinator.py`) — tool and streaming lifecycle callbacks
+- **InitializationPhaseManager** (`runtime/initialization_manager.py`) — 8-phase structured initialization sequence
+- **SessionStateAccessor** — session state delegation
+- **8 Runtime Boundaries** — provider, metrics, workflow, memory, resilience, coordination, interaction, services
+- **21 Coordinators** (`victor/agent/coordinators/`) — fine-grained coordination modules
 
 ```python
 from victor.agent.orchestrator import AgentOrchestrator
@@ -207,7 +232,7 @@ Validates, selects, and executes tools with budget enforcement. Key methods: `ex
 
 **Location:** `victor/agent/provider_manager.py`
 
-Manages 22 LLM provider adapters — initialization, mid-conversation switching, health monitoring with circuit breaker, and fallback selection. Key methods: `get_provider()`, `switch()`, `check_health()`.
+Manages 24 LLM provider adapters — initialization, mid-conversation switching, health monitoring with circuit breaker, and fallback selection. Optionally uses `ProviderPool` (enabled via `use_provider_pooling` feature flag) for pooled provider instances. Key methods: `get_provider()`, `switch()`, `check_health()`.
 
 ### ServiceProvider
 
@@ -239,6 +264,23 @@ Multi-agent coordination with 4 formation strategies: SEQUENTIAL, PARALLEL, HIER
 **Location:** `victor/state/`
 
 Unified state management across 4 scopes: WORKFLOW, CONVERSATION, TEAM, GLOBAL. The `GlobalStateManager` facade provides a single entry point with copy-on-write optimization.
+
+### Extension Loader
+
+**Location:** `victor/core/verticals/` (~1,897 LOC total)
+
+Responsible for discovering, loading, and caching vertical extensions. Decomposed into focused components:
+
+- **ExtensionModuleResolver** (`extension_module_resolver.py`) — module path resolution for vertical packages
+- **ExtensionCacheManager** (`extension_cache_manager.py`) — thread-safe namespaced cache for loaded extensions
+- **ExtensionLoaderPressureMonitor** — metrics and queue pressure tracking
+- **CapabilityNegotiator** (`capability_negotiator.py`) — validates `ExtensionManifest` during vertical activation
+
+### SDK Extension Support
+
+**Location:** `victor-sdk/victor_sdk/`
+
+The SDK now exports `ExtensionManifest`, `ExtensionType`, and API versioning utilities. `VerticalBase.get_manifest()` auto-builds a manifest from overridden hooks, which the `CapabilityNegotiator` validates during vertical activation.
 
 ### Events & CQRS
 
@@ -328,7 +370,7 @@ workflows:
 
 ### Vertical Architecture
 
-Self-contained domain modules that encapsulate tools, prompts, workflows, and configurations.
+Self-contained domain modules that encapsulate tools, prompts, workflows, and configurations. Built-in contrib verticals (`victor/verticals/contrib/`) now emit a `DeprecationWarning` on import; external packages registered via entry points are preferred.
 
 ```
 victor/{vertical}/
@@ -519,7 +561,7 @@ Victor's architecture adheres to SOLID principles:
 
 | Principle | Implementation |
 |-----------|----------------|
-| **Single Responsibility (SRP)** | Each StepHandler handles one concern; Orchestrator is a thin facade |
+| **Single Responsibility (SRP)** | Each StepHandler handles one concern; Orchestrator delegates to 21 coordinators, PropertyFacade, CallbackCoordinator, InitPhaseManager |
 | **Open/Closed (OCP)** | ExtensionHandlerRegistry for pluggable components; Plugin system for providers/tools |
 | **Liskov Substitution (LSP)** | Protocol-based interfaces ensure substitutability |
 | **Interface Segregation (ISP)** | Focused protocols like `SubAgentContext` |
@@ -527,7 +569,7 @@ Victor's architecture adheres to SOLID principles:
 
 ### Provider Agnosticism
 
-Victor supports 22 LLM providers through a unified interface:
+Victor supports 24 LLM providers through a unified interface:
 
 - **Frontier Cloud:** Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex
 - **Local (air-gapped):** Ollama, LM Studio, vLLM, llama.cpp
@@ -552,7 +594,7 @@ When `airgapped_mode=True`:
 |--------------|--------|----------|
 | **Lazy Tool Loading** | Faster startup | `victor/tools/composition/lazy.py` |
 | **AOT Manifest Cache** | 50-100ms startup savings | `victor/core/aot_manifest.py` |
-| **Extension Caching** | One-time initialization | `VerticalBase._get_cached_extension()` |
+| **Extension Caching** | One-time initialization | `ExtensionCacheManager` (thread-safe namespaced) |
 | **Two-Level Workflow Cache** | Definition + execution caching | `victor/workflows/unified_compiler.py` |
 | **RL Cache Eviction** | Smart cache management | `victor/storage/cache/rl_eviction_policy.py` |
 
@@ -582,13 +624,13 @@ When `airgapped_mode=True`:
 
 | Aspect | Details |
 |--------|---------|
-| **Architecture Pattern** | Facade with extracted components |
-| **Provider Count** | 22 (cloud + local) |
-| **Tool Count** | 33 tool modules |
+| **Architecture Pattern** | Facade with extracted components (21 coordinators, 8 runtime boundaries) |
+| **Provider Count** | 24 (cloud + local) |
+| **Tool Count** | 34 tool modules |
 | **Vertical Count** | 9 built-in (Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark) |
 | **Team Formations** | 4 (Sequential, Parallel, Hierarchical, Pipeline) |
 | **State Scopes** | 4 (Workflow, Conversation, Team, Global) |
 | **Key Entry Point** | `AgentOrchestrator.process_message()` |
-| **Configuration** | YAML profiles + Python settings |
+| **Configuration** | YAML profiles + Python settings (16 nested config groups, flat-access deprecated) |
 | **Extension Mechanism** | Entry points (`victor.verticals`, `victor.providers`) |
 | **Air-Gapped Support** | Yes (Ollama, LM Studio, vLLM, llama.cpp) |

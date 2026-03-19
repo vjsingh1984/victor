@@ -37,14 +37,64 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.capability_config_service import CapabilityConfigService
-from victor.coding.workflows import CodingWorkflowProvider
-from victor.devops.workflows import DevOpsWorkflowProvider
-from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
-from victor.research.workflows import ResearchWorkflowProvider
-from victor.rag.workflows import RAGWorkflowProvider
-from victor.benchmark.workflows import BenchmarkWorkflowProvider
+
+
+def _load_vertical_attr(
+    module_path: str,
+    attr_name: str,
+    *,
+    allow_module_level: bool = False,
+):
+    """Resolve vertical attributes using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(
+            f"Vertical module or attribute unavailable: {module_path}:{attr_name}",
+            allow_module_level=allow_module_level,
+        )
+    return getattr(module, attr_name)
+
+
+def _load_provider_class(provider_class_path: str):
+    """Load a provider class from dotted path using vertical import fallbacks."""
+    module_path, class_name = provider_class_path.rsplit(".", 1)
+    return _load_vertical_attr(module_path, class_name)
+
+
+CodingWorkflowProvider = _load_vertical_attr(
+    "victor.coding.workflows",
+    "CodingWorkflowProvider",
+    allow_module_level=True,
+)
+DevOpsWorkflowProvider = _load_vertical_attr(
+    "victor.devops.workflows",
+    "DevOpsWorkflowProvider",
+    allow_module_level=True,
+)
+DataAnalysisWorkflowProvider = _load_vertical_attr(
+    "victor.dataanalysis.workflows",
+    "DataAnalysisWorkflowProvider",
+    allow_module_level=True,
+)
+ResearchWorkflowProvider = _load_vertical_attr(
+    "victor.research.workflows",
+    "ResearchWorkflowProvider",
+    allow_module_level=True,
+)
+RAGWorkflowProvider = _load_vertical_attr(
+    "victor.rag.workflows",
+    "RAGWorkflowProvider",
+    allow_module_level=True,
+)
+BenchmarkWorkflowProvider = _load_vertical_attr(
+    "victor.benchmark.workflows",
+    "BenchmarkWorkflowProvider",
+    allow_module_level=True,
+)
 
 
 class MockOrchestrator:
@@ -222,10 +272,17 @@ class TestResearchVerticalCapabilities:
         Verifies that getter functions properly retrieve configuration
         from the orchestrator.
         """
-        from victor.research.capabilities import (
-            get_source_verification,
-            get_citation_config,
-            get_research_quality,
+        get_source_verification = _load_vertical_attr(
+            "victor.research.capabilities",
+            "get_source_verification",
+        )
+        get_citation_config = _load_vertical_attr(
+            "victor.research.capabilities",
+            "get_citation_config",
+        )
+        get_research_quality = _load_vertical_attr(
+            "victor.research.capabilities",
+            "get_research_quality",
         )
 
         orchestrator = MockOrchestrator()
@@ -341,7 +398,10 @@ class TestDevOpsVerticalCapabilities:
 
     def test_devops_getter_methods(self):
         """Test DevOps capability getter methods."""
-        from victor.devops.capabilities import get_container_settings
+        get_container_settings = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "get_container_settings",
+        )
 
         orchestrator = MockOrchestrator()
         orchestrator.container_config = {
@@ -421,7 +481,14 @@ class TestDataAnalysisVerticalCapabilities:
         Verifies that DataAnalysisCapabilityProvider properly delegates
         to framework PrivacyCapabilityProvider for privacy management.
         """
-        from victor.dataanalysis.capabilities import configure_data_privacy, get_privacy_config
+        configure_data_privacy = _load_vertical_attr(
+            "victor.dataanalysis.capabilities",
+            "configure_data_privacy",
+        )
+        get_privacy_config = _load_vertical_attr(
+            "victor.dataanalysis.capabilities",
+            "get_privacy_config",
+        )
 
         orchestrator = MockOrchestrator()
 
@@ -486,7 +553,10 @@ class TestCodingVerticalCapabilities:
         Since CodingWorkflowProvider doesn't implement the hook,
         test that we can still import the provider directly.
         """
-        from victor.coding.capabilities import CodingCapabilityProvider
+        CodingCapabilityProvider = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "CodingCapabilityProvider",
+        )
 
         provider = CodingCapabilityProvider()
 
@@ -505,7 +575,10 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capabilities_accessible(self):
         """Test that all 5 Coding capabilities are accessible via direct import."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        CodingCapabilityProvider = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "CodingCapabilityProvider",
+        )
 
         cap_provider = CodingCapabilityProvider()
         capabilities = cap_provider.get_capabilities()
@@ -518,7 +591,10 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capability_metadata(self):
         """Test that Coding capability metadata is correct."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        CodingCapabilityProvider = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "CodingCapabilityProvider",
+        )
 
         cap_provider = CodingCapabilityProvider()
         metadata = cap_provider.get_capability_metadata()
@@ -536,7 +612,10 @@ class TestCodingVerticalCapabilities:
 
     def test_coding_capability_application(self):
         """Test that Coding capabilities can be applied to orchestrator."""
-        from victor.coding.capabilities import CodingCapabilityProvider
+        CodingCapabilityProvider = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "CodingCapabilityProvider",
+        )
 
         cap_provider = CodingCapabilityProvider()
         orchestrator = MockOrchestrator()
@@ -559,9 +638,13 @@ class TestCodingVerticalCapabilities:
         Verifies that capabilities properly integrate with coding middleware
         like code style enforcement.
         """
-        from victor.coding.capabilities import (
-            configure_code_style,
-            get_code_style,
+        configure_code_style = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "configure_code_style",
+        )
+        get_code_style = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "get_code_style",
         )
 
         orchestrator = MockOrchestrator()
@@ -604,7 +687,10 @@ class TestRAGVerticalCapabilities:
         RAG has a capabilities module but the workflow provider hook
         is not yet implemented. Test direct import functionality.
         """
-        from victor.rag.capabilities import RAGCapabilityProvider
+        RAGCapabilityProvider = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "RAGCapabilityProvider",
+        )
 
         provider = RAGCapabilityProvider()
 
@@ -623,7 +709,10 @@ class TestRAGVerticalCapabilities:
 
     def test_rag_capabilities_accessible(self):
         """Test that all 5 RAG capabilities are accessible."""
-        from victor.rag.capabilities import RAGCapabilityProvider
+        RAGCapabilityProvider = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "RAGCapabilityProvider",
+        )
 
         cap_provider = RAGCapabilityProvider()
         capabilities = cap_provider.get_capabilities()
@@ -636,7 +725,10 @@ class TestRAGVerticalCapabilities:
 
     def test_rag_capability_metadata(self):
         """Test that RAG capability metadata is correct."""
-        from victor.rag.capabilities import RAGCapabilityProvider
+        RAGCapabilityProvider = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "RAGCapabilityProvider",
+        )
 
         cap_provider = RAGCapabilityProvider()
         metadata = cap_provider.get_capability_metadata()
@@ -658,7 +750,10 @@ class TestRAGVerticalCapabilities:
 
     def test_rag_capability_application(self):
         """Test that RAG capabilities can be applied to orchestrator."""
-        from victor.rag.capabilities import RAGCapabilityProvider
+        RAGCapabilityProvider = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "RAGCapabilityProvider",
+        )
 
         cap_provider = RAGCapabilityProvider()
         orchestrator = MockOrchestrator()
@@ -797,7 +892,10 @@ class TestCapabilityProviderErrorHandling:
         Verifies that capabilities don't crash when applied to orchestrator
         missing expected attributes.
         """
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         cap_provider = ResearchCapabilityProvider()
 
@@ -829,7 +927,10 @@ class TestCapabilityProviderLazyLoading:
         assert cap_provider is not None
 
         # Verify it's the right type
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         assert isinstance(cap_provider, ResearchCapabilityProvider)
 
@@ -840,7 +941,10 @@ class TestCapabilityProviderLazyLoading:
         cap_provider = provider.get_capability_provider()
         assert cap_provider is not None
 
-        from victor.devops.capabilities import DevOpsCapabilityProvider
+        DevOpsCapabilityProvider = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "DevOpsCapabilityProvider",
+        )
 
         assert isinstance(cap_provider, DevOpsCapabilityProvider)
 
@@ -851,7 +955,10 @@ class TestCapabilityProviderLazyLoading:
         cap_provider = provider.get_capability_provider()
         assert cap_provider is not None
 
-        from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+        DataAnalysisCapabilityProvider = _load_vertical_attr(
+            "victor.dataanalysis.capabilities",
+            "DataAnalysisCapabilityProvider",
+        )
 
         assert isinstance(cap_provider, DataAnalysisCapabilityProvider)
 
@@ -886,23 +993,14 @@ class TestCapabilityMetadataConsistency:
             ("research", "victor.research.capabilities.ResearchCapabilityProvider", 5),
             ("devops", "victor.devops.capabilities.DevOpsCapabilityProvider", 5),
             ("dataanalysis", "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider", 5),
-            ("coding", "victor.coding.capabilities.CodingCapabilityProvider", 5),
+            ("coding", "victor_coding.capabilities.CodingCapabilityProvider", 5),
             ("rag", "victor.rag.capabilities.RAGCapabilityProvider", 5),
         ],
     )
     def test_capability_count(self, vertical, provider_class, expected_count):
         """Test that each vertical has the expected number of capabilities."""
-        # Dynamic import
-        parts = provider_class.split(".")
-        module_path = ".".join(parts[:-1])
-        class_name = parts[-1]
-
-        from importlib import import_module
-
-        module = import_module(module_path)
-        provider_class = getattr(module, class_name)
-
-        provider = provider_class()
+        provider_cls = _load_provider_class(provider_class)
+        provider = provider_cls()
         capabilities = provider.get_capabilities()
 
         assert len(capabilities) == expected_count, (
@@ -916,7 +1014,7 @@ class TestCapabilityMetadataConsistency:
             "victor.research.capabilities.ResearchCapabilityProvider",
             "victor.devops.capabilities.DevOpsCapabilityProvider",
             "victor.dataanalysis.capabilities.DataAnalysisCapabilityProvider",
-            "victor.coding.capabilities.CodingCapabilityProvider",
+            "victor_coding.capabilities.CodingCapabilityProvider",
             "victor.rag.capabilities.RAGCapabilityProvider",
         ],
     )
@@ -929,17 +1027,8 @@ class TestCapabilityMetadataConsistency:
         - version (str)
         - tags (List[str])
         """
-        # Dynamic import
-        parts = provider_class.split(".")
-        module_path = ".".join(parts[:-1])
-        class_name = parts[-1]
-
-        from importlib import import_module
-
-        module = import_module(module_path)
-        provider_class = getattr(module, class_name)
-
-        provider = provider_class()
+        provider_cls = _load_provider_class(provider_class)
+        provider = provider_cls()
         metadata = provider.get_capability_metadata()
 
         for cap_name, meta in metadata.items():
@@ -962,17 +1051,13 @@ class TestCapabilityMetadataConsistency:
             ("victor.research.capabilities", "ResearchCapabilityProvider"),
             ("victor.devops.capabilities", "DevOpsCapabilityProvider"),
             ("victor.dataanalysis.capabilities", "DataAnalysisCapabilityProvider"),
-            ("victor.coding.capabilities", "CodingCapabilityProvider"),
+            ("victor_coding.capabilities", "CodingCapabilityProvider"),
             ("victor.rag.capabilities", "RAGCapabilityProvider"),
         ]
 
         for module_path, class_name in providers:
-            from importlib import import_module
-
-            module = import_module(module_path)
-            provider_class = getattr(module, class_name)
-
-            provider = provider_class()
+            provider_cls = _load_vertical_attr(module_path, class_name)
+            provider = provider_cls()
             capabilities = provider.get_capabilities()
             metadata = provider.get_capability_metadata()
 
@@ -993,9 +1078,18 @@ class TestCrossVerticalCapabilityIntegration:
         Verifies that an orchestrator can have capabilities from different
         verticals applied without conflicts.
         """
-        from victor.research.capabilities import ResearchCapabilityProvider
-        from victor.devops.capabilities import DevOpsCapabilityProvider
-        from victor.coding.capabilities import CodingCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
+        DevOpsCapabilityProvider = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "DevOpsCapabilityProvider",
+        )
+        CodingCapabilityProvider = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "CodingCapabilityProvider",
+        )
 
         orchestrator = MockOrchestrator()
 
@@ -1025,9 +1119,18 @@ class TestCrossVerticalCapabilityIntegration:
         Verifies that capabilities that depend on other capabilities
         correctly declare their dependencies in metadata.
         """
-        from victor.research.capabilities import ResearchCapabilityProvider
-        from victor.devops.capabilities import DevOpsCapabilityProvider
-        from victor.rag.capabilities import RAGCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
+        DevOpsCapabilityProvider = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "DevOpsCapabilityProvider",
+        )
+        RAGCapabilityProvider = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "RAGCapabilityProvider",
+        )
 
         # Research dependencies
         research_provider = ResearchCapabilityProvider()
@@ -1059,7 +1162,14 @@ class TestServiceBackedCapabilityConfigFlow:
     """Integration tests for service-backed capability config runtime getters."""
 
     def test_coding_service_backed_getter_flow(self):
-        from victor.coding.capabilities import configure_code_style, get_code_style
+        configure_code_style = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "configure_code_style",
+        )
+        get_code_style = _load_vertical_attr(
+            "victor.coding.capabilities",
+            "get_code_style",
+        )
 
         service = CapabilityConfigService()
         orchestrator = ServiceBackedOrchestrator(service)
@@ -1070,7 +1180,14 @@ class TestServiceBackedCapabilityConfigFlow:
         assert get_code_style(orchestrator)["max_line_length"] == 120
 
     def test_rag_service_backed_getter_flow(self):
-        from victor.rag.capabilities import configure_retrieval, get_retrieval_config
+        configure_retrieval = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "configure_retrieval",
+        )
+        get_retrieval_config = _load_vertical_attr(
+            "victor.rag.capabilities",
+            "get_retrieval_config",
+        )
 
         service = CapabilityConfigService()
         orchestrator = ServiceBackedOrchestrator(service)
@@ -1082,7 +1199,14 @@ class TestServiceBackedCapabilityConfigFlow:
         assert get_retrieval_config(orchestrator)["search_type"] == "semantic"
 
     def test_devops_service_backed_getter_flow(self):
-        from victor.devops.capabilities import configure_container_settings, get_container_settings
+        configure_container_settings = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "configure_container_settings",
+        )
+        get_container_settings = _load_vertical_attr(
+            "victor.devops.capabilities",
+            "get_container_settings",
+        )
 
         service = CapabilityConfigService()
         orchestrator = ServiceBackedOrchestrator(service)
@@ -1093,9 +1217,13 @@ class TestServiceBackedCapabilityConfigFlow:
         assert get_container_settings(orchestrator)["max_image_size_mb"] == 1024
 
     def test_dataanalysis_service_backed_getter_flow(self):
-        from victor.dataanalysis.capabilities import (
-            configure_statistical_analysis,
-            get_statistical_config,
+        configure_statistical_analysis = _load_vertical_attr(
+            "victor.dataanalysis.capabilities",
+            "configure_statistical_analysis",
+        )
+        get_statistical_config = _load_vertical_attr(
+            "victor.dataanalysis.capabilities",
+            "get_statistical_config",
         )
 
         service = CapabilityConfigService()

@@ -84,11 +84,17 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import importlib
+import importlib.util
 import logging
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type
+
+from victor.core.verticals.extension_cache_manager import ExtensionCacheManager
+from victor.core.verticals.extension_module_resolver import ExtensionModuleResolver
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -101,6 +107,307 @@ _EXTENSION_LOADER_PRESSURE_TOPIC = "vertical.extensions.loader.pressure"
 
 _METRICS_REPORTER_LOCK = threading.Lock()
 _METRICS_REPORTER_SINGLETON: Optional["ExtensionLoaderMetricsReporter"] = None
+
+
+class ExtensionLoaderPressureMonitor:
+    """Internal helper that owns all pressure monitoring and metrics state.
+
+    Encapsulates the lightweight loader metrics counters, queue-pressure
+    thresholds, cooldown logic, and event emission so that
+    ``VerticalExtensionLoader`` can delegate to a single instance without
+    spreading metrics bookkeeping across many class variables.
+
+    Not part of the public API -- instantiated once as a class variable on
+    ``VerticalExtensionLoader._pressure_monitor``.
+    """
+
+    def __init__(self) -> None:
+        self._metrics: Dict[str, int] = {
+            "submitted": 0,
+            "completed": 0,
+            "failed": 0,
+            "in_flight": 0,
+            "max_in_flight": 0,
+            "queued": 0,
+            "max_queued": 0,
+            "queue_waits": 0,
+            "pressure_warnings": 0,
+            "pressure_errors": 0,
+        }
+        self._metrics_lock = threading.RLock()
+
+        # Queue pressure policy (P3 reliability).
+        self.warn_queue_threshold: int = 24
+        self.error_queue_threshold: int = 32
+        self.warn_in_flight_threshold: int = 6
+        self.error_in_flight_threshold: int = 8
+        self.pressure_cooldown_seconds: float = 5.0
+        self.emit_pressure_events: bool = False
+        self.last_pressure_level: str = "ok"
+        self.last_pressure_emit_ts: float = 0.0
+
+        # Track optional modules already reported missing (avoid log spam).
+        self._missing_extension_modules: Set[str] = set()
+        self._missing_extension_modules_lock = threading.RLock()
+
+    # ------------------------------------------------------------------
+    # Metric helpers
+    # ------------------------------------------------------------------
+
+    def increment_metric(self, metric: str, delta: int = 1) -> None:
+        """Increment extension loader metric counter."""
+        with self._metrics_lock:
+            self._metrics[metric] = self._metrics.get(metric, 0) + delta
+
+    def update_peak_metric(self, metric: str, value: int) -> None:
+        """Update extension loader metric peak value."""
+        with self._metrics_lock:
+            current = self._metrics.get(metric, 0)
+            if value > current:
+                self._metrics[metric] = value
+
+    def get_metric(self, metric: str) -> int:
+        """Return current value of a single metric under lock."""
+        with self._metrics_lock:
+            return self._metrics.get(metric, 0)
+
+    def get_metrics_snapshot(
+        self,
+        *,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+    ) -> Dict[str, Any]:
+        """Return snapshot of all loader metrics plus threshold config.
+
+        Args:
+            max_workers: Executor max_workers value to include in snapshot.
+            queue_limit: Executor queue_limit value to include in snapshot.
+        """
+        with self._metrics_lock:
+            snapshot: Dict[str, Any] = dict(self._metrics)
+        snapshot["max_workers"] = max_workers
+        snapshot["queue_limit"] = queue_limit
+        snapshot["warn_queue_threshold"] = self.warn_queue_threshold
+        snapshot["error_queue_threshold"] = self.error_queue_threshold
+        snapshot["warn_in_flight_threshold"] = self.warn_in_flight_threshold
+        snapshot["error_in_flight_threshold"] = self.error_in_flight_threshold
+        snapshot["pressure_level"] = self.last_pressure_level
+        return snapshot
+
+    def reset_metrics(self) -> None:
+        """Reset all metric counters and pressure state."""
+        with self._metrics_lock:
+            for key in (
+                "submitted",
+                "completed",
+                "failed",
+                "in_flight",
+                "max_in_flight",
+                "queued",
+                "max_queued",
+                "queue_waits",
+                "pressure_warnings",
+                "pressure_errors",
+            ):
+                self._metrics[key] = 0
+            self.last_pressure_level = "ok"
+            self.last_pressure_emit_ts = 0.0
+
+    # ------------------------------------------------------------------
+    # Pressure level evaluation
+    # ------------------------------------------------------------------
+
+    def pressure_level(self, *, queued: int, in_flight: int) -> str:
+        """Return pressure level for current loader queue and in-flight counts."""
+        if queued >= self.error_queue_threshold or in_flight >= self.error_in_flight_threshold:
+            return "error"
+        if queued >= self.warn_queue_threshold or in_flight >= self.warn_in_flight_threshold:
+            return "warn"
+        return "ok"
+
+    # ------------------------------------------------------------------
+    # Pressure event emission
+    # ------------------------------------------------------------------
+
+    def emit_pressure_event(self, level: str, snapshot: Dict[str, Any], reason: str) -> None:
+        """Emit queue-pressure signal for extension loader saturation."""
+        try:
+            from victor.core.events import get_observability_bus
+            from victor.core.events.emit_helper import emit_event_sync
+
+            bus = get_observability_bus()
+            if bus is None:
+                return
+            emit_event_sync(
+                bus,
+                _EXTENSION_LOADER_PRESSURE_TOPIC,
+                {
+                    "level": level,
+                    "reason": reason,
+                    "metrics": snapshot,
+                },
+                source="VerticalExtensionLoader",
+                use_background_loop=True,
+                track_metrics=False,
+            )
+        except Exception as e:
+            logger.debug("Failed emitting extension loader pressure event: %s", e)
+
+    # ------------------------------------------------------------------
+    # Combined pressure check (warn / error / emit)
+    # ------------------------------------------------------------------
+
+    def check_pressure(
+        self,
+        *,
+        reason: str,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+    ) -> None:
+        """Check queue pressure and optionally emit warning/error diagnostics."""
+        snapshot = self.get_metrics_snapshot(
+            max_workers=max_workers,
+            queue_limit=queue_limit,
+        )
+        queued = int(snapshot.get("queued", 0))
+        in_flight = int(snapshot.get("in_flight", 0))
+        level = self.pressure_level(queued=queued, in_flight=in_flight)
+
+        now = time.monotonic()
+        should_emit = False
+        with self._metrics_lock:
+            previous_level = self.last_pressure_level
+            cooldown = self.pressure_cooldown_seconds
+            elapsed = now - self.last_pressure_emit_ts
+
+            if level == "ok":
+                self.last_pressure_level = "ok"
+                return
+
+            if level != previous_level or elapsed >= cooldown:
+                self.last_pressure_level = level
+                self.last_pressure_emit_ts = now
+                should_emit = True
+                if level == "error":
+                    self._metrics["pressure_errors"] += 1
+                else:
+                    self._metrics["pressure_warnings"] += 1
+
+        if not should_emit:
+            return
+
+        message = (
+            "Extension loader pressure %s: queued=%s in_flight=%s "
+            "(reason=%s, thresholds q:%s/%s in_f:%s/%s)"
+        )
+        args = (
+            level.upper(),
+            queued,
+            in_flight,
+            reason,
+            self.warn_queue_threshold,
+            self.error_queue_threshold,
+            self.warn_in_flight_threshold,
+            self.error_in_flight_threshold,
+        )
+
+        if level == "error":
+            logger.error(message, *args)
+        else:
+            logger.warning(message, *args)
+
+        if self.emit_pressure_events:
+            self.emit_pressure_event(level, snapshot, reason)
+
+    # ------------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------------
+
+    def configure(
+        self,
+        *,
+        warn_queue_threshold: Optional[int] = None,
+        error_queue_threshold: Optional[int] = None,
+        warn_in_flight_threshold: Optional[int] = None,
+        error_in_flight_threshold: Optional[int] = None,
+        cooldown_seconds: Optional[float] = None,
+        emit_events: Optional[bool] = None,
+    ) -> None:
+        """Configure queue-pressure warning/error thresholds."""
+        with self._metrics_lock:
+            if warn_queue_threshold is not None:
+                self.warn_queue_threshold = max(0, int(warn_queue_threshold))
+            if error_queue_threshold is not None:
+                self.error_queue_threshold = max(0, int(error_queue_threshold))
+            if warn_in_flight_threshold is not None:
+                self.warn_in_flight_threshold = max(0, int(warn_in_flight_threshold))
+            if error_in_flight_threshold is not None:
+                self.error_in_flight_threshold = max(0, int(error_in_flight_threshold))
+            if cooldown_seconds is not None:
+                self.pressure_cooldown_seconds = max(0.0, float(cooldown_seconds))
+            if emit_events is not None:
+                self.emit_pressure_events = bool(emit_events)
+
+    # ------------------------------------------------------------------
+    # Metrics event emission
+    # ------------------------------------------------------------------
+
+    def emit_metrics_event(
+        self,
+        *,
+        max_workers: int = 0,
+        queue_limit: int = 0,
+        event_bus: Optional[Any] = None,
+        topic: str = _EXTENSION_LOADER_METRICS_TOPIC,
+        source: str = "VerticalExtensionLoader",
+        reset_after_emit: bool = False,
+    ) -> Dict[str, Any]:
+        """Emit current extension-loader metrics as an observability event."""
+        metrics = self.get_metrics_snapshot(
+            max_workers=max_workers,
+            queue_limit=queue_limit,
+        )
+
+        bus = event_bus
+        if bus is None:
+            try:
+                from victor.core.events import get_observability_bus
+
+                bus = get_observability_bus()
+            except Exception as e:
+                logger.debug("Failed resolving observability bus for loader metrics: %s", e)
+                bus = None
+
+        if bus is not None:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    bus,
+                    topic,
+                    {"metrics": metrics},
+                    source=source,
+                    use_background_loop=True,
+                    track_metrics=False,
+                )
+            except Exception as e:
+                logger.debug("Failed emitting extension-loader metrics event: %s", e)
+
+        if reset_after_emit:
+            self.reset_metrics()
+        return metrics
+
+    # ------------------------------------------------------------------
+    # Missing module tracking
+    # ------------------------------------------------------------------
+
+    def record_missing_module(self, cache_key: str) -> bool:
+        """Record a missing module key. Return True if this is the first time."""
+        with self._missing_extension_modules_lock:
+            if cache_key not in self._missing_extension_modules:
+                self._missing_extension_modules.add(cache_key)
+                return True
+        return False
 
 
 class VerticalExtensionLoader(ABC):
@@ -133,8 +440,7 @@ class VerticalExtensionLoader(ABC):
     _lsp_capability: ClassVar[Optional[Any]] = None
 
     # Extension cache (shared across all verticals)
-    _extensions_cache: Dict[str, Any] = {}
-    _extensions_cache_lock: ClassVar[threading.RLock] = threading.RLock()
+    _cache_manager: ClassVar[ExtensionCacheManager] = ExtensionCacheManager()
 
     # Shared async extension loading infrastructure (P3)
     _extension_executor_max_workers: ClassVar[int] = 8
@@ -143,31 +449,12 @@ class VerticalExtensionLoader(ABC):
     _extension_executor_lock: ClassVar[threading.RLock] = threading.RLock()
     _extension_executor_semaphores: ClassVar[Dict[int, asyncio.Semaphore]] = {}
 
-    # Lightweight loader metrics for observability.
-    _extension_loader_metrics: ClassVar[Dict[str, int]] = {
-        "submitted": 0,
-        "completed": 0,
-        "failed": 0,
-        "in_flight": 0,
-        "max_in_flight": 0,
-        "queued": 0,
-        "max_queued": 0,
-        "queue_waits": 0,
-        "pressure_warnings": 0,
-        "pressure_errors": 0,
-    }
-    _extension_loader_metrics_lock: ClassVar[threading.RLock] = threading.RLock()
+    # Pressure monitoring (metrics, thresholds, cooldown, missing-module tracking).
+    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = ExtensionLoaderPressureMonitor()
 
-    # Queue pressure policy (P3 reliability): warn/error thresholds and emission controls.
-    _extension_loader_warn_queue_threshold: ClassVar[int] = 24
-    _extension_loader_error_queue_threshold: ClassVar[int] = 32
-    _extension_loader_warn_in_flight_threshold: ClassVar[int] = 6
-    _extension_loader_error_in_flight_threshold: ClassVar[int] = 8
-    _extension_loader_pressure_cooldown_seconds: ClassVar[float] = 5.0
-    _extension_loader_emit_pressure_events: ClassVar[bool] = False
-    _extension_loader_last_pressure_level: ClassVar[str] = "ok"
-    _extension_loader_last_pressure_emit_ts: ClassVar[float] = 0.0
-    _tiered_tools_deprecation_warned: ClassVar[Set[str]] = set()
+    # Module resolver (delegates candidate resolution, availability checks,
+    # attribute loading, and class-name generation).
+    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(_pressure_monitor)
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -223,56 +510,141 @@ class VerticalExtensionLoader(ABC):
     @classmethod
     def _increment_loader_metric(cls, metric: str, delta: int = 1) -> None:
         """Increment extension loader metric counter."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            base._extension_loader_metrics[metric] = (
-                base._extension_loader_metrics.get(metric, 0) + delta
-            )
+        VerticalExtensionLoader._pressure_monitor.increment_metric(metric, delta)
 
     @classmethod
     def _update_loader_peak_metric(cls, metric: str, value: int) -> None:
         """Update extension loader metric peak value."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            current = base._extension_loader_metrics.get(metric, 0)
-            if value > current:
-                base._extension_loader_metrics[metric] = value
+        VerticalExtensionLoader._pressure_monitor.update_peak_metric(metric, value)
 
     @classmethod
     def get_extension_loader_metrics(cls) -> Dict[str, Any]:
         """Return snapshot of shared async extension loader metrics."""
         base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            snapshot = dict(base._extension_loader_metrics)
-        snapshot["max_workers"] = base._extension_executor_max_workers
-        snapshot["queue_limit"] = base._extension_executor_queue_limit
-        snapshot["warn_queue_threshold"] = base._extension_loader_warn_queue_threshold
-        snapshot["error_queue_threshold"] = base._extension_loader_error_queue_threshold
-        snapshot["warn_in_flight_threshold"] = base._extension_loader_warn_in_flight_threshold
-        snapshot["error_in_flight_threshold"] = base._extension_loader_error_in_flight_threshold
-        snapshot["pressure_level"] = base._extension_loader_last_pressure_level
-        return snapshot
+        return base._pressure_monitor.get_metrics_snapshot(
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
+        )
 
     @classmethod
     def reset_extension_loader_metrics(cls) -> None:
         """Reset async extension loader metrics counters."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            for key in (
-                "submitted",
-                "completed",
-                "failed",
-                "in_flight",
-                "max_in_flight",
-                "queued",
-                "max_queued",
-                "queue_waits",
-                "pressure_warnings",
-                "pressure_errors",
-            ):
-                base._extension_loader_metrics[key] = 0
-            base._extension_loader_last_pressure_level = "ok"
-            base._extension_loader_last_pressure_emit_ts = 0.0
+        VerticalExtensionLoader._pressure_monitor.reset_metrics()
+
+    @classmethod
+    def _extension_module_candidates(cls, module_suffix: str) -> List[str]:
+        """Return possible module paths for an optional vertical extension."""
+        vertical_name = getattr(cls, "name", None) or ""
+        return cls._module_resolver.resolve_candidates(vertical_name, module_suffix)
+
+    @classmethod
+    def _extension_module_available(cls, module_path: str) -> bool:
+        """Return True when the extension module can be imported."""
+        return cls._module_resolver.is_available(
+            module_path,
+            vertical_display_name=getattr(cls, "name", cls.__name__),
+            caller_class_name=cls.__name__,
+        )
+
+    @classmethod
+    def _find_available_candidates(cls, suffix: str) -> List[str]:
+        """Resolve and filter extension module candidates to available ones."""
+        return [
+            path
+            for path in cls._extension_module_candidates(suffix)
+            if cls._extension_module_available(path)
+        ]
+
+    @classmethod
+    def _resolve_factory_extension(
+        cls,
+        extension_key: str,
+        suffix: str,
+        class_name: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Common pattern: find candidates → try _get_extension_factory on each.
+
+        Used by get_safety_extension, get_prompt_contributor, get_team_spec_provider,
+        get_enrichment_strategy, etc. to eliminate repeated candidate iteration.
+
+        Args:
+            extension_key: Cache key for the extension.
+            suffix: Module suffix to resolve candidates for.
+            class_name: Optional explicit class name (auto-generated if None).
+
+        Returns:
+            Extension instance or None if not found.
+        """
+        candidate_paths = cls._find_available_candidates(suffix)
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    extension_key,
+                    module_path,
+                    class_name,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
+
+    @classmethod
+    def _resolve_class_or_factory_extension(
+        cls,
+        extension_key: str,
+        suffix: str,
+        class_name: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Common pattern: find candidates → try direct class import → fallback to factory.
+
+        Used by get_mode_config_provider, get_rl_config_provider, get_rl_hooks,
+        get_capability_provider, get_service_provider, etc.
+
+        Args:
+            extension_key: Cache key for the extension.
+            suffix: Module suffix to resolve candidates for.
+            class_name: Explicit class name to look for. If None, auto-generated.
+
+        Returns:
+            Extension instance or None if not found.
+        """
+        if class_name is None:
+            class_name = cls._module_resolver.auto_generate_class_name(cls.__name__, extension_key)
+        candidate_paths = cls._find_available_candidates(suffix)
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        # Try direct class import first (using __import__ to match original pattern)
+        for module_path in candidate_paths:
+            try:
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        # Fallback to extension factory
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    extension_key,
+                    module_path,
+                    class_name,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def configure_extension_loader_pressure(
@@ -286,120 +658,36 @@ class VerticalExtensionLoader(ABC):
         emit_events: Optional[bool] = None,
     ) -> None:
         """Configure queue-pressure warning/error thresholds for extension loading."""
-        base = VerticalExtensionLoader
-        with base._extension_loader_metrics_lock:
-            if warn_queue_threshold is not None:
-                base._extension_loader_warn_queue_threshold = max(0, int(warn_queue_threshold))
-            if error_queue_threshold is not None:
-                base._extension_loader_error_queue_threshold = max(0, int(error_queue_threshold))
-            if warn_in_flight_threshold is not None:
-                base._extension_loader_warn_in_flight_threshold = max(
-                    0, int(warn_in_flight_threshold)
-                )
-            if error_in_flight_threshold is not None:
-                base._extension_loader_error_in_flight_threshold = max(
-                    0, int(error_in_flight_threshold)
-                )
-            if cooldown_seconds is not None:
-                base._extension_loader_pressure_cooldown_seconds = max(0.0, float(cooldown_seconds))
-            if emit_events is not None:
-                base._extension_loader_emit_pressure_events = bool(emit_events)
+        VerticalExtensionLoader._pressure_monitor.configure(
+            warn_queue_threshold=warn_queue_threshold,
+            error_queue_threshold=error_queue_threshold,
+            warn_in_flight_threshold=warn_in_flight_threshold,
+            error_in_flight_threshold=error_in_flight_threshold,
+            cooldown_seconds=cooldown_seconds,
+            emit_events=emit_events,
+        )
 
     @classmethod
     def _pressure_level(cls, *, queued: int, in_flight: int) -> str:
         """Return pressure level for current loader queue and in-flight counts."""
-        base = VerticalExtensionLoader
-        if (
-            queued >= base._extension_loader_error_queue_threshold
-            or in_flight >= base._extension_loader_error_in_flight_threshold
-        ):
-            return "error"
-        if (
-            queued >= base._extension_loader_warn_queue_threshold
-            or in_flight >= base._extension_loader_warn_in_flight_threshold
-        ):
-            return "warn"
-        return "ok"
+        return VerticalExtensionLoader._pressure_monitor.pressure_level(
+            queued=queued, in_flight=in_flight
+        )
 
     @classmethod
     def _emit_pressure_event(cls, level: str, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
-        try:
-            from victor.core.events import get_observability_bus
-            from victor.core.events.emit_helper import emit_event_sync
-
-            bus = get_observability_bus()
-            if bus is None:
-                return
-            emit_event_sync(
-                bus,
-                _EXTENSION_LOADER_PRESSURE_TOPIC,
-                {
-                    "level": level,
-                    "reason": reason,
-                    "metrics": snapshot,
-                },
-                source="VerticalExtensionLoader",
-                use_background_loop=True,
-                track_metrics=False,
-            )
-        except Exception as e:
-            logger.debug("Failed emitting extension loader pressure event: %s", e)
+        VerticalExtensionLoader._pressure_monitor.emit_pressure_event(level, snapshot, reason)
 
     @classmethod
     def _check_pressure(cls, *, reason: str) -> None:
         """Check queue pressure and optionally emit warning/error diagnostics."""
         base = VerticalExtensionLoader
-        snapshot = base.get_extension_loader_metrics()
-        queued = int(snapshot.get("queued", 0))
-        in_flight = int(snapshot.get("in_flight", 0))
-        level = base._pressure_level(queued=queued, in_flight=in_flight)
-
-        now = time.monotonic()
-        should_emit = False
-        with base._extension_loader_metrics_lock:
-            previous_level = base._extension_loader_last_pressure_level
-            cooldown = base._extension_loader_pressure_cooldown_seconds
-            elapsed = now - base._extension_loader_last_pressure_emit_ts
-
-            if level == "ok":
-                base._extension_loader_last_pressure_level = "ok"
-                return
-
-            if level != previous_level or elapsed >= cooldown:
-                base._extension_loader_last_pressure_level = level
-                base._extension_loader_last_pressure_emit_ts = now
-                should_emit = True
-                if level == "error":
-                    base._extension_loader_metrics["pressure_errors"] += 1
-                else:
-                    base._extension_loader_metrics["pressure_warnings"] += 1
-
-        if not should_emit:
-            return
-
-        message = (
-            "Extension loader pressure %s: queued=%s in_flight=%s "
-            "(reason=%s, thresholds q:%s/%s in_f:%s/%s)"
+        base._pressure_monitor.check_pressure(
+            reason=reason,
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
         )
-        args = (
-            level.upper(),
-            queued,
-            in_flight,
-            reason,
-            base._extension_loader_warn_queue_threshold,
-            base._extension_loader_error_queue_threshold,
-            base._extension_loader_warn_in_flight_threshold,
-            base._extension_loader_error_in_flight_threshold,
-        )
-
-        if level == "error":
-            logger.error(message, *args)
-        else:
-            logger.warning(message, *args)
-
-        if base._extension_loader_emit_pressure_events:
-            base._emit_pressure_event(level, snapshot, reason)
 
     @classmethod
     def emit_extension_loader_metrics_event(
@@ -411,36 +699,15 @@ class VerticalExtensionLoader(ABC):
         reset_after_emit: bool = False,
     ) -> Dict[str, Any]:
         """Emit current extension-loader metrics as an observability event."""
-        metrics = cls.get_extension_loader_metrics()
-
-        bus = event_bus
-        if bus is None:
-            try:
-                from victor.core.events import get_observability_bus
-
-                bus = get_observability_bus()
-            except Exception as e:
-                logger.debug("Failed resolving observability bus for loader metrics: %s", e)
-                bus = None
-
-        if bus is not None:
-            try:
-                from victor.core.events.emit_helper import emit_event_sync
-
-                emit_event_sync(
-                    bus,
-                    topic,
-                    {"metrics": metrics},
-                    source=source,
-                    use_background_loop=True,
-                    track_metrics=False,
-                )
-            except Exception as e:
-                logger.debug("Failed emitting extension-loader metrics event: %s", e)
-
-        if reset_after_emit:
-            cls.reset_extension_loader_metrics()
-        return metrics
+        base = VerticalExtensionLoader
+        return base._pressure_monitor.emit_metrics_event(
+            max_workers=base._extension_executor_max_workers,
+            queue_limit=base._extension_executor_queue_limit,
+            event_bus=event_bus,
+            topic=topic,
+            source=source,
+            reset_after_emit=reset_after_emit,
+        )
 
     # =========================================================================
     # Extension Caching Infrastructure
@@ -474,12 +741,38 @@ class VerticalExtensionLoader(ABC):
                     return [MyMiddleware()]
                 return cls._get_cached_extension("middleware", _create)
         """
-        # Use namespaced composite key to avoid collisions across modules.
-        cache_key = f"{cls._cache_namespace()}:{key}"
-        with cls._extensions_cache_lock:
-            if cache_key not in cls._extensions_cache:
-                cls._extensions_cache[cache_key] = factory()
-            return cls._extensions_cache[cache_key]
+        return cls._cache_manager.get_or_create(cls._cache_namespace(), key, factory)
+
+    @classmethod
+    def _get_cached_extension_value(cls, key: str) -> tuple[bool, Any]:
+        """Return a cached extension value without caching misses."""
+        return cls._cache_manager.get_if_cached(cls._cache_namespace(), key)
+
+    @classmethod
+    def _load_cached_optional_extension(
+        cls,
+        extension_key: str,
+        loader: Callable[[], Optional[Any]],
+    ) -> Optional[Any]:
+        """Load an optional extension while caching hits but not misses."""
+        return cls._cache_manager.load_optional(cls._cache_namespace(), extension_key, loader)
+
+    @classmethod
+    def _load_named_entry_point_extension(
+        cls,
+        extension_key: str,
+        group: str,
+    ) -> Optional[Any]:
+        """Resolve an optional runtime extension from an explicit entry-point group."""
+        try:
+            from victor.framework.entry_point_loader import load_runtime_extension_from_entry_points
+        except ImportError:
+            return None
+
+        return cls._load_cached_optional_extension(
+            extension_key,
+            lambda: load_runtime_extension_from_entry_points(cls.name, group),
+        )
 
     @classmethod
     def _get_extension_factory(
@@ -522,23 +815,17 @@ class VerticalExtensionLoader(ABC):
                         )
         """
 
+        resolver = cls._module_resolver
+
         def _create():
             # Determine the class name to import
             if attribute_name is None:
-                # Auto-generate class name
-                # Convert "CodingAssistant" -> "Coding"
-                vertical_name = cls.__name__.replace("Assistant", "")
-                # Convert "safety_extension" -> "SafetyExtension"
-                extension_type = extension_key.replace("_", " ").title().replace(" ", "")
-                class_name = f"{vertical_name}{extension_type}"
+                class_name = resolver.auto_generate_class_name(cls.__name__, extension_key)
             else:
                 class_name = attribute_name
 
-            # Lazy import: only loads module when first called
-            module = __import__(import_path, fromlist=[class_name])
-
-            # Import and instantiate
-            return getattr(module, class_name)()
+            # Lazy import + retrieve attribute, then instantiate
+            return resolver.load_attribute(import_path, class_name)()
 
         # Use existing caching infrastructure
         return cls._get_cached_extension(extension_key, _create)
@@ -554,81 +841,76 @@ class VerticalExtensionLoader(ABC):
     def get_middleware(cls) -> List[Any]:
         """Get middleware implementations for this vertical.
 
-        Override to provide vertical-specific middleware for tool
-        execution processing.
+        Default implementation resolves a ``get_middleware()`` factory from the
+        vertical's runtime middleware module when present.
 
         Returns:
             List of middleware implementations (MiddlewareProtocol)
         """
-        return []
+        candidate_paths = cls._find_available_candidates("middleware")
+        if not candidate_paths:
+            return []
+
+        try:
+            factory = cls._module_resolver.try_load_from_candidates(
+                candidate_paths, "get_middleware"
+            )
+        except ImportError:
+            return []
+
+        if factory is None:
+            return []
+
+        return cls._get_cached_extension(
+            "middleware",
+            lambda factory=factory: list(factory() or []),
+        )
 
     @classmethod
     def get_safety_extension(cls) -> Optional[Any]:
         """Get safety extension for this vertical.
 
-        Default implementation uses the extension factory pattern with the vertical's
-        safety module. Override only if custom behavior needed.
-
-        This eliminates ~20 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Safety extension (SafetyExtensionProtocol) or None
         """
-        try:
-            return cls._get_extension_factory(
-                "safety_extension",
-                f"victor.{cls.name}.safety",
-            )
-        except (ImportError, AttributeError):
-            return None
+        return cls._resolve_factory_extension("safety_extension", "safety")
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[Any]:
         """Get prompt contributor for this vertical.
 
-        Default implementation uses the extension factory pattern with the vertical's
-        prompts module. Override only if custom behavior needed.
-
-        This eliminates ~25 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Prompt contributor (PromptContributorProtocol) or None
         """
-        try:
-            return cls._get_extension_factory(
-                "prompt_contributor",
-                f"victor.{cls.name}.prompts",
-            )
-        except (ImportError, AttributeError):
-            return None
+        contributor = cls._load_named_entry_point_extension(
+            "prompt_contributor",
+            "victor.prompt_contributors",
+        )
+        if contributor is not None:
+            return contributor
+
+        return cls._resolve_factory_extension("prompt_contributor", "prompts")
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
         """Get mode configuration provider for this vertical.
 
-        Default implementation tries direct import pattern, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~6 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Mode config provider (ModeConfigProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingModeConfigProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}ModeConfigProvider"
-            module = __import__(f"victor.{cls.name}.mode_config", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
-            try:
-                # Fall back to extension factory pattern
-                return cls._get_extension_factory(
-                    "mode_config_provider",
-                    f"victor.{cls.name}.mode_config",
-                )
-            except (ImportError, AttributeError):
-                return None
+        provider = cls._load_named_entry_point_extension(
+            "mode_config_provider",
+            "victor.mode_configs",
+        )
+        if provider is not None:
+            return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        return cls._resolve_class_or_factory_extension(
+            "mode_config_provider",
+            "mode_config",
+            class_name=f"{vertical_name}ModeConfigProvider",
+        )
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:
@@ -726,15 +1008,27 @@ class VerticalExtensionLoader(ABC):
             Tool dependency provider (ToolDependencyProviderProtocol) or None
         """
         try:
-            from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-
-            return cls._get_cached_extension(
-                "tool_dependency_provider",
-                lambda: create_vertical_tool_dependency_provider(cls.name),
+            from victor.framework.entry_point_loader import (
+                load_tool_dependency_provider_from_entry_points,
             )
-        except (ImportError, ValueError):
-            # If factory not available or vertical not recognized, return None
-            return None
+
+            return cls._load_cached_optional_extension(
+                "tool_dependency_provider",
+                lambda: load_tool_dependency_provider_from_entry_points(cls.name),
+            )
+        except ImportError:
+            try:
+                from victor.core.tool_dependency_loader import (
+                    create_vertical_tool_dependency_provider,
+                )
+
+                return cls._load_cached_optional_extension(
+                    "tool_dependency_provider",
+                    lambda: create_vertical_tool_dependency_provider(cls.name),
+                )
+            except (ImportError, ValueError):
+                # If factory not available or vertical not recognized, return None
+                return None
 
     @classmethod
     def get_tool_graph(cls) -> Optional[Any]:
@@ -761,108 +1055,49 @@ class VerticalExtensionLoader(ABC):
         """
         return None
 
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[Any]:
-        """Get tiered tool configuration for intelligent selection.
-
-        DEPRECATED: Use get_tiered_tool_config() instead.
-
-        This method is maintained for backward compatibility. New verticals
-        should override get_tiered_tool_config() which has a default
-        implementation using TieredToolTemplate.
-
-        Override to provide vertical-specific tiered tool configuration
-        for context-efficient tool selection. When implemented, this enables:
-
-        1. Mandatory tools: Always included (e.g., read, ls)
-        2. Vertical core: Always included for this vertical (e.g., web, fetch for research)
-        3. Semantic pool: Selected based on query similarity and stage
-
-        Example for research vertical:
-            return TieredToolConfig(
-                mandatory={"read", "ls"},
-                vertical_core={"web", "fetch"},
-                semantic_pool={"write", "edit", "grep", "search"},
-                stage_tools={
-                    "WRITING": {"write", "edit"},
-                    "SEARCHING": {"web", "fetch", "grep"},
-                },
-                readonly_only_for_analysis=True,
-            )
-
-        Returns:
-            TieredToolConfig or None (falls back to get_tools())
-        """
-        # Keep compatibility at the core adapter boundary only.
-        qualified_name = f"{cls.__module__}.{cls.__qualname__}"
-        with VerticalExtensionLoader._extensions_cache_lock:
-            if qualified_name not in VerticalExtensionLoader._tiered_tools_deprecation_warned:
-                VerticalExtensionLoader._tiered_tools_deprecation_warned.add(qualified_name)
-                logger.warning(
-                    "%s.get_tiered_tools() is deprecated and will be removed after 2026-06-30; "
-                    "implement get_tiered_tool_config() instead.",
-                    qualified_name,
-                )
-
-        # Delegate to the canonical method
-        return cls.get_tiered_tool_config()
+    # get_tiered_tools() removed (E5 M3) — use get_tiered_tool_config() instead
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:
         """Get RL configuration provider for this vertical.
 
-        Default implementation tries direct import pattern first, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~25 LOC of duplicated wrapper code across verticals.
-
         Returns:
             RL config provider (RLConfigProviderProtocol) or None
         """
         try:
-            # Try direct import pattern (e.g., CodingRLConfig)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}RLConfig"
-            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
-            try:
-                # Fall back to extension factory pattern
-                return cls._get_extension_factory(
-                    "rl_config_provider",
-                    f"victor.{cls.name}.rl",
-                    class_name,
-                )
-            except (ImportError, AttributeError):
-                return None
+            from victor.framework.entry_point_loader import (
+                load_rl_config_provider_from_entry_points,
+            )
+        except ImportError:
+            pass
+        else:
+            provider = cls._load_cached_optional_extension(
+                "rl_config_provider",
+                lambda: load_rl_config_provider_from_entry_points(cls.name),
+            )
+            if provider is not None:
+                return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        return cls._resolve_class_or_factory_extension(
+            "rl_config_provider",
+            "rl",
+            class_name=f"{vertical_name}RLConfig",
+        )
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
         """Get RL hooks for outcome recording.
 
-        Default implementation tries direct import pattern, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~6 LOC of duplicated wrapper code across verticals.
-
         Returns:
             RLHooks instance or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingRLHooks)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}RLHooks"
-            module = __import__(f"victor.{cls.name}.rl", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
-            try:
-                # Fall back to extension factory pattern
-                return cls._get_extension_factory(
-                    "rl_hooks",
-                    f"victor.{cls.name}.rl",
-                )
-            except (ImportError, AttributeError):
-                return None
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        return cls._resolve_class_or_factory_extension(
+            "rl_hooks",
+            "rl",
+            class_name=f"{vertical_name}RLHooks",
+        )
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
@@ -876,69 +1111,200 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Team spec provider (TeamSpecProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingTeamSpecProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}TeamSpecProvider"
-            module = __import__(f"victor.{cls.name}.teams", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
+        provider = cls._load_named_entry_point_extension(
+            "team_spec_provider",
+            "victor.team_spec_providers",
+        )
+        if provider is not None:
+            return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}TeamSpecProvider"
+        candidate_paths = [
+            path
+            for path in cls._extension_module_candidates("teams")
+            if cls._extension_module_available(path)
+        ]
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Fall back to extension factory pattern
+                module = __import__(module_path, fromlist=[class_name])
+                provider_cls = getattr(module, class_name, None)
+                if provider_cls is not None:
+                    return provider_cls()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
                 return cls._get_extension_factory(
                     "team_spec_provider",
-                    f"victor.{cls.name}.teams",
+                    module_path,
                 )
-            except (ImportError, AttributeError):
-                return None
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        try:
+            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+            provider = VerticalRuntimeAdapter.build_team_spec_provider(cls)
+            if provider is not None:
+                return provider
+        except Exception as exc:
+            if last_error is None:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Get team specifications for this vertical.
+
+        Returns:
+            Dict mapping team names to TeamSpec instances
+        """
+
+        provider = cls.get_team_spec_provider()
+        if provider is None or not hasattr(provider, "get_team_specs"):
+            return {}
+        return provider.get_team_specs()
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:
         """Get capability provider for this vertical.
 
-        Default implementation tries direct import pattern first, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~20 LOC of duplicated wrapper code across verticals.
-
         Returns:
             Capability provider (BaseCapabilityProvider) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingCapabilityProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}CapabilityProvider"
-            module = __import__(f"victor.{cls.name}.capabilities", fromlist=[class_name])
-            return getattr(module, class_name)()
-        except (ImportError, AttributeError):
-            try:
-                # Fall back to extension factory pattern
-                return cls._get_extension_factory(
-                    "capability_provider",
-                    f"victor.{cls.name}.capabilities",
-                )
-            except (ImportError, AttributeError):
-                return None
+        provider = cls._load_named_entry_point_extension(
+            "capability_provider",
+            "victor.capability_providers",
+        )
+        if provider is not None:
+            return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        return cls._resolve_class_or_factory_extension(
+            "capability_provider",
+            "capabilities",
+            class_name=f"{vertical_name}CapabilityProvider",
+        )
 
     @classmethod
     def get_service_provider(cls) -> Optional[Any]:
         """Get service provider for this vertical.
 
-        By default, returns a BaseVerticalServiceProvider that registers
-        the vertical's prompt contributor, safety extension, mode config,
-        and tool dependency providers with the DI container.
-
-        Override to provide custom service registration logic.
-
         Returns:
             Service provider (ServiceProviderProtocol) or factory-created provider
         """
+        provider = cls._load_named_entry_point_extension(
+            "service_provider",
+            "victor.service_providers",
+        )
+        if provider is not None:
+            return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}ServiceProvider"
+        candidate_paths = cls._find_available_candidates("service_provider")
+        last_error: Optional[Exception] = None
+
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            provider_cls = getattr(module, class_name, None)
+            if provider_cls is not None:
+                return cls._get_cached_extension(
+                    "service_provider",
+                    lambda provider_cls=provider_cls: provider_cls(),
+                )
+
+            factory = getattr(module, "get_service_provider", None)
+            if callable(factory):
+                return cls._get_cached_extension("service_provider", factory)
+
         try:
             from victor.core.verticals.base_service_provider import VerticalServiceProviderFactory
 
             return VerticalServiceProviderFactory.create(cls)
         except ImportError:
+            if last_error is not None:
+                raise last_error
             return None
+
+    @classmethod
+    def get_composed_chains(cls) -> Dict[str, Any]:
+        """Get composed tool chains for this vertical from runtime modules."""
+        candidate_paths = cls._find_available_candidates("composed_chains")
+        if not candidate_paths:
+            return {}
+
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_CHAINS"
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_composed_chains", None)
+            if callable(factory):
+                return cls._get_cached_extension(
+                    "composed_chains",
+                    lambda factory=factory: dict(factory() or {}),
+                )
+
+            chains = getattr(module, constant_name, None)
+            if isinstance(chains, dict):
+                return cls._get_cached_extension(
+                    "composed_chains",
+                    lambda chains=chains: dict(chains),
+                )
+
+        if last_error:
+            raise last_error
+        return {}
+
+    @classmethod
+    def get_personas(cls) -> Dict[str, Any]:
+        """Get vertical personas from runtime team modules when available."""
+        candidate_paths = cls._find_available_candidates("teams")
+        if not candidate_paths:
+            return {}
+
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_personas", None)
+            if callable(factory):
+                return cls._get_cached_extension(
+                    "personas",
+                    lambda factory=factory: dict(factory() or {}),
+                )
+
+            personas = getattr(module, constant_name, None)
+            if isinstance(personas, dict):
+                return cls._get_cached_extension(
+                    "personas",
+                    lambda personas=personas: dict(personas),
+                )
+
+        if last_error:
+            raise last_error
+        return {}
 
     @classmethod
     def get_enrichment_strategy(cls) -> Optional[Any]:
@@ -1000,8 +1366,8 @@ class VerticalExtensionLoader(ABC):
 
         # Return cached extensions if available and caching enabled
         if use_cache:
-            with cls._extensions_cache_lock:
-                cached = cls._extensions_cache.get(cache_key)
+            with cls._cache_manager._lock:
+                cached = cls._cache_manager._cache.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -1098,91 +1464,38 @@ class VerticalExtensionLoader(ABC):
         )
 
         # Cache the extensions
-        with cls._extensions_cache_lock:
-            cls._extensions_cache[cache_key] = extensions
+        with cls._cache_manager._lock:
+            cls._cache_manager._cache[cache_key] = extensions
         return extensions
 
     @classmethod
-    async def get_extensions_async(
+    def _get_cached_extensions(cls, use_cache: bool) -> Optional["VerticalExtensions"]:
+        """Return cached VerticalExtensions if available, else None."""
+        if not use_cache:
+            return None
+        cache_key = cls._cache_namespace()
+        with cls._cache_manager._lock:
+            return cls._cache_manager._cache.get(cache_key)
+
+    @classmethod
+    def _resolve_strict_mode(cls, strict: Optional[bool]) -> bool:
+        """Resolve effective strict mode from explicit arg or class default."""
+        return strict if strict is not None else cls.strict_extension_loading
+
+    @classmethod
+    async def _submit_extension_tasks(
         cls,
-        *,
-        use_cache: bool = True,
-        strict: Optional[bool] = None,
-    ) -> "VerticalExtensions":
-        """Async version of get_extensions that loads extensions in parallel.
-
-        Uses a thread pool executor to load all extensions concurrently,
-        providing faster initialization when extensions involve I/O.
-
-        Shares the same cache as the synchronous get_extensions() method.
+        load_fn: callable,
+    ) -> Dict[str, Any]:
+        """Submit all extension loads in parallel with bounded concurrency.
 
         Args:
-            use_cache: If True (default), return cached extensions if available.
-            strict: Override the class-level strict_extension_loading setting.
+            load_fn: A callable(extension_type, loader, is_list) that loads
+                     a single extension with error handling.
 
         Returns:
-            VerticalExtensions containing all vertical extensions (never None)
-
-        Raises:
-            ExtensionLoadError: In strict mode or when a required extension fails
+            Dict mapping extension type keys to loaded results.
         """
-        from victor.core.errors import ExtensionLoadError
-        from victor.core.verticals.protocols import VerticalExtensions
-
-        cache_key = cls._cache_namespace()
-
-        # Return cached extensions if available (shared with sync get_extensions)
-        if use_cache:
-            with cls._extensions_cache_lock:
-                cached = cls._extensions_cache.get(cache_key)
-            if cached is not None:
-                return cached
-
-        # Determine strict mode
-        is_strict = strict if strict is not None else cls.strict_extension_loading
-
-        # Collect errors for reporting
-        errors: List[ExtensionLoadError] = []
-        errors_lock = threading.Lock()
-
-        def _load_extension(
-            extension_type: str,
-            loader: callable,
-            is_list: bool = False,
-        ) -> Any:
-            """Load an extension with error handling (runs in thread pool)."""
-            try:
-                return loader()
-            except Exception as e:
-                cls._increment_loader_metric("failed")
-                is_required = extension_type in cls.required_extensions
-                error = ExtensionLoadError(
-                    message=(
-                        f"Failed to load '{extension_type}' extension "
-                        f"for vertical '{cls.name}': {e}"
-                    ),
-                    extension_type=extension_type,
-                    vertical_name=cls.name,
-                    original_error=e,
-                    is_required=is_required,
-                )
-                with errors_lock:
-                    errors.append(error)
-
-                if is_strict or is_required:
-                    logger.error(
-                        f"[{error.correlation_id}] {extension_type} extension failed "
-                        f"for vertical '{cls.name}': {e}",
-                        exc_info=True,
-                    )
-                else:
-                    logger.warning(
-                        f"[{error.correlation_id}] {extension_type} extension failed "
-                        f"for vertical '{cls.name}': {e}"
-                    )
-                return [] if is_list else None
-
-        # Load all extensions in parallel using shared bounded infrastructure (P3).
         loop = asyncio.get_running_loop()
         executor = cls._get_shared_extension_executor()
         semaphore = cls._get_extension_load_semaphore()
@@ -1194,8 +1507,7 @@ class VerticalExtensionLoader(ABC):
         ) -> Any:
             cls._increment_loader_metric("submitted")
             cls._increment_loader_metric("queued")
-            with cls._extension_loader_metrics_lock:
-                queued_now = cls._extension_loader_metrics.get("queued", 0)
+            queued_now = cls._pressure_monitor.get_metric("queued")
             cls._update_loader_peak_metric("max_queued", queued_now)
             cls._check_pressure(reason=f"{extension_type}.queued")
 
@@ -1209,14 +1521,13 @@ class VerticalExtensionLoader(ABC):
 
                 cls._increment_loader_metric("queued", -1)
                 cls._increment_loader_metric("in_flight")
-                with cls._extension_loader_metrics_lock:
-                    in_flight_now = cls._extension_loader_metrics.get("in_flight", 0)
+                in_flight_now = cls._pressure_monitor.get_metric("in_flight")
                 cls._update_loader_peak_metric("max_in_flight", in_flight_now)
                 cls._check_pressure(reason=f"{extension_type}.in_flight")
 
                 return await loop.run_in_executor(
                     executor,
-                    lambda: _load_extension(extension_type, loader, is_list),
+                    lambda: load_fn(extension_type, loader, is_list),
                 )
             except Exception:
                 cls._increment_loader_metric("failed")
@@ -1267,8 +1578,15 @@ class VerticalExtensionLoader(ABC):
         results = {}
         for key, task in futures.items():
             results[key] = await task
+        return results
 
-        # Check for critical failures
+    @classmethod
+    def _validate_extension_errors(
+        cls,
+        errors: List[Any],
+        is_strict: bool,
+    ) -> None:
+        """Check for critical extension errors and raise or log as appropriate."""
         critical_errors = [e for e in errors if is_strict or e.is_required]
         if critical_errors:
             raise critical_errors[0]
@@ -1279,7 +1597,12 @@ class VerticalExtensionLoader(ABC):
                 f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
             )
 
-        extensions = VerticalExtensions(
+    @classmethod
+    def _assemble_extensions(cls, results: Dict[str, Any]) -> "VerticalExtensions":
+        """Build a VerticalExtensions from a results dict."""
+        from victor.core.verticals.protocols import VerticalExtensions
+
+        return VerticalExtensions(
             middleware=results["middleware"] if results["middleware"] else [],
             safety_extensions=[results["safety"]] if results["safety"] else [],
             prompt_contributors=[results["prompt"]] if results["prompt"] else [],
@@ -1293,9 +1616,89 @@ class VerticalExtensionLoader(ABC):
             tiered_tool_config=results["tiered_tools"],
         )
 
-        # Cache the extensions (shared with sync get_extensions)
-        with cls._extensions_cache_lock:
-            cls._extensions_cache[cache_key] = extensions
+    @classmethod
+    def _cache_extensions(cls, extensions: "VerticalExtensions") -> None:
+        """Store extensions in the shared cache."""
+        cache_key = cls._cache_namespace()
+        with cls._cache_manager._lock:
+            cls._cache_manager._cache[cache_key] = extensions
+
+    @classmethod
+    async def get_extensions_async(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> "VerticalExtensions":
+        """Async version of get_extensions that loads extensions in parallel.
+
+        Uses a thread pool executor to load all extensions concurrently,
+        providing faster initialization when extensions involve I/O.
+
+        Shares the same cache as the synchronous get_extensions() method.
+
+        Args:
+            use_cache: If True (default), return cached extensions if available.
+            strict: Override the class-level strict_extension_loading setting.
+
+        Returns:
+            VerticalExtensions containing all vertical extensions (never None)
+
+        Raises:
+            ExtensionLoadError: In strict mode or when a required extension fails
+        """
+        from victor.core.errors import ExtensionLoadError
+
+        cached = cls._get_cached_extensions(use_cache)
+        if cached is not None:
+            return cached
+
+        is_strict = cls._resolve_strict_mode(strict)
+
+        errors: List[ExtensionLoadError] = []
+        errors_lock = threading.Lock()
+
+        def _load_extension(
+            extension_type: str,
+            loader: callable,
+            is_list: bool = False,
+        ) -> Any:
+            """Load an extension with error handling (runs in thread pool)."""
+            try:
+                return loader()
+            except Exception as e:
+                cls._increment_loader_metric("failed")
+                is_required = extension_type in cls.required_extensions
+                error = ExtensionLoadError(
+                    message=(
+                        f"Failed to load '{extension_type}' extension "
+                        f"for vertical '{cls.name}': {e}"
+                    ),
+                    extension_type=extension_type,
+                    vertical_name=cls.name,
+                    original_error=e,
+                    is_required=is_required,
+                )
+                with errors_lock:
+                    errors.append(error)
+
+                if is_strict or is_required:
+                    logger.error(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}",
+                        exc_info=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[{error.correlation_id}] {extension_type} extension failed "
+                        f"for vertical '{cls.name}': {e}"
+                    )
+                return [] if is_list else None
+
+        results = await cls._submit_extension_tasks(_load_extension)
+        cls._validate_extension_errors(errors, is_strict)
+        extensions = cls._assemble_extensions(results)
+        cls._cache_extensions(extensions)
         return extensions
 
     @classmethod
@@ -1310,28 +1713,47 @@ class VerticalExtensionLoader(ABC):
         Returns:
             Workflow provider instance (WorkflowProviderProtocol) or None
         """
-        try:
-            # Try direct import pattern (e.g., CodingWorkflowProvider)
-            vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
-            class_name = f"{vertical_name}WorkflowProvider"
-            module = __import__(f"victor.{cls.name}.workflows", fromlist=[class_name])
-            provider_class = getattr(module, class_name)
-            return provider_class()
-        except (ImportError, AttributeError):
+        provider = cls._load_named_entry_point_extension(
+            "workflow_provider",
+            "victor.workflow_providers",
+        )
+        if provider is not None:
+            return provider
+
+        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        class_name = f"{vertical_name}WorkflowProvider"
+
+        candidate_paths: List[str] = []
+        for suffix in ("workflows", "workflows.provider"):
+            for module_path in cls._extension_module_candidates(suffix):
+                if cls._extension_module_available(module_path):
+                    candidate_paths.append(module_path)
+
+        if not candidate_paths:
+            return None
+
+        last_error: Optional[Exception] = None
+        for module_path in candidate_paths:
             try:
-                # Try provider submodule
-                module = __import__(f"victor.{cls.name}.workflows.provider", fromlist=[class_name])
-                provider_class = getattr(module, class_name)
-                return provider_class()
-            except (ImportError, AttributeError):
-                try:
-                    # Fall back to extension factory pattern
-                    return cls._get_extension_factory(
-                        "workflow_provider",
-                        f"victor.{cls.name}.workflows",
-                    )
-                except (ImportError, AttributeError):
-                    return None
+                module = __import__(module_path, fromlist=[class_name])
+                provider_class = getattr(module, class_name, None)
+                if provider_class is not None:
+                    return provider_class()
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        for module_path in candidate_paths:
+            try:
+                return cls._get_extension_factory(
+                    "workflow_provider",
+                    module_path,
+                )
+            except (ImportError, AttributeError) as exc:
+                last_error = exc
+
+        if last_error:
+            raise last_error
+        return None
 
     @classmethod
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:
@@ -1342,31 +1764,31 @@ class VerticalExtensionLoader(ABC):
                        If False (default), clear only for this class.
         """
         if clear_all:
-            with cls._extensions_cache_lock:
-                cls._extensions_cache.clear()
+            with cls._cache_manager._lock:
+                cls._cache_manager._cache.clear()
         else:
             namespaced_key = cls._cache_namespace()
             namespaced_prefix = f"{namespaced_key}:"
             legacy_key = cls.__name__
             legacy_prefix = f"{legacy_key}:"
-            with cls._extensions_cache_lock:
+            with cls._cache_manager._lock:
                 # Clear namespaced cache entries
-                cls._extensions_cache.pop(namespaced_key, None)
+                cls._cache_manager._cache.pop(namespaced_key, None)
                 namespaced_keys = [
-                    k for k in cls._extensions_cache if k.startswith(namespaced_prefix)
+                    k for k in cls._cache_manager._cache if k.startswith(namespaced_prefix)
                 ]
                 for key in namespaced_keys:
-                    cls._extensions_cache.pop(key, None)
+                    cls._cache_manager._cache.pop(key, None)
 
                 # Backward compatibility: clear legacy class-name-only keys.
-                cls._extensions_cache.pop(legacy_key, None)
+                cls._cache_manager._cache.pop(legacy_key, None)
                 legacy_keys = [
                     k
-                    for k in cls._extensions_cache
+                    for k in cls._cache_manager._cache
                     if k.startswith(legacy_prefix) and k.count(":") == 1
                 ]
                 for key in legacy_keys:
-                    cls._extensions_cache.pop(key, None)
+                    cls._cache_manager._cache.pop(key, None)
 
 
 class ExtensionLoaderMetricsReporter:

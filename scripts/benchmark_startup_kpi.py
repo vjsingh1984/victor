@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Benchmark startup KPIs for Victor import and Agent.create().
+"""Benchmark startup KPIs for Victor import, Agent.create(), and discovery.
 
 Measures:
 - `import victor` cold + warm timings
 - `Agent.create()` cold + warm timings
+- optional vertical discovery cold + warm timings with cache counters
 
 Usage:
     python scripts/benchmark_startup_kpi.py
     python scripts/benchmark_startup_kpi.py --iterations 10 --json
     python scripts/benchmark_startup_kpi.py --provider openai --model gpt-4o-mini
+    python scripts/benchmark_startup_kpi.py --skip-agent-create --discovery-probe --json
 """
 
 from __future__ import annotations
@@ -359,6 +361,99 @@ def _measure_activation_probe(
     return payload
 
 
+def _measure_discovery_probe(
+    *,
+    python_executable: str,
+    iterations: int,
+    timeout_seconds: float,
+) -> Dict[str, Any]:
+    """Measure cold/warm vertical discovery behavior and cache usage."""
+    code = textwrap.dedent(
+        f"""
+        import json
+        import time
+
+        from victor.core.verticals.vertical_loader import VerticalLoader
+        from victor.framework.module_loader import get_entry_point_cache
+
+        warm_iters = {iterations}
+        loader = VerticalLoader()
+        entry_point_cache = get_entry_point_cache()
+
+        initial_loader_stats = loader.get_discovery_stats()
+
+        t0 = time.perf_counter()
+        discovered = loader.discover_verticals(force_refresh=True, emit_event=False)
+        cold_ms = (time.perf_counter() - t0) * 1000.0
+
+        warm = []
+        for _ in range(warm_iters):
+            t = time.perf_counter()
+            loader.discover_verticals(emit_event=False)
+            warm.append((time.perf_counter() - t) * 1000.0)
+
+        final_loader_stats = loader.get_discovery_stats()
+        vertical_stats = final_loader_stats.get("vertical", {{}})
+        initial_vertical_stats = initial_loader_stats.get("vertical", {{}})
+        entry_point_cache_stats = entry_point_cache.get_cache_stats()
+        cached_vertical_group = entry_point_cache_stats.get("groups", {{}}).get(
+            "victor.verticals",
+            {{}},
+        )
+
+        def _delta(name):
+            return int(vertical_stats.get(name, 0) or 0) - int(
+                initial_vertical_stats.get(name, 0) or 0
+            )
+
+        def _percentile(values, q):
+            if not values:
+                return 0.0
+            if len(values) == 1:
+                return float(values[0])
+            ordered = sorted(values)
+            idx = round((len(ordered) - 1) * q)
+            return float(ordered[idx])
+
+        warm_mean_ms = (sum(warm) / len(warm)) if warm else 0.0
+
+        print(json.dumps({{
+            "cold_ms": cold_ms,
+            "warm_ms": warm,
+            "warm_mean_ms": warm_mean_ms,
+            "warm_p95_ms": _percentile(warm, 0.95),
+            "discovered_count": len(discovered),
+            "discovered_vertical_names": sorted(discovered.keys()),
+            "call_total": _delta("calls"),
+            "cache_hit_total": _delta("cache_hits"),
+            "scan_total": _delta("scans"),
+            "last_discovery_ms": float(vertical_stats.get("last_discovery_ms", 0.0) or 0.0),
+            "entry_point_groups_cached": int(entry_point_cache_stats.get("groups_cached", 0) or 0),
+            "entry_point_vertical_entries": int(cached_vertical_group.get("entries", 0) or 0),
+        }}))
+        """
+    )
+    payload = _run_snippet(
+        python_executable=python_executable,
+        code=code,
+        timeout_seconds=timeout_seconds,
+    )
+    return {
+        "cold_ms": float(payload["cold_ms"]),
+        "warm_samples_ms": [float(v) for v in payload["warm_ms"]],
+        "warm_mean_ms": float(payload["warm_mean_ms"]),
+        "warm_p95_ms": float(payload["warm_p95_ms"]),
+        "discovered_count": int(payload["discovered_count"]),
+        "discovered_vertical_names": [str(v) for v in payload["discovered_vertical_names"]],
+        "call_total": int(payload["call_total"]),
+        "cache_hit_total": int(payload["cache_hit_total"]),
+        "scan_total": int(payload["scan_total"]),
+        "last_discovery_ms": float(payload["last_discovery_ms"]),
+        "entry_point_groups_cached": int(payload["entry_point_groups_cached"]),
+        "entry_point_vertical_entries": int(payload["entry_point_vertical_entries"]),
+    }
+
+
 def _build_report(
     *,
     python_executable: str,
@@ -366,18 +461,34 @@ def _build_report(
     provider: str,
     model: str,
     import_timing: _TimingSummary,
-    create_timing: _TimingSummary,
+    create_timing: _TimingSummary | None,
+    discovery_probe: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    return {
+    report: Dict[str, Any] = {
         "python": python_executable,
         "iterations": iterations,
-        "agent_create": {
+        "import_victor": import_timing.to_dict(),
+    }
+    if create_timing is not None:
+        report["agent_create"] = {
             "provider": provider,
             "model": model,
             **create_timing.to_dict(),
-        },
-        "import_victor": import_timing.to_dict(),
-    }
+        }
+    if discovery_probe is not None:
+        report["discovery_probe"] = discovery_probe
+    return report
+
+
+def _lookup_report_value(report: Dict[str, Any], key: str) -> Any:
+    """Resolve a dotted report key to a nested value."""
+    value: Any = report
+    for part in key.split("."):
+        if isinstance(value, dict) and part in value:
+            value = value[part]
+            continue
+        return None
+    return value
 
 
 def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
@@ -396,6 +507,10 @@ def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
         thresholds["activation_probe.cold_ms"] = args.max_activation_cold_ms
     if hasattr(args, 'max_activation_warm_mean_ms') and args.max_activation_warm_mean_ms is not None:
         thresholds["activation_probe.warm_mean_ms"] = args.max_activation_warm_mean_ms
+    if hasattr(args, 'max_discovery_cold_ms') and args.max_discovery_cold_ms is not None:
+        thresholds["discovery_probe.cold_ms"] = args.max_discovery_cold_ms
+    if hasattr(args, 'max_discovery_warm_mean_ms') and args.max_discovery_warm_mean_ms is not None:
+        thresholds["discovery_probe.warm_mean_ms"] = args.max_discovery_warm_mean_ms
 
     return thresholds
 
@@ -405,15 +520,7 @@ def _evaluate_threshold_failures(report: Dict[str, Any], thresholds: Dict[str, f
     failures: List[str] = []
 
     for key, threshold in thresholds.items():
-        parts = key.split(".")
-        if len(parts) != 2:
-            continue
-
-        section, metric = parts
-        if section not in report:
-            continue
-
-        value = report[section].get(metric)
+        value = _lookup_report_value(report, key)
         if value is None:
             continue
 
@@ -431,6 +538,10 @@ def _collect_minimums(args: argparse.Namespace) -> Dict[str, float]:
         minimums["activation_probe.framework_registry_attempted_total"] = args.min_framework_registry_attempted_total
     if hasattr(args, 'min_framework_registry_applied_total') and args.min_framework_registry_applied_total is not None:
         minimums["activation_probe.framework_registry_applied_total"] = args.min_framework_registry_applied_total
+    if hasattr(args, 'min_discovery_vertical_count') and args.min_discovery_vertical_count is not None:
+        minimums["discovery_probe.discovered_count"] = args.min_discovery_vertical_count
+    if hasattr(args, 'min_discovery_cache_hits') and args.min_discovery_cache_hits is not None:
+        minimums["discovery_probe.cache_hit_total"] = args.min_discovery_cache_hits
 
     return minimums
 
@@ -440,19 +551,7 @@ def _evaluate_minimum_failures(report: Dict[str, Any], minimums: Dict[str, float
     failures: List[str] = []
 
     for key, minimum in minimums.items():
-        parts = key.split(".")
-        if len(parts) < 2:
-            continue
-
-        # Navigate nested structure
-        value = report
-        for part in parts:
-            if isinstance(value, dict) and part in value:
-                value = value[part]
-            else:
-                value = None
-                break
-
+        value = _lookup_report_value(report, key)
         if value is None:
             continue
 
@@ -485,19 +584,7 @@ def _evaluate_flag_expectation_failures(report: Dict[str, Any], expectations: Di
     failures: List[str] = []
 
     for key, expected_value in expectations.items():
-        parts = key.split(".")
-        if len(parts) < 2:
-            continue
-
-        # Navigate nested structure
-        value = report
-        for part in parts:
-            if isinstance(value, dict) and part in value:
-                value = value[part]
-            else:
-                value = None
-                break
-
+        value = _lookup_report_value(report, key)
         if value is None:
             failures.append(f"{key}: not found in report")
         elif value != expected_value:
@@ -508,7 +595,7 @@ def _evaluate_flag_expectation_failures(report: Dict[str, Any], expectations: Di
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Benchmark startup KPIs for import victor + Agent.create()."
+        description="Benchmark startup KPIs for import victor, Agent.create(), and discovery."
     )
     parser.add_argument(
         "--iterations",
@@ -541,6 +628,16 @@ def main() -> int:
         "--json",
         action="store_true",
         help="Print JSON report only.",
+    )
+    parser.add_argument(
+        "--skip-agent-create",
+        action="store_true",
+        help="Skip the Agent.create() probe when only import/discovery metrics are needed.",
+    )
+    parser.add_argument(
+        "--discovery-probe",
+        action="store_true",
+        help="Measure vertical discovery cold/warm timings and cache behavior.",
     )
 
     # Threshold arguments for CI/CD validation
@@ -580,6 +677,18 @@ def main() -> int:
         default=None,
         help="Maximum acceptable activation-probe warm mean time in milliseconds.",
     )
+    parser.add_argument(
+        "--max-discovery-cold-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable discovery-probe cold time in milliseconds.",
+    )
+    parser.add_argument(
+        "--max-discovery-warm-mean-ms",
+        type=float,
+        default=None,
+        help="Maximum acceptable discovery-probe warm mean time in milliseconds.",
+    )
 
     # Minimum value arguments
     parser.add_argument(
@@ -593,6 +702,18 @@ def main() -> int:
         type=float,
         default=None,
         help="Minimum acceptable framework registry applied total.",
+    )
+    parser.add_argument(
+        "--min-discovery-vertical-count",
+        type=float,
+        default=None,
+        help="Minimum acceptable number of discovered external verticals.",
+    )
+    parser.add_argument(
+        "--min-discovery-cache-hits",
+        type=float,
+        default=None,
+        help="Minimum acceptable discovery cache hits across warm samples.",
     )
 
     # Flag expectation arguments
@@ -640,13 +761,23 @@ def main() -> int:
         iterations=args.iterations,
         timeout_seconds=args.timeout_seconds,
     )
-    create_timing = _measure_agent_create(
-        python_executable=args.python,
-        iterations=args.iterations,
-        provider=args.provider,
-        model=args.model,
-        timeout_seconds=args.timeout_seconds,
-    )
+    create_timing = None
+    if not args.skip_agent_create:
+        create_timing = _measure_agent_create(
+            python_executable=args.python,
+            iterations=args.iterations,
+            provider=args.provider,
+            model=args.model,
+            timeout_seconds=args.timeout_seconds,
+        )
+
+    discovery_probe = None
+    if args.discovery_probe:
+        discovery_probe = _measure_discovery_probe(
+            python_executable=args.python,
+            iterations=args.iterations,
+            timeout_seconds=args.timeout_seconds,
+        )
 
     report = _build_report(
         python_executable=args.python,
@@ -655,6 +786,7 @@ def main() -> int:
         model=args.model,
         import_timing=import_timing,
         create_timing=create_timing,
+        discovery_probe=discovery_probe,
     )
 
     # Add activation probe if vertical specified
@@ -703,12 +835,21 @@ def main() -> int:
     print(f"  cold_ms: {report['import_victor']['cold_ms']:.2f}")
     print(f"  warm_mean_ms: {report['import_victor']['warm_mean_ms']:.2f}")
     print(f"  warm_p95_ms: {report['import_victor']['warm_p95_ms']:.2f}")
-    print("")
-    print("Agent.create()")
-    print(f"  provider/model: {args.provider}/{args.model}")
-    print(f"  cold_ms: {report['agent_create']['cold_ms']:.2f}")
-    print(f"  warm_mean_ms: {report['agent_create']['warm_mean_ms']:.2f}")
-    print(f"  warm_p95_ms: {report['agent_create']['warm_p95_ms']:.2f}")
+    if "agent_create" in report:
+        print("")
+        print("Agent.create()")
+        print(f"  provider/model: {args.provider}/{args.model}")
+        print(f"  cold_ms: {report['agent_create']['cold_ms']:.2f}")
+        print(f"  warm_mean_ms: {report['agent_create']['warm_mean_ms']:.2f}")
+        print(f"  warm_p95_ms: {report['agent_create']['warm_p95_ms']:.2f}")
+    if "discovery_probe" in report:
+        print("")
+        print("Discovery probe")
+        print(f"  cold_ms: {report['discovery_probe']['cold_ms']:.2f}")
+        print(f"  warm_mean_ms: {report['discovery_probe']['warm_mean_ms']:.2f}")
+        print(f"  warm_p95_ms: {report['discovery_probe']['warm_p95_ms']:.2f}")
+        print(f"  discovered_count: {report['discovery_probe']['discovered_count']}")
+        print(f"  cache_hit_total: {report['discovery_probe']['cache_hit_total']}")
     if "activation_probe" in report:
         print("")
         print(f"Activation probe ({report['activation_probe']['vertical']})")

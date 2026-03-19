@@ -16,6 +16,7 @@
 
 import pytest
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.security.safety.infrastructure import (
     InfraPatternCategory,
     InfrastructureScanner,
@@ -31,6 +32,14 @@ from victor.security.safety.infrastructure import (
     get_all_infrastructure_patterns,
     get_safety_reminders,
 )
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute or skip when unavailable."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
 
 
 class TestPatternLists:
@@ -395,10 +404,10 @@ class TestVerticalIntegration:
 
     def test_coding_safety_extension_uses_scanner(self):
         """CodingSafetyExtension should delegate to CodePatternScanner."""
-        try:
-            from victor_coding.safety import CodingSafetyExtension
-        except ImportError:
-            pytest.skip("victor-coding package not installed")
+        CodingSafetyExtension = _load_vertical_attr(
+            "victor.coding.safety",
+            "CodingSafetyExtension",
+        )
 
         ext = CodingSafetyExtension()
         patterns = ext.get_bash_patterns()
@@ -408,10 +417,10 @@ class TestVerticalIntegration:
 
     def test_devops_safety_extension_uses_scanner(self):
         """DevOpsSafetyExtension should delegate to InfrastructureScanner."""
-        try:
-            from victor_devops.safety import DevOpsSafetyExtension
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
+        DevOpsSafetyExtension = _load_vertical_attr(
+            "victor.devops.safety",
+            "DevOpsSafetyExtension",
+        )
 
         ext = DevOpsSafetyExtension()
         patterns = ext.get_bash_patterns()
@@ -421,10 +430,10 @@ class TestVerticalIntegration:
 
     def test_coding_extension_scan_command(self):
         """CodingSafetyExtension.scan_command should work."""
-        try:
-            from victor_coding.safety import CodingSafetyExtension
-        except ImportError:
-            pytest.skip("victor-coding package not installed")
+        CodingSafetyExtension = _load_vertical_attr(
+            "victor.coding.safety",
+            "CodingSafetyExtension",
+        )
 
         ext = CodingSafetyExtension()
         matches = ext.scan_command("git push --force origin main")
@@ -432,10 +441,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_scan_command(self):
         """DevOpsSafetyExtension.scan_command should work."""
-        try:
-            from victor_devops.safety import DevOpsSafetyExtension
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
+        DevOpsSafetyExtension = _load_vertical_attr(
+            "victor.devops.safety",
+            "DevOpsSafetyExtension",
+        )
 
         ext = DevOpsSafetyExtension()
         result = ext.scan_command("kubectl delete namespace prod")
@@ -443,10 +452,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_validate_dockerfile(self):
         """DevOpsSafetyExtension.validate_dockerfile should work."""
-        try:
-            from victor_devops.safety import DevOpsSafetyExtension
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
+        DevOpsSafetyExtension = _load_vertical_attr(
+            "victor.devops.safety",
+            "DevOpsSafetyExtension",
+        )
 
         ext = DevOpsSafetyExtension()
         warnings = ext.validate_dockerfile("FROM python:latest")
@@ -454,10 +463,10 @@ class TestVerticalIntegration:
 
     def test_devops_extension_validate_k8s(self):
         """DevOpsSafetyExtension.validate_kubernetes_manifest should work."""
-        try:
-            from victor_devops.safety import DevOpsSafetyExtension
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
+        DevOpsSafetyExtension = _load_vertical_attr(
+            "victor.devops.safety",
+            "DevOpsSafetyExtension",
+        )
 
         ext = DevOpsSafetyExtension()
         warnings = ext.validate_kubernetes_manifest("privileged: true")

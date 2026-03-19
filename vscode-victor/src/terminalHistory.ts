@@ -27,6 +27,32 @@ interface PendingExecution {
     outputLines: string[];
 }
 
+interface ShellExecutionLike {
+    commandLine?: string | { value?: string };
+    cwd?: { fsPath?: string };
+    exitCode?: number;
+    read?: () => AsyncIterable<unknown> | undefined;
+}
+
+interface ShellExecutionEventLike {
+    terminal?: vscode.Terminal;
+    execution?: ShellExecutionLike;
+    shellIntegration?: {
+        executeCommand?: ShellExecutionLike;
+    };
+    exitCode?: number;
+}
+
+type ShellExecutionEventRegistrar = (
+    listener: (event: ShellExecutionEventLike) => void
+) => vscode.Disposable;
+
+const ESC = String.fromCharCode(27);
+const BEL = String.fromCharCode(7);
+const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+const OSC_SHELL_SEQUENCE = new RegExp(`${ESC}\\][0-9]+;[^${BEL}]*${BEL}`, 'g');
+const BACKSPACE_SEQUENCE = new RegExp('[^\\b]\\b', 'g');
+
 /**
  * Singleton service for terminal history tracking
  */
@@ -179,32 +205,31 @@ export class TerminalHistoryService implements vscode.Disposable {
      */
     private _initShellIntegration(): void {
         try {
-            // Check if shell integration events exist (VS Code 1.93+)
-            // These are proposed APIs that may not be available in all versions
-            if ('onDidStartTerminalShellExecution' in vscode.window &&
-                'onDidEndTerminalShellExecution' in vscode.window) {
+            const windowWithShellIntegration = vscode.window as typeof vscode.window & {
+                onDidStartTerminalShellExecution?: ShellExecutionEventRegistrar;
+                onDidEndTerminalShellExecution?: ShellExecutionEventRegistrar;
+            };
+
+            const startEvent = windowWithShellIntegration.onDidStartTerminalShellExecution;
+            const endEvent = windowWithShellIntegration.onDidEndTerminalShellExecution;
+
+            if (typeof startEvent === 'function' && typeof endEvent === 'function') {
 
                 this._shellIntegrationAvailable = true;
 
                 // Listen for command execution start
-                const startEvent = (vscode.window as any).onDidStartTerminalShellExecution;
-                if (startEvent) {
-                    this._disposables.push(
-                        startEvent((event: any) => {
-                            this._onShellExecutionStart(event);
-                        })
-                    );
-                }
+                this._disposables.push(
+                    startEvent((event: ShellExecutionEventLike) => {
+                        this._onShellExecutionStart(event);
+                    })
+                );
 
                 // Listen for command execution end
-                const endEvent = (vscode.window as any).onDidEndTerminalShellExecution;
-                if (endEvent) {
-                    this._disposables.push(
-                        endEvent((event: any) => {
-                            this._onShellExecutionEnd(event);
-                        })
-                    );
-                }
+                this._disposables.push(
+                    endEvent((event: ShellExecutionEventLike) => {
+                        this._onShellExecutionEnd(event);
+                    })
+                );
 
                 console.log('[TerminalHistory] Shell integration API available');
             } else {
@@ -218,7 +243,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Handle shell execution start event
      */
-    private _onShellExecutionStart(event: any): void {
+    private _onShellExecutionStart(event: ShellExecutionEventLike): void {
         try {
             const terminal = event.terminal as vscode.Terminal;
             const execution = event.shellIntegration?.executeCommand || event.execution;
@@ -227,7 +252,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 return;
             }
 
-            const commandLine = execution.commandLine?.value || execution.commandLine || '';
+            const commandLine = this._getCommandLine(execution);
             const cwd = execution.cwd?.fsPath || undefined;
 
             if (!commandLine) {
@@ -256,7 +281,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Handle shell execution end event
      */
-    private _onShellExecutionEnd(event: any): void {
+    private _onShellExecutionEnd(event: ShellExecutionEventLike): void {
         try {
             const terminal = event.terminal as vscode.Terminal;
             const execution = event.shellIntegration?.executeCommand || event.execution;
@@ -266,7 +291,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 return;
             }
 
-            const commandLine = execution?.commandLine?.value || execution?.commandLine || '';
+            const commandLine = this._getCommandLine(execution);
 
             // Find matching pending execution
             let matchingKey: string | undefined;
@@ -308,7 +333,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Capture output from shell execution stream
      */
-    private async _captureOutput(key: string, execution: any): Promise<void> {
+    private async _captureOutput(key: string, execution: ShellExecutionLike): Promise<void> {
         try {
             const pending = this._pendingExecutions.get(key);
             if (!pending) {
@@ -316,7 +341,7 @@ export class TerminalHistoryService implements vscode.Disposable {
             }
 
             // Read output stream if available
-            const reader = execution.read();
+            const reader = execution.read?.();
             if (!reader) {
                 return;
             }
@@ -326,7 +351,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                     break; // Execution already completed
                 }
 
-                const text = typeof data === 'string' ? data : data.toString();
+                const text = typeof data === 'string' ? data : String(data);
                 const lines = text.split('\n');
 
                 for (const line of lines) {
@@ -379,10 +404,10 @@ export class TerminalHistoryService implements vscode.Disposable {
      */
     private _cleanLine(line: string): string {
         // Remove ANSI escape codes
-        let cleaned = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+        let cleaned = line.replace(ANSI_ESCAPE_SEQUENCE, '');
 
         // Remove shell integration escape sequences (OSC 633/133)
-        cleaned = cleaned.replace(/\x1b\][0-9]+;[^\x07]*\x07/g, '');
+        cleaned = cleaned.replace(OSC_SHELL_SEQUENCE, '');
 
         // Process carriage returns (keep only final state)
         if (cleaned.includes('\r')) {
@@ -392,10 +417,22 @@ export class TerminalHistoryService implements vscode.Disposable {
 
         // Remove backspaces
         while (cleaned.includes('\b')) {
-            cleaned = cleaned.replace(/[^\b]\b/g, '');
+            cleaned = cleaned.replace(BACKSPACE_SEQUENCE, '');
         }
 
         return cleaned;
+    }
+
+    private _getCommandLine(execution?: ShellExecutionLike): string {
+        if (!execution) {
+            return '';
+        }
+
+        if (typeof execution.commandLine === 'string') {
+            return execution.commandLine;
+        }
+
+        return execution.commandLine?.value ?? '';
     }
 
     private _trackTerminal(_terminal: vscode.Terminal): void {

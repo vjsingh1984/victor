@@ -1505,16 +1505,17 @@ async def read(
                         )  # Ensure at least 100 lines
                         max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute context-aware truncation limits: %s", e)
                 return 1500, 65536  # Fallback for local models: 1500, 64KB
 
             # Cloud models get higher limits (large context windows)
             # Anthropic: 200K tokens, GPT-4: 128K tokens
             # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
             return 1500, 65536  # ~2500 lines, 100KB for cloud models
-        except Exception:
+        except Exception as e:
             # Default to cloud limits if settings unavailable
+            logger.debug("Settings unavailable for truncation limits, using defaults: %s", e)
             return 1500, 65536  # ~1500 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
@@ -1618,12 +1619,7 @@ async def read(
         "Automatically uses LSP validation/formatting when available for the language",
     ],
 )
-async def write(
-    path: str,
-    content: str,
-    *,
-    use_lsp: bool = True
-) -> str:
+async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
     """Write file. Creates parent dirs. Use edit_files for partial edits.
 
     Automatically uses LSP (Language Server Protocol) enhancement when available:
@@ -1668,32 +1664,53 @@ async def write(
         # Check if language has LSP support by file extension
         lsp_supported_extensions = {
             # Programming languages
-            '.py', '.pyi', '.pyx',        # Python
-            '.c', '.h', '.cpp', '.hpp', '.cc', '.cxx',  # C/C++
-            '.rs',                        # Rust
-            '.ts', '.tsx', '.js', '.jsx', # JavaScript/TypeScript
-            '.go',                        # Go
-            '.java',                      # Java
-            '.kt', '.kts',                # Kotlin
-            '.swift',                     # Swift
-            '.scala',                     # Scala
-            '.cs',                        # C#
-            '.php',                       # PHP
-            '.rb',                        # Ruby
-            '.lua',                       # Lua
-            '.ex', '.exs',                # Elixir
-            '.hs',                        # Haskell
-            '.r', '.R',                    # R
+            ".py",
+            ".pyi",
+            ".pyx",  # Python
+            ".c",
+            ".h",
+            ".cpp",
+            ".hpp",
+            ".cc",
+            ".cxx",  # C/C++
+            ".rs",  # Rust
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",  # JavaScript/TypeScript
+            ".go",  # Go
+            ".java",  # Java
+            ".kt",
+            ".kts",  # Kotlin
+            ".swift",  # Swift
+            ".scala",  # Scala
+            ".cs",  # C#
+            ".php",  # PHP
+            ".rb",  # Ruby
+            ".lua",  # Lua
+            ".ex",
+            ".exs",  # Elixir
+            ".hs",  # Haskell
+            ".r",
+            ".R",  # R
             # Config files
-            '.json', '.jsonc',            # JSON
-            '.yaml', '.yml',              # YAML
-            '.toml',                      # TOML
-            '.xml',                       # XML
-            '.html', '.htm',              # HTML
-            '.css', '.scss', '.less',     # CSS
-            '.sh', '.bash', '.zsh',        # Shell
-            '.sql',                       # SQL
-            '.md', '.markdown',           # Markdown
+            ".json",
+            ".jsonc",  # JSON
+            ".yaml",
+            ".yml",  # YAML
+            ".toml",  # TOML
+            ".xml",  # XML
+            ".html",
+            ".htm",  # HTML
+            ".css",
+            ".scss",
+            ".less",  # CSS
+            ".sh",
+            ".bash",
+            ".zsh",  # Shell
+            ".sql",  # SQL
+            ".md",
+            ".markdown",  # Markdown
         }
 
         if file_path.suffix.lower() in lsp_supported_extensions:
@@ -1718,7 +1735,9 @@ async def write(
 
                     if result.validated:
                         error_count = sum(1 for d in result.diagnostics if d.severity == "error")
-                        warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+                        warning_count = sum(
+                            1 for d in result.diagnostics if d.severity == "warning"
+                        )
 
                         if error_count > 0 or warning_count > 0:
                             lsp_info.append(f"{error_count} errors, {warning_count} warnings")

@@ -79,23 +79,25 @@ class BenchmarkModeConfig(BaseModeConfigProvider, ModeHelperMixin):
         }
 
         # Add benchmark-specific modes
-        modes.update({
-            # Example: Custom mode with specific requirements
-            "default": ModeDefinition(
-                name="default",
-                tool_budget=30,
-                max_iterations=15,
-                temperature=0.2,
-                description=f"Balanced settings for standard benchmark tasks",
-                exploration_multiplier=1.0,
-                priority_tools=[
-                    "read",
-                    "grep",
-                    "edit",
-                    "shell",
-                ],
-            ),
-        })
+        modes.update(
+            {
+                # Example: Custom mode with specific requirements
+                "default": ModeDefinition(
+                    name="default",
+                    tool_budget=30,
+                    max_iterations=15,
+                    temperature=0.2,
+                    description="Balanced settings for standard benchmark tasks",
+                    exploration_multiplier=1.0,
+                    priority_tools=[
+                        "read",
+                        "grep",
+                        "edit",
+                        "shell",
+                    ],
+                ),
+            }
+        )
 
         return modes
 

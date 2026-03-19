@@ -16,14 +16,15 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as net from 'net';
 
 export interface ServerConfig {
     host: string;
     port: number;
     autoStart: boolean;
+    serverUrl?: string;
     pythonPath?: string;
     victorPath?: string;
-    backend?: 'aiohttp' | 'fastapi';
     fallbackPorts?: number[];
 }
 
@@ -54,6 +55,14 @@ const BACKOFF_CONFIG = {
 // Fallback ports to try
 const DEFAULT_FALLBACK_PORTS = [8765, 8766, 8767, 8768, 8000];
 
+function normalizeServerUrl(serverUrl?: string): string | null {
+    const trimmed = serverUrl?.trim();
+    if (!trimmed) {
+        return null;
+    }
+    return trimmed.replace(/\/+$/, '');
+}
+
 export class ServerManager {
     private serverProcess: cp.ChildProcess | null = null;
     private status: ServerStatus = ServerStatus.Stopped;
@@ -65,13 +74,26 @@ export class ServerManager {
     private activePort: number;
     private isExternalServer: boolean = false;
     private pidFilePath: string;
+    private remoteServerUrl: string | null = null;
 
     constructor(config: ServerConfig) {
         this.config = {
             ...config,
             fallbackPorts: config.fallbackPorts || DEFAULT_FALLBACK_PORTS
         };
+        this.remoteServerUrl = normalizeServerUrl(config.serverUrl);
         this.activePort = config.port;
+        if (this.remoteServerUrl) {
+            try {
+                const parsed = new URL(this.remoteServerUrl);
+                this.config.host = parsed.hostname;
+                this.activePort = parsed.port
+                    ? Number(parsed.port)
+                    : parsed.protocol === 'https:' ? 443 : 80;
+            } catch {
+                // Keep configured host/port if URL parsing fails.
+            }
+        }
         this.outputChannel = vscode.window.createOutputChannel('Victor Server');
         this.pidFilePath = path.join(os.homedir(), '.victor', 'server.pid');
     }
@@ -108,16 +130,18 @@ export class ServerManager {
      * Get the server URL
      */
     getServerUrl(): string {
-        return `http://${this.config.host}:${this.activePort}`;
+        return this.remoteServerUrl || `http://${this.config.host}:${this.activePort}`;
     }
 
     /**
      * Check if server is running by hitting health endpoint
      */
     async checkHealth(port?: number): Promise<boolean> {
-        const targetPort = port || this.activePort;
+        const targetUrl = this.remoteServerUrl && port === undefined
+            ? `${this.remoteServerUrl}/health`
+            : `http://${this.config.host}:${port || this.activePort}/health`;
         try {
-            const response = await fetch(`http://${this.config.host}:${targetPort}/health`, {
+            const response = await fetch(targetUrl, {
                 method: 'GET',
                 signal: AbortSignal.timeout(2000)
             });
@@ -132,6 +156,10 @@ export class ServerManager {
      * Checks configured port and fallback ports
      */
     async discoverExistingServer(): Promise<number | null> {
+        if (this.remoteServerUrl) {
+            return (await this.checkHealth()) ? this.activePort : null;
+        }
+
         const portsToCheck = [this.config.port, ...(this.config.fallbackPorts || [])];
         const uniquePorts = [...new Set(portsToCheck)];
 
@@ -184,7 +212,6 @@ export class ServerManager {
      */
     private async isPortInUse(port: number): Promise<boolean> {
         return new Promise((resolve) => {
-            const net = require('net');
             const server = net.createServer();
 
             server.once('error', (err: NodeJS.ErrnoException) => {
@@ -209,6 +236,20 @@ export class ServerManager {
      * First tries to discover existing server, then spawns new one if needed
      */
     async start(): Promise<boolean> {
+        if (this.remoteServerUrl) {
+            this.isExternalServer = true;
+            if (await this.checkHealth()) {
+                this.setStatus(ServerStatus.Running);
+                this.log(`Connected to configured remote server ${this.remoteServerUrl}`);
+                this.startHealthCheck();
+                return true;
+            }
+
+            this.setStatus(ServerStatus.Error);
+            this.log(`ERROR: Remote Victor server unavailable at ${this.remoteServerUrl}`);
+            return false;
+        }
+
         // First, try to discover an existing server
         const existingPort = await this.discoverExistingServer();
         if (existingPort !== null) {
@@ -264,11 +305,6 @@ export class ServerManager {
             '--port', availablePort.toString(),
             '--log-level', 'INFO'
         ];
-
-        // Add backend flag if configured
-        if (this.config.backend) {
-            args.push('--backend', this.config.backend);
-        }
 
         try {
             // Spawn the server process
@@ -338,7 +374,7 @@ export class ServerManager {
         this.stopHealthCheck();
 
         // Don't stop external servers
-        if (this.isExternalServer) {
+        if (this.isExternalServer || this.remoteServerUrl) {
             this.log('Disconnecting from external server (not stopping it)');
             this.setStatus(ServerStatus.Stopped);
             return;
@@ -661,16 +697,13 @@ export function createServerManager(): ServerManager {
     const configuredPython = config.get<string>('pythonPath') || undefined;
     const pythonPath = configuredPython || detectedPython;
 
-    // Get backend preference (default to aiohttp for backward compatibility)
-    const backend = config.get<'aiohttp' | 'fastapi'>('serverBackend', 'aiohttp');
-
     return new ServerManager({
         host: '127.0.0.1',
         port: config.get('serverPort', 8765),
         autoStart: config.get('autoStart', false),
+        serverUrl: config.get('serverUrl') || undefined,
         pythonPath,
         victorPath: config.get('victorPath'),
-        backend,
         fallbackPorts: config.get('fallbackPorts', DEFAULT_FALLBACK_PORTS)
     });
 }

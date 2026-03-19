@@ -218,9 +218,14 @@ class QuestionTypeClassifier:
 
     _instance: Optional["QuestionTypeClassifier"] = None
 
-    def __init__(self):
-        """Initialize the classifier."""
+    def __init__(self, decision_service=None):
+        """Initialize the classifier.
+
+        Args:
+            decision_service: Optional LLMDecisionService for low-confidence augmentation
+        """
         self._patterns = QUESTION_PATTERNS
+        self._decision_service = decision_service
         logger.debug(f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns")
 
     @classmethod
@@ -277,7 +282,39 @@ class QuestionTypeClassifier:
                 matched_pattern=best_match[2][:50],  # Truncate for logging
             )
 
-        # No pattern matched - default to CLARIFICATION if contains question
+        # No pattern matched - consult LLM if available
+        if self._decision_service is not None:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = self._decision_service.decide_sync(
+                    DecisionType.QUESTION_CLASSIFICATION,
+                    context={"question_text": text[-300:]},
+                    heuristic_confidence=0.5,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "question_type"):
+                    type_map = {
+                        "rhetorical": QuestionType.RHETORICAL,
+                        "continuation": QuestionType.CONTINUATION,
+                        "clarification": QuestionType.CLARIFICATION,
+                        "info": QuestionType.INFORMATION,
+                    }
+                    mapped = type_map.get(decision.result.question_type)
+                    if mapped is not None:
+                        logger.debug(
+                            "LLM classified question as %s (conf=%.2f)",
+                            mapped.value,
+                            decision.confidence,
+                        )
+                        return QuestionClassificationResult(
+                            question_type=mapped,
+                            confidence=decision.confidence,
+                            matched_pattern="llm_classification",
+                        )
+            except Exception:
+                logger.debug("LLM question classification failed", exc_info=True)
+
+        # Default to CLARIFICATION if contains question
         # This is conservative - prefer returning to user
         return QuestionClassificationResult(
             question_type=QuestionType.CLARIFICATION,

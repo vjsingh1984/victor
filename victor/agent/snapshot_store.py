@@ -199,8 +199,8 @@ class FileSnapshotStore:
             )
             if result.returncode == 0:
                 return result.stdout.strip()[:12]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to resolve git HEAD for snapshot: %s", e)
         return None
 
     def _read_file_safe(self, path: Path) -> Optional[str]:

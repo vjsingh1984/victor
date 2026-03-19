@@ -47,12 +47,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
 from victor.agent.presentation.null_adapter import NullPresentationAdapter
 from victor.agent.presentation.protocols import PresentationProtocol
 
 if TYPE_CHECKING:
-    pass
+    from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
+
+
+def _get_emoji_adapter_class() -> type:
+    from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
+
+    return EmojiPresentationAdapter
 
 
 def create_presentation_adapter(*, use_null: bool = False) -> PresentationProtocol:
@@ -76,7 +81,14 @@ def create_presentation_adapter(*, use_null: bool = False) -> PresentationProtoc
     """
     if use_null:
         return NullPresentationAdapter()
-    return EmojiPresentationAdapter()
+    cls = _get_emoji_adapter_class()
+    return cls()
+
+
+def __getattr__(name: str):
+    if name == "EmojiPresentationAdapter":
+        return _get_emoji_adapter_class()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

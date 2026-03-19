@@ -58,7 +58,10 @@ from victor.verticals.contrib.coding.languages.base import (
     Linter,
     LanguageConfig,
 )
-from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.registry import (
+    LanguageRegistry,
+    get_language_registry,
+)
 from victor.verticals.contrib.coding.languages.manager import LanguageManager
 from victor.verticals.contrib.coding.languages.tiers import (
     LanguageTier,

@@ -148,6 +148,7 @@ from victor.agent.unified_task_tracker import TrackerTaskType, UnifiedTaskTracke
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
 # Decomposed components - configs, strategies, functions
+from victor.core.context import session_id as ctx_session_id, set_session_id
 from victor.agent.conversation_controller import (
     ConversationConfig,
     ContextMetrics,
@@ -168,6 +169,7 @@ from victor.agent.tool_call_extractor import ExtractedToolCall
 from victor.framework.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
+from victor.agent.session_state_accessor import SessionStateAccessor
 from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
 
 # Recovery - enums and functions used at runtime
@@ -555,6 +557,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
+            factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
@@ -569,6 +572,46 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._chat_coordinator = self._interaction_runtime.chat_coordinator
         self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
+
+    def _initialize_services(self) -> None:
+        """Resolve service adapters from DI container when USE_SERVICE_LAYER flag is enabled.
+
+        This implements the Strangler Fig pattern: when the flag is on, orchestrator
+        methods delegate to service adapters (which wrap coordinators) instead of
+        calling coordinators directly. When the flag is off, services are None and
+        methods fall through to coordinators as before.
+        """
+        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+        self._use_service_layer = get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_SERVICE_LAYER
+        )
+        if not self._use_service_layer or not hasattr(self, "_container"):
+            self._chat_service = None
+            self._tool_service = None
+            self._session_service = None
+            self._context_service = None
+            return
+
+        from victor.agent.services.protocols import (
+            ChatServiceProtocol,
+            ToolServiceProtocol,
+            SessionServiceProtocol,
+            ContextServiceProtocol,
+        )
+
+        self._chat_service = self._container.get_optional(ChatServiceProtocol)
+        self._tool_service = self._container.get_optional(ToolServiceProtocol)
+        self._session_service = self._container.get_optional(SessionServiceProtocol)
+        self._context_service = self._container.get_optional(ContextServiceProtocol)
+
+        logger.info(
+            "Service layer initialized: chat=%s, tool=%s, session=%s, context=%s",
+            self._chat_service is not None,
+            self._tool_service is not None,
+            self._session_service is not None,
+            self._context_service is not None,
+        )
 
     def __init__(
         self,
@@ -680,6 +723,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Replaces scattered state variables: tool_calls_used, observed_files, executed_tools,
         # failed_tool_signatures, _read_files_session, _required_files, _required_outputs, etc.
         self._session_state = create_session_state_manager(tool_budget=self.tool_budget)
+        self._session_accessor = SessionStateAccessor(self._session_state)
 
         # Gap implementations: Complexity classifier, action authorizer, search router (via factory)
         self.task_classifier = self._factory.create_complexity_classifier()
@@ -710,6 +754,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Metrics/analytics runtime boundary with lazy collector/coordinator loading.
         self._initialize_metrics_runtime()
+
+        # CallbackCoordinator: centralized callback delegation for tool/streaming events.
+        self._callback_coordinator = self._build_callback_coordinator()
 
         # Cancellation support for streaming
         self._cancel_event: Optional[asyncio.Event] = None
@@ -863,7 +910,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager = self._factory.create_lifecycle_manager(
             conversation_controller=self._conversation_controller,
             metrics_collector=(
-                self._metrics_coordinator.metrics_collector if hasattr(self, "_metrics_coordinator") else None
+                self._metrics_coordinator.metrics_collector
+                if hasattr(self, "_metrics_coordinator")
+                else None
             ),
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
@@ -888,6 +937,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             on_tool_complete=self._on_tool_complete_callback,
             deduplication_tracker=self._deduplication_tracker,
             middleware_chain=self._middleware_chain,
+            search_router=self.search_router,
         )
 
         # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
@@ -1012,6 +1062,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Interaction runtime boundary: lazily materialize chat/tool/session coordinators.
         self._initialize_interaction_runtime()
 
+        # Service layer delegation (Strangler Fig pattern).
+        # When USE_SERVICE_LAYER flag is enabled, orchestrator delegates to
+        # service adapters instead of coordinators directly.
+        self._initialize_services()
+
         # =================================================================
         # NEW: Sync/Streaming Coordinators for Phase 2 split
         # These provide separate execution paths for sync and streaming
@@ -1047,6 +1102,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
         self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
 
+        # Initialize session context for tracing/propagation
+        set_session_id(self.active_session_id or "")
+
         # Debug-mode conformance assertion for ChatOrchestratorProtocol
         # Placed at end of __init__ so all attributes are initialized
         if __debug__:
@@ -1068,86 +1126,49 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     # =====================================================================
-    # Callbacks for decomposed components
+    # Callbacks for decomposed components — delegated to CallbackCoordinator
     # =====================================================================
+
+    def _build_callback_coordinator(self) -> Any:
+        """Lazily construct the CallbackCoordinator."""
+        from victor.agent.callback_coordinator import CallbackCoordinator
+
+        return CallbackCoordinator(
+            metrics_coordinator=self._metrics_coordinator,
+            get_tool_coordinator=lambda: self._tool_coordinator,
+            get_observability=lambda: getattr(self, "_observability", None),
+            get_pipeline_calls_used=lambda: (
+                self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
+            ),
+            get_usage_analytics=lambda: (
+                self._usage_analytics
+                if hasattr(self, "_usage_analytics") and self._usage_analytics
+                else None
+            ),
+            get_rl_coordinator=lambda: self._rl_coordinator,
+            get_vertical_context=lambda: self._vertical_context,
+        )
 
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
-        iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-        self._metrics_coordinator.on_tool_start(tool_name, arguments, iteration)
-
-        # Emit observability event for tool start
-        if hasattr(self, "_observability") and self._observability:
-            tool_id = f"tool-{iteration}"
-            self._observability.on_tool_start(tool_name, arguments, tool_id)
+        self._callback_coordinator.on_tool_start(tool_name, arguments)
 
     def _on_tool_complete_callback(self, result: ToolCallResult) -> None:
-        """Callback when tool execution completes (from ToolPipeline).
-
-        Delegates to ToolCoordinator.on_tool_complete with orchestrator state.
-        """
-        # Use a mutable list as a flag so ToolCoordinator can update it
+        """Callback when tool execution completes (from ToolPipeline)."""
         nudge_flag = [getattr(self, "_all_files_read_nudge_sent", False)]
-
-        self._tool_coordinator.on_tool_complete(
-            result=result,
-            metrics_collector=self._metrics_coordinator.metrics_collector,
+        self._callback_coordinator.on_tool_complete(
+            result,
             read_files_session=self._read_files_session,
             required_files=self._required_files,
             required_outputs=self._required_outputs,
             nudge_sent_flag=nudge_flag,
             add_message=self.add_message,
-            observability=getattr(self, "_observability", None),
-            pipeline_calls_used=(
-                self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
-            ),
         )
-
-        # Sync the nudge flag back
         self._all_files_read_nudge_sent = nudge_flag[0]
 
     def _on_streaming_session_complete(self, session: StreamingSession) -> None:
-        """Callback when streaming session completes (from StreamingController).
-
-        This callback:
-        1. Records metrics via MetricsCoordinator
-        2. Ends UsageAnalytics session
-        3. Sends RL reward signal to update provider Q-values
-        """
-        self._metrics_coordinator.on_streaming_session_complete(session)
-
-        # End UsageAnalytics session
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            self._usage_analytics.end_session()
-
-        # Send RL reward signal for Q-learning model selection
-        self._send_rl_reward_signal(session)
-
-    def _send_rl_reward_signal(self, session: StreamingSession) -> None:
-        """Send reward signal to RL model selector. Delegates to MetricsCoordinator."""
-        self._metrics_coordinator.send_rl_reward_signal(
-            session=session,
-            rl_coordinator=self._rl_coordinator,
-            vertical_context=self._vertical_context,
-        )
-
-    @property
-    def conversation_controller(self) -> "ConversationController":
-        """Get the conversation controller component.
-
-        Returns:
-            ConversationController instance for managing conversation state
-        """
-        return self._conversation_controller
-
-    @property
-    def tool_pipeline(self) -> "ToolPipeline":
-        """Get the tool pipeline component.
-
-        Returns:
-            ToolPipeline instance for coordinating tool execution
-        """
-        return self._tool_pipeline
+        """Callback when streaming session completes (from StreamingController)."""
+        self._callback_coordinator.on_streaming_session_complete(session)
 
     @property
     def workflow_registry(self) -> Any:
@@ -1163,33 +1184,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def workflow_registry(self, value: Any) -> None:
         """Set workflow registry (supports test overrides)."""
         self._workflow_registry = value
-
-    @property
-    def streaming_controller(self) -> "StreamingController":
-        """Get the streaming controller component.
-
-        Returns:
-            StreamingController instance for managing streaming sessions
-        """
-        return self._streaming_controller
-
-    @property
-    def streaming_handler(self) -> StreamingChatHandler:
-        """Get the streaming chat handler component.
-
-        Returns:
-            StreamingChatHandler instance for testable streaming loop logic
-        """
-        return self._streaming_handler
-
-    @property
-    def task_analyzer(self) -> "TaskAnalyzer":
-        """Get the task analyzer component.
-
-        Returns:
-            TaskAnalyzer instance for unified task analysis
-        """
-        return self._task_analyzer
 
     @property
     def observability(self) -> Optional[ObservabilityIntegration]:
@@ -1262,511 +1256,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.set_capability_loader(loader)
         return loader
 
-    @property
-    def provider_manager(self) -> "ProviderManager":
-        """Get the provider manager component.
-
-        Returns:
-            ProviderManager instance for unified provider management
-        """
-        return self._provider_manager
-
-    @property
-    def context_compactor(self) -> "ContextCompactor":
-        """Get the context compactor component.
-
-        Returns:
-            ContextCompactor instance for proactive context management
-        """
-        return self._context_compactor
-
-    # =====================================================================
-    # NEW: Phase 1/2 Coordinator Properties
-    # =====================================================================
-
-    @property
-    def protocol_adapter(self) -> Any:
-        """Get the protocol adapter for DIP compliance.
-
-        Returns:
-            OrchestratorProtocolAdapter instance
-        """
-        if self._protocol_adapter is None:
-            from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
-
-            self._protocol_adapter = OrchestratorProtocolAdapter(self)
-        return self._protocol_adapter
-
-    @property
-    def execution_coordinator(self) -> Any:
-        """Get the execution coordinator for agentic loop.
-
-        Returns:
-            ExecutionCoordinator instance for agentic loop execution
-        """
-        if self._execution_coordinator is None:
-            from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
-
-            # Execution coordinator depends on protocol adapter
-            self._execution_coordinator = ExecutionCoordinator(
-                chat_context=self.protocol_adapter,
-                tool_context=self.protocol_adapter,
-                provider_context=self.protocol_adapter,
-                execution_provider=self.protocol_adapter,
-            )
-        return self._execution_coordinator
-
-    @property
-    def sync_chat_coordinator(self) -> Any:
-        """Get the sync chat coordinator for non-streaming execution.
-
-        Returns:
-            SyncChatCoordinator instance for optimized non-streaming execution
-        """
-        if self._sync_chat_coordinator is None:
-            from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
-
-            self._sync_chat_coordinator = SyncChatCoordinator(
-                chat_context=self.protocol_adapter,
-                tool_context=self.protocol_adapter,
-                provider_context=self.protocol_adapter,
-                execution_coordinator=self.execution_coordinator,
-                orchestrator=self,
-            )
-        return self._sync_chat_coordinator
-
-    @property
-    def streaming_chat_coordinator(self) -> Any:
-        """Get the streaming chat coordinator for streaming execution.
-
-        Returns:
-            StreamingChatCoordinator instance for optimized streaming execution
-        """
-        if self._streaming_chat_coordinator is None:
-            from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
-
-            self._streaming_chat_coordinator = StreamingChatCoordinator(
-                chat_context=self.protocol_adapter,
-                tool_context=self.protocol_adapter,
-                provider_context=self.protocol_adapter,
-                event_emitter=self.observability,
-            )
-        return self._streaming_chat_coordinator
-
-    @property
-    def unified_chat_coordinator(self) -> Any:
-        """Get the unified chat coordinator facade.
-
-        Returns:
-            UnifiedChatCoordinator instance for sync/streaming execution
-        """
-        if self._unified_chat_coordinator is None:
-            from victor.agent.coordinators.unified_chat_coordinator import (
-                UnifiedChatCoordinator,
-            )
-            from victor.agent.coordinators.protocols import ExecutionMode
-
-            self._unified_chat_coordinator = UnifiedChatCoordinator(
-                sync_coordinator=self.sync_chat_coordinator,
-                streaming_coordinator=self.streaming_chat_coordinator,
-                default_mode=ExecutionMode.SYNC,  # Default to sync for performance
-            )
-        return self._unified_chat_coordinator
-
-    # =====================================================================
-    # End Phase 1/2 Coordinator Properties
-    # =====================================================================
-
-    @property
-    def tool_output_formatter(self) -> "ToolOutputFormatter":
-        """Get the tool output formatter for LLM-context-aware formatting.
-
-        Returns:
-            ToolOutputFormatter instance for formatting tool outputs
-        """
-        return self._tool_output_formatter
-
-    @property
-    def usage_analytics(self) -> "UsageAnalytics":
-        """Get the usage analytics singleton.
-
-        Returns:
-            UsageAnalytics instance for data-driven optimization
-        """
-        return self._usage_analytics
-
-    @property
-    def sequence_tracker(self) -> "ToolSequenceTracker":
-        """Get the tool sequence tracker for intelligent next-tool suggestions.
-
-        Returns:
-            ToolSequenceTracker instance for pattern learning
-        """
-        return self._sequence_tracker
-
-    @property
-    def recovery_handler(self) -> Optional["RecoveryHandler"]:
-        """Get the recovery handler for model failure recovery.
-
-        Returns:
-            RecoveryHandler instance or None if not enabled
-        """
-        handler = getattr(self, "_recovery_handler", None)
-        if hasattr(handler, "get_instance"):
-            resolved = handler.get_instance()
-            self._recovery_handler = resolved
-            return resolved
-        return handler
-
-    @property
-    def recovery_integration(self) -> "OrchestratorRecoveryIntegration":
-        """Get the recovery integration submodule.
-
-        Returns:
-            OrchestratorRecoveryIntegration for delegated recovery handling
-        """
-        integration = getattr(self, "_recovery_integration", None)
-        if hasattr(integration, "get_instance"):
-            resolved = integration.get_instance()
-            self._recovery_integration = resolved
-            return resolved
-        return integration
-
-    @property
-    def recovery_coordinator(self) -> "StreamingRecoveryCoordinator":
-        """Get the recovery coordinator for centralized recovery logic.
-
-        The StreamingRecoveryCoordinator consolidates all recovery and error handling
-        logic for streaming sessions, including condition checking, action
-        handling, and recovery integration.
-
-        Extracted from CRITICAL-001 Phase 2A.
-
-        Returns:
-            StreamingRecoveryCoordinator instance for recovery coordination
-        """
-        return self._recovery_coordinator
-
-    @property
-    def chunk_generator(self) -> "ChunkGenerator":
-        """Get the chunk generator for streaming output.
-
-        The ChunkGenerator provides a centralized interface for generating
-        streaming chunks for various purposes (tool execution, status updates,
-        metrics, content).
-
-        Extracted from CRITICAL-001 Phase 2B.
-
-        Returns:
-            ChunkGenerator instance for chunk generation
-        """
-        return self._chunk_generator
-
-    @property
-    def tool_planner(self) -> "ToolPlanner":
-        """Get the tool planner for tool planning operations.
-
-        The ToolPlanner provides a centralized interface for tool planning,
-        including goal inference, tool sequence planning, and intent-based
-        filtering.
-
-        Extracted from CRITICAL-001 Phase 2C.
-
-        Returns:
-            ToolPlanner instance for tool planning
-        """
-        return self._tool_planner
-
-    @property
-    def task_coordinator(self) -> "TaskCoordinator":
-        """Get the task coordinator for task coordination operations.
-
-        The TaskCoordinator provides a centralized interface for task
-        preparation, intent detection, and task-specific guidance.
-
-        Extracted from CRITICAL-001 Phase 2D.
-
-        Returns:
-            TaskCoordinator instance for task coordination
-        """
-        return self._task_coordinator
-
-    @property
-    def code_correction_middleware(self) -> Optional[Any]:
-        """Get the code correction middleware for automatic code validation/fixing.
-
-        Returns:
-            CodeCorrectionMiddleware instance or None if not enabled
-        """
-        return self._code_correction_middleware
-
-    # =====================================================================
-    # Session state delegation properties (TD-002)
-    # These delegate to SessionStateManager for consolidated state tracking
-    # =====================================================================
-
-    @property
-    def session_state(self) -> SessionStateManager:
-        """Get the session state manager.
-
-        Returns:
-            SessionStateManager instance for consolidated state tracking
-        """
-        return self._session_state
-
-    @property
-    def tool_calls_used(self) -> int:
-        """Get the number of tool calls used in this session.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.tool_calls_used
-
-    @tool_calls_used.setter
-    def tool_calls_used(self, value: int) -> None:
-        """Set the number of tool calls used (for backward compatibility)."""
-        self._session_state.execution_state.tool_calls_used = value
-
-    @property
-    def observed_files(self) -> Set[str]:
-        """Get set of files observed/read during this session.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.observed_files
-
-    @observed_files.setter
-    def observed_files(self, value: Set[str]) -> None:
-        """Set observed files (for checkpoint restore)."""
-        self._session_state.execution_state.observed_files = set(value) if value else set()
-
-    @property
-    def executed_tools(self) -> List[str]:
-        """Get list of executed tool names in order.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.executed_tools
-
-    @executed_tools.setter
-    def executed_tools(self, value: List[str]) -> None:
-        """Set executed tools (for checkpoint restore)."""
-        self._session_state.execution_state.executed_tools = list(value) if value else []
-
-    @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
-        """Get set of (tool_name, args_hash) tuples for failed calls.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.failed_tool_signatures
-
-    @failed_tool_signatures.setter
-    def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
-        """Set failed tool signatures (for checkpoint restore)."""
-        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
-
-    @property
-    def _tool_capability_warned(self) -> bool:
-        """Get whether we've warned about tool capability limitations.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.session_flags.tool_capability_warned
-
-    @_tool_capability_warned.setter
-    def _tool_capability_warned(self, value: bool) -> None:
-        """Set tool capability warning flag."""
-        self._session_state.session_flags.tool_capability_warned = value
-
-    @property
-    def _read_files_session(self) -> Set[str]:
-        """Get files read during this session for task completion detection.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.read_files_session
-
-    @property
-    def _required_files(self) -> List[str]:
-        """Get required files extracted from user prompts.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.required_files
-
-    @_required_files.setter
-    def _required_files(self, value: List[str]) -> None:
-        """Set required files list."""
-        self._session_state.execution_state.required_files = list(value)
-
-    @property
-    def _required_outputs(self) -> List[str]:
-        """Get required outputs extracted from user prompts.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.execution_state.required_outputs
-
-    @_required_outputs.setter
-    def _required_outputs(self, value: List[str]) -> None:
-        """Set required outputs list."""
-        self._session_state.execution_state.required_outputs = list(value)
-
-    @property
-    def _all_files_read_nudge_sent(self) -> bool:
-        """Get whether we've sent a nudge that all required files are read.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.session_flags.all_files_read_nudge_sent
-
-    @_all_files_read_nudge_sent.setter
-    def _all_files_read_nudge_sent(self, value: bool) -> None:
-        """Set all files read nudge flag."""
-        self._session_state.session_flags.all_files_read_nudge_sent = value
-
-    @property
-    def _cumulative_token_usage(self) -> Dict[str, int]:
-        """Get cumulative token usage for evaluation/benchmarking.
-
-        Delegates to SessionStateManager.
-        """
-        return self._session_state.get_token_usage()
-
-    @_cumulative_token_usage.setter
-    def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
-        """Set cumulative token usage (for backward compatibility)."""
-        self._session_state.execution_state.token_usage = dict(value)
-
-    @property
-    def intelligent_integration(self) -> Optional["OrchestratorIntegration"]:
-        """Get the intelligent pipeline integration (lazy initialization).
-
-        Use this for:
-        - RL-based mode learning (explore → plan → build → review)
-        - Response quality scoring
-        - Provider resilience integration
-        - Embedding-based prompt optimization
-
-        Returns:
-            OrchestratorIntegration instance or None if disabled or failed to initialize
-        """
-        if not self._intelligent_pipeline_enabled:
-            return None
-
-        if self._intelligent_integration is None:
-            try:
-                from victor.agent.orchestrator_integration import OrchestratorIntegration
-
-                # Synchronous initialization (async version available via enhance_orchestrator)
-                from victor.agent.intelligent_pipeline import IntelligentAgentPipeline
-
-                # Determine project root for grounding verification
-                # Context file is at .victor/init.md, so project root is grandparent
-                from victor.config.settings import get_project_paths
-                from victor.context.project_context import VICTOR_DIR_NAME
-
-                if self.project_context.context_file:
-                    # Context file: /project/.victor/init.md
-                    # Parent: /project/.victor/ (not what we want)
-                    # If parent is .victor dir, use grandparent as project root
-                    parent_dir = self.project_context.context_file.parent
-                    if parent_dir.name == VICTOR_DIR_NAME:
-                        intelligent_project_root = str(parent_dir.parent)
-                    else:
-                        # Legacy case: context file directly in project root
-                        intelligent_project_root = str(parent_dir)
-                else:
-                    # Fall back to project paths (which uses cwd)
-                    intelligent_project_root = str(get_project_paths().project_root)
-
-                pipeline = IntelligentAgentPipeline(
-                    provider_name=self.provider_name,
-                    model=self.model,
-                    profile_name=f"{self.provider_name}:{self.model}",
-                    project_root=intelligent_project_root,
-                )
-                self._intelligent_integration = OrchestratorIntegration(
-                    orchestrator=self,
-                    pipeline=pipeline,
-                    config=self._intelligent_integration_config,
-                )
-                logger.info(
-                    f"IntelligentPipeline initialized for {self.provider_name}:{self.model}"
-                )
-            except ImportError as e:
-                logger.debug(f"IntelligentPipeline dependencies not available: {e}")
-                self._intelligent_pipeline_enabled = False
-            except (ValueError, TypeError, AttributeError) as e:
-                logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
-                self._intelligent_pipeline_enabled = False
-
-        return self._intelligent_integration
-
-    @property
-    def subagent_orchestrator(self) -> Optional["SubAgentOrchestrator"]:  # noqa: F821
-        """Get the sub-agent orchestrator (lazy initialization).
-
-        Use this for:
-        - Spawning specialized sub-agents (researcher, planner, executor, etc.)
-        - Parallel task delegation via fan_out()
-        - Hierarchical task decomposition
-
-        Returns:
-            SubAgentOrchestrator instance or None if disabled or failed to initialize
-        """
-        if not self._subagent_orchestration_enabled:
-            return None
-
-        if self._subagent_orchestrator is None:
-            try:
-                from victor.agent.subagents import SubAgentOrchestrator
-
-                self._subagent_orchestrator = SubAgentOrchestrator(parent=self)
-                logger.info("SubAgentOrchestrator initialized")
-            except ImportError as e:
-                logger.debug(f"SubAgentOrchestrator module not available: {e}")
-                self._subagent_orchestration_enabled = False
-            except (ValueError, TypeError, AttributeError) as e:
-                logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
-                self._subagent_orchestration_enabled = False
-
-        return self._subagent_orchestrator
-
-    @property
-    def checkpoint_manager(self) -> Optional[Any]:
-        """Get the checkpoint manager for time-travel debugging.
-
-        Use this for:
-        - Saving conversation state snapshots
-        - Restoring to previous states
-        - Forking sessions from checkpoints
-        - Comparing state differences
-
-        Returns:
-            ConversationCheckpointManager instance or None if disabled
-        """
-        return self._checkpoint_manager
-
-    @property
-    def vertical_context(self) -> VerticalContext:
-        """Get the vertical context for unified vertical state access.
-
-        The VerticalContext provides structured access to all vertical-related
-        configuration, replacing scattered _vertical_* attributes.
-
-        Use this for:
-        - Accessing vertical name and configuration
-        - Querying enabled tools from vertical
-        - Getting middleware, safety patterns, task hints
-        - Mode configuration and tool dependencies
-
-        Returns:
-            VerticalContext instance (never None, may be empty)
-        """
-        return self._vertical_context
-
     def get_vertical_context(self) -> VerticalContext:
         """Get vertical context via explicit protocol getter."""
         return self._vertical_context
@@ -1790,29 +1279,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         self._lsp = lsp_capability
         logger.debug("LSP capability registered with orchestrator")
-
-    @property
-    def coordination(self) -> Any:
-        """Get the mode-workflow-team coordinator (lazy initialization).
-
-        The ModeWorkflowTeamCoordinator bridges agent modes, team specifications,
-        and workflow definitions to provide intelligent suggestions for task execution.
-
-        Use this for:
-        - Getting team suggestions for complex tasks
-        - Workflow recommendations based on task type
-        - Mode-specific coordination configuration
-
-        Returns:
-            ModeWorkflowTeamCoordinator instance
-        """
-        if self._mode_workflow_team_coordinator is None:
-            self._mode_workflow_team_coordinator = (
-                self._factory.create_mode_workflow_team_coordinator(self._vertical_context)
-            )
-            logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
-
-        return self._mode_workflow_team_coordinator
 
     def get_team_suggestions(
         self,
@@ -1950,7 +1416,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Optional[str]:
         """Save a manual checkpoint of the current conversation state.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             description: Human-readable description for the checkpoint
@@ -1959,12 +1425,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Checkpoint ID if saved, None if checkpointing is disabled
         """
+        if self._use_service_layer and self._session_service:
+            return await self._session_service.save_checkpoint(description, tags)
         return await self._session_coordinator.save_checkpoint(description, tags)
 
     async def restore_checkpoint(self, checkpoint_id: str) -> bool:
         """Restore conversation state from a checkpoint.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             checkpoint_id: ID of checkpoint to restore
@@ -1972,6 +1440,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if restored successfully, False otherwise
         """
+        if self._use_service_layer and self._session_service:
+            return await self._session_service.restore_checkpoint(checkpoint_id)
         return await self._session_coordinator.restore_checkpoint(checkpoint_id)
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
@@ -2574,6 +2044,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Should be called after orchestrator initialization to avoid blocking
         the main thread. Safe to call multiple times (no-op if already started).
+
+        Embedding preload is deferred by default to avoid +694MB memory spike
+        on first task. Set `preload_embeddings=True` in settings to eagerly load.
+        The embedding model will still lazy-load on first semantic query via
+        EmbeddingService._ensure_model_loaded().
         """
         if getattr(self.settings, "framework_preload_enabled", False):
             if self._runtime_preload_task is not None:
@@ -2582,6 +2057,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             if task:
                 self._runtime_preload_task = task
                 logger.info("Started runtime preload task")
+            return
+
+        # Only preload embeddings if explicitly requested (default: deferred)
+        if not getattr(self.settings, "preload_embeddings", False):
             return
 
         if not self.use_semantic_selection or self._embedding_preload_task:
@@ -2605,14 +2084,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Route a search query to the optimal search tool using SearchRouter.
 
         Analyzes the query to determine whether keyword search (code_search)
-        or semantic search (semantic_code_search) would yield better results.
+        semantic search (semantic_code_search), or graph traversal (graph)
+        would yield better results.
 
         Args:
             query: The search query
 
         Returns:
             Dictionary with routing recommendation:
-                - recommended_tool: "code_search" or "semantic_code_search" or "both"
+                - recommended_tool: "code_search" or "semantic_code_search" or "graph" or "both"
+                - recommended_args: Suggested tool arguments (for example {"mode": "bugs"})
                 - confidence: Confidence in the recommendation (0.0-1.0)
                 - reason: Human-readable explanation
                 - search_type: SearchType enum value
@@ -2633,8 +2114,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             SearchType.HYBRID: "both",
         }
 
+        recommended_tool = route.tool_name or tool_map.get(route.search_type, "code_search")
+
         return {
-            "recommended_tool": tool_map.get(route.search_type, "code_search"),
+            "recommended_tool": recommended_tool,
+            "recommended_args": route.tool_arguments,
             "confidence": route.confidence,
             "reason": route.reason,
             "search_type": route.search_type.value,
@@ -2651,7 +2135,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             query: The search query
 
         Returns:
-            Tool name: "code_search", "semantic_code_search", or "both"
+            Tool name: "code_search", "semantic_code_search", "graph", or "both"
         """
         return self.route_search_query(query)["recommended_tool"]
 
@@ -2809,6 +2293,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with shutdown status for each component
         """
+        # Shutdown provider pool if active
+        pool = getattr(getattr(self, "_provider_runtime", None), "pool", None)
+        if pool is not None:
+            try:
+                await pool.shutdown()
+                logger.info("ProviderPool shutdown complete")
+            except Exception as e:
+                logger.warning("ProviderPool shutdown error: %s", e)
+
         # Delegate to LifecycleManager for graceful shutdown
         return await self._lifecycle_manager.graceful_shutdown()
 
@@ -2956,6 +2449,25 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return result
 
+    def update_system_prompt_for_query(self, query_classification=None) -> None:
+        """Rebuild system prompt with query-specific classification context.
+
+        Called by coordinators when a query classification is available,
+        injecting task-aware guidance and tool constraints into the prompt.
+
+        Args:
+            query_classification: Optional QueryClassification for task-aware prompting
+        """
+        if query_classification is not None:
+            self.prompt_builder.query_classification = query_classification
+        base_system_prompt = self._build_system_prompt_with_adapter()
+        if self.project_context and self.project_context.content:
+            self._system_prompt = (
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+            )
+        else:
+            self._system_prompt = base_system_prompt
+
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
 
@@ -3028,79 +2540,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"Failed to emit prompt_used event: {e}")
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
-        """Resolve shell aliases to the appropriate enabled shell variant.
+        """Resolve shell aliases to the appropriate enabled shell variant."""
+        from victor.agent.shell_resolver import resolve_shell_variant
 
-        LLMs often hallucinate shell tool names like 'run', 'bash', 'execute'.
-        These map to 'shell' canonically, but in INITIAL stage only 'shell_readonly'
-        may be enabled. This method resolves to whichever shell variant is available.
-
-        This method now delegates to ToolAliasResolver for extensibility while
-        maintaining backward compatibility with existing behavior.
-
-        Args:
-            tool_name: Original tool name (may be alias like 'run')
-
-        Returns:
-            The appropriate enabled shell tool name, or original if not a shell alias
-        """
-        # Shell-related aliases that should resolve intelligently
-        # Also include shell_readonly so it can be upgraded to shell in BUILD mode
-        shell_aliases = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
-
-        if tool_name not in shell_aliases:
-            return tool_name
-
-        # Get alias resolver and register shell aliases with our custom resolver
-        # We always register to ensure this orchestrator's resolver is used (handles
-        # multiple orchestrator instances correctly by updating the resolver reference)
-        resolver = get_alias_resolver()
-        resolver.register(
-            ToolNames.SHELL,
-            aliases=list(shell_aliases - {ToolNames.SHELL}),
-            resolver=self._shell_alias_resolver,
-        )
-
-        # Use the alias resolver - it will call our custom resolver
-        return resolver.resolve(tool_name, enabled_tools=[])
-
-    def _shell_alias_resolver(self, tool_name: str) -> str:
-        """Custom resolver for shell aliases that checks mode and tool availability.
-
-        This is registered with ToolAliasResolver to handle shell-related resolution.
-        It encapsulates the mode-aware logic for choosing between shell and shell_readonly.
-
-        Args:
-            tool_name: The shell-related tool name being resolved.
-
-        Returns:
-            The appropriate shell variant based on mode and tool availability.
-        """
-        from victor.tools.tool_names import get_canonical_name
-
-        # Check mode controller for BUILD mode (allows all tools including shell)
-        # Uses ModeAwareMixin for consistent access
-        mc = self.mode_controller
-        if mc is not None:
-            config = mc.config
-            # If mode allows all tools and shell isn't explicitly disallowed, use full shell
-            if config.allow_all_tools and "shell" not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
-                return ToolNames.SHELL
-
-        # Check if full shell is enabled first
-        if self.tools.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
-            return ToolNames.SHELL
-
-        # Fall back to shell_readonly if enabled
-        if self.tools.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
-            return ToolNames.SHELL_READONLY
-
-        # Neither enabled - return canonical name (will fail validation)
-        canonical = get_canonical_name(tool_name)
-        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
-        return canonical
+        return resolve_shell_variant(tool_name, self.tools, self.mode_controller)
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Prefix a prompt with the thinking disable prefix if supported.
@@ -3301,18 +2744,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         elif role == "assistant":
             self.usage_logger.log_event("assistant_response", {"content": content})
 
-    async def chat(self, user_message: str) -> CompletionResponse:
+    async def chat(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = False,
+    ) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
-        Delegates to ChatCoordinator for the full agentic loop implementation.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ChatCoordinator.
 
         Args:
             user_message: User's message
+            use_planning: Whether to use planning. None = auto-detect,
+                True = always, False = never.
 
         Returns:
             CompletionResponse from the model with complete response
         """
-        return await self._chat_coordinator.chat(user_message)
+        if self._use_service_layer and self._chat_service:
+            return await self._chat_service.chat(user_message)
+        return await self._chat_coordinator.chat(user_message, use_planning=use_planning)
 
     async def chat_with_planning(
         self,
@@ -3355,6 +2807,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 use_planning=False
             )
         """
+        if self._use_service_layer and self._chat_service:
+            return await self._chat_service.chat_with_planning(user_message, use_planning)
         return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
 
     async def _handle_context_and_iteration_limits(
@@ -3605,7 +3059,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
-        Delegates to ChatCoordinator for the full streaming implementation.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ChatCoordinator.
 
         Args:
             user_message: User's input message
@@ -3613,6 +3068,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
+        if self._use_service_layer and self._chat_service:
+            async for chunk in self._chat_service.stream_chat(user_message):
+                yield chunk
+            return
         async for chunk in self._chat_coordinator.stream_chat(user_message):
             yield chunk
 
@@ -3621,8 +3080,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[Any, bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
-        Delegates to ToolCoordinator.execute_tool_with_retry with orchestrator-specific
-        execution backend and task completion detection callback.
+        Delegates to service layer when USE_SERVICE_LAYER is enabled,
+        otherwise falls through to ToolCoordinator.
 
         Args:
             tool_name: Name of the tool to execute
@@ -3632,6 +3091,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Tuple of (result, success, error_message or None)
         """
+        if self._use_service_layer and self._tool_service:
+            return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
 
         async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
             return await self.tools.execute(name, context=ctx, **args)
@@ -3708,21 +3169,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             normalized_args = norm.args
 
-            # Skip repeated failing calls
+            # Skip repeated failing calls (suppress from user output)
             if norm.is_repeated_failure:
-                self.console.print(
-                    f"[yellow]{warn_icon} Skipping repeated failing call to '{tool_name}' with same arguments[/]"
+                logger.debug(
+                    "Skipping repeated failing call to '%s' with same arguments",
+                    tool_name,
                 )
                 continue
 
-            # Log normalization if applied
+            # Log normalization if applied (debug-only, not user-facing)
             if norm.strategy != NormalizationStrategy.DIRECT:
-                logger.warning(
-                    f"Applied {norm.strategy.value} normalization to {tool_name} arguments"
-                )
-                gear_icon = self._presentation.icon("gear", with_color=False)
-                self.console.print(
-                    f"[yellow]{gear_icon} Normalized arguments via {norm.strategy.value}[/]"
+                logger.debug(
+                    "Applied %s normalization to %s arguments",
+                    norm.strategy.value,
+                    tool_name,
                 )
 
             # --- Execution (uses orchestrator context) ---
@@ -3790,12 +3250,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # --- Result formatting + conversation injection ---
             output = exec_result.result if success else None
+            follow_up_suggestions = None
 
             # Check for semantic failure
             semantic_success = success
             if success and isinstance(output, dict) and output.get("success") is False:
                 semantic_success = False
                 error_msg = output.get("error", "Operation returned success=False")
+            elif success and isinstance(output, dict):
+                metadata = output.get("metadata")
+                if isinstance(metadata, dict):
+                    suggestions = metadata.get("follow_up_suggestions")
+                    if isinstance(suggestions, list) and suggestions:
+                        follow_up_suggestions = suggestions
 
             error_display = None if semantic_success else (error_msg or "Unknown error")
 
@@ -3824,13 +3291,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         "success": True,
                         "elapsed": time.monotonic() - start,
                         "args": normalized_args,
+                        "follow_up_suggestions": follow_up_suggestions,
                     }
                 )
             else:
                 self.failed_tool_signatures.add(norm.signature)
-                self.console.print(
-                    f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
-                )
+                # Only show "Tool not found" errors once per tool name
+                _not_found = "not found" in str(error_display).lower()
+                _shown_key = f"notfound:{tool_name}" if _not_found else None
+                if not hasattr(self, "_shown_tool_errors"):
+                    self._shown_tool_errors: set = set()
+                if _shown_key and _shown_key in self._shown_tool_errors:
+                    logger.debug("Suppressed repeated '%s' error display", tool_name)
+                else:
+                    if _shown_key:
+                        self._shown_tool_errors.add(_shown_key)
+                    self.console.print(
+                        f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
+                    )
 
                 error_output = output if isinstance(output, dict) else {"error": error_display}
                 formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)
@@ -3922,7 +3400,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Args:
             limit: Maximum number of sessions to return
@@ -3930,6 +3408,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of session metadata dictionaries
         """
+        if self._use_service_layer and self._session_service:
+            return self._session_service.get_recent_sessions(limit)
         return self._session_coordinator.get_recent_sessions(limit)
 
     def recover_session(self, session_id: str) -> bool:
@@ -3967,11 +3447,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for the current memory session.
 
-        Delegates to SessionCoordinator.
+        Delegates to service layer when enabled, otherwise SessionCoordinator.
 
         Returns:
             Dictionary with session statistics.
         """
+        if self._use_service_layer and self._session_service:
+            return self._session_service.get_session_stats()
         return self._session_coordinator.get_session_stats()
 
     async def shutdown(self) -> None:
@@ -4152,11 +3634,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_available_tools(self) -> Set[str]:
         """Get all registered tool names (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Returns:
             Set of tool names available in registry
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.get_available_tools()
         return self._tool_coordinator.get_available_tools()
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
@@ -4172,27 +3656,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Returns:
             Set of enabled tool names for this session
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.get_enabled_tools()
         return self._tool_coordinator.get_enabled_tools()
 
     def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
-        Delegates core logic to ToolCoordinator, handles orchestrator-specific
-        propagation (vertical context, tiered config).
+        Delegates core logic to service layer when enabled, otherwise
+        ToolCoordinator with orchestrator-specific propagation.
 
         Args:
             tools: Set of tool names to enable
             tiered_config: Optional TieredToolConfig to propagate for stage filtering.
         """
         self._enabled_tools = tools
+        if self._use_service_layer and self._tool_service:
+            self._tool_service.set_enabled_tools(tools)
         # Only propagate to tool_coordinator if it's already initialized
         # to avoid eager materialization during orchestrator setup
-        if hasattr(self, "_tool_coordinator") and self._tool_coordinator.initialized:
+        elif hasattr(self, "_tool_coordinator") and self._tool_coordinator.initialized:
             self._tool_coordinator.set_enabled_tools(tools)
 
         # Apply to vertical context and tool access controller
@@ -4231,7 +3719,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).
 
-        Delegates to ToolCoordinator.
+        Delegates to service layer when enabled, otherwise ToolCoordinator.
 
         Args:
             tool_name: Name of tool to check
@@ -4239,6 +3727,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if tool is enabled
         """
+        if self._use_service_layer and self._tool_service:
+            return self._tool_service.is_tool_enabled(tool_name)
         return self._tool_coordinator.is_tool_enabled(tool_name)
 
     # --- SystemPromptProtocol ---
@@ -4315,95 +3805,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         profile_name: str = "default",
         thinking: bool = False,
     ) -> "AgentOrchestrator":
-        """Create orchestrator from settings.
+        """Create orchestrator from settings. Delegates to orchestrator_creation module."""
+        from victor.agent.orchestrator_creation import create_orchestrator_from_settings
 
-        Args:
-            settings: Application settings
-            profile_name: Profile to use
-            thinking: Enable extended thinking mode (Claude models only)
-
-        Returns:
-            Configured AgentOrchestrator instance
-
-        Note:
-            The orchestrator reads settings.one_shot_mode to determine whether to
-            auto-continue on ASKING_INPUT (one-shot) or return to user (interactive).
-        """
-        # Load profile
-        profiles = settings.load_profiles()
-        profile = profiles.get(profile_name)
-
-        if not profile:
-            available = list(profiles.keys())
-            # Use difflib for similar name suggestions
-            import difflib
-
-            suggestions = difflib.get_close_matches(profile_name, available, n=3, cutoff=0.4)
-
-            error_msg = f"Profile not found: '{profile_name}'"
-            if suggestions:
-                error_msg += f"\n  Did you mean: {', '.join(suggestions)}?"
-            if available:
-                error_msg += f"\n  Available profiles: {', '.join(sorted(available))}"
-            else:
-                error_msg += "\n  No profiles configured. Run 'victor init' or create ~/.victor/profiles.yaml"
-            raise ValueError(error_msg)
-
-        # Get provider-level settings
-        provider_settings = settings.get_provider_settings(profile.provider)
-
-        # Merge profile-level overrides (base_url, timeout, api_key, etc.)
-        # ProfileConfig uses extra="allow" so extra fields are in __pydantic_extra__
-        if hasattr(profile, "__pydantic_extra__") and profile.__pydantic_extra__:
-            # Profile-level settings override provider-level settings
-            provider_settings.update(profile.__pydantic_extra__)
-            logger.debug(
-                f"Profile '{profile_name}' overrides: {list(profile.__pydantic_extra__.keys())}"
-            )
-
-        # Apply timeout multiplier from model capabilities
-        # Slow local models (Ollama, LMStudio) get longer timeouts
-        from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
-
-        cap_loader = ModelCapabilityLoader()
-        caps = cap_loader.get_capabilities(profile.provider, profile.model)
-        if caps and caps.timeout_multiplier > 1.0:
-            base_timeout = provider_settings.get("timeout", 300)
-            adjusted_timeout = int(base_timeout * caps.timeout_multiplier)
-            provider_settings["timeout"] = adjusted_timeout
-            logger.info(
-                f"Adjusted timeout for {profile.provider}/{profile.model}: "
-                f"{base_timeout}s -> {adjusted_timeout}s (multiplier: {caps.timeout_multiplier}x)"
-            )
-
-        # Create provider instance using registry
-        provider = ProviderRegistry.create(profile.provider, **provider_settings)
-
-        orchestrator = cls(
-            settings=settings,
-            provider=provider,
-            model=profile.model,
-            temperature=profile.temperature,
-            max_tokens=profile.max_tokens,
-            tool_selection=profile.tool_selection,
-            thinking=thinking,
-            provider_name=profile.provider,
-            profile_name=profile_name,
+        return await create_orchestrator_from_settings(
+            cls, settings, profile_name=profile_name, thinking=thinking
         )
 
-        # Setup JSONL exporter if enabled
-        if getattr(settings, "enable_observability_logging", False):
-            from victor.observability.bridge import ObservabilityBridge
-            from victor.core.events import get_observability_bus
 
-            try:
-                bridge = ObservabilityBridge.get_instance()
-                log_path = getattr(settings, "observability_log_path", None)
-                bridge.setup_jsonl_exporter(log_path=log_path)
-                logger.info(
-                    f"JSONL event logging enabled: {log_path or '~/.victor/metrics/victor.jsonl'}"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to setup JSONL exporter: {e}")
+# Install extracted property descriptors onto the class.
+# This runs once at import time and keeps full mock.patch.object compatibility.
+from victor.agent.orchestrator_properties import install_properties as _install_properties
 
-        return orchestrator
+_install_properties(AgentOrchestrator)
+del _install_properties

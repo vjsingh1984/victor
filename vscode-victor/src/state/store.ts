@@ -15,14 +15,9 @@ import {
     AppState,
     AgentMode,
     ConnectionState,
-    ConversationState,
     ContextItem,
     ModelInfo,
     ProviderType,
-    ServerState,
-    SessionState,
-    SettingsState,
-    UIState,
     StateChangeEvent,
     StateSubscriber,
     StateSelector,
@@ -34,6 +29,26 @@ import {
  */
 function generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function normalizeServerUrl(serverUrl?: string): string | null {
+    const trimmed = serverUrl?.trim();
+    if (!trimmed) {
+        return null;
+    }
+    return trimmed.replace(/\/+$/, '');
+}
+
+function deriveServerPort(serverUrl: string, fallbackPort: number): number {
+    try {
+        const parsed = new URL(serverUrl);
+        if (parsed.port) {
+            return Number(parsed.port);
+        }
+        return parsed.protocol === 'https:' ? 443 : 80;
+    } catch {
+        return fallbackPort;
+    }
 }
 
 /**
@@ -75,8 +90,8 @@ function createInitialState(): AppState {
     return {
         server: {
             status: ServerStatus.Stopped,
-            url: 'http://localhost:8000',
-            port: 8000,
+            url: 'http://localhost:8765',
+            port: 8765,
             connectionState: ConnectionState.Disconnected,
         },
         session: {
@@ -105,7 +120,7 @@ function createInitialState(): AppState {
             showInlineCompletions: true,
             semanticSearchEnabled: true,
             semanticSearchMaxResults: 10,
-            serverPort: 8000,
+            serverPort: 8765,
             serverApiKey: '',
         },
         initialized: false,
@@ -183,11 +198,15 @@ export class StateStore {
      */
     private async syncWithConfiguration(): Promise<void> {
         const config = vscode.workspace.getConfiguration('victor');
+        const configuredPort = config.get('serverPort', 8765);
+        const configuredServerUrl = normalizeServerUrl(config.get<string>('serverUrl', ''));
+        const resolvedServerUrl = configuredServerUrl || `http://localhost:${configuredPort}`;
+        const resolvedServerPort = deriveServerPort(resolvedServerUrl, configuredPort);
 
         this.updateState({
             server: {
-                port: config.get('serverPort', 8000),
-                url: `http://localhost:${config.get('serverPort', 8000)}`,
+                port: resolvedServerPort,
+                url: resolvedServerUrl,
             },
             session: {
                 mode: config.get('mode', 'build') as AgentMode,
@@ -205,7 +224,7 @@ export class StateStore {
                 showInlineCompletions: config.get('showInlineCompletions', true),
                 semanticSearchEnabled: config.get('semanticSearch.enabled', true),
                 semanticSearchMaxResults: config.get('semanticSearch.maxResults', 10),
-                serverPort: config.get('serverPort', 8000),
+                serverPort: configuredPort,
                 serverApiKey: config.get('serverApiKey', ''),
             },
         });

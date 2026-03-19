@@ -126,15 +126,11 @@ class ExecutionCoordinator:
         # Initialize tracking for this conversation turn
         self._tool_context.tool_calls_used = 0
         failure_context = ToolFailureContext()
-        max_iterations_setting = getattr(
-            self._chat_context.settings, "chat_max_iterations", 10
-        )
+        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
         iteration = 0
 
         # Classify task complexity for appropriate budgeting
-        task_classification = self._provider_context.task_classifier.classify(
-            user_message
-        )
+        task_classification = self._provider_context.task_classifier.classify(user_message)
         # Ensure at least 1 iteration is always allowed
         task_iteration_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(
@@ -153,8 +149,7 @@ class ExecutionCoordinator:
             tools = None
             if (
                 self._provider_context.provider.supports_tools()
-                and self._tool_context.tool_calls_used
-                < self._tool_context.tool_budget
+                and self._tool_context.tool_calls_used < self._tool_context.tool_budget
             ):
                 tools = await self._select_tools_for_turn(user_message)
 
@@ -185,9 +180,7 @@ class ExecutionCoordinator:
             # Check if model wants to use tools
             if response.tool_calls:
                 # Handle tool calls and track results
-                tool_results = await self._tool_context._handle_tool_calls(
-                    response.tool_calls
-                )
+                tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
 
                 # Update failure context
                 for result in tool_results:
@@ -205,9 +198,7 @@ class ExecutionCoordinator:
             break
 
         # Ensure we have a complete response
-        final_response = await self._ensure_complete_response(
-            final_response, failure_context
-        )
+        final_response = await self._ensure_complete_response(final_response, failure_context)
 
         return final_response
 
@@ -268,9 +259,7 @@ class ExecutionCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 
@@ -304,14 +293,14 @@ class ExecutionCoordinator:
             response: Response from model
         """
         if response.usage:
-            self._chat_context._cumulative_token_usage["prompt_tokens"] += (
-                response.usage.get("prompt_tokens", 0)
+            self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                "prompt_tokens", 0
             )
-            self._chat_context._cumulative_token_usage["completion_tokens"] += (
-                response.usage.get("completion_tokens", 0)
+            self._chat_context._cumulative_token_usage["completion_tokens"] += response.usage.get(
+                "completion_tokens", 0
             )
-            self._chat_context._cumulative_token_usage["total_tokens"] += (
-                response.usage.get("total_tokens", 0)
+            self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
+                "total_tokens", 0
             )
 
     async def _check_context_compaction(
@@ -377,8 +366,7 @@ class ExecutionCoordinator:
 
         # Last resort fallback
         fallback_content = (
-            "I was unable to generate a complete response. "
-            "Please try rephrasing your request."
+            "I was unable to generate a complete response. " "Please try rephrasing your request."
         )
         if failure_context.failed_tools:
             fallback_content = (

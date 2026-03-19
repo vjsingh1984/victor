@@ -404,8 +404,8 @@ class AutoCommitter:
                         "date": parts[4],
                         "is_victor": self.COMMIT_SIGNATURE in full_message,
                     }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to retrieve last commit info: %s", e)
         return None
 
     def is_last_commit_by_victor(self) -> bool:

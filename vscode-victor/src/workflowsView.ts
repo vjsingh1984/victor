@@ -324,6 +324,7 @@ export class WorkflowsViewProvider implements vscode.TreeDataProvider<WorkflowTr
     private _executions: Map<string, WorkflowExecution> = new Map();
     private _disposables: vscode.Disposable[] = [];
     private _refreshInterval: NodeJS.Timeout | null = null;
+    private _capabilityAvailable: boolean | null = null;
     private _showExecutions: boolean = false;  // Toggle between templates and executions
 
     constructor(
@@ -427,6 +428,16 @@ export class WorkflowsViewProvider implements vscode.TreeDataProvider<WorkflowTr
 
     async _fetchWorkflowsFromBackend(): Promise<void> {
         try {
+            const workflowsAvailable = await this._client.supportsCapability('workflows');
+            this._capabilityAvailable = workflowsAvailable;
+            if (!workflowsAvailable) {
+                this._templates = [];
+                this._executions.clear();
+                this.refresh();
+                this._log('Workflows capability unavailable on current server');
+                return;
+            }
+
             const templates = await this._client.listWorkflowTemplates();
             this._templates = templates.map(t => ({
                 ...t,
@@ -528,6 +539,10 @@ export class WorkflowsViewProvider implements vscode.TreeDataProvider<WorkflowTr
     }
 
     private _getTemplateItems(): WorkflowTreeItem[] {
+        if (this._capabilityAvailable === false) {
+            return [new WorkflowInfoItem('Workflows unavailable', 'This Victor server does not expose workflow APIs', 'circle-slash')];
+        }
+
         if (this._templates.length === 0) {
             return [new WorkflowInfoItem('No workflows', 'No workflow templates available', 'info')];
         }

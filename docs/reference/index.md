@@ -6,8 +6,8 @@ Complete reference documentation for Victor AI Assistant.
 
 | Reference | Description |
 |-----------|-------------|
-| [**Providers**](providers/) | All 22 LLM providers with setup, models, and configuration |
-| [**Tools**](tools/) | 33 tool modules organized by category |
+| [**Providers**](providers/) | All 24 LLM providers with setup, models, and configuration |
+| [**Tools**](tools/) | 34 tool modules organized by category |
 | [**Configuration**](configuration/) | Complete configuration reference (profiles, API keys, MCP) |
 | [**API**](api/) | HTTP API, MCP server, Python package API |
 | [**Verticals**](verticals/) | 9 domain-specific assistants |
@@ -16,7 +16,7 @@ Complete reference documentation for Victor AI Assistant.
 
 ## Provider Reference
 
-Complete reference for all 22 supported LLM providers.
+Complete reference for all 24 supported LLM providers.
 
 ### Local Providers (No API Key Required)
 
@@ -43,7 +43,7 @@ Complete reference for all 22 supported LLM providers.
 
 ## Tool Reference
 
-33 tool modules organized by category for code operations, testing, search, and more.
+34 tool modules organized by category for code operations, testing, search, and more.
 
 ### Tool Categories
 

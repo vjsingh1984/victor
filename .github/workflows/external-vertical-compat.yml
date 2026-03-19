@@ -1,0 +1,80 @@
+name: External Vertical Compatibility
+
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch-compat-checks:
+    name: Dispatch Compatibility Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: victor-ai/victor-coding
+            name: victor-coding
+          - repo: victor-ai/victor-devops
+            name: victor-devops
+          - repo: victor-ai/victor-rag
+            name: victor-rag
+          - repo: victor-ai/victor-dataanalysis
+            name: victor-dataanalysis
+          - repo: victor-ai/victor-research
+            name: victor-research
+          - repo: victor-ai/victor-invest
+            name: victor-invest
+
+    steps:
+      - name: Dispatch core-compat-check to ${{ matrix.name }}
+        uses: peter-evans/repository-dispatch@v3
+        continue-on-error: true  # Advisory for first 2 weeks
+        with:
+          token: ${{ secrets.EXTERNAL_VERTICAL_PAT }}
+          repository: ${{ matrix.repo }}
+          event-type: core-compat-check
+          client-payload: |
+            {
+              "victor_ref": "${{ github.sha }}",
+              "victor_branch": "${{ github.ref_name }}",
+              "triggered_by": "${{ github.event_name }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+
+      - name: Log dispatch
+        run: |
+          echo "Dispatched core-compat-check to ${{ matrix.repo }}"
+          echo "  Victor ref: ${{ github.sha }}"
+          echo "  Victor branch: ${{ github.ref_name }}"
+
+  report-status:
+    name: Report Dispatch Status
+    runs-on: ubuntu-latest
+    needs: dispatch-compat-checks
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## External Vertical Compatibility Dispatch" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Dispatched \`core-compat-check\` events to external vertical repos." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Each external repo runs its test suite against this commit." >> $GITHUB_STEP_SUMMARY
+          echo "Results are **advisory** — failures do not block this workflow." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Repo | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-coding | Dispatched |" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-devops | Dispatched |" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-rag | Dispatched |" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-dataanalysis | Dispatched |" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-research | Dispatched |" >> $GITHUB_STEP_SUMMARY
+          echo "| victor-invest | Dispatched |" >> $GITHUB_STEP_SUMMARY

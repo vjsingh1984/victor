@@ -232,9 +232,6 @@ export class VictorHoverProvider implements vscode.HoverProvider {
             content.appendMarkdown('---\n\n');
             content.appendMarkdown('**Victor AI Actions:**\n\n');
 
-            const uri = encodeURIComponent(document.uri.toString());
-            const rangeStr = encodeURIComponent(JSON.stringify(wordRange));
-
             // Explain action
             content.appendMarkdown(
                 `[$(question) Explain](command:victor.explainSymbol?${JSON.stringify([document.uri, wordRange, word])}) | `

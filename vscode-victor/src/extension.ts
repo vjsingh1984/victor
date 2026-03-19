@@ -85,11 +85,23 @@ let providers: ExtensionProviders | null = null;
  */
 function validateConfiguration(config: vscode.WorkspaceConfiguration): void {
     const warnings: string[] = [];
+    const serverUrl = (config.get<string>('serverUrl', '') || '').trim();
 
     // Validate serverPort
     const serverPort = config.get<number>('serverPort', 8765);
     if (serverPort < 1 || serverPort > 65535) {
         warnings.push(`Invalid serverPort ${serverPort}. Using default 8765.`);
+    }
+
+    if (serverUrl) {
+        try {
+            const parsed = new URL(serverUrl);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                warnings.push(`Invalid serverUrl "${serverUrl}". Use http:// or https://.`);
+            }
+        } catch {
+            warnings.push(`Invalid serverUrl "${serverUrl}". Use a full http:// or https:// URL.`);
+        }
     }
 
     // Validate fallbackPorts
@@ -148,10 +160,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Listen for server status changes and update state store
     serverManager.onStatusChange((status) => {
-        store.setServerStatus(status);
+        store.updateState({
+            server: {
+                status,
+                port: serverManager.getActivePort(),
+                url: serverManager.getServerUrl(),
+            },
+        });
         const activePort = serverManager.getActivePort();
         const configPort = config.get<number>('serverPort', 8765);
-        const usingFallback = activePort !== configPort;
+        const hasExplicitServerUrl = !!(config.get<string>('serverUrl') || '').trim();
+        const usingFallback = !hasExplicitServerUrl && activePort !== configPort;
         updateServerStatusBar(serverStatusBarItem, status, activePort, usingFallback);
     });
 
@@ -163,6 +182,11 @@ export async function activate(context: vscode.ExtensionContext) {
         console.warn('[Victor] Failed to prefetch session token (server may be offline):', error.message || error);
     });
     // Keep Victor client auth in sync with configuration updates
+    context.subscriptions.push(
+        store.subscribe('server', (_state) => {
+            victorClient.setServerUrl(store.select(selectors.serverUrl));
+        })
+    );
     context.subscriptions.push(
         store.subscribe('settings', (_state) => {
             const latestKey = store.select(selectors.serverApiKey) || undefined;

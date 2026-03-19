@@ -182,6 +182,7 @@ class ComplexityBudget:
     max_turns: int  # Max conversation turns
     max_continuation_requests: int  # Max "need more info" before force stop
     timeout_seconds: int  # Total task timeout
+    per_tool_timeout_seconds: int = 30  # Per-tool-call timeout
 
     @classmethod
     def for_complexity(cls, complexity: "TaskComplexity") -> "ComplexityBudget":
@@ -196,36 +197,42 @@ COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
         max_turns=5,
         max_continuation_requests=3,
         timeout_seconds=60,
+        per_tool_timeout_seconds=15,
     ),
     TaskComplexity.MEDIUM: ComplexityBudget(
         tool_budget=15,
         max_turns=10,
         max_continuation_requests=5,
         timeout_seconds=120,
+        per_tool_timeout_seconds=30,
     ),
     TaskComplexity.COMPLEX: ComplexityBudget(
         tool_budget=25,
         max_turns=20,
         max_continuation_requests=10,
         timeout_seconds=300,
+        per_tool_timeout_seconds=60,
     ),
     TaskComplexity.GENERATION: ComplexityBudget(
         tool_budget=10,
         max_turns=5,
         max_continuation_requests=3,
         timeout_seconds=60,
+        per_tool_timeout_seconds=15,
     ),
     TaskComplexity.ACTION: ComplexityBudget(
         tool_budget=50,
         max_turns=30,
         max_continuation_requests=15,
         timeout_seconds=600,
+        per_tool_timeout_seconds=60,
     ),
     TaskComplexity.ANALYSIS: ComplexityBudget(
         tool_budget=60,
         max_turns=40,
         max_continuation_requests=20,
         timeout_seconds=900,
+        per_tool_timeout_seconds=60,
     ),
 }
 
@@ -512,6 +519,15 @@ class TaskComplexityService:
         Returns:
             TaskClassification with complexity, budget, and metadata
         """
+        # Empty messages default to SIMPLE (no semantic meaning, no patterns match)
+        if not message or not message.strip():
+            return TaskClassification(
+                complexity=TaskComplexity.SIMPLE,
+                tool_budget=self.budgets[TaskComplexity.SIMPLE],
+                confidence=0.3,
+                matched_patterns=[],
+            )
+
         # Try custom classifiers first
         for classifier in self.custom_classifiers:
             result = classifier(message)

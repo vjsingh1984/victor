@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -492,7 +494,11 @@ class LlamaCppProvider(BaseProvider):
                 except Exception:
                     pass
 
-                error_msg = error_data.get("error", {}).get("message") if isinstance(error_data, dict) else str(error_data)
+                error_msg = (
+                    error_data.get("error", {}).get("message")
+                    if isinstance(error_data, dict)
+                    else str(error_data)
+                )
                 if not error_msg:
                     error_msg = e.response.text[:500] if e.response.text else "Unknown error"
 
@@ -736,7 +742,9 @@ class LlamaCppProvider(BaseProvider):
                                 )
 
                         except json.JSONDecodeError:
-                            self._provider_logger.logger.debug(f"Failed to parse streaming chunk: {line}")
+                            self._provider_logger.logger.debug(
+                                f"Failed to parse streaming chunk: {line}"
+                            )
                             continue
 
         except httpx.TimeoutException as e:

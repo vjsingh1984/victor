@@ -8,7 +8,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChatMessage, ToolCall } from './victorClient';
+import { ChatMessage } from './victorClient';
 
 export interface StoredConversation {
     id: string;

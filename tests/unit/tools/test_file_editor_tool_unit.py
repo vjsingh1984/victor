@@ -24,8 +24,18 @@ from pathlib import Path
 
 from victor.tools.file_editor_tool import edit
 
+try:
+    import victor_coding  # noqa: F401
+
+    _has_victor_coding = True
+except ImportError:
+    _has_victor_coding = False
+
 # Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
+]
 
 
 class TestEditFiles:

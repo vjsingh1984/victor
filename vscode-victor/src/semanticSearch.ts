@@ -55,11 +55,10 @@ export class SemanticSearchProvider {
     }
 
     private async _showResults(query: string): Promise<void> {
-        const items: vscode.QuickPickItem[] = this._results.map((result, index) => ({
+        const items: vscode.QuickPickItem[] = this._results.map((result) => ({
             label: `$(file) ${this._getRelativePath(result.file)}`,
             description: `Line ${result.line}`,
             detail: this._truncate(result.content, 100),
-            // Store index in alwaysShow to retrieve later
             alwaysShow: true,
         }));
 

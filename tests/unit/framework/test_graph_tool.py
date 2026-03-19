@@ -680,6 +680,74 @@ class TestGraphToolFunction:
                 assert "patterns" in result or "total_patterns_found" in result
 
     @pytest.mark.asyncio
+    async def test_graph_callers_mode_uses_provider_capability(self, mock_graph_store):
+        """callers mode should use provider-backed traversal when available."""
+        mock_index = MagicMock()
+        mock_index.find_callers = AsyncMock(
+            return_value=[
+                {
+                    "id": "function:src/main.py:main",
+                    "name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 1,
+                }
+            ]
+        )
+        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.tools.graph_tool._get_capability_index",
+                new=AsyncMock(return_value=mock_index),
+            ):
+                result = await graph(mode="callers", node="call_provider", depth=2)
+
+        assert result["mode"] == "callers"
+        assert result["provider_backed"] is True
+        assert result["count"] == 1
+        mock_index.find_callers.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_graph_callees_mode_falls_back_to_analyzer(self, mock_graph_store):
+        """callees mode should fall back to analyzer traversal when provider support fails."""
+        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.tools.graph_tool._get_capability_index",
+                new=AsyncMock(side_effect=NotImplementedError("unsupported")),
+            ):
+                result = await graph(mode="callees", node="orchestrator", depth=2)
+
+        assert result["mode"] == "callees"
+        assert result["provider_backed"] is False
+        assert result["count"] >= 1
+        assert any(row["name"] == "process_request" for row in result["results"])
+
+    @pytest.mark.asyncio
+    async def test_graph_trace_mode_uses_provider_capability(self, mock_graph_store):
+        """trace mode should use provider-backed execution trace when available."""
+        mock_index = MagicMock()
+        mock_index.trace_execution_path = AsyncMock(
+            return_value={
+                "entry_point": {"id": "function:src/main.py:main", "name": "main"},
+                "nodes": [{"id": "function:src/main.py:main", "name": "main"}],
+                "edges": [],
+                "edge_type": "CALLS",
+                "max_depth": 3,
+            }
+        )
+        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.tools.graph_tool._get_capability_index",
+                new=AsyncMock(return_value=mock_index),
+            ):
+                result = await graph(mode="trace", node="call_provider", depth=3)
+
+        assert result["mode"] == "trace"
+        assert result["provider_backed"] is True
+        assert result["nodes_count"] == 1
+
+    @pytest.mark.asyncio
     async def test_graph_unknown_mode(self, mock_graph_store):
         """Test handling of unknown mode."""
         with patch("victor.tools.graph_tool.create_graph_store") as mock_create:

@@ -19,11 +19,18 @@ Owner: Verticals Lead (program owner), with role-level ownership per entry.
 | `CodingTeamSpec` | `victor/verticals/contrib/coding/teams/specs.py` | `TeamSpec` from `victor.framework.team_schema` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 | `ResearchTeamSpec` | `victor/verticals/contrib/research/teams/__init__.py` | `TeamSpec` from `victor.framework.team_schema` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 | Fragmented/legacy event type names (module-level compatibility) | `victor/core/events/taxonomy.py` | `UnifiedEventType` values from `victor.core.events.taxonomy` | Observability Lead | `v0.8.0` | `2026-12-31` |
+| `VerticalBase.create_agent()` convenience factory | `victor/core/verticals/base.py` | `Agent.create(vertical=MyVertical, ...)` | Verticals Lead | `v0.8.0` | `2026-12-31` |
 
 ## Notes
 
 - Entries with explicit source-level targets were kept as-is (`v0.7.0` / `2026-06-30`).
 - Entries without explicit source targets are assigned provisional `v0.8.0` / `2026-12-31` per policy and should be re-validated at each milestone cut.
+- `VerticalBase.create_agent()` and the legacy config-only vertical activation shim
+  share the same provisional removal milestone: `v0.8.0` / `2026-12-31`.
+- Until that removal milestone lands, each release note set must include:
+  - the replacement path `Agent.create(vertical=MyVertical, ...)`
+  - confirmation that legacy config-only verticals still run through the runtime shim
+  - a link to `victor-sdk/MIGRATION_GUIDE.md`
 
 ## M2 Update (2026-03-04)
 
@@ -39,3 +46,51 @@ Migration path for all three verticals:
 from victor.verticals.contrib.devops.tool_dependencies import get_provider
 provider = get_provider()
 ```
+
+## M3 Update (2026-03-10)
+
+Removed 6 more items (9/13 total = 69%, exceeds 60% target):
+
+1. **`UnifiedWorkflowCompilerAdapter` + `CompiledGraphAdapter` + `ExecutorResultAdapter`** (`victor/workflows/adapter.py`)
+   - Module now raises `ImportError` with migration message
+   - Migration: `victor.workflows.compiler_protocols.WorkflowCompilerProtocol` via DI container
+
+2. **`get_tiered_tools()` extension hook** (`victor/core/verticals/extension_loader.py`)
+   - Method and protocol declaration removed
+   - Migration: override `get_tiered_tool_config()` instead
+
+3. **`CodingToolDependencyProvider` class + 6 deprecated constants + `_LazyDeprecatedProperty` infra** (`victor/verticals/contrib/coding/tool_dependencies.py`)
+   - Only `get_provider()` factory remains
+   - Migration: `from victor.verticals.contrib.coding.tool_dependencies import get_provider`
+
+4. **`CodingTeamSpec` class + `_FORMATION_TO_TOPOLOGY`** (`victor/verticals/contrib/coding/teams/specs.py`)
+   - Migration: `TeamSpec` from `victor.framework.team_schema`
+
+5. **`ResearchTeamSpec` class** (`victor/verticals/contrib/research/teams/__init__.py`)
+   - Migration: `TeamSpec` from `victor.framework.team_schema`
+
+6. **`TASK_TYPE_HINTS` fallback dict + `__getattr__`** (`victor/agent/prompt_builder.py`)
+   - Migration: `get_task_type_hint(task_type, prompt_contributors=[...])` with vertical contributors
+
+**Remaining** (4 items, deferred to v0.8.0):
+- `UnifiedWorkflowCompiler` (19+ dependents)
+- Sync `switch_provider()`
+- `WorkflowGraph` alias
+- Fragmented event type names
+
+## Architecture Strengthening Update (2026-03-15)
+
+Added to inventory:
+
+| Deprecated API/Symbol | Replacement | Target Removal | Status |
+|---|---|---|---|
+| `victor.verticals.contrib.coding` | `victor-coding` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.rag` | `victor-rag` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.devops` | `victor-devops` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.dataanalysis` | `victor-dataanalysis` package | `v0.7.0` | DeprecationWarning active |
+| `victor.verticals.contrib.research` | `victor-research` package | `v0.7.0` | DeprecationWarning active |
+| Settings flat-field access (e.g. `settings.default_provider`) | Nested groups (e.g. `settings.provider.default_provider`) | `v0.8.0` | DeprecationWarning active |
+| `VerticalBase.create_agent()` | `Agent.create(vertical=MyVertical, ...)` | `v0.8.0` | DeprecationWarning active |
+
+**Updated inventory**: 9/13 original items removed (69%). 7 new deprecations added with warnings active.
+**E5 status**: Migration-note closure at 69% for original items. New contrib deprecations are fully documented with v0.7.0 target.

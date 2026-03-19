@@ -315,6 +315,76 @@ SEMANTIC_CACHE_CONFIG = SemanticCacheConfig()
 RL_LEARNER_CONFIG = RLLearnerConfig()
 
 
+@dataclass(frozen=True)
+class SessionLedgerConfig:
+    """Configuration for session ledger (structured session state).
+
+    Attributes:
+        max_entries: Maximum ledger entries before oldest-first eviction
+        max_render_chars: Hard cap on rendered ledger output
+        file_summary_max_len: Max chars for per-file summary strings
+    """
+
+    max_entries: int = 200
+    max_render_chars: int = 3000
+    file_summary_max_len: int = 80
+
+
+@dataclass(frozen=True)
+class DeduplicationConfig:
+    """Configuration for tool result deduplication.
+
+    Attributes:
+        enabled: Whether deduplication is active
+        stub_template: Template for replacement stubs
+        dedup_tool_names: Tool names considered as read operations
+        min_content_chars_to_dedup: Minimum content size to trigger dedup
+    """
+
+    enabled: bool = True
+    stub_template: str = "[Previously read: {path} -- {lines} lines]"
+    dedup_tool_names: tuple = ("read", "cat", "read_file")
+    min_content_chars_to_dedup: int = 500
+
+
+@dataclass(frozen=True)
+class ContextAssemblerConfig:
+    """Configuration for turn-boundary context assembly.
+
+    Attributes:
+        history_budget_pct: Fraction of max_context_chars for history
+        response_reserve_pct: Fraction reserved for response generation
+        full_turn_count: Number of recent turns kept in full
+        min_scored_messages: Minimum older messages to score-select
+        ledger_budget_pct: Fraction of max_context_chars for ledger rendering
+    """
+
+    history_budget_pct: float = 0.70
+    response_reserve_pct: float = 0.30
+    full_turn_count: int = 3
+    min_scored_messages: int = 4
+    ledger_budget_pct: float = 0.05
+
+
+@dataclass(frozen=True)
+class ReferentialIntentConfig:
+    """Configuration for referential intent resolution.
+
+    Attributes:
+        enabled: Whether referential intent resolution is active
+        max_enrichment_chars: Max chars appended as context enrichment
+    """
+
+    enabled: bool = True
+    max_enrichment_chars: int = 1500
+
+
+SESSION_LEDGER_CONFIG = SessionLedgerConfig()
+DEDUPLICATION_CONFIG = DeduplicationConfig()
+CONTEXT_ASSEMBLER_CONFIG = ContextAssemblerConfig()
+REFERENTIAL_INTENT_CONFIG = ReferentialIntentConfig()
+
+
 # ============================================================================
 # Singleton instances (read-only)
 # ============================================================================

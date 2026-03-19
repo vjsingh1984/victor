@@ -242,26 +242,17 @@ class TestNodeExecutorFactory:
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestAdapterLayer:
-    """Test adapter layer for backward compatibility."""
+    """Test that adapter layer raises ImportError after removal (E5 M3)."""
 
-    @pytest.mark.asyncio
-    async def test_adapter_instantiation(self, container):
-        """Test that adapter can be instantiated."""
-        from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter
+    def test_adapter_import_raises(self):
+        """Importing removed adapter classes should raise ImportError."""
+        with pytest.raises(ImportError, match="removed in E5 M3"):
+            from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter  # noqa: F401
 
-        adapter = UnifiedWorkflowCompilerAdapter(settings=container.get(Settings))
-        assert adapter is not None
-
-    @pytest.mark.asyncio
-    async def test_adapter_compile(self, container, simple_workflow_yaml):
-        """Test that adapter can compile workflows."""
-        from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter
-
-        adapter = UnifiedWorkflowCompilerAdapter(settings=container.get(Settings))
-        compiled = adapter.compile(simple_workflow_yaml)
-
-        assert compiled is not None
-        assert hasattr(compiled, "invoke")
+    def test_compiled_graph_adapter_import_raises(self):
+        """Importing removed CompiledGraphAdapter should raise ImportError."""
+        with pytest.raises(ImportError, match="removed in E5 M3"):
+            from victor.workflows.adapter import CompiledGraphAdapter  # noqa: F401
 
 
 @pytest.mark.integration

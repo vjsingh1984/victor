@@ -101,22 +101,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ConversationStage(str, Enum):
-    """Stages in a typical coding assistant conversation.
-
-    This is the canonical source for conversation stages.
-    Uses string values for serialization compatibility.
-
-    Note: Framework's `Stage` enum is now an alias to this class.
-    """
-
-    INITIAL = "initial"  # First interaction
-    PLANNING = "planning"  # Understanding scope, planning approach
-    READING = "reading"  # Reading files, gathering context
-    ANALYSIS = "analysis"  # Analyzing code, understanding structure
-    EXECUTION = "execution"  # Making changes, running commands
-    VERIFICATION = "verification"  # Testing, validating
-    COMPLETION = "completion"  # Summarizing, done
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import ConversationStage  # noqa: F401
 
 
 # Stage ordering for adjacency calculations (since values are strings, not ints)

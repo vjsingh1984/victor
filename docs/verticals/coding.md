@@ -144,7 +144,7 @@ The Coding vertical progresses through these stages:
 The Coding vertical uses Tree-sitter for fast, accurate AST parsing across 20+ programming languages:
 
 ```python
-from victor.coding.ast.tree_sitter_manager import TreeSitterManager
+from victor_coding.ast.tree_sitter_manager import TreeSitterManager
 
 manager = TreeSitterManager()
 tree = manager.parse_file("example.py")
@@ -163,7 +163,7 @@ Language Server Protocol support provides:
 - Hover information
 
 ```python
-from victor.coding.lsp.manager import LSPManager
+from victor_coding.lsp.manager import LSPManager
 
 lsp = LSPManager()
 await lsp.start_server("python")
@@ -192,7 +192,7 @@ Understand code relationships through graph analysis:
 ### Vertical Configuration
 
 ```python
-from victor.coding.assistant import CodingAssistant
+from victor_coding.assistant import CodingAssistant
 
 # Get system prompt for coding tasks
 prompt = CodingAssistant.get_system_prompt()
@@ -233,7 +233,7 @@ timeout: 300            # Node timeout in seconds
 ### Basic Code Review
 
 ```python
-from victor.coding.workflows import CodingWorkflowProvider
+from victor_coding.workflows import CodingWorkflowProvider
 
 provider = CodingWorkflowProvider()
 workflow = provider.compile_workflow("code_review")

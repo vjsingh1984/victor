@@ -150,7 +150,9 @@ class VertexAIProvider(BaseProvider):
                 "Vertex AI project ID not provided. Set GOOGLE_CLOUD_PROJECT environment variable."
             )
 
-        auth_method = "API key" if self._api_key else "Google Cloud ADC (Application Default Credentials)"
+        auth_method = (
+            "API key" if self._api_key else "Google Cloud ADC (Application Default Credentials)"
+        )
 
         # Build base URL for Vertex AI
         base_url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{self._project_id}/locations/{location}/publishers/google/models"
@@ -215,7 +217,9 @@ class VertexAIProvider(BaseProvider):
                         token = result.stdout.strip()
                         headers["Authorization"] = f"Bearer {token}"
                     else:
-                        self._provider_logger.logger.warning("Failed to get access token from gcloud CLI")
+                        self._provider_logger.logger.warning(
+                            "Failed to get access token from gcloud CLI"
+                        )
                 except Exception as e:
                     self._provider_logger.logger.warning(f"Failed to get access token: {e}")
 

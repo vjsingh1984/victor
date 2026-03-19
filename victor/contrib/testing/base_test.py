@@ -66,11 +66,11 @@ class VerticalTestCase:
         import shutil
 
         # Remove temporary directory
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir, ignore_errors=True)
 
         # Restore environment
-        if hasattr(self, 'original_environ'):
+        if hasattr(self, "original_environ"):
             os.environ.clear()
             os.environ.update(self.original_environ)
 
@@ -119,7 +119,7 @@ class VerticalTestCase:
             Path to the created file
         """
         filepath = os.path.join(self.temp_dir, filename)
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             f.write(content)
         return filepath
 
@@ -145,7 +145,7 @@ class VerticalTestCase:
         Returns:
             File content as string
         """
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             return f.read()
 
     # ==========================================================================
@@ -188,7 +188,9 @@ class VerticalTestCase:
         """
         for key, value in expected.items():
             assert key in actual, f"Key '{key}' not found in actual dict"
-            assert actual[key] == value, f"Value mismatch for key '{key}': expected {value}, got {actual[key]}"
+            assert (
+                actual[key] == value
+            ), f"Value mismatch for key '{key}': expected {value}, got {actual[key]}"
 
     def assert_has_keys(self, data: dict, *keys: str) -> None:
         """Assert that a dict has all specified keys.

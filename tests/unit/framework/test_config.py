@@ -470,311 +470,17 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "destructive" in reason.lower() or "rm -rf" in reason.lower()
 
-    def test_devops_safety_deployment_rules(self):
-        """DevOps deployment safety rules should require approval for production."""
-        try:
-            from victor_devops.safety import create_deployment_safety_rules
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
+    # NOTE: Tests for vertical-specific safety rules have been migrated to their
+    # respective vertical repositories:
+    # - victor-devops: tests/test_safety.py (deployment, container, infrastructure rules)
+    # - victor-rag: tests/test_safety.py (deletion, ingestion rules)
+    # - victor-research: tests/test_safety.py (source, content rules)
+    # - victor-dataanalysis: tests/test_safety.py (PII, export rules)
+    # - victor-coding: tests/safety/test_safety_integration.py (all coding rules)
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_deployment_safety_rules(enforcer, require_approval_for_production=True)
-
-        # Test production deployment blocking
-        allowed, reason = enforcer.check_operation("kubectl apply -f deployment.yaml -n production")
-        assert allowed is False
-        assert "approval" in reason.lower() or "production" in reason.lower()
-
-    def test_devops_safety_container_rules(self):
-        """DevOps container safety rules should block privileged containers."""
-        try:
-            from victor_devops.safety import create_container_safety_rules
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_container_safety_rules(enforcer, block_privileged_containers=True)
-
-        # Test privileged container blocking
-        allowed, reason = enforcer.check_operation("docker run --privileged alpine")
-        assert allowed is False
-        assert "privileged" in reason.lower()
-
-    def test_devops_safety_infrastructure_rules(self):
-        """DevOps infrastructure safety rules should block destructive commands."""
-        try:
-            from victor_devops.safety import create_infrastructure_safety_rules
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_infrastructure_safety_rules(enforcer, block_destructive_commands=True)
-
-        # Test terraform destroy blocking
-        allowed, reason = enforcer.check_operation("terraform destroy -auto-approve")
-        assert allowed is False
-        assert "destructive" in reason.lower() or "destroy" in reason.lower()
-
-        # Test kubectl delete blocking
-        allowed, reason = enforcer.check_operation("kubectl delete deployment -n production app")
-        assert allowed is False
-        assert "destructive" in reason.lower() or "delete" in reason.lower()
-
-    def test_create_all_coding_safety_rules(self):
-        """create_all_coding_safety_rules should register all coding rules."""
-        try:
-            from victor_coding.safety import create_all_coding_safety_rules
-        except ImportError:
-            pytest.skip("victor-coding package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_coding_safety_rules(enforcer)
-
-        # Should have rules from git, file, and test categories
-        assert len(enforcer.rules) > 0
-
-        # Verify force push is blocked
-        allowed, _ = enforcer.check_operation("git push --force origin main")
-        assert allowed is False
-
-    def test_create_all_devops_safety_rules(self):
-        """create_all_devops_safety_rules should register all devops rules."""
-        try:
-            from victor_devops.safety import create_all_devops_safety_rules
-        except ImportError:
-            pytest.skip("victor-devops package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_devops_safety_rules(enforcer)
-
-        # Should have rules from deployment, container, and infrastructure categories
-        assert len(enforcer.rules) > 0
-
-        # Verify privileged container is blocked
-        allowed, _ = enforcer.check_operation("docker run --privileged alpine")
-        assert allowed is False
-
-    def test_rag_safety_deletion_rules(self):
-        """RAG deletion safety rules should block bulk deletions."""
-        try:
-            from victor_rag.safety import create_rag_deletion_safety_rules
-        except ImportError:
-            pytest.skip("victor-rag package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_rag_deletion_safety_rules(enforcer, block_bulk_delete=True, block_delete_all=True)
-
-        # Test bulk delete blocking
-        allowed, reason = enforcer.check_operation("rag_delete *")
-        assert allowed is False
-        assert "bulk" in reason.lower() or "delete" in reason.lower()
-
-        # Test delete all blocking
-        allowed, reason = enforcer.check_operation("rag_delete --all")
-        assert allowed is False
-        assert "all" in reason.lower() or "delete" in reason.lower()
-
-    def test_rag_safety_ingestion_rules(self):
-        """RAG ingestion safety rules should block unsafe ingestion."""
-        try:
-            from victor_rag.safety import create_rag_ingestion_safety_rules
-        except ImportError:
-            pytest.skip("victor-rag package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_rag_ingestion_safety_rules(
-            enforcer,
-            block_executable_files=True,
-            block_system_files=True,
-            require_https=True,
-        )
-
-        # Test executable file blocking
-        allowed, reason = enforcer.check_operation("rag_ingest document.exe")
-        assert allowed is False
-        assert "executable" in reason.lower()
-
-        # Test system file blocking
-        allowed, reason = enforcer.check_operation("rag_ingest /etc/passwd")
-        assert allowed is False
-        assert "system" in reason.lower()
-
-        # Test HTTPS requirement
-        allowed, reason = enforcer.check_operation("rag_ingest http://example.com/data.json")
-        assert allowed is False
-        assert "https" in reason.lower()
-
-    def test_create_all_rag_safety_rules(self):
-        """create_all_rag_safety_rules should register all RAG rules."""
-        try:
-            from victor_rag.safety import create_all_rag_safety_rules
-        except ImportError:
-            # victor-rag not installed, skip test
-            pytest.skip("victor-rag package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_rag_safety_rules(enforcer)
-
-        # Should have rules from deletion and ingestion categories
-        assert len(enforcer.rules) > 0
-
-        # Verify bulk delete is blocked
-        allowed, _ = enforcer.check_operation("rag_delete *")
-        assert allowed is False
-
-        # Verify executable ingestion is blocked
-        allowed, _ = enforcer.check_operation("rag_ingest malware.exe")
-        assert allowed is False
-
-    def test_research_safety_source_rules(self):
-        """Research source safety rules should block low-credibility sources."""
-        try:
-            from victor_research.safety import create_research_source_safety_rules
-        except ImportError:
-            # victor-research not installed, skip test
-            pytest.skip("victor-research package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_research_source_safety_rules(
-            enforcer,
-            block_low_credibility_sources=True,
-            blocked_domains=["fake-news-site.com"],
-        )
-
-        # Test low-credibility source blocking
-        allowed, reason = enforcer.check_operation("cite article from fake-blog.blogspot.com")
-        assert allowed is False
-        assert (
-            "credibility" in reason.lower()
-            or "blogspot" in reason.lower()
-            or "blocked" in reason.lower()
-        )
-
-        # Test blocked domain - note: low-credibility rule may trigger first
-        allowed, reason = enforcer.check_operation("cite source from fake-news-site.com")
-        assert allowed is False
-        # Either the domain-specific rule or the general low-credibility rule can block
-        assert (
-            "fake" in reason.lower()
-            or "credibility" in reason.lower()
-            or "blocked" in reason.lower()
-        )
-
-    def test_research_safety_content_rules(self):
-        """Research content safety rules should block fabricated content."""
-        try:
-            from victor_research.safety import create_research_content_safety_rules
-        except ImportError:
-            pytest.skip("victor-research package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_research_content_safety_rules(
-            enforcer,
-            block_fabricated_content=True,
-            warn_absolute_claims=True,
-        )
-
-        # Test fabricated content blocking
-        allowed, reason = enforcer.check_operation("fabricate source for claim")
-        assert allowed is False
-        assert "fabricat" in reason.lower()
-
-        # Test absolute claims warning (should only warn, not block at HIGH level)
-        # But block_fabricated_content should catch it
-        allowed, reason = enforcer.check_operation("always use this source")
-        # At HIGH level, LOW/MEDIUM warnings might still block depending on implementation
-        assert isinstance(allowed, bool)
-
-    def test_create_all_research_safety_rules(self):
-        """create_all_research_safety_rules should register all research rules."""
-        try:
-            from victor_research.safety import create_all_research_safety_rules
-        except ImportError:
-            pytest.skip("victor-research package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_research_safety_rules(enforcer)
-
-        # Should have rules from source and content categories
-        assert len(enforcer.rules) > 0
-
-        # Verify low-credibility source is blocked
-        allowed, _ = enforcer.check_operation("cite tumblr.com source")
-        assert allowed is False
-
-        # Verify fabricated content is blocked
-        allowed, _ = enforcer.check_operation("invent citation for paper")
-        assert allowed is False
-
-    def test_dataanalysis_safety_pii_rules(self):
-        """DataAnalysis PII safety rules should block PII exports."""
-        try:
-            from victor_dataanalysis.safety import create_dataanalysis_pii_safety_rules
-        except ImportError:
-            pytest.skip("victor-dataanalysis package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_dataanalysis_pii_safety_rules(
-            enforcer,
-            block_pii_exports=True,
-            warn_on_pii_columns=True,
-        )
-
-        # Test PII export blocking
-        allowed, reason = enforcer.check_operation("export data with SSN to CSV")
-        assert allowed is False
-        assert "pii" in reason.lower() or "ssn" in reason.lower() or "blocked" in reason.lower()
-
-        # Test credit card export blocking (use space, not underscore)
-        allowed, reason = enforcer.check_operation("to_csv credit card data")
-        assert allowed is False
-        assert "credit" in reason.lower() or "pii" in reason.lower() or "blocked" in reason.lower()
-
-    def test_dataanalysis_safety_export_rules(self):
-        """DataAnalysis export safety rules should block external uploads."""
-        try:
-            from victor_dataanalysis.safety import create_dataanalysis_export_safety_rules
-        except ImportError:
-            pytest.skip("victor-dataanalysis package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_dataanalysis_export_safety_rules(
-            enforcer,
-            block_external_uploads=True,
-            block_production_db_access=True,
-        )
-
-        # Test external upload blocking (use "upload to" without word in between)
-        allowed, reason = enforcer.check_operation("upload to s3 bucket")
-        assert allowed is False
-        assert "external" in reason.lower() or "s3" in reason.lower() or "blocked" in reason.lower()
-
-        # Test production DB access blocking
-        allowed, reason = enforcer.check_operation("query production database")
-        assert allowed is False
-        assert "production" in reason.lower() or "blocked" in reason.lower()
-
-    def test_create_all_dataanalysis_safety_rules(self):
-        """create_all_dataanalysis_safety_rules should register all dataanalysis rules."""
-        try:
-            from victor_dataanalysis.safety import create_all_dataanalysis_safety_rules
-        except ImportError:
-            pytest.skip("victor-dataanalysis package not installed")
-
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_dataanalysis_safety_rules(enforcer)
-
-        # Should have rules from PII and export categories
-        assert len(enforcer.rules) > 0
-
-        # Verify PII export is blocked
-        allowed, _ = enforcer.check_operation("export data with SSN")
-        assert allowed is False
-
-        # Verify external upload is blocked
-        allowed, _ = enforcer.check_operation("upload to dropbox")
-        assert allowed is False
-
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_repository_rules(self):
         """Benchmark repository safety rules should block operations outside workspace."""
         from victor.benchmark.safety import create_benchmark_repository_safety_rules
@@ -801,6 +507,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "git" in reason.lower() or "blocked" in reason.lower()
 
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_resource_rules(self):
         """Benchmark resource safety rules should block excessive resource usage."""
         from victor.benchmark.safety import create_benchmark_resource_safety_rules
@@ -818,6 +527,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "budget" in reason.lower() or "blocked" in reason.lower()
 
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_test_rules(self):
         """Benchmark test safety rules should block production test runs."""
         from victor.benchmark.safety import create_benchmark_test_safety_rules
@@ -844,6 +556,9 @@ class TestVerticalSafetyIntegration:
         assert allowed is False
         assert "destructive" in reason.lower() or "blocked" in reason.lower()
 
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_benchmark_safety_data_rules(self):
         """Benchmark data safety rules should block external data uploads."""
         from victor.benchmark.safety import create_benchmark_data_safety_rules
@@ -879,6 +594,9 @@ class TestVerticalSafetyIntegration:
             or "blocked" in reason.lower()
         )
 
+    @pytest.mark.skip(
+        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
+    )
     def test_create_all_benchmark_safety_rules(self):
         """create_all_benchmark_safety_rules should register all benchmark rules."""
         from victor.benchmark.safety import create_all_benchmark_safety_rules

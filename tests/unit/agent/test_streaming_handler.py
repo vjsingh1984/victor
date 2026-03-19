@@ -280,6 +280,32 @@ class TestProcessToolResults:
         assert len(status_chunks) == 1
         assert "Thinking" in status_chunks[0].metadata["status"]
 
+    def test_preserves_follow_up_suggestions(self, handler, basic_context):
+        """Preserves tool follow-up suggestions in tool_result metadata."""
+        execution = ToolExecutionResult()
+        execution.add_result(
+            "code_search",
+            success=True,
+            args={"query": "main entry point"},
+            follow_up_suggestions=[
+                {
+                    "command": 'graph(mode="trace", node="main", depth=3)',
+                    "description": "Trace execution starting from main.",
+                }
+            ],
+        )
+
+        chunks = handler.process_tool_results(execution, basic_context)
+
+        tool_result_chunks = [c for c in chunks if c.metadata and "tool_result" in c.metadata]
+        assert len(tool_result_chunks) == 1
+        assert tool_result_chunks[0].metadata["tool_result"]["follow_up_suggestions"] == [
+            {
+                "command": 'graph(mode="trace", node="main", depth=3)',
+                "description": "Trace execution starting from main.",
+            }
+        ]
+
 
 class TestGenerateToolStartChunk:
     """Tests for generate_tool_start_chunk method."""

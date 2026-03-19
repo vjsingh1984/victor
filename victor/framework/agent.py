@@ -144,7 +144,7 @@ class Agent:
             profile: Profile name from ~/.victor/profiles.yaml
             workspace: Working directory for file operations
             config: Advanced configuration (overrides other options)
-            vertical: Optional vertical class (e.g., CodingAssistant, ResearchAssistant).
+            vertical: Optional vertical class or name (e.g., 'coding', 'research').
                 When provided, the vertical's configuration (tools, system_prompt,
                 stages) is automatically applied.
             enable_observability: Auto-initialize ObservabilityIntegration for
@@ -171,8 +171,7 @@ class Agent:
             # With vertical (domain-specific assistant)
             # Note: External vertical packages must be installed separately
             # pip install victor-coding  # or victor-ai[coding]
-            # from victor_coding import CodingAssistant
-            # agent = await Agent.create(vertical=CodingAssistant)
+            agent = await Agent.create(vertical="coding")
 
             # With observability events
             agent = await Agent.create(session_id="my-session")
@@ -184,6 +183,7 @@ class Agent:
             )
         """
         from victor.framework._internal import create_orchestrator_from_options
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
         # Extract configuration from vertical if provided
         # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
@@ -192,7 +192,8 @@ class Agent:
         system_prompt: Optional[str] = None
 
         if vertical:
-            vertical_config = vertical.get_config()
+            vertical_binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
+            vertical_config = vertical_binding.runtime_config
             # Vertical tools override explicit tools if not provided
             # Note: Pipeline also handles this, but we do it here for tools kwarg compat
             if tools is None:

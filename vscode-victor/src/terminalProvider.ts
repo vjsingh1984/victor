@@ -9,7 +9,7 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
+import * as cp from 'child_process';
 
 export interface CommandExecution {
     id: string;
@@ -198,8 +198,6 @@ export class TerminalProvider implements vscode.Disposable {
         execution.status = 'running';
 
         return new Promise((resolve) => {
-            const cp = require('child_process');
-
             const child = cp.spawn(command, [], {
                 shell: true,
                 cwd,

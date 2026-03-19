@@ -83,6 +83,38 @@ from victor.core.verticals.vertical_loader import (
     get_active_vertical,
     get_vertical_extensions,
 )
+from victor.core.verticals.runtime_diagnostics import (
+    get_vertical_runtime_diagnostics,
+)
+from victor.core.verticals.sdk_discovery import (
+    # Registry access
+    get_sdk_protocol_registry,
+    discover_sdk_protocols,
+    reload_sdk_discovery,
+    reset_sdk_discovery,
+    # Protocol providers
+    get_sdk_tool_providers,
+    get_sdk_safety_providers,
+    get_sdk_workflow_providers,
+    get_sdk_prompt_providers,
+    # Capability providers
+    get_sdk_capability_providers,
+    get_sdk_capability_provider,
+    # Validators
+    get_sdk_validators,
+    get_sdk_validator,
+    # Discovery info
+    get_sdk_discovery_stats,
+    get_sdk_discovery_summary,
+    list_sdk_capabilities,
+    list_sdk_validators,
+    # Vertical enhancement
+    enhance_vertical_with_sdk_protocols,
+    # Types
+    ProtocolRegistry,
+    DiscoveryStats,
+    ProtocolMetadata,
+)
 
 __all__ = [
     # Base classes
@@ -129,6 +161,28 @@ __all__ = [
     "load_vertical",
     "get_active_vertical",
     "get_vertical_extensions",
+    "get_vertical_runtime_diagnostics",
+    # SDK Protocol Discovery (Phase 4: Enhanced Entry Points)
+    "get_sdk_protocol_registry",
+    "discover_sdk_protocols",
+    "reload_sdk_discovery",
+    "reset_sdk_discovery",
+    "get_sdk_tool_providers",
+    "get_sdk_safety_providers",
+    "get_sdk_workflow_providers",
+    "get_sdk_prompt_providers",
+    "get_sdk_capability_providers",
+    "get_sdk_capability_provider",
+    "get_sdk_validators",
+    "get_sdk_validator",
+    "get_sdk_discovery_stats",
+    "get_sdk_discovery_summary",
+    "list_sdk_capabilities",
+    "list_sdk_validators",
+    "enhance_vertical_with_sdk_protocols",
+    "ProtocolRegistry",
+    "DiscoveryStats",
+    "ProtocolMetadata",
     # Helper functions
     "get_vertical",
     "list_verticals",
@@ -149,6 +203,7 @@ def _register_builtin_verticals() -> None:
     # Only register verticals that truly exist in the victor package
     try:
         from victor.benchmark import BenchmarkVertical
+
         VerticalRegistry.register(BenchmarkVertical)
     except ImportError:
         pass
@@ -170,6 +225,16 @@ def _discover_external_verticals() -> None:
     the required abstract methods (get_tools, get_system_prompt).
     """
     try:
+        # Primary path: use VerticalLoader so runtime discovery has a single
+        # authoritative implementation with cache/observability support.
+        get_vertical_loader().discover_verticals(emit_event=False)
+        VerticalRegistry._external_discovered = True
+        return
+    except Exception:
+        pass
+
+    try:
+        # Compatibility fallback for legacy call paths/tests.
         VerticalRegistry.discover_external_verticals()
     except Exception:
         # Silently ignore discovery failures during import

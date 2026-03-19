@@ -22,13 +22,14 @@ Provides commands for:
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
+import yaml
 
 from victor.config.profiles import (
     ProfileLevel,
@@ -43,6 +44,51 @@ from victor.config.profiles import (
 
 profiles_app = typer.Typer(name="profile", help="Manage configuration profiles.")
 console = Console()
+
+
+# =============================================================================
+# Helper functions for backward compatibility with tests
+# =============================================================================
+
+
+def _load_profiles_yaml(profiles_file: Path) -> Dict[str, Any]:
+    """Load profiles from a YAML file.
+
+    Args:
+        profiles_file: Path to profiles.yaml file
+
+    Returns:
+        Dictionary containing profiles data, or empty dict if file doesn't exist or is invalid
+    """
+    if not profiles_file.exists():
+        return {"profiles": {}}
+
+    try:
+        with open(profiles_file) as f:
+            return yaml.safe_load(f) or {"profiles": {}}
+    except (yaml.YAMLError, IOError, OSError):
+        return {"profiles": {}}
+
+
+def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:
+    """Save profiles to a YAML file.
+
+    Args:
+        profiles_file: Path to profiles.yaml file
+        data: Dictionary containing profiles data
+
+    Raises:
+        typer.Exit: If file cannot be written
+    """
+    import sys
+
+    try:
+        profiles_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(profiles_file, "w") as f:
+            yaml.safe_dump(data, f, default_flow_style=False)
+    except (IOError, OSError) as e:
+        console.print(f"[red]Error writing profiles file: {e}[/]")
+        raise typer.Exit(1)
 
 
 @profiles_app.command("list")
@@ -104,7 +150,9 @@ def profile_list(
 
 @profiles_app.command("show")
 def profile_show(
-    name: str = typer.Argument(..., help="Profile name (basic, advanced, expert, coding, research)"),
+    name: str = typer.Argument(
+        ..., help="Profile name (basic, advanced, expert, coding, research)"
+    ),
     export_yaml: bool = typer.Option(False, "--yaml", "-y", help="Export as YAML"),
 ) -> None:
     """Show details for a specific profile."""
@@ -185,7 +233,9 @@ def profile_apply(
 
     # Apply the profile
     try:
-        profiles_path = install_profile(profile, config_dir=config_path, provider_override=provider, model_override=model)
+        profiles_path = install_profile(
+            profile, config_dir=config_path, provider_override=provider, model_override=model
+        )
 
         console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")
         console.print(f"[dim]Config written to: {profiles_path}[/]")

@@ -1,6 +1,6 @@
 # Tool Reference
 
-**Quick reference for Victor's 33 tool modules.**
+**Quick reference for Victor's 34 tool modules.**
 
 ## Tool Categories
 

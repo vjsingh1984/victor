@@ -91,6 +91,24 @@ suite('VictorClient Test Suite', () => {
         }
     });
 
+    test('supportsCapability should return false when server is unavailable', async () => {
+        (client as unknown as { getStatus: () => Promise<unknown> }).getStatus = async () => {
+            throw new VictorError('offline', VictorErrorType.Network);
+        };
+
+        const supported = await client.supportsCapability('agents');
+        assert.strictEqual(supported, false);
+    });
+
+    test('supportsCapability should return true for legacy servers without /status', async () => {
+        (client as unknown as { getStatus: () => Promise<unknown> }).getStatus = async () => {
+            throw new VictorError('missing status route', VictorErrorType.NotFound, 404);
+        };
+
+        const supported = await client.supportsCapability('agents');
+        assert.strictEqual(supported, true);
+    });
+
     test('disconnectWebSocket should be safe to call multiple times', () => {
         // Should not throw
         client.disconnectWebSocket();

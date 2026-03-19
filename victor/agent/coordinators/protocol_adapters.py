@@ -32,8 +32,18 @@ import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import asyncio
+
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.providers.base import CompletionResponse, Message
+    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.context_compactor import ContextCompactor
+    from victor.agent.message_history import MessageHistory
+    from victor.agent.session_state_manager import SessionStateManager
+    from victor.agent.task_analyzer import TaskAnalyzer
+    from victor.agent.tool_planner import ToolPlanner
+    from victor.agent.tool_selection import ToolSelector
+    from victor.config.settings import Settings
+    from victor.providers.base import BaseProvider, CompletionResponse, Message
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +207,7 @@ class OrchestratorProtocolAdapter:
         self._orchestrator.messages.clear()
 
     @property
-    def conversation(self) -> Any:
+    def conversation(self) -> "MessageHistory":
         """Get conversation manager."""
         return self._orchestrator.conversation
 
@@ -268,22 +278,22 @@ class OrchestratorProtocolAdapter:
     # =====================================================================
 
     @property
-    def settings(self) -> Any:
+    def settings(self) -> "Settings":
         """Get settings."""
         return self._orchestrator.settings
 
     @property
-    def conversation_controller(self) -> Any:
+    def conversation_controller(self) -> "ConversationController":
         """Get conversation controller."""
         return self._orchestrator.conversation_controller
 
     @property
-    def _context_compactor(self) -> Any:
+    def _context_compactor(self) -> "ContextCompactor":
         """Get context compactor."""
         return self._orchestrator._context_compactor
 
     @property
-    def _session_state(self) -> Any:
+    def _session_state(self) -> "SessionStateManager":
         """Get session state manager."""
         return self._orchestrator._session_state
 
@@ -305,7 +315,7 @@ class OrchestratorProtocolAdapter:
     # =====================================================================
 
     @property
-    def tool_selector(self) -> Any:
+    def tool_selector(self) -> "ToolSelector":
         """Get tool selector."""
         return self._orchestrator.tool_selector
 
@@ -320,7 +330,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator._tool_coordinator
 
     @property
-    def _tool_planner(self) -> Any:
+    def _tool_planner(self) -> "ToolPlanner":
         """Get tool planner."""
         return self._orchestrator._tool_planner
 
@@ -345,7 +355,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.use_semantic_selection
 
     @property
-    def observed_files(self) -> Any:
+    def observed_files(self) -> set:
         """Get observed files set."""
         return self._orchestrator.observed_files
 
@@ -367,7 +377,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.task_classifier
 
     @property
-    def task_analyzer(self) -> Any:
+    def task_analyzer(self) -> "TaskAnalyzer":
         """Get task analyzer."""
         return self._orchestrator.task_analyzer
 
@@ -377,7 +387,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.response_completer
 
     @property
-    def provider(self) -> Any:
+    def provider(self) -> "BaseProvider":
         """Get LLM provider."""
         return self._orchestrator.provider
 
@@ -407,7 +417,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.task_classifier
 
     @property
-    def task_analyzer(self) -> Any:
+    def task_analyzer(self) -> "TaskAnalyzer":
         """Get task analyzer."""
         return self._orchestrator.task_analyzer
 
@@ -422,7 +432,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator._provider_coordinator
 
     @property
-    def _cancel_event(self) -> Any:
+    def _cancel_event(self) -> Optional["asyncio.Event"]:
         """Get cancel event."""
         return self._orchestrator._cancel_event
 

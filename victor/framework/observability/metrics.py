@@ -1168,6 +1168,7 @@ class MetricsCollector:
 
         # Apply sampling
         import random
+
         if random.random() > self._sample_rate:
             return False
 
@@ -1338,26 +1339,30 @@ class MetricsExporter:
         writer = csv.writer(output)
 
         # Header
-        writer.writerow([
-            "name",
-            "type",
-            "timestamp",
-            "labels",
-            "value",
-        ])
+        writer.writerow(
+            [
+                "name",
+                "type",
+                "timestamp",
+                "labels",
+                "value",
+            ]
+        )
 
         # Rows
         for metric in metrics:
-            labels_str = ",".join(f"{l.key}={l.value}" for l in metric.labels)
+            labels_str = ",".join(f"{label.key}={label.value}" for label in metric.labels)
             value_str = _format_metric_value(metric)
 
-            writer.writerow([
-                metric.name,
-                metric.metric_type.value,
-                metric.timestamp,
-                labels_str,
-                value_str,
-            ])
+            writer.writerow(
+                [
+                    metric.name,
+                    metric.metric_type.value,
+                    metric.timestamp,
+                    labels_str,
+                    value_str,
+                ]
+            )
 
         return output.getvalue()
 
@@ -1389,7 +1394,9 @@ class MetricsExporter:
 
         for metric in metrics:
             # Create metric name and labels
-            labels_str = "{" + ",".join(f'{l.key}="{l.value}"' for l in metric.labels) + "}"
+            labels_str = (
+                "{" + ",".join(f'{label.key}="{label.value}"' for label in metric.labels) + "}"
+            )
             if len(metric.labels) == 0:
                 labels_str = ""
 
@@ -1407,7 +1414,7 @@ class MetricsExporter:
                 lines.append(f"{metric_line}_count {metric.count}")
                 lines.append(f"{metric_line}_sum {metric.sum}")
                 for bucket in metric.buckets:
-                    le_label = "{le=\"%.1f\"}" % bucket.upper_bound
+                    le_label = '{le="%.1f"}' % bucket.upper_bound
                     lines.append(f"{metric.name}_bucket{le_label} {bucket.count}")
             elif isinstance(metric, SummaryMetric):
                 lines.append(f"# TYPE {metric.name} summary")
@@ -1430,7 +1437,7 @@ def _metric_to_dict(metric: Metric) -> Dict[str, Any]:
         "name": metric.name,
         "description": metric.description,
         "type": metric.metric_type.value,
-        "labels": {l.key: l.value for l in metric.labels},
+        "labels": {label.key: label.value for label in metric.labels},
         "timestamp": metric.timestamp,
         "datetime": datetime.fromtimestamp(metric.timestamp).isoformat(),
         "value": _extract_metric_value(metric),

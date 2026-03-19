@@ -58,6 +58,7 @@ from typing import (
 )
 
 from victor.framework.prompt_builder import PromptBuilder
+from victor.agent.system_prompt_policy import SystemPromptPolicy
 
 if TYPE_CHECKING:
     from victor.agent.vertical_context import VerticalContext
@@ -154,6 +155,7 @@ class PromptCoordinator:
         config: Optional[PromptCoordinatorConfig] = None,
         base_identity: Optional[str] = None,
         on_prompt_built: Optional[Callable[[str, TaskContext], None]] = None,
+        policy: Optional[SystemPromptPolicy] = None,
     ) -> None:
         """Initialize the PromptCoordinator.
 
@@ -163,12 +165,14 @@ class PromptCoordinator:
             config: Configuration options
             base_identity: Base identity section for the prompt
             on_prompt_built: Callback when prompt is built
+            policy: Optional policy for enforcing prompt safety nets
         """
         self._builder = prompt_builder or PromptBuilder()
         self._vertical_context = vertical_context
         self._config = config or PromptCoordinatorConfig()
         self._base_identity = base_identity
         self._on_prompt_built = on_prompt_built
+        self._policy = policy or SystemPromptPolicy()
 
         # Custom task hints (override vertical hints)
         self._task_hints: Dict[str, str] = {}
@@ -245,15 +249,48 @@ class PromptCoordinator:
 
         # Add context
         if context.additional_context:
+            remaining_budget = self._config.max_context_tokens
             for key, value in context.additional_context.items():
                 if isinstance(value, str):
-                    builder.add_context(f"{key}: {value}")
+                    chunk = f"{key}: {value}".strip()
+                    if not chunk:
+                        continue
+
+                    if remaining_budget is not None:
+                        if remaining_budget <= 0:
+                            logger.debug(
+                                "Context budget exceeded for system prompt; skipping remainder."
+                            )
+                            break
+                        chunk_length = len(chunk)
+                        if chunk_length > remaining_budget:
+                            chunk = chunk[:remaining_budget]
+                            remaining_budget = 0
+                        else:
+                            remaining_budget -= chunk_length
+
+                    builder.add_context(chunk)
 
         # Set grounding mode
         builder.set_grounding_mode(self._config.default_grounding_mode)
 
-        # Build the prompt
-        prompt = builder.build()
+        # Enforce system prompt policy before building
+        try:
+            if self._policy:
+                self._policy.enforce(builder, context)
+        except Exception:
+            logger.exception("System prompt policy enforcement failed. Continuing without policy.")
+
+        # Build the prompt with fallback handling
+        try:
+            prompt = builder.build()
+        except Exception:
+            logger.exception("Failed to build system prompt. Using fallback.")
+            prompt = self._policy.build_fallback_prompt(context)
+        else:
+            if not prompt.strip():
+                logger.warning("Empty system prompt produced; using fallback string.")
+                prompt = self._policy.build_fallback_prompt(context)
 
         # Callback
         if self._on_prompt_built:
@@ -450,6 +487,7 @@ def create_prompt_coordinator(
     vertical_context: Optional["VerticalContext"] = None,
     config: Optional[PromptCoordinatorConfig] = None,
     base_identity: Optional[str] = None,
+    policy: Optional[SystemPromptPolicy] = None,
 ) -> PromptCoordinator:
     """Factory function to create a PromptCoordinator.
 
@@ -458,6 +496,7 @@ def create_prompt_coordinator(
         vertical_context: Optional vertical context for sections
         config: Configuration options
         base_identity: Base identity section for the prompt
+        policy: Optional prompt enforcement policy
 
     Returns:
         Configured PromptCoordinator instance
@@ -467,6 +506,7 @@ def create_prompt_coordinator(
         vertical_context=vertical_context,
         config=config,
         base_identity=base_identity,
+        policy=policy,
     )
 
 

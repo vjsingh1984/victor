@@ -1,0 +1,35 @@
+{
+  "description": "External vertical repositories for cross-repo compatibility testing",
+  "repos": [
+    {
+      "name": "victor-coding",
+      "repo": "victor-ai/victor-coding",
+      "test_command": "pytest tests/ -v --tb=short"
+    },
+    {
+      "name": "victor-devops",
+      "repo": "victor-ai/victor-devops",
+      "test_command": "pytest tests/ -v --tb=short"
+    },
+    {
+      "name": "victor-rag",
+      "repo": "victor-ai/victor-rag",
+      "test_command": "pytest tests/ -v --tb=short"
+    },
+    {
+      "name": "victor-dataanalysis",
+      "repo": "victor-ai/victor-dataanalysis",
+      "test_command": "pytest tests/ -v --tb=short"
+    },
+    {
+      "name": "victor-research",
+      "repo": "victor-ai/victor-research",
+      "test_command": "pytest tests/ -v --tb=short"
+    },
+    {
+      "name": "victor-invest",
+      "repo": "victor-ai/victor-invest",
+      "test_command": "pytest tests/ -v --tb=short"
+    }
+  ]
+}

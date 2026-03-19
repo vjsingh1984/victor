@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
-from victor.agent.tool_executor import ToolExecutor
+from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
 from victor.agent.parallel_executor import (
     ParallelToolExecutor,
     ParallelExecutionConfig,
@@ -77,6 +77,7 @@ except ImportError:
     native_compute_signature = None  # type: ignore
 
 if TYPE_CHECKING:
+    from victor.agent.search_router import SearchRouter
     from victor.tools.base import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
@@ -103,6 +104,9 @@ class ToolPipelineConfig:
     # Code correction settings
     enable_code_correction: bool = False
     code_correction_auto_fix: bool = True
+
+    # Per-tool-call timeout for serial execution path
+    per_tool_timeout_seconds: float = 30.0
 
     # Parallel execution settings
     enable_parallel_execution: bool = True
@@ -144,6 +148,34 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
+    }
+)
+
+GRAPH_TOOL_ARGUMENTS = frozenset(
+    {
+        "mode",
+        "node",
+        "source",
+        "target",
+        "query",
+        "file",
+        "node_type",
+        "edge_types",
+        "depth",
+        "top_k",
+        "direction",
+        "expand",
+        "exclude_paths",
+        "only_runtime",
+        "runtime_weighted",
+        "modules_only",
+        "include_callsites",
+        "max_callsites",
+        "structured",
+        "include_symbols",
+        "include_modules",
+        "include_calls",
+        "include_refs",
     }
 )
 
@@ -447,9 +479,11 @@ class ToolPipeline:
         signature_store: Optional["SignatureStore"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
+        on_tool_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional["MiddlewareChain"] = None,
         semantic_cache: Optional["ToolResultCache"] = None,
+        search_router: Optional["SearchRouter"] = None,
     ):
         """Initialize tool pipeline.
 
@@ -466,6 +500,7 @@ class ToolPipeline:
             deduplication_tracker: Optional tracker for detecting redundant tool calls
             middleware_chain: Optional middleware chain for processing tool calls
             semantic_cache: Optional FAISS-based semantic cache for tool results
+            search_router: Optional search router for enriching search tool calls
         """
         self.tools = tool_registry
         self.executor = tool_executor
@@ -477,10 +512,12 @@ class ToolPipeline:
         self.deduplication_tracker = deduplication_tracker
         self.middleware_chain = middleware_chain
         self.semantic_cache = semantic_cache
+        self.search_router = search_router
 
         # Callbacks
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
+        self.on_tool_event = on_tool_event
 
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
@@ -659,6 +696,65 @@ class ToolPipeline:
                 logger.warning(f"Parameter validation failed for {tool_name}: {e}")
 
         return normalized_args, strategy
+
+    def _apply_search_routing(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any], bool]:
+        """Apply search router hints to search-tool calls when beneficial."""
+        if self.search_router is None:
+            return tool_name, arguments, False
+
+        if tool_name not in ("code_search", "semantic_code_search"):
+            return tool_name, arguments, False
+
+        if arguments.get("mode"):
+            return tool_name, arguments, False
+
+        query = arguments.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return tool_name, arguments, False
+
+        try:
+            route = self.search_router.route(query)
+        except Exception as exc:
+            logger.debug("Search router enrichment failed for %s: %s", tool_name, exc)
+            return tool_name, arguments, False
+
+        if not route.tool_name or not route.tool_arguments:
+            return tool_name, arguments, False
+
+        routed_tool_name = route.tool_name
+        if routed_tool_name == "graph" and routed_tool_name != tool_name:
+            routed_args = {
+                key: value for key, value in arguments.items() if key in GRAPH_TOOL_ARGUMENTS
+            }
+            routed_args.update(route.tool_arguments)
+        else:
+            routed_args = dict(route.tool_arguments)
+            routed_args.update(arguments)
+        changed = routed_tool_name != tool_name or routed_args != arguments
+
+        if changed:
+            logger.debug(
+                "Applied search route to %s query: tool=%s extra_args=%s",
+                tool_name,
+                routed_tool_name,
+                route.tool_arguments,
+            )
+
+        return routed_tool_name, routed_args, changed
+
+    def _normalize_tool_call(
+        self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
+    ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
+        """Normalize a full tool call, including search-routing adjustments."""
+        normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
+        normalized_tool_name, normalized_args, changed = self._apply_search_routing(
+            tool_name, normalized_args
+        )
+        if changed and strategy == NormalizationStrategy.DIRECT:
+            strategy = NormalizationStrategy.MANUAL_REPAIR
+        return normalized_tool_name, normalized_args, strategy
 
     def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
         """Generate signature for deduplication.
@@ -1175,21 +1271,22 @@ class ToolPipeline:
                 )
                 continue
 
+            raw_args = tc.get("arguments", {})
+            tool_name, normalized_args, _ = self._normalize_tool_call(
+                tool_name, raw_args, context=context
+            )
+
             if not self.tools.is_tool_enabled(tool_name):
                 skipped_results.append(
                     ToolCallResult(
                         tool_name=tool_name,
-                        arguments={},
+                        arguments=normalized_args,
                         success=False,
                         skipped=True,
                         skip_reason=f"Unknown or disabled tool: {tool_name}",
                     )
                 )
                 continue
-
-            # Normalize arguments
-            raw_args = tc.get("arguments", {})
-            normalized_args, _ = self._normalize_arguments(tool_name, raw_args)
 
             # Check for repeated failures
             if self.config.enable_failed_signature_tracking:
@@ -1310,10 +1407,14 @@ class ToolPipeline:
             )
 
         # Check if tool exists
+        tool_name, normalized_args, strategy = self._normalize_tool_call(
+            tool_name, raw_args, context=context
+        )
+
         if not self.tools.is_tool_enabled(tool_name):
             return ToolCallResult(
                 tool_name=tool_name,
-                arguments={},
+                arguments=normalized_args,
                 success=False,
                 skipped=True,
                 skip_reason=f"Unknown or disabled tool: {tool_name}",
@@ -1323,14 +1424,12 @@ class ToolPipeline:
         if self._calls_used >= self.config.tool_budget:
             return ToolCallResult(
                 tool_name=tool_name,
-                arguments={},
+                arguments=normalized_args,
                 success=False,
                 skipped=True,
                 skip_reason="Tool budget exhausted",
             )
 
-        # Normalize arguments
-        normalized_args, strategy = self._normalize_arguments(tool_name, raw_args)
         normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
 
         # Check idempotent cache for read-only tools
@@ -1511,13 +1610,28 @@ class ToolPipeline:
             except Exception as e:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
-        # Execute
+        # Execute with per-tool timeout
         start_time = time.monotonic()
-        exec_result = await self.executor.execute(
-            tool_name=tool_name,
-            arguments=normalized_args,
-            context=context,
-        )
+        try:
+            exec_result = await asyncio.wait_for(
+                self.executor.execute(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    context=context,
+                ),
+                timeout=self.config.per_tool_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"[Pipeline] Tool '{tool_name}' timed out after "
+                f"{self.config.per_tool_timeout_seconds}s"
+            )
+            exec_result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=f"Tool execution timed out after {self.config.per_tool_timeout_seconds}s",
+            )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
         # Update state
@@ -1537,6 +1651,57 @@ class ToolPipeline:
             code_validation_errors=code_validation_errors,
         )
 
+        # Attempt error recovery fallback on failure
+        if not exec_result.success and exec_result.error:
+            try:
+                from victor.agent.error_recovery import recover_from_error, RecoveryAction
+
+                recovery = recover_from_error(
+                    Exception(exec_result.error), tool_name, normalized_args
+                )
+                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
+                    fallback_name = recovery.fallback_tool
+                    if self.tools.is_tool_enabled(fallback_name):
+                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
+                        try:
+                            fb_result = await asyncio.wait_for(
+                                self.executor.execute(
+                                    tool_name=fallback_name,
+                                    arguments=normalized_args,
+                                    context=context,
+                                ),
+                                timeout=self.config.per_tool_timeout_seconds,
+                            )
+                        except asyncio.TimeoutError:
+                            fb_result = None
+                        if fb_result is not None and fb_result.success:
+                            call_result = ToolCallResult(
+                                tool_name=fallback_name,
+                                arguments=normalized_args,
+                                success=fb_result.success,
+                                result=fb_result.result,
+                                error=fb_result.error,
+                                execution_time_ms=((time.monotonic() - start_time) * 1000),
+                            )
+            except Exception as e:
+                logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
+
+        if self.on_tool_event:
+            try:
+                payload = {
+                    "tool_name": tool_name,
+                    "success": exec_result.success,
+                    "execution_time_ms": execution_time_ms,
+                    "arguments": normalized_args,
+                }
+                if exec_result.error:
+                    payload["error"] = exec_result.error
+                if exec_result.result is not None:
+                    payload["result"] = exec_result.result
+                self.on_tool_event("tool.raw_result", payload)
+            except Exception as e:
+                logger.debug(f"on_tool_event callback failed for raw result: {e}")
+
         # Process through middleware chain (after execution)
         if self.middleware_chain is not None:
             try:
@@ -1555,6 +1720,17 @@ class ToolPipeline:
                         code_corrected=call_result.code_corrected,
                         code_validation_errors=call_result.code_validation_errors,
                     )
+                    if self.on_tool_event:
+                        try:
+                            self.on_tool_event(
+                                "tool.middleware_adjusted",
+                                {
+                                    "tool_name": call_result.tool_name,
+                                    "description": "Result modified by middleware chain",
+                                },
+                            )
+                        except Exception as e:
+                            logger.debug(f"on_tool_event middleware notification failed: {e}")
             except (ValueError, TypeError, KeyError) as e:
                 logger.warning(f"Middleware chain process_after failed (data error): {e}")
             except AttributeError as e:
@@ -1622,6 +1798,19 @@ class ToolPipeline:
                 self.on_tool_complete(call_result)
             except Exception as e:
                 logger.warning(f"on_tool_complete callback failed: {e}")
+        elif self.on_tool_event:
+            # Emit a simple fallback event so UI can still react
+            try:
+                self.on_tool_event(
+                    "tool.complete",
+                    {
+                        "tool_name": call_result.tool_name,
+                        "success": call_result.success,
+                        "execution_time_ms": call_result.execution_time_ms,
+                    },
+                )
+            except Exception:
+                logger.debug("on_tool_event fallback emission failed", exc_info=True)
 
         return call_result
 

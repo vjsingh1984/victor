@@ -142,7 +142,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
                     line: position.line,
                     character: position.character,
                 },
-                context: this._getFileContext(document, position),
+                context: this._getFileContext(document),
                 max_tokens: 128,  // Keep completions concise
                 temperature: 0.0,  // Deterministic for inline suggestions
             };
@@ -210,7 +210,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         return document.getText(range);
     }
 
-    private _getFileContext(document: vscode.TextDocument, position: vscode.Position): string {
+    private _getFileContext(document: vscode.TextDocument): string {
         // Get imports and function signatures from the file
         const lines: string[] = [];
         const text = document.getText();
@@ -345,7 +345,6 @@ export class ContextManager {
         }
 
         const lines: string[] = ['// Workspace Context:'];
-        const rootPath = workspaceFolder.uri.fsPath;
         const rootName = workspaceFolder.name;
 
         lines.push(`// Project: ${rootName}`);
@@ -388,11 +387,6 @@ export class ContextManager {
                 '*',
                 '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/__pycache__/**}',
                 50
-            );
-            const dirs = await vscode.workspace.findFiles(
-                '*/',
-                '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/__pycache__/**}',
-                20
             );
 
             lines.push('\n// === Directory Structure ===');

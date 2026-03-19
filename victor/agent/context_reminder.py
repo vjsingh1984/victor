@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,6 +49,7 @@ class ReminderType(Enum):
     TASK_HINT = "task_hint"  # Task type guidance
     GROUNDING = "grounding"  # Grounding rules reminder
     PROGRESS = "progress"  # Progress tracking
+    COMPACTION = "compaction"  # Context was compacted — summary of lost content
     CUSTOM = "custom"  # User-defined reminders
 
 
@@ -95,6 +98,7 @@ class ContextState:
     task_hint: str = ""
     last_reminder_at: int = 0
     reminder_history: Dict[ReminderType, str] = field(default_factory=dict)
+    compaction_summary: str = ""  # Summary of compacted context, set after compaction
 
 
 class ContextReminderManager:
@@ -152,6 +156,11 @@ class ContextReminderManager:
             enabled=True,
             frequency=5,
             priority=40,
+        ),
+        ReminderType.COMPACTION: ReminderConfig(
+            enabled=True,
+            frequency=1,  # Always show after compaction
+            priority=95,  # High priority — agent needs to know what was lost
         ),
     }
 
@@ -295,6 +304,20 @@ class ContextReminderManager:
         """Format the grounding rules reminder."""
         return "[Ground responses in tool output only. Do not invent file paths or content.]"
 
+    def _format_compaction_reminder(self) -> str:
+        """Format the compaction context reminder.
+
+        Injected after context was compacted to inform the agent what context
+        was lost and what key information was preserved.
+        """
+        if not self.state.compaction_summary:
+            return ""
+        return (
+            f"[Context compacted: {self.state.compaction_summary}. "
+            "Earlier conversation details were summarized. "
+            "Use tools to re-read files if you need specific content.]"
+        )
+
     def get_reminder(self, reminder_type: ReminderType) -> Optional[str]:
         """Get a specific reminder if it should be injected.
 
@@ -318,6 +341,7 @@ class ContextReminderManager:
                 ReminderType.TASK_HINT: self._format_task_hint,
                 ReminderType.PROGRESS: self._format_progress_reminder,
                 ReminderType.GROUNDING: self._format_grounding_reminder,
+                ReminderType.COMPACTION: self._format_compaction_reminder,
             }
             formatter = formatters.get(reminder_type)
             content = formatter() if formatter else ""

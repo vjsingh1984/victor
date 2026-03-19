@@ -26,7 +26,16 @@ from unittest.mock import MagicMock, patch
 from typing import Dict, Any, Optional, List
 
 from victor.core.verticals.base import VerticalBase
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.agent.vertical_context import VerticalContext
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute and skip test when unavailable."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
 
 
 class MockVertical(VerticalBase):
@@ -279,13 +288,13 @@ class TestCodingVerticalHandlers:
 
     def test_coding_vertical_has_get_handlers(self):
         """Test CodingAssistant has get_handlers method."""
-        from victor.coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         assert hasattr(CodingAssistant, "get_handlers")
 
     def test_coding_vertical_get_handlers_returns_handlers(self):
         """Test CodingAssistant.get_handlers returns handlers."""
-        from victor.coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         result = CodingAssistant.get_handlers()
         assert isinstance(result, dict)

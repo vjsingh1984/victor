@@ -223,9 +223,16 @@ class CodingServiceProvider(ServiceProviderProtocol):
         ]
 
 
+def get_service_provider() -> CodingServiceProvider:
+    """Return the coding vertical's service provider instance."""
+
+    return CodingServiceProvider()
+
+
 __all__ = [
     "CodingServiceProvider",
     "CodingMiddlewareProtocol",
     "CodingSafetyProtocol",
     "CodingPromptProtocol",
+    "get_service_provider",
 ]

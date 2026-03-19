@@ -41,35 +41,23 @@ class TestContextualError:
 
     def test_error_with_operation(self):
         """Error with operation context."""
-        error = ContextualError(
-            message="Failed",
-            operation="Test Operation"
-        )
+        error = ContextualError(message="Failed", operation="Test Operation")
         assert "[Test Operation]" in str(error)
         assert "Failed" in str(error)
 
     def test_error_with_suggestion(self):
         """Error with suggestion."""
-        error = ContextualError(
-            message="Failed",
-            suggestion="Try again"
-        )
+        error = ContextualError(message="Failed", suggestion="Try again")
         assert "💡 Suggestion: Try again" in str(error)
 
     def test_error_with_error_code(self):
         """Error with error code."""
-        error = ContextualError(
-            message="Failed",
-            error_code="TEST_ERROR"
-        )
+        error = ContextualError(message="Failed", error_code="TEST_ERROR")
         assert "Error Code: TEST_ERROR" in str(error)
 
     def test_error_with_details(self):
         """Error with details."""
-        error = ContextualError(
-            message="Failed",
-            details={"key": "value"}
-        )
+        error = ContextualError(message="Failed", details={"key": "value"})
         assert "Details:" in str(error)
         assert "key: value" in str(error)
 
@@ -102,9 +90,7 @@ class TestToolExecutionError:
     def test_tool_error_with_basic_info(self):
         """Tool error with basic info."""
         error = ToolExecutionError(
-            tool_name="test_tool",
-            operation="execute",
-            error=Exception("Tool failed")
+            tool_name="test_tool", operation="execute", error=Exception("Tool failed")
         )
         error_str = str(error)
         assert "test_tool" in error_str
@@ -113,9 +99,7 @@ class TestToolExecutionError:
     def test_tool_error_with_custom_suggestion(self):
         """Tool error with custom suggestion."""
         error = ToolExecutionError(
-            tool_name="test_tool",
-            operation="execute",
-            suggestion="Check permissions"
+            tool_name="test_tool", operation="execute", suggestion="Check permissions"
         )
         assert "Check permissions" in str(error)
 
@@ -126,9 +110,7 @@ class TestFileOperationError:
     def test_file_read_error(self):
         """File read error."""
         error = FileOperationError(
-            operation="read",
-            path="/test/file.txt",
-            error=FileNotFoundError("Not found")
+            operation="read", path="/test/file.txt", error=FileNotFoundError("Not found")
         )
         error_str = str(error)
         assert "read" in error_str
@@ -137,9 +119,7 @@ class TestFileOperationError:
     def test_file_write_error(self):
         """File write error."""
         error = FileOperationError(
-            operation="write",
-            path="/test/file.txt",
-            error=PermissionError("Denied")
+            operation="write", path="/test/file.txt", error=PermissionError("Denied")
         )
         error_str = str(error)
         assert "write" in error_str
@@ -150,10 +130,7 @@ class TestConfigurationError:
 
     def test_config_error_with_field(self):
         """Configuration error with field."""
-        error = ConfigurationError(
-            message="Invalid configuration",
-            field="api_key"
-        )
+        error = ConfigurationError(message="Invalid configuration", field="api_key")
         error_str = str(error)
         assert "Invalid configuration" in error_str
         assert "api_key" in error_str
@@ -183,37 +160,28 @@ class TestHelperFunctions:
     def test_create_provider_error(self):
         """create_provider_error creates correct error type."""
         error = create_provider_error(
-            provider="anthropic",
-            operation="generate",
-            error=Exception("API Error")
+            provider="anthropic", operation="generate", error=Exception("API Error")
         )
         assert isinstance(error, ProviderConnectionError)
 
     def test_create_tool_error(self):
         """create_tool_error creates correct error type."""
         error = create_tool_error(
-            tool_name="test_tool",
-            operation="execute",
-            error=Exception("Failed")
+            tool_name="test_tool", operation="execute", error=Exception("Failed")
         )
         assert isinstance(error, ToolExecutionError)
 
     def test_create_file_error(self):
         """create_file_error creates correct error type."""
         error = create_file_error(
-            operation="read",
-            path="/test/file.txt",
-            error=FileNotFoundError()
+            operation="read", path="/test/file.txt", error=FileNotFoundError()
         )
         assert isinstance(error, FileOperationError)
 
     def test_wrap_error(self):
         """wrap_error wraps exception with context."""
         original = ValueError("Invalid value")
-        error = wrap_error(
-            error=original,
-            context="Parsing configuration"
-        )
+        error = wrap_error(error=original, context="Parsing configuration")
         assert isinstance(error, ContextualError)
         assert "Parsing configuration" in str(error)
 

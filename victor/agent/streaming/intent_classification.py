@@ -15,8 +15,9 @@
 """Intent classification handler for streaming chat.
 
 This module provides the IntentClassificationHandler class which encapsulates
-the intent classification and continuation action determination logic
-extracted from _stream_chat_impl (P0 SRP refactor).
+the intent classification and continuation action determination logic that
+previously lived inside ``ChatCoordinator._stream_chat_impl`` and is now
+orchestrated by ``StreamingChatPipeline``.
 
 The handler manages:
 - Content yielding when no tool calls

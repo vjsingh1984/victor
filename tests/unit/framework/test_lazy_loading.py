@@ -45,7 +45,7 @@ class TestLazyLoading:
         import victor.framework
 
         with pytest.raises(AttributeError, match="no attribute"):
-            getattr(victor.framework, "ThisDoesNotExist12345")
+            victor.framework.ThisDoesNotExist12345
 
     def test_dir_contains_core_names(self):
         """__dir__ should include core names."""

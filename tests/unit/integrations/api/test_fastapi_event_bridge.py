@@ -20,9 +20,11 @@ TDD tests for real-time event streaming to VS Code and other clients.
 import asyncio
 import json
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from victor.core.events import MessagingEvent
 
 
 class TestEventBridgeEventTypes:
@@ -140,8 +142,49 @@ class TestEventBridgeIntegration:
         assert hasattr(bridge, "_broadcaster")
 
 
+class TestEventBridgeConvenienceEmitters:
+    """Tests for direct helper emitters."""
+
+    def test_emit_tool_complete_includes_follow_up_suggestions(self):
+        """emit_tool_complete should preserve follow-up suggestion payloads."""
+        from victor.integrations.api.event_bridge import emit_tool_complete
+
+        broadcaster = MagicMock()
+
+        with patch(
+            "victor.integrations.api.event_bridge.EventBroadcaster",
+            return_value=broadcaster,
+        ):
+            emit_tool_complete(
+                "tool-123",
+                "done",
+                duration_ms=42,
+                follow_up_suggestions=[
+                    {
+                        "command": 'graph(mode="callers", node="parse_json", depth=1)',
+                        "description": "Show callers of parse_json.",
+                    }
+                ],
+            )
+
+        broadcaster.broadcast_sync.assert_called_once()
+        event = broadcaster.broadcast_sync.call_args.args[0]
+        assert event.data["tool_id"] == "tool-123"
+        assert event.data["follow_up_suggestions"] == [
+            {
+                "command": 'graph(mode="callers", node="parse_json", depth=1)',
+                "description": "Show callers of parse_json.",
+            }
+        ]
+
+
 class TestEventBusAdapterCompatibility:
-    """Compatibility tests for sync and async EventBus APIs."""
+    """Compatibility tests for sync and async EventBus APIs.
+
+    M1: Async subscribe is now the primary and only supported path.
+    Sync subscribe is no longer supported - use ObservabilityBus or other
+    async-compatible event bus.
+    """
 
     @pytest.mark.asyncio
     async def test_event_bus_adapter_supports_async_subscribe(self):
@@ -182,33 +225,44 @@ class TestEventBusAdapterCompatibility:
 
         assert all(handle.unsubscribed for handle in event_bus.handles)
 
-    def test_event_bus_adapter_supports_legacy_sync_subscribe(self):
-        """Adapter should keep working with legacy sync subscribe/unsubscribe API."""
+    @pytest.mark.asyncio
+    async def test_event_bus_adapter_rejects_sync_subscribe_m1(self):
+        """M1: Adapter should reject event buses with sync subscribe (not supported)."""
         from victor.integrations.api.event_bridge import EventBusAdapter
 
         class FakeSyncBus:
             def __init__(self):
                 self.subscribe_calls = []
-                self.unsubscribe_calls = []
 
             def subscribe(self, pattern, handler):
                 self.subscribe_calls.append((pattern, handler))
                 return None
 
-            def unsubscribe(self, pattern, handler):
-                self.unsubscribe_calls.append((pattern, handler))
-                return None
-
         event_bus = FakeSyncBus()
         adapter = EventBusAdapter()
 
-        adapter.connect(event_bus)
+        # The sync connect() should fail to schedule the operation
+        # and the async connect_async() should raise RuntimeError
+        with pytest.raises(RuntimeError, match="async subscribe"):
+            await adapter.connect_async(event_bus)
 
-        assert len(event_bus.subscribe_calls) == len(adapter.EVENT_MAPPING)
-        assert all(not asyncio.iscoroutinefunction(h) for _, h in event_bus.subscribe_calls)
+    def test_event_bus_adapter_preserves_correlation_id_in_bridge_payload(self):
+        """Bridge payloads should expose correlation_id for websocket clients."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
 
-        adapter.disconnect()
-        assert len(event_bus.unsubscribe_calls) == len(adapter.EVENT_MAPPING)
+        broadcaster = MagicMock()
+        adapter = EventBusAdapter(broadcaster=broadcaster)
+        event = MessagingEvent(
+            topic="tool.complete",
+            data={"tool_name": "graph", "success": True},
+            correlation_id="chat_req_456",
+        )
+
+        adapter._on_event(event)
+
+        broadcaster.broadcast_sync.assert_called_once()
+        bridge_event = broadcaster.broadcast_sync.call_args.args[0]
+        assert bridge_event.data["correlation_id"] == "chat_req_456"
 
 
 class TestEventBridgeReliability:
@@ -240,7 +294,9 @@ class TestEventBridgeReliability:
         bridge._broadcaster.add_client("event-loss-check", send_func)
 
         await wait_for(lambda: bridge._broadcaster._running)
-        await wait_for(lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING))
+        await wait_for(
+            lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING)
+        )
 
         total_events = 25
         for idx in range(total_events):
@@ -400,6 +456,366 @@ class TestEventBridgeFiltering:
 
         for type_name in expected_types:
             assert hasattr(BridgeEventType, type_name), f"Missing event type: {type_name}"
+
+    @pytest.mark.asyncio
+    async def test_broadcaster_filters_events_by_correlation_id(self):
+        """Clients with a correlation filter should only receive matching events."""
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBroadcaster,
+        )
+
+        broadcaster = EventBroadcaster()
+        broadcaster._clients.clear()
+
+        matching = AsyncMock()
+        general = AsyncMock()
+
+        broadcaster.add_client(
+            "filtered",
+            matching,
+            subscriptions={"tool.complete"},
+            correlation_id="chat_123",
+        )
+        broadcaster.add_client("general", general, subscriptions={"tool.complete"})
+
+        await broadcaster._send_to_clients(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_999"},
+            )
+        )
+
+        matching.assert_not_awaited()
+        general.assert_awaited_once()
+
+        await broadcaster._send_to_clients(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_123"},
+            )
+        )
+
+        assert matching.await_count == 1
+        assert general.await_count == 2
+        broadcaster._clients.clear()
+
+    @pytest.mark.asyncio
+    async def test_websocket_handler_subscribe_supports_categories_and_correlation_id(self):
+        """Subscribe messages should normalize categories and preserve correlation filters."""
+        from victor.integrations.api.event_bridge import WebSocketEventHandler
+
+        broadcaster = MagicMock()
+        handler = WebSocketEventHandler(broadcaster=broadcaster)
+
+        await handler._handle_message(
+            "client-1",
+            json.dumps(
+                {
+                    "type": "subscribe",
+                    "categories": ["tool.complete", "tool.error"],
+                    "correlation_id": "chat_abc",
+                }
+            ),
+        )
+
+        broadcaster.normalize_subscriptions.assert_called_once_with(["tool.complete", "tool.error"])
+        broadcaster.update_subscriptions.assert_called_once_with(
+            "client-1",
+            broadcaster.normalize_subscriptions.return_value,
+            correlation_id="chat_abc",
+        )
+
+    def test_broadcaster_recent_events_supports_same_filters(self):
+        """Recent-event snapshots should use the same category/correlation matching rules."""
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBroadcaster,
+        )
+
+        broadcaster = EventBroadcaster()
+        broadcaster._recent_events.clear()
+
+        broadcaster.broadcast_sync(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_COMPLETE,
+                data={"tool_name": "graph", "correlation_id": "chat_1"},
+            )
+        )
+        broadcaster.broadcast_sync(
+            BridgeEvent(
+                type=BridgeEventType.TOOL_ERROR,
+                data={"tool_name": "graph", "correlation_id": "chat_2"},
+            )
+        )
+
+        filtered = broadcaster.get_recent_events(
+            limit=5,
+            subscriptions={"tool.complete"},
+            correlation_id="chat_1",
+        )
+
+        assert len(filtered) == 1
+        assert filtered[0].type is BridgeEventType.TOOL_COMPLETE
+        assert filtered[0].data["correlation_id"] == "chat_1"
+        broadcaster._recent_events.clear()
+
+
+class TestEventBusAdapterAsyncPath:
+    """M1 Tests for async subscribe path in EventBusAdapter."""
+
+    @pytest.mark.asyncio
+    async def test_connect_async_with_async_event_bus(self):
+        """Test connect_async successfully subscribes to async event bus."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        adapter = EventBusAdapter()
+
+        await adapter.connect_async(bus)
+
+        # Verify subscriptions were created
+        assert len(adapter._subscriptions) > 0
+        assert len(adapter._subscription_handles) == len(adapter._subscriptions)
+
+    @pytest.mark.asyncio
+    async def test_connect_async_fails_without_subscribe_method(self):
+        """Test connect_async raises error when event bus has no subscribe method."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class InvalidBus:
+            pass
+
+        bus = InvalidBus()
+        adapter = EventBusAdapter()
+
+        with pytest.raises(RuntimeError, match="no subscribe\\(\\) method"):
+            await adapter.connect_async(bus)
+
+    @pytest.mark.asyncio
+    async def test_connect_async_fails_with_sync_subscribe(self):
+        """Test connect_async raises error when subscribe is not async."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class SyncBus:
+            def subscribe(self, pattern, handler):
+                return None
+
+        bus = SyncBus()
+        adapter = EventBusAdapter()
+
+        with pytest.raises(RuntimeError, match="async subscribe"):
+            await adapter.connect_async(bus)
+
+    @pytest.mark.asyncio
+    async def test_connect_async_handles_partial_subscription_failures(self):
+        """Test connect_async continues when some subscriptions fail."""
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        class FlakyAsyncBus:
+            def __init__(self):
+                self.call_count = 0
+
+            async def subscribe(self, pattern, handler):
+                self.call_count += 1
+                # Fail on first subscription
+                if self.call_count == 1:
+                    raise RuntimeError("First subscription failed")
+                # Return mock handle for others
+                from unittest.mock import Mock
+
+                handle = Mock()
+                handle.unsubscribe = AsyncMock()
+                return handle
+
+        bus = FlakyAsyncBus()
+        adapter = EventBusAdapter()
+
+        # Should not raise, should continue with other subscriptions
+        await adapter.connect_async(bus)
+
+        # Should have some subscriptions despite failures
+        assert len(adapter._subscription_handles) > 0
+
+    @pytest.mark.asyncio
+    async def test_disconnect_async_properly_unsubscribes(self):
+        """Test disconnect_async properly awaits all unsubscribe calls."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        adapter = EventBusAdapter()
+
+        await adapter.connect_async(bus)
+        initial_sub_count = len(adapter._subscription_handles)
+
+        await adapter.disconnect_async()
+
+        # All handles should be cleared
+        assert len(adapter._subscription_handles) == 0
+        assert len(adapter._subscriptions) == 0
+
+    @pytest.mark.asyncio
+    async def test_disconnect_async_handles_disconnect_during_subscribe(self):
+        """Test disconnect_async handles rapid connect/disconnect cycles."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        adapter = EventBusAdapter()
+
+        await adapter.connect_async(bus)
+        # Immediately disconnect
+        await adapter.disconnect_async()
+
+        # Should cleanly handle the rapid cycle
+        assert len(adapter._subscription_handles) == 0
+
+    @pytest.mark.asyncio
+    async def test_disconnect_async_idempotent(self):
+        """Test disconnect_async can be called multiple times safely."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        adapter = EventBusAdapter()
+
+        await adapter.connect_async(bus)
+        await adapter.disconnect_async()
+        # Second disconnect should be safe
+        await adapter.disconnect_async()
+
+        assert len(adapter._subscription_handles) == 0
+
+
+class TestEventBridgeAsyncPath:
+    """M1 Tests for async path in EventBridge."""
+
+    @pytest.mark.asyncio
+    async def test_async_start_stop_lifecycle(self):
+        """Test async_start and async_stop lifecycle."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+
+        await bridge.async_start()
+        assert bridge._running is True
+        assert len(bridge._adapter._subscription_handles) > 0
+
+        await bridge.async_stop()
+        assert bridge._running is False
+        assert len(bridge._adapter._subscription_handles) == 0
+
+    @pytest.mark.asyncio
+    async def test_async_start_idempotent(self):
+        """Test async_start can be called multiple times safely."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+
+        await bridge.async_start()
+        await bridge.async_start()  # Second call should be no-op
+
+        assert bridge._running is True
+
+        await bridge.async_stop()
+
+    @pytest.mark.asyncio
+    async def test_async_stop_idempotent(self):
+        """Test async_stop can be called multiple times safely."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+
+        await bridge.async_start()
+        await bridge.async_stop()
+        await bridge.async_stop()  # Second call should be no-op
+
+        assert bridge._running is False
+
+    @pytest.mark.asyncio
+    async def test_async_start_without_event_bus(self):
+        """Test async_start works without an event bus (broadcast only)."""
+        from victor.integrations.api.event_bridge import EventBridge
+
+        bridge = EventBridge(event_bus=None)
+
+        await bridge.async_start()
+        assert bridge._running is True
+
+        await bridge.async_stop()
+        assert bridge._running is False
+
+
+class TestEventBridgeAsyncBackwardCompatibility:
+    """M1 Tests for backward compatibility of sync methods."""
+
+    @pytest.mark.asyncio
+    async def test_sync_start_still_works(self):
+        """Test sync start() still works for backward compatibility."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+
+        # Sync start in async context should schedule the operation
+        bridge.start()
+        await asyncio.sleep(0.1)  # Let the scheduled operation complete
+
+        # May or may not be running depending on timing
+        # but should not raise an error
+        await bridge.async_stop()
+
+    @pytest.mark.asyncio
+    async def test_sync_stop_still_works(self):
+        """Test sync stop() still works for backward compatibility."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBridge
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        bridge = EventBridge(bus)
+
+        await bridge.async_start()
+
+        # Sync stop in async context should schedule the operation
+        bridge.stop()
+        await asyncio.sleep(0.1)  # Let the scheduled operation complete
+
+    @pytest.mark.asyncio
+    async def test_adapter_sync_connect_still_works(self):
+        """Test adapter sync connect() still works for backward compatibility."""
+        from victor.core.events import InMemoryEventBackend, ObservabilityBus
+        from victor.integrations.api.event_bridge import EventBusAdapter
+
+        backend = InMemoryEventBackend()
+        bus = ObservabilityBus(backend=backend)
+        adapter = EventBusAdapter()
+
+        # Sync connect in async context should schedule the operation
+        adapter.connect(bus)
+        await asyncio.sleep(0.1)  # Let the scheduled operation complete
+
+        # Clean up
+        await adapter.disconnect_async()
 
 
 if __name__ == "__main__":

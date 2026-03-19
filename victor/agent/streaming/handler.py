@@ -261,37 +261,17 @@ class StreamingChatHandler:
             elapsed = result.get("elapsed", 0.0)
             tool_args = result.get("args", {})
             success = result.get("success", False)
-
-            if success:
-                chunks.append(
-                    StreamChunk(
-                        content="",
-                        metadata={
-                            "tool_result": {
-                                "name": tool_name,
-                                "success": True,
-                                "elapsed": elapsed,
-                                "arguments": tool_args,
-                            }
-                        },
-                    )
+            error_msg = result.get("error", "failed") if not success else None
+            chunks.append(
+                self.generate_tool_result_chunk(
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                    elapsed=elapsed,
+                    success=success,
+                    error=error_msg,
+                    follow_up_suggestions=result.get("follow_up_suggestions"),
                 )
-            else:
-                error_msg = result.get("error", "failed")
-                chunks.append(
-                    StreamChunk(
-                        content="",
-                        metadata={
-                            "tool_result": {
-                                "name": tool_name,
-                                "success": False,
-                                "elapsed": elapsed,
-                                "arguments": tool_args,
-                                "error": error_msg,
-                            }
-                        },
-                    )
-                )
+            )
 
         # Add thinking status
         thinking_icon = self._presentation.icon("thinking", with_color=False)
@@ -817,6 +797,9 @@ class StreamingChatHandler:
                         maybe_prefix(
                             "The previous action did not complete. Use discovery tools:\n"
                             "- graph(mode='pagerank', top_k=5) to find important symbols\n"
+                            "- graph(mode='callers', node='symbol', depth=2) to find reverse call chains\n"
+                            "- graph(mode='callees', node='symbol', depth=2) to find forward call chains\n"
+                            "- graph(mode='trace', node='entry_function', depth=3) to trace execution flow\n"
                             "- search(query='...') for semantic code search\n"
                             "- overview(path='.') for project structure\n"
                             "Pick ONE tool to continue."
@@ -842,6 +825,9 @@ class StreamingChatHandler:
                     (
                         "The previous action did not complete. Use discovery tools:\n"
                         "- graph(mode='pagerank', top_k=5) - find important symbols\n"
+                        "- graph(mode='callers', node='symbol', depth=2) - find who calls a function\n"
+                        "- graph(mode='callees', node='symbol', depth=2) - find what a function calls\n"
+                        "- graph(mode='trace', node='entry_function', depth=3) - trace execution flow\n"
                         "- search(query='...') - semantic code search\n"
                         "- overview(path='.') - project structure\n"
                         "- refs(symbol_name='...') - find usages\n"
@@ -1030,6 +1016,7 @@ class StreamingChatHandler:
         elapsed: float,
         success: bool,
         error: Optional[str] = None,
+        follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
 
@@ -1053,6 +1040,8 @@ class StreamingChatHandler:
         }
         if not success and error:
             metadata["tool_result"]["error"] = error
+        if follow_up_suggestions:
+            metadata["tool_result"]["follow_up_suggestions"] = follow_up_suggestions
         return StreamChunk(content="", metadata=metadata)
 
     def generate_file_preview_chunk(
@@ -1146,10 +1135,18 @@ class StreamingChatHandler:
         tool_args = result.get("args", {})
         success = result.get("success", False)
         error = result.get("error") if not success else None
+        follow_up_suggestions = result.get("follow_up_suggestions")
 
         # Main tool result chunk
         chunks.append(
-            self.generate_tool_result_chunk(tool_name, tool_args, elapsed, success, error)
+            self.generate_tool_result_chunk(
+                tool_name,
+                tool_args,
+                elapsed,
+                success,
+                error,
+                follow_up_suggestions=follow_up_suggestions,
+            )
         )
 
         # Generate preview chunks for successful write/edit operations

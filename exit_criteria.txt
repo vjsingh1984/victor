@@ -1,0 +1,43 @@
+**Exit Criteria – Legal‑Mandated for Each Milestone (Moody’s Data Estate – Phase 2)**
+
+*The following bullets capture the concrete, contractual exit conditions that must be met before invoicing and milestone sign‑off. They are derived from the milestone descriptions in the SOW (lines 63‑107) and standard legal requirements for a professional‑services engagement.*
+
+| Milestone | Deliverable(s) | Legal‑Mandated Exit Criteria |
+|-----------|----------------|---|
+| **Milestone 1 – Project Kick‑off, Discovery & Project/Implementation Plan** (lines 63‑67) | • Signed project charter
+• Discovery report (scope, assumptions, constraints)
+• Detailed implementation plan (timeline, resource assignment) | 1. All deliverables are formally signed by a duly‑authorized representative of both parties.
+2. No material scope‑change requests outstanding.
+3. Project plan shows 100 % resource commitment and approved budget allocation. |
+| **Milestone 2 – Establish CI/CD and Deployment Automation** (lines 69‑76) | • Configured automated build, test, and deployment pipelines for Non‑Production environments.
+• Documentation of pipeline workflows and runbooks.
+• Successful end‑to‑end automated deployment of a test artifact. | 1. Automated pipelines demonstrate 100 % pass rate for all defined tests.
+2. Pipeline runbooks are approved and signed off.
+3. No unresolved critical defects in the CI/CD implementation. |
+| **Milestone 3 – Develop and Deploy Ingestion Pipelines** (lines 78‑83) | • .txt, .csv, and .pdf ingest patterns based on PoC logic.
+• Client‑specific pipelines assembled and deployed.
+• Test results for each file type and client. | 1. All ingest pipelines process the agreed‑upon 454 files without failure.
+2. Test coverage ≥ 90 % with no critical bugs.
+3. Customer acceptance sign‑off on the delivered pipelines. |
+| **Milestone 4 – Embed Validation and Decommission** (lines 85‑92) | • Validation logic embedded in pipelines.
+• End‑to‑end testing completed.
+• Legacy workflows decommissioned (if applicable). | 1. Validation passes all defined quality gates.
+2. Legacy workflows are fully retired and documented.
+3. No outstanding defects that would impede production use. |
+| **Milestone 5 – Configure Data Quality and Final Integration/Optimizations** (lines 94‑100) | • Production Kafka ingestion and CDS infrastructure configured.
+• Automated data‑quality checks and monitoring dashboards deployed.
+• Performance benchmarks met. | 1. Data‑quality metrics meet or exceed agreed KPIs.
+2. Monitoring alerts are operational and tested.
+3. Performance benchmarks meet contractual thresholds. |
+| **Milestone 6 – Execute Full‑Scale Data Processing & Final Documentation** (lines 101‑108) | • Full‑scale data processing run confirming system stability.
+• Operational documentation (runbooks, SOPs) finalized.
+• Final sign‑off from both parties. | 1. Full‑scale run completes without critical failures.
+2. Documentation is complete, reviewed, and signed off.
+3. No outstanding change‑order requests or defects above the defined severity level. |
+
+---
+
+### Paragraph Summary (Copy‑Paste Friendly)
+
+> **Exit Criteria Summary**
+> Each milestone shall be considered complete only when all deliverables listed in the SOW are delivered, tested, and formally signed off by authorized representatives of both Databricks and Moody’s Analytics. Legal‑mandated exit criteria include: (1) full documentation and sign‑off of deliverables, (2) successful completion of all specified tests with no critical defects, (3) compliance with all performance and data‑quality KPIs, (4) decommissioning or retirement of legacy workflows where required, and (5) final stakeholder acceptance. No invoice shall be issued until the corresponding milestone’s exit criteria are met and the milestone is approved in writing.

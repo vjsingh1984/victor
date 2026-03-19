@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +17,12 @@
 """Configuration management for CodingAgent."""
 
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
 
 import yaml
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
@@ -439,6 +442,389 @@ class ProfileConfig(BaseSettings):
         return v
 
 
+# =============================================================================
+# NESTED CONFIG GROUPS
+# =============================================================================
+# Focused Pydantic models that group related settings by domain.
+# Settings composes these and syncs flat field values into them,
+# enabling both flat access (settings.default_provider) and
+# structured access (settings.provider.default_provider).
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+
+class ProviderSettings(_BaseModel):
+    """Provider connection and model defaults."""
+
+    default_provider: str = "ollama"
+    default_model: str = "qwen3-coder:30b"
+    default_temperature: float = 0.7
+    default_max_tokens: int = 4096
+    anthropic_api_key: Optional[SecretStr] = None
+    openai_api_key: Optional[SecretStr] = None
+    google_api_key: Optional[SecretStr] = None
+    moonshot_api_key: Optional[SecretStr] = None
+    deepseek_api_key: Optional[SecretStr] = None
+    ollama_base_url: str = "http://localhost:11434"
+    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
+    vllm_base_url: str = "http://localhost:8000"
+    lmstudio_max_vram_gb: Optional[float] = 48.0
+
+    def __str__(self) -> str:
+        """Return provider name for string operations.
+
+        Enables backward compatibility with code that treats provider as a string.
+        Allows operations like str(provider), f"{provider}", etc.
+        """
+        return self.default_provider
+
+    # String-like methods for backward compatibility
+    def lower(self) -> str:
+        """Return lowercase provider name."""
+        return self.default_provider.lower()
+
+    def upper(self) -> str:
+        """Return uppercase provider name."""
+        return self.default_provider.upper()
+
+    def title(self) -> str:
+        """Return title-case provider name."""
+        return self.default_provider.title()
+
+    def startswith(self, prefix: str) -> bool:
+        """Check if provider name starts with prefix."""
+        return self.default_provider.startswith(prefix)
+
+    def endswith(self, suffix: str) -> bool:
+        """Check if provider name ends with suffix."""
+        return self.default_provider.endswith(suffix)
+
+    def replace(self, old: str, new: str) -> str:
+        """Replace substrings in provider name."""
+        return self.default_provider.replace(old, new)
+
+    def split(self, sep: str = None, maxsplit: int = -1):
+        """Split provider name."""
+        return self.default_provider.split(sep, maxsplit)
+
+    def strip(self) -> str:
+        """Strip whitespace from provider name."""
+        return self.default_provider.strip()
+
+    def __eq__(self, other: object) -> bool:
+        """Compare provider name with other (string or ProviderSettings)."""
+        if isinstance(other, str):
+            return self.default_provider == other
+        if isinstance(other, ProviderSettings):
+            return self.default_provider == other.default_provider
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash provider name for dict/set operations."""
+        return hash(self.default_provider)
+
+
+class ToolSettings(_BaseModel):
+    """Tool execution, selection, and retry configuration."""
+
+    tool_call_budget: int = Field(default_factory=lambda: BUDGET_LIMITS.max_session_budget)
+    tool_call_budget_warning_threshold: int = Field(
+        default_factory=lambda: int(
+            BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
+        )
+    )
+    tool_calling_models: Dict[str, list[str]] = Field(
+        default_factory=_load_tool_capable_patterns_from_yaml
+    )
+    tool_retry_enabled: bool = True
+    tool_retry_max_attempts: int = 3
+    tool_retry_base_delay: float = 1.0
+    tool_retry_max_delay: float = 10.0
+    fallback_max_tools: int = 8
+    enable_tool_deduplication: bool = True
+    tool_deduplication_window_size: int = 20
+    use_semantic_tool_selection: bool = True
+    embedding_provider: str = "sentence-transformers"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    tool_cache_enabled: bool = True
+    tool_cache_ttl: int = 600
+    tool_cache_allowlist: List[str] = Field(
+        default_factory=lambda: [
+            "code_search",
+            "semantic_code_search",
+            "list_directory",
+            "plan_files",
+        ]
+    )
+    generic_result_cache_enabled: bool = False
+    generic_result_cache_ttl: int = 300
+    tool_selection_cache_enabled: bool = True
+    tool_selection_cache_ttl: int = 300
+    tool_validation_mode: str = "lenient"
+
+
+class SearchSettings(_BaseModel):
+    """Codebase search and semantic configuration."""
+
+    unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    codebase_vector_store: str = "lancedb"
+    codebase_embedding_provider: str = "sentence-transformers"
+    codebase_embedding_model: str = "BAAI/bge-small-en-v1.5"
+    codebase_persist_directory: Optional[str] = None
+    codebase_dimension: int = 384
+    codebase_batch_size: int = 32
+    codebase_graph_store: str = "sqlite"
+    codebase_graph_path: Optional[str] = None
+    core_readonly_tools: Optional[List[str]] = None
+    semantic_similarity_threshold: float = 0.25
+    semantic_query_expansion_enabled: bool = True
+    semantic_max_query_expansions: int = 5
+    enable_hybrid_search: bool = False
+    hybrid_search_semantic_weight: float = 0.6
+    hybrid_search_keyword_weight: float = 0.4
+    enable_semantic_threshold_rl_learning: bool = False
+    semantic_threshold_overrides: dict = Field(default_factory=dict)
+
+
+class ResilienceSettings(_BaseModel):
+    """Circuit breaker, retry, rate limiting, and streaming metrics."""
+
+    resilience_enabled: bool = True
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_success_threshold: int = 2
+    circuit_breaker_timeout: float = 60.0
+    circuit_breaker_half_open_max: int = 3
+    retry_max_attempts: int = 3
+    retry_base_delay: float = 1.0
+    retry_max_delay: float = 60.0
+    retry_exponential_base: float = 2.0
+    rate_limiting_enabled: bool = True
+    rate_limit_requests_per_minute: int = 50
+    rate_limit_tokens_per_minute: int = 50000
+    rate_limit_max_concurrent: int = 5
+    rate_limit_queue_size: int = 100
+    rate_limit_num_workers: int = 3
+    streaming_metrics_enabled: bool = True
+    streaming_metrics_history_size: int = 1000
+
+
+class SecuritySettings(_BaseModel):
+    """Server security, sandboxing, and approval settings."""
+
+    airgapped_mode: bool = False
+    server_api_key: Optional[str] = None
+    server_session_secret: Optional[str] = None
+    server_max_sessions: int = 100
+    server_max_message_bytes: int = 32768
+    server_session_ttl_seconds: int = 86400
+    render_max_payload_bytes: int = 20000
+    render_timeout_seconds: int = 10
+    render_max_concurrency: int = 2
+    code_executor_network_disabled: bool = True
+    code_executor_memory_limit: Optional[str] = "512m"
+    code_executor_cpu_shares: Optional[int] = 256
+    write_approval_mode: str = "risky_only"
+    headless_mode: bool = False
+    dry_run_mode: bool = False
+    auto_approve_safe: bool = False
+    max_file_changes: Optional[int] = None
+    security_dependency_scan: bool = False
+    security_iac_scan: bool = False
+
+
+class EventSettings(_BaseModel):
+    """Event system backend and configuration."""
+
+    event_backend_type: str = "in_memory"
+    event_backend_lazy_init: bool = True
+    event_delivery_guarantee: str = "at_most_once"
+    event_max_batch_size: int = 100
+    event_flush_interval_ms: float = 1000.0
+    event_queue_maxsize: int = 10000
+    event_queue_overflow_policy: str = "drop_newest"
+    event_queue_overflow_block_timeout_ms: float = 50.0
+    event_queue_overflow_topic_policies: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": "block_with_timeout",
+            "vertical.applied": "block_with_timeout",
+            "error.*": "block_with_timeout",
+            "core.events.emit_sync.metrics": "drop_oldest",
+            "vertical.extensions.loader.metrics": "drop_oldest",
+        }
+    )
+    event_queue_overflow_topic_block_timeout_ms: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "lifecycle.session.*": 150.0,
+            "vertical.applied": 120.0,
+            "error.*": 200.0,
+        }
+    )
+    event_emit_sync_metrics_enabled: bool = False
+    event_emit_sync_metrics_interval_seconds: float = 60.0
+    event_emit_sync_metrics_reset_after_emit: bool = False
+    event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
+    extension_loader_warn_queue_threshold: int = 24
+    extension_loader_error_queue_threshold: int = 32
+    extension_loader_warn_in_flight_threshold: int = 6
+    extension_loader_error_in_flight_threshold: int = 8
+    extension_loader_pressure_cooldown_seconds: float = 5.0
+    extension_loader_emit_pressure_events: bool = False
+    extension_loader_metrics_reporter_enabled: bool = False
+    extension_loader_metrics_reporter_interval_seconds: float = 60.0
+    extension_loader_metrics_reporter_reset_after_emit: bool = False
+    extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
+
+
+class ObservabilitySettings(_BaseModel):
+    """Logging, observability, and analytics configuration."""
+
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
+    enable_observability_logging: bool = False
+    observability_log_path: Optional[str] = None
+    analytics_enabled: bool = True
+
+
+class ContextSettings(_BaseModel):
+    """Context window management and conversation memory."""
+
+    context_compaction_strategy: str = "tiered"
+    context_min_messages_to_keep: int = 6
+    context_tool_retention_weight: float = 1.5
+    context_recency_weight: float = 2.0
+    context_semantic_threshold: float = 0.3
+    max_context_tokens: int = 100000
+    response_token_reserve: int = 4096
+    conversation_memory_enabled: bool = True
+    conversation_embeddings_enabled: bool = True
+
+
+class CheckpointSettings(_BaseModel):
+    """State checkpointing for time-travel debugging."""
+
+    checkpoint_enabled: bool = True
+    checkpoint_auto_interval: int = 5
+    checkpoint_max_per_session: int = 50
+    checkpoint_compression_enabled: bool = True
+    checkpoint_compression_threshold: int = 1024
+
+
+class UISettings(_BaseModel):
+    """User interface display preferences."""
+
+    theme: str = "monokai"
+    show_token_count: bool = True
+    show_cost_metrics: bool = False
+    stream_responses: bool = True
+    use_emojis: bool = Field(
+        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
+    )
+
+
+class PipelineSettings(_BaseModel):
+    """Intelligent agent pipeline, quality scoring, and recovery."""
+
+    intelligent_pipeline_enabled: bool = True
+    intelligent_quality_scoring: bool = True
+    intelligent_mode_learning: bool = True
+    intelligent_prompt_optimization: bool = True
+    intelligent_grounding_verification: bool = True
+    intelligent_min_quality_threshold: float = 0.5
+    intelligent_grounding_threshold: float = 0.7
+    intelligent_exploration_rate: float = 0.3
+    intelligent_learning_rate: float = 0.1
+    intelligent_discount_factor: float = 0.9
+    serialization_enabled: bool = True
+    serialization_default_format: Optional[str] = None
+    serialization_min_savings_threshold: float = 0.15
+    serialization_include_format_hint: bool = True
+    serialization_min_rows_for_tabular: int = 3
+    serialization_debug_mode: bool = False
+    max_exploration_iterations: int = 200
+    max_exploration_iterations_action: int = 500
+    max_exploration_iterations_analysis: int = 1000
+    min_content_threshold: int = 50
+    max_research_iterations: int = 50
+    recovery_empty_response_threshold: int = 5
+    recovery_blocked_consecutive_threshold: int = 6
+    recovery_blocked_total_threshold: int = 9
+    max_continuation_prompts_analysis: int = 6
+    max_continuation_prompts_action: int = 5
+    max_continuation_prompts_default: int = 3
+    continuation_prompt_overrides: dict = Field(default_factory=dict)
+    enable_continuation_rl_learning: bool = False
+    session_idle_timeout: int = 180
+
+
+class FeatureFlagSettings(_BaseModel):
+    """Feature flags for gradual rollout of architecture components."""
+
+    use_new_chat_service: bool = False
+    use_new_tool_service: bool = False
+    use_new_context_service: bool = False
+    use_new_provider_service: bool = False
+    use_new_recovery_service: bool = False
+    use_new_session_service: bool = False
+    use_composition_over_inheritance: bool = False
+    use_strategy_based_tool_registration: bool = False
+    use_provider_pooling: bool = False
+
+
+class PromptEnrichmentSettings(_BaseModel):
+    """Prompt enrichment and optimization configuration."""
+
+    prompt_enrichment_enabled: bool = True
+    prompt_enrichment_max_tokens: int = 2000
+    prompt_enrichment_timeout_ms: float = 500.0
+    prompt_enrichment_cache_enabled: bool = True
+    prompt_enrichment_cache_ttl: int = 300
+    prompt_enrichment_strategies: List[str] = Field(
+        default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
+    )
+    prompt_enrichment_coding: bool = True
+    prompt_enrichment_research: bool = True
+    prompt_enrichment_devops: bool = True
+    prompt_enrichment_data_analysis: bool = True
+
+
+class HITLSettings(_BaseModel):
+    """Human-in-the-loop workflow interrupt configuration."""
+
+    hitl_default_timeout: float = 300.0
+    hitl_default_fallback: str = "abort"
+    hitl_auto_approve_low_risk: bool = False
+    hitl_keyboard_shortcuts_enabled: bool = True
+
+
+class PluginSettings(_BaseModel):
+    """Plugin system configuration."""
+
+    plugin_enabled: bool = True
+    plugin_packages: List[str] = Field(default_factory=list)
+    plugin_disabled: List[str] = Field(default_factory=list)
+    plugin_config: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+
+
+# Module-level mapping of group names to nested model classes
+_NESTED_GROUPS = {
+    "provider": ProviderSettings,
+    "tools": ToolSettings,
+    "search": SearchSettings,
+    "resilience": ResilienceSettings,
+    "security": SecuritySettings,
+    "events": EventSettings,
+    "pipeline": PipelineSettings,
+    "observability": ObservabilitySettings,
+    "context": ContextSettings,
+    "checkpoint": CheckpointSettings,
+    "ui": UISettings,
+    "feature_flags": FeatureFlagSettings,
+    "enrichment": PromptEnrichmentSettings,
+    "hitl": HITLSettings,
+    "plugins": PluginSettings,
+}
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -449,6 +835,78 @@ class Settings(BaseSettings):
         extra="allow",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _handle_legacy_field_names(cls, data: Any) -> Any:
+        """Handle legacy field names for backward compatibility.
+
+        Maps old field names to new field names:
+        - provider → default_provider
+        - model → default_model
+        - api_key → anthropic_api_key (default)
+
+        This allows tests and code to use the old field names while
+        internally using the new structured names.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # Handle legacy 'provider' field → 'default_provider'
+        if "provider" in data and "default_provider" not in data:
+            provider_value = data["provider"]
+            # Only map if it's a string (not already a ProviderSettings object)
+            if isinstance(provider_value, str):
+                data["default_provider"] = provider_value
+                # Remove the old field name to avoid validation errors
+                del data["provider"]
+
+        # Handle legacy 'model' field → 'default_model'
+        if "model" in data and "default_model" not in data:
+            model_value = data["model"]
+            if isinstance(model_value, str):
+                data["default_model"] = model_value
+                del data["model"]
+
+        # Handle legacy 'api_key' field → specific provider API keys
+        if "api_key" in data:
+            api_key_value = data["api_key"]
+            if isinstance(api_key_value, str):
+                # Try to determine which provider based on the default_provider
+                default_provider = data.get("default_provider", data.get("provider", "ollama"))
+                if default_provider in ["anthropic", "claude"]:
+                    data["anthropic_api_key"] = api_key_value
+                elif default_provider in ["openai", "gpt"]:
+                    data["openai_api_key"] = api_key_value
+                elif default_provider in ["google", "gemini"]:
+                    data["google_api_key"] = api_key_value
+                # Remove the generic api_key field
+                del data["api_key"]
+
+        return data
+
+    # Nested config groups (structured access to grouped settings).
+    # Auto-synced from flat fields by _sync_nested_groups validator.
+    # Use flat access (settings.default_provider) or
+    # nested access (settings.provider.default_provider).
+
+    # NOTE: For backward compatibility, these fields accept None during construction
+    # and are populated by the _sync_nested_groups validator from flat fields.
+    provider: Optional[ProviderSettings] = Field(default=None, exclude=True, repr=False)
+    tools: Optional[ToolSettings] = Field(default=None, exclude=True, repr=False)
+    search: Optional[SearchSettings] = Field(default=None, exclude=True, repr=False)
+    resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
+    security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
+    events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
+    pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
+    observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
+    context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)
+    checkpoint: Optional[CheckpointSettings] = Field(default=None, exclude=True, repr=False)
+    ui: Optional[UISettings] = Field(default=None, exclude=True, repr=False)
+    feature_flags: Optional[FeatureFlagSettings] = Field(default=None, exclude=True, repr=False)
+    enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
+    hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
+    plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
+
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
     default_model: str = "qwen3-coder:30b"
@@ -456,11 +914,11 @@ class Settings(BaseSettings):
     default_max_tokens: int = 4096
 
     # API Keys
-    anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    moonshot_api_key: Optional[str] = None  # Moonshot AI for Kimi K2 models
-    deepseek_api_key: Optional[str] = None  # DeepSeek for DeepSeek-V3 models
+    anthropic_api_key: Optional[SecretStr] = None
+    openai_api_key: Optional[SecretStr] = None
+    google_api_key: Optional[SecretStr] = None
+    moonshot_api_key: Optional[SecretStr] = None  # Moonshot AI for Kimi K2 models
+    deepseek_api_key: Optional[SecretStr] = None  # DeepSeek for DeepSeek-V3 models
 
     # Local server URLs
     # Can be overridden via environment variables:
@@ -551,6 +1009,7 @@ class Settings(BaseSettings):
 
     # Tool Selection Strategy
     use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
+    preload_embeddings: bool = False  # Defer embedding model load to first semantic query
     embedding_provider: str = (
         "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
     )
@@ -600,11 +1059,6 @@ class Settings(BaseSettings):
         default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
         description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var.",
     )
-
-    # Interaction Mode
-    # When True (one-shot mode), auto-continue when model asks for user input
-    # When False (interactive mode), return to user for choice
-    one_shot_mode: bool = False
 
     # MCP
     use_mcp_tools: bool = False
@@ -674,7 +1128,9 @@ class Settings(BaseSettings):
     http_connection_pool_total_timeout: int = 60  # seconds
 
     # Startup/runtime preloading coordinator for warm-path dependencies.
-    framework_preload_enabled: bool = True  # Enable preloading by default for 50-70% first-request latency reduction
+    framework_preload_enabled: bool = (
+        True  # Enable preloading by default for 50-70% first-request latency reduction
+    )
     framework_preload_parallel: bool = True
 
     # Strict mode for blocking private attribute fallbacks in framework integration.
@@ -743,6 +1199,43 @@ class Settings(BaseSettings):
     # - Slightly more complex debugging (state may be shared until mutation)
     # - First mutation incurs full deep copy cost
     stategraph_copy_on_write_enabled: bool = True
+
+    # ==========================================================================
+    # Feature Flags (SOLID Refactoring)
+    # ==========================================================================
+    # Feature flags for gradual rollout of new architecture components.
+    # These enable zero-downtime migration and instant rollback if issues arise.
+    #
+    # All flags default to False (disabled) for backward compatibility.
+    # Enable via environment variables: VICTOR_USE_NEW_CHAT_SERVICE=true
+    # Or via YAML config: ~/.victor/features.yaml
+    #
+    # Phase 3 - Service Implementation:
+    #   - Extract orchestrator logic into focused services (ChatService, ToolService, etc.)
+    #   - Each service can be independently enabled/disabled
+    #   - Services implement protocols for ISP compliance
+    #
+    # Phase 4 - Vertical Composition:
+    #   - Use composition over inheritance for vertical capabilities
+    #   - Enables OCP compliance (add capabilities without modifying base)
+    #
+    # Phase 5 - Tool Registration Strategy:
+    #   - Strategy pattern for extensible tool registration
+    #   - Enables OCP compliance (add tool types without modifying registry)
+
+    # Phase 3 - Service Implementation flags
+    use_new_chat_service: bool = False  # Use ChatService instead of orchestrator methods
+    use_new_tool_service: bool = False  # Use ToolService instead of orchestrator methods
+    use_new_context_service: bool = False  # Use ContextService for context management
+    use_new_provider_service: bool = False  # Use ProviderService for provider management
+    use_new_recovery_service: bool = False  # Use RecoveryService for error recovery
+    use_new_session_service: bool = False  # Use SessionService for session management
+
+    # Phase 4 - Vertical Composition flag
+    use_composition_over_inheritance: bool = False  # Use composition-based verticals
+
+    # Phase 5 - Tool Registration Strategy flag
+    use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
 
     # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
@@ -1003,24 +1496,6 @@ class Settings(BaseSettings):
     extension_loader_metrics_reporter_reset_after_emit: bool = False
     extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
 
-    # ==========================================================================
-    # Legacy EventBus Configuration (DEPRECATED - MIGRATED TO core/events)
-    # ==========================================================================
-    # Legacy configuration migrated to canonical event system above.
-    # These settings are kept for backward compatibility during migration.
-    # TODO: Remove in v0.3.0 once all components use core/events
-
-    # Legacy EventBus Backend Type (deprecated)
-    eventbus_backend: str = "memory"  # Mapped to event_backend_type
-
-    eventbus_queue_maxsize: int = 10000  # Not used in new system
-    eventbus_backpressure_strategy: str = "drop_oldest"  # Not used in new system
-    eventbus_sampling_enabled: bool = False  # Not used in new system
-    eventbus_sampling_default_rate: float = 1.0  # Not used in new system
-    eventbus_batching_enabled: bool = False  # Mapped to event_flush_interval_ms
-    eventbus_batch_size: int = 100  # Mapped to event_max_batch_size
-    eventbus_batch_flush_interval_ms: float = 1000.0  # Mapped to event_flush_interval_ms
-
     # Analytics
     analytics_enabled: bool = True
     # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
@@ -1093,6 +1568,48 @@ class Settings(BaseSettings):
                 raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
             normalized[pattern] = parsed_timeout
         return normalized
+
+    # Track whether flat-access deprecation warnings have been emitted
+    _flat_access_warned: bool = False
+
+    @model_validator(mode="after")
+    def _sync_nested_groups(self) -> "Settings":
+        """Sync flat field values into nested config groups.
+
+        Enables structured access via settings.provider.default_provider
+        alongside flat access via settings.default_provider.
+        Flat fields remain the source of truth for construction and env vars.
+
+        For backward compatibility, if a nested field is None or was passed
+        as a string (legacy behavior), it's populated from the corresponding
+        flat fields. A deprecation warning is emitted once to guide migration
+        to the nested access pattern (e.g. settings.provider.xxx).
+        """
+        has_nested_overlap = False
+        for group_name, model_cls in _NESTED_GROUPS.items():
+            # Get current value of the nested field
+            nested_obj = getattr(self, group_name)
+
+            # If nested field is None or needs to be synced, create it from flat fields
+            if nested_obj is None or not isinstance(nested_obj, model_cls):
+                data = {}
+                settings_fields = type(self).model_fields
+                for field_name in model_cls.model_fields:
+                    if field_name in settings_fields:
+                        data[field_name] = getattr(self, field_name)
+                        has_nested_overlap = True
+                object.__setattr__(self, group_name, model_cls(**data))
+
+        if has_nested_overlap and not self._flat_access_warned:
+            warnings.warn(
+                "Flat settings field access (e.g. settings.default_provider) is deprecated. "
+                "Use nested groups instead (e.g. settings.provider.default_provider). "
+                "Flat fields will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object.__setattr__(self, "_flat_access_warned", True)
+        return self
 
     @model_validator(mode="after")
     def validate_extension_loader_thresholds(self) -> "Settings":
@@ -1386,23 +1903,57 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load tool config: {e}")
             return {}
 
-    def get_provider_settings(self, provider: str) -> Dict[str, Any]:
+    def get_provider_settings(
+        self, provider: str, profile_overrides: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
-        Uses the ProviderConfigRegistry for OCP-compliant provider configuration.
-        Each provider has a dedicated strategy class that handles its specific
-        settings (API keys, base URLs, etc.).
+        This method now uses the new AccountManager for configuration while maintaining
+        backward compatibility with the old ProviderConfigRegistry.
+
+        Priority order:
+        1. AccountManager (config.yaml) - new unified configuration
+        2. ProviderConfigRegistry (profiles.yaml) - legacy configuration
+        3. Environment variables - CI/CD support
 
         Args:
             provider: Provider name (or alias like 'gemini' for 'google')
+            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig)
 
         Returns:
             Dictionary of provider settings
         """
+        # Try new AccountManager first
+        try:
+            from victor.config.accounts import get_account_manager
+            from victor.config.resolution import get_provider_resolver
+
+            account_manager = get_account_manager()
+            resolver = get_provider_resolver()
+
+            # Check if new config exists
+            if account_manager.config_path.exists():
+                # Use new unified configuration system
+                config = resolver.resolve_quick(
+                    provider=provider,
+                    model=self.default_model,
+                )
+                return config
+
+        except Exception as e:
+            # Fall back to old system if new system fails
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry"
+            )
+
+        # Fall back to old ProviderConfigRegistry for backward compatibility
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
-        return registry.get_settings(provider, self)
+        return registry.get_settings(provider, self, profile_overrides)
 
 
 def load_settings() -> Settings:

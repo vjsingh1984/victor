@@ -26,6 +26,15 @@ from victor.agent.session_manager_base import (
     InteractiveSessionHandler,
     OneshotSessionHandler,
 )
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute and skip test when unavailable."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+    return getattr(module, attr_name)
 
 
 class TestCLISessionInitialization:
@@ -92,7 +101,7 @@ class TestCLISessionInitialization:
     @pytest.mark.integration
     async def test_session_with_vertical_integration(self, session_config):
         """Test session with vertical integration."""
-        from victor.coding.assistant import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding.assistant", "CodingAssistant")
 
         session_config.vertical = "coding"
 

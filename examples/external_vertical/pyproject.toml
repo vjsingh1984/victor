@@ -22,7 +22,7 @@
 # Key concepts:
 # 1. Entry Points: Victor discovers verticals via "victor.verticals" entry points
 # 2. Package Structure: src/ layout for clean imports
-# 3. Dependencies: Minimal dependencies - only Victor is required
+# 3. Dependencies: victor-sdk for authoring, victor-ai as an optional runtime
 # =============================================================================
 
 [build-system]
@@ -31,8 +31,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-security"
-version = "0.1.0"
-description = "Security auditing and vulnerability analysis vertical for Victor AI"
+version = "0.2.0"
+description = "SDK-only security auditing and vulnerability analysis vertical for Victor"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
@@ -52,12 +52,15 @@ classifiers = [
 keywords = ["victor", "ai", "security", "vulnerability", "audit"]
 requires-python = ">=3.10"
 
-# Dependencies - Victor is the only required dependency
+# Dependencies - external authoring depends on victor-sdk only
 dependencies = [
-    "victor-ai>=0.3.0",  # Main Victor package
+    "victor-sdk>=1.0.0",
 ]
 
 [project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.3.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21.0",
@@ -87,10 +90,7 @@ Issues = "https://github.com/your-org/victor-security/issues"
 [project.entry-points."victor.verticals"]
 security = "victor_security:SecurityAssistant"
 
-# You can also register additional tools with the victor.tools entry point
-# [project.entry-points."victor.tools"]
-# security_scan = "victor_security.tools:SecurityScanTool"
-# dependency_audit = "victor_security.tools:DependencyAuditTool"
+# This example intentionally avoids runtime-owned tool or protocol entry points.
 
 [tool.setuptools]
 package-dir = {"" = "src"}

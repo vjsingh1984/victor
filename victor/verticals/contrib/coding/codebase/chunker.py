@@ -220,30 +220,51 @@ class CodeChunk:
         }
 
 
-class CodeChunker:
+from victor.core.chunking.base import (
+    Chunk as CoreChunk,
+    ChunkingConfig as CoreChunkingConfig,
+    ChunkingStrategy as CoreChunkingStrategy,
+)
+
+
+class CodeChunker(CoreChunkingStrategy):
     """Intelligent code chunker with AST-aware parsing.
 
     This chunker respects code boundaries (functions, classes) and creates
     hierarchical embeddings for accurate semantic search.
-
-    Example:
-        chunker = CodeChunker(config=ChunkConfig(strategy=ChunkingStrategy.BODY_AWARE))
-        chunks = chunker.chunk_file(Path("src/auth.py"), "src/auth.py")
-
-        # Result: List of CodeChunks with different types
-        # - FILE_SUMMARY: "File: auth.py - User authentication module..."
-        # - CLASS_SUMMARY: "Class UserAuth - Manages user sessions..."
-        # - METHOD_HEADER: "def login(username, password): Authenticate user..."
-        # - METHOD_BODY: "# Implementation chunk 1 of 3..."
     """
 
-    def __init__(self, config: Optional[ChunkConfig] = None):
-        """Initialize chunker with configuration.
+    def __init__(self, config: Optional[CoreChunkingConfig] = None):
+        """Initialize chunker with core configuration."""
+        super().__init__(config)
+        # Adapt core config to domain config
+        self.domain_config = ChunkConfig(
+            max_chunk_tokens=self.config.chunk_size // 4,  # Rough estimation
+            overlap_tokens=self.config.chunk_overlap // 4,
+        )
 
-        Args:
-            config: Chunking configuration (defaults to BODY_AWARE strategy)
-        """
-        self.config = config or ChunkConfig()
+    @property
+    def name(self) -> str:
+        return "ast_python"
+
+    @property
+    def supported_types(self) -> List[str]:
+        return ["python"]
+
+    def chunk(self, content: str) -> List[CoreChunk]:
+        """Implement core chunking interface."""
+        # Use existing logic but convert to core chunks
+        chunks = self.chunk_file(Path("virtual.py"), "virtual.py", content=content)
+        return [
+            CoreChunk(
+                content=c.content,
+                start_char=0,  # TODO: Calculate if needed
+                end_char=len(c.content),
+                chunk_type=c.chunk_type.value,
+                metadata=c.metadata,
+            )
+            for c in chunks
+        ]
 
     def chunk_file(
         self,

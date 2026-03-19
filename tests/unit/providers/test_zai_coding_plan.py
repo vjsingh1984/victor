@@ -23,7 +23,6 @@ from victor.providers.zai_provider import (
     ZAI_MODELS,
 )
 
-
 # ---------------------------------------------------------------------------
 # Z.AI Base URL constants
 # ---------------------------------------------------------------------------
@@ -58,9 +57,7 @@ class TestZAICodingPlan:
             api_key="test-key",
             coding_plan=True,
         )
-        assert str(provider.client.base_url).rstrip("/") == (
-            "https://api.z.ai/api/coding/paas/v4"
-        )
+        assert str(provider.client.base_url).rstrip("/") == ("https://api.z.ai/api/coding/paas/v4")
 
     def test_standard_default_base_url(self):
         provider = ZAIProvider(
@@ -122,7 +119,16 @@ class TestZAIConfigStrategy:
         providers = registry.list_providers()
         assert "zai" in providers
 
+    @pytest.mark.skip(
+        reason="zai-coding-plan provider removed - use model suffix 'glm-4.6:coding' instead"
+    )
     def test_zai_coding_plan_config_registered(self):
+        """Test ZAI coding plan config is registered.
+
+        NOTE: ZAICodingPlanConfig has been removed in favor of model suffix notation.
+        Use model="glm-4.6:coding" to specify the coding plan endpoint.
+        The ZAI provider now handles this automatically via model suffix parsing.
+        """
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
@@ -147,7 +153,14 @@ class TestZAIConfigStrategy:
         result = config.get_settings(settings, {})
         assert result["base_url"] == "https://api.z.ai/api/paas/v4/"
 
+    @pytest.mark.skip(
+        reason="ZAICodingPlanConfig removed - use model suffix 'glm-4.6:coding' instead"
+    )
     def test_zai_coding_plan_base_url(self):
+        """Test ZAI coding plan base URL."""
+        # NOTE: ZAICodingPlanConfig has been removed in favor of model suffix notation.
+        # Use model="glm-4.6:coding" to specify the coding plan endpoint.
+        # The ZAI provider now handles this automatically via model suffix parsing.
         from victor.config.provider_config_registry import ZAICodingPlanConfig
 
         config = ZAICodingPlanConfig()
@@ -178,6 +191,36 @@ class TestZAIModels:
     def test_free_flash_models(self):
         assert "glm-4.7-flash" in ZAI_MODELS
         assert "glm-4.6v-flash" in ZAI_MODELS
+
+
+# ---------------------------------------------------------------------------
+# Z.AI Model Suffix Notation for Coding Plan
+# ---------------------------------------------------------------------------
+
+
+class TestZAIModelSuffixNotation:
+    """Test model suffix notation for endpoint selection."""
+
+    def test_coding_suffix_sets_coding_endpoint(self):
+        """Test that :coding suffix sets the coding plan endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:coding")
+        assert "api.z.ai/api/coding/paas/v4" in str(provider.client.base_url)
+
+    def test_standard_suffix_or_no_suffix_uses_standard_endpoint(self):
+        """Test that :standard suffix or no suffix uses the standard endpoint."""
+        # No suffix - should use standard endpoint
+        provider = ZAIProvider(api_key="test-key")
+        assert "api.z.ai/api/paas/v4" in str(provider.client.base_url)
+
+    def test_china_suffix_sets_china_endpoint(self):
+        """Test that :china suffix sets the China endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:china")
+        assert "open.bigmodel.cn/api/paas/v4" in str(provider.client.base_url)
+
+    def test_anthropic_suffix_sets_anthropic_endpoint(self):
+        """Test that :anthropic suffix sets the Anthropic-compatible endpoint."""
+        provider = ZAIProvider(api_key="test-key", model="glm-4.6:anthropic")
+        assert "api.z.ai/api/anthropic/v1" in str(provider.client.base_url)
 
 
 # ---------------------------------------------------------------------------
@@ -323,9 +366,7 @@ class TestZAIParseStreamChunk:
         assert result is None
 
     def test_content_chunk(self, provider):
-        data = {
-            "choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]
-        }
+        data = {"choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]}
         result = provider._parse_stream_chunk(data, [])
         assert result is not None
         assert result.content == "Hello"
@@ -384,9 +425,7 @@ class TestZAIParseStreamChunk:
         assert accumulated[0]["arguments"] == '{"x": 1}'
 
         # Final chunk: tool_calls finish
-        data3 = {
-            "choices": [{"delta": {}, "finish_reason": "tool_calls"}]
-        }
+        data3 = {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}
         result3 = provider._parse_stream_chunk(data3, accumulated)
         assert result3.tool_calls is not None
         assert result3.tool_calls[0]["name"] == "calc"
@@ -424,9 +463,7 @@ class TestZAIListModels:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"id": "glm-4.7"}, {"id": "glm-5"}]
-        }
+        mock_response.json.return_value = {"data": [{"id": "glm-4.7"}, {"id": "glm-5"}]}
         mock_response.raise_for_status = MagicMock()
 
         provider.client.get = AsyncMock(return_value=mock_response)

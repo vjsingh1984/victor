@@ -414,14 +414,18 @@ class ToolExecutor:
                 f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
             )
             self._validation_failures += 1
-            logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
             if self.validation_mode == ValidationMode.STRICT:
+                logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
                 return False, ToolValidationResult.failure([error_msg])
             else:
                 # Strip unknown arguments so the tool function doesn't crash
                 for arg in unknown_args:
                     arguments.pop(arg, None)
-                logger.warning("Stripped unknown arguments %s (lenient mode)", sorted(unknown_args))
+                logger.debug(
+                    "Stripped unknown arguments for '%s': %s (lenient mode)",
+                    tool.name,
+                    sorted(unknown_args),
+                )
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
@@ -834,7 +838,8 @@ class ToolExecutor:
                 # Run before hooks - critical hooks can block execution
                 self._run_before_hooks(tool.name, arguments)
 
-                # Execute the tool
+                # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
+                arguments.pop("_exec_ctx", None)
                 result = await tool.execute(_exec_ctx=context, **arguments)
 
                 # Run after hooks - critical hooks can raise errors

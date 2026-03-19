@@ -44,7 +44,7 @@ class TestReplicateProviderInitialization:
             with patch.object(
                 UnifiedApiKeyResolver,
                 "get_api_key",
-                return_value=MagicMock(key=None, sources_attempted=[], non_interactive=True)
+                return_value=MagicMock(key=None, sources_attempted=[], non_interactive=True),
             ):
                 with pytest.raises(APIKeyNotFoundError) as exc_info:
                     ReplicateProvider()

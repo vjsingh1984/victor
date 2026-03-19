@@ -123,13 +123,13 @@ class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
     complexity mapping.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, default_mode: str = "default") -> None:
         """Initialize coding mode provider."""
         # Ensure registration (idempotent - handles singleton reset)
         _register_coding_modes()
         super().__init__(
             vertical="coding",
-            default_mode="default",
+            default_mode=default_mode,
             default_budget=10,
         )
 

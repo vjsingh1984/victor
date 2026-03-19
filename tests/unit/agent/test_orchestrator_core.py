@@ -716,15 +716,19 @@ class TestFromSettings:
         mock_provider.supports_tools.return_value = True
         mock_provider.get_context_window.return_value = 100000
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
-            mock_registry.create.return_value = mock_provider
-            with patch("victor.agent.orchestrator.UsageLogger"):
-                orch = await AgentOrchestrator.from_settings(
-                    settings=orchestrator_settings, profile_name="default"
-                )
+        with (
+            patch("victor.providers.registry.ProviderRegistry.create") as mock_create,
+            patch("victor.agent.tool_calling.capabilities.ModelCapabilityLoader") as mock_caps,
+            patch("victor.agent.orchestrator.UsageLogger"),
+        ):
+            mock_create.return_value = mock_provider
+            mock_caps.return_value.get_capabilities.return_value = None
+            orch = await AgentOrchestrator.from_settings(
+                settings=orchestrator_settings, profile_name="default"
+            )
 
-                assert orch is not None
-                assert orch.model == "test-model"
+            assert orch is not None
+            assert orch.model == "test-model"
 
 
 class TestToolPlanning:
@@ -1442,7 +1446,7 @@ class TestCallbacks:
         # Should not raise
 
     def test_send_rl_reward_signal(self, orchestrator):
-        """_send_rl_reward_signal handles reward signal gracefully."""
+        """RL reward signal via callback coordinator handles reward gracefully."""
         from victor.agent.streaming_controller import StreamingSession
         import time
 
@@ -1454,7 +1458,7 @@ class TestCallbacks:
         )
         session.end_time = time.time()
         # Should not raise, even if RL module not available
-        orchestrator._send_rl_reward_signal(session)
+        orchestrator._callback_coordinator._send_rl_reward_signal(session)
 
 
 class TestContextLimitCalculation:
@@ -4441,7 +4445,7 @@ class TestStreamingHandlerProperty:
 
 
 class TestCheckProgressWithHandler:
-    """Tests for progress checking (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for progress checking (now owned by StreamingChatPipeline).
 
     The _check_progress_with_handler method was removed from the orchestrator.
     Progress checking is now handled via the recovery coordinator directly.
@@ -4471,7 +4475,7 @@ class TestCheckProgressWithHandler:
 
 
 class TestHandleForceCompletionWithHandler:
-    """Tests for force completion (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for force completion (now driven by StreamingChatPipeline).
 
     The _handle_force_completion_with_handler method was removed from the orchestrator.
     Force completion is now handled via the unified_tracker and streaming context.

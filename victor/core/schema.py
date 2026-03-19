@@ -143,6 +143,15 @@ class Tables:
     AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot"  # Policy state snapshots
 
     # ===========================================
+    # VERTICAL DOMAIN (vertical_) - Project-level tables
+    # ===========================================
+
+    # Vertical state externalization (Phase 4.3)
+    VERTICAL_STATE = "vertical_state"  # Vertical context persistence
+    VERTICAL_NEGOTIATION = "vertical_negotiation"  # Capability negotiation results
+    VERTICAL_SESSION = "vertical_session"  # Vertical session tracking
+
+    # ===========================================
     # GRAPH DOMAIN (graph_) - Project-level tables
     # ===========================================
 
@@ -685,6 +694,80 @@ class Schema:
             ON messages(session_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_context_sizes_session
             ON context_sizes(session_id);
+    """
+
+    # ===========================================
+    # VERTICAL STATE TABLES (project-level) - Phase 4.3
+    # ===========================================
+
+    VERTICAL_STATE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.VERTICAL_STATE} (
+            id TEXT PRIMARY KEY,
+            vertical_name TEXT NOT NULL,
+            vertical_version TEXT,
+            project_path TEXT,
+            session_id TEXT,
+            state_data TEXT NOT NULL,
+            config_json TEXT,
+            stages_json TEXT,
+            middleware_json TEXT,
+            safety_patterns_json TEXT,
+            enabled_tools_json TEXT,
+            mode_configs_json TEXT,
+            negotiation_results_json TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    VERTICAL_NEGOTIATION = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.VERTICAL_NEGOTIATION} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vertical_state_id TEXT NOT NULL,
+            capability_name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            agreed_version TEXT,
+            supported_features TEXT,
+            unsupported_features TEXT,
+            missing_required_features TEXT,
+            fallback_version TEXT,
+            error_message TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (vertical_state_id) REFERENCES {Tables.VERTICAL_STATE}(id)
+        )
+    """
+
+    VERTICAL_SESSION = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.VERTICAL_SESSION} (
+            id TEXT PRIMARY KEY,
+            vertical_name TEXT NOT NULL,
+            session_type TEXT NOT NULL,
+            orchestrator_id TEXT,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            status TEXT DEFAULT 'active',
+            metadata TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    VERTICAL_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_vertical_state_name
+            ON {Tables.VERTICAL_STATE}(vertical_name);
+        CREATE INDEX IF NOT EXISTS idx_vertical_state_session
+            ON {Tables.VERTICAL_STATE}(session_id);
+        CREATE INDEX IF NOT EXISTS idx_vertical_state_project
+            ON {Tables.VERTICAL_STATE}(project_path);
+        CREATE INDEX IF NOT EXISTS idx_vertical_state_updated
+            ON {Tables.VERTICAL_STATE}(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_vertical_negotiation_state
+            ON {Tables.VERTICAL_NEGOTIATION}(vertical_state_id);
+        CREATE INDEX IF NOT EXISTS idx_vertical_negotiation_capability
+            ON {Tables.VERTICAL_NEGOTIATION}(capability_name);
+        CREATE INDEX IF NOT EXISTS idx_vertical_session_name
+            ON {Tables.VERTICAL_SESSION}(vertical_name);
+        CREATE INDEX IF NOT EXISTS idx_vertical_session_status
+            ON {Tables.VERTICAL_SESSION}(status);
     """
 
     # ===========================================

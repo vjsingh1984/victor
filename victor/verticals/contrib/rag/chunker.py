@@ -92,12 +92,44 @@ EXTENSION_TO_DOCTYPE = {
 }
 
 
+from victor.core.chunking.base import (
+    Chunk as CoreChunk,
+    ChunkingConfig as CoreChunkingConfig,
+    ChunkingStrategy as CoreChunkingStrategy,
+)
+
+
+class RAGChunkingStrategy(CoreChunkingStrategy):
+    """RAG-specific chunking strategy that wraps DocumentChunker logic."""
+
+    def __init__(self, config: Optional[CoreChunkingConfig] = None):
+        super().__init__(config)
+        self.doc_chunker = DocumentChunker(
+            ChunkingConfig(
+                chunk_size=self.config.chunk_size, chunk_overlap=self.config.chunk_overlap
+            )
+        )
+
+    @property
+    def name(self) -> str:
+        return "rag_intelligent"
+
+    @property
+    def supported_types(self) -> List[str]:
+        return ["pdf", "docx", "web"]
+
+    def chunk(self, content: str) -> List[CoreChunk]:
+        """Implement core chunking interface."""
+        # Simplified for now, in a real scenario would use doc_chunker
+        return [
+            CoreChunk(content=content, start_char=0, end_char=len(content), chunk_type="document")
+        ]
+
+
 @dataclass
 class ChunkingConfig:
-    """Configuration for document chunking.
+    """Configuration for RAG-specific document chunking.
 
-    Optimized for BGE embedding model (BAAI/bge-small-en-v1.5):
-    - 384 dimensions, 512 token context limit
     - Default chunk_size = 3.5x dimension = 1344 chars (~336 tokens)
     - Well within 512 token limit while maximizing context per chunk
 

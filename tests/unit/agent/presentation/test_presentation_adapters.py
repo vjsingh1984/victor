@@ -134,13 +134,13 @@ class TestEmojiPresentationAdapter:
         formatted = adapter.format_tool_name("read_file")
         assert "[cyan]read_file[/]" == formatted
 
-    @patch("victor.agent.presentation.emoji_adapter.is_emoji_enabled")
+    @patch("victor.ui.emoji.is_emoji_enabled")
     def test_emojis_enabled_true(self, mock_enabled, adapter):
         """emojis_enabled should return True when setting is True."""
         mock_enabled.return_value = True
         assert adapter.emojis_enabled is True
 
-    @patch("victor.agent.presentation.emoji_adapter.is_emoji_enabled")
+    @patch("victor.ui.emoji.is_emoji_enabled")
     def test_emojis_enabled_false(self, mock_enabled, adapter):
         """emojis_enabled should return False when setting is False."""
         mock_enabled.return_value = False
@@ -300,3 +300,38 @@ class TestAllIconNames:
         """NullPresentationAdapter should support all standard icons."""
         icon = null_adapter.icon(icon_name)
         assert icon  # Not empty
+
+
+class TestEmojiAdapterLazyImport:
+    """Test that EmojiPresentationAdapter uses lazy imports and is resilient."""
+
+    def test_adapter_can_be_instantiated(self):
+        """EmojiPresentationAdapter can be instantiated without triggering imports."""
+        from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
+
+        adapter = EmojiPresentationAdapter()
+        assert adapter is not None
+
+    def test_adapter_methods_work_when_emoji_available(self):
+        """Methods work correctly when victor.ui.emoji is available."""
+        from victor.agent.presentation.emoji_adapter import EmojiPresentationAdapter
+
+        adapter = EmojiPresentationAdapter()
+        icon = adapter.icon("success")
+        assert icon
+        enabled = adapter.emojis_enabled
+        assert isinstance(enabled, bool)
+
+    def test_module_getattr_provides_class(self):
+        """Module __getattr__ provides EmojiPresentationAdapter lazily."""
+        import victor.agent.presentation as mod
+
+        cls = mod.EmojiPresentationAdapter
+        assert cls.__name__ == "EmojiPresentationAdapter"
+
+    def test_module_getattr_raises_for_unknown(self):
+        """Module __getattr__ raises AttributeError for unknown names."""
+        import victor.agent.presentation as mod
+
+        with pytest.raises(AttributeError, match="has no attribute"):
+            _ = mod.NonExistentClass
