@@ -26,7 +26,6 @@ from typing import Any, Dict, Optional, Type
 import typer
 from victor_sdk import PluginContext
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -68,7 +67,9 @@ class HostPluginContext(PluginContext):
 
         try:
             VerticalRegistry.register(vertical_class)
-            logger.debug(f"Plugin registered vertical: {getattr(vertical_class, 'name', vertical_class)}")
+            logger.debug(
+                f"Plugin registered vertical: {getattr(vertical_class, 'name', vertical_class)}"
+            )
         except Exception as e:
             logger.error(f"Plugin failed to register vertical: {e}")
 
@@ -79,7 +80,9 @@ class HostPluginContext(PluginContext):
         try:
             registry = get_chunking_registry()
             registry.register(chunker_instance)
-            logger.debug(f"Plugin registered chunker: {getattr(chunker_instance, 'name', chunker_instance)}")
+            logger.debug(
+                f"Plugin registered chunker: {getattr(chunker_instance, 'name', chunker_instance)}"
+            )
         except Exception as e:
             logger.error(f"Plugin failed to register chunker: {e}")
 
@@ -92,6 +95,7 @@ class HostPluginContext(PluginContext):
         """Retrieve a service from the container."""
         if not self._container:
             from victor.core.container import get_container
+
             self._container = get_container()
 
         try:
@@ -105,6 +109,7 @@ class HostPluginContext(PluginContext):
 
         if not self._container:
             from victor.core.container import get_container
+
             self._container = get_container()
 
         try:
