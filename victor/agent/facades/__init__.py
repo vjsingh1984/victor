@@ -24,9 +24,21 @@ cross-domain coordination.
 """
 
 from victor.agent.facades.chat_facade import ChatFacade
+from victor.agent.facades.metrics_facade import MetricsFacade
+from victor.agent.facades.orchestration_facade import OrchestrationFacade
+from victor.agent.facades.provider_facade import ProviderFacade
+from victor.agent.facades.resilience_facade import ResilienceFacade
+from victor.agent.facades.session_facade import SessionFacade
 from victor.agent.facades.tool_facade import ToolFacade
+from victor.agent.facades.workflow_facade import WorkflowFacade
 
 __all__ = [
     "ChatFacade",
+    "MetricsFacade",
+    "OrchestrationFacade",
+    "ProviderFacade",
+    "ResilienceFacade",
+    "SessionFacade",
     "ToolFacade",
+    "WorkflowFacade",
 ]

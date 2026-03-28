@@ -402,6 +402,52 @@ class TestYAMLToStateGraphCompiler:
 
         assert compiler.config.max_iterations == 100
 
+    def test_compile_uses_shared_native_backend(self, monkeypatch):
+        """Compile should route through the shared native workflow backend."""
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        checkpointer = MemoryCheckpointer()
+        config = CompilerConfig(
+            max_iterations=77,
+            timeout=33.0,
+            checkpointer=checkpointer,
+            interrupt_on_hitl=False,
+        )
+        captured: Dict[str, Any] = {}
+
+        class FakeNativeWorkflowGraphCompiler:
+            def __init__(
+                self,
+                node_executor_factory,
+                *,
+                checkpointer_factory=None,
+                enable_checkpointing=True,
+                interrupt_on_hitl=True,
+            ):
+                captured["node_executor_factory"] = node_executor_factory
+                captured["checkpointer_factory"] = checkpointer_factory
+                captured["enable_checkpointing"] = enable_checkpointing
+                captured["interrupt_on_hitl"] = interrupt_on_hitl
+
+            def compile(self, parsed):
+                captured["parsed"] = parsed
+                return "compiled"
+
+        monkeypatch.setattr(
+            "victor.workflows.yaml_to_graph_compiler.NativeWorkflowGraphCompiler",
+            FakeNativeWorkflowGraphCompiler,
+        )
+
+        compiler = YAMLToStateGraphCompiler(config=config)
+        compiled = compiler.compile(workflow)
+
+        assert compiled == "compiled"
+        assert captured["enable_checkpointing"] is True
+        assert captured["interrupt_on_hitl"] is False
+        assert captured["checkpointer_factory"]() is checkpointer
+        assert captured["parsed"].workflow.name == "test"
+        assert captured["parsed"].workflow.max_iterations == 77
+        assert captured["parsed"].workflow.max_execution_timeout_seconds == 33.0
+
     def test_compile_simple_workflow(self):
         """Test compiling a simple linear workflow."""
         workflow = (

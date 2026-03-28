@@ -48,35 +48,31 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
-import copy
 import logging
-import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
     Dict,
-    List,
     Optional,
-    Set,
 )
 
 from victor.framework.graph import (
-    END,
     CheckpointerProtocol,
     CompiledGraph,
     GraphExecutionResult,
     MemoryCheckpointer,
-    StateGraph,
+)
+from victor.workflows.compiler.boundary import (
+    NativeWorkflowGraphCompiler,
+    ParsedWorkflowDefinition,
+    WorkflowCompilationRequest,
 )
 from victor.workflows.definition import (
     ConditionNode,
-    ParallelNode,
     WorkflowDefinition,
-    WorkflowNodeType,
 )
 from victor.workflows.executors.factory import NodeExecutorFactory as UnifiedNodeExecutorFactory
 from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
@@ -308,6 +304,41 @@ class YAMLToStateGraphCompiler:
         except Exception:
             return None
 
+    def _apply_compile_config(
+        self,
+        workflow: WorkflowDefinition,
+        config: CompilerConfig,
+    ) -> WorkflowDefinition:
+        """Overlay compiler config onto the workflow definition for compilation."""
+        return replace(
+            workflow,
+            max_iterations=config.max_iterations,
+            max_execution_timeout_seconds=config.timeout,
+        )
+
+    def _build_checkpointer_factory(
+        self,
+        config: CompilerConfig,
+    ) -> Callable[[], Optional[CheckpointerProtocol]]:
+        """Create a checkpointer factory matching the legacy compiler config."""
+
+        def create_checkpointer() -> Optional[CheckpointerProtocol]:
+            return config.checkpointer or MemoryCheckpointer()
+
+        return create_checkpointer
+
+    def _create_native_graph_compiler(
+        self,
+        config: CompilerConfig,
+    ) -> NativeWorkflowGraphCompiler:
+        """Create the shared native workflow compiler backend."""
+        return NativeWorkflowGraphCompiler(
+            node_executor_factory=self._executor_factory,
+            checkpointer_factory=self._build_checkpointer_factory(config),
+            enable_checkpointing=config.enable_checkpointing,
+            interrupt_on_hitl=config.interrupt_on_hitl,
+        )
+
     def compile(
         self,
         workflow: WorkflowDefinition,
@@ -333,185 +364,20 @@ class YAMLToStateGraphCompiler:
             raise ValueError(f"Invalid workflow: {'; '.join(errors)}")
 
         logger.info(f"Compiling workflow '{workflow.name}' to StateGraph")
-
-        # Create StateGraph with WorkflowState schema
-        graph = StateGraph(WorkflowState)
-
-        # Track nodes and edges
-        nodes_added: Set[str] = set()
-        condition_nodes: Dict[str, ConditionNode] = {}
-        parallel_nodes: Dict[str, ParallelNode] = {}
-
-        # First pass: categorize nodes and find parallel children
-        parallel_children: Set[str] = set()
-        for node_id, node in workflow.nodes.items():
-            if isinstance(node, ConditionNode):
-                condition_nodes[node_id] = node
-            elif isinstance(node, ParallelNode):
-                parallel_nodes[node_id] = node
-                # Mark child nodes - they'll be executed inside the parallel executor
-                parallel_children.update(node.parallel_nodes)
-
-        # Second pass: add execution nodes (skip parallel children)
-        for node_id, node in workflow.nodes.items():
-            # Skip nodes that are children of a parallel node
-            if node_id in parallel_children:
-                continue
-
-            if isinstance(node, ConditionNode):
-                # Condition nodes are handled as passthrough + conditional edge
-                executor = self._executor_factory.create_executor(node)
-                graph.add_node(node_id, executor)
-                nodes_added.add(node_id)
-            elif isinstance(node, ParallelNode):
-                # Parallel nodes need special handling
-                self._add_parallel_node_group(graph, node, workflow, nodes_added)
-            else:
-                # Regular execution node
-                executor = self._executor_factory.create_executor(node)
-                graph.add_node(node_id, executor)
-                nodes_added.add(node_id)
-
-        # Third pass: add edges (skip parallel children)
-        for node_id, node in workflow.nodes.items():
-            # Skip nodes that are children of a parallel node
-            if node_id in parallel_children:
-                continue
-
-            if isinstance(node, ConditionNode):
-                # Add conditional edge
-                router = ConditionEvaluator.create_router(node)
-                graph.add_conditional_edge(
-                    node_id,
-                    router,
-                    node.branches,
-                )
-            elif isinstance(node, ParallelNode):
-                # Parallel node edges are handled in _add_parallel_node_group
-                pass
-            else:
-                # Add normal edges to next nodes
-                for next_node_id in node.next_nodes:
-                    # Skip edges to parallel children (they're internal to the parallel node)
-                    if next_node_id in parallel_children:
-                        continue
-                    if next_node_id in workflow.nodes or next_node_id == END:
-                        graph.add_edge(node_id, next_node_id)
-
-        # Set entry point
-        if workflow.start_node:
-            graph.set_entry_point(workflow.start_node)
-        elif workflow.nodes:
-            # Default to first node
-            first_node = next(iter(workflow.nodes.keys()))
-            graph.set_entry_point(first_node)
-
-        # Configure HITL interrupts
-        interrupt_before = []
-        if config.interrupt_on_hitl:
-            for node_id, node in workflow.nodes.items():
-                if node.node_type == WorkflowNodeType.HITL:
-                    interrupt_before.append(node_id)
-
-        # Build checkpointer
-        checkpointer = None
-        if config.enable_checkpointing:
-            checkpointer = config.checkpointer or MemoryCheckpointer()
-
-        # Compile with individual config parameters
-        # StateGraph.compile() expects checkpointer and **config_kwargs
-        compiled = graph.compile(
-            checkpointer=checkpointer,
-            max_iterations=config.max_iterations,
-            timeout=config.timeout,
-            interrupt_before=interrupt_before,
+        compiled_workflow = self._apply_compile_config(workflow, config)
+        parsed = ParsedWorkflowDefinition(
+            request=WorkflowCompilationRequest(
+                source=f"yaml://{workflow.name}",
+                workflow_name=workflow.name,
+                validate=True,
+            ),
+            workflow=compiled_workflow,
         )
+        compiled = self._create_native_graph_compiler(config).compile(parsed)
 
-        logger.info(f"Compiled workflow '{workflow.name}' with {len(nodes_added)} nodes")
+        logger.info(f"Compiled workflow '{workflow.name}' with {len(workflow.nodes)} nodes")
 
         return compiled
-
-    def _add_parallel_node_group(
-        self,
-        graph: StateGraph,
-        parallel_node: ParallelNode,
-        workflow: WorkflowDefinition,
-        nodes_added: Set[str],
-    ) -> None:
-        """Add a parallel node group to the graph.
-
-        Parallel execution is modeled by:
-        1. A fork node that splits into parallel branches
-        2. Individual parallel branch nodes
-        3. A join node that synchronizes results
-
-        For simplicity, we execute parallel nodes sequentially in the
-        same node function. True parallel execution would require
-        extending the StateGraph model.
-
-        Args:
-            graph: The StateGraph being built
-            parallel_node: The parallel node definition
-            workflow: The full workflow definition
-            nodes_added: Set of already-added node IDs
-        """
-        # Create a combined executor that runs all parallel nodes
-        parallel_node_defs = []
-        for child_id in parallel_node.parallel_nodes:
-            if child_id in workflow.nodes:
-                parallel_node_defs.append(workflow.nodes[child_id])
-
-        executors = [self._executor_factory.create_executor(node) for node in parallel_node_defs]
-
-        async def execute_parallel_group(state: WorkflowState) -> WorkflowState:
-            """Execute all parallel nodes and aggregate results."""
-            state = dict(state)
-            start_time = time.time()
-
-            if "_parallel_results" not in state:
-                state["_parallel_results"] = {}
-
-            # Execute all nodes (can be parallelized with asyncio.gather)
-            tasks = [executor(copy.deepcopy(state)) for executor in executors]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Merge results
-            for i, (node_def, result) in enumerate(zip(parallel_node_defs, results)):
-                if isinstance(result, Exception):
-                    state["_parallel_results"][node_def.id] = {
-                        "success": False,
-                        "error": str(result),
-                    }
-                else:
-                    # Merge state changes from parallel execution
-                    for key, value in result.items():
-                        if not key.startswith("_"):
-                            state[key] = value
-                    state["_parallel_results"][node_def.id] = {
-                        "success": True,
-                        "output": result.get(node_def.output_key or node_def.id),
-                    }
-
-            # Record parallel node result
-            if "_node_results" not in state:
-                state["_node_results"] = {}
-            state["_node_results"][parallel_node.id] = GraphNodeResult(
-                node_id=parallel_node.id,
-                success=all(r.get("success", False) for r in state["_parallel_results"].values()),
-                output=state["_parallel_results"],
-                duration_seconds=time.time() - start_time,
-            )
-
-            return state
-
-        # Add the combined parallel executor
-        graph.add_node(parallel_node.id, execute_parallel_group)
-        nodes_added.add(parallel_node.id)
-
-        # Add edges to next nodes
-        for next_node_id in parallel_node.next_nodes:
-            if next_node_id in workflow.nodes or next_node_id == END:
-                graph.add_edge(parallel_node.id, next_node_id)
 
     async def compile_and_execute(
         self,

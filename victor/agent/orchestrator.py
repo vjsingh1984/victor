@@ -1096,7 +1096,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # These wrap already-initialized components (conservative approach)
         # so that orchestrator properties can delegate through facades.
         # =================================================================
-        from victor.agent.facades import ChatFacade, ToolFacade
+        from victor.agent.facades import (
+            ChatFacade,
+            MetricsFacade,
+            OrchestrationFacade,
+            ProviderFacade,
+            ResilienceFacade,
+            SessionFacade,
+            ToolFacade,
+            WorkflowFacade,
+        )
 
         self._chat_facade = ChatFacade(
             conversation=self.conversation,
@@ -1141,7 +1150,93 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             plugin_manager=self.plugin_manager,
         )
 
-        logger.debug("Domain facades created: ChatFacade, ToolFacade")
+        self._provider_facade = ProviderFacade(
+            provider=self.provider,
+            model=self.model,
+            provider_name=self.provider_name,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            thinking=self.thinking,
+            provider_manager=self._provider_manager,
+            provider_runtime=self._provider_runtime,
+            provider_coordinator=self._provider_coordinator,
+            provider_switch_coordinator=self._provider_switch_coordinator,
+        )
+
+        self._session_facade = SessionFacade(
+            session_state=self._session_state,
+            session_accessor=self._session_accessor,
+            session_ledger=self._session_ledger,
+            lifecycle_manager=self._lifecycle_manager,
+            active_session_id=self.active_session_id,
+            memory_session_id=self._memory_session_id,
+            profile_name=self._profile_name,
+            checkpoint_manager=self._checkpoint_manager,
+        )
+
+        self._metrics_facade = MetricsFacade(
+            metrics_runtime=self._metrics_runtime,
+            metrics_collector=self._metrics_collector,
+            usage_analytics=self._usage_analytics,
+            usage_logger=self.usage_logger,
+            streaming_metrics_collector=self.streaming_metrics_collector,
+            session_cost_tracker=self._session_cost_tracker,
+            metrics_coordinator=self._metrics_coordinator,
+            debug_logger=self.debug_logger,
+            callback_coordinator=self._callback_coordinator,
+        )
+
+        self._resilience_facade = ResilienceFacade(
+            resilience_runtime=self._resilience_runtime,
+            recovery_handler=self._recovery_handler,
+            recovery_integration=self._recovery_integration,
+            recovery_coordinator=self._recovery_coordinator,
+            chunk_generator=self._chunk_generator,
+            context_manager=self._context_manager,
+            rl_coordinator=self._rl_coordinator,
+            code_manager=self.code_manager,
+            background_tasks=self._background_tasks,
+            cancel_event=self._cancel_event,
+            is_streaming=self._is_streaming,
+        )
+
+        self._workflow_facade = WorkflowFacade(
+            workflow_registry=self._workflow_registry,
+            workflow_runtime=self._workflow_runtime,
+            workflow_optimization=self._workflow_optimization,
+            mode_workflow_team_coordinator=self._mode_workflow_team_coordinator,
+        )
+
+        self._orchestration_facade = OrchestrationFacade(
+            interaction_runtime=self._interaction_runtime,
+            chat_coordinator=self._chat_coordinator,
+            tool_coordinator=self._tool_coordinator,
+            session_coordinator=self._session_coordinator,
+            execution_coordinator=self._execution_coordinator,
+            sync_chat_coordinator=self._sync_chat_coordinator,
+            streaming_chat_coordinator=self._streaming_chat_coordinator,
+            unified_chat_coordinator=self._unified_chat_coordinator,
+            protocol_adapter=self._protocol_adapter,
+            streaming_handler=self._streaming_handler,
+            streaming_controller=self._streaming_controller,
+            streaming_coordinator=self._streaming_coordinator,
+            iteration_coordinator=getattr(self, "_iteration_coordinator", None),
+            task_analyzer=self._task_analyzer,
+            presentation=self._presentation,
+            vertical_integration_adapter=self._vertical_integration_adapter,
+            vertical_context=self._vertical_context,
+            observability=self._observability,
+            execution_tracer=getattr(self, "_execution_tracer", None),
+            tool_call_tracer=getattr(self, "_tool_call_tracer", None),
+            intelligent_integration=self._intelligent_integration,
+            subagent_orchestrator=self._subagent_orchestrator,
+        )
+
+        logger.debug(
+            "Domain facades created: ChatFacade, ToolFacade, ProviderFacade, "
+            "SessionFacade, MetricsFacade, ResilienceFacade, WorkflowFacade, "
+            "OrchestrationFacade"
+        )
 
         # Wire up LifecycleManager with dependencies for shutdown
         # (must be done after all components are initialized)

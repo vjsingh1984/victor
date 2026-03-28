@@ -74,22 +74,30 @@ def _tool_pipeline(self: "AgentOrchestrator") -> "ToolPipeline":
 
 
 def _streaming_controller(self: "AgentOrchestrator") -> "StreamingController":
-    """Get the streaming controller component."""
+    """Get the streaming controller component (delegates to OrchestrationFacade)."""
+    if hasattr(self, "_orchestration_facade"):
+        return self._orchestration_facade.streaming_controller
     return self._streaming_controller
 
 
 def _streaming_handler(self: "AgentOrchestrator") -> "StreamingChatHandler":
-    """Get the streaming chat handler component."""
+    """Get the streaming chat handler component (delegates to OrchestrationFacade)."""
+    if hasattr(self, "_orchestration_facade"):
+        return self._orchestration_facade.streaming_handler
     return self._streaming_handler
 
 
 def _task_analyzer(self: "AgentOrchestrator") -> "TaskAnalyzer":
-    """Get the task analyzer component."""
+    """Get the task analyzer component (delegates to OrchestrationFacade)."""
+    if hasattr(self, "_orchestration_facade"):
+        return self._orchestration_facade.task_analyzer
     return self._task_analyzer
 
 
 def _provider_manager(self: "AgentOrchestrator") -> "ProviderManager":
-    """Get the provider manager component."""
+    """Get the provider manager component (delegates to ProviderFacade)."""
+    if hasattr(self, "_provider_facade"):
+        return self._provider_facade.provider_manager
     return self._provider_manager
 
 
@@ -108,11 +116,9 @@ def _tool_output_formatter(self: "AgentOrchestrator") -> "ToolOutputFormatter":
 
 
 def _usage_analytics(self: "AgentOrchestrator") -> "UsageAnalytics":
-    """Get the usage analytics singleton.
-
-    Note: UsageAnalytics is an infrastructure component shared across domains.
-    Remains on the orchestrator directly (not in ChatFacade or ToolFacade).
-    """
+    """Get the usage analytics singleton (delegates to MetricsFacade)."""
+    if hasattr(self, "_metrics_facade"):
+        return self._metrics_facade.usage_analytics
     return self._usage_analytics
 
 
@@ -124,12 +130,16 @@ def _sequence_tracker(self: "AgentOrchestrator") -> "ToolSequenceTracker":
 
 
 def _recovery_coordinator(self: "AgentOrchestrator") -> "StreamingRecoveryCoordinator":
-    """Get the recovery coordinator for centralized recovery logic."""
+    """Get the recovery coordinator for centralized recovery logic (delegates to ResilienceFacade)."""
+    if hasattr(self, "_resilience_facade"):
+        return self._resilience_facade.recovery_coordinator
     return self._recovery_coordinator
 
 
 def _chunk_generator(self: "AgentOrchestrator") -> "ChunkGenerator":
-    """Get the chunk generator for streaming output."""
+    """Get the chunk generator for streaming output (delegates to ResilienceFacade)."""
+    if hasattr(self, "_resilience_facade"):
+        return self._resilience_facade.chunk_generator
     return self._chunk_generator
 
 
@@ -144,7 +154,9 @@ def _task_coordinator(self: "AgentOrchestrator") -> "TaskCoordinator":
 
 
 def _session_ledger_get(self: "AgentOrchestrator") -> Any:
-    """Get the session ledger for structured state tracking."""
+    """Get the session ledger for structured state tracking (delegates to SessionFacade)."""
+    if hasattr(self, "_session_facade"):
+        return self._session_facade.session_ledger
     return self._session_ledger
 
 
@@ -160,12 +172,16 @@ def _code_correction_middleware(self: "AgentOrchestrator") -> Optional[Any]:
 
 
 def _checkpoint_manager(self: "AgentOrchestrator") -> Optional[Any]:
-    """Get the checkpoint manager for time-travel debugging."""
+    """Get the checkpoint manager for time-travel debugging (delegates to SessionFacade)."""
+    if hasattr(self, "_session_facade"):
+        return self._session_facade.checkpoint_manager
     return self._checkpoint_manager
 
 
 def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
-    """Get the vertical context for unified vertical state access."""
+    """Get the vertical context for unified vertical state access (delegates to OrchestrationFacade)."""
+    if hasattr(self, "_orchestration_facade"):
+        return self._orchestration_facade.vertical_context
     return self._vertical_context
 
 
