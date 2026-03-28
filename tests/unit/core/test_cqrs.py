@@ -56,11 +56,12 @@ class TestCommandBus:
         assert result.success is True
         assert result.result == "created:widget"
 
-    async def test_no_handler_returns_failure(self):
+    async def test_no_handler_raises_error(self):
+        from victor.core.cqrs import HandlerNotFoundError
+
         bus = CommandBus()
-        result = await bus.execute(CreateItemCommand(name="x"))
-        assert result.success is False
-        assert "No handler" in result.error
+        with pytest.raises(HandlerNotFoundError, match="No handler registered"):
+            await bus.execute(CreateItemCommand(name="x"))
 
     async def test_handler_exception_returns_failure(self):
         bus = CommandBus()
@@ -72,6 +73,7 @@ class TestCommandBus:
         result = await bus.execute(CreateItemCommand(name="x"))
         assert result.success is False
         assert "boom" in result.error
+        assert isinstance(result.exception, ValueError)
 
     async def test_execution_time_recorded(self):
         bus = CommandBus()
@@ -97,11 +99,12 @@ class TestQueryBus:
         assert result.success is True
         assert result.data == "item-42"
 
-    async def test_no_handler_returns_failure(self):
+    async def test_no_handler_raises_error(self):
+        from victor.core.cqrs import HandlerNotFoundError
+
         bus = QueryBus()
-        result = await bus.execute(GetItemQuery(item_id="1"))
-        assert result.success is False
-        assert "No handler" in result.error
+        with pytest.raises(HandlerNotFoundError, match="No handler registered"):
+            await bus.execute(GetItemQuery(item_id="1"))
 
     async def test_handler_exception_returns_failure(self):
         bus = QueryBus()

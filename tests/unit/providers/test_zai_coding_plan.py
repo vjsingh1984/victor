@@ -144,12 +144,13 @@ class TestZAIConfigStrategy:
         assert registry._aliases.get("zhipu") == "zai"
 
     def test_zai_default_base_url(self):
-        from victor.config.provider_config_registry import ZAIConfig
+        from victor.config.provider_config_registry import DefaultProviderConfig
 
-        config = ZAIConfig()
+        config = DefaultProviderConfig("zai", aliases=["zhipuai", "zhipu"])
         from unittest.mock import MagicMock
 
         settings = MagicMock()
+        settings.zai_api_key = None
         result = config.get_settings(settings, {})
         assert result["base_url"] == "https://api.z.ai/api/paas/v4/"
 

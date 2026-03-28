@@ -68,6 +68,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -136,6 +137,7 @@ class CommandResult(Generic[TResult]):
     success: bool
     result: Optional[TResult] = None
     error: Optional[str] = None
+    exception: Optional[Exception] = None
     command_id: str = ""
     execution_time_ms: float = 0.0
     events: List[Any] = field(default_factory=list)
@@ -188,6 +190,7 @@ QueryHandlerFunc = Callable[[Query[TResult]], Awaitable[TResult]]
 # Global registries for decorator-based registration
 _COMMAND_HANDLERS: Dict[Type[Command], CommandHandlerFunc] = {}
 _QUERY_HANDLERS: Dict[Type[Query], QueryHandlerFunc] = {}
+_registry_lock = threading.Lock()
 
 
 def command_handler(
@@ -202,7 +205,8 @@ def command_handler(
     """
 
     def decorator(func: CommandHandlerFunc) -> CommandHandlerFunc:
-        _COMMAND_HANDLERS[command_type] = func
+        with _registry_lock:
+            _COMMAND_HANDLERS[command_type] = func
         logger.debug(f"Registered command handler for {command_type.__name__}")
         return func
 
@@ -221,7 +225,8 @@ def query_handler(
     """
 
     def decorator(func: QueryHandlerFunc) -> QueryHandlerFunc:
-        _QUERY_HANDLERS[query_type] = func
+        with _registry_lock:
+            _QUERY_HANDLERS[query_type] = func
         logger.debug(f"Registered query handler for {query_type.__name__}")
         return func
 
@@ -230,18 +235,21 @@ def query_handler(
 
 def get_registered_command_handlers() -> Dict[Type[Command], CommandHandlerFunc]:
     """Get all registered command handlers."""
-    return _COMMAND_HANDLERS.copy()
+    with _registry_lock:
+        return _COMMAND_HANDLERS.copy()
 
 
 def get_registered_query_handlers() -> Dict[Type[Query], QueryHandlerFunc]:
     """Get all registered query handlers."""
-    return _QUERY_HANDLERS.copy()
+    with _registry_lock:
+        return _QUERY_HANDLERS.copy()
 
 
 def clear_handlers() -> None:
     """Clear all registered handlers (useful for testing)."""
-    _COMMAND_HANDLERS.clear()
-    _QUERY_HANDLERS.clear()
+    with _registry_lock:
+        _COMMAND_HANDLERS.clear()
+        _QUERY_HANDLERS.clear()
 
 
 # =============================================================================
@@ -504,10 +512,9 @@ class CommandBus:
         handler = self._handlers.get(command_type)
 
         if handler is None:
-            return CommandResult(
-                success=False,
-                error=f"No handler registered for {command_type.__name__}",
-                command_id=command.command_id,
+            logger.warning(f"No handler registered for {command_type.__name__}")
+            raise HandlerNotFoundError(
+                f"No handler registered for {command_type.__name__}"
             )
 
         start = time.perf_counter()
@@ -544,6 +551,7 @@ class CommandBus:
             return CommandResult(
                 success=False,
                 error=str(e),
+                exception=e,
                 command_id=command.command_id,
                 execution_time_ms=elapsed,
             )
@@ -620,10 +628,9 @@ class QueryBus:
         handler = self._handlers.get(query_type)
 
         if handler is None:
-            return QueryResult(
-                success=False,
-                error=f"No handler registered for {query_type.__name__}",
-                query_id=query.query_id,
+            logger.warning(f"No handler registered for {query_type.__name__}")
+            raise HandlerNotFoundError(
+                f"No handler registered for {query_type.__name__}"
             )
 
         start = time.perf_counter()

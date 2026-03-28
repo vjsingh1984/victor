@@ -73,6 +73,7 @@ import sqlite3
 import time
 import uuid
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -606,6 +607,8 @@ class SQLiteEventStore(EventStore):
     """SQLite-based event store for persistence.
 
     Provides durable event storage with atomic operations.
+    All blocking sqlite3 I/O is offloaded to a dedicated thread via
+    ThreadPoolExecutor to avoid blocking the asyncio event loop.
     """
 
     def __init__(self, db_path: Union[str, Path]) -> None:
@@ -616,6 +619,9 @@ class SQLiteEventStore(EventStore):
         """
         self._db_path = Path(db_path)
         self._lock = asyncio.Lock()
+        self._executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="sqlite-event-store"
+        )
         self._init_db()
 
     def _init_db(self) -> None:
@@ -649,6 +655,146 @@ class SQLiteEventStore(EventStore):
                 """)
             conn.commit()
 
+    async def close(self) -> None:
+        """Shut down the executor. Call when done with the store."""
+        self._executor.shutdown(wait=True)
+
+    def _append_sync(
+        self,
+        stream_id: str,
+        events: List[DomainEvent],
+        expected_version: Optional[int],
+    ) -> int:
+        """Synchronous append — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            cursor = conn.execute(
+                "SELECT COALESCE(MAX(stream_version), 0) "
+                "FROM events WHERE stream_id = ?",
+                (stream_id,),
+            )
+            current_version = cursor.fetchone()[0]
+
+            if expected_version is not None and current_version != expected_version:
+                raise ConcurrencyError(stream_id, expected_version, current_version)
+
+            for event in events:
+                current_version += 1
+                conn.execute(
+                    "INSERT INTO events "
+                    "(stream_id, stream_version, event_id, event_type, event_data, stored_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        stream_id,
+                        current_version,
+                        event.event_id,
+                        event.event_type,
+                        json.dumps(event.to_dict()),
+                        datetime.now(timezone.utc).isoformat(),
+                    ),
+                )
+
+            conn.commit()
+            return current_version
+
+    def _read_sync(
+        self,
+        stream_id: str,
+        from_version: int,
+        to_version: Optional[int],
+    ) -> List[EventEnvelope]:
+        """Synchronous read — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            if to_version is not None:
+                cursor = conn.execute(
+                    "SELECT stream_id, stream_version, event_data, stored_at "
+                    "FROM events "
+                    "WHERE stream_id = ? AND stream_version >= ? AND stream_version <= ? "
+                    "ORDER BY stream_version",
+                    (stream_id, from_version, to_version),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT stream_id, stream_version, event_data, stored_at "
+                    "FROM events "
+                    "WHERE stream_id = ? AND stream_version >= ? "
+                    "ORDER BY stream_version",
+                    (stream_id, from_version),
+                )
+
+            return self._rows_to_envelopes(cursor)
+
+    def _read_all_sync(self, from_position: int, limit: int) -> List[EventEnvelope]:
+        """Synchronous read_all — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            cursor = conn.execute(
+                "SELECT stream_id, stream_version, event_data, stored_at "
+                "FROM events WHERE global_position > ? "
+                "ORDER BY global_position LIMIT ?",
+                (from_position, limit),
+            )
+            return self._rows_to_envelopes(cursor)
+
+    def _get_stream_version_sync(self, stream_id: str) -> int:
+        """Synchronous get_stream_version — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            cursor = conn.execute(
+                "SELECT COALESCE(MAX(stream_version), 0) "
+                "FROM events WHERE stream_id = ?",
+                (stream_id,),
+            )
+            return cursor.fetchone()[0]
+
+    def _save_snapshot_sync(
+        self, stream_id: str, version: int, snapshot: Dict[str, Any]
+    ) -> None:
+        """Synchronous save_snapshot — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO snapshots "
+                "(stream_id, version, snapshot_data, created_at) VALUES (?, ?, ?, ?)",
+                (
+                    stream_id,
+                    version,
+                    json.dumps(snapshot),
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            conn.commit()
+
+    def _load_snapshot_sync(self, stream_id: str) -> Optional[Dict[str, Any]]:
+        """Synchronous load_snapshot — runs in executor thread."""
+        with sqlite3.connect(self._db_path) as conn:
+            cursor = conn.execute(
+                "SELECT version, snapshot_data FROM snapshots WHERE stream_id = ?",
+                (stream_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return {"version": row[0], "data": json.loads(row[1])}
+            return None
+
+    @staticmethod
+    def _rows_to_envelopes(cursor) -> List[EventEnvelope]:
+        """Convert cursor rows to EventEnvelope list with error handling."""
+        result = []
+        for row in cursor:
+            try:
+                event_data = json.loads(row[2])
+                event = DomainEvent.from_dict(event_data)
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(
+                    "Skipping corrupt event in stream %s v%s: %s", row[0], row[1], e
+                )
+                continue
+            envelope = EventEnvelope(
+                stream_id=row[0],
+                stream_version=row[1],
+                event=event,
+                stored_at=datetime.fromisoformat(row[3]),
+            )
+            result.append(envelope)
+        return result
+
     async def append(
         self,
         stream_id: str,
@@ -657,41 +803,10 @@ class SQLiteEventStore(EventStore):
     ) -> int:
         """Append events to stream."""
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                # Get current version
-                cursor = conn.execute(
-                    """
-                    SELECT COALESCE(MAX(stream_version), 0)
-                    FROM events WHERE stream_id = ?
-                    """,
-                    (stream_id,),
-                )
-                current_version = cursor.fetchone()[0]
-
-                if expected_version is not None and current_version != expected_version:
-                    raise ConcurrencyError(stream_id, expected_version, current_version)
-
-                # Append events
-                for event in events:
-                    current_version += 1
-                    conn.execute(
-                        """
-                        INSERT INTO events
-                        (stream_id, stream_version, event_id, event_type, event_data, stored_at)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            stream_id,
-                            current_version,
-                            event.event_id,
-                            event.event_type,
-                            json.dumps(event.to_dict()),
-                            datetime.now(timezone.utc).isoformat(),
-                        ),
-                    )
-
-                conn.commit()
-                return current_version
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                self._executor, self._append_sync, stream_id, events, expected_version
+            )
 
     async def read(
         self,
@@ -701,44 +816,10 @@ class SQLiteEventStore(EventStore):
     ) -> List[EventEnvelope]:
         """Read events from stream."""
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                if to_version is not None:
-                    cursor = conn.execute(
-                        """
-                        SELECT stream_id, stream_version, event_data, stored_at
-                        FROM events
-                        WHERE stream_id = ?
-                        AND stream_version >= ?
-                        AND stream_version <= ?
-                        ORDER BY stream_version
-                        """,
-                        (stream_id, from_version, to_version),
-                    )
-                else:
-                    cursor = conn.execute(
-                        """
-                        SELECT stream_id, stream_version, event_data, stored_at
-                        FROM events
-                        WHERE stream_id = ? AND stream_version >= ?
-                        ORDER BY stream_version
-                        """,
-                        (stream_id, from_version),
-                    )
-
-                result = []
-                for row in cursor:
-                    event_data = json.loads(row[2])
-                    # Create event from data
-                    event = DomainEvent.from_dict(event_data)
-                    envelope = EventEnvelope(
-                        stream_id=row[0],
-                        stream_version=row[1],
-                        event=event,
-                        stored_at=datetime.fromisoformat(row[3]),
-                    )
-                    result.append(envelope)
-
-                return result
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                self._executor, self._read_sync, stream_id, from_version, to_version
+            )
 
     async def read_all(
         self,
@@ -747,44 +828,18 @@ class SQLiteEventStore(EventStore):
     ) -> List[EventEnvelope]:
         """Read all events."""
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT stream_id, stream_version, event_data, stored_at
-                    FROM events
-                    WHERE global_position > ?
-                    ORDER BY global_position
-                    LIMIT ?
-                    """,
-                    (from_position, limit),
-                )
-
-                result = []
-                for row in cursor:
-                    event_data = json.loads(row[2])
-                    event = DomainEvent.from_dict(event_data)
-                    envelope = EventEnvelope(
-                        stream_id=row[0],
-                        stream_version=row[1],
-                        event=event,
-                        stored_at=datetime.fromisoformat(row[3]),
-                    )
-                    result.append(envelope)
-
-                return result
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                self._executor, self._read_all_sync, from_position, limit
+            )
 
     async def get_stream_version(self, stream_id: str) -> int:
         """Get stream version."""
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT COALESCE(MAX(stream_version), 0)
-                    FROM events WHERE stream_id = ?
-                    """,
-                    (stream_id,),
-                )
-                return cursor.fetchone()[0]
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                self._executor, self._get_stream_version_sync, stream_id
+            )
 
     async def save_snapshot(
         self,
@@ -800,21 +855,10 @@ class SQLiteEventStore(EventStore):
             snapshot: Snapshot data.
         """
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO snapshots
-                    (stream_id, version, snapshot_data, created_at)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        stream_id,
-                        version,
-                        json.dumps(snapshot),
-                        datetime.now(timezone.utc).isoformat(),
-                    ),
-                )
-                conn.commit()
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor, self._save_snapshot_sync, stream_id, version, snapshot
+            )
 
     async def load_snapshot(
         self,
@@ -829,21 +873,10 @@ class SQLiteEventStore(EventStore):
             Snapshot data or None if not found.
         """
         async with self._lock:
-            with sqlite3.connect(self._db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT version, snapshot_data
-                    FROM snapshots WHERE stream_id = ?
-                    """,
-                    (stream_id,),
-                )
-                row = cursor.fetchone()
-                if row:
-                    return {
-                        "version": row[0],
-                        "data": json.loads(row[1]),
-                    }
-                return None
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                self._executor, self._load_snapshot_sync, stream_id
+            )
 
 
 # =============================================================================
@@ -1082,3 +1115,22 @@ class StateChangedEvent(DomainEvent):
     from_state: str = ""
     to_state: str = ""
     reason: str = ""
+
+
+@dataclass
+class ContextCompactedEvent(DomainEvent):
+    """Event emitted when conversation context is compacted."""
+
+    messages_removed: int = 0
+    chars_freed: int = 0
+    trigger: str = ""
+    summary: str = ""
+
+
+@dataclass
+class SessionResumedEvent(DomainEvent):
+    """Event emitted when a session is resumed from persistence."""
+
+    session_id: str = ""
+    messages_restored: int = 0
+    ledger_entries_restored: int = 0

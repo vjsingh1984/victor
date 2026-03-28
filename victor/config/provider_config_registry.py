@@ -53,6 +53,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
 
+from victor.config.secrets import unwrap_secrets
+
 if TYPE_CHECKING:
     from victor.config.settings import Settings
 
@@ -130,19 +132,30 @@ class DefaultProviderConfig(ProviderConfigStrategy):
     This eliminates the need for individual strategy classes for each provider.
     """
 
-    def __init__(self, provider_name: str, base_url: Optional[str] = None):
+    def __init__(
+        self,
+        provider_name: str,
+        base_url: Optional[str] = None,
+        aliases: Optional[List[str]] = None,
+    ):
         """Initialize default provider config.
 
         Args:
             provider_name: The provider name
             base_url: Optional base URL (uses default if not specified)
+            aliases: Optional alternative names that map to this provider
         """
         self._provider_name = provider_name
         self._base_url = base_url or DEFAULT_PROVIDER_ENDPOINTS.get(provider_name)
+        self._aliases = aliases or []
 
     @property
     def provider_name(self) -> str:
         return self._provider_name
+
+    @property
+    def aliases(self) -> List[str]:
+        return self._aliases
 
     def get_settings(
         self,
@@ -181,26 +194,6 @@ class DefaultProviderConfig(ProviderConfigStrategy):
 # Existing strategies kept for backward compatibility.
 
 
-class AnthropicConfig(ProviderConfigStrategy):
-    """Configuration strategy for Anthropic Claude.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "anthropic"
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("anthropic").get_settings(settings, base_settings)
-
-
 class OpenAIConfig(ProviderConfigStrategy):
     """Configuration strategy for OpenAI."""
 
@@ -231,54 +224,6 @@ class OpenAIConfig(ProviderConfigStrategy):
             result.setdefault("base_url", "https://api.openai.com/v1")
 
         return result
-
-
-class GoogleConfig(ProviderConfigStrategy):
-    """Configuration strategy for Google/Gemini.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "google"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["gemini"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("google").get_settings(settings, base_settings)
-
-
-class XAIConfig(ProviderConfigStrategy):
-    """Configuration strategy for xAI/Grok.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "xai"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["grok"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("xai").get_settings(settings, base_settings)
 
 
 class OllamaConfig(ProviderConfigStrategy):
@@ -331,10 +276,11 @@ class LMStudioConfig(ProviderConfigStrategy):
                     if resp.status_code == 200:
                         chosen = url
                         break
-                except Exception:
+                except Exception as e:
+                    logger.debug("LM Studio probe failed for %s: %s", url, e)
                     continue
-        except Exception:
-            pass
+        except ImportError:
+            logger.debug("httpx not available for LM Studio URL probing")
 
         if urls:
             result["base_url"] = f"{(chosen or urls[0]).rstrip('/')}/v1"
@@ -356,83 +302,6 @@ class VLLMConfig(ProviderConfigStrategy):
         result = dict(base_settings)
         result.setdefault("base_url", settings.vllm_base_url)
         return result
-
-
-class MoonshotConfig(ProviderConfigStrategy):
-    """Configuration strategy for Moonshot/Kimi.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "moonshot"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["kimi"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("moonshot").get_settings(settings, base_settings)
-
-
-class DeepSeekConfig(ProviderConfigStrategy):
-    """Configuration strategy for DeepSeek.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "deepseek"
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("deepseek").get_settings(settings, base_settings)
-
-
-class ZAIConfig(ProviderConfigStrategy):
-    """Configuration strategy for Z.AI (ZhipuAI).
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-
-    Note: For GLM Coding Plan endpoint, use model suffix "glm-4.6:coding".
-    The ZAIProvider automatically detects the :coding suffix and uses the coding endpoint.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "zai"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["zhipuai", "zhipu"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("zai").get_settings(settings, base_settings)
-
-
-# NOTE: ZAICodingPlanConfig has been removed.
-# GLM Coding Plan endpoint should now be accessed via model suffix:
-#   Use model="glm-4.6:coding" instead of provider="zai-coding-plan"
-# The ZAIProvider automatically detects the :coding suffix and uses the coding endpoint.
 
 
 class QwenConfig(ProviderConfigStrategy):
@@ -464,30 +333,6 @@ class QwenConfig(ProviderConfigStrategy):
                 result["api_key"] = api_key
             result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
         return result
-
-
-class GroqCloudConfig(ProviderConfigStrategy):
-    """Configuration strategy for Groq Cloud.
-
-    DEPRECATED: Use DefaultProviderConfig instead.
-    This strategy is kept for backward compatibility.
-    """
-
-    @property
-    def provider_name(self) -> str:
-        return "groqcloud"
-
-    @property
-    def aliases(self) -> List[str]:
-        return ["groq"]
-
-    def get_settings(
-        self,
-        settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Delegate to default strategy
-        return DefaultProviderConfig("groqcloud").get_settings(settings, base_settings)
 
 
 # =============================================================================
@@ -547,7 +392,7 @@ class ProviderConfigRegistry:
             base_settings = {}
             provider_config = settings.load_provider_config(resolved)
             if provider_config:
-                base_settings.update(provider_config.model_dump(exclude_none=True))
+                base_settings.update(unwrap_secrets(provider_config.model_dump(exclude_none=True)))
 
             # Apply profile overrides BEFORE calling strategy
             # This allows the strategy to see auth_mode and make decisions
@@ -601,19 +446,18 @@ def get_provider_config_registry() -> ProviderConfigRegistry:
 
 def _register_builtin_providers(registry: ProviderConfigRegistry) -> None:
     """Register all built-in provider configurations."""
-    builtin_strategies = [
-        AnthropicConfig(),
+    builtin_strategies: List[ProviderConfigStrategy] = [
+        DefaultProviderConfig("anthropic"),
         OpenAIConfig(),
-        GoogleConfig(),
-        XAIConfig(),
+        DefaultProviderConfig("google", aliases=["gemini"]),
+        DefaultProviderConfig("xai", aliases=["grok"]),
         OllamaConfig(),
         LMStudioConfig(),
         VLLMConfig(),
-        MoonshotConfig(),
-        DeepSeekConfig(),
-        GroqCloudConfig(),
-        ZAIConfig(),
-        # NOTE: ZAICodingPlanConfig removed - use model suffix "glm-4.6:coding" instead
+        DefaultProviderConfig("moonshot", aliases=["kimi"]),
+        DefaultProviderConfig("deepseek"),
+        DefaultProviderConfig("groqcloud", aliases=["groq"]),
+        DefaultProviderConfig("zai", aliases=["zhipuai", "zhipu"]),
         QwenConfig(),
     ]
 
@@ -651,18 +495,9 @@ __all__ = [
     "DefaultProviderConfig",
     "DEFAULT_PROVIDER_ENDPOINTS",
     # Built-in strategies (for testing/extension)
-    # NOTE: Simple provider strategies below are deprecated - use DefaultProviderConfig
-    "AnthropicConfig",
     "OpenAIConfig",
-    "GoogleConfig",
-    "XAIConfig",
     "OllamaConfig",
     "LMStudioConfig",
     "VLLMConfig",
-    "MoonshotConfig",
-    "DeepSeekConfig",
-    "GroqCloudConfig",
-    "ZAIConfig",
-    # NOTE: ZAICodingPlanConfig removed - use model suffix "glm-4.6:coding" instead
     "QwenConfig",
 ]

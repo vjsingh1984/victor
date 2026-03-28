@@ -17,10 +17,14 @@ Example:
 
 from __future__ import annotations
 
+import itertools
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
+
+# Monotonically increasing counter for event ordering across concurrent operations
+_event_counter = itertools.count(1)
 
 
 class EventType(str, Enum):
@@ -142,6 +146,10 @@ class AgentExecutionEvent:
     progress: float = 0.0
     milestone: Optional[str] = None
 
+    # Sequencing — monotonic ordering and causality tracking
+    sequence_id: int = field(default_factory=lambda: next(_event_counter))
+    parent_event_id: Optional[str] = None
+
     # Metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
@@ -191,6 +199,8 @@ class AgentExecutionEvent:
             "recoverable": self.recoverable,
             "progress": self.progress,
             "milestone": self.milestone,
+            "sequence_id": self.sequence_id,
+            "parent_event_id": self.parent_event_id,
             "metadata": self.metadata,
             "timestamp": self.timestamp,
         }

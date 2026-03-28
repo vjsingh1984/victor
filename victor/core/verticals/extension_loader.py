@@ -1525,10 +1525,19 @@ class VerticalExtensionLoader(ABC):
                 cls._update_loader_peak_metric("max_in_flight", in_flight_now)
                 cls._check_pressure(reason=f"{extension_type}.in_flight")
 
-                return await loop.run_in_executor(
+                future = loop.run_in_executor(
                     executor,
                     lambda: load_fn(extension_type, loader, is_list),
                 )
+                return await asyncio.wait_for(future, timeout=30.0)
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Extension '%s' timed out after 30s for vertical '%s'",
+                    extension_type,
+                    cls.name,
+                )
+                cls._increment_loader_metric("failed")
+                return [] if is_list else None
             except Exception:
                 cls._increment_loader_metric("failed")
                 raise

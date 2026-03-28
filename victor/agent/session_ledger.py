@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional
 
 from victor.config.orchestrator_constants import SessionLedgerConfig, SESSION_LEDGER_CONFIG
 
@@ -70,34 +72,36 @@ class SessionLedger:
 
     def __init__(self, config: Optional[SessionLedgerConfig] = None):
         self._config = config or SESSION_LEDGER_CONFIG
-        self._entries: List[LedgerEntry] = []
+        self._entries: Deque[LedgerEntry] = deque(maxlen=self._config.max_entries)
         self._files_read: Dict[str, str] = {}  # path -> summary
+        self._lock = threading.Lock()
 
     @property
     def entries(self) -> List[LedgerEntry]:
-        return list(self._entries)
+        with self._lock:
+            return list(self._entries)
 
     @property
     def config(self) -> SessionLedgerConfig:
         return self._config
 
     def _add_entry(self, entry: LedgerEntry) -> None:
-        self._entries.append(entry)
-        while len(self._entries) > self._config.max_entries:
-            self._entries.pop(0)
+        with self._lock:
+            self._entries.append(entry)  # deque handles eviction via maxlen
 
     def record_file_read(self, path: str, summary: str, turn_index: int) -> None:
         truncated = summary[: self._config.file_summary_max_len]
-        self._files_read[path] = truncated
-        self._add_entry(
-            LedgerEntry(
-                timestamp=time.time(),
-                category="file_read",
-                key=path,
-                summary=truncated,
-                turn_index=turn_index,
+        with self._lock:
+            self._files_read[path] = truncated
+            self._entries.append(
+                LedgerEntry(
+                    timestamp=time.time(),
+                    category="file_read",
+                    key=path,
+                    summary=truncated,
+                    turn_index=turn_index,
+                )
             )
-        )
 
     def record_file_modified(self, path: str, change_summary: str, turn_index: int) -> None:
         truncated = change_summary[: self._config.file_summary_max_len]
@@ -290,6 +294,22 @@ class SessionLedger:
                 "file_summary_max_len": self._config.file_summary_max_len,
             },
         }
+
+    def merge(self, other: "SessionLedger") -> None:
+        """Merge entries from another ledger (for cross-session linking).
+
+        Deduplicates by (category, key) pairs and merges files_read dicts.
+        """
+        with self._lock:
+            existing_keys = {
+                (e.category, e.key) for e in self._entries
+            }
+            for entry in other._entries:
+                if (entry.category, entry.key) not in existing_keys:
+                    self._entries.append(entry)
+                    existing_keys.add((entry.category, entry.key))
+
+            self._files_read.update(other._files_read)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SessionLedger":

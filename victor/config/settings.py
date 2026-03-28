@@ -16,16 +16,20 @@ from __future__ import annotations
 
 """Configuration management for CodingAgent."""
 
+import logging
 import os
 import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List
+
+logger = logging.getLogger(__name__)
 
 import yaml
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
+from victor.config.secrets import reveal_secret, unwrap_secrets
 
 # =============================================================================
 # CENTRALIZED PATH CONFIGURATION
@@ -303,11 +307,20 @@ def reset_project_paths() -> None:
 class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
-    api_key: Optional[str] = None
+    api_key: Optional[SecretStr] = None
     base_url: Optional[Union[str, List[str]]] = None
     timeout: int = 300  # 5 minutes - increased for CPU-only inference
     max_retries: int = 3
     organization: Optional[str] = None  # For OpenAI
+
+    @property
+    def api_key_value(self) -> Optional[str]:
+        """Return the plain API key for provider construction."""
+        return reveal_secret(self.api_key)
+
+    def to_runtime_dict(self) -> Dict[str, Any]:
+        """Serialize provider config with secrets unwrapped for runtime use."""
+        return unwrap_secrets(self.model_dump(exclude_none=True))
 
 
 class ProfileConfig(BaseSettings):
@@ -612,8 +625,8 @@ class SecuritySettings(_BaseModel):
     """Server security, sandboxing, and approval settings."""
 
     airgapped_mode: bool = False
-    server_api_key: Optional[str] = None
-    server_session_secret: Optional[str] = None
+    server_api_key: Optional[SecretStr] = None
+    server_session_secret: Optional[SecretStr] = None
     server_max_sessions: int = 100
     server_max_message_bytes: int = 32768
     server_session_ttl_seconds: int = 86400
@@ -805,6 +818,87 @@ class PluginSettings(_BaseModel):
     plugin_config: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
+class PromptPolicySettings(_BaseModel):
+    """System prompt enforcement and fallback templates."""
+
+    prompt_policy_enforce_identity: bool = True
+    prompt_policy_enforce_guidelines: bool = True
+    prompt_policy_enforce_operating_preamble: bool = True
+    prompt_policy_enforce_unique_sections: bool = True
+    prompt_policy_protected_sections: List[str] = Field(
+        default_factory=lambda: ["identity", "guidelines", "operating_mode"]
+    )
+    prompt_policy_max_section_chars: int = 18000
+    prompt_policy_identity: Optional[str] = None
+    prompt_policy_guidelines: Optional[str] = None
+    prompt_policy_operating_template: Optional[str] = None
+    prompt_policy_fallback_template: Optional[str] = None
+
+
+class ConversationSettings(_BaseModel):
+    """Conversation persistence and history limits."""
+
+    conversation_memory_enabled: bool = True
+    conversation_embeddings_enabled: bool = True
+    max_conversation_history: int = 100
+    session_idle_timeout: int = 180
+
+
+class ExplorationSettings(_BaseModel):
+    """Exploration iteration limits, recovery, and continuation prompts."""
+
+    max_exploration_iterations: int = 8
+    max_exploration_iterations_action: int = 12
+    max_exploration_iterations_analysis: int = 50
+    chat_max_iterations: int = 50
+    max_consecutive_tool_calls: int = 20
+    max_research_iterations: int = 6
+    min_content_threshold: int = 150
+    recovery_empty_response_threshold: int = 5
+    recovery_blocked_consecutive_threshold: int = 6
+    recovery_blocked_total_threshold: int = 9
+    max_continuation_prompts_default: int = 3
+    max_continuation_prompts_action: int = 5
+    max_continuation_prompts_analysis: int = 6
+    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
+        default_factory=dict
+    )
+    enable_continuation_rl_learning: bool = False
+
+
+class SerializationSettings(_BaseModel):
+    """Token-optimized serialization strategies."""
+
+    serialization_enabled: bool = True
+    serialization_default_format: Optional[str] = None
+    serialization_min_savings_threshold: float = 0.15
+    serialization_include_format_hint: bool = True
+    serialization_min_rows_for_tabular: int = 3
+    serialization_debug_mode: bool = False
+
+
+class AutomationSettings(_BaseModel):
+    """Git automation, headless mode, and provider fallback."""
+
+    auto_commit_enabled: bool = False
+    headless_mode: bool = False
+    dry_run_mode: bool = False
+    auto_approve_safe: bool = False
+    one_shot_mode: bool = False
+    max_file_changes: Optional[int] = None
+    provider_health_checks: bool = True
+    provider_auto_fallback: bool = True
+    fallback_providers: List[str] = Field(default_factory=list)
+
+
+class CodeCorrectionSettings(_BaseModel):
+    """Automatic code correction configuration."""
+
+    code_correction_enabled: bool = True
+    code_correction_auto_fix: bool = True
+    code_correction_max_iterations: int = 3
+
+
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
     "provider": ProviderSettings,
@@ -822,13 +916,32 @@ _NESTED_GROUPS = {
     "enrichment": PromptEnrichmentSettings,
     "hitl": HITLSettings,
     "plugins": PluginSettings,
+    "prompt_policy": PromptPolicySettings,
+    "conversation": ConversationSettings,
+    "exploration": ExplorationSettings,
+    "serialization": SerializationSettings,
+    "automation": AutomationSettings,
+    "code_correction": CodeCorrectionSettings,
 }
 
 
 class Settings(BaseSettings):
-    """Main application settings."""
+    """Main application settings.
+
+    Consolidates all configuration sources with explicit precedence.
+    Use from_sources() classmethod to load with proper precedence.
+
+    Precedence (highest to lowest):
+    1. CLI arguments (passed via override)
+    2. Environment variables (VICTOR_*)
+    3. .env file
+    4. ~/.victor/settings.yaml
+    5. ~/.victor/profiles.yaml
+    6. Default values
+    """
 
     model_config = SettingsConfigDict(
+        env_prefix="VICTOR_",
         env_file=".env" if not os.getenv("VICTOR_SKIP_ENV_FILE") else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
@@ -906,12 +1019,34 @@ class Settings(BaseSettings):
     enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
     hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
     plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
+    prompt_policy: Optional[PromptPolicySettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    conversation: Optional[ConversationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    exploration: Optional[ExplorationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    serialization: Optional[SerializationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    automation: Optional[AutomationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    code_correction: Optional[CodeCorrectionSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
     default_model: str = "qwen3-coder:30b"
-    default_temperature: float = 0.7
-    default_max_tokens: int = 4096
+    default_temperature: float = Field(
+        default=0.7, ge=0.0, le=2.0, description="Default temperature for generation"
+    )
+    default_max_tokens: int = Field(
+        default=4096, gt=0, description="Default maximum tokens for generation"
+    )
 
     # API Keys
     anthropic_api_key: Optional[SecretStr] = None
@@ -956,9 +1091,9 @@ class Settings(BaseSettings):
 
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
-    server_api_key: Optional[str] = None
+    server_api_key: Optional[SecretStr] = None
     # HMAC secret for issuing/verifying session tokens (defaults to random per-process secret)
-    server_session_secret: Optional[str] = None
+    server_session_secret: Optional[SecretStr] = None
     # Hard cap on simultaneous sessions to avoid resource exhaustion
     server_max_sessions: int = 100
     # Maximum inbound message payload size (bytes) for WebSocket messages
@@ -1500,6 +1635,205 @@ class Settings(BaseSettings):
     analytics_enabled: bool = True
     # Note: analytics_log_file now uses get_project_paths().global_logs_dir / "usage.jsonl"
 
+    # ==========================================================================
+    # Code Correction (from VictorSettings merge)
+    # ==========================================================================
+    code_correction_enabled: bool = Field(
+        default=True, description="Enable automatic code correction suggestions"
+    )
+    code_correction_auto_fix: bool = Field(
+        default=True, description="Automatically apply code corrections"
+    )
+    code_correction_max_iterations: int = Field(
+        default=3, ge=1, description="Maximum correction iterations per file"
+    )
+
+    # ==========================================================================
+    # Auto Commit (from VictorSettings merge)
+    # ==========================================================================
+    auto_commit_enabled: bool = Field(
+        default=False, description="Enable automatic git commits for file changes"
+    )
+
+    # ==========================================================================
+    # Exploration Loop Extended (from VictorSettings merge)
+    # ==========================================================================
+    chat_max_iterations: int = Field(
+        default=50, ge=1, description="Maximum chat iterations per session"
+    )
+    max_consecutive_tool_calls: int = Field(
+        default=20, ge=1, description="Maximum consecutive tool calls before forcing synthesis"
+    )
+
+    # ==========================================================================
+    # Context Compaction Advanced (from VictorSettings merge)
+    # ==========================================================================
+    context_proactive_compaction: bool = Field(
+        default=True, description="Enable proactive compaction before hitting limit"
+    )
+    context_proactive_threshold: float = Field(
+        default=0.90,
+        ge=0.5,
+        le=0.99,
+        description="Trigger compaction at this fraction of max tokens",
+    )
+    context_min_messages_after_compact: int = Field(
+        default=8, ge=1, description="Minimum messages after compaction"
+    )
+    context_truncation_strategy: str = Field(
+        default="smart", description="Truncation strategy: simple, smart, preserve_code"
+    )
+    file_structure_threshold: int = Field(
+        default=50000, ge=1000, description="File size threshold for structure-based truncation"
+    )
+
+    # ==========================================================================
+    # Conversation History (from VictorSettings merge)
+    # ==========================================================================
+    max_context_chars: Optional[int] = Field(
+        default=None,
+        ge=1000,
+        description="Maximum characters in context (alternative to token-based limit)",
+    )
+    max_conversation_history: int = Field(
+        default=100, ge=10, description="Maximum messages to retain in conversation history"
+    )
+
+    # ==========================================================================
+    # Tool Output Limits (from VictorSettings merge)
+    # ==========================================================================
+    max_tool_output_chars: int = Field(
+        default=15000, ge=100, description="Maximum characters in tool output"
+    )
+    max_tool_output_lines: int = Field(
+        default=200, ge=10, description="Maximum lines in tool output"
+    )
+    tool_result_truncation: bool = Field(
+        default=True, description="Enable truncation of large tool results"
+    )
+
+    # ==========================================================================
+    # Parallel Tool Execution (from VictorSettings merge)
+    # ==========================================================================
+    parallel_tool_execution: bool = Field(
+        default=True, description="Enable parallel execution of independent tools"
+    )
+    max_concurrent_tools: int = Field(
+        default=5, ge=1, description="Maximum tools to execute concurrently"
+    )
+
+    # ==========================================================================
+    # Response Completion (from VictorSettings merge)
+    # ==========================================================================
+    response_completion_retries: int = Field(
+        default=3, ge=1, description="Max retries for incomplete responses"
+    )
+    force_response_on_error: bool = Field(
+        default=True, description="Force synthesis even if errors occurred"
+    )
+
+    # ==========================================================================
+    # Grounding (from VictorSettings merge)
+    # ==========================================================================
+    grounding_confidence_threshold: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Confidence threshold for grounding verification"
+    )
+
+    # ==========================================================================
+    # Provider Resilience Advanced (from VictorSettings merge)
+    # ==========================================================================
+    provider_health_checks: bool = Field(
+        default=True, description="Enable periodic provider health checks"
+    )
+    provider_auto_fallback: bool = Field(
+        default=True, description="Automatically fallback to secondary providers on failure"
+    )
+    fallback_providers: List[str] = Field(
+        default_factory=list, description="Ordered list of fallback providers"
+    )
+
+    # ==========================================================================
+    # Plugin Directories (from VictorSettings merge)
+    # ==========================================================================
+    plugin_dirs: List[str] = Field(
+        default_factory=list, description="Additional directories to scan for plugins"
+    )
+    disabled_plugins: List[str] = Field(
+        default_factory=list,
+        description="List of plugin names to disable (renamed from plugin_disabled)",
+    )
+
+    # ==========================================================================
+    # Tool Cache Storage (from VictorSettings merge)
+    # ==========================================================================
+    tool_cache_dir: Optional[str] = Field(
+        default=None, description="Custom directory for tool result cache"
+    )
+
+    # ==========================================================================
+    # Subagent Orchestration (from VictorSettings merge)
+    # ==========================================================================
+    subagent_orchestration_enabled: bool = Field(
+        default=True, description="Enable hierarchical subagent task decomposition"
+    )
+
+    # ==========================================================================
+    # Observability (from VictorSettings merge)
+    # ==========================================================================
+    enable_observability: bool = Field(
+        default=True, description="Enable observability integration (Langfuse, etc.)"
+    )
+
+    # ==========================================================================
+    # Debug Settings (from VictorSettings merge)
+    # ==========================================================================
+    debug_logging: bool = Field(default=False, description="Enable verbose debug logging")
+
+    # ==========================================================================
+    # System Prompt Policy (from VictorSettings merge)
+    # ==========================================================================
+    prompt_policy_enforce_identity: bool = Field(
+        default=True,
+        description="Ensure the system prompt always includes an identity section",
+    )
+    prompt_policy_enforce_guidelines: bool = Field(
+        default=True,
+        description="Ensure the system prompt always includes a guidelines section",
+    )
+    prompt_policy_enforce_operating_preamble: bool = Field(
+        default=True,
+        description="Ensure the system prompt includes operating mode metadata",
+    )
+    prompt_policy_enforce_unique_sections: bool = Field(
+        default=True,
+        description="Deduplicate sections with identical content",
+    )
+    prompt_policy_protected_sections: List[str] = Field(
+        default_factory=lambda: ["identity", "guidelines", "operating_mode"],
+        description="Sections that should never be trimmed",
+    )
+    prompt_policy_max_section_chars: int = Field(
+        default=18000,
+        ge=1000,
+        description="Maximum characters allocated to structured sections",
+    )
+    prompt_policy_identity: Optional[str] = Field(
+        default=None,
+        description="Custom fallback identity content",
+    )
+    prompt_policy_guidelines: Optional[str] = Field(
+        default=None,
+        description="Custom fallback guidelines",
+    )
+    prompt_policy_operating_template: Optional[str] = Field(
+        default=None,
+        description="Template for the operating-mode preamble",
+    )
+    prompt_policy_fallback_template: Optional[str] = Field(
+        default=None,
+        description="Template used when prompt assembly fails",
+    )
+
     @field_validator("event_queue_overflow_policy")
     @classmethod
     def validate_event_queue_overflow_policy(cls, value: str) -> str:
@@ -1660,6 +1994,196 @@ class Settings(BaseSettings):
             # Use object.__setattr__ to bypass pydantic validation
             object.__setattr__(self, "use_emojis", False)
         return self
+
+    # ==========================================================================
+    # Validators ported from VictorSettings
+    # ==========================================================================
+
+    @field_validator("default_provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        """Validate provider name."""
+        valid_providers = [
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
+            "groq",
+            "lmstudio",
+            "vllm",
+            "deepseek",
+            "moonshot",
+            "xai",
+        ]
+        if v.lower() not in valid_providers:
+            raise ValueError(
+                f"Invalid provider: {v}. Must be one of {valid_providers}"
+            )
+        return v.lower()
+
+    @field_validator("write_approval_mode")
+    @classmethod
+    def validate_write_approval_mode(cls, v: str) -> str:
+        """Validate write approval mode."""
+        valid_modes = ["off", "risky_only", "all_writes"]
+        if v not in valid_modes:
+            raise ValueError(
+                f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}"
+            )
+        return v
+
+    @field_validator("tool_validation_mode")
+    @classmethod
+    def validate_tool_validation_mode(cls, v: str) -> str:
+        """Validate tool validation mode."""
+        valid_modes = ["strict", "lenient", "off"]
+        if v not in valid_modes:
+            raise ValueError(
+                f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}"
+            )
+        return v
+
+    @field_validator("context_compaction_strategy")
+    @classmethod
+    def validate_context_compaction_strategy(cls, v: str) -> str:
+        """Validate context compaction strategy."""
+        valid_strategies = ["simple", "tiered", "semantic", "hybrid"]
+        if v not in valid_strategies:
+            raise ValueError(
+                f"Invalid context_compaction_strategy: {v}. "
+                f"Must be one of {valid_strategies}"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_hybrid_search_weights(self) -> "Settings":
+        """Validate that hybrid search weights sum to 1.0."""
+        if self.enable_hybrid_search:
+            total_weight = (
+                self.hybrid_search_semantic_weight
+                + self.hybrid_search_keyword_weight
+            )
+            if abs(total_weight - 1.0) > 0.01:
+                raise ValueError(
+                    f"Hybrid search weights must sum to 1.0, got {total_weight}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def validate_embedding_config(self) -> "Settings":
+        """Warn on unknown embedding providers."""
+        known_providers = {
+            "sentence-transformers",
+            "openai",
+            "ollama",
+            "huggingface",
+            "cohere",
+        }
+        for field_name in ("embedding_provider", "codebase_embedding_provider"):
+            val = getattr(self, field_name, "")
+            if val and val not in known_providers:
+                warnings.warn(
+                    f"Unknown {field_name}='{val}'. "
+                    f"Known providers: {sorted(known_providers)}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        return self
+
+    # ==========================================================================
+    # Loading with Precedence (from VictorSettings merge)
+    # ==========================================================================
+
+    @classmethod
+    def from_sources(
+        cls,
+        cli_args: Optional[Dict[str, Any]] = None,
+        profile_name: Optional[str] = None,
+        config_dir: Optional[Path] = None,
+    ) -> "Settings":
+        """Load settings with proper precedence.
+
+        Precedence (highest to lowest):
+        1. CLI arguments (passed via cli_args)
+        2. Environment variables (VICTOR_*)
+        3. .env file
+        4. ~/.victor/settings.yaml
+        5. ~/.victor/profiles.yaml (specific profile)
+        6. Default values
+
+        Args:
+            cli_args: CLI argument overrides (highest priority)
+            profile_name: Active profile name to load from profiles.yaml
+            config_dir: Custom config directory (defaults to ~/.victor)
+
+        Returns:
+            Settings instance with all sources merged
+
+        Example:
+            >>> settings = Settings.from_sources(
+            ...     cli_args={"provider": "ollama", "model": "qwen3-coder:30b"},
+            ...     profile_name="default"
+            ... )
+            >>> settings.default_provider
+            'ollama'
+        """
+        # Determine config directory
+        if config_dir is None:
+            config_dir = Path.home() / ".victor"
+
+        # Start with defaults + env vars + .env file (Pydantic handles these)
+        settings_dict: Dict[str, Any] = {}
+
+        # Layer 5: Load profiles.yaml if exists
+        profiles_path = config_dir / "profiles.yaml"
+        if profiles_path.exists():
+            try:
+                with open(profiles_path) as f:
+                    profiles_data = yaml.safe_load(f) or {}
+
+                # Extract profile if specified
+                if profile_name and profile_name in profiles_data.get(
+                    "profiles", {}
+                ):
+                    profile_config = profiles_data["profiles"][profile_name]
+                    # Only take settings that exist in Settings
+                    for key, value in profile_config.items():
+                        if key in cls.model_fields:
+                            settings_dict[key] = value
+            except Exception as e:
+                logger.warning("Failed to load profiles.yaml: %s", e)
+
+        # Layer 4: Load settings.yaml if exists
+        settings_path = config_dir / "settings.yaml"
+        if settings_path.exists():
+            try:
+                with open(settings_path) as f:
+                    user_settings = yaml.safe_load(f) or {}
+                    # Override with user settings
+                    for key, value in user_settings.items():
+                        if key in cls.model_fields:
+                            settings_dict[key] = value
+            except Exception as e:
+                logger.warning("Failed to load settings.yaml: %s", e)
+
+        # Layer 3: .env file + Layer 2: Environment variables
+        # Pydantic Settings handles these automatically in __init__
+
+        # Create base settings with layers 3-6 (defaults, .env, env vars)
+        settings = cls(**settings_dict)
+
+        # Layer 1: Apply CLI overrides (highest priority)
+        if cli_args:
+            # Filter out None values and non-field keys
+            filtered_args = {
+                k: v
+                for k, v in cli_args.items()
+                if v is not None and k in cls.model_fields
+            }
+            if filtered_args:
+                settings = settings.model_copy(update=filtered_args)
+
+        return settings
 
     @staticmethod
     def _estimate_model_vram_gb(model_id: str) -> Optional[float]:

@@ -156,6 +156,11 @@ class ProviderLogger:
         """
         Context manager for logging API call lifecycle.
 
+        Automatically logs API_CALL_SUCCESS on normal exit. Providers can
+        optionally call the yielded callback to attach token counts to
+        the success log — if the callback is invoked, it replaces the
+        automatic log so there is never a duplicate.
+
         Args:
             endpoint: API endpoint being called
             model: Model being used
@@ -163,10 +168,12 @@ class ProviderLogger:
             **extra_context: Additional context to log
 
         Yields:
-            Function to call with success/error
+            Function to call with success details (tokens, etc.)
         """
         start_time = time.time()
         call_id = f"{self.provider}_{model}_{int(start_time * 1000)}"
+        # Track whether the provider explicitly called the callback
+        _logged = {"done": False}
 
         self.logger.info(
             f"API_CALL_START provider={self.provider} model={model} operation={operation}",
@@ -181,13 +188,23 @@ class ProviderLogger:
             },
         )
 
-        try:
-            yield lambda **kwargs: self._log_api_call_success(
+        def _log_success(**kwargs: Any) -> None:
+            _logged["done"] = True
+            self._log_api_call_success(
                 call_id, endpoint, model, start_time, **kwargs
             )
+
+        try:
+            yield _log_success
         except Exception as e:
             self._log_api_call_error(call_id, endpoint, model, start_time, e, **extra_context)
             raise
+        else:
+            # Auto-log success if the provider didn't call the callback
+            if not _logged["done"]:
+                self._log_api_call_success(
+                    call_id, endpoint, model, start_time,
+                )
 
     def _log_api_call_success(
         self,
@@ -251,19 +268,32 @@ class ProviderLogger:
         )
 
     def _is_retryable_error(self, error: Exception) -> bool:
-        """Determine if an error is retryable."""
-        # Retryable error patterns
-        retryable_patterns = [
-            "timeout",
-            "connection",
-            "rate limit",
-            "503",  # Service Unavailable
-            "502",  # Bad Gateway
-            "429",  # Too Many Requests
-        ]
+        """Determine if an error is retryable.
 
+        Uses a three-tier classification strategy:
+        1. Exception type checks (most reliable)
+        2. HTTP status code checks
+        3. String pattern fallback (for third-party exceptions)
+        """
+        # Tier 1: Type-based check (reliable)
+        try:
+            from victor.core.errors import ProviderRateLimitError, ProviderTimeoutError
+
+            if isinstance(error, (ProviderRateLimitError, ProviderTimeoutError)):
+                return True
+        except ImportError:
+            pass
+
+        # Tier 2: Status code check
+        status = getattr(error, "status_code", None) or getattr(error, "code", None)
+        if isinstance(status, int) and status in (429, 502, 503):
+            return True
+
+        # Tier 3: String fallback (for third-party exceptions)
         error_str = str(error).lower()
-        return any(pattern in error_str for pattern in retryable_patterns)
+        return any(
+            p in error_str for p in ("timeout", "rate limit", "connection reset")
+        )
 
     def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """

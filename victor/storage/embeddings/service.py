@@ -249,8 +249,9 @@ class EmbeddingService:
 
         Uses xxhash (C-backed, ~10x faster than SHA-256) for cache keys
         where cryptographic strength is unnecessary.
+        Includes model name so cache is invalidated on model switch.
         """
-        return self._hash_fn(text.encode()).hexdigest()
+        return self._hash_fn(f"{self.model_name}:{text}".encode()).hexdigest()
 
     @staticmethod
     def _init_hash_fn():
@@ -499,10 +500,7 @@ class EmbeddingService:
             )
             return np.zeros(self.dimension, dtype=np.float32)
 
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, lambda: self.embed_text_sync(text, use_cache=use_cache)
-        )
+        return await asyncio.to_thread(self.embed_text_sync, text, use_cache=use_cache)
 
     async def embed_batch(self, texts: List[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (async version).
@@ -520,8 +518,7 @@ class EmbeddingService:
             )
             return np.zeros((len(texts), self.dimension), dtype=np.float32)
 
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.embed_batch_sync, texts)
+        return await asyncio.to_thread(self.embed_batch_sync, texts)
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

@@ -171,12 +171,21 @@ def _create_tool_selection_cache_key(
     # Normalize message (lowercase, strip extra whitespace)
     normalized_message = " ".join(user_message.lower().strip().split())
 
+    # Bucket conversation depth into ranges to improve cache hit rate.
+    # Exact depth changes every iteration, causing cache misses.
+    if conversation_depth < 5:
+        depth_bucket = "short"
+    elif conversation_depth < 20:
+        depth_bucket = "medium"
+    else:
+        depth_bucket = "long"
+
     # Build key parts
     key_parts = [
         ResultType.TOOL_SELECTION.value,
         normalized_message,
         history_context,
-        str(conversation_depth),
+        depth_bucket,
         stage or "none",
         "semantic" if use_semantic else "keyword",
     ]
@@ -252,7 +261,7 @@ class GenericResultCache:
         self._dependencies: Dict[str, CacheDependency] = {}
         self._dependency_lock = threading.RLock()
 
-        # Path index: path -> set of cache keys
+        # Path index: path -> set of cache keys (paths are normalized)
         self._path_index: Dict[str, Set[str]] = {}
 
         # Result type index: result_type -> set of keys
@@ -274,6 +283,16 @@ class GenericResultCache:
             default_ttl,
             enable_dependency_tracking,
         )
+
+    @staticmethod
+    def _normalize_path(path_str: str) -> str:
+        """Normalize file paths for consistent cache key generation."""
+        if "/" in path_str or "\\" in path_str:
+            try:
+                return str(Path(path_str).resolve())
+            except (OSError, ValueError):
+                return path_str
+        return path_str
 
     def get(
         self,
@@ -372,7 +391,8 @@ class GenericResultCache:
                 for path_str in depends_on:
                     # Check if it looks like a file path
                     if "/" in path_str or "\\" in path_str:
-                        self._path_index.setdefault(path_str, set()).add(key)
+                        normalized = self._normalize_path(path_str)
+                        self._path_index.setdefault(normalized, set()).add(key)
 
                 # Update type index
                 self._type_index[result_type].add(key)
@@ -454,7 +474,7 @@ class GenericResultCache:
 
         with self._dependency_lock:
             for path in paths:
-                path_str = str(path)
+                path_str = self._normalize_path(str(path))
                 # Get keys that depend on this path
                 dependent_keys = self._path_index.get(path_str, set())
                 keys_to_invalidate.update(dependent_keys)

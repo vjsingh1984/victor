@@ -187,6 +187,10 @@ def bootstrap_container(
     This function configures the container with all required services.
     Call once at application startup.
 
+    Execution follows an explicit dependency DAG defined in
+    :data:`_BOOTSTRAP_PHASES`. Each phase declares its dependencies,
+    and phases are executed in topological order.
+
     Args:
         settings: Optional Settings instance (loads from config if None)
         vertical: Optional vertical name to activate (e.g., "coding", "research")
@@ -196,6 +200,8 @@ def bootstrap_container(
     Returns:
         Configured ServiceContainer
     """
+    from victor.core.bootstrap_phases import BootstrapPhase, execute_phases
+
     if settings is None:
         settings = load_settings()
 
@@ -203,56 +209,116 @@ def bootstrap_container(
 
     container = ServiceContainer()
 
-    # Register Settings as singleton
+    # Shared mutable context for inter-phase data
+    context: Dict[str, Any] = {
+        "active_vertical": active_vertical,
+        "override_services": override_services,
+    }
+
+    execute_phases(_BOOTSTRAP_PHASES, container, settings, context)
+
+    logger.info("Bootstrapped service container")
+    return container
+
+
+# -------------------------------------------------------------------------
+# Phase registration functions (thin wrappers for the DAG)
+# Each accepts (container, settings, context) for uniform signatures.
+# -------------------------------------------------------------------------
+
+
+def _phase_settings(container, settings, context):
+    """Phase: Register Settings singleton and domain config slices."""
     container.register_instance(Settings, settings)
 
-    # Register core services
+    # Register each nested config group as an independent service.
+    # Components can depend on e.g. ToolSettings instead of full Settings.
+    from victor.config.settings import _NESTED_GROUPS
+
+    for group_name, group_cls in _NESTED_GROUPS.items():
+        group_obj = getattr(settings, group_name, None)
+        if group_obj is not None:
+            container.register_instance(group_cls, group_obj)
+
+
+def _phase_core(container, settings, context):
+    """Phase: Core services (cache, capability config, framework)."""
     _register_core_services(container, settings)
 
-    # Register event services
+
+def _phase_events(container, settings, context):
+    """Phase: Event backend, observability bus, message bus."""
     _register_event_services(container, settings)
 
-    # Register analytics services
+
+def _phase_analytics(container, settings, context):
+    """Phase: Metrics, logger, usage analytics."""
     _register_analytics_services(container, settings)
 
-    # Register embedding services
+
+def _phase_embedding(container, settings, context):
+    """Phase: Lazy embedding service."""
     _register_embedding_services(container, settings)
 
-    # Register and initialize plugins (dynamic capabilities)
+
+def _phase_plugins(container, settings, context):
+    """Phase: Plugin discovery and registration."""
     from victor.core.plugins.registry import PluginRegistry
 
     plugin_registry = PluginRegistry.get_instance()
     plugin_registry.register_all(container)
 
-    # Bootstrap capability registry (stubs + entry point discovery)
-    bootstrap_capabilities()
-    _report_capability_health(active_vertical, container)
 
-    # Register coding services (language plugins, indexing)
+def _phase_capabilities(container, settings, context):
+    """Phase: Capability stubs + entry point discovery."""
+    bootstrap_capabilities()
+    _report_capability_health(context.get("active_vertical"), container)
+
+
+def _phase_coding(container, settings, context):
+    """Phase: Language plugins, indexing (optional)."""
     _register_coding_services(container, settings)
 
-    # Register signature store
+
+def _phase_signature(container, settings, context):
+    """Phase: Signature store."""
     _register_signature_store(container, settings)
 
-    # Register orchestrator services (Phase 10 DI Migration)
+
+def _phase_orchestrator(container, settings, context):
+    """Phase: 46+ orchestrator services from OrchestratorServiceProvider."""
     _register_orchestrator_services(container, settings)
 
-    # Register SOLID-refactored services (Phase 6 - Feature Flag Controlled)
+
+def _phase_solid(container, settings, context):
+    """Phase: SOLID-refactored services (feature-flag gated)."""
     _register_solid_refactored_services(container, settings)
 
-    # Register workflow services (SOLID Refactoring)
+
+def _phase_workflow(container, settings, context):
+    """Phase: Workflow services."""
     _register_workflow_services(container, settings)
 
-    # Register workflow compiler plugins (Plugin Architecture)
+
+def _phase_compiler_plugins(container, settings, context):
+    """Phase: Workflow compiler plugins."""
     _register_workflow_compiler_plugins(container, settings)
 
-    # Apply runtime pressure/reporter configuration for extension loading.
+
+def _phase_extensions(container, settings, context):
+    """Phase: Extension loader runtime configuration."""
     _configure_extension_loader_runtime(settings)
 
-    # Register vertical services
+
+def _phase_vertical(container, settings, context):
+    """Phase: Vertical-specific services."""
+    active_vertical = context.get("active_vertical")
     _register_vertical_services(container, settings, active_vertical)
 
-    # Apply overrides for testing
+
+def _phase_overrides(container, settings, context):
+    """Phase: Apply testing overrides."""
+    override_services = context.get("override_services")
     if override_services:
         for service_type, instance in override_services.items():
             container.register_or_replace(
@@ -261,11 +327,55 @@ def bootstrap_container(
                 ServiceLifetime.SINGLETON,
             )
 
-    # Set as global container
+
+def _phase_finalize(container, settings, context):
+    """Phase: Set global container."""
     set_container(container)
 
-    logger.info("Bootstrapped service container")
-    return container
+
+# -------------------------------------------------------------------------
+# Phase DAG definition
+# -------------------------------------------------------------------------
+
+from victor.core.bootstrap_phases import BootstrapPhase  # noqa: E402
+
+_BOOTSTRAP_PHASES = [
+    BootstrapPhase("settings", _phase_settings),
+    BootstrapPhase("core", _phase_core, depends_on=("settings",)),
+    BootstrapPhase("events", _phase_events, depends_on=("settings",)),
+    BootstrapPhase("analytics", _phase_analytics, depends_on=("settings",)),
+    BootstrapPhase("embedding", _phase_embedding, depends_on=("settings",)),
+    BootstrapPhase(
+        "plugins",
+        _phase_plugins,
+        depends_on=("core", "events", "analytics", "embedding"),
+    ),
+    BootstrapPhase("capabilities", _phase_capabilities, depends_on=("plugins",)),
+    BootstrapPhase(
+        "coding", _phase_coding, depends_on=("capabilities",), optional=True
+    ),
+    BootstrapPhase("signature", _phase_signature, depends_on=("settings",)),
+    BootstrapPhase(
+        "orchestrator", _phase_orchestrator, depends_on=("capabilities",)
+    ),
+    BootstrapPhase(
+        "solid", _phase_solid, depends_on=("orchestrator",), optional=True
+    ),
+    BootstrapPhase("workflow", _phase_workflow, depends_on=("settings",)),
+    BootstrapPhase(
+        "compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)
+    ),
+    BootstrapPhase("extensions", _phase_extensions, depends_on=("events",)),
+    BootstrapPhase(
+        "vertical",
+        _phase_vertical,
+        depends_on=("capabilities", "orchestrator"),
+    ),
+    BootstrapPhase(
+        "overrides", _phase_overrides, depends_on=("vertical",)
+    ),
+    BootstrapPhase("finalize", _phase_finalize, depends_on=("overrides",)),
+]
 
 
 def _register_core_services(container: ServiceContainer, settings: Settings) -> None:
@@ -477,6 +587,7 @@ def bootstrap_capabilities() -> None:
     from victor.core.capability_registry import CapabilityRegistry, CapabilityStatus
     from victor.framework.vertical_protocols import (
         CodebaseIndexFactoryProtocol,
+        EditorProtocol,
         IgnorePatternsProtocol,
         LanguageRegistryProtocol,
         SymbolStoreFactoryProtocol,
@@ -507,6 +618,10 @@ def bootstrap_capabilities() -> None:
     registry.register(IgnorePatternsProtocol, BasicIgnorePatterns(), CapabilityStatus.STUB)
     registry.register(LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB)
     registry.register(TaskTypeHintProtocol, NullTaskTypeHinter(), CapabilityStatus.STUB)
+
+    from victor.contrib.editing.diff_editor import DiffEditor
+
+    registry.register(EditorProtocol, DiffEditor(), CapabilityStatus.STUB)
     # LSPManagerProtocol and EmbeddingModelFactoryProtocol — no stubs registered;
     # capabilities.get() returns None when not available, which callers already handle.
 
@@ -530,33 +645,80 @@ def bootstrap_capabilities() -> None:
 
     # 3. Auto-detect installed vertical packages that provide enhanced capabilities
     #    but haven't registered via entry points (e.g., victor-coding's CodebaseIndex).
-    _auto_detect_package_capabilities(registry, CodebaseIndexFactoryProtocol)
+    _auto_detect_enhanced_capabilities(registry)
 
 
-def _auto_detect_package_capabilities(registry: Any, index_factory_protocol: type) -> None:
+# ---------------------------------------------------------------------------
+# Data-driven auto-detection for enhanced capabilities
+# ---------------------------------------------------------------------------
+#
+# Each entry maps a protocol to either:
+#   - "import_path": direct class import (registered as-is)
+#   - "factory": module:function that returns an instance (or None)
+#
+# To add a new auto-detected capability, append an entry here — no new
+# function needed.
+_AUTO_DETECT_SPECS: list[dict[str, Any]] = [
+    {
+        "protocol_attr": "CodebaseIndexFactoryProtocol",
+        "factory": "victor.core.search.indexer:detect_enhanced_index_factory",
+        "label": "CodebaseIndexFactory",
+    },
+    {
+        "protocol_attr": "EditorProtocol",
+        "import_path": "victor_coding.editing.file_editor:FileEditor",
+        "label": "FileEditor",
+    },
+]
+
+
+def _auto_detect_enhanced_capabilities(registry: Any) -> None:
     """Auto-detect enhanced capabilities from installed vertical packages.
 
-    Checks for installed packages that provide enhanced implementations
-    but may not have registered them via 'victor.capabilities' entry points.
-    This bridges the gap when external packages use different registration
-    mechanisms (e.g., victor.sdk.capabilities vs victor.capabilities).
+    Uses a declarative spec list (_AUTO_DETECT_SPECS) so adding a new
+    auto-detected protocol requires only a dict entry, not a new function.
     """
+    import importlib
+
     from victor.core.capability_registry import CapabilityStatus
+    from victor.framework import vertical_protocols
 
-    # Skip if an enhanced provider is already registered
-    if registry.is_enhanced(index_factory_protocol):
-        return
+    for spec in _AUTO_DETECT_SPECS:
+        protocol = getattr(vertical_protocols, spec["protocol_attr"], None)
+        if protocol is None:
+            continue
 
-    # Try to detect victor-coding's CodebaseIndex
-    try:
-        from victor.core.search.indexer import detect_enhanced_index_factory
+        if registry.is_enhanced(protocol):
+            continue
 
-        factory = detect_enhanced_index_factory()
-        if factory is not None:
-            registry.register(index_factory_protocol, factory, CapabilityStatus.ENHANCED)
-            logger.info("Auto-detected victor-coding: registered enhanced CodebaseIndexFactory")
-    except Exception as e:
-        logger.debug(f"CodebaseIndex auto-detection skipped: {e}")
+        label = spec.get("label", spec["protocol_attr"])
+
+        # Strategy 1: direct class import
+        if "import_path" in spec:
+            module_path, class_name = spec["import_path"].rsplit(":", 1)
+            try:
+                module = importlib.import_module(module_path)
+                provider = getattr(module, class_name)
+                registry.register(protocol, provider, CapabilityStatus.ENHANCED)
+                logger.info(f"Auto-detected enhanced {label}")
+            except ImportError:
+                logger.debug(f"{label} auto-detection skipped: package not installed")
+            except Exception as e:
+                logger.debug(f"{label} auto-detection failed: {e}")
+            continue
+
+        # Strategy 2: factory function
+        if "factory" in spec:
+            module_path, func_name = spec["factory"].rsplit(":", 1)
+            try:
+                module = importlib.import_module(module_path)
+                factory_fn = getattr(module, func_name)
+                provider = factory_fn()
+                if provider is not None:
+                    registry.register(protocol, provider, CapabilityStatus.ENHANCED)
+                    logger.info(f"Auto-detected enhanced {label}")
+            except Exception as e:
+                logger.debug(f"{label} auto-detection skipped: {e}")
 
 
 def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
