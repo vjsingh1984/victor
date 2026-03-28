@@ -426,6 +426,51 @@ class TestCompilationFromDefinition:
         assert isinstance(compiled, CachedCompiledGraph)
         assert compiled.compiled_graph is not None
 
+    @pytest.mark.asyncio
+    async def test_compile_definition_uses_shared_custom_executor_registry(self):
+        """Definition compilation should honor the shared custom executor registry."""
+        from victor.workflows.definition import WorkflowDefinition, WorkflowNode
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        class CustomExecutor:
+            def __init__(self, context=None):
+                self.context = context
+
+            async def execute(self, node, state):
+                next_state = dict(state)
+                next_state["custom_output"] = node.id
+                return next_state
+
+        @dataclass
+        class CustomNode(WorkflowNode):
+            @property
+            def node_type(self) -> str:
+                return "custom_plugin"
+
+        workflow = WorkflowDefinition(
+            name="custom_workflow",
+            nodes={
+                "custom": CustomNode(
+                    id="custom",
+                    name="Custom Node",
+                ),
+            },
+            start_node="custom",
+        )
+
+        try:
+            clear_registered_workflow_node_executors()
+            register_workflow_node_executor("custom_plugin", CustomExecutor)
+
+            compiler = UnifiedWorkflowCompiler()
+            compiled = compiler.compile_definition(workflow, cache_key="custom-workflow")
+            result = await compiled.invoke({})
+
+            assert result.success is True
+            assert result.state["custom_output"] == "custom"
+        finally:
+            clear_registered_workflow_node_executors()
+
 
 class TestCompilationFromGraphDSL:
     """Tests for compiling from WorkflowGraph (graph_dsl)."""
