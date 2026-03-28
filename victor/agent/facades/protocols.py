@@ -179,14 +179,9 @@ class MetricsFacadeProtocol(Protocol):
 class ResilienceFacadeProtocol(Protocol):
     """Protocol for the resilience domain facade.
 
-    Manages error recovery, context compaction, middleware chain,
-    safety checking, and RL coordination.
+    Manages error recovery, context management, RL coordination,
+    code execution, and background task management.
     """
-
-    @property
-    def context_compactor(self) -> Optional[Any]:
-        """Optional context compactor."""
-        ...
 
     @property
     def recovery_handler(self) -> Optional[Any]:
@@ -194,8 +189,8 @@ class ResilienceFacadeProtocol(Protocol):
         ...
 
     @property
-    def safety_checker(self) -> Optional[Any]:
-        """Optional safety checker."""
+    def context_manager(self) -> Optional[Any]:
+        """Optional context window manager."""
         ...
 
 

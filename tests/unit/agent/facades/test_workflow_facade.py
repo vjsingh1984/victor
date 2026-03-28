@@ -1,0 +1,109 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for WorkflowFacade domain facade."""
+
+import pytest
+from unittest.mock import MagicMock
+
+from victor.agent.facades.workflow_facade import WorkflowFacade
+from victor.agent.facades.protocols import WorkflowFacadeProtocol
+
+
+class TestWorkflowFacadeInit:
+    """Tests for WorkflowFacade initialization."""
+
+    def test_init_with_all_components(self):
+        """WorkflowFacade initializes with all components provided."""
+        registry = MagicMock()
+        runtime = MagicMock()
+
+        facade = WorkflowFacade(
+            workflow_registry=registry,
+            workflow_runtime=runtime,
+            workflow_optimization=MagicMock(),
+            mode_workflow_team_coordinator=MagicMock(),
+        )
+
+        assert facade.workflow_registry is registry
+        assert facade.workflow_runtime is runtime
+
+    def test_init_with_minimal_components(self):
+        """WorkflowFacade initializes with no required components (all optional)."""
+        facade = WorkflowFacade()
+
+        assert facade.workflow_registry is None
+        assert facade.workflow_runtime is None
+        assert facade.workflow_optimization is None
+        assert facade.mode_workflow_team_coordinator is None
+
+
+class TestWorkflowFacadeProperties:
+    """Tests for WorkflowFacade property access."""
+
+    @pytest.fixture
+    def facade(self):
+        """Create a WorkflowFacade with mock components."""
+        return WorkflowFacade(
+            workflow_registry=MagicMock(name="registry"),
+            workflow_runtime=MagicMock(name="runtime"),
+            workflow_optimization=MagicMock(name="optimization"),
+            mode_workflow_team_coordinator=MagicMock(name="coordinator"),
+        )
+
+    def test_workflow_registry_property(self, facade):
+        """WorkflowRegistry property returns the registry."""
+        assert facade.workflow_registry._mock_name == "registry"
+
+    def test_workflow_registry_setter(self, facade):
+        """WorkflowRegistry setter updates the registry."""
+        new_registry = MagicMock(name="new_registry")
+        facade.workflow_registry = new_registry
+        assert facade.workflow_registry is new_registry
+
+    def test_workflow_runtime_property(self, facade):
+        """WorkflowRuntime property returns the runtime."""
+        assert facade.workflow_runtime._mock_name == "runtime"
+
+    def test_workflow_optimization_property(self, facade):
+        """WorkflowOptimization property returns the optimization components."""
+        assert facade.workflow_optimization._mock_name == "optimization"
+
+    def test_mode_coordinator_property(self, facade):
+        """ModeWorkflowTeamCoordinator property returns the coordinator."""
+        assert facade.mode_workflow_team_coordinator._mock_name == "coordinator"
+
+    def test_mode_coordinator_setter(self, facade):
+        """ModeWorkflowTeamCoordinator setter updates the coordinator."""
+        new_coordinator = MagicMock(name="new_coordinator")
+        facade.mode_workflow_team_coordinator = new_coordinator
+        assert facade.mode_workflow_team_coordinator is new_coordinator
+
+
+class TestWorkflowFacadeProtocolConformance:
+    """Tests that WorkflowFacade satisfies WorkflowFacadeProtocol."""
+
+    def test_satisfies_protocol(self):
+        """WorkflowFacade structurally conforms to WorkflowFacadeProtocol."""
+        facade = WorkflowFacade()
+        assert isinstance(facade, WorkflowFacadeProtocol)
+
+    def test_protocol_properties_present(self):
+        """All protocol-required properties are present on WorkflowFacade."""
+        required = [
+            "workflow_registry",
+        ]
+        facade = WorkflowFacade()
+        for prop in required:
+            assert hasattr(facade, prop), f"Missing protocol property: {prop}"
