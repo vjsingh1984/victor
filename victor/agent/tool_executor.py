@@ -344,6 +344,77 @@ class ToolExecutor:
                 f"permission for tool '{tool_name}' (category: {category})",
             )
 
+    def _check_missing_required_args(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+    ) -> List[str]:
+        """Check for missing required arguments before execution.
+
+        Uses the tool's JSON Schema to identify required parameters
+        that were not provided, preventing TypeError crashes.
+
+        Args:
+            tool: The tool to check arguments for
+            arguments: Arguments provided by the LLM
+
+        Returns:
+            List of missing required argument names (empty if all present)
+        """
+        schema = tool.parameters
+        if not schema:
+            return []
+
+        required = schema.get("required", [])
+        if not required:
+            return []
+
+        return [r for r in required if r not in arguments]
+
+    @staticmethod
+    def _coerce_arg_types(tool: BaseTool, arguments: Dict[str, Any]) -> None:
+        """Best-effort type coercion based on JSON Schema property types.
+
+        Prevents runtime TypeErrors when the LLM sends a value with the
+        wrong type (e.g. string "5" for an integer parameter). Modifies
+        ``arguments`` in place.
+
+        Only handles safe, lossless conversions:
+        - str → int/float (numeric strings)
+        - int → float
+        - str → bool ("true"/"false")
+        """
+        schema = tool.parameters
+        if not schema:
+            return
+
+        properties = schema.get("properties", {})
+        for key, value in list(arguments.items()):
+            prop_schema = properties.get(key)
+            if not prop_schema:
+                continue
+
+            expected = prop_schema.get("type")
+            if not expected or not isinstance(expected, str):
+                continue
+
+            try:
+                if expected == "integer" and isinstance(value, str):
+                    arguments[key] = int(value)
+                elif expected == "number" and isinstance(value, str):
+                    arguments[key] = float(value)
+                elif expected == "number" and isinstance(value, int):
+                    arguments[key] = float(value)
+                elif expected == "boolean" and isinstance(value, str):
+                    if value.lower() in ("true", "1", "yes"):
+                        arguments[key] = True
+                    elif value.lower() in ("false", "0", "no"):
+                        arguments[key] = False
+                elif expected == "string" and not isinstance(value, str):
+                    arguments[key] = str(value)
+            except (ValueError, TypeError):
+                pass  # Leave original value; tool will handle the error
+
     def _check_unknown_arguments(
         self,
         tool: BaseTool,
@@ -601,6 +672,19 @@ class ToolExecutor:
             self._complete_tool_call(call_id, False, error=result.error)
             return result
 
+        # Check for missing required arguments before schema validation
+        missing = self._check_missing_required_args(tool, normalized_args)
+        if missing:
+            error_msg = f"Error: Missing required arguments: {', '.join(missing)}"
+            result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=error_msg,
+            )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
+
         # Pre-execution schema validation
         should_proceed, validation_result = self._validate_arguments(tool, normalized_args)
         if not should_proceed:
@@ -615,6 +699,11 @@ class ToolExecutor:
             )
             self._complete_tool_call(call_id, False, error=result.error)
             return result
+
+        # In LENIENT mode, coerce argument types to match schema to prevent
+        # runtime TypeErrors (e.g., string "5" when int expected)
+        if self.validation_mode == ValidationMode.LENIENT:
+            self._coerce_arg_types(tool, normalized_args)
 
         # Safety check for dangerous operations
         should_proceed, rejection_reason = await self.safety_checker.check_and_confirm(

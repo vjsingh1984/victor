@@ -53,7 +53,7 @@
 
 ### 2. Open/Closed Principle (OCP) Violations
 - Adding new node types requires modifying multiple files (executor, compiler, handlers)
-- No plugin mechanism for custom node execution strategies
+- Custom node execution is now extensible via `PluginContext.register_workflow_node_executor()`; remaining work is documenting and hardening the extension lifecycle
 
 ### 3. Liskov Substitution Principle (LSP) Violations
 - Two `StateGraph` classes with same name but incompatible `compile()` return types

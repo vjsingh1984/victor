@@ -1,5 +1,4 @@
 import typer
-import asyncio
 import re
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
@@ -8,10 +7,83 @@ from typing import Optional, List
 import yaml
 
 from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
+
+
+async def _generate_enhanced_init_content_async(
+    *,
+    use_llm: bool,
+    include_conversations: bool,
+    on_progress,
+    force: bool,
+    include_dirs: Optional[List[str]],
+    exclude_dirs: Optional[List[str]],
+) -> str:
+    from victor.verticals.contrib.coding.codebase_analyzer import generate_enhanced_init_md
+
+    return await generate_enhanced_init_md(
+        use_llm=use_llm,
+        include_conversations=include_conversations,
+        on_progress=on_progress,
+        force=force,
+        include_dirs=include_dirs,
+        exclude_dirs=exclude_dirs,
+    )
+
+
+def _generate_enhanced_init_content(
+    *,
+    use_llm: bool,
+    include_conversations: bool,
+    on_progress,
+    force: bool,
+    include_dirs: Optional[List[str]],
+    exclude_dirs: Optional[List[str]],
+) -> str:
+    return run_sync(
+        _generate_enhanced_init_content_async(
+            use_llm=use_llm,
+            include_conversations=include_conversations,
+            on_progress=on_progress,
+            force=force,
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
+    )
+
+
+async def _generate_index_init_content_async(
+    *,
+    force: bool,
+    include_dirs: Optional[List[str]],
+    exclude_dirs: Optional[List[str]],
+) -> str:
+    from victor.verticals.contrib.coding.codebase_analyzer import generate_victor_md_from_index
+
+    return await generate_victor_md_from_index(
+        force=force,
+        include_dirs=include_dirs,
+        exclude_dirs=exclude_dirs,
+    )
+
+
+def _generate_index_init_content(
+    *,
+    force: bool,
+    include_dirs: Optional[List[str]],
+    exclude_dirs: Optional[List[str]],
+) -> str:
+    return run_sync(
+        _generate_index_init_content_async(
+            force=force,
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
+    )
 
 
 def _ensure_profile_preset(
@@ -357,17 +429,7 @@ providers:
 
             if deep or learn:
                 try:
-                    from victor.verticals.contrib.coding.codebase_analyzer import (
-                        generate_enhanced_init_md,
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-
-                new_content = asyncio.run(
-                    generate_enhanced_init_md(
+                    new_content = _generate_enhanced_init_content(
                         use_llm=deep,
                         include_conversations=learn,
                         on_progress=on_progress,
@@ -375,26 +437,24 @@ providers:
                         include_dirs=include_dirs or None,
                         exclude_dirs=exclude_dirs or None,
                     )
-                )
+                except ImportError:
+                    console.print(
+                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
+                    )
+                    return
             elif index:
                 try:
-                    from victor.verticals.contrib.coding.codebase_analyzer import (
-                        generate_victor_md_from_index,
+                    console.print("[dim]  Building symbol index...[/]")
+                    new_content = _generate_index_init_content(
+                        force=force,
+                        include_dirs=include_dirs or None,
+                        exclude_dirs=exclude_dirs or None,
                     )
                 except ImportError:
                     console.print(
                         "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
                     )
                     return
-
-                console.print("[dim]  Building symbol index...[/]")
-                new_content = asyncio.run(
-                    generate_victor_md_from_index(
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
-                    )
-                )
             else:
                 try:
                     from victor.verticals.contrib.coding.codebase_analyzer import (

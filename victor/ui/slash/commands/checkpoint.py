@@ -24,7 +24,6 @@ Commands:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from rich.panel import Panel
@@ -49,9 +48,10 @@ class CheckpointCommand(BaseSlashCommand):
             usage="/checkpoint <save|list|restore|diff|timeline> [args]",
             category="checkpoint",
             requires_agent=True,
+            is_async=True,
         )
 
-    def execute(self, ctx: CommandContext) -> None:
+    async def execute(self, ctx: CommandContext) -> None:
         if not self._require_agent(ctx):
             return
 
@@ -63,15 +63,15 @@ class CheckpointCommand(BaseSlashCommand):
         subargs = ctx.args[1:]
 
         if subcommand == "save":
-            self._handle_save(ctx, subargs)
+            await self._handle_save(ctx, subargs)
         elif subcommand == "list":
-            self._handle_list(ctx, subargs)
+            await self._handle_list(ctx, subargs)
         elif subcommand == "restore":
-            self._handle_restore(ctx, subargs)
+            await self._handle_restore(ctx, subargs)
         elif subcommand == "diff":
-            self._handle_diff(ctx, subargs)
+            await self._handle_diff(ctx, subargs)
         elif subcommand == "timeline":
-            self._handle_timeline(ctx, subargs)
+            await self._handle_timeline(ctx, subargs)
         else:
             ctx.console.print(f"[yellow]Unknown subcommand:[/] {subcommand}")
             self._show_help(ctx)
@@ -102,9 +102,17 @@ class CheckpointCommand(BaseSlashCommand):
 """
         ctx.console.print(Panel(help_text, title="Checkpoint Help", border_style="blue"))
 
-    def _handle_save(self, ctx: CommandContext, args: list[str]) -> None:
+    def _checkpoint_manager_enabled(self, ctx: CommandContext) -> bool:
+        """Return whether checkpoint support is available for the active agent."""
+        return bool(getattr(ctx.agent, "checkpoint_manager", None))
+
+    def _get_session_id(self, ctx: CommandContext) -> str:
+        """Return the current checkpoint session identifier."""
+        return getattr(ctx.agent, "_memory_session_id", None) or "default"
+
+    async def _handle_save(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint save subcommand."""
-        if not ctx.agent.checkpoint_manager:
+        if not self._checkpoint_manager_enabled(ctx):
             ctx.console.print(
                 "[yellow]Checkpoint system not enabled.[/] "
                 "Set checkpoint_enabled=True in settings."
@@ -114,23 +122,7 @@ class CheckpointCommand(BaseSlashCommand):
         description = " ".join(args) if args else None
 
         try:
-            # Run async method in event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Create a new task if we're already in an async context
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        ctx.agent.save_checkpoint(description=description),
-                    )
-                    checkpoint_id = future.result(timeout=10)
-            else:
-                checkpoint_id = loop.run_until_complete(
-                    ctx.agent.save_checkpoint(description=description)
-                )
-
+            checkpoint_id = await ctx.agent.save_checkpoint(description=description)
             if checkpoint_id:
                 ctx.console.print(
                     Panel(
@@ -149,9 +141,9 @@ class CheckpointCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error saving checkpoint:[/] {e}")
             logger.exception("Checkpoint save error")
 
-    def _handle_list(self, ctx: CommandContext, args: list[str]) -> None:
+    async def _handle_list(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint list subcommand."""
-        if not ctx.agent.checkpoint_manager:
+        if not self._checkpoint_manager_enabled(ctx):
             ctx.console.print(
                 "[yellow]Checkpoint system not enabled.[/] "
                 "Set checkpoint_enabled=True in settings."
@@ -167,25 +159,11 @@ class CheckpointCommand(BaseSlashCommand):
                 return
 
         try:
-            # Get session ID from agent
-            session_id = getattr(ctx.agent, "_memory_session_id", None) or "default"
-
-            # Run async method
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        ctx.agent.checkpoint_manager.list_checkpoints(session_id, limit=limit),
-                    )
-                    checkpoints = future.result(timeout=10)
-            else:
-                checkpoints = loop.run_until_complete(
-                    ctx.agent.checkpoint_manager.list_checkpoints(session_id, limit=limit)
-                )
-
+            session_id = self._get_session_id(ctx)
+            checkpoints = await ctx.agent.checkpoint_manager.list_checkpoints(
+                session_id,
+                limit=limit,
+            )
             if not checkpoints:
                 ctx.console.print("[dim]No checkpoints found for this session.[/]")
                 return
@@ -214,14 +192,14 @@ class CheckpointCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error listing checkpoints:[/] {e}")
             logger.exception("Checkpoint list error")
 
-    def _handle_restore(self, ctx: CommandContext, args: list[str]) -> None:
+    async def _handle_restore(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint restore subcommand."""
         if not args:
             ctx.console.print("[yellow]Usage:[/] /checkpoint restore <checkpoint_id>")
             ctx.console.print("[dim]Use '/checkpoint list' to see available checkpoints[/]")
             return
 
-        if not ctx.agent.checkpoint_manager:
+        if not self._checkpoint_manager_enabled(ctx):
             ctx.console.print(
                 "[yellow]Checkpoint system not enabled.[/] "
                 "Set checkpoint_enabled=True in settings."
@@ -231,20 +209,7 @@ class CheckpointCommand(BaseSlashCommand):
         checkpoint_id = args[0]
 
         try:
-            # Run async method
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        ctx.agent.restore_checkpoint(checkpoint_id),
-                    )
-                    success = future.result(timeout=10)
-            else:
-                success = loop.run_until_complete(ctx.agent.restore_checkpoint(checkpoint_id))
-
+            success = await ctx.agent.restore_checkpoint(checkpoint_id)
             if success:
                 ctx.console.print(
                     Panel(
@@ -262,13 +227,13 @@ class CheckpointCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error restoring checkpoint:[/] {e}")
             logger.exception("Checkpoint restore error")
 
-    def _handle_diff(self, ctx: CommandContext, args: list[str]) -> None:
+    async def _handle_diff(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint diff subcommand."""
         if len(args) < 2:
             ctx.console.print("[yellow]Usage:[/] /checkpoint diff <checkpoint_a> <checkpoint_b>")
             return
 
-        if not ctx.agent.checkpoint_manager:
+        if not self._checkpoint_manager_enabled(ctx):
             ctx.console.print(
                 "[yellow]Checkpoint system not enabled.[/] "
                 "Set checkpoint_enabled=True in settings."
@@ -278,22 +243,7 @@ class CheckpointCommand(BaseSlashCommand):
         checkpoint_a, checkpoint_b = args[0], args[1]
 
         try:
-            # Run async method
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b),
-                    )
-                    diff = future.result(timeout=10)
-            else:
-                diff = loop.run_until_complete(
-                    ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b)
-                )
-
+            diff = await ctx.agent.checkpoint_manager.diff_checkpoints(checkpoint_a, checkpoint_b)
             # Display diff summary
             ctx.console.print(
                 Panel(
@@ -307,9 +257,9 @@ class CheckpointCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error comparing checkpoints:[/] {e}")
             logger.exception("Checkpoint diff error")
 
-    def _handle_timeline(self, ctx: CommandContext, args: list[str]) -> None:
+    async def _handle_timeline(self, ctx: CommandContext, args: list[str]) -> None:
         """Handle checkpoint timeline subcommand."""
-        if not ctx.agent.checkpoint_manager:
+        if not self._checkpoint_manager_enabled(ctx):
             ctx.console.print(
                 "[yellow]Checkpoint system not enabled.[/] "
                 "Set checkpoint_enabled=True in settings."
@@ -317,25 +267,8 @@ class CheckpointCommand(BaseSlashCommand):
             return
 
         try:
-            # Get session ID from agent
-            session_id = getattr(ctx.agent, "_memory_session_id", None) or "default"
-
-            # Run async method
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        ctx.agent.checkpoint_manager.get_timeline(session_id),
-                    )
-                    timeline = future.result(timeout=10)
-            else:
-                timeline = loop.run_until_complete(
-                    ctx.agent.checkpoint_manager.get_timeline(session_id)
-                )
-
+            session_id = self._get_session_id(ctx)
+            timeline = await ctx.agent.checkpoint_manager.get_timeline(session_id)
             if not timeline:
                 ctx.console.print("[dim]No checkpoints found for timeline.[/]")
                 return

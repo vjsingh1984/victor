@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 from tree_sitter import Query
 
+from victor.core.async_utils import run_sync
 from victor.verticals.contrib.coding.codebase.graph.protocol import GraphEdge, GraphNode
 from victor.verticals.contrib.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
 from victor.verticals.contrib.coding.codebase.unified_extractor import (
@@ -1646,7 +1647,7 @@ class CodebaseIndex:
             "watcher_running": self._observer is not None,
         }
         if self.use_embeddings and self.embedding_provider:
-            stats["embedding_stats"] = asyncio.run(self.embedding_provider.get_stats())
+            stats["embedding_stats"] = run_sync(self.embedding_provider.get_stats())
         return stats
 
     def _initialize_embeddings(self, config: Optional[Dict[str, Any]]) -> None:

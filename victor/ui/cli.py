@@ -131,12 +131,15 @@ def _register_plugin_commands():
         registry = PluginRegistry.get_instance()
 
         # 1. Register commands from PluginContext (New method)
+        analyze_registered = False
         if registry.context:
             for name, sub_app in registry.context.commands.items():
                 try:
                     if name == "analyze":
-                        # Coding-specific command
+                        analyze_registered = True
+                        # Register under both coding subcommand AND top level
                         coding_app.add_typer(sub_app, name=name)
+                        app.add_typer(sub_app, name=name)
                     else:
                         # Register command under its specified name at top level
                         app.add_typer(sub_app, name=name)
@@ -158,6 +161,18 @@ def _register_plugin_commands():
                 console.print(
                     f"[yellow]Warning:[/] Failed to load legacy CLI app from plugin '{plugin.name}': {e}"
                 )
+
+        # 3. Fallback: register analyze from contrib if plugin context didn't provide it
+        if not analyze_registered:
+            try:
+                from victor.verticals.contrib.coding.commands.analyze import (
+                    app as _analyze_fallback,
+                )
+
+                coding_app.add_typer(_analyze_fallback, name="analyze")
+                app.add_typer(_analyze_fallback, name="analyze")
+            except (ImportError, Exception):
+                pass  # Neither plugin nor contrib available
     except Exception:
         pass
 

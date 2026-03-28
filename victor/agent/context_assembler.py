@@ -45,10 +45,12 @@ class TurnBoundaryContextAssembler:
         config: Optional[ContextAssemblerConfig] = None,
         session_ledger: Optional[object] = None,
         score_fn: Optional[Callable] = None,
+        conversation_controller: Optional[object] = None,
     ):
         self._config = config or CONTEXT_ASSEMBLER_CONFIG
         self._session_ledger = session_ledger
         self._score_fn = score_fn
+        self._conversation_controller = conversation_controller
 
     @property
     def config(self) -> ContextAssemblerConfig:
@@ -130,6 +132,7 @@ class TurnBoundaryContextAssembler:
         older_budget = max(0, history_budget - chars_used - recent_chars)
 
         # 4. Score and select older messages
+        older_chars = 0
         if older_messages and self._score_fn and older_budget > 0:
             scored = self._score_fn(older_messages, current_query)
             # scored should be list of (message, score) or similar
@@ -161,7 +164,30 @@ class TurnBoundaryContextAssembler:
                     result.insert(len(result), msg)
                     older_chars += len(msg.content)
 
-        # 5. Append recent turns (always kept)
+        # 5. Semantic augmentation: retrieve relevant compacted context
+        if self._conversation_controller and current_query:
+            retrieve_fn = getattr(
+                self._conversation_controller, "retrieve_relevant_history", None
+            )
+            if retrieve_fn:
+                try:
+                    remaining_budget = older_budget - older_chars
+                    if remaining_budget > 500:
+                        relevant = retrieve_fn(query=current_query, limit=3)
+                        semantic_chars = 0
+                        for ctx_str in relevant:
+                            if semantic_chars + len(ctx_str) <= remaining_budget:
+                                result.append(
+                                    Message(
+                                        role="assistant",
+                                        content=f"[Historical context: {ctx_str}]",
+                                    )
+                                )
+                                semantic_chars += len(ctx_str)
+                except Exception as e:
+                    logger.debug(f"Semantic retrieval failed gracefully: {e}")
+
+        # 6. Append recent turns (always kept)
         for msg in recent_messages:
             result.append(msg)
 

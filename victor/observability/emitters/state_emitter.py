@@ -137,7 +137,7 @@ class StateEventEmitter(IStateEventEmitter):
         """Emit a state event synchronously (for gradual migration).
 
         This method wraps the async emit_async() method using emit_event_sync()
-        to avoid asyncio.run() errors in running event loops.
+        so sync callers can reuse the shared async/sync bridge behavior.
 
         Args:
             topic: Event topic (e.g., "state.transition")

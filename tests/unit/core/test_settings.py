@@ -18,6 +18,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
+from pydantic import SecretStr
+
 from victor.config.settings import (
     ProviderConfig,
     ProfileConfig,
@@ -49,7 +51,9 @@ class TestProviderConfig:
             organization="test_org",
         )
 
-        assert config.api_key == "test_key"
+        assert isinstance(config.api_key, SecretStr)
+        assert config.api_key.get_secret_value() == "test_key"
+        assert config.api_key_value == "test_key"
         assert config.base_url == "https://api.example.com"
         assert config.timeout == 120
         assert config.max_retries == 5
@@ -381,7 +385,8 @@ providers:
                 config = Settings.load_provider_config("anthropic")
 
                 assert config is not None
-                assert config.api_key == "test_key_123"
+                assert config.api_key is not None
+                assert config.api_key.get_secret_value() == "test_key_123"
                 assert config.timeout == 90
                 assert config.max_retries == 5
 
@@ -406,7 +411,8 @@ providers:
                     config = Settings.load_provider_config("anthropic")
 
                     assert config is not None
-                    assert config.api_key == "env_key_456"
+                    assert config.api_key is not None
+                    assert config.api_key.get_secret_value() == "env_key_456"
 
     def test_load_provider_config_error_handling(self):
         """Test error handling when loading provider config fails."""
@@ -557,6 +563,20 @@ providers:
                 assert provider_settings["api_key"] == "test_key"
                 assert provider_settings["timeout"] == 120
                 assert provider_settings["max_retries"] == 10
+
+    def test_server_secrets_use_secretstr(self):
+        """Server-facing secrets should be stored as SecretStr values."""
+        settings = Settings(
+            server_api_key="server-token",
+            server_session_secret="session-secret",
+        )
+
+        assert isinstance(settings.server_api_key, SecretStr)
+        assert settings.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server_session_secret, SecretStr)
+        assert settings.server_session_secret.get_secret_value() == "session-secret"
+        assert settings.security.server_api_key.get_secret_value() == "server-token"
+        assert settings.security.server_session_secret.get_secret_value() == "session-secret"
 
 
 class TestLoadSettings:

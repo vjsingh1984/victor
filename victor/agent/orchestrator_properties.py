@@ -129,6 +129,15 @@ def _task_coordinator(self: "AgentOrchestrator") -> "TaskCoordinator":
     return self._task_coordinator
 
 
+def _session_ledger_get(self: "AgentOrchestrator") -> Any:
+    """Get the session ledger for structured state tracking."""
+    return self._session_ledger
+
+
+def _session_ledger_set(self: "AgentOrchestrator", value: Any) -> None:
+    self._session_ledger = value
+
+
 def _code_correction_middleware(self: "AgentOrchestrator") -> Optional[Any]:
     """Get the code correction middleware for automatic code validation/fixing."""
     return self._code_correction_middleware
@@ -441,6 +450,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "chunk_generator": (_chunk_generator, None),
     "tool_planner": (_tool_planner, None),
     "task_coordinator": (_task_coordinator, None),
+    "session_ledger": (_session_ledger_get, _session_ledger_set),
     "code_correction_middleware": (_code_correction_middleware, None),
     "checkpoint_manager": (_checkpoint_manager, None),
     "vertical_context": (_vertical_context, None),

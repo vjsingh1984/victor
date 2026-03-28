@@ -197,35 +197,15 @@ class TestProviderSwitchingIntegration:
     @pytest.mark.asyncio
     async def test_switch_provider_with_custom_settings(self, orchestrator, mock_provider2):
         """Test switching provider with custom provider settings."""
-        # Note: The protocol method doesn't support **kwargs for custom settings
-        # This test verifies that the sync implementation handles custom settings correctly
         custom_settings = {"base_url": "http://localhost:8080", "timeout": 60}
 
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch with custom settings using the sync implementation
-            # We need to get the actual sync method implementation from the class __dict__
-            # before the async method override shadows it
-            import inspect
-
-            # Find the sync switch_provider method (first one defined, not the async one)
-            for name, method in inspect.getmembers(AgentOrchestrator, predicate=inspect.isfunction):
-                if name == "switch_provider" and not inspect.iscoroutinefunction(method):
-                    # This is the sync method
-                    success = method(orchestrator, "mock2", "model", **custom_settings)
-                    break
-            else:
-                # Fallback: just check that provider registry is called with the right args
-                # Mock the settings to return our custom settings
-                with patch.object(
-                    orchestrator.settings, "get_provider_settings", return_value=custom_settings
-                ):
-                    await orchestrator.switch_provider("mock2", "model")
-
-                # Verify registry was called with custom settings
-                mock_registry.create.assert_called_with("mock2", **custom_settings)
-                success = True  # If we got here, it worked
+            with patch.object(
+                orchestrator.settings, "get_provider_settings", return_value=custom_settings
+            ):
+                success = await orchestrator.switch_provider("mock2", "model")
 
             assert success is True
             # Verify registry was called with custom settings

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import SecretStr
 
 from victor.config.unified_settings import VictorSettings
 
@@ -343,6 +344,18 @@ class TestVictorSettingsTypeSafety:
         assert settings.openai_api_key is None
         assert settings.log_file is None
         assert settings.codebase_persist_directory is None
+
+    def test_server_secrets_are_redacted_types(self):
+        """Server-facing secrets should use SecretStr for safe repr/logging."""
+        settings = VictorSettings(
+            server_api_key="server-token",
+            server_session_secret="session-secret",
+        )
+
+        assert isinstance(settings.server_api_key, SecretStr)
+        assert settings.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server_session_secret, SecretStr)
+        assert settings.server_session_secret.get_secret_value() == "session-secret"
 
     def test_field_types_validated(self):
         """Test that field types are validated."""

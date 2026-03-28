@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
-from victor.tools.language_analyzer import (
+from victor.verticals.contrib.coding.tools.language_analyzer import (
     AnalysisIssue,
     detect_language,
     get_analyzer_for_file,

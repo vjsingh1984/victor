@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
 
+from victor.core.async_utils import run_sync
 from victor.ui.slash.protocol import CommandContext, CommandMetadata
 from victor.ui.slash.registry import CommandRegistry, get_command_registry
 
@@ -175,7 +176,7 @@ class SlashCommandHandler:
 
         For use in contexts where async is not available.
         """
-        return asyncio.get_event_loop().run_until_complete(self.execute(text))
+        return run_sync(self.execute(text))
 
     def get_help(self, command_name: Optional[str] = None) -> str:
         """Get help text for a command or all commands.

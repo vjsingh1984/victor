@@ -64,6 +64,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from victor.core.async_utils import run_sync
+
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
     from victor.agent.lifecycle_manager import LifecycleManager
@@ -716,16 +718,17 @@ class SessionCoordinator:
             if not conversation_embedding_store.is_initialized:
                 try:
                     loop = asyncio.get_running_loop()
-                    loop.create_task(conversation_embedding_store.initialize())
                 except RuntimeError:
                     try:
-                        asyncio.run(conversation_embedding_store.initialize())
+                        run_sync(conversation_embedding_store.initialize())
                     except Exception as e:
                         logger.debug(
                             "Failed to run ConversationEmbeddingStore.initialize() "
                             "synchronously: %s",
                             e,
                         )
+                else:
+                    loop.create_task(conversation_embedding_store.initialize())
 
             logger.info(
                 "ConversationEmbeddingStore configured. " "Message embeddings will sync to LanceDB."

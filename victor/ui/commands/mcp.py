@@ -1,5 +1,4 @@
 import typer
-import asyncio
 import logging
 import sys
 import os
@@ -9,6 +8,7 @@ from typing import Optional
 
 from rich.console import Console
 
+from victor.core.async_utils import run_sync
 from victor.integrations.mcp.server import MCPServer
 from victor.tools.base import ToolRegistry
 from victor.ui.commands.utils import setup_logging
@@ -49,7 +49,7 @@ def _mcp(stdio: bool, log_level: Optional[str]):
     setup_logging(command="mcp", cli_log_level=log_level, stream=sys.stderr)
 
     if stdio:
-        asyncio.run(_run_mcp_server())
+        run_sync(_run_mcp_server())
     else:
         console.print("[red]Only stdio mode is currently supported[/]")
         raise typer.Exit(1)

@@ -30,7 +30,7 @@ This module provides a single, unified state type for workflow execution,
 consolidating the previously fragmented state types:
 
 - WorkflowContext (dataclass in executor.py) - used by WorkflowExecutor
-- WorkflowState (TypedDict in yaml_to_graph_compiler.py) - used by StateGraphExecutor
+- WorkflowState (TypedDict in runtime_types.py) - used by StateGraphExecutor
 - WorkflowState (TypedDict in adapters.py) - used by workflow adapters
 
 The ExecutionContext TypedDict is designed to be compatible with all runtimes
@@ -70,6 +70,7 @@ Migration Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 import warnings
@@ -83,6 +84,8 @@ from typing import (
     TypedDict,
     Union,
 )
+
+from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
     from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
@@ -100,7 +103,7 @@ class ExecutionContext(TypedDict, total=False):
 
     This TypedDict consolidates the state models from:
     - WorkflowContext (executor.py) - dataclass for WorkflowExecutor
-    - WorkflowState (yaml_to_graph_compiler.py) - TypedDict for StateGraphExecutor
+    - WorkflowState (runtime_types.py) - TypedDict for StateGraphExecutor
     - WorkflowState (adapters.py) - TypedDict for workflow adapters
 
     All execution metadata uses underscore prefix to avoid conflicts with
@@ -274,22 +277,10 @@ class ExecutionContextWrapper:
         """
         # Check manager first
         try:
-            import asyncio
-
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # We're in async context, but this is a sync method
-                    # Fall back to direct state access
-                    pass
-                else:
-                    # We can run async code
-                    try:
-                        return asyncio.run(self._manager.get(key, default))
-                    except RuntimeError:
-                        pass
+                asyncio.get_running_loop()
             except RuntimeError:
-                pass
+                return run_sync(self._manager.get(key, default))
         except Exception:
             pass
 
@@ -303,21 +294,10 @@ class ExecutionContextWrapper:
         """
         # Update both manager and state for compatibility
         try:
-            import asyncio
-
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # We're in async context
-                    pass
-                else:
-                    # We can run async code
-                    try:
-                        asyncio.run(self._manager.set(key, value))
-                    except RuntimeError:
-                        pass
+                asyncio.get_running_loop()
             except RuntimeError:
-                pass
+                run_sync(self._manager.set(key, value))
         except Exception:
             pass
 
@@ -333,17 +313,10 @@ class ExecutionContextWrapper:
         """
         # Update both manager and state for compatibility
         try:
-            import asyncio
-
             try:
-                loop = asyncio.get_event_loop()
-                if not loop.is_running():
-                    try:
-                        asyncio.run(self._manager.update(values))
-                    except RuntimeError:
-                        pass
+                asyncio.get_running_loop()
             except RuntimeError:
-                pass
+                run_sync(self._manager.update(values))
         except Exception:
             pass
 
@@ -545,10 +518,10 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
 
 
 def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
-    """Convert yaml_to_graph_compiler WorkflowState to ExecutionContext.
+    """Convert compiled runtime WorkflowState to ExecutionContext.
 
     Args:
-        state: WorkflowState dict from yaml_to_graph_compiler
+        state: WorkflowState dict from compiled workflow runtime
 
     Returns:
         ExecutionContext with data migrated
@@ -590,13 +563,13 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
 
 
 def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
-    """Convert ExecutionContext to yaml_to_graph_compiler WorkflowState format.
+    """Convert ExecutionContext to compiled runtime WorkflowState format.
 
     Args:
         ctx: ExecutionContext
 
     Returns:
-        Dict compatible with yaml_to_graph_compiler WorkflowState
+        Dict compatible with compiled runtime WorkflowState
     """
     # Start with user data
     state: Dict[str, Any] = ctx.get("data", {}).copy()

@@ -62,14 +62,16 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Union
 from uuid import uuid4
 
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
+from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
     from victor.core.cqrs import Event as CQRSEvent
@@ -301,26 +303,10 @@ class CQRSEventAdapter:
 
         # Subscribe to EventBus for observability -> CQRS
         if self._config.enable_observability_to_cqrs:
-            # New ObservabilityBus uses async subscribe()
-            # We need to handle this in the event loop
-            try:
-                import asyncio
-
-                # Try to get running loop
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # Loop is running, create task for async subscription
-                        # Subscribe to all events using wildcard pattern
-                        asyncio.create_task(self._async_subscribe_observability())
-                    else:
-                        # Loop not running yet, run directly
-                        loop.run_until_complete(self._async_subscribe_observability())
-                except RuntimeError:
-                    # No loop yet, create new one
-                    asyncio.run(self._async_subscribe_observability())
-            except Exception as e:
-                logger.warning(f"Failed to subscribe to observability events: {e}")
+            self._start_async_subscription(
+                self._async_subscribe_observability,
+                "observability events",
+            )
 
         # Subscribe to EventDispatcher for CQRS -> observability
         if self._config.enable_cqrs_to_observability:
@@ -328,16 +314,33 @@ class CQRSEventAdapter:
                 # Old sync API
                 self._event_dispatcher.subscribe_all(self._on_cqrs_event)
             else:
-                # New async API - handle similarly
-                try:
-                    import asyncio
-
-                    asyncio.create_task(self._async_subscribe_cqrs())
-                except Exception as e:
-                    logger.warning(f"Failed to subscribe to CQRS events: {e}")
+                self._start_async_subscription(
+                    self._async_subscribe_cqrs,
+                    "CQRS events",
+                )
 
         self._is_active = True
         logger.info("CQRSEventAdapter started")
+
+    def _start_async_subscription(
+        self,
+        subscribe_coro: Callable[[], Awaitable[None]],
+        description: str,
+    ) -> None:
+        """Start an async subscription from sync or async startup paths."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                run_sync(subscribe_coro())
+            except Exception as e:
+                logger.warning("Failed to subscribe to %s: %s", description, e)
+            return
+
+        try:
+            loop.create_task(subscribe_coro())
+        except Exception as e:
+            logger.warning("Failed to schedule subscription to %s: %s", description, e)
 
     def stop(self) -> None:
         """Stop the adapter and unsubscribe from all events."""

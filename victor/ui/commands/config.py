@@ -2,9 +2,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 import yaml
-import asyncio
 from typing import Any
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.config.validation import validate_configuration, format_validation_result
 
@@ -208,7 +208,7 @@ def config_validate(
         # Optional connectivity checks
         if check_connectivity:
             console.print("\n[bold]Connectivity Checks:[/]")
-            asyncio.run(_check_connectivity(settings, profiles, verbose))
+            run_sync(_check_connectivity(settings, profiles, verbose))
 
         # Summary
         console.print("\n" + "─" * 50)

@@ -169,7 +169,7 @@ class NodeExecutionResult:
 # =============================================================================
 
 
-class NodeExecutorFactory:
+class _LegacyUnifiedCompilerNodeExecutorFactory:
     """Factory for creating node executors (DRY consolidation).
 
     Extracts common node execution logic from all compilers into shared
@@ -1066,6 +1066,105 @@ class NodeExecutorFactory:
             return state
 
         return passthrough
+
+
+# =============================================================================
+# Shared Factory Compatibility
+# =============================================================================
+
+
+class NodeExecutorFactory:
+    """Compatibility shim over the canonical workflow node executor factory."""
+
+    def __init__(
+        self,
+        orchestrator: Optional["AgentOrchestrator"] = None,
+        tool_registry: Optional["ToolRegistry"] = None,
+        runner_registry: Optional["NodeRunnerRegistry"] = None,
+        emitter: Optional[Any] = None,
+    ):
+        from victor.workflows.executors.factory import NodeExecutorFactory as SharedNodeExecutorFactory
+
+        self.orchestrator = orchestrator
+        self.tool_registry = tool_registry
+        self._runner_registry = runner_registry
+        self._emitter = emitter
+        self._mutable_state_keys = frozenset(
+            {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
+        )
+        self._delegate = SharedNodeExecutorFactory()
+        self._compat_context = _UnifiedCompilerExecutionContext(
+            orchestrator=orchestrator,
+            tool_registry=tool_registry,
+        )
+
+    def _resolve_execution_context(self) -> "_UnifiedCompilerExecutionContext":
+        return self._compat_context
+
+    def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        child_state = dict(state)
+        for key in self._mutable_state_keys:
+            if key in child_state:
+                child_state[key] = copy.deepcopy(child_state[key])
+        return child_state
+
+    def register_executor_type(
+        self,
+        node_type: str,
+        executor_class: Any,
+        *,
+        replace: bool = False,
+    ) -> None:
+        self._delegate.register_executor_type(node_type, executor_class, replace=replace)
+
+    def create_executor(
+        self,
+        node: "WorkflowNode",
+    ) -> Callable[[Dict[str, Any]], Any]:
+        original_resolver = self._delegate._resolve_execution_context
+        self._delegate._resolve_execution_context = self._resolve_execution_context
+        try:
+            return self._delegate.create_executor(node)
+        finally:
+            self._delegate._resolve_execution_context = original_resolver
+
+    def create_agent_executor(self, node: "AgentNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def create_compute_executor(self, node: "ComputeNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def create_condition_router(self, node: "ConditionNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def create_parallel_executor(
+        self,
+        node: "ParallelNode",
+        child_nodes: Optional[List["WorkflowNode"]] = None,
+    ) -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def create_transform_executor(self, node: "TransformNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def create_team_executor(self, node: "TeamNodeWorkflow") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
+
+    def supports_node_type(self, node_type: str) -> bool:
+        return self._delegate.supports_node_type(node_type)
+
+
+class _UnifiedCompilerExecutionContext:
+    """Execution context adapter for unified compiler factory compatibility."""
+
+    def __init__(
+        self,
+        orchestrator: Optional["AgentOrchestrator"] = None,
+        tool_registry: Optional["ToolRegistry"] = None,
+    ) -> None:
+        self.orchestrator = orchestrator
+        self.tool_registry = tool_registry
+        self.services = None
 
 
 # =============================================================================

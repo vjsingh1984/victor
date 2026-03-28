@@ -632,6 +632,30 @@ class OrchestratorServiceProvider:
             learning_rate=getattr(self._settings, "sequence_learning_rate", 0.3),
         )
 
+    def _create_compaction_summarizer(self) -> Any:
+        """Create CompactionSummarizer instance.
+
+        Note: Returns None because the real instance needs a provider dependency
+        which is not available at container initialization time.
+        """
+        return None
+
+    def _create_hierarchical_compaction_manager(self) -> Any:
+        """Create HierarchicalCompactionManager instance.
+
+        Note: Returns None because the real instance needs a summarizer dependency
+        which is created by the orchestrator at runtime.
+        """
+        return None
+
+    def _create_session_context_linker(self) -> Any:
+        """Create SessionContextLinker instance.
+
+        Note: Returns None because the real instance needs a persistence dependency
+        which is not available at container initialization time.
+        """
+        return None
+
     def _create_context_compactor(self) -> "ContextCompactorProtocol | None":
         """Create ContextCompactor instance.
 

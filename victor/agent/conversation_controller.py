@@ -34,6 +34,9 @@ from victor.providers.base import Message
 if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
     from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.compaction_summarizer import CompactionSummaryStrategy
+    from victor.agent.context_reminder import ContextReminderManager
+    from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
 
 
 class CompactionStrategy(Enum):
@@ -137,7 +140,9 @@ class ConversationController:
         conversation_store: Optional["ConversationStore"] = None,
         session_id: Optional[str] = None,
         prompt_normalizer: Optional[PromptNormalizer] = None,
-        compaction_summarizer: Optional[Any] = None,
+        compaction_summarizer: Optional["CompactionSummaryStrategy"] = None,
+        context_reminder_manager: Optional["ContextReminderManager"] = None,
+        hierarchical_manager: Optional["HierarchicalCompactionManager"] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -151,6 +156,8 @@ class ConversationController:
         self._compaction_summarizer = compaction_summarizer
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
+        self._context_reminder_manager = context_reminder_manager
+        self._hierarchical_manager = hierarchical_manager
         # PromptNormalizer for input deduplication (DIP compliance)
         self._normalizer = prompt_normalizer or get_prompt_normalizer()
 
@@ -437,6 +444,10 @@ class ConversationController:
             summary = self._generate_compaction_summary(removed_messages)
             if summary:
                 self._compaction_summaries.append(summary)
+                # Feed into hierarchical manager if available
+                if self._hierarchical_manager:
+                    turn_index = len(self.messages)
+                    self._hierarchical_manager.add_summary(summary, turn_index)
                 # Persist to SQLite for future semantic retrieval
                 message_ids = [f"msg_{i}" for i in removed_indices]
                 self.persist_compaction_summary(summary, message_ids)
@@ -644,24 +655,40 @@ class ConversationController:
         return self._compaction_summaries.copy()
 
     def inject_compaction_context(self) -> bool:
-        """Inject compaction summaries as context reminder.
+        """Update compaction context for the next LLM call.
 
-        Adds a message summarizing compacted content if summaries exist.
+        Two injection modes:
+        - With ContextReminderManager: Sets compaction_summary on manager state.
+          Actual injection happens during the next get_consolidated_reminder() call.
+        - Without (fallback): Inserts assistant message directly at position 1.
 
         Returns:
-            True if context was injected
+            True if compaction context was updated or injected.
         """
         if not self._compaction_summaries:
             return False
 
-        combined = " | ".join(self._compaction_summaries[-3:])  # Last 3 summaries
-        reminder = f"[Context reminder: {combined}]"
+        # Use hierarchical manager for compressed context if available
+        if self._hierarchical_manager:
+            combined = self._hierarchical_manager.get_active_context()
+        else:
+            combined = " | ".join(self._compaction_summaries[-3:])
 
-        # Insert as assistant message after system prompt
+        if not combined:
+            return False
+
+        # Primary: delegate to reminder framework
+        if self._context_reminder_manager:
+            self._context_reminder_manager.state.compaction_summary = combined
+            return True
+
+        # Fallback: direct insertion (backward compat)
         if len(self.messages) > 1:
-            reminder_msg = Message(role="assistant", content=reminder)
+            reminder_msg = Message(
+                role="assistant", content=f"[Context reminder: {combined}]"
+            )
             self._history._messages.insert(1, reminder_msg)
-            logger.debug(f"Injected compaction context: {reminder[:100]}...")
+            logger.debug(f"Injected compaction context: {combined[:100]}...")
             return True
 
         return False

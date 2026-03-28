@@ -32,10 +32,11 @@ Example:
 """
 
 import argparse
-import asyncio
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from victor.core.async_utils import run_sync
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -310,11 +311,11 @@ def main():
     args = parser.parse_args()
 
     if args.stats:
-        asyncio.run(show_stats())
+        run_sync(show_stats())
         return
 
     if args.query:
-        asyncio.run(query_docs(args.query))
+        run_sync(query_docs(args.query))
         return
 
     print(f"\n{'=' * 60}")
@@ -324,14 +325,14 @@ def main():
     if args.victor or (not args.path and not args.pattern):
         # Ingest Victor docs
         print("Mode: Ingest Victor Documentation")
-        results = asyncio.run(ingest_victor_docs())
+        results = run_sync(ingest_victor_docs())
     else:
         # Ingest custom docs
         project_path = Path(args.path) if args.path else Path.cwd()
         patterns = args.pattern or ["*.md"]
         print(f"Path: {project_path}")
         print(f"Patterns: {patterns}")
-        results = asyncio.run(
+        results = run_sync(
             ingest_project_docs(
                 project_path=project_path,
                 patterns=patterns,

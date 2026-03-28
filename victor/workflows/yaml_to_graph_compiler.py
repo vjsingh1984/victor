@@ -62,35 +62,24 @@ from typing import (
     List,
     Optional,
     Set,
-    Type,
-    TypedDict,
-    Union,
 )
 
 from victor.framework.graph import (
     END,
-    START,
     CheckpointerProtocol,
     CompiledGraph,
-    Edge,
-    EdgeType,
     GraphExecutionResult,
-    GraphConfig,
     MemoryCheckpointer,
-    Node,
     StateGraph,
 )
 from victor.workflows.definition import (
-    AgentNode,
-    ComputeNode,
     ConditionNode,
     ParallelNode,
-    TaskConstraints,
-    TransformNode,
     WorkflowDefinition,
-    WorkflowNode,
     WorkflowNodeType,
 )
+from victor.workflows.executors.factory import NodeExecutorFactory as UnifiedNodeExecutorFactory
+from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -98,93 +87,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Lazy-loaded presentation adapter for icon rendering
-_presentation = None
-
-
-def _get_icon(name: str) -> str:
-    """Get icon from presentation adapter."""
-    global _presentation
-    if _presentation is None:
-        from victor.agent.presentation import create_presentation_adapter
-
-        _presentation = create_presentation_adapter()
-    return _presentation.icon(name, with_color=False)
-
-
-# =============================================================================
-# Workflow State Definition
-# =============================================================================
-
-
-class WorkflowState(TypedDict, total=False):
-    """Generic state for compiled YAML workflows.
-
-    This TypedDict serves as the state schema for StateGraph execution.
-    It combines workflow context data with execution metadata.
-
-    Attributes:
-        _workflow_id: Unique workflow execution ID
-        _current_node: Currently executing node ID
-        _node_results: Results from each executed node
-        _error: Error message if execution failed
-        _iteration: Current iteration count (for loop detection)
-        _parallel_results: Results from parallel node execution
-        _hitl_pending: Whether waiting for human input
-        _hitl_response: Human response data
-
-    All other keys are dynamic workflow context data.
-    """
-
-    # Execution metadata (prefixed with _ to avoid conflicts)
-    _workflow_id: str
-    _current_node: str
-    _node_results: Dict[str, Any]
-    _error: Optional[str]
-    _iteration: int
-    _parallel_results: Dict[str, Any]
-    _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
-
-
-# =============================================================================
-# Node Execution Result
-# =============================================================================
-
-
-@dataclass
-class GraphNodeResult:
-    """Result from executing a workflow node in the graph.
-
-    Attributes:
-        node_id: ID of the executed node
-        success: Whether execution succeeded
-        output: Output data from the node
-        error: Error message if failed
-        duration_seconds: Execution time
-        tool_calls_used: Number of tool calls made
-    """
-
-    node_id: str
-    success: bool
-    output: Any = None
-    error: Optional[str] = None
-    duration_seconds: float = 0.0
-    tool_calls_used: int = 0
-
 
 # =============================================================================
 # Node Executor Factory
 # =============================================================================
 
 
-class NodeExecutorFactory:
-    """Factory for creating StateGraph node functions from YAML node definitions.
-
-    This factory converts each YAML node type into an async function that can
-    be used as a StateGraph node. The generated functions preserve the original
-    node semantics while conforming to the StateGraph execution model.
-    """
+class NodeExecutorFactory(UnifiedNodeExecutorFactory):
+    """Compatibility wrapper around the canonical workflow node executor factory."""
 
     def __init__(
         self,
@@ -192,475 +102,56 @@ class NodeExecutorFactory:
         orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
-        """Initialize the factory.
-
-        Args:
-            orchestrator: Default agent orchestrator for executing agent nodes
-            orchestrators: Dict mapping profile names to orchestrators
-            tool_registry: Tool registry for executing compute nodes
-        """
         self.orchestrator = orchestrator
         self.orchestrators = orchestrators or {}
         self.tool_registry = tool_registry
+        self._compat_context = _YAMLCompilerExecutionContext(
+            orchestrator=orchestrator,
+            orchestrators=self.orchestrators,
+            tool_registry=tool_registry,
+        )
+        super().__init__()
 
-    def create_executor(
+    def _resolve_execution_context(self) -> "_YAMLCompilerExecutionContext":
+        return self._compat_context
+
+
+class _YAMLCompilerOrchestratorPool:
+    """Profile-aware orchestrator lookup used by YAML compiler compatibility."""
+
+    def __init__(
         self,
-        node: WorkflowNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create a StateGraph node function from a workflow node.
+        orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
+    ) -> None:
+        self._orchestrator = orchestrator
+        self._orchestrators = orchestrators or {}
 
-        Args:
-            node: The workflow node to convert
+    def get_orchestrator(self, profile: Optional[str] = None) -> Optional["AgentOrchestrator"]:
+        if profile and profile in self._orchestrators:
+            return self._orchestrators[profile]
+        return self._orchestrator
 
-        Returns:
-            Async function suitable for StateGraph node execution
-        """
-        if isinstance(node, AgentNode):
-            return self._create_agent_executor(node)
-        elif isinstance(node, ComputeNode):
-            return self._create_compute_executor(node)
-        elif isinstance(node, TransformNode):
-            return self._create_transform_executor(node)
-        elif isinstance(node, ParallelNode):
-            return self._create_parallel_executor(node)
-        elif isinstance(node, ConditionNode):
-            # Condition nodes don't execute - they're handled as edges
-            return self._create_passthrough_executor(node)
-        else:
-            logger.warning(f"Unknown node type: {type(node)}, using passthrough")
-            return self._create_passthrough_executor(node)
+    def get_default_orchestrator(self) -> Optional["AgentOrchestrator"]:
+        return self._orchestrator
 
-    def _create_agent_executor(
+
+class _YAMLCompilerExecutionContext:
+    """Execution context adapter for YAML compiler compatibility."""
+
+    def __init__(
         self,
-        node: AgentNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create executor for an AgentNode.
-
-        Spawns a sub-agent with the specified role and goal to process
-        the task using LLM inference and tool execution.
-        """
-
-        # Select orchestrator based on node profile
-        def get_orchestrator_for_node(node: AgentNode):
-            """Get the appropriate orchestrator for a node based on its profile."""
-            if hasattr(node, "profile") and node.profile and node.profile in self.orchestrators:
-                return self.orchestrators[node.profile]
-            return self.orchestrator
-
-        async def execute_agent(state: WorkflowState) -> WorkflowState:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-
-            try:
-                logger.debug(f"\n{'='*80}")
-                logger.debug(f"🤖 AGENT NODE START: {node.id}")
-                logger.debug(f"   Profile: {getattr(node, 'profile', 'default')}")
-                logger.debug(f"   Role: {node.role}")
-                logger.debug(f"   Tool Budget: {node.tool_budget}")
-                logger.debug(f"   Timeout: {node.timeout_seconds or 300}s")
-
-                # Build input context from input_mapping
-                input_context = {}
-                for param_name, context_key in node.input_mapping.items():
-                    if context_key in state:
-                        input_context[param_name] = state[context_key]
-
-                if input_context:
-                    logger.debug(f"   Input Context: {list(input_context.keys())}")
-
-                # Build the goal with context substitution
-                goal = node.goal
-                original_goal = goal
-
-                logger.debug(f"   Original Goal (first 200 chars): {goal[:200]}...")
-
-                # First pass: Handle dict values (agent results) - extract response field
-                substitutions = []
-                for key, value in state.items():
-                    if not key.startswith("_") and isinstance(value, dict):
-                        # If value is a dict (e.g., agent result), extract response field
-                        if "response" in value:
-                            response_text = value["response"]
-                            # Substitute {{key}} with the response content (not the whole dict)
-                            if f"{{{{{key}}}}}" in goal or f"${{{key}}}" in goal:
-                                goal = goal.replace(f"{{{{{key}}}}}", str(response_text))
-                                goal = goal.replace(f"${{{key}}}", str(response_text))
-                                substitutions.append(f"{key}=<dict with response>")
-
-                # Second pass: Handle non-dict values (primitives like user_task)
-                for key, value in state.items():
-                    if not key.startswith("_") and not isinstance(value, dict):
-                        # Jinja-style: {{key}}
-                        goal = goal.replace(f"{{{{{key}}}}}", str(value))
-                        # Dollar-style: ${key}
-                        goal = goal.replace(f"${{{key}}}", str(value))
-                        # Context-style: $ctx.key
-                        goal = goal.replace(f"$ctx.{key}", str(value))
-                        if f"{{{{{key}}}}}" in original_goal or f"${{{key}}}" in original_goal:
-                            substitutions.append(f"{key}={str(value)[:50]}")
-
-                if substitutions:
-                    logger.debug(f"   Context Substitutions: {', '.join(substitutions)}")
-                logger.debug(f"   Substituted Goal (first 300 chars): {goal[:300]}...")
-
-                # Execute via SubAgentOrchestrator
-                from victor.agent.subagents import (
-                    SubAgentOrchestrator,
-                    SubAgentRole,
-                )
-
-                # Get orchestrator for this node based on profile
-                node_orchestrator = get_orchestrator_for_node(node)
-                profile_used = getattr(node, "profile", "default")
-                logger.debug(f"   Using orchestrator: {profile_used}")
-
-                if node_orchestrator is None:
-                    # Fallback: store placeholder result
-                    logger.warning(
-                        f"No orchestrator available for agent node '{node.id}' with profile '{getattr(node, 'profile', None)}', "
-                        "using placeholder execution"
-                    )
-                    output = {
-                        "node_id": node.id,
-                        "role": node.role,
-                        "goal": goal,
-                        "status": "placeholder",
-                        "input_context": input_context,
-                    }
-                else:
-
-                    # Map role string to SubAgentRole enum
-                    role_map = {
-                        "researcher": SubAgentRole.RESEARCHER,
-                        "planner": SubAgentRole.PLANNER,
-                        "executor": SubAgentRole.EXECUTOR,
-                        "reviewer": SubAgentRole.REVIEWER,
-                        "tester": SubAgentRole.TESTER,
-                        "writer": SubAgentRole.EXECUTOR,  # Writer maps to executor
-                        "senior_architect": SubAgentRole.PLANNER,  # Architect uses planner
-                        "practical_engineer": SubAgentRole.EXECUTOR,
-                        "code_specialist": SubAgentRole.REVIEWER,
-                        "consensus_facilitator": SubAgentRole.PLANNER,
-                        "lead_reviewer": SubAgentRole.REVIEWER,
-                        "analyst": SubAgentRole.RESEARCHER,  # Alias
-                    }
-                    role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
-
-                    # Create and execute sub-agent
-                    sub_orchestrator = SubAgentOrchestrator(node_orchestrator)
-                    logger.debug(
-                        f"   {_get_icon('gear')}  Spawning sub-agent with role: {role.value}"
-                    )
-
-                    result = await sub_orchestrator.spawn(
-                        role=role,
-                        task=goal,
-                        tool_budget=node.tool_budget,
-                        allowed_tools=node.allowed_tools,
-                        timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
-                        disable_embeddings=getattr(node, "disable_embeddings", False),
-                    )
-
-                    output = {
-                        "response": result.summary if result else "",
-                        "success": result.success if result else False,
-                        "tool_calls": result.tool_calls_used if result else 0,
-                        "error": result.error if result else None,
-                    }
-
-                    # Log result summary
-                    duration = time.time() - start_time
-                    logger.debug(f"\n{'='*80}")
-                    logger.debug(f"✅ AGENT NODE COMPLETE: {node.id}")
-                    logger.debug(f"   Success: {output['success']}")
-                    logger.debug(f"   Tool Calls Used: {output['tool_calls']}/{node.tool_budget}")
-                    logger.debug(f"   Duration: {duration:.2f}s")
-                    if output["error"]:
-                        logger.debug(f"   Error: {output['error']}")
-                    logger.debug(
-                        f"   Response Preview (first 200 chars): {str(output['response'])[:200]}..."
-                    )
-                    logger.debug(f"{'='*80}\n")
-
-                # Store output in state
-                output_key = node.output_key or node.id
-                state[output_key] = output
-                logger.debug(f"   Stored result in state key: {output_key}")
-
-                # Update node results
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=time.time() - start_time,
-                )
-
-            except Exception as e:
-                logger.error(f"Agent node '{node.id}' failed: {e}", exc_info=True)
-                state["_error"] = f"Agent node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=time.time() - start_time,
-                )
-
-            return state
-
-        return execute_agent
-
-    def _create_compute_executor(
-        self,
-        node: ComputeNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create executor for a ComputeNode.
-
-        Executes tools directly without LLM inference, using registered
-        handlers for domain-specific logic.
-        """
-        tool_registry = self.tool_registry
-
-        async def execute_compute(state: WorkflowState) -> WorkflowState:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-            tool_calls_used = 0
-
-            try:
-                # Build params from input_mapping
-                params = {}
-                for param_name, context_key in node.input_mapping.items():
-                    # Handle $ctx.key syntax
-                    if isinstance(context_key, str) and context_key.startswith("$ctx."):
-                        context_key = context_key[5:]
-                    if context_key in state:
-                        params[param_name] = state[context_key]
-                    else:
-                        params[param_name] = context_key
-
-                # Check for custom handler
-                if node.handler:
-                    from victor.workflows.executor import get_compute_handler
-
-                    handler = get_compute_handler(node.handler)
-                    if handler:
-                        # Create minimal WorkflowContext wrapper
-                        from victor.workflows.executor import WorkflowContext
-
-                        context = WorkflowContext(dict(state))
-                        result = await handler(node, context, tool_registry)
-
-                        # Transfer context changes back to state
-                        for key, value in context.data.items():
-                            if not key.startswith("_"):
-                                state[key] = value
-
-                        output = result.output if result else None
-                        tool_calls_used = result.tool_calls_used if result else 0
-                    else:
-                        logger.warning(f"Handler '{node.handler}' not found for node '{node.id}'")
-                        output = {"error": f"Handler '{node.handler}' not found"}
-                else:
-                    # Execute tools directly
-                    outputs = {}
-                    if tool_registry and node.tools:
-                        for tool_name in node.tools:
-                            # Check constraints
-                            if not node.constraints.allows_tool(tool_name):
-                                logger.debug(f"Tool '{tool_name}' blocked by constraints")
-                                continue
-
-                            try:
-                                result = await asyncio.wait_for(
-                                    tool_registry.execute(
-                                        tool_name,
-                                        _exec_ctx={
-                                            "workflow_context": state,
-                                            "constraints": node.constraints.to_dict(),
-                                        },
-                                        **params,
-                                    ),
-                                    timeout=node.constraints.timeout,
-                                )
-                                tool_calls_used += 1
-
-                                if result.success:
-                                    outputs[tool_name] = result.output
-                                else:
-                                    outputs[tool_name] = {"error": result.error}
-
-                                if node.fail_fast and not result.success:
-                                    break
-
-                            except asyncio.TimeoutError:
-                                outputs[tool_name] = {"error": "Timeout"}
-                                if node.fail_fast:
-                                    break
-                            except Exception as e:
-                                outputs[tool_name] = {"error": str(e)}
-                                if node.fail_fast:
-                                    break
-                    else:
-                        outputs = {"status": "no_tools_executed", "params": params}
-
-                    output = outputs
-
-                # Store output in state
-                output_key = node.output_key or node.id
-                state[output_key] = output
-
-                # Update node results
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=time.time() - start_time,
-                    tool_calls_used=tool_calls_used,
-                )
-
-            except Exception as e:
-                logger.error(f"Compute node '{node.id}' failed: {e}", exc_info=True)
-                state["_error"] = f"Compute node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=time.time() - start_time,
-                    tool_calls_used=tool_calls_used,
-                )
-
-            return state
-
-        return execute_compute
-
-    def _create_transform_executor(
-        self,
-        node: TransformNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create executor for a TransformNode.
-
-        Applies a transformation function to the workflow state.
-        """
-
-        async def execute_transform(state: WorkflowState) -> WorkflowState:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-
-            try:
-                # Execute transform function
-                transformed = node.transform(state)
-
-                # Merge transformed data back into state
-                for key, value in transformed.items():
-                    state[key] = value
-
-                # Update node results
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=True,
-                    output={"transformed_keys": list(transformed.keys())},
-                    duration_seconds=time.time() - start_time,
-                )
-
-            except Exception as e:
-                logger.error(f"Transform node '{node.id}' failed: {e}", exc_info=True)
-                state["_error"] = f"Transform node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=time.time() - start_time,
-                )
-
-            return state
-
-        return execute_transform
-
-    def _create_parallel_executor(
-        self,
-        node: ParallelNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create executor for a ParallelNode.
-
-        Executes child nodes in parallel and aggregates results.
-        Note: The actual parallel execution is handled by the compiler
-        which creates separate graph branches. This executor serves as
-        a synchronization point.
-        """
-
-        async def execute_parallel(state: WorkflowState) -> WorkflowState:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-
-            try:
-                # Parallel results should already be populated by child nodes
-                # This node serves as a join point
-                parallel_results = state.get("_parallel_results", {})
-
-                # Apply join strategy
-                if node.join_strategy == "all":
-                    # All must succeed
-                    all_success = all(r.get("success", False) for r in parallel_results.values())
-                    if not all_success:
-                        state["_error"] = "Not all parallel nodes succeeded"
-                elif node.join_strategy == "any":
-                    # At least one must succeed
-                    any_success = any(r.get("success", False) for r in parallel_results.values())
-                    if not any_success:
-                        state["_error"] = "No parallel nodes succeeded"
-                # "merge" strategy just combines all results
-
-                # Update node results
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = GraphNodeResult(
-                    node_id=node.id,
-                    success="_error" not in state,
-                    output={"parallel_nodes": node.parallel_nodes},
-                    duration_seconds=time.time() - start_time,
-                )
-
-            except Exception as e:
-                logger.error(f"Parallel node '{node.id}' failed: {e}", exc_info=True)
-                state["_error"] = f"Parallel node '{node.id}' failed: {e}"
-
-            return state
-
-        return execute_parallel
-
-    def _create_passthrough_executor(
-        self,
-        node: WorkflowNode,
-    ) -> Callable[[WorkflowState], WorkflowState]:
-        """Create a passthrough executor that just forwards state.
-
-        Used for condition nodes (which are handled as edges) and
-        unknown node types.
-        """
-
-        async def passthrough(state: WorkflowState) -> WorkflowState:
-            state = dict(state)
-            if "_node_results" not in state:
-                state["_node_results"] = {}
-            state["_node_results"][node.id] = GraphNodeResult(
-                node_id=node.id,
-                success=True,
-                output={"passthrough": True},
-            )
-            return state
-
-        return passthrough
+        orchestrator: Optional["AgentOrchestrator"] = None,
+        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
+        tool_registry: Optional["ToolRegistry"] = None,
+    ) -> None:
+        self.orchestrator = orchestrator
+        self.orchestrator_pool = _YAMLCompilerOrchestratorPool(
+            orchestrator=orchestrator,
+            orchestrators=orchestrators,
+        )
+        self.tool_registry = tool_registry
+        self.services = None
 
 
 # =============================================================================
@@ -1084,7 +575,11 @@ def compile_yaml_workflow(
     Returns:
         CompiledGraph ready for execution
     """
-    compiler = YAMLToStateGraphCompiler(orchestrator, tool_registry, config)
+    compiler = YAMLToStateGraphCompiler(
+        orchestrator=orchestrator,
+        tool_registry=tool_registry,
+        config=config,
+    )
     return compiler.compile(workflow)
 
 
@@ -1111,7 +606,11 @@ async def execute_yaml_workflow(
     Returns:
         ExecutionResult with final state
     """
-    compiler = YAMLToStateGraphCompiler(orchestrator, tool_registry, config)
+    compiler = YAMLToStateGraphCompiler(
+        orchestrator=orchestrator,
+        tool_registry=tool_registry,
+        config=config,
+    )
     return await compiler.compile_and_execute(workflow, initial_state, thread_id)
 
 

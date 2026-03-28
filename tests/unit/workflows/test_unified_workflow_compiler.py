@@ -35,10 +35,16 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, TypedDict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from victor.workflows.executors.registry import (
+    clear_registered_workflow_node_executors,
+    register_workflow_node_executor,
+)
 
 # =============================================================================
 # Test Fixtures
@@ -235,6 +241,51 @@ def reset_workflow_caches():
 # =============================================================================
 # SECTION 1: Compilation Tests
 # =============================================================================
+
+
+class TestNodeExecutorFactoryCompatibility:
+    """Tests for the deprecated unified-compiler factory shim."""
+
+    @pytest.mark.asyncio
+    async def test_factory_uses_shared_custom_executor_registry(self):
+        """Custom node registrations should flow through the shared factory."""
+        from victor.workflows.unified_compiler import NodeExecutorFactory
+
+        class CustomExecutor:
+            def __init__(self, context=None):
+                self.context = context
+
+            async def execute(self, node, state):
+                state = dict(state)
+                state["custom_output"] = node.id
+                return state
+
+        custom_node = SimpleNamespace(id="custom", node_type="custom_plugin")
+
+        try:
+            clear_registered_workflow_node_executors()
+            register_workflow_node_executor("custom_plugin", CustomExecutor)
+
+            factory = NodeExecutorFactory()
+            executor = factory.create_executor(custom_node)
+            result = await executor({})
+
+            assert factory.supports_node_type("custom_plugin") is True
+            assert result["custom_output"] == "custom"
+        finally:
+            clear_registered_workflow_node_executors()
+
+    def test_set_runner_registry_updates_factory_compatibility_state(self):
+        """UnifiedWorkflowCompiler should keep the runner registry on the shim."""
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        compiler = UnifiedWorkflowCompiler()
+        registry = object()
+
+        compiler.set_runner_registry(registry)
+
+        assert compiler._runner_registry is registry
+        assert compiler._executor_factory._runner_registry is registry
 
 
 class TestCompilationFromYAML:

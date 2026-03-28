@@ -44,9 +44,11 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+import asyncio
 import logging
 import sqlite3
 
+from victor.core.async_utils import run_sync
 from victor.core.json_utils import json_dumps, json_loads
 import uuid
 
@@ -2013,15 +2015,49 @@ class ConversationStore:
         Returns:
             List of (message, similarity_score) tuples sorted by similarity
         """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError(
+                "Cannot call get_semantically_relevant_messages from async context. "
+                "Use await aget_semantically_relevant_messages(...) instead."
+            )
+
+        return run_sync(
+            self.aget_semantically_relevant_messages(
+                session_id=session_id,
+                query=query,
+                limit=limit,
+                min_similarity=min_similarity,
+                exclude_recent=exclude_recent,
+            )
+        )
+
+    async def aget_semantically_relevant_messages(
+        self,
+        session_id: str,
+        query: str,
+        limit: int = 10,
+        min_similarity: float = 0.3,
+        exclude_recent: int = 5,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Async variant of semantic message retrieval for runtime code paths."""
         # Try LanceDB vector search first (much faster)
         if hasattr(self, "_embedding_store") and self._embedding_store is not None:
-            return self._get_relevant_messages_via_lancedb(
+            return await self._aget_relevant_messages_via_lancedb(
                 session_id, query, limit, min_similarity, exclude_recent
             )
 
         # Fall back to on-the-fly embedding (slower but works without LanceDB)
-        return self._get_relevant_messages_via_embedding(
-            session_id, query, limit, min_similarity, exclude_recent
+        return await asyncio.to_thread(
+            self._get_relevant_messages_via_embedding,
+            session_id,
+            query,
+            limit,
+            min_similarity,
+            exclude_recent,
         )
 
     def _get_relevant_messages_via_lancedb(
@@ -2036,8 +2072,18 @@ class ConversationStore:
 
         Much faster than on-the-fly embedding - O(log n) vs O(n).
         """
-        import asyncio
+        return run_sync(
+            self._aget_relevant_messages_via_lancedb(
+                session_id=session_id,
+                query=query,
+                limit=limit,
+                min_similarity=min_similarity,
+                exclude_recent=exclude_recent,
+            )
+        )
 
+    def _get_excluded_message_ids(self, session_id: str, exclude_recent: int) -> List[str]:
+        """Fetch recent message IDs that should be excluded from semantic search."""
         # Get recent message IDs to exclude
         exclude_ids: List[str] = []
         if exclude_recent > 0:
@@ -2053,31 +2099,26 @@ class ConversationStore:
                     (session_id, exclude_recent),
                 ).fetchall()
                 exclude_ids = [row["id"] for row in recent_rows]
+        return exclude_ids
 
-        # Run async search
-        async def _search():
-            return await self._embedding_store.search_similar(
-                query=query,
-                session_id=session_id,
-                limit=limit,
-                min_similarity=min_similarity,
-                exclude_message_ids=exclude_ids,
-            )
+    async def _aget_relevant_messages_via_lancedb(
+        self,
+        session_id: str,
+        query: str,
+        limit: int,
+        min_similarity: float,
+        exclude_recent: int,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Retrieve relevant messages using the async embedding store path."""
+        exclude_ids = self._get_excluded_message_ids(session_id, exclude_recent)
 
-        try:
-            # Check if we're in an async context
-            asyncio.get_running_loop()
-            # If we are, raise an error to force caller to use async API
-            raise RuntimeError(
-                "Cannot call _get_relevant_messages_via_lancedb from async context. "
-                "Use the async version of this method instead."
-            )
-        except RuntimeError as e:
-            if "async context" in str(e):
-                # Re-raise our custom error
-                raise
-            # No running loop, safe to use asyncio.run()
-            search_results = asyncio.run(_search())
+        search_results = await self._embedding_store.search_similar(
+            query=query,
+            session_id=session_id,
+            limit=limit,
+            min_similarity=min_similarity,
+            exclude_message_ids=exclude_ids,
+        )
 
         # Fetch full messages from SQLite for the matching IDs
         if not search_results:

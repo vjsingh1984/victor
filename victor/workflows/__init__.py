@@ -189,14 +189,23 @@ from victor.workflows.batch_executor import (
     BatchWorkflowExecutor,
 )
 from victor.workflows.yaml_to_graph_compiler import (
-    WorkflowState,
-    GraphNodeResult as CompiledGraphNodeResult,
     CompilerConfig,
     YAMLToStateGraphCompiler,
     NodeExecutorFactory,
     ConditionEvaluator,
     compile_yaml_workflow,
     execute_yaml_workflow,
+)
+from victor.workflows.executors import (
+    WorkflowNodeExecutorRegistration,
+    WorkflowNodeExecutorRegistry,
+    clear_registered_workflow_node_executors,
+    get_workflow_node_executor_registry,
+    register_workflow_node_executor,
+)
+from victor.workflows.runtime_types import (
+    WorkflowState,
+    GraphNodeResult as CompiledGraphNodeResult,
 )
 from victor.workflows.unified_executor import (
     ExecutorConfig,
@@ -469,6 +478,11 @@ __all__ = [
     "CompilerConfig",
     "YAMLToStateGraphCompiler",
     "NodeExecutorFactory",
+    "WorkflowNodeExecutorRegistration",
+    "WorkflowNodeExecutorRegistry",
+    "clear_registered_workflow_node_executors",
+    "get_workflow_node_executor_registry",
+    "register_workflow_node_executor",
     "ConditionEvaluator",
     "compile_yaml_workflow",
     "execute_yaml_workflow",

@@ -78,6 +78,17 @@ class SaveCommand(BaseSlashCommand):
             if hasattr(ctx.agent, "session_state_accessor"):
                 execution_state = ctx.agent.session_state_accessor.session_state.execution_state
 
+            # Get session ledger for persistence
+            session_ledger = getattr(ctx.agent, "session_ledger", None)
+
+            # Get compaction hierarchy state for persistence
+            compaction_hierarchy = None
+            cc = getattr(ctx.agent, "conversation_controller", None)
+            if cc:
+                hm = getattr(cc, "_hierarchical_manager", None)
+                if hm and hasattr(hm, "to_dict"):
+                    compaction_hierarchy = hm.to_dict()
+
             session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation,
                 model=ctx.agent.model,
@@ -87,6 +98,8 @@ class SaveCommand(BaseSlashCommand):
                 title=title,
                 conversation_state=getattr(ctx.agent, "conversation_state", None),
                 execution_state=execution_state,
+                session_ledger=session_ledger,
+                compaction_hierarchy=compaction_hierarchy,
             )
 
             if session_id:
@@ -371,23 +384,55 @@ class ResumeCommand(BaseSlashCommand):
                 except Exception as e:
                     logger.warning(f"Failed to restore conversation state: {e}")
 
-            # Restore execution state (observed_files, tool_calls_used, etc.)
-            execution_state_dict = session_data.get("execution_state")
-            if execution_state_dict and hasattr(ctx.agent, "session_state_accessor"):
-                try:
-                    from victor.agent.session_state_manager import ExecutionState
+            # Restore ledger + execution state via SessionContextLinker
+            from victor.agent.session_context_linker import SessionContextLinker
 
-                    restored = ExecutionState.from_dict(execution_state_dict)
-                    accessor = ctx.agent.session_state_accessor
-                    accessor.observed_files = restored.observed_files
-                    accessor.executed_tools = restored.executed_tools
-                    accessor.tool_calls_used = restored.tool_calls_used
-                    logger.info(
-                        f"Restored execution state: {len(restored.observed_files)} files, "
-                        f"{restored.tool_calls_used} tool calls"
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to restore execution state: {e}")
+            linker = SessionContextLinker(session_persistence=persistence)
+            resume_ctx = linker.build_resume_context(session_id)
+
+            if resume_ctx.ledger and hasattr(ctx.agent, "session_ledger"):
+                ctx.agent.session_ledger = resume_ctx.ledger
+                logger.info(
+                    f"Restored session ledger: {len(resume_ctx.ledger.entries)} entries"
+                )
+
+            if resume_ctx.execution_state and hasattr(ctx.agent, "session_state_accessor"):
+                accessor = ctx.agent.session_state_accessor
+                accessor.observed_files = resume_ctx.execution_state.observed_files
+                accessor.executed_tools = resume_ctx.execution_state.executed_tools
+                accessor.tool_calls_used = resume_ctx.execution_state.tool_calls_used
+                logger.info("Restored execution state via SessionContextLinker")
+
+            # Restore compaction hierarchy
+            hierarchy_data = session_data.get("compaction_hierarchy")
+            if hierarchy_data:
+                cc = getattr(ctx.agent, "conversation_controller", None)
+                if cc and hasattr(cc, "_hierarchical_manager"):
+                    try:
+                        from victor.agent.compaction_hierarchy import (
+                            HierarchicalCompactionManager,
+                        )
+
+                        cc._hierarchical_manager = HierarchicalCompactionManager.from_dict(
+                            hierarchy_data
+                        )
+                        logger.info("Restored compaction hierarchy")
+                    except Exception as e:
+                        logger.warning(f"Failed to restore compaction hierarchy: {e}")
+
+            # Inject restored compaction context so the LLM is oriented on next turn
+            _cc = getattr(ctx.agent, "conversation_controller", None)
+            if _cc:
+                _hm = getattr(_cc, "_hierarchical_manager", None)
+                if _hm:
+                    active_ctx = _hm.get_active_context()
+                    if active_ctx and hasattr(_cc, "_compaction_summaries") and not _cc._compaction_summaries:
+                        _cc._compaction_summaries.append(active_ctx)
+                    try:
+                        _cc.inject_compaction_context()
+                        logger.info("Injected compaction context from restored hierarchy")
+                    except Exception as e:
+                        logger.debug(f"Compaction context injection skipped on resume: {e}")
 
             ctx.console.print(
                 Panel(
@@ -478,6 +523,16 @@ class CompactCommand(BaseSlashCommand):
                     *messages[-keep_recent:],
                 ]
                 ctx.agent.conversation.messages = new_messages
+
+                # Record in controller tracking systems (mirrors auto-compact in conversation_controller)
+                _cc = getattr(ctx.agent, "conversation_controller", None)
+                if _cc:
+                    _compact_record = f"[Manual compact: {summary[:300]}]"
+                    if hasattr(_cc, "_compaction_summaries"):
+                        _cc._compaction_summaries.append(_compact_record)
+                    _hm = getattr(_cc, "_hierarchical_manager", None)
+                    if _hm:
+                        _hm.add_summary(_compact_record, len(messages))
 
                 ctx.console.print(
                     Panel(

@@ -281,6 +281,7 @@ class WorkflowServiceProvider:
         The NodeExecutorFactory is responsible for:
         - Mapping node types to executor functions
         - Creating executor functions for workflow nodes
+        - Providing built-in executor registrations for first-party node types
         - Supporting registration of custom node types
         - Providing executor type checking
 
@@ -292,21 +293,7 @@ class WorkflowServiceProvider:
         from victor.workflows.executors.factory import NodeExecutorFactory
 
         factory = NodeExecutorFactory(container=self.container)
-
-        # Register built-in node executors
-        from victor.workflows.executors.agent import AgentNodeExecutor
-        from victor.workflows.executors.compute import ComputeNodeExecutor
-        from victor.workflows.executors.transform import TransformNodeExecutor
-        from victor.workflows.executors.parallel import ParallelNodeExecutor
-        from victor.workflows.executors.condition import ConditionNodeExecutor
-
-        factory.register_executor_type("agent", AgentNodeExecutor)
-        factory.register_executor_type("compute", ComputeNodeExecutor)
-        factory.register_executor_type("transform", TransformNodeExecutor)
-        factory.register_executor_type("parallel", ParallelNodeExecutor)
-        factory.register_executor_type("condition", ConditionNodeExecutor)
-
-        logger.debug("Registered built-in node executor types")
+        logger.debug("Created node executor factory with built-in executor registrations")
 
         return factory
 

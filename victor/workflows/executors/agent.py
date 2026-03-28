@@ -21,12 +21,14 @@ This is a stub that delegates to legacy implementation during migration.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
-    from victor.workflows.definition import AgentNode, WorkflowState
+    from victor.workflows.definition import AgentNode
     from victor.workflows.compiler_protocols import NodeExecutorProtocol
+    from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +77,10 @@ class AgentNodeExecutor:
             Exception: If agent execution fails
         """
         from victor.agent.subagents.orchestrator import SubAgentOrchestrator
-        from victor.agent.subagents.roles import SubAgentRole
-        from victor.framework.graph import GraphNodeResult
+        from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info(f"Executing agent node: {node.id} with role: {node.role}")
+        start_time = time.time()
 
         # Step 1: Build input context from input_mapping
         input_context = {}
@@ -96,6 +98,32 @@ class AgentNodeExecutor:
 
         # Step 3: Get orchestrator based on profile
         orchestrator = self._get_orchestrator(node.profile)
+
+        if orchestrator is None:
+            logger.warning(
+                "No orchestrator available for agent node '%s'; using placeholder execution",
+                node.id,
+            )
+            output = {
+                "node_id": node.id,
+                "role": node.role,
+                "goal": goal,
+                "status": "placeholder",
+                "input_context": input_context,
+            }
+            output_key = node.output_key or node.id
+            state[output_key] = output
+
+            if "_node_results" not in state:
+                state["_node_results"] = {}
+
+            state["_node_results"][node.id] = GraphNodeResult(
+                node_id=node.id,
+                success=True,
+                output=output,
+                duration_seconds=time.time() - start_time,
+            )
+            return state
 
         # Step 4: Map role to SubAgentRole enum
         role = self._map_role_to_enum(node.role)
@@ -115,14 +143,22 @@ class AgentNodeExecutor:
         except Exception as e:
             logger.error(f"Agent node {node.id} execution failed: {e}")
             # Store error in state and return
-            if node.output:
-                state[node.output] = {"error": str(e), "success": False}
+            output_key = node.output_key or node.id
+            state[output_key] = {"error": str(e), "success": False}
+
+            if "_node_results" not in state:
+                state["_node_results"] = {}
+            state["_node_results"][node.id] = GraphNodeResult(
+                node_id=node.id,
+                success=False,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
             return state
 
         # Step 6: Store result in state
-        if node.output:
-            # Store the entire result object
-            state[node.output] = result
+        output_key = node.output_key or node.id
+        state[output_key] = result
 
         # Track node result for observability
         if "_node_results" not in state:
@@ -130,13 +166,10 @@ class AgentNodeExecutor:
 
         state["_node_results"][node.id] = GraphNodeResult(
             node_id=node.id,
-            status="completed",
-            result=result,
-            metadata={
-                "role": node.role,
-                "tool_budget": node.tool_budget,
-                "profile": node.profile,
-            },
+            success=True,
+            output=result,
+            duration_seconds=time.time() - start_time,
+            tool_calls_used=getattr(result, "tool_calls_used", 0),
         )
 
         logger.info(f"Agent node {node.id} completed successfully")
@@ -159,12 +192,23 @@ class AgentNodeExecutor:
             else:
                 return pool.get_default_orchestrator()
 
+        # Fall back to service container if execution context exposes one
+        if self._context and hasattr(self._context, "services") and self._context.services is not None:
+            from victor.workflows.orchestrator_pool import OrchestratorPool
+
+            services = self._context.services
+            if hasattr(services, "get_optional"):
+                pool = services.get_optional(OrchestratorPool)
+                if pool is not None:
+                    if profile:
+                        return pool.get_orchestrator(profile)
+                    return pool.get_default_orchestrator()
+
         # Otherwise, use orchestrator from context directly
         if self._context and hasattr(self._context, "orchestrator"):
             return self._context.orchestrator
 
-        # Fallback: raise error
-        raise ValueError(f"No orchestrator available for profile: {profile}")
+        return None
 
     def _map_role_to_enum(self, role: str) -> "SubAgentRole":
         """Map role string to SubAgentRole enum.

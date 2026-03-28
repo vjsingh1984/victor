@@ -1,10 +1,10 @@
 import typer
-import asyncio
 import logging
 from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 
+from victor.core.async_utils import run_sync
 from victor.ui.commands.utils import setup_logging
 
 serve_app = typer.Typer(
@@ -106,7 +106,7 @@ def _serve(
         )
     )
 
-    asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
+    run_sync(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
 
 
 async def _run_fastapi_server(
@@ -260,7 +260,7 @@ def serve_hitl(
         )
     )
 
-    asyncio.run(_run_hitl_server(host, port, require_auth, auth_token, persistent, db_path))
+    run_sync(_run_hitl_server(host, port, require_auth, auth_token, persistent, db_path))
 
 
 async def _run_hitl_server(

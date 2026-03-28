@@ -1,10 +1,11 @@
-import typer
-import asyncio
+import logging
 from datetime import datetime
+
+import typer
 from rich.console import Console
 from rich.table import Table
-import logging
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 
 models_app = typer.Typer(name="models", help="List available models for a provider.")
@@ -52,7 +53,7 @@ def list_models(
         victor models list -p openai
         victor models list -p google
     """
-    asyncio.run(list_models_async(provider, endpoint))
+    run_sync(list_models_async(provider, endpoint))
 
 
 async def list_models_async(provider: str, endpoint: str = None) -> None:

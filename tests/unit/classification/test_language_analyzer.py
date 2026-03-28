@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.tools.language_analyzer import (
+from victor.verticals.contrib.coding.tools.language_analyzer import (
     AnalysisIssue,
     AnalysisResult,
     BaseLanguageAnalyzer,
@@ -961,7 +961,7 @@ class TestBashAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import BashAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import BashAnalyzer
 
         self.analyzer = BashAnalyzer(max_complexity=10)
 
@@ -994,7 +994,7 @@ class TestSQLAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import SQLAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import SQLAnalyzer
 
         self.analyzer = SQLAnalyzer(max_complexity=10)
 
@@ -1312,7 +1312,7 @@ class TestRegistryAdvancedFunctions:
 
     def test_register_custom_analyzer(self):
         """Test registering a custom analyzer."""
-        from victor.tools.language_analyzer import LanguageRegistry, BaseLanguageAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import LanguageRegistry, BaseLanguageAnalyzer
 
         # Create a custom analyzer class
         class CustomAnalyzer(BaseLanguageAnalyzer):
@@ -1334,7 +1334,7 @@ class TestRegistryAdvancedFunctions:
 
     def test_get_glob_pattern_function(self):
         """Test get_glob_pattern function."""
-        from victor.tools.language_analyzer import get_glob_pattern
+        from victor.verticals.contrib.coding.tools.language_analyzer import get_glob_pattern
 
         assert get_glob_pattern("python") == "*.py"
         assert "js" in get_glob_pattern("javascript")
@@ -1348,7 +1348,7 @@ class TestLuaAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import LuaAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import LuaAnalyzer
 
         self.analyzer = LuaAnalyzer(max_complexity=10)
 
@@ -1377,7 +1377,7 @@ class TestElixirAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import ElixirAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import ElixirAnalyzer
 
         self.analyzer = ElixirAnalyzer(max_complexity=10)
 
@@ -1409,7 +1409,7 @@ class TestHaskellAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import HaskellAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import HaskellAnalyzer
 
         self.analyzer = HaskellAnalyzer(max_complexity=10)
 
@@ -1437,7 +1437,7 @@ class TestRAnalyzer:
 
     def setup_method(self):
         """Set up test fixtures."""
-        from victor.tools.language_analyzer import RAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import RAnalyzer
 
         self.analyzer = RAnalyzer(max_complexity=10)
 
@@ -1468,7 +1468,7 @@ class TestAnalyzeFileAsync:
     @pytest.mark.asyncio
     async def test_analyze_file_success(self, tmp_path):
         """Test analyze_file with valid file."""
-        from victor.tools.language_analyzer import analyze_file
+        from victor.verticals.contrib.coding.tools.language_analyzer import analyze_file
 
         test_file = tmp_path / "test.py"
         test_file.write_text('print("hello")')
@@ -1480,7 +1480,7 @@ class TestAnalyzeFileAsync:
     @pytest.mark.asyncio
     async def test_analyze_file_unsupported(self, tmp_path):
         """Test analyze_file with unsupported file type."""
-        from victor.tools.language_analyzer import analyze_file
+        from victor.verticals.contrib.coding.tools.language_analyzer import analyze_file
 
         test_file = tmp_path / "test.xyz"
         test_file.write_text("content")
@@ -1492,7 +1492,7 @@ class TestAnalyzeFileAsync:
     @pytest.mark.asyncio
     async def test_analyze_file_read_error(self):
         """Test analyze_file with non-existent file."""
-        from victor.tools.language_analyzer import analyze_file
+        from victor.verticals.contrib.coding.tools.language_analyzer import analyze_file
 
         result = await analyze_file(Path("/nonexistent/test.py"))
         assert not result.success
@@ -1501,7 +1501,7 @@ class TestAnalyzeFileAsync:
     @pytest.mark.asyncio
     async def test_analyze_file_with_aspects(self, tmp_path):
         """Test analyze_file with specific aspects."""
-        from victor.tools.language_analyzer import analyze_file
+        from victor.verticals.contrib.coding.tools.language_analyzer import analyze_file
 
         test_file = tmp_path / "test.py"
         test_file.write_text('password = "secret"')
@@ -1512,7 +1512,7 @@ class TestAnalyzeFileAsync:
     @pytest.mark.asyncio
     async def test_analyze_file_with_custom_complexity(self, tmp_path):
         """Test analyze_file with custom max_complexity."""
-        from victor.tools.language_analyzer import analyze_file
+        from victor.verticals.contrib.coding.tools.language_analyzer import analyze_file
 
         test_file = tmp_path / "test.py"
         test_file.write_text("def f(): return 1")

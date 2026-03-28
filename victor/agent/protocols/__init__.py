@@ -116,6 +116,9 @@ _MODULE_MEMBERS = {
         "ResponseCompleterProtocol",
         "VerticalStorageProtocol",
         "TaskTrackerProtocol",
+        "CompactionSummarizerProtocol",
+        "HierarchicalCompactionProtocol",
+        "SessionContextLinkerProtocol",
     ],
     "budget_protocols": [
         "ModeControllerProtocol",

@@ -21,10 +21,12 @@ This is a stub that delegates to legacy implementation during migration.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import ComputeNode, WorkflowState
+    from victor.workflows.definition import ComputeNode
+    from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +67,24 @@ class ComputeNodeExecutor:
             Exception: If handler execution fails
         """
         import asyncio
-        from victor.framework.graph import GraphNodeResult
+        from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info(f"Executing compute node: {node.id}")
+        start_time = time.time()
 
-        # Step 1: Build params from node.inputs with $ctx. and $state. prefixes
+        # Step 1: Build params from node input_mapping with $ctx. and $state. prefixes
         params = {}
-        if node.inputs:
-            for param_name, source in node.inputs.items():
+        if node.input_mapping:
+            for param_name, source in node.input_mapping.items():
                 # Handle $ctx. prefix (from state)
-                if source.startswith("$ctx."):
+                if isinstance(source, str) and source.startswith("$ctx."):
                     context_key = source[5:]
                     if context_key in state:
                         params[param_name] = state[context_key]
                     else:
                         params[param_name] = context_key
                 # Handle $state. prefix (also from state)
-                elif source.startswith("$state."):
+                elif isinstance(source, str) and source.startswith("$state."):
                     context_key = source[7:]
                     if context_key in state:
                         params[param_name] = state[context_key]
@@ -95,6 +98,20 @@ class ComputeNodeExecutor:
         tool_registry = None
         if self._context and hasattr(self._context, "tool_registry"):
             tool_registry = self._context.tool_registry
+        elif self._context and hasattr(self._context, "services") and self._context.services is not None:
+            from victor.tools.registry import ToolRegistry
+
+            services = self._context.services
+            if hasattr(services, "get_optional"):
+                tool_registry = services.get_optional(ToolRegistry)
+
+        if tool_registry is None:
+            try:
+                from victor.tools.registry import get_tool_registry
+
+                tool_registry = get_tool_registry()
+            except Exception:
+                tool_registry = None
 
         tool_calls_used = 0
         output = None
@@ -175,7 +192,7 @@ class ComputeNodeExecutor:
             output = outputs
 
         # Step 5: Store output in state
-        output_key = node.output or node.id
+        output_key = node.output_key or node.id
         state[output_key] = output
 
         # Step 6: Update node results for observability
@@ -184,13 +201,10 @@ class ComputeNodeExecutor:
 
         state["_node_results"][node.id] = GraphNodeResult(
             node_id=node.id,
-            status="completed",
-            result=output,
-            metadata={
-                "handler": node.handler,
-                "tools": node.tools if hasattr(node, "tools") else [],
-                "tool_calls_used": tool_calls_used,
-            },
+            success=True,
+            output=output,
+            duration_seconds=time.time() - start_time,
+            tool_calls_used=tool_calls_used,
         )
 
         logger.info(f"Compute node {node.id} completed successfully")

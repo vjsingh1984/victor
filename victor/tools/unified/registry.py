@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from victor.tools.base import ToolDefinition
     from victor.tools.selection.protocol import ToolSelectionContext
 
+from victor.core.async_utils import run_sync
 from victor.framework.tools import ToolCategory
 from victor.tools.base import BaseTool, CostTier, ToolResult
 from victor.tools.selection.protocol import (
@@ -299,7 +300,10 @@ class UnifiedToolRegistry:
                 # Close selector if present
                 if cls._instance._selector:
                     try:
-                        asyncio.run(cls._instance._selector.close())
+                        asyncio.get_running_loop()
+                        asyncio.create_task(cls._instance._selector.close())
+                    except RuntimeError:
+                        run_sync(cls._instance._selector.close())
                     except Exception as e:
                         logger.debug("Failed to close selector during registry reset: %s", e)
             cls._instance = None

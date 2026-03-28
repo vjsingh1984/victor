@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
+from victor.core.async_utils import run_sync
 from victor.integrations.mcp.protocol import (
     MCP_PROTOCOL_VERSION,
     MCPCapabilities,
@@ -695,6 +696,4 @@ async def run_mcp_server_stdio() -> None:
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(run_mcp_server_stdio())
+    run_sync(run_mcp_server_stdio())

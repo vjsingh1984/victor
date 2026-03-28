@@ -60,11 +60,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class WorkflowState(TypedDict, total=False):
-    """Standard state for adapted workflows.
+class AdapterWorkflowState(TypedDict, total=False):
+    """Standard state for adapted WorkflowBuilder-to-StateGraph flows.
 
-    This state structure is used when adapting WorkflowBuilder
-    workflows to StateGraph execution.
+    This state model is adapter-specific and intentionally distinct from the
+    compiled runtime `victor.workflows.runtime_types.WorkflowState`.
 
     Attributes:
         context: Original workflow context (from WorkflowBuilder)
@@ -85,6 +85,9 @@ class WorkflowState(TypedDict, total=False):
     is_complete: bool
 
 
+WorkflowState = AdapterWorkflowState
+
+
 @dataclass
 class AdaptedNode:
     """A workflow node adapted for StateGraph execution.
@@ -101,7 +104,7 @@ class AdaptedNode:
 
     name: str
     node_type: WorkflowNodeType
-    handler: Callable[[WorkflowState], WorkflowState]
+    handler: Callable[[AdapterWorkflowState], AdapterWorkflowState]
     next_nodes: List[str] = field(default_factory=list)
     conditional_edges: Dict[str, str] = field(default_factory=dict)
     tool_budget: int = 10
@@ -161,7 +164,7 @@ class WorkflowToGraphAdapter:
         from victor.framework.graph import StateGraph, END
 
         # Create StateGraph with workflow state
-        graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
+        graph: StateGraph[AdapterWorkflowState] = StateGraph(AdapterWorkflowState)
 
         # Convert each node
         for node in workflow.nodes:
@@ -205,10 +208,10 @@ class WorkflowToGraphAdapter:
 
         def create_handler(
             n: WorkflowNode,
-        ) -> Callable[[WorkflowState], WorkflowState]:
+        ) -> Callable[[AdapterWorkflowState], AdapterWorkflowState]:
             """Create a state-updating handler for the node."""
 
-            def handler(state: WorkflowState) -> WorkflowState:
+            def handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
                 # Update state with node execution
                 new_state = dict(state)
                 new_state["current_node"] = n.name
@@ -262,7 +265,7 @@ class WorkflowToGraphAdapter:
         # Import here to avoid circular imports
         from victor.framework.graph import StateGraph, END
 
-        graph: StateGraph[WorkflowState] = StateGraph(WorkflowState)
+        graph: StateGraph[AdapterWorkflowState] = StateGraph(AdapterWorkflowState)
 
         # Convert each node with real execution
         for node in workflow.nodes:
@@ -287,7 +290,7 @@ class WorkflowToGraphAdapter:
         self,
         node: WorkflowNode,
         executor: "WorkflowExecutor",
-    ) -> Callable[[WorkflowState], WorkflowState]:
+    ) -> Callable[[AdapterWorkflowState], AdapterWorkflowState]:
         """Create an execution handler that uses the workflow executor.
 
         Args:
@@ -300,7 +303,7 @@ class WorkflowToGraphAdapter:
         # Import here to avoid circular imports
         from victor.workflows.executor import WorkflowExecutor
 
-        async def async_handler(state: WorkflowState) -> WorkflowState:
+        async def async_handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
             """Execute the node using the workflow executor."""
             new_state = dict(state)
             new_state["current_node"] = node.name
@@ -331,7 +334,7 @@ class WorkflowToGraphAdapter:
             return new_state  # type: ignore
 
         # Return sync wrapper that runs async handler
-        def sync_handler(state: WorkflowState) -> WorkflowState:
+        def sync_handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
             import asyncio
 
             try:
@@ -399,6 +402,7 @@ class GraphToWorkflowAdapter:
 
 
 __all__ = [
+    "AdapterWorkflowState",
     "WorkflowState",
     "AdaptedNode",
     "WorkflowToGraphAdapter",

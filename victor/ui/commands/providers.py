@@ -1,12 +1,11 @@
-import asyncio
-from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
+from victor.core.async_utils import run_sync
 from victor.providers.registry import ProviderRegistry
 from victor.providers.health import ProviderHealthChecker
 
@@ -127,67 +126,82 @@ def check_provider(
         victor providers check anthropic --connectivity
         victor providers check ollama
     """
-
-    async def run_check():
-        checker = ProviderHealthChecker()
-        result = await checker.check_provider(
+    run_sync(
+        _check_provider_async(
             provider=provider,
             model=model,
-            check_connectivity=connectivity,
+            connectivity=connectivity,
             timeout=timeout,
+            json_output=json_output,
         )
+    )
 
-        if json_output:
-            import json
 
-            console.print(json.dumps(result.to_dict(), indent=2))
-            return
+async def _check_provider_async(
+    *,
+    provider: str,
+    model: str,
+    connectivity: bool,
+    timeout: float,
+    json_output: bool,
+) -> None:
+    checker = ProviderHealthChecker()
+    result = await checker.check_provider(
+        provider=provider,
+        model=model,
+        check_connectivity=connectivity,
+        timeout=timeout,
+    )
 
-        # Display results in a nice format
-        if result.healthy:
-            status_panel = Panel(
-                "[bold green]✓ HEALTHY[/bold green]",
-                title=f"[bold]{provider.upper()}[/bold]",
-                subtitle=f"Model: {model}",
-            )
-            console.print(status_panel)
+    if json_output:
+        import json
 
-            # Show info
-            if result.info:
-                info_table = Table(title="Configuration", show_header=False)
-                info_table.add_column("Key", style="cyan")
-                info_table.add_column("Value", style="green")
+        console.print(json.dumps(result.to_dict(), indent=2))
+        return
 
-                for key, value in result.info.items():
-                    info_table.add_row(key, str(value))
+    # Display results in a nice format
+    if result.healthy:
+        status_panel = Panel(
+            "[bold green]✓ HEALTHY[/bold green]",
+            title=f"[bold]{provider.upper()}[/bold]",
+            subtitle=f"Model: {model}",
+        )
+        console.print(status_panel)
 
-                console.print(info_table)
+        # Show info
+        if result.info:
+            info_table = Table(title="Configuration", show_header=False)
+            info_table.add_column("Key", style="cyan")
+            info_table.add_column("Value", style="green")
 
-            # Show warnings if any
-            if result.warnings:
-                console.print("\n[bold yellow]Warnings:[/bold yellow]")
-                for warning in result.warnings:
-                    console.print(f"  ⚠️  {warning}")
-        else:
-            status_panel = Panel(
-                "[bold red]✗ UNHEALTHY[/bold red]",
-                title=f"[bold]{provider.upper()}[/bold]",
-                subtitle=f"Model: {model}",
-            )
-            console.print(status_panel)
+            for key, value in result.info.items():
+                info_table.add_row(key, str(value))
 
-            # Show issues
-            console.print("\n[bold red]Issues:[/bold red]")
-            for i, issue in enumerate(result.issues, 1):
-                console.print(f"  {i}. {issue}")
+            console.print(info_table)
 
-            # Show warnings if any
-            if result.warnings:
-                console.print("\n[bold yellow]Warnings:[/bold yellow]")
-                for warning in result.warnings:
-                    console.print(f"  ⚠️  {warning}")
+        # Show warnings if any
+        if result.warnings:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in result.warnings:
+                console.print(f"  ⚠️  {warning}")
+    else:
+        status_panel = Panel(
+            "[bold red]✗ UNHEALTHY[/bold red]",
+            title=f"[bold]{provider.upper()}[/bold]",
+            subtitle=f"Model: {model}",
+        )
+        console.print(status_panel)
 
-    asyncio.run(run_check())
+        # Show issues
+        console.print("\n[bold red]Issues:[/bold red]")
+        for i, issue in enumerate(result.issues, 1):
+            console.print(f"  {i}. {issue}")
+
+        # Show warnings if any
+        if result.warnings:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in result.warnings:
+                console.print(f"  ⚠️  {warning}")
 
 
 @providers_app.command("verify")
@@ -205,61 +219,73 @@ def verify_provider(
         victor providers verify deepseek --model deepseek-chat
         victor providers verify anthropic --model claude-3-5-haiku --api-key sk-...
     """
-    from victor.providers.resolution import UnifiedApiKeyResolver, APIKeyNotFoundError
-
-    async def run_verify():
-        console.print(f"[bold]Verifying Provider:[/bold] {provider}")
-        console.print(f"[bold]Model:[/bold] {model}\n")
-
-        # Check if provider is registered
-        try:
-            ProviderRegistry.get(provider)
-            console.print("[green]✓[/green] Provider is registered")
-        except Exception:
-            console.print(f"[red]✗[/red] Provider '{provider}' is not registered")
-            available = ProviderRegistry.list_providers()
-            console.print(f"\nAvailable providers: {', '.join(available)}")
-            raise typer.Exit(1)
-
-        # Check API key resolution
-        resolver = UnifiedApiKeyResolver()
-        key_result = resolver.get_api_key(provider, explicit_key=api_key)
-
-        console.print("\n[bold]API Key Resolution:[/bold]")
-        for i, source in enumerate(key_result.sources_attempted, 1):
-            status = "[green]✓[/green]" if source.found else "[red]✗[/red]"
-            console.print(f"  {i}. {status} {source.description}")
-
-            if source.found and source.value_preview:
-                console.print(f"     Preview: {source.value_preview}")
-
-        if key_result.key is None:
-            error = APIKeyNotFoundError(
-                provider=provider,
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
-                model=model,
-            )
-            console.print(f"\n[red]{error}[/red]")
-            raise typer.Exit(1)
-
-        # Run health check
-        console.print("\n[bold]Health Check:[/bold]")
-        checker = ProviderHealthChecker()
-        health_result = await checker.check_provider(
+    run_sync(
+        _verify_provider_async(
             provider=provider,
             model=model,
-            check_connectivity=False,
+            api_key=api_key,
         )
+    )
 
-        if health_result.healthy:
-            console.print("[green]✓ All checks passed![/green]")
-        else:
-            console.print("[red]✗ Health check failed:[/red]")
-            for issue in health_result.issues:
-                console.print(f"  • {issue}")
 
-    asyncio.run(run_verify())
+async def _verify_provider_async(
+    *,
+    provider: str,
+    model: str,
+    api_key: Optional[str],
+) -> None:
+    from victor.providers.resolution import UnifiedApiKeyResolver, APIKeyNotFoundError
+
+    console.print(f"[bold]Verifying Provider:[/bold] {provider}")
+    console.print(f"[bold]Model:[/bold] {model}\n")
+
+    # Check if provider is registered
+    try:
+        ProviderRegistry.get(provider)
+        console.print("[green]✓[/green] Provider is registered")
+    except Exception:
+        console.print(f"[red]✗[/red] Provider '{provider}' is not registered")
+        available = ProviderRegistry.list_providers()
+        console.print(f"\nAvailable providers: {', '.join(available)}")
+        raise typer.Exit(1)
+
+    # Check API key resolution
+    resolver = UnifiedApiKeyResolver()
+    key_result = resolver.get_api_key(provider, explicit_key=api_key)
+
+    console.print("\n[bold]API Key Resolution:[/bold]")
+    for i, source in enumerate(key_result.sources_attempted, 1):
+        status = "[green]✓[/green]" if source.found else "[red]✗[/red]"
+        console.print(f"  {i}. {status} {source.description}")
+
+        if source.found and source.value_preview:
+            console.print(f"     Preview: {source.value_preview}")
+
+    if key_result.key is None:
+        error = APIKeyNotFoundError(
+            provider=provider,
+            sources_attempted=key_result.sources_attempted,
+            non_interactive=key_result.non_interactive,
+            model=model,
+        )
+        console.print(f"\n[red]{error}[/red]")
+        raise typer.Exit(1)
+
+    # Run health check
+    console.print("\n[bold]Health Check:[/bold]")
+    checker = ProviderHealthChecker()
+    health_result = await checker.check_provider(
+        provider=provider,
+        model=model,
+        check_connectivity=False,
+    )
+
+    if health_result.healthy:
+        console.print("[green]✓ All checks passed![/green]")
+    else:
+        console.print("[red]✗ Health check failed:[/red]")
+        for issue in health_result.issues:
+            console.print(f"  • {issue}")
 
 
 # ---------------------------------------------------------------------------
@@ -295,35 +321,36 @@ def auth_login(
         )
         raise typer.Exit(1)
 
+    run_sync(_auth_login_async(provider=provider, force=force))
+
+
+async def _auth_login_async(*, provider: str, force: bool) -> None:
     from victor.providers.oauth_manager import OAuthTokenManager
 
-    async def _login():
-        mgr = OAuthTokenManager(provider)
+    mgr = OAuthTokenManager(provider)
 
-        if not force:
-            cached = mgr._load_cached()
-            if cached is not None and not cached.is_expired:
-                console.print(f"[green]✓[/] Already authenticated with {provider}")
-                console.print(
-                    f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
-                )
-                console.print("[dim]Use --force to re-authenticate[/]")
-                return
+    if not force:
+        cached = mgr._load_cached()
+        if cached is not None and not cached.is_expired:
+            console.print(f"[green]✓[/] Already authenticated with {provider}")
+            console.print(
+                f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            )
+            console.print("[dim]Use --force to re-authenticate[/]")
+            return
 
-        console.print(f"[cyan]Opening browser for {provider} OAuth login...[/]")
-        try:
-            token = await mgr.get_valid_token()
-            if token:
-                console.print(f"[green]✓[/] Successfully authenticated with {provider}")
-                console.print("  Token saved to ~/.victor/oauth_tokens.yaml")
-            else:
-                console.print(f"[red]✗[/] Authentication failed for {provider}")
-                raise typer.Exit(1)
-        except Exception as e:
-            console.print(f"[red]✗[/] OAuth login failed: {e}")
+    console.print(f"[cyan]Opening browser for {provider} OAuth login...[/]")
+    try:
+        token = await mgr.get_valid_token()
+        if token:
+            console.print(f"[green]✓[/] Successfully authenticated with {provider}")
+            console.print("  Token saved to ~/.victor/oauth_tokens.yaml")
+        else:
+            console.print(f"[red]✗[/] Authentication failed for {provider}")
             raise typer.Exit(1)
-
-    asyncio.run(_login())
+    except Exception as e:
+        console.print(f"[red]✗[/] OAuth login failed: {e}")
+        raise typer.Exit(1)
 
 
 @auth_app.command("logout")

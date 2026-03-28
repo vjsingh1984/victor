@@ -902,7 +902,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             memory_manager=self.memory_manager,
             memory_session_id=self._memory_session_id,
             system_prompt=self._system_prompt,
+            context_reminder_manager=(
+                self.reminder_manager if hasattr(self, "reminder_manager") else None
+            ),
+            hierarchical_manager=self._factory.create_hierarchical_compaction_manager(),
         )
+
+        # SessionLedger: Structured session state tracking (survives compaction)
+        self._session_ledger = self._factory.create_session_ledger()
 
         # LifecycleManager: Coordinate session lifecycle and resource cleanup (via factory)
         # Handles conversation reset, session recovery, graceful shutdown
@@ -1953,7 +1960,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             The created task, or None if no event loop is available.
         """
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             task = loop.create_task(coro, name=name)
 
             # Track the task
@@ -1965,6 +1972,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.debug(f"Created background task: {name}")
             return task
         except RuntimeError:
+            if asyncio.iscoroutine(coro):
+                coro.close()
             logger.debug(f"No event loop available for background task: {name}")
             return None
 
@@ -2309,91 +2318,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # Provider/Model Hot-Swap Methods
     # =========================================================================
 
-    def switch_provider(
-        self,
-        provider_name: str,
-        model: Optional[str] = None,
-        **provider_kwargs: Any,
-    ) -> bool:
-        """Switch to a different provider mid-conversation.
-
-        .. deprecated::
-            This method is deprecated. Use the async version instead:
-            await orchestrator.switch_provider(provider_name, model)
-
-        This synchronous method is kept for backward compatibility but
-        delegates to ProviderCoordinator (Phase 2 refactoring).
-
-        Args:
-            provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
-            model: Optional model name. If not provided, uses current model.
-            **provider_kwargs: Additional provider-specific arguments (base_url, api_key, etc.)
-
-        Returns:
-            True if switch was successful, False otherwise
-        """
-        import warnings
-
-        warnings.warn(
-            "switch_provider() is deprecated and will be removed. "
-            "Use async switch_provider() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # For backward compatibility, run the async version in an event loop
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is already running, we can't use run_until_complete
-                # Fall back to the old implementation for now
-                logger.warning(
-                    "switch_provider() called from async context - "
-                    "deprecated sync path will be removed in future version"
-                )
-                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
-            else:
-                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
-        except Exception as e:
-            logger.error(f"Failed to switch provider to {provider_name}: {e}")
-            return False
-
-    def switch_model(self, model: str) -> bool:
-        """Switch to a different model on the current provider.
-
-        Delegates to ProviderCoordinator (Phase 2 refactoring).
-
-        This is a lighter-weight switch than switch_provider() - it only
-        updates the model and reinitializes the tool adapter.
-
-        Args:
-            model: New model name
-
-        Returns:
-            True if switch was successful, False otherwise
-
-        Example:
-            orchestrator.switch_model("qwen2.5-coder:32b")
-        """
-        import warnings
-
-        # For backward compatibility with sync API, run the async version
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is already running, we can't use run_until_complete
-                # Fall back to a simpler implementation
-                logger.warning(
-                    "switch_model() called from async context - "
-                    "consider using await coordinator.switch_model() instead"
-                )
-                return asyncio.run(self._provider_coordinator.switch_model(model))
-            else:
-                return asyncio.run(self._provider_coordinator.switch_model(model))
-        except Exception as e:
-            logger.error(f"Failed to switch model to {model}: {e}")
-            return False
-
     def get_current_provider_info(self) -> Dict[str, Any]:
         """Get information about the current provider and model.
 
@@ -2454,6 +2378,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         Called by coordinators when a query classification is available,
         injecting task-aware guidance and tool constraints into the prompt.
+        Updates both the orchestrator's cached prompt AND the conversation's
+        live system message so the provider receives the updated prompt.
 
         Args:
             query_classification: Optional QueryClassification for task-aware prompting
@@ -2467,6 +2393,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
         else:
             self._system_prompt = base_system_prompt
+
+        # Sync to conversation's live message list so provider receives it
+        if hasattr(self, "conversation") and self.conversation is not None:
+            self.conversation.system_prompt = self._system_prompt
+            # Replace the existing system message if already inserted
+            if self.conversation._system_added and self.conversation._messages:
+                if self.conversation._messages[0].role == "system":
+                    from victor.agent.message_history import Message
+
+                    self.conversation._messages[0] = Message(
+                        role="system", content=self._system_prompt
+                    )
 
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
@@ -3595,13 +3533,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Raises:
             ProviderNotFoundError: If provider not found
         """
-        result = await self._provider_coordinator._manager.switch_provider(
+        result = await self._provider_coordinator.switch_provider_async(
             provider_name=provider_name,
             model=model,
         )
 
         if result:
-            self._provider_coordinator._notify_post_switch_hooks()
             # Sync orchestrator's attributes with provider manager state
             self.model = self._provider_manager.model
             self.provider_name = self._provider_manager.provider_name
@@ -3622,9 +3559,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if switch was successful, False otherwise
         """
-        result = await self._provider_manager.switch_model(model)
+        result = await self._provider_coordinator.switch_model_async(model)
         if result:
-            self._provider_coordinator._notify_post_switch_hooks()
             # Sync orchestrator's model attribute with provider manager state
             self.model = self._provider_manager.model
         return result

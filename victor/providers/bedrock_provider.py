@@ -301,7 +301,7 @@ class BedrockProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 client = await self._get_client()
 
@@ -325,13 +325,7 @@ class BedrockProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = response.usage.get("total_tokens") if response.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(messages)}",
-                    endpoint=f"bedrock.{self._region}.amazonaws.com",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return response
 

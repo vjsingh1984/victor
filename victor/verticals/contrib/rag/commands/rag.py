@@ -30,7 +30,6 @@ Usage:
     victor rag --log-level DEBUG query "question" --synthesize
 """
 
-import asyncio
 import os
 import sys
 from pathlib import Path
@@ -40,6 +39,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from victor.core.async_utils import run_sync
 from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.ui.commands.utils import setup_logging
 
@@ -146,7 +146,7 @@ def ingest(
         victor rag ingest ./docs --recursive --pattern "*.md"
         victor rag ingest https://example.com/api-docs
     """
-    asyncio.run(_ingest_async(source, recursive, pattern, doc_type, doc_id))
+    run_sync(_ingest_async(source, recursive, pattern, doc_type, doc_id))
 
 
 async def _ingest_async(
@@ -207,7 +207,7 @@ def search(
         victor rag search "authentication"
         victor rag search "error handling" --top-k 10
     """
-    asyncio.run(_search_async(query, top_k))
+    run_sync(_search_async(query, top_k))
 
 
 async def _search_async(query: str, top_k: int) -> None:
@@ -271,7 +271,7 @@ def query(
         victor rag query "API endpoints" -S -p anthropic -m claude-sonnet-4-20250514
         victor rag query "Compare Apple and Microsoft" -S --no-enrichment
     """
-    asyncio.run(_query_async(question, synthesize, provider, model, top_k, show_enrichment))
+    run_sync(_query_async(question, synthesize, provider, model, top_k, show_enrichment))
 
 
 async def _query_async(
@@ -421,7 +421,7 @@ def list_docs() -> None:
     Example:
         victor rag list
     """
-    asyncio.run(_list_async())
+    run_sync(_list_async())
 
 
 async def _list_async() -> None:
@@ -445,7 +445,7 @@ def stats() -> None:
     Example:
         victor rag stats
     """
-    asyncio.run(_stats_async())
+    run_sync(_stats_async())
 
 
 async def _stats_async() -> None:
@@ -486,7 +486,7 @@ def delete(
         if not confirm:
             raise typer.Abort()
 
-    asyncio.run(_delete_async(doc_id))
+    run_sync(_delete_async(doc_id))
 
 
 async def _delete_async(doc_id: str) -> None:
@@ -519,7 +519,7 @@ def demo(
     if demo_type == "docs":
         console.print("[bold blue]Running project documentation demo...[/]")
         console.print("This will ingest documentation from the current project.\n")
-        asyncio.run(_demo_docs())
+        run_sync(_demo_docs())
     elif demo_type == "sec":
         console.print("[bold blue]Running SEC filing demo...[/]")
         console.print("Use 'victor rag demo-sec' for full SEC filing functionality.\n")
@@ -632,17 +632,17 @@ def demo_sec(
         return
 
     if stats:
-        asyncio.run(show_stats())
+        run_sync(show_stats())
         return
 
     if clear:
         console.print("[bold yellow]Clearing SEC filings from RAG store...[/]")
-        count_deleted = asyncio.run(clear_sec_filings())
+        count_deleted = run_sync(clear_sec_filings())
         console.print(f"[green]Removed {count_deleted} SEC filing documents[/]")
         return
 
     if query:
-        asyncio.run(
+        run_sync(
             query_filings(
                 query,
                 synthesize=synthesize,
@@ -675,7 +675,7 @@ def demo_sec(
     console.print(f"[dim]Max concurrent: {max_concurrent}[/]\n")
 
     with console.status("[bold blue]Ingesting SEC filings...[/]"):
-        results = asyncio.run(
+        results = run_sync(
             ingest_sec_filings(
                 companies=companies,
                 filing_type=filing_type,

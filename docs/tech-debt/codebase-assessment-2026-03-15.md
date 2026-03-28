@@ -1,6 +1,6 @@
 # Victor Codebase Assessment (2026-03-15)
 
-**Status**: Active baseline (updated with deep audit findings)
+**Status**: Superseded by [`codebase-assessment-2026-03-26.md`](codebase-assessment-2026-03-26.md)
 **Scope**: Repo-level review of product surface, architecture, roadmap, CI/workflow governance, security posture, and technical debt.
 
 ## Snapshot

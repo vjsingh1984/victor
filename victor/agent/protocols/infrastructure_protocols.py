@@ -37,6 +37,9 @@ __all__ = [
     "ResponseCompleterProtocol",
     "VerticalStorageProtocol",
     "TaskTrackerProtocol",
+    "CompactionSummarizerProtocol",
+    "HierarchicalCompactionProtocol",
+    "SessionContextLinkerProtocol",
 ]
 
 
@@ -681,4 +684,43 @@ class TaskTrackerProtocol(Protocol):
 
     def is_loop_detected(self) -> bool:
         """Check if execution loop is detected."""
+        ...
+
+
+@runtime_checkable
+class CompactionSummarizerProtocol(Protocol):
+    """Protocol for compaction summarization strategies."""
+
+    def summarize(self, removed_messages: List[Any], ledger: Optional[object] = None) -> str:
+        """Summarize removed messages into a compact context string."""
+        ...
+
+
+@runtime_checkable
+class HierarchicalCompactionProtocol(Protocol):
+    """Protocol for hierarchical compaction management."""
+
+    def add_summary(self, summary: str, turn_index: int) -> None:
+        """Add a compaction summary; may trigger epoch creation."""
+        ...
+
+    def get_active_context(self, max_chars: int = 2000) -> str:
+        """Get epoch summaries + recent individual summaries within budget."""
+        ...
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize for persistence."""
+        ...
+
+
+@runtime_checkable
+class SessionContextLinkerProtocol(Protocol):
+    """Protocol for cross-session context linking."""
+
+    def build_resume_context(self, session_id: str) -> Any:
+        """Build rich resume context from persisted session data."""
+        ...
+
+    def find_related_sessions(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+        """Semantic search across sessions for cross-session linking."""
         ...

@@ -51,10 +51,13 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+
+from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
     from victor.agent.provider.switcher import ProviderSwitcher
@@ -544,8 +547,6 @@ class ProviderSwitchCoordinator:
 
         Deprecated: Use _execute_hooks() with SwitchContext instead.
         """
-        import asyncio
-
         # Create a minimal context
         context = SwitchContext(
             old_provider=None,
@@ -561,8 +562,7 @@ class ProviderSwitchCoordinator:
             loop = asyncio.get_running_loop()
             loop.create_task(self._execute_hooks(context))
         except RuntimeError:
-            # No running loop, run synchronously
-            asyncio.run(self._execute_hooks(context))
+            run_sync(self._execute_hooks(context))
 
 
 def create_provider_switch_coordinator(

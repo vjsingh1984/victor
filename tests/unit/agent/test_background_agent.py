@@ -199,6 +199,32 @@ class TestBackgroundAgentManager:
         manager.set_event_callback(callback)
         assert manager._event_callback == callback
 
+    def test_from_factory_uses_shared_sync_bridge(self):
+        """from_factory should bridge async factory creation from sync code."""
+        factory = MagicMock()
+        orchestrator = MagicMock()
+        factory.create_agent = AsyncMock(return_value=orchestrator)
+
+        manager = BackgroundAgentManager.from_factory(factory, max_concurrent=3)
+
+        assert manager._orchestrator is orchestrator
+        assert manager._factory is factory
+        assert manager._max_concurrent == 3
+        factory.create_agent.assert_awaited_once_with(mode="foreground")
+
+    def test_from_factory_rejects_running_loop(self):
+        """from_factory should fail fast when called from an async context."""
+        factory = MagicMock()
+        factory.create_agent = AsyncMock(return_value=MagicMock())
+
+        async def _inner():
+            with pytest.raises(RuntimeError, match="Cannot use run_sync\\(\\)"):
+                BackgroundAgentManager.from_factory(factory)
+
+        asyncio.run(_inner())
+        factory.create_agent.assert_called_once_with(mode="foreground")
+        factory.create_agent.assert_not_awaited()
+
     @pytest.mark.asyncio
     async def test_start_agent(self, manager):
         """start_agent should create and return agent ID."""

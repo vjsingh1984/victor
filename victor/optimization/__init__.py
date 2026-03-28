@@ -48,7 +48,7 @@ from victor.optimization.strategies import (
 from victor.optimization.generator import WorkflowVariantGenerator
 from victor.optimization.search import HillClimbingOptimizer
 from victor.optimization.evaluator import VariantEvaluator
-from victor.optimization.optimizer import WorkflowOptimizer
+from victor.optimization.optimizer import OptimizationConfig, WorkflowOptimizer
 from victor.optimization.validator import (
     ConstraintViolation,
     OptimizationValidationResult,
@@ -69,6 +69,7 @@ __all__ = [
     # Core components
     "WorkflowProfiler",
     "WorkflowOptimizer",
+    "OptimizationConfig",
     "WorkflowVariantGenerator",
     "VariantEvaluator",
     "HillClimbingOptimizer",

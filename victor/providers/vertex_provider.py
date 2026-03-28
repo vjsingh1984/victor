@@ -252,7 +252,7 @@ class VertexAIProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 headers = await self._get_auth_headers()
                 payload = self._build_request_payload(
@@ -269,13 +269,7 @@ class VertexAIProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = result.usage.get("total_tokens") if result.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint=f"/{model}:generateContent",
-                    model=model,
-                    start_time=0,  # Will be set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return result
 

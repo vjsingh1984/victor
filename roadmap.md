@@ -1,8 +1,8 @@
 # Victor Roadmap (Canonical)
 
 **Status**: Single source of truth for all roadmap priorities
-**Last Updated**: 2026-03-15
-**Next Review**: 2026-03-17 (weekly)
+**Last Updated**: 2026-03-26
+**Next Review**: 2026-03-30 (weekly)
 
 > ⚠️ **All other planning documents are considered non-canonical** unless explicitly
 > referenced below as supporting documentation. This roadmap overrides any conflicting
@@ -33,19 +33,39 @@
 - Scope: Active 90-day execution plan + directional horizons
 
 Related documents:
+- Product vision: [`VISION.md`](VISION.md)
 - Detailed strategy archive: [`docs/roadmap/improvement-plan-v1.md`](docs/roadmap/improvement-plan-v1.md)
 - Tracker template: [`docs/planning/GITHUB_PROJECT_90_DAY_TEMPLATE.md`](docs/planning/GITHUB_PROJECT_90_DAY_TEMPLATE.md)
+- Consolidated implementation reference: [`docs/planning/consolidated-implementation-plan-2026-03-27.md`](docs/planning/consolidated-implementation-plan-2026-03-27.md)
 - Release review logs: [`docs/roadmap/release-reviews/2026q2/README.md`](docs/roadmap/release-reviews/2026q2/README.md)
-- Evidence-based assessment: [`docs/tech-debt/codebase-assessment-2026-03-15.md`](docs/tech-debt/codebase-assessment-2026-03-15.md)
+- Evidence-based assessment: [`docs/tech-debt/codebase-assessment-2026-03-26.md`](docs/tech-debt/codebase-assessment-2026-03-26.md)
+- Issue-sized execution backlog: [`docs/planning/tiered-execution-backlog-2026-03-26.md`](docs/planning/tiered-execution-backlog-2026-03-26.md)
 
-## 2026-03-15 Audit Refresh
+## 2026-03-26 Hindsight Refresh
 
-- Validation workflow trigger wiring and modified-vertical discovery had drifted and were repaired in-repo.
-- Local `make lint` now fails on mypy again after re-verifying `mypy victor` clean on the current tree.
-- Repo metadata and PR-helper links were corrected to the canonical GitHub repo.
-- Security now has a real blocking baseline: `gitleaks` plus Trivy `CRITICAL` findings fail CI, while advisory scanners are explicitly documented in `SECURITY.md`.
-- `E1` remains open: `victor/agent/orchestrator.py` is still 3940 LOC and protocol-based injection is not complete.
-- `E5` remains in progress: removal volume exceeded 60%, but migration-note closure still needs to be finished and reflected in issue state.
+- The previous 2026-03-15 assessment is now partially stale against the live tree and has been superseded.
+- Current concentration risk is broader than orchestration alone: `victor/integrations/api/server.py`, `victor/framework/vertical_integration.py`, `victor/agent/conversation_memory.py`, and `victor/storage/vector_stores/proximadb_multi.py` now deserve first-class roadmap attention alongside `victor/agent/orchestrator.py`.
+- Security posture improved materially, but generic and server-side secret fields still need the same redaction-safe treatment already used for provider-specific keys.
+- The strongest product differentiators remain the external vertical contract model, event bridge reliability work, and the integrated ProximaDB-backed semantic/graph/metrics indexing path.
+- The largest product-execution gaps are now benchmark publication, onboarding clarity, and deciding whether the observability dashboard remains a prototype or becomes a supported surface.
+
+## Current Execution Order (Tiered)
+
+1. **Foundational alignment**
+   - Keep roadmap dates current.
+   - Keep one active assessment and one durable execution backlog.
+   - Maintain a concise vision statement in-repo.
+2. **Security hardening**
+   - Normalize secret handling across provider, server, and session settings.
+   - Keep scanner/SBOM operator guidance close to the implemented baseline.
+3. **Architecture reduction**
+   - Remove deprecated sync orchestration seams.
+   - Complete the real workflow compiler boundary.
+   - Decompose the API server, vertical integration, conversation memory, and ProximaDB provider hotspots.
+4. **Product proof**
+   - Publish benchmark results.
+   - Clarify onboarding and happy-path docs.
+   - Productize or explicitly archive the observability dashboard prototype.
 
 ## Current 90-Day Priorities (2026Q2)
 

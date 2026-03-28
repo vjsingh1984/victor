@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from victor.agent.budget_manager import BudgetManager
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
+    from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
     from victor.agent.conversation_controller import ConversationController
     from victor.observability.integration import ObservabilityIntegration
     from victor.observability.tracing import ExecutionTracer, ToolCallTracer
@@ -298,6 +299,21 @@ class InfrastructureBuildersMixin:
             logger.warning(f"Failed to create ConversationCheckpointManager: {e}")
             return None
 
+    def create_hierarchical_compaction_manager(
+        self, summarizer: Optional[Any] = None
+    ) -> "HierarchicalCompactionManager":
+        """Create HierarchicalCompactionManager for epoch-level compaction.
+
+        Args:
+            summarizer: Optional compaction summarizer (kept for backward compat)
+
+        Returns:
+            HierarchicalCompactionManager instance
+        """
+        from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+
+        return HierarchicalCompactionManager(summarizer=summarizer)
+
     def create_session_ledger(self) -> "SessionLedger":
         """Create SessionLedger for structured session state tracking."""
         from victor.agent.session_ledger import SessionLedger
@@ -306,14 +322,37 @@ class InfrastructureBuildersMixin:
         return SessionLedger()
 
     def create_compaction_summarizer(
-        self, ledger: Optional["SessionLedger"] = None
+        self, ledger: Optional["SessionLedger"] = None, use_llm: bool = False
     ) -> "LedgerAwareCompactionSummarizer":
-        """Create ledger-aware compaction summarizer strategy."""
+        """Create compaction summarizer strategy.
+
+        Args:
+            ledger: Optional session ledger
+            use_llm: If True, wraps LedgerAwareCompactionSummarizer as fallback
+                inside LLMCompactionSummarizer for richer abstractive summaries.
+        """
         from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
 
-        summarizer = LedgerAwareCompactionSummarizer()
+        fallback = LedgerAwareCompactionSummarizer()
+
+        if use_llm:
+            try:
+                from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+
+                provider = getattr(self, "_provider", None)
+                if provider is None:
+                    provider = getattr(self, "provider", None)
+                if provider is not None:
+                    summarizer = LLMCompactionSummarizer(
+                        provider=provider, fallback=fallback
+                    )
+                    logger.debug("LLMCompactionSummarizer created with LedgerAware fallback")
+                    return summarizer
+            except Exception as e:
+                logger.debug(f"LLM summarizer unavailable, using LedgerAware: {e}")
+
         logger.debug("LedgerAwareCompactionSummarizer created")
-        return summarizer
+        return fallback
 
     def create_budget_manager(self) -> "BudgetManager":
         """Create BudgetManager for unified budget tracking.

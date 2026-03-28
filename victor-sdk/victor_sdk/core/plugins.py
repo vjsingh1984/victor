@@ -66,6 +66,22 @@ class PluginContext(Protocol):
         """
         ...
 
+    def register_workflow_node_executor(
+        self,
+        node_type: str,
+        executor_factory: Any,
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Register a custom workflow node executor type with the host.
+
+        Args:
+            node_type: Custom workflow node type identifier.
+            executor_factory: Executor class or factory callable for the node type.
+            replace: Whether to replace an existing registration.
+        """
+        ...
+
     def get_service(self, service_type: Type[Any]) -> Optional[Any]:
         """Retrieve a service from the host container.
 

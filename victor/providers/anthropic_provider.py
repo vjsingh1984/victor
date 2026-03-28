@@ -154,7 +154,7 @@ class AnthropicProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 # Separate system messages from conversation
                 system_message = None
@@ -193,15 +193,9 @@ class AnthropicProvider(BaseProvider):
 
                 parsed = self._parse_response(response, model)
 
-                # Log success with usage info
+                # Log success with usage info via context manager callback
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(request_params)}",
-                    endpoint="/messages/create",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -244,6 +238,24 @@ class AnthropicProvider(BaseProvider):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Anthropic with tool-use support."""
+        import time as _time
+
+        stream_start_time = _time.time()
+        call_id = f"stream_{model}_{int(stream_start_time * 1000)}"
+        self._provider_logger.logger.info(
+            f"API_CALL_START provider=anthropic model={model} operation=stream",
+            extra={
+                "event": "API_CALL_START",
+                "call_id": call_id,
+                "provider": "anthropic",
+                "model": model,
+                "operation": "stream",
+                "endpoint": "/messages/create",
+                "num_messages": len(messages),
+                "has_tools": tools is not None,
+            },
+        )
+
         try:
             # Separate system messages
             system_message = None
@@ -374,6 +386,16 @@ class AnthropicProvider(BaseProvider):
                     elif event_type == "message_stop":
                         for tc in tool_calls.values():
                             tc["arguments"] = self._parse_json_arguments(tc.get("arguments"))
+
+                        # Log streaming success
+                        total_tokens = usage.get("total_tokens") if usage else None
+                        self._provider_logger._log_api_call_success(
+                            call_id=call_id,
+                            endpoint="/messages/create",
+                            model=model,
+                            start_time=stream_start_time,
+                            tokens=total_tokens,
+                        )
 
                         yield StreamChunk(
                             content="",

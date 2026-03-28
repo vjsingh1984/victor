@@ -259,7 +259,7 @@ class HuggingFaceProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 # Use OpenAI-compatible Messages API
                 payload = self._build_request_payload(
@@ -278,13 +278,7 @@ class HuggingFaceProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint=f"/models/{model}/v1/chat/completions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 

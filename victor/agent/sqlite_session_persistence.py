@@ -126,6 +126,8 @@ class SQLiteSessionPersistence:
         conversation_state: Optional[Any] = None,
         tool_selection_stats: Optional[Dict[str, Any]] = None,
         execution_state: Optional[Any] = None,
+        session_ledger: Optional[Any] = None,
+        compaction_hierarchy: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Save a session to SQLite database.
 
@@ -193,6 +195,12 @@ class SQLiteSessionPersistence:
                 if hasattr(execution_state, "to_dict")
                 else execution_state
             ),
+            "session_ledger": (
+                session_ledger.to_dict()
+                if hasattr(session_ledger, "to_dict")
+                else session_ledger
+            ),
+            "compaction_hierarchy": compaction_hierarchy,
         }
 
         try:

@@ -50,7 +50,9 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import logging
+import threading
 from typing import Any, Awaitable, Callable, TypeVar
 
 logger = logging.getLogger(__name__)
@@ -82,18 +84,18 @@ def run_sync(coro: Awaitable[T]) -> T:
     """
     try:
         asyncio.get_running_loop()
-        # We're in an async context - can't nest asyncio.run()
-        raise RuntimeError(
-            "Cannot use run_sync() from within an async context. " "Use 'await' instead."
-        )
     except RuntimeError:
         # No running loop - safe to use asyncio.run()
-        pass
+        return asyncio.run(coro)
 
-    return asyncio.run(coro)
+    # We're in an async context - close bare coroutines to avoid leak warnings.
+    if inspect.iscoroutine(coro):
+        coro.close()
+
+    raise RuntimeError("Cannot use run_sync() from within an async context. Use 'await' instead.")
 
 
-def run_sync_in_thread(coro: Awaitable[T]) -> T:
+def run_sync_in_thread(coro: Awaitable[T], timeout: float | None = None) -> T:
     """Run an async coroutine from sync context using a thread.
 
     This is useful when called from within a sync callback that's
@@ -105,22 +107,38 @@ def run_sync_in_thread(coro: Awaitable[T]) -> T:
 
     Args:
         coro: The coroutine to run
+        timeout: Optional timeout in seconds for the worker thread
 
     Returns:
         The result of the coroutine
-    """
-    import concurrent.futures
 
-    def run_in_loop():
+    Raises:
+        TimeoutError: If timeout is reached before the coroutine completes
+    """
+    result: list[T | None] = [None]
+    error: list[Exception | None] = [None]
+
+    def run_in_loop() -> None:
         loop = asyncio.new_event_loop()
         try:
-            return loop.run_until_complete(coro)
+            asyncio.set_event_loop(loop)
+            result[0] = loop.run_until_complete(coro)
+        except Exception as exc:  # pragma: no cover - exercised via wrapper tests
+            error[0] = exc
         finally:
+            asyncio.set_event_loop(None)
             loop.close()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(run_in_loop)
-        return future.result()
+    worker = threading.Thread(target=run_in_loop, daemon=True)
+    worker.start()
+    worker.join(timeout=timeout)
+
+    if worker.is_alive():
+        raise TimeoutError("Async operation timed out")
+    if error[0] is not None:
+        raise error[0]
+
+    return result[0]  # type: ignore[return-value]
 
 
 def async_to_sync(func: Callable[..., Awaitable[T]]) -> Callable[..., T]:

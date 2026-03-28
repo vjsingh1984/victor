@@ -28,6 +28,7 @@ from victor.agent.services.protocols.decision_service import (
     DecisionMetrics,
     DecisionResult,
 )
+from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
@@ -216,30 +217,25 @@ class LLMDecisionService:
                 confidence=heuristic_confidence,
             )
 
-        # Try to run async decide in a new event loop
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
-            loop = None
-
-        if loop is not None and loop.is_running():
-            # Can't block a running loop; return heuristic fallback
-            self._metrics.total_calls += 1
-            return DecisionResult(
-                decision_type=decision_type,
-                result=heuristic_result,
-                source="heuristic",
-                confidence=heuristic_confidence,
+            return run_sync(
+                self.decide(
+                    decision_type,
+                    context,
+                    heuristic_result=heuristic_result,
+                    heuristic_confidence=heuristic_confidence,
+                )
             )
 
-        # No running loop: safe to use asyncio.run
-        return asyncio.run(
-            self.decide(
-                decision_type,
-                context,
-                heuristic_result=heuristic_result,
-                heuristic_confidence=heuristic_confidence,
-            )
+        # Can't block a running loop; return heuristic fallback
+        self._metrics.total_calls += 1
+        return DecisionResult(
+            decision_type=decision_type,
+            result=heuristic_result,
+            source="heuristic",
+            confidence=heuristic_confidence,
         )
 
     @property

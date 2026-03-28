@@ -15,6 +15,7 @@
 """Tests for UnifiedToolRegistry."""
 
 import pytest
+from unittest.mock import MagicMock, patch
 
 from victor.framework.tools import ToolCategory
 from victor.tools.base import BaseTool, CostTier, ToolResult
@@ -320,3 +321,99 @@ class TestRegistryAdapters:
         # Get schemas
         schemas = adapter.get_tool_schemas()
         assert len(schemas) > 0
+
+
+class TestRegistryAdapterSyncBridge:
+    """Sync bridge tests for ToolRegistryAdapter compatibility wrappers."""
+
+    def test_tool_registry_adapter_register_uses_shared_sync_bridge(self):
+        """Sync register should bridge through run_sync when no loop is active."""
+        from victor.tools.unified import adapters as adapters_module
+
+        adapter = adapters_module.ToolRegistryAdapter()
+        tool = DummyTool()
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(adapter._unified, "register", mock_async),
+            patch.object(adapters_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            adapter.register(tool)
+
+        mock_async.assert_called_once_with(tool, enabled=True)
+        mock_run_sync.assert_called_once_with(coro)
+
+    @pytest.mark.parametrize(
+        ("method_name", "helper_name", "arg", "result"),
+        [
+            ("unregister", "unregister", "dummy_tool", True),
+            ("enable_tool", "enable", "dummy_tool", True),
+            ("disable_tool", "disable", "dummy_tool", True),
+        ],
+    )
+    def test_tool_registry_adapter_sync_operations_use_shared_bridge(
+        self,
+        method_name: str,
+        helper_name: str,
+        arg: str,
+        result: bool,
+    ):
+        """Sync adapter operations should use run_sync when no loop is active."""
+        from victor.tools.unified import adapters as adapters_module
+
+        adapter = adapters_module.ToolRegistryAdapter()
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(adapters_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(adapter._unified, helper_name, mock_async),
+            patch.object(adapters_module, "run_sync", return_value=result) as mock_run_sync,
+        ):
+            call_result = getattr(adapter, method_name)(arg)
+
+        assert call_result is result
+        mock_async.assert_called_once_with(arg)
+        mock_run_sync.assert_called_once_with(coro)
+
+
+class TestUnifiedRegistrySyncBridge:
+    """Sync bridge tests for UnifiedToolRegistry lifecycle wrappers."""
+
+    def test_reset_instance_uses_shared_sync_bridge_for_selector_close(self):
+        """reset_instance should bridge selector close through run_sync outside loops."""
+        registry = UnifiedToolRegistry.get_instance()
+        selector = MagicMock()
+        coro = object()
+        selector.close.return_value = coro
+        registry._selector = selector
+
+        with (
+            patch("victor.tools.unified.registry.asyncio.get_running_loop", side_effect=RuntimeError),
+            patch("victor.tools.unified.registry.run_sync", return_value=None) as mock_run_sync,
+        ):
+            UnifiedToolRegistry.reset_instance()
+
+        selector.close.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_reset_instance_schedules_selector_close_when_loop_running(self):
+        """reset_instance should schedule selector close when already inside a loop."""
+        registry = UnifiedToolRegistry.get_instance()
+        selector = MagicMock()
+        coro = object()
+        selector.close.return_value = coro
+        registry._selector = selector
+
+        with (
+            patch("victor.tools.unified.registry.asyncio.get_running_loop", return_value=object()),
+            patch("victor.tools.unified.registry.asyncio.create_task") as mock_create_task,
+            patch("victor.tools.unified.registry.run_sync") as mock_run_sync,
+        ):
+            UnifiedToolRegistry.reset_instance()
+
+        selector.close.assert_called_once_with()
+        mock_create_task.assert_called_once_with(coro)
+        mock_run_sync.assert_not_called()

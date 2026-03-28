@@ -474,7 +474,11 @@ class TestFallbackAndMandatoryTools:
         """Test _get_mandatory_tools returns git tools for commit (covers lines 412-418)."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        result = selector._get_mandatory_tools("please commit my changes")
+        with patch(
+            "victor.tools.semantic_selector.get_tools_matching_mandatory_keywords",
+            return_value={"git"},
+        ):
+            result = selector._get_mandatory_tools("please commit my changes")
         # Accept any git-related tools (git, commit_msg, shell)
         assert "git" in result or "commit_msg" in result or "shell" in result
 
@@ -483,7 +487,11 @@ class TestFallbackAndMandatoryTools:
         """Test _get_mandatory_tools returns test tools."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        result = selector._get_mandatory_tools("run the tests")
+        with patch(
+            "victor.tools.semantic_selector.get_tools_matching_mandatory_keywords",
+            return_value={"shell"},
+        ):
+            result = selector._get_mandatory_tools("run the tests")
         assert "shell" in result or "test" in result
 
     @pytest.mark.asyncio

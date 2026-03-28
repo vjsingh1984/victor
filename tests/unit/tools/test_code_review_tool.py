@@ -24,7 +24,7 @@ Tests the consolidated code_review function with various aspects:
 
 import pytest
 
-from victor.tools.code_review_tool import code_review
+from victor.verticals.contrib.coding.tools.code_review_tool import code_review
 
 
 class TestCodeReviewBasic:
@@ -484,8 +484,8 @@ class TestHelperFunctions:
 
     def test_issue_to_dict(self):
         """Test _issue_to_dict conversion."""
-        from victor.tools.code_review_tool import _issue_to_dict
-        from victor.tools.language_analyzer import AnalysisIssue
+        from victor.verticals.contrib.coding.tools.code_review_tool import _issue_to_dict
+        from victor.verticals.contrib.coding.tools.language_analyzer import AnalysisIssue
 
         issue = AnalysisIssue(
             type="security",
@@ -507,8 +507,8 @@ class TestHelperFunctions:
 
     def test_issue_to_dict_with_metric(self):
         """Test _issue_to_dict with metric value."""
-        from victor.tools.code_review_tool import _issue_to_dict
-        from victor.tools.language_analyzer import AnalysisIssue
+        from victor.verticals.contrib.coding.tools.code_review_tool import _issue_to_dict
+        from victor.verticals.contrib.coding.tools.language_analyzer import AnalysisIssue
 
         issue = AnalysisIssue(
             type="complexity",
@@ -525,7 +525,7 @@ class TestHelperFunctions:
 
     def test_get_glob_patterns_for_languages_all(self):
         """Test getting glob patterns for all languages."""
-        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
 
         patterns = _get_glob_patterns_for_languages(None)
         assert len(patterns) > 0
@@ -533,35 +533,35 @@ class TestHelperFunctions:
 
     def test_get_glob_patterns_for_python(self):
         """Test getting glob patterns for Python."""
-        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
 
         patterns = _get_glob_patterns_for_languages(["python"])
         assert "*.py" in patterns
 
     def test_get_glob_patterns_for_javascript(self):
         """Test getting glob patterns for JavaScript."""
-        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
 
         patterns = _get_glob_patterns_for_languages(["javascript"])
         assert len(patterns) > 0
 
     def test_get_glob_patterns_unknown_language(self):
         """Test glob patterns default to Python for unknown language."""
-        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
 
         patterns = _get_glob_patterns_for_languages(["unknown_xyz"])
         assert patterns == ["*.py"]
 
     def test_get_glob_patterns_multiple_languages(self):
         """Test glob patterns for multiple languages."""
-        from victor.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
 
         patterns = _get_glob_patterns_for_languages(["python", "javascript"])
         assert len(patterns) >= 2
 
     def test_analyze_file_python(self, tmp_path):
         """Test _analyze_file for Python."""
-        from victor.tools.code_review_tool import _analyze_file
+        from victor.verticals.contrib.coding.tools.code_review_tool import _analyze_file
 
         test_file = tmp_path / "test.py"
         test_file.write_text('password = "secret"\nprint("debug")')
@@ -572,7 +572,7 @@ class TestHelperFunctions:
 
     def test_analyze_file_unsupported(self, tmp_path):
         """Test _analyze_file for unsupported file type."""
-        from victor.tools.code_review_tool import _analyze_file
+        from victor.verticals.contrib.coding.tools.code_review_tool import _analyze_file
 
         test_file = tmp_path / "test.xyz"
         test_file.write_text("content")
@@ -583,7 +583,7 @@ class TestHelperFunctions:
     def test_analyze_file_read_error(self):
         """Test _analyze_file handles read errors."""
         from pathlib import Path
-        from victor.tools.code_review_tool import _analyze_file
+        from victor.verticals.contrib.coding.tools.code_review_tool import _analyze_file
 
         issues = _analyze_file(Path("/nonexistent/test.py"), ["all"], 10)
         assert issues == []
@@ -591,7 +591,7 @@ class TestHelperFunctions:
     def test_build_report_no_issues(self):
         """Test _build_report with no issues."""
         from pathlib import Path
-        from victor.tools.code_review_tool import _build_report
+        from victor.verticals.contrib.coding.tools.code_review_tool import _build_report
 
         report = _build_report(
             path=Path("/test"),
@@ -613,7 +613,7 @@ class TestHelperFunctions:
     def test_build_report_with_issues(self):
         """Test _build_report with issues."""
         from pathlib import Path
-        from victor.tools.code_review_tool import _build_report
+        from victor.verticals.contrib.coding.tools.code_review_tool import _build_report
 
         security_issue = {
             "type": "security",
@@ -640,7 +640,7 @@ class TestHelperFunctions:
     def test_build_report_with_many_issues(self):
         """Test _build_report truncation for many issues."""
         from pathlib import Path
-        from victor.tools.code_review_tool import _build_report
+        from victor.verticals.contrib.coding.tools.code_review_tool import _build_report
 
         issues = [
             {
@@ -669,7 +669,7 @@ class TestHelperFunctions:
     def test_build_report_all_aspects(self):
         """Test _build_report with all aspects."""
         from pathlib import Path
-        from victor.tools.code_review_tool import _build_report
+        from victor.verticals.contrib.coding.tools.code_review_tool import _build_report
 
         complexity_issue = {
             "type": "complexity",

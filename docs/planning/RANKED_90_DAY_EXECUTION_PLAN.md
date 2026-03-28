@@ -2,6 +2,8 @@
 
 Plan window: **March 3, 2026 to June 1, 2026**
 
+Implementation detail reference: [`consolidated-implementation-plan-2026-03-27.md`](consolidated-implementation-plan-2026-03-27.md)
+
 ## Milestones
 
 - **M1: Foundation Cut (2026-03-31)**: architecture seams defined, baseline metrics captured, roadmap source finalized.

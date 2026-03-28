@@ -56,6 +56,7 @@ from typing import (
 from victor.agent.model_switcher import SwitchReason
 from victor.agent.provider_manager import ProviderManager, ProviderState
 from victor.agent.tool_calling import ToolCallingCapabilities
+from victor.core.async_utils import run_sync
 from victor.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
@@ -213,27 +214,27 @@ class ProviderCoordinator:
         Returns:
             True if switch was successful
         """
-        # Run async switch in event loop
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Cannot run sync in async context - caller should use async API
-                logger.warning(
-                    "switch_provider called synchronously in async context. "
-                    "Consider using async API."
-                )
-                return False
-            else:
-                result = loop.run_until_complete(
-                    self._manager.switch_provider(provider_name, model, **kwargs)
-                )
+            asyncio.get_running_loop()
         except RuntimeError:
-            # No event loop, create one
-            result = asyncio.run(self._manager.switch_provider(provider_name, model, **kwargs))
+            return run_sync(self.switch_provider_async(provider_name, model, **kwargs))
 
+        logger.warning(
+            "switch_provider called synchronously in async context. "
+            "Use await switch_provider_async(...) instead."
+        )
+        return False
+
+    async def switch_provider_async(
+        self,
+        provider_name: str,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> bool:
+        """Switch to a different provider asynchronously."""
+        result = await self._manager.switch_provider(provider_name, model, **kwargs)
         if result:
             self._notify_post_switch_hooks()
-
         return result
 
     def switch_model(self, model: str) -> bool:
@@ -249,21 +250,21 @@ class ProviderCoordinator:
             True if switch was successful
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                logger.warning(
-                    "switch_model called synchronously in async context. "
-                    "Consider using async API."
-                )
-                return False
-            else:
-                result = loop.run_until_complete(self._manager.switch_model(model))
+            asyncio.get_running_loop()
         except RuntimeError:
-            result = asyncio.run(self._manager.switch_model(model))
+            return run_sync(self.switch_model_async(model))
 
+        logger.warning(
+            "switch_model called synchronously in async context. "
+            "Use await switch_model_async(...) instead."
+        )
+        return False
+
+    async def switch_model_async(self, model: str) -> bool:
+        """Switch to a different model asynchronously."""
+        result = await self._manager.switch_model(model)
         if result:
             self._notify_post_switch_hooks()
-
         return result
 
     def get_current_info(self) -> Dict[str, Any]:

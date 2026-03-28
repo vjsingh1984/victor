@@ -25,10 +25,10 @@ from unittest.mock import patch, MagicMock
 from victor.tools.file_editor_tool import edit
 
 try:
-    import victor_coding  # noqa: F401
+    from victor.tools.file_editor_tool import _is_file_editor_available
 
-    _has_victor_coding = True
-except ImportError:
+    _has_victor_coding = _is_file_editor_available()
+except Exception:
     _has_victor_coding = False
 
 # Mark all tests in this module as integration tests (require victor-coding)

@@ -15,10 +15,11 @@
 """Unit tests for TeamNode."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
+import victor.framework.workflows.nodes as nodes_module
 from victor.framework.workflows.nodes import TeamNode, TeamNodeConfig
 from victor.framework.state_merging import MergeMode, StateMergeError
 from victor.teams.types import TeamFormation, TeamMember
@@ -475,18 +476,47 @@ class TestTeamNodeSyncExecute:
 
     def test_sync_execute_wraps_async(self, simple_team_node):
         """Test that sync execute properly wraps async execute."""
+        coro = object()
+
         with patch.object(
             simple_team_node,
             "execute_async",
-            return_value=asyncio.sleep(0),
-        ) as mock_execute:
+            new=Mock(return_value=coro),
+        ) as mock_execute, patch.object(
+            nodes_module,
+            "run_sync",
+            return_value={"team_result": "ok"},
+        ) as mock_run_sync:
             graph_state = {"key": "value"}
 
-            # This should work without raising
             result = simple_team_node.execute(None, graph_state)
 
-            # Verify async was called
             mock_execute.assert_called_once()
+            mock_run_sync.assert_called_once_with(coro)
+            assert result == {"team_result": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_sync_execute_uses_worker_thread_bridge_inside_running_loop(
+        self,
+        simple_team_node,
+    ):
+        """Test that sync execute uses the shared bridge from async contexts."""
+        coro = object()
+
+        with patch.object(
+            simple_team_node,
+            "execute_async",
+            new=Mock(return_value=coro),
+        ) as mock_execute, patch.object(
+            nodes_module,
+            "run_sync",
+            return_value={"team_result": "ok"},
+        ) as mock_run_sync:
+            result = simple_team_node.execute(None, {"key": "value"})
+
+        mock_execute.assert_called_once_with(None, {"key": "value"})
+        mock_run_sync.assert_called_once_with(coro)
+        assert result == {"team_result": "ok"}
 
 
 class TestTeamNodeRichPersona:

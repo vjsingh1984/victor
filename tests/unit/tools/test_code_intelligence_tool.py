@@ -27,10 +27,11 @@ from victor.tools.code_intelligence_tool import (
 from victor.tools.refactor_tool import rename
 
 try:
-    import victor_coding  # noqa: F401
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import TreeSitterParserProtocol
 
-    _has_victor_coding = True
-except ImportError:
+    _has_victor_coding = CapabilityRegistry.get_instance().is_enhanced(TreeSitterParserProtocol)
+except Exception:
     _has_victor_coding = False
 
 # Mark all tests in this module as integration tests (require victor-coding)

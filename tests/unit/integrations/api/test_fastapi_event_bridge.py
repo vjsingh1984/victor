@@ -818,5 +818,113 @@ class TestEventBridgeAsyncBackwardCompatibility:
         await adapter.disconnect_async()
 
 
+class TestEventBridgeSyncBridge:
+    def test_adapter_connect_uses_shared_sync_bridge_without_running_loop(self):
+        """Sync adapter connect should bridge with run_sync outside async contexts."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        adapter = event_bridge_module.EventBusAdapter()
+        event_bus = object()
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(adapter, "connect_async", mock_async),
+            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            adapter.connect(event_bus)
+
+        mock_async.assert_called_once_with(event_bus)
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_adapter_disconnect_uses_shared_sync_bridge_without_running_loop(self):
+        """Sync adapter disconnect should bridge with run_sync outside async contexts."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        adapter = event_bridge_module.EventBusAdapter()
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(adapter, "disconnect_async", mock_async),
+            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            adapter.disconnect()
+
+        mock_async.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_adapter_run_async_operation_uses_shared_sync_bridge_without_running_loop(self):
+        """Internal adapter bridge helper should delegate to run_sync."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        adapter = event_bridge_module.EventBusAdapter()
+        awaitable = object()
+        on_success = MagicMock()
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(event_bridge_module, "run_sync", return_value="done") as mock_run_sync,
+        ):
+            adapter._run_async_operation(awaitable, description="connect", on_success=on_success)
+
+        mock_run_sync.assert_called_once_with(awaitable)
+        on_success.assert_called_once_with("done")
+
+    def test_bridge_start_uses_shared_sync_bridge_without_running_loop(self):
+        """Sync bridge start should delegate to run_sync outside async contexts."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        bridge = event_bridge_module.EventBridge()
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(bridge, "_start_and_set_flag", mock_async),
+            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            bridge.start()
+
+        mock_async.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_bridge_stop_uses_shared_sync_bridge_without_running_loop(self):
+        """Sync bridge stop should delegate to run_sync outside async contexts."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        bridge = event_bridge_module.EventBridge()
+        bridge._running = True
+        coro = object()
+        mock_async = MagicMock(return_value=coro)
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(bridge, "_stop_and_cleanup", mock_async),
+            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            bridge.stop()
+
+        mock_async.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+
+    def test_bridge_run_async_operation_uses_shared_sync_bridge_without_running_loop(self):
+        """EventBridge lifecycle helper should delegate to run_sync."""
+        from victor.integrations.api import event_bridge as event_bridge_module
+
+        bridge = event_bridge_module.EventBridge()
+        awaitable = object()
+
+        with (
+            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+        ):
+            bridge._run_async_operation(awaitable, description="start")
+
+        mock_run_sync.assert_called_once_with(awaitable)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -189,6 +189,8 @@ class RuntimeBuildersMixin:
         memory_manager: Optional["ConversationStore"],
         memory_session_id: str,
         system_prompt: str,
+        context_reminder_manager: Optional[Any] = None,
+        hierarchical_manager: Optional[Any] = None,
     ) -> "ConversationController":
         """Create conversation controller for managing message history and state.
 
@@ -200,6 +202,8 @@ class RuntimeBuildersMixin:
             memory_manager: Memory manager for persistent storage
             memory_session_id: Unique session identifier
             system_prompt: System prompt to set on the controller
+            context_reminder_manager: Optional reminder manager for consolidated reminders
+            hierarchical_manager: Optional hierarchical compaction manager
 
         Returns:
             ConversationController instance configured with model-aware settings
@@ -245,6 +249,8 @@ class RuntimeBuildersMixin:
             state_machine=conversation_state,
             conversation_store=memory_manager,
             session_id=memory_session_id,
+            context_reminder_manager=context_reminder_manager,
+            hierarchical_manager=hierarchical_manager,
         )
         controller.set_system_prompt(system_prompt)
 

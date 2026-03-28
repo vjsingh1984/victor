@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+import victor.verticals.contrib.coding.codebase.indexer.core as indexer_core_module
 from victor.verticals.contrib.coding.codebase.indexer import CodebaseIndex
 
 
@@ -118,3 +119,26 @@ async def test_codebase_index_capability_methods_require_embeddings() -> None:
 
     with pytest.raises(ValueError, match="Embeddings not enabled"):
         await index.find_callers("parse_json")
+
+
+def test_codebase_index_get_stats_uses_shared_sync_bridge_for_embedding_stats() -> None:
+    provider = Mock()
+    coro = object()
+    provider.get_stats.return_value = coro
+    index = _make_index(provider)
+    index.files = {}
+    index.symbols = {}
+    index._is_indexed = True
+    index._staleness_lock = indexer_core_module.threading.Lock()
+    index._is_stale = False
+    index._changed_files = set()
+    index._last_indexed = None
+    index._watcher_enabled = False
+    index._observer = None
+
+    with patch.object(indexer_core_module, "run_sync", return_value={"vectors": 3}) as mock_run_sync:
+        stats = index.get_stats()
+
+    provider.get_stats.assert_called_once_with()
+    mock_run_sync.assert_called_once_with(coro)
+    assert stats["embedding_stats"] == {"vectors": 3}

@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.core.async_utils import run_sync
 from victor.core.events import ObservabilityBus as EventBus, MessagingEvent
 
 logger = logging.getLogger(__name__)
@@ -556,7 +557,7 @@ class EventBusAdapter:
         except RuntimeError:
             # No running loop, try to run it
             try:
-                asyncio.run(self.connect_async(event_bus))
+                run_sync(self.connect_async(event_bus))
             except Exception as e:
                 logger.warning(f"EventBusAdapter sync connect failed: {e}")
 
@@ -628,7 +629,7 @@ class EventBusAdapter:
         except RuntimeError:
             # No running loop, try to run it
             try:
-                asyncio.run(self.disconnect_async())
+                run_sync(self.disconnect_async())
             except Exception as e:
                 logger.warning(f"EventBusAdapter sync disconnect failed: {e}")
 
@@ -693,7 +694,7 @@ class EventBusAdapter:
             asyncio.get_running_loop()  # Check if loop is running
         except RuntimeError:
             try:
-                result = asyncio.run(awaitable)
+                result = run_sync(awaitable)
                 if on_success:
                     on_success(result)
             except Exception as e:
@@ -869,7 +870,7 @@ class EventBridge:
         except RuntimeError:
             # No running loop, try to run it
             try:
-                asyncio.run(self._start_and_set_flag())
+                run_sync(self._start_and_set_flag())
             except Exception as e:
                 self._running = False  # Reset on failure
                 logger.warning(f"EventBridge sync start failed: {e}")
@@ -928,7 +929,7 @@ class EventBridge:
         except RuntimeError:
             # No running loop, try to run it
             try:
-                asyncio.run(self._stop_and_cleanup())
+                run_sync(self._stop_and_cleanup())
             except Exception as e:
                 logger.warning(f"EventBridge sync stop failed: {e}")
 
@@ -969,7 +970,7 @@ class EventBridge:
             asyncio.get_running_loop()
         except RuntimeError:
             try:
-                asyncio.run(awaitable)
+                run_sync(awaitable)
             except Exception as e:
                 logger.debug(f"Failed to {description}: {e}")
             return

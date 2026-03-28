@@ -1980,13 +1980,17 @@ class TestSwitchModel:
 
     def test_switch_model_returns_bool(self, orchestrator):
         """switch_model returns boolean."""
-        result = orchestrator.switch_model("different-model")
+        import asyncio
+
+        result = asyncio.run(orchestrator.switch_model("different-model"))
         assert isinstance(result, bool)
 
     def test_switch_model_updates_model(self, orchestrator):
         """Successful model switch updates model attribute."""
+        import asyncio
+
         old_model = orchestrator.model
-        result = orchestrator.switch_model("new-test-model")
+        result = asyncio.run(orchestrator.switch_model("new-test-model"))
         if result:
             assert orchestrator.model == "new-test-model"
         else:
@@ -3339,6 +3343,23 @@ class TestCreateBackgroundTask:
 
         # Should have added a task
         assert len(orchestrator._background_tasks) >= initial_count
+
+    def test_create_background_task_without_loop_returns_none(self, orchestrator):
+        """Test _create_background_task closes bare coroutines without a running loop."""
+
+        async def dummy_coro():
+            return None
+
+        coro = dummy_coro()
+
+        with patch(
+            "victor.agent.orchestrator.asyncio.get_running_loop",
+            side_effect=RuntimeError,
+        ):
+            result = orchestrator._create_background_task(coro, name="test_task")
+
+        assert result is None
+        assert coro.cr_frame is None
 
 
 class TestSwitchModel:

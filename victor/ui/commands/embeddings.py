@@ -1,11 +1,12 @@
-import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.prompt import Confirm
-from typing import Optional
+import importlib
+import inspect
 from pathlib import Path
 
+import typer
+from rich.console import Console
+from rich.prompt import Confirm
+
+from victor.core.async_utils import run_sync
 from victor.storage.cache.embedding_cache_manager import CacheType, EmbeddingCacheManager
 
 embeddings_app = typer.Typer(
@@ -177,55 +178,17 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
             console.print(f"  [green]✓[/] Task classifiers rebuilt ({phrase_count} phrases)")
 
         if CacheType.TOOL in targets:
-            import asyncio
-            from victor.tools.base import ToolRegistry
-            from victor.tools.semantic_selector import SemanticToolSelector
-            import importlib, inspect, os as tool_os
-
             try:
                 console.print("  [dim]Rebuilding tool embeddings...[/]")
-                registry = ToolRegistry()
-                tools_dir = tool_os.path.join(tool_os.path.dirname(__file__), "..", "..", "tools")
-                excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
-                for filename in tool_os.listdir(tools_dir):
-                    if filename.endswith(".py") and filename not in excluded_files:
-                        module_name = f"victor.tools.{filename[:-3]}"
-                        try:
-                            module = importlib.import_module(module_name)
-                            for _name, obj in inspect.getmembers(module):
-                                if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
-                                    registry.register(obj)
-                        except Exception:
-                            pass
-
-                async def rebuild_tool_embeddings():
-                    selector = SemanticToolSelector(cache_embeddings=True)
-                    await selector.initialize_tool_embeddings(registry)
-                    await selector.close()
-                    return len(registry.list_tools())
-
-                tool_count = asyncio.run(rebuild_tool_embeddings())
+                tool_count = _rebuild_tool_embeddings_sync()
                 console.print(f"  [green]✓[/] Tool embeddings rebuilt ({tool_count} tools)")
             except Exception as e:
                 console.print(f"  [yellow]⚠[/] Tool embeddings: {e}")
 
         if CacheType.CONVERSATION in targets:
-            import asyncio
-            from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-            from victor.storage.embeddings.service import EmbeddingService
-
             try:
                 console.print("  [dim]Rebuilding conversation embeddings...[/]")
-
-                async def rebuild_conversations():
-                    embedding_service = EmbeddingService.get_instance()
-                    store = ConversationEmbeddingStore(embedding_service)
-                    await store.initialize()
-                    count = await store.rebuild()
-                    await store.close()
-                    return count
-
-                msg_count = asyncio.run(rebuild_conversations())
+                msg_count = _rebuild_conversation_embeddings_sync()
                 console.print(
                     f"  [green]✓[/] Conversation embeddings rebuilt ({msg_count} messages)"
                 )
@@ -236,3 +199,59 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
     except Exception as e:
         console.print(f"\n[yellow]Rebuild skipped: {e}[/]")
         console.print("[dim]Caches will auto-rebuild on next 'victor chat'.[/]")
+
+
+def _build_tool_registry():
+    from victor.tools.base import ToolRegistry
+
+    registry = ToolRegistry()
+    tools_dir = Path(__file__).resolve().parents[2] / "tools"
+    excluded_files = {"__init__.py", "base.py", "decorators.py", "semantic_selector.py"}
+
+    for module_path in tools_dir.iterdir():
+        if module_path.suffix != ".py" or module_path.name in excluded_files:
+            continue
+
+        module_name = f"victor.tools.{module_path.stem}"
+        try:
+            module = importlib.import_module(module_name)
+            for _name, obj in inspect.getmembers(module):
+                if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
+                    registry.register(obj)
+        except Exception:
+            pass
+
+    return registry
+
+
+async def _rebuild_tool_embeddings_async(registry) -> int:
+    from victor.tools.semantic_selector import SemanticToolSelector
+
+    selector = SemanticToolSelector(cache_embeddings=True)
+    try:
+        await selector.initialize_tool_embeddings(registry)
+        return len(registry.list_tools())
+    finally:
+        await selector.close()
+
+
+def _rebuild_tool_embeddings_sync() -> int:
+    registry = _build_tool_registry()
+    return run_sync(_rebuild_tool_embeddings_async(registry))
+
+
+async def _rebuild_conversation_embeddings_async() -> int:
+    from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
+    from victor.storage.embeddings.service import EmbeddingService
+
+    embedding_service = EmbeddingService.get_instance()
+    store = ConversationEmbeddingStore(embedding_service)
+    try:
+        await store.initialize()
+        return await store.rebuild()
+    finally:
+        await store.close()
+
+
+def _rebuild_conversation_embeddings_sync() -> int:
+    return run_sync(_rebuild_conversation_embeddings_async())

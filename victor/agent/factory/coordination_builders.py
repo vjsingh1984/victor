@@ -571,6 +571,7 @@ class CoordinationBuildersMixin:
         assembler = TurnBoundaryContextAssembler(
             session_ledger=ledger,
             score_fn=score_fn,
+            conversation_controller=controller,
         )
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler

@@ -1,5 +1,4 @@
 import typer
-import asyncio
 import os
 import sys
 import time
@@ -14,6 +13,7 @@ from rich.table import Table
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
+from victor.core.async_utils import run_sync
 from victor.framework.shim import FrameworkShim
 from victor.core.verticals import get_vertical, list_verticals
 from victor.ui.output_formatter import InputReader, create_formatter
@@ -220,6 +220,11 @@ def chat(
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
     ),
+    show_reasoning: bool = typer.Option(
+        False,
+        "--show-reasoning",
+        help="Show LLM reasoning/thinking content in output.",
+    ),
     enable_planning: Optional[bool] = typer.Option(
         None,
         "--planning/--no-planning",
@@ -271,7 +276,7 @@ def chat(
                 )
                 raise typer.Exit(1)
 
-            asyncio.run(
+            run_sync(
                 run_workflow_mode(
                     workflow_path=workflow,  # type: ignore
                     validate_only=validate_workflow,
@@ -459,7 +464,7 @@ def chat(
             settings.default_model = model
 
         if actual_message:
-            asyncio.run(
+            run_sync(
                 run_oneshot(
                     actual_message,
                     settings,
@@ -477,13 +482,14 @@ def chat(
                     enable_planning=enable_planning,
                     planning_model=planning_model,
                     legacy_mode=legacy_mode,
+                    show_reasoning=show_reasoning,
                 )
             )
         elif stdin or input_file:
             formatter.error("No input received from stdin or file")
             raise typer.Exit(1)
         else:
-            asyncio.run(
+            run_sync(
                 run_interactive(
                     settings,
                     profile,
@@ -501,6 +507,7 @@ def chat(
                     legacy_mode=legacy_mode,
                     use_tui=use_tui,
                     resume_session_id=session_id,
+                    show_reasoning=show_reasoning,
                 )
             )
             return
@@ -513,7 +520,7 @@ def _run_default_interactive() -> None:
 
     settings = load_settings()
     setup_safety_confirmation()
-    asyncio.run(run_interactive(settings, "default", True, False, use_tui=False))
+    run_sync(run_interactive(settings, "default", True, False, use_tui=False))
 
 
 async def run_oneshot(
@@ -533,6 +540,7 @@ async def run_oneshot(
     enable_planning: Optional[bool] = None,
     planning_model: Optional[str] = None,
     legacy_mode: bool = False,
+    show_reasoning: bool = False,
 ) -> None:
     """Run a single message and exit.
 
@@ -626,10 +634,6 @@ async def run_oneshot(
 
         agent.start_embedding_preload()
 
-        content_buffer = ""
-        usage_stats = None
-        model_name = None
-
         # Planning mode requires non-streaming (plan generation → step execution → summary)
         use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
 
@@ -648,17 +652,25 @@ async def run_oneshot(
                 if use_live
                 else FormatterRenderer(formatter, console)
             )
-            content_buffer = await stream_response(agent, message, renderer)
-        else:
-            response = await agent.chat(message, use_planning=enable_planning)
-            content_buffer = response.content
-            usage_stats = response.usage
-            model_name = response.model
-            formatter.response(
-                content=content_buffer,
-                usage=usage_stats,
-                model=model_name,
+            await stream_response(
+                agent, message, renderer, suppress_thinking=not show_reasoning
             )
+        else:
+            # Use streaming pipeline with BufferedRenderer to capture
+            # tool calls and reasoning that agent.chat() would swallow
+            from victor.ui.rendering import (
+                BufferedRenderer,
+                stream_response,
+            )
+
+            buffered = BufferedRenderer(
+                show_reasoning=show_reasoning,
+                plain=formatter._plain if hasattr(formatter, "_plain") else False,
+            )
+            await stream_response(
+                agent, message, buffered, suppress_thinking=not show_reasoning
+            )
+            buffered.flush(console)
 
         success = True
         if hasattr(agent, "get_session_metrics"):
@@ -697,6 +709,7 @@ async def run_interactive(
     legacy_mode: bool = False,
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
+    show_reasoning: bool = False,
 ) -> None:
     """Run interactive CLI mode.
 
@@ -706,6 +719,7 @@ async def run_interactive(
 
     Args:
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
+        show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
     agent = None
     shim: Optional[FrameworkShim] = None
@@ -845,6 +859,7 @@ async def run_interactive(
                 renderer_choice=renderer_choice,
                 vertical_name=vertical,
                 enable_planning=enable_planning,
+                show_reasoning=show_reasoning,
             )
 
         success = True
@@ -932,6 +947,7 @@ async def _run_cli_repl(
     renderer_choice: str = "auto",
     vertical_name: Optional[str] = None,
     enable_planning: Optional[bool] = None,
+    show_reasoning: bool = False,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
@@ -1000,7 +1016,10 @@ async def _run_cli_repl(
                     if use_live
                     else FormatterRenderer(create_formatter(), console)
                 )
-                content_buffer = await stream_response(agent, user_input, renderer)
+                content_buffer = await stream_response(
+                    agent, user_input, renderer,
+                    suppress_thinking=not show_reasoning,
+                )
                 content_buffer = sanitize_response(content_buffer)
             else:
                 response = await agent.chat(user_input, use_planning=enable_planning)

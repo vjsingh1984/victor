@@ -1,8 +1,8 @@
 import typer
-import asyncio
 import logging
 from rich.console import Console
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.providers.registry import ProviderRegistry
 
@@ -36,7 +36,7 @@ def test_provider(
     """Test if a provider is working correctly."""
     if ctx.invoked_subcommand is None:
         console.print(f"Testing provider: [cyan]{provider}[/]")
-        asyncio.run(
+        run_sync(
             test_provider_async(
                 provider,
                 auth_mode=auth_mode,

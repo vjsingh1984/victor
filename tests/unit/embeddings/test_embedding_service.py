@@ -281,6 +281,23 @@ class TestEmbeddingGeneration:
             assert embedding.dtype == np.float32
 
     @pytest.mark.asyncio
+    async def test_embed_text_async_does_not_depend_on_get_event_loop(self):
+        """Async text embedding should not access the legacy event-loop getter."""
+        from victor.storage.embeddings.service import EmbeddingService
+
+        service = EmbeddingService()
+        expected = np.ones(384, dtype=np.float32)
+
+        with (
+            patch.object(service, "embed_text_sync", return_value=expected) as mock_sync,
+            patch("victor.storage.embeddings.service.asyncio.get_event_loop", side_effect=AssertionError),
+        ):
+            embedding = await service.embed_text("test text", use_cache=False)
+
+        assert np.array_equal(embedding, expected)
+        mock_sync.assert_called_once_with("test text", use_cache=False)
+
+    @pytest.mark.asyncio
     async def test_embed_batch_async(self):
         """Test async batch embedding."""
         from victor.storage.embeddings.service import EmbeddingService
@@ -297,6 +314,24 @@ class TestEmbeddingGeneration:
             embeddings = await service.embed_batch(texts)
 
             assert embeddings.shape == (5, 384)
+
+    @pytest.mark.asyncio
+    async def test_embed_batch_async_does_not_depend_on_get_event_loop(self):
+        """Async batch embedding should not access the legacy event-loop getter."""
+        from victor.storage.embeddings.service import EmbeddingService
+
+        service = EmbeddingService()
+        texts = ["a", "b"]
+        expected = np.ones((2, 384), dtype=np.float32)
+
+        with (
+            patch.object(service, "embed_batch_sync", return_value=expected) as mock_sync,
+            patch("victor.storage.embeddings.service.asyncio.get_event_loop", side_effect=AssertionError),
+        ):
+            embeddings = await service.embed_batch(texts)
+
+        assert np.array_equal(embeddings, expected)
+        mock_sync.assert_called_once_with(texts)
 
 
 class TestEmbeddingFallback:

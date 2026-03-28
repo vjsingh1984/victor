@@ -57,13 +57,14 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.framework.graph import CheckpointerProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.yaml_to_graph_compiler import (
-        CompilerConfig,
-        YAMLToStateGraphCompiler,
-    )
-    from victor.framework.graph import CheckpointerProtocol
+from victor.workflows.yaml_to_graph_compiler import (
+    CompilerConfig,
+    YAMLToStateGraphCompiler,
+)
+from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +256,6 @@ class StateGraphExecutor:
         logger.info(f"Executing workflow '{workflow.name}'")
 
         try:
-            from victor.workflows.yaml_to_graph_compiler import WorkflowState
-
             compiler = self._get_compiler()
 
             # Override checkpointer if provided
@@ -330,8 +329,6 @@ class StateGraphExecutor:
         Yields:
             Tuple of (node_id, current_state) after each node execution
         """
-        from victor.workflows.yaml_to_graph_compiler import WorkflowState
-
         compiler = self._get_compiler()
         compiled = compiler.compile(workflow)
 

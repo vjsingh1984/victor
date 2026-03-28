@@ -566,7 +566,10 @@ def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
 
 ## External Plugin Registration
 
-External packages can register verticals without modifying Victor's source code using Python entry points.
+External packages should register runtime integrations through the `victor.plugins`
+entry point. That gives the package a `PluginContext` with access to framework
+registration hooks for verticals, commands, tools, chunkers, and custom workflow
+node executors.
 
 ### Package Structure
 
@@ -599,22 +602,41 @@ dependencies = ["victor-sdk>=1.0.0"]
 [project.optional-dependencies]
 runtime = ["victor-ai>=0.4.0"]
 
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityAssistant"
+[project.entry-points."victor.plugins"]
+security = "victor_security:plugin"
 ```
 
 ### Package Implementation
 
 ```python
 # victor_security/__init__.py
+from victor_security.plugin import plugin
+
+__all__ = ["plugin"]
+```
+
+```python
+# victor_security/plugin.py
+from victor_sdk import PluginContext, VictorPlugin
 from victor_security.assistant import SecurityAssistant
 
-__all__ = ["SecurityAssistant"]
+
+class SecurityPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "security"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+
+
+plugin = SecurityPlugin()
 ```
 
 ```python
 # victor_security/assistant.py
 from victor_sdk import ToolNames, VerticalBase
+
 
 class SecurityAssistant(VerticalBase):
     name = "security"
@@ -634,6 +656,53 @@ class SecurityAssistant(VerticalBase):
         return "You are a security analyst..."
 ```
 
+### Registering Custom Workflow Node Executors
+
+If your package introduces a custom workflow node type, register its executor
+through the same plugin context instead of patching the core workflow factory.
+
+```python
+# victor_security/plugin.py
+from victor_sdk import PluginContext, VictorPlugin
+from victor.workflows import CompiledGraphNodeResult
+
+
+class ThreatModelExecutor:
+    def __init__(self, container=None):
+        self._container = container
+
+    async def execute(self, node, state):
+        result = {"threat_model": f"modeled:{node.id}"}
+        state.setdefault("_node_results", {})[node.id] = CompiledGraphNodeResult(
+            node_id=node.id,
+            success=True,
+            output=result,
+            metadata={"node_type": "threat_model"},
+        )
+        state.update(result)
+        return state
+
+
+class SecurityPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "security"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+        context.register_workflow_node_executor("threat_model", ThreatModelExecutor)
+```
+
+For application-local extensions that are not packaged as plugins, the same
+registration helpers are also available from `victor.workflows`:
+
+```python
+from victor.workflows import register_workflow_node_executor
+
+
+register_workflow_node_executor("threat_model", ThreatModelExecutor)
+```
+
 ### Installation and Discovery
 
 ```bash
@@ -643,9 +712,12 @@ pip install victor-security
 # Or install with runtime helpers if the package ships them
 pip install "victor-security[runtime]"
 
-# Victor automatically discovers and registers the vertical
+# Victor automatically discovers and registers the plugin
 victor chat --vertical security
 ```
+
+`victor.verticals` remains a legacy compatibility entry point for definition-only
+packages, but new runtime-integrated extensions should use `victor.plugins`.
 
 ### Validation Requirements
 

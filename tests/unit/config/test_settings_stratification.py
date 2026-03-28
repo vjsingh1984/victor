@@ -89,6 +89,11 @@ class TestNestedAccess:
         s = Settings(write_approval_mode="all_writes")
         assert s.security.write_approval_mode == "all_writes"
 
+    def test_nested_security_secret_access(self):
+        s = Settings(server_api_key="server-token", server_session_secret="session-secret")
+        assert s.security.server_api_key.get_secret_value() == "server-token"
+        assert s.security.server_session_secret.get_secret_value() == "session-secret"
+
     def test_nested_events_access(self):
         s = Settings(event_queue_maxsize=5000)
         assert s.events.event_queue_maxsize == 5000

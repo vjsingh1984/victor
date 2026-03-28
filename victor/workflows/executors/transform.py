@@ -24,7 +24,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import TransformNode, WorkflowState
+    from victor.workflows.definition import TransformNode
+    from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class TransformNodeExecutor:
             Exception: If transform function fails
         """
         import time
-        from victor.framework.graph import GraphNodeResult
+        from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info(f"Executing transform node: {node.id}")
         start_time = time.time()
@@ -87,11 +88,9 @@ class TransformNodeExecutor:
 
             state["_node_results"][node.id] = GraphNodeResult(
                 node_id=node.id,
-                status="completed",
-                result={"transformed_keys": list(transformed.keys())},
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                },
+                success=True,
+                output={"transformed_keys": list(transformed.keys())},
+                duration_seconds=time.time() - start_time,
             )
 
             logger.info(f"Transform node {node.id} completed successfully")
@@ -106,11 +105,9 @@ class TransformNodeExecutor:
 
             state["_node_results"][node.id] = GraphNodeResult(
                 node_id=node.id,
-                status="failed",
+                success=False,
                 error=str(e),
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                },
+                duration_seconds=time.time() - start_time,
             )
 
             raise

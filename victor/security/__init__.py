@@ -30,8 +30,8 @@ Example usage:
     from victor.security.auth import RBACManager, Permission
     from victor.security.safety import detect_secrets, CodePatternScanner
     from victor.security.audit import AuditManager
+    from victor.core.async_utils import run_sync
     from pathlib import Path
-    import asyncio
 
     async def scan_project():
         # Vulnerability scanning
@@ -67,7 +67,7 @@ Example usage:
         audit = AuditManager.get_instance()
         await audit.log_file_operation("read", "/path/to/file")
 
-    asyncio.run(scan_project())
+    run_sync(scan_project())
 """
 
 # CVE/Vulnerability scanning (existing functionality)

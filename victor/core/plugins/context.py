@@ -91,6 +91,43 @@ class HostPluginContext(PluginContext):
         self._commands[name] = app
         logger.debug(f"Plugin registered command: {name}")
 
+    def register_workflow_node_executor(
+        self,
+        node_type: str,
+        executor_factory: Any,
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Register a custom workflow node executor."""
+        from victor.workflows.executors.registry import register_workflow_node_executor
+
+        register_workflow_node_executor(
+            node_type,
+            executor_factory,
+            replace=replace,
+        )
+
+        if self._container is not None:
+            try:
+                from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+
+                if hasattr(self._container, "is_registered") and self._container.is_registered(
+                    NodeExecutorFactoryProtocol
+                ):
+                    factory = self._container.get_optional(NodeExecutorFactoryProtocol)
+                    if factory is not None:
+                        existing = getattr(factory, "_executor_types", {}).get(node_type)
+                        if existing is not executor_factory:
+                            factory.register_executor_type(
+                                node_type,
+                                executor_factory,
+                                replace=replace,
+                            )
+            except Exception as e:
+                logger.debug(f"Plugin deferred live workflow executor registration: {e}")
+
+        logger.debug("Plugin registered workflow node executor: %s", node_type)
+
     def get_service(self, service_type: Type[Any]) -> Optional[Any]:
         """Retrieve a service from the container."""
         if not self._container:

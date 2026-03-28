@@ -203,7 +203,7 @@ class ReplicateProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=False,  # Replicate doesn't support tools
-        ):
+        ) as log_success:
             try:
                 # Convert messages to prompt format for Replicate
                 prompt = self._messages_to_prompt(messages)
@@ -239,13 +239,7 @@ class ReplicateProvider(BaseProvider):
                 )
 
                 # Log success
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(prompt)}",
-                    endpoint="/predictions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=None,  # Replicate doesn't provide token counts
-                )
+                log_success(tokens=None)
 
                 return response
 

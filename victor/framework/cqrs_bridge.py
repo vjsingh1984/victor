@@ -53,6 +53,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
 from uuid import uuid4
 
+from victor.core.async_utils import run_sync
 from victor.framework.events import AgentExecutionEvent, EventType
 
 if TYPE_CHECKING:
@@ -258,6 +259,27 @@ def framework_event_to_observability(event: AgentExecutionEvent) -> Dict[str, An
     return convert_to_observability(event)
 
 
+def _schedule_compat(awaitable: Any, *, description: str) -> None:
+    """Run or schedule an awaitable from sync bridge code."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        run_sync(awaitable)
+        return
+
+    task = asyncio.create_task(awaitable)
+
+    def _on_done(done_task: asyncio.Task[Any]) -> None:
+        try:
+            done_task.result()
+        except asyncio.CancelledError:
+            logger.debug("Cancelled task while trying to %s", description)
+        except Exception as e:
+            logger.warning("Failed to %s: %s", description, e)
+
+    task.add_done_callback(_on_done)
+
+
 # =============================================================================
 # Event Adapters
 # =============================================================================
@@ -358,16 +380,10 @@ class FrameworkEventAdapter:
                     }
                 )
 
-            # Dispatch to handlers (async dispatch, handle sync/async context)
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.create_task(self.event_dispatcher.dispatch(cqrs_event))
-                else:
-                    loop.run_until_complete(self.event_dispatcher.dispatch(cqrs_event))
-            except RuntimeError:
-                # No event loop available, create a new one
-                asyncio.run(self.event_dispatcher.dispatch(cqrs_event))
+            _schedule_compat(
+                self.event_dispatcher.dispatch(cqrs_event),
+                description="dispatch framework event to CQRS",
+            )
 
         except Exception as e:
             logger.warning(f"Failed to forward event to CQRS: {e}")
@@ -387,16 +403,15 @@ class FrameworkEventAdapter:
 
             bus = get_observability_bus()
             if bus:
-                import asyncio
-
-                asyncio.run(
+                _schedule_compat(
                     bus.emit(
                         topic=topic,
                         data={
                             **obs_data["data"],
                             "category": obs_data["category"],  # Preserve for observability
                         },
-                    )
+                    ),
+                    description="emit framework event to observability",
                 )
 
         except Exception as e:
@@ -532,16 +547,10 @@ class ObservabilityToCQRSBridge:
                     }
                 )
 
-            # Dispatch to handlers (async dispatch, handle sync/async context)
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.create_task(self._dispatcher.dispatch(cqrs_event))
-                else:
-                    loop.run_until_complete(self._dispatcher.dispatch(cqrs_event))
-            except RuntimeError:
-                # No event loop available, create a new one
-                asyncio.run(self._dispatcher.dispatch(cqrs_event))
+            _schedule_compat(
+                self._dispatcher.dispatch(cqrs_event),
+                description="dispatch observability event to CQRS",
+            )
 
             self._event_count += 1
 

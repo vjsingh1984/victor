@@ -18,6 +18,7 @@ This module provides the AuditManager class that coordinates audit
 logging, compliance checking, and report generation.
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from victor.config.settings import get_project_paths, load_settings
+from victor.core.async_utils import run_sync
 
 from .checker import DefaultComplianceChecker
 from .logger import FileAuditLogger, create_event
@@ -183,8 +185,6 @@ class AuditManager:
             resource: Affected resource
             severity: Event severity
         """
-        import asyncio
-
         if not self._config.enabled:
             return
 
@@ -204,9 +204,9 @@ class AuditManager:
             # We're in an async context - schedule the log
             loop.create_task(self._logger.log_event(event))
         except RuntimeError:
-            # No running loop - run synchronously
+            # No running loop - bridge through the shared sync boundary.
             try:
-                asyncio.run(self._logger.log_event(event))
+                run_sync(self._logger.log_event(event))
             except Exception as e:
                 logger.debug(f"Failed to log audit event: {e}")
 

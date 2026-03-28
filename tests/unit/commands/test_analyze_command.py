@@ -5,7 +5,7 @@ import re
 import pytest
 from typer.testing import CliRunner
 
-from victor.ui.commands.analyze import app
+from victor.verticals.contrib.coding.commands.analyze import app
 
 runner = CliRunner()
 
@@ -44,3 +44,12 @@ class TestAnalyzeCommand:
     def test_refresh_flag_exists(self):
         result = runner.invoke(app, ["--help"])
         assert "--refresh" in _strip_ansi(result.output)
+
+
+def test_analyze_app_importable_from_contrib():
+    """Analyze app is always importable from contrib — CLI fallback path relies on this."""
+    import typer
+    from victor.verticals.contrib.coding.commands.analyze import app as _app
+
+    assert _app is not None
+    assert isinstance(_app, typer.Typer)

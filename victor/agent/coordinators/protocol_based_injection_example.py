@@ -7,6 +7,8 @@ with lightweight mocks instead of full orchestrator instances.
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
+from victor.core.async_utils import run_sync
+
 # =============================================================================
 # Lightweight Protocol Implementations for Testing
 # =============================================================================
@@ -295,9 +297,12 @@ def print_benefits():
     print(benefits)
 
 
-if __name__ == "__main__":
-    import asyncio
-
+def main() -> None:
+    """Run the protocol-based injection example."""
     print_benefits()
     print("\n" + "=" * 60 + "\n")
-    asyncio.run(example_chat_with_mock_orchestrator())
+    run_sync(example_chat_with_mock_orchestrator())
+
+
+if __name__ == "__main__":
+    main()
