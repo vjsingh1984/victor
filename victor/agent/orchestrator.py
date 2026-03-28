@@ -1091,6 +1091,58 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # This replaces hasattr duck-typing with type-safe protocol conformance
         self.__init_capability_registry__()
 
+        # =================================================================
+        # Domain Facades: Group related components behind coherent interfaces
+        # These wrap already-initialized components (conservative approach)
+        # so that orchestrator properties can delegate through facades.
+        # =================================================================
+        from victor.agent.facades import ChatFacade, ToolFacade
+
+        self._chat_facade = ChatFacade(
+            conversation=self.conversation,
+            conversation_controller=self._conversation_controller,
+            conversation_state=self.conversation_state,
+            memory_manager=self.memory_manager,
+            memory_session_id=self._memory_session_id,
+            embedding_store=getattr(self, "_conversation_embedding_store", None),
+            intent_classifier=self.intent_classifier,
+            intent_detector=self.intent_detector,
+            reminder_manager=self.reminder_manager,
+            system_prompt=self._system_prompt,
+            response_completer=self.response_completer,
+            context_compactor=self._context_compactor,
+            task_completion_detector=self._task_completion_detector,
+        )
+
+        self._tool_facade = ToolFacade(
+            tools=self.tools,
+            tool_pipeline=self._tool_pipeline,
+            tool_executor=self.tool_executor,
+            tool_selector=self.tool_selector,
+            tool_cache=self.tool_cache,
+            tool_graph=self.tool_graph,
+            tool_registrar=self.tool_registrar,
+            tool_budget=self.tool_budget,
+            tool_output_formatter=self._tool_output_formatter,
+            deduplication_tracker=self._deduplication_tracker,
+            argument_normalizer=self.argument_normalizer,
+            parallel_executor=self.parallel_executor,
+            safety_checker=self._safety_checker,
+            auto_committer=self._auto_committer,
+            middleware_chain=self._middleware_chain,
+            code_correction_middleware=self._code_correction_middleware,
+            tool_access_controller=self._tool_access_controller,
+            budget_manager=self._budget_manager,
+            search_router=self.search_router,
+            semantic_selector=self.semantic_selector,
+            task_classifier=self.task_classifier,
+            sequence_tracker=self._sequence_tracker,
+            unified_tracker=self.unified_tracker,
+            plugin_manager=self.plugin_manager,
+        )
+
+        logger.debug("Domain facades created: ChatFacade, ToolFacade")
+
         # Wire up LifecycleManager with dependencies for shutdown
         # (must be done after all components are initialized)
         self._lifecycle_manager.set_provider(self.provider)

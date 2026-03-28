@@ -60,12 +60,16 @@ logger = logging.getLogger(__name__)
 
 
 def _conversation_controller(self: "AgentOrchestrator") -> "ConversationController":
-    """Get the conversation controller component."""
+    """Get the conversation controller component (delegates to ChatFacade)."""
+    if hasattr(self, "_chat_facade"):
+        return self._chat_facade.conversation_controller
     return self._conversation_controller
 
 
 def _tool_pipeline(self: "AgentOrchestrator") -> "ToolPipeline":
-    """Get the tool pipeline component."""
+    """Get the tool pipeline component (delegates to ToolFacade)."""
+    if hasattr(self, "_tool_facade"):
+        return self._tool_facade.tool_pipeline
     return self._tool_pipeline
 
 
@@ -90,22 +94,32 @@ def _provider_manager(self: "AgentOrchestrator") -> "ProviderManager":
 
 
 def _context_compactor(self: "AgentOrchestrator") -> "ContextCompactor":
-    """Get the context compactor component."""
+    """Get the context compactor component (delegates to ChatFacade)."""
+    if hasattr(self, "_chat_facade"):
+        return self._chat_facade.context_compactor
     return self._context_compactor
 
 
 def _tool_output_formatter(self: "AgentOrchestrator") -> "ToolOutputFormatter":
-    """Get the tool output formatter."""
+    """Get the tool output formatter (delegates to ToolFacade)."""
+    if hasattr(self, "_tool_facade"):
+        return self._tool_facade.tool_output_formatter
     return self._tool_output_formatter
 
 
 def _usage_analytics(self: "AgentOrchestrator") -> "UsageAnalytics":
-    """Get the usage analytics singleton."""
+    """Get the usage analytics singleton.
+
+    Note: UsageAnalytics is an infrastructure component shared across domains.
+    Remains on the orchestrator directly (not in ChatFacade or ToolFacade).
+    """
     return self._usage_analytics
 
 
 def _sequence_tracker(self: "AgentOrchestrator") -> "ToolSequenceTracker":
-    """Get the tool sequence tracker."""
+    """Get the tool sequence tracker (delegates to ToolFacade)."""
+    if hasattr(self, "_tool_facade"):
+        return self._tool_facade.sequence_tracker
     return self._sequence_tracker
 
 
@@ -139,7 +153,9 @@ def _session_ledger_set(self: "AgentOrchestrator", value: Any) -> None:
 
 
 def _code_correction_middleware(self: "AgentOrchestrator") -> Optional[Any]:
-    """Get the code correction middleware for automatic code validation/fixing."""
+    """Get the code correction middleware (delegates to ToolFacade)."""
+    if hasattr(self, "_tool_facade"):
+        return self._tool_facade.code_correction_middleware
     return self._code_correction_middleware
 
 

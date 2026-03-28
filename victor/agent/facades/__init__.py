@@ -22,3 +22,11 @@ The AgentOrchestrator delegates to these facades rather than managing
 individual components directly, reducing its responsibility to thin
 cross-domain coordination.
 """
+
+from victor.agent.facades.chat_facade import ChatFacade
+from victor.agent.facades.tool_facade import ToolFacade
+
+__all__ = [
+    "ChatFacade",
+    "ToolFacade",
+]
