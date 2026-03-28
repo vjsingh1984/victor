@@ -191,6 +191,22 @@ class TestNodeExecutorFactory:
         executor = factory.create_executor(node)
         assert callable(executor)
 
+    def test_factory_exposes_profile_aware_orchestrator_pool(self):
+        """Compatibility context should preserve orchestrator-pool lookup."""
+        default_orchestrator = object()
+        profile_orchestrator = object()
+        factory = NodeExecutorFactory(
+            orchestrator=default_orchestrator,
+            orchestrators={"analysis": profile_orchestrator},
+        )
+
+        context = factory._resolve_execution_context()
+
+        assert context.orchestrator is default_orchestrator
+        assert context.orchestrator_pool.get_default_orchestrator() is default_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("analysis") is profile_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("missing") is default_orchestrator
+
     @pytest.mark.asyncio
     async def test_agent_executor_without_orchestrator(self):
         """Test agent executor runs in placeholder mode without orchestrator."""

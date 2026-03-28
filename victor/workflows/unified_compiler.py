@@ -72,6 +72,8 @@ from typing import (
     Union,
 )
 
+from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
+
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.framework.graph import CompiledGraph, GraphExecutionResult, GraphConfig
@@ -168,7 +170,7 @@ class NodeExecutionResult:
 # =============================================================================
 
 
-class NodeExecutorFactory:
+class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
     """Compatibility shim over the canonical workflow node executor factory."""
 
     def __init__(
@@ -178,23 +180,15 @@ class NodeExecutorFactory:
         runner_registry: Optional["NodeRunnerRegistry"] = None,
         emitter: Optional[Any] = None,
     ):
-        from victor.workflows.executors.factory import NodeExecutorFactory as SharedNodeExecutorFactory
-
-        self.orchestrator = orchestrator
-        self.tool_registry = tool_registry
+        super().__init__(
+            orchestrator=orchestrator,
+            tool_registry=tool_registry,
+        )
         self._runner_registry = runner_registry
         self._emitter = emitter
         self._mutable_state_keys = frozenset(
             {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
         )
-        self._delegate = SharedNodeExecutorFactory()
-        self._compat_context = _UnifiedCompilerExecutionContext(
-            orchestrator=orchestrator,
-            tool_registry=tool_registry,
-        )
-
-    def _resolve_execution_context(self) -> "_UnifiedCompilerExecutionContext":
-        return self._compat_context
 
     def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
         child_state = dict(state)
@@ -247,19 +241,6 @@ class NodeExecutorFactory:
 
     def supports_node_type(self, node_type: str) -> bool:
         return self._delegate.supports_node_type(node_type)
-
-
-class _UnifiedCompilerExecutionContext:
-    """Execution context adapter for unified compiler factory compatibility."""
-
-    def __init__(
-        self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        tool_registry: Optional["ToolRegistry"] = None,
-    ) -> None:
-        self.orchestrator = orchestrator
-        self.tool_registry = tool_registry
-        self.services = None
 
 
 # =============================================================================

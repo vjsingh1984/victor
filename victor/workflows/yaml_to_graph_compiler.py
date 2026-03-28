@@ -74,7 +74,7 @@ from victor.workflows.definition import (
     ConditionNode,
     WorkflowDefinition,
 )
-from victor.workflows.executors.factory import NodeExecutorFactory as UnifiedNodeExecutorFactory
+from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
 from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class NodeExecutorFactory(UnifiedNodeExecutorFactory):
+class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
     """Compatibility wrapper around the canonical workflow node executor factory."""
 
     def __init__(
@@ -98,56 +98,11 @@ class NodeExecutorFactory(UnifiedNodeExecutorFactory):
         orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
-        self.orchestrator = orchestrator
-        self.orchestrators = orchestrators or {}
-        self.tool_registry = tool_registry
-        self._compat_context = _YAMLCompilerExecutionContext(
-            orchestrator=orchestrator,
-            orchestrators=self.orchestrators,
-            tool_registry=tool_registry,
-        )
-        super().__init__()
-
-    def _resolve_execution_context(self) -> "_YAMLCompilerExecutionContext":
-        return self._compat_context
-
-
-class _YAMLCompilerOrchestratorPool:
-    """Profile-aware orchestrator lookup used by YAML compiler compatibility."""
-
-    def __init__(
-        self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
-    ) -> None:
-        self._orchestrator = orchestrator
-        self._orchestrators = orchestrators or {}
-
-    def get_orchestrator(self, profile: Optional[str] = None) -> Optional["AgentOrchestrator"]:
-        if profile and profile in self._orchestrators:
-            return self._orchestrators[profile]
-        return self._orchestrator
-
-    def get_default_orchestrator(self) -> Optional["AgentOrchestrator"]:
-        return self._orchestrator
-
-
-class _YAMLCompilerExecutionContext:
-    """Execution context adapter for YAML compiler compatibility."""
-
-    def __init__(
-        self,
-        orchestrator: Optional["AgentOrchestrator"] = None,
-        orchestrators: Optional[Dict[str, "AgentOrchestrator"]] = None,
-        tool_registry: Optional["ToolRegistry"] = None,
-    ) -> None:
-        self.orchestrator = orchestrator
-        self.orchestrator_pool = _YAMLCompilerOrchestratorPool(
+        super().__init__(
             orchestrator=orchestrator,
             orchestrators=orchestrators,
+            tool_registry=tool_registry,
         )
-        self.tool_registry = tool_registry
-        self.services = None
 
 
 # =============================================================================
