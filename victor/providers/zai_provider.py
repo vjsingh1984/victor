@@ -412,37 +412,7 @@ class ZAIProvider(BaseProvider):
                         raw_error=e,
                     ) from e
             except Exception as e:
-                # Skip if already a ProviderError
-                if isinstance(e, ProviderError):
-                    raise
-                # Convert to specific provider error types based on error message
-                error_str = str(e).lower()
-                auth_keywords = [
-                    "auth",
-                    "unauthorized",
-                    "invalid key",
-                    "invalid api",
-                    "api_key",
-                    "401",
-                ]
-                rate_limit_keywords = ["rate limit", "429", "too many requests"]
-                if any(term in error_str for term in auth_keywords):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in rate_limit_keywords):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    raise ProviderError(
-                        message=f"z.ai API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,
@@ -560,37 +530,7 @@ class ZAIProvider(BaseProvider):
                     raw_error=e,
                 ) from e
         except Exception as e:
-            # Skip if already a ProviderError
-            if isinstance(e, ProviderError):
-                raise
-            # Convert to specific provider error types based on error message
-            error_str = str(e).lower()
-            auth_keywords = [
-                "auth",
-                "unauthorized",
-                "invalid key",
-                "invalid api",
-                "api_key",
-                "401",
-            ]
-            rate_limit_keywords = ["rate limit", "429", "too many requests"]
-            if any(term in error_str for term in auth_keywords):
-                raise ProviderAuthError(
-                    message=f"Authentication failed: {str(e)}",
-                    provider=self.name,
-                ) from e
-            elif any(term in error_str for term in rate_limit_keywords):
-                raise ProviderRateLimitError(
-                    message=f"Rate limit exceeded: {str(e)}",
-                    provider=self.name,
-                    status_code=429,
-                ) from e
-            else:
-                raise ProviderError(
-                    message=f"z.ai streaming error: {str(e)}",
-                    provider=self.name,
-                    raw_error=e,
-                ) from e
+            raise self.classify_error(e) from e
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to z.ai format (OpenAI-compatible)."""

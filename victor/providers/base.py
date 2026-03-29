@@ -315,6 +315,91 @@ class BaseProvider(ABC):
             return self._circuit_breaker.get_stats()
         return None
 
+    def classify_error(self, error: Exception) -> ProviderError:
+        """Classify a raw exception into the appropriate ProviderError subtype.
+
+        Providers can override this for provider-specific error handling.
+        The base implementation uses a three-tier strategy:
+        1. Pass through existing ProviderError subtypes unchanged
+        2. Check HTTP status codes (if available on the exception)
+        3. String-based pattern matching as final fallback
+
+        Args:
+            error: The raw exception from the provider API call.
+
+        Returns:
+            A ProviderError (or subtype) wrapping the original exception.
+        """
+        # Tier 0: Already classified
+        if isinstance(error, ProviderError):
+            return error
+
+        wrapped_error = (
+            getattr(error, "last_error", None)
+            or getattr(error, "raw_error", None)
+            or getattr(error, "cause", None)
+            or getattr(error, "__cause__", None)
+        )
+        if isinstance(wrapped_error, Exception) and wrapped_error is not error:
+            return self.classify_error(wrapped_error)
+
+        error_str = str(error).lower()
+
+        # Tier 1: Check HTTP status code attributes
+        # Also check .response.status_code for httpx.HTTPStatusError compatibility
+        status = (
+            getattr(error, "status_code", None)
+            or getattr(error, "code", None)
+            or getattr(getattr(error, "response", None), "status_code", None)
+        )
+        if isinstance(status, int):
+            if status == 401 or status == 403:
+                return ProviderAuthError(
+                    message=f"Authentication failed: {error}",
+                    provider=self.name,
+                    status_code=status,
+                    raw_error=error,
+                )
+            if status == 429:
+                return ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {error}",
+                    provider=self.name,
+                    status_code=429,
+                    raw_error=error,
+                )
+
+        # Tier 2: String-based classification
+        if any(
+            t in error_str
+            for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
+        ):
+            return ProviderAuthError(
+                message=f"Authentication failed: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+        if any(t in error_str for t in ("rate limit", "429", "too many requests")):
+            return ProviderRateLimitError(
+                message=f"Rate limit exceeded: {error}",
+                provider=self.name,
+                status_code=429,
+                raw_error=error,
+            )
+        if any(t in error_str for t in ("timeout", "timed out")):
+            return ProviderTimeoutError(
+                message=f"Request timed out: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+
+        # Default: generic ProviderError
+        return ProviderError(
+            message=f"{self.name} API error: {error}",
+            provider=self.name,
+            status_code=status if isinstance(status, int) else None,
+            raw_error=error,
+        )
+
     @property
     @abstractmethod
     def name(self) -> str:

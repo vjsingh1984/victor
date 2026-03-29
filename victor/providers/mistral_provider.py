@@ -293,38 +293,7 @@ class MistralProvider(BaseProvider):
                         raw_error=e,
                     ) from e
             except Exception as e:
-                # Skip if already a ProviderError
-                if isinstance(e, ProviderError):
-                    raise
-                # Convert to specific provider error types based on error message
-                error_str = str(e).lower()
-                if any(
-                    term in error_str
-                    for term in [
-                        "auth",
-                        "unauthorized",
-                        "invalid key",
-                        "invalid api",
-                        "api_key",
-                        "401",
-                    ]
-                ):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    raise ProviderError(
-                        message=f"Mistral API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,
