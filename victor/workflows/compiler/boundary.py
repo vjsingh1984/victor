@@ -72,6 +72,36 @@ def _looks_like_yaml_content(source: str) -> bool:
     return stripped.startswith(("workflows:", "-", "{"))
 
 
+def create_condition_router(node: ConditionNode) -> Callable[[WorkflowState], str]:
+    """Build a condition router shared across compiler compatibility layers."""
+
+    def route(state: WorkflowState) -> str:
+        try:
+            branch = node.condition(dict(state))
+            if branch in node.branches:
+                return branch
+            if "default" in node.branches:
+                return "default"
+
+            logger.warning(
+                "Condition node '%s' returned '%s' without a matching branch",
+                node.id,
+                branch,
+            )
+        except Exception as exc:
+            logger.error(
+                "Condition evaluation failed for node '%s': %s",
+                node.id,
+                exc,
+                exc_info=True,
+            )
+            if "default" in node.branches:
+                return "default"
+        return "__END__"
+
+    return route
+
+
 class WorkflowParser:
     """Parse file-or-string workflow sources into normalized definitions."""
 
@@ -320,31 +350,7 @@ class NativeWorkflowGraphCompiler:
         graph.add_node(parallel_node.id, execute_parallel_group)
 
     def _create_condition_router(self, node: ConditionNode) -> Callable[[WorkflowState], str]:
-        def route(state: WorkflowState) -> str:
-            try:
-                branch = node.condition(dict(state))
-                if branch in node.branches:
-                    return branch
-                if "default" in node.branches:
-                    return "default"
-
-                logger.warning(
-                    "Condition node '%s' returned '%s' without a matching branch",
-                    node.id,
-                    branch,
-                )
-            except Exception as exc:
-                logger.error(
-                    "Condition evaluation failed for node '%s': %s",
-                    node.id,
-                    exc,
-                    exc_info=True,
-                )
-                if "default" in node.branches:
-                    return "default"
-            return "__END__"
-
-        return route
+        return create_condition_router(node)
 
     def _build_checkpointer(self) -> Any:
         if not self._enable_checkpointing:
@@ -382,6 +388,7 @@ class LegacyWorkflowGraphCompiler:
 
 
 __all__ = [
+    "create_condition_router",
     "LegacyWorkflowGraphCompiler",
     "NativeWorkflowGraphCompiler",
     "ParsedWorkflowDefinition",

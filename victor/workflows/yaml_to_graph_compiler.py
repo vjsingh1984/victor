@@ -69,6 +69,7 @@ from victor.workflows.compiler.boundary import (
     NativeWorkflowGraphCompiler,
     ParsedWorkflowDefinition,
     WorkflowCompilationRequest,
+    create_condition_router,
 )
 from victor.workflows.definition import (
     ConditionNode,
@@ -121,52 +122,8 @@ class ConditionEvaluator:
     def create_router(
         node: ConditionNode,
     ) -> Callable[[WorkflowState], str]:
-        """Create a router function for a condition node.
-
-        The router evaluates the condition and returns the BRANCH NAME
-        (not the target node ID). The StateGraph Edge.get_target() method
-        uses this branch name to look up the actual target from the branches dict.
-
-        Args:
-            node: The condition node
-
-        Returns:
-            Function that takes state and returns branch name
-        """
-
-        def route(state: WorkflowState) -> str:
-            try:
-                # Evaluate condition using the node's condition function
-                # This should return a branch name like "good", "bad", "default"
-                branch = node.condition(dict(state))
-
-                # Verify the branch exists in branches dict
-                if branch in node.branches:
-                    return branch
-
-                # Check for default branch
-                if "default" in node.branches:
-                    return "default"
-
-                logger.warning(
-                    f"Condition node '{node.id}' returned '{branch}' "
-                    f"but no matching branch found"
-                )
-                # Return a non-existent branch, which will cause Edge.get_target()
-                # to return None, and the graph will end
-                return "__END__"
-
-            except Exception as e:
-                logger.error(
-                    f"Condition evaluation failed for node '{node.id}': {e}",
-                    exc_info=True,
-                )
-                # Try default branch on error
-                if "default" in node.branches:
-                    return "default"
-                return "__END__"
-
-        return route
+        """Create a router function for a condition node."""
+        return create_condition_router(node)
 
 
 # =============================================================================
