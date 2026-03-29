@@ -618,24 +618,25 @@ class UnifiedWorkflowCompiler:
             config=config,
         )
 
-    def _select_loaded_workflow(
+    def _create_workflow_parser(
         self,
-        loaded: Any,
+        *,
         workflow_name: Optional[str] = None,
-    ) -> "WorkflowDefinition":
-        """Normalize YAML loader results to a single workflow definition."""
-        if isinstance(loaded, dict):
-            if workflow_name:
-                workflow = loaded.get(workflow_name)
-                if workflow is None:
-                    raise ValueError(f"Workflow '{workflow_name}' not found")
-                return workflow
-            if not loaded:
-                raise ValueError("No workflows found in source")
-            return next(iter(loaded.values()))
-        return loaded
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        base_dir: Optional[Path] = None,
+    ) -> Any:
+        """Build the shared parser stage for deprecated YAML compilation paths."""
+        from victor.workflows.compiler.boundary import WorkflowParser
 
-    def _load_workflow_definition(
+        loader = self._create_yaml_loader(
+            condition_registry=condition_registry,
+            transform_registry=transform_registry,
+            base_dir=base_dir,
+        )
+        return WorkflowParser(loader)
+
+    def _parse_workflow_definition(
         self,
         source: str,
         *,
@@ -643,15 +644,23 @@ class UnifiedWorkflowCompiler:
         condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
         base_dir: Optional[Path] = None,
-    ) -> "WorkflowDefinition":
-        """Load a single workflow definition from file or YAML content."""
-        loader = self._create_yaml_loader(
+    ) -> Any:
+        """Parse and normalize a workflow source through the shared boundary parser."""
+        from victor.workflows.compiler.boundary import WorkflowCompilationRequest
+
+        parser = self._create_workflow_parser(
+            workflow_name=workflow_name,
             condition_registry=condition_registry,
             transform_registry=transform_registry,
             base_dir=base_dir,
         )
-        loaded = loader.load(source, workflow_name=workflow_name)
-        return self._select_loaded_workflow(loaded, workflow_name)
+        return parser.parse(
+            WorkflowCompilationRequest(
+                source=source,
+                workflow_name=workflow_name,
+                validate=self._config.validate_before_compile,
+            )
+        )
 
     # =========================================================================
     # YAML Compilation
@@ -725,13 +734,14 @@ class UnifiedWorkflowCompiler:
                     max_retries=cached_def.max_retries,
                 )
 
-        workflow_def = self._load_workflow_definition(
+        parsed = self._parse_workflow_definition(
             str(path),
             workflow_name=workflow_name,
             condition_registry=condition_registry,
             transform_registry=transform_registry,
             base_dir=path.parent,
         )
+        workflow_def = parsed.workflow
 
         # Cache the definition if enabled
         if self._config.enable_caching:
@@ -746,7 +756,7 @@ class UnifiedWorkflowCompiler:
             workflow_def,
             source=str(path),
             workflow_name=name,
-            source_path=path,
+            source_path=parsed.source_path or path,
         )
         return CachedCompiledGraph(
             compiled_graph=compiled,
@@ -782,12 +792,13 @@ class UnifiedWorkflowCompiler:
         """
         # Generate cache key from content hash
         cache_key = self._generate_content_cache_key(yaml_content, workflow_name)
-        workflow_def = self._load_workflow_definition(
+        parsed = self._parse_workflow_definition(
             yaml_content,
             workflow_name=workflow_name,
             condition_registry=condition_registry,
             transform_registry=transform_registry,
         )
+        workflow_def = parsed.workflow
 
         self._compile_stats["yaml_content_compiles"] += 1
 
@@ -796,6 +807,7 @@ class UnifiedWorkflowCompiler:
             workflow_def,
             source=yaml_content,
             workflow_name=workflow_name,
+            source_path=parsed.source_path,
         )
         return CachedCompiledGraph(
             compiled_graph=compiled,

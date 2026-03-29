@@ -324,6 +324,20 @@ class TestCompilationFromYAML:
         assert isinstance(compiled, CachedCompiledGraph)
 
     @pytest.mark.asyncio
+    async def test_compile_yaml_content_preserves_shared_parser_metadata(
+        self, sample_yaml_content: str
+    ):
+        """YAML content compilation should use the shared parser metadata contract."""
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+
+        compiler = UnifiedWorkflowCompiler()
+        compiled = compiler.compile_yaml_content(sample_yaml_content, workflow_name="test_workflow")
+
+        assert isinstance(compiled, CachedCompiledGraph)
+        assert compiled.workflow_name == "test_workflow"
+        assert compiled.source_path is None
+
+    @pytest.mark.asyncio
     async def test_compile_yaml_with_agent_timeout(
         self, agent_timeout_yaml_content: str, tmp_path: Path
     ):
