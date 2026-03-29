@@ -17,6 +17,10 @@ from typing import (
 __all__ = [
     "ObservabilityProtocol",
     "MetricsCollectorProtocol",
+    # Recovery (ISP-split)
+    "FailureDetectorProtocol",
+    "RecoveryExecutorProtocol",
+    "RecoveryDiagnosticsProtocol",
     "RecoveryHandlerProtocol",
     "ResponseSanitizerProtocol",
     "ArgumentNormalizerProtocol",
@@ -35,6 +39,10 @@ __all__ = [
     "SystemPromptBuilderProtocol",
     "ParallelExecutorProtocol",
     "ResponseCompleterProtocol",
+    # Vertical storage (ISP-split)
+    "VerticalMiddlewareStorageProtocol",
+    "SafetyPatternStorageProtocol",
+    "TeamSpecStorageProtocol",
     "VerticalStorageProtocol",
     "TaskTrackerProtocol",
     "CompactionSummarizerProtocol",
@@ -92,15 +100,8 @@ class MetricsCollectorProtocol(Protocol):
 
 
 @runtime_checkable
-class RecoveryHandlerProtocol(Protocol):
-    """Protocol for model failure recovery.
-
-    Provides a high-level interface for detecting and recovering from
-    model failures, stuck states, and hallucinations. Integrates with:
-    - Q-learning for adaptive strategy selection
-    - UsageAnalytics for telemetry
-    - ContextCompactor for proactive compaction
-    """
+class FailureDetectorProtocol(Protocol):
+    """Protocol for detecting model failures (ISP: read-only detection)."""
 
     def detect_failure(
         self,
@@ -120,6 +121,11 @@ class RecoveryHandlerProtocol(Protocol):
             FailureType if failure detected, None otherwise
         """
         ...
+
+
+@runtime_checkable
+class RecoveryExecutorProtocol(Protocol):
+    """Protocol for executing recovery actions (ISP: mutating recovery)."""
 
     async def recover(
         self,
@@ -150,17 +156,40 @@ class RecoveryHandlerProtocol(Protocol):
         """
         ...
 
-    def record_outcome(self, success: bool, quality_improvement: float) -> None:
-        """Record recovery outcome for Q-learning."""
-        ...
-
     def reset_session(self, session_id: str) -> None:
         """Reset recovery state for a new session."""
+        ...
+
+
+@runtime_checkable
+class RecoveryDiagnosticsProtocol(Protocol):
+    """Protocol for recovery metrics and diagnostics (ISP: observability)."""
+
+    def record_outcome(self, success: bool, quality_improvement: float) -> None:
+        """Record recovery outcome for Q-learning."""
         ...
 
     def get_diagnostics(self) -> Dict[str, Any]:
         """Get diagnostic information about recovery system."""
         ...
+
+
+@runtime_checkable
+class RecoveryHandlerProtocol(
+    FailureDetectorProtocol,
+    RecoveryExecutorProtocol,
+    RecoveryDiagnosticsProtocol,
+    Protocol,
+):
+    """Composed protocol for full recovery handler (backward compatible).
+
+    Clients that need only failure detection should depend on
+    FailureDetectorProtocol. Clients that need only recovery execution
+    should depend on RecoveryExecutorProtocol. This composed protocol
+    is for the orchestrator which needs all capabilities.
+    """
+
+    ...
 
 
 @runtime_checkable
@@ -592,78 +621,59 @@ class ResponseCompleterProtocol(Protocol):
 
 
 @runtime_checkable
-class VerticalStorageProtocol(Protocol):
-    """Protocol for storing vertical-specific data in orchestrator.
-
-    This protocol addresses the DIP (Dependency Inversion Principle) violation
-    where FrameworkStepHandler uses private attribute fallbacks on the orchestrator
-    (e.g., _vertical_middleware_storage, _safety_patterns, _team_specs).
-
-    By defining this protocol, consumers can depend on an abstraction rather than
-    concrete implementation details, enabling:
-    - Proper dependency injection
-    - Easy testing via mock substitution
-    - Clear contracts for vertical data storage
-
-    Usage:
-        from victor.agent.protocols import VerticalStorageProtocol
-
-        def configure_vertical(storage: VerticalStorageProtocol) -> None:
-            storage.set_middleware(middleware_list)
-            storage.set_safety_patterns(patterns)
-            storage.set_team_specs(specs)
-
-        # Later retrieval
-        middleware = storage.get_middleware()
-    """
+class VerticalMiddlewareStorageProtocol(Protocol):
+    """Protocol for vertical middleware storage (ISP: middleware only)."""
 
     def set_middleware(self, middleware: List[Any]) -> None:
-        """Store middleware configuration.
-
-        Args:
-            middleware: List of MiddlewareProtocol implementations
-        """
+        """Store middleware configuration."""
         ...
 
     def get_middleware(self) -> List[Any]:
-        """Retrieve middleware configuration.
-
-        Returns:
-            List of middleware instances, or empty list if not set
-        """
+        """Retrieve middleware configuration."""
         ...
 
-    def set_safety_patterns(self, patterns: List[Any]) -> None:
-        """Store safety patterns.
 
-        Args:
-            patterns: List of SafetyPattern instances from vertical extensions
-        """
+@runtime_checkable
+class SafetyPatternStorageProtocol(Protocol):
+    """Protocol for vertical safety pattern storage (ISP: safety only)."""
+
+    def set_safety_patterns(self, patterns: List[Any]) -> None:
+        """Store safety patterns."""
         ...
 
     def get_safety_patterns(self) -> List[Any]:
-        """Retrieve safety patterns.
-
-        Returns:
-            List of safety pattern instances, or empty list if not set
-        """
+        """Retrieve safety patterns."""
         ...
 
-    def set_team_specs(self, specs: Dict[str, Any]) -> None:
-        """Store team specifications.
 
-        Args:
-            specs: Dictionary mapping team names to TeamSpec instances
-        """
+@runtime_checkable
+class TeamSpecStorageProtocol(Protocol):
+    """Protocol for vertical team spec storage (ISP: teams only)."""
+
+    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+        """Store team specifications."""
         ...
 
     def get_team_specs(self) -> Dict[str, Any]:
-        """Retrieve team specifications.
-
-        Returns:
-            Dictionary of team specs, or empty dict if not set
-        """
+        """Retrieve team specifications."""
         ...
+
+
+@runtime_checkable
+class VerticalStorageProtocol(
+    VerticalMiddlewareStorageProtocol,
+    SafetyPatternStorageProtocol,
+    TeamSpecStorageProtocol,
+    Protocol,
+):
+    """Composed protocol for full vertical storage (backward compatible).
+
+    Clients that need only middleware should depend on
+    VerticalMiddlewareStorageProtocol. This composed protocol is for
+    the orchestrator which needs all three capabilities.
+    """
+
+    ...
 
 
 @runtime_checkable

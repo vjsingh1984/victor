@@ -243,6 +243,11 @@ class EmbeddingServiceProtocol(Protocol):
     """Protocol for embedding generation service.
 
     Allows components to use embeddings without importing heavy dependencies.
+
+    Raises:
+        RuntimeError: If the service has been shut down.
+        ImportError: If the underlying model library is not installed.
+        OSError: If model files cannot be loaded from disk.
     """
 
     async def embed_text(self, text: str) -> List[float]:
@@ -391,6 +396,12 @@ class ProviderProtocol(Protocol):
     """Protocol for LLM providers.
 
     Minimal interface that all providers must implement.
+
+    Raises:
+        ProviderAuthError: If authentication credentials are invalid or expired.
+        ProviderRateLimitError: If request rate or token limits are exceeded.
+        ProviderTimeoutError: If the request exceeds the configured timeout.
+        ProviderError: For all other provider-related failures.
     """
 
     @property
@@ -417,6 +428,12 @@ class ProviderProtocol(Protocol):
 
         Returns:
             Completion response
+
+        Raises:
+            ProviderAuthError: If authentication fails (401/403).
+            ProviderRateLimitError: If rate limited (429).
+            ProviderTimeoutError: If request times out.
+            ProviderError: For other API errors.
         """
         ...
 
@@ -435,6 +452,12 @@ class ProviderProtocol(Protocol):
 
         Yields:
             Stream chunks
+
+        Raises:
+            ProviderAuthError: If authentication fails (401/403).
+            ProviderRateLimitError: If rate limited (429).
+            ProviderTimeoutError: If request times out.
+            ProviderError: For other API errors.
         """
         ...
 
@@ -444,6 +467,13 @@ class CacheProtocol(Protocol):
     """Protocol for cache implementations.
 
     Allows components to use caching without importing specific implementations.
+
+    All methods are safe to call concurrently. Implementations must be
+    thread-safe. Methods never raise on missing keys (return None/False).
+
+    Raises:
+        OSError: If a disk-backed cache encounters I/O errors.
+        MemoryError: If an in-memory cache exceeds its memory limit.
     """
 
     def get(self, key: str) -> Optional[Any]:
