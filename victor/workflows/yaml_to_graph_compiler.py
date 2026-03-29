@@ -49,7 +49,6 @@ Example:
 from __future__ import annotations
 
 import logging
-import uuid
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
@@ -76,7 +75,11 @@ from victor.workflows.definition import (
     WorkflowDefinition,
 )
 from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
-from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
+from victor.workflows.runtime_types import (
+    GraphNodeResult,
+    WorkflowState,
+    create_initial_workflow_state,
+)
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -309,22 +312,10 @@ class YAMLToStateGraphCompiler:
         """
         compiled = self.compile(workflow)
 
-        # Prepare initial state
-        state: WorkflowState = {
-            "_workflow_id": uuid.uuid4().hex,
-            "_current_node": workflow.start_node or "",
-            "_node_results": {},
-            "_error": None,
-            "_iteration": 0,
-            "_parallel_results": {},
-            "_hitl_pending": False,
-            "_hitl_response": None,
-        }
-
-        # Merge user-provided initial state
-        if initial_state:
-            for key, value in initial_state.items():
-                state[key] = value
+        state = create_initial_workflow_state(
+            current_node=workflow.start_node or "",
+            initial_state=initial_state,
+        )
 
         return await compiled.invoke(state, thread_id=thread_id)
 

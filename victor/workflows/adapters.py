@@ -43,10 +43,12 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict
 
+from victor.core.async_utils import run_sync, run_sync_in_thread
 from victor.workflows.definition import (
     WorkflowDefinition,
     WorkflowNode,
@@ -333,17 +335,14 @@ class WorkflowToGraphAdapter:
 
             return new_state  # type: ignore
 
-        # Return sync wrapper that runs async handler
+        # Keep a sync compatibility shell for graph callbacks while routing
+        # event-loop ownership through the shared async bridge helpers.
         def sync_handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
-            import asyncio
-
             try:
-                loop = asyncio.get_event_loop()
+                asyncio.get_running_loop()
+                return run_sync_in_thread(async_handler(state))
             except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            return loop.run_until_complete(async_handler(state))
+                return run_sync(async_handler(state))
 
         return sync_handler
 

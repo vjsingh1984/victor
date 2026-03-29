@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, TypedDict
 
@@ -24,6 +25,7 @@ class WorkflowState(TypedDict, total=False):
     """Generic state for compiled workflow execution."""
 
     _workflow_id: str
+    _workflow_name: str
     _current_node: str
     _node_results: Dict[str, Any]
     _error: Optional[str]
@@ -45,7 +47,32 @@ class GraphNodeResult:
     tool_calls_used: int = 0
 
 
+def create_initial_workflow_state(
+    *,
+    current_node: str = "",
+    workflow_id: Optional[str] = None,
+    workflow_name: str = "",
+    initial_state: Optional[Dict[str, Any]] = None,
+) -> WorkflowState:
+    """Create the canonical initial state for compiled workflow execution."""
+    state: WorkflowState = {
+        "_workflow_id": workflow_id or uuid.uuid4().hex,
+        "_workflow_name": workflow_name,
+        "_current_node": current_node,
+        "_node_results": {},
+        "_error": None,
+        "_iteration": 0,
+        "_parallel_results": {},
+        "_hitl_pending": False,
+        "_hitl_response": None,
+    }
+    if initial_state:
+        state.update(initial_state)
+    return state
+
+
 __all__ = [
+    "create_initial_workflow_state",
     "GraphNodeResult",
     "WorkflowState",
 ]

@@ -86,6 +86,7 @@ from typing import (
 )
 
 from victor.core.async_utils import run_sync
+from victor.workflows.runtime_types import create_initial_workflow_state
 
 if TYPE_CHECKING:
     from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
@@ -179,6 +180,52 @@ class ExecutionContext(TypedDict, total=False):
 # =============================================================================
 
 
+def _build_execution_context(
+    *,
+    initial_data: Optional[Dict[str, Any]] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
+    workflow_id: Optional[str] = None,
+    workflow_name: str = "",
+    current_node: str = "",
+    node_results: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    iteration: int = 0,
+    visited_nodes: Optional[List[str]] = None,
+    parallel_results: Optional[Dict[str, Any]] = None,
+    hitl_pending: bool = False,
+    hitl_response: Optional[Dict[str, Any]] = None,
+    as_of_date: Optional[str] = None,
+    lookback_periods: Optional[int] = None,
+    include_end_date: bool = True,
+    is_complete: bool = False,
+    success: bool = False,
+) -> ExecutionContext:
+    """Build ExecutionContext values on top of the shared compiled-state defaults."""
+    runtime_state = create_initial_workflow_state(
+        workflow_id=workflow_id,
+        workflow_name=workflow_name,
+        current_node=current_node,
+    )
+    runtime_state["_node_results"] = dict(node_results or {})
+    runtime_state["_error"] = error
+    runtime_state["_iteration"] = iteration
+    runtime_state["_parallel_results"] = dict(parallel_results or {})
+    runtime_state["_hitl_pending"] = hitl_pending
+    runtime_state["_hitl_response"] = hitl_response
+
+    return {
+        "data": dict(initial_data or {}),
+        "messages": list(messages or []),
+        **runtime_state,
+        "_visited_nodes": list(visited_nodes or []),
+        "_as_of_date": as_of_date,
+        "_lookback_periods": lookback_periods,
+        "_include_end_date": include_end_date,
+        "_is_complete": is_complete,
+        "_success": success,
+    }
+
+
 def create_execution_context(
     initial_data: Optional[Dict[str, Any]] = None,
     workflow_id: Optional[str] = None,
@@ -200,26 +247,11 @@ def create_execution_context(
             workflow_name="my_workflow",
         )
     """
-    ctx: ExecutionContext = {
-        "data": initial_data or {},
-        "messages": [],
-        "_workflow_id": workflow_id or str(uuid.uuid4()),
-        "_workflow_name": workflow_name or "",
-        "_current_node": "",
-        "_node_results": {},
-        "_error": None,
-        "_iteration": 0,
-        "_visited_nodes": [],
-        "_parallel_results": {},
-        "_hitl_pending": False,
-        "_hitl_response": None,
-        "_as_of_date": None,
-        "_lookback_periods": None,
-        "_include_end_date": True,
-        "_is_complete": False,
-        "_success": False,
-    }
-    return ctx
+    return _build_execution_context(
+        initial_data=initial_data,
+        workflow_id=workflow_id or str(uuid.uuid4()),
+        workflow_name=workflow_name or "",
+    )
 
 
 # =============================================================================
@@ -431,25 +463,19 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
         lookback_periods = ctx.temporal.lookback_periods
         include_end_date = ctx.temporal.include_end_date
 
-    return {
-        "data": ctx.data.copy(),
-        "messages": [],
-        "_workflow_id": ctx.metadata.get("workflow_id", str(uuid.uuid4())),
-        "_workflow_name": ctx.metadata.get("workflow_name", ""),
-        "_current_node": ctx.metadata.get("current_node", ""),
-        "_node_results": node_results,
-        "_error": None,
-        "_iteration": ctx.metadata.get("iteration", 0),
-        "_visited_nodes": list(ctx.node_results.keys()),
-        "_parallel_results": {},
-        "_hitl_pending": False,
-        "_hitl_response": None,
-        "_as_of_date": as_of_date,
-        "_lookback_periods": lookback_periods,
-        "_include_end_date": include_end_date,
-        "_is_complete": False,
-        "_success": not ctx.has_failures(),
-    }
+    return _build_execution_context(
+        initial_data=ctx.data,
+        workflow_id=ctx.metadata.get("workflow_id", str(uuid.uuid4())),
+        workflow_name=ctx.metadata.get("workflow_name", ""),
+        current_node=ctx.metadata.get("current_node", ""),
+        node_results=node_results,
+        iteration=ctx.metadata.get("iteration", 0),
+        visited_nodes=list(ctx.node_results.keys()),
+        as_of_date=as_of_date,
+        lookback_periods=lookback_periods,
+        include_end_date=include_end_date,
+        success=not ctx.has_failures(),
+    )
 
 
 def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
@@ -529,6 +555,7 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     # Extract system fields and user data
     system_keys = {
         "_workflow_id",
+        "_workflow_name",
         "_current_node",
         "_node_results",
         "_error",
@@ -541,25 +568,20 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     # User data is everything not in system keys
     user_data = {k: v for k, v in state.items() if k not in system_keys}
 
-    return {
-        "data": user_data,
-        "messages": [],
-        "_workflow_id": state.get("_workflow_id", str(uuid.uuid4())),
-        "_workflow_name": "",
-        "_current_node": state.get("_current_node", ""),
-        "_node_results": state.get("_node_results", {}),
-        "_error": state.get("_error"),
-        "_iteration": state.get("_iteration", 0),
-        "_visited_nodes": list(state.get("_node_results", {}).keys()),
-        "_parallel_results": state.get("_parallel_results", {}),
-        "_hitl_pending": state.get("_hitl_pending", False),
-        "_hitl_response": state.get("_hitl_response"),
-        "_as_of_date": None,
-        "_lookback_periods": None,
-        "_include_end_date": True,
-        "_is_complete": False,
-        "_success": state.get("_error") is None,
-    }
+    return _build_execution_context(
+        initial_data=user_data,
+        workflow_id=state.get("_workflow_id", str(uuid.uuid4())),
+        workflow_name=state.get("_workflow_name", ""),
+        current_node=state.get("_current_node", ""),
+        node_results=state.get("_node_results", {}),
+        error=state.get("_error"),
+        iteration=state.get("_iteration", 0),
+        visited_nodes=list(state.get("_node_results", {}).keys()),
+        parallel_results=state.get("_parallel_results", {}),
+        hitl_pending=state.get("_hitl_pending", False),
+        hitl_response=state.get("_hitl_response"),
+        success=state.get("_error") is None,
+    )
 
 
 def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
@@ -576,6 +598,7 @@ def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
 
     # Add system fields
     state["_workflow_id"] = ctx.get("_workflow_id", "")
+    state["_workflow_name"] = ctx.get("_workflow_name", "")
     state["_current_node"] = ctx.get("_current_node", "")
     state["_node_results"] = ctx.get("_node_results", {})
     state["_error"] = ctx.get("_error")
@@ -596,25 +619,17 @@ def from_adapter_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     Returns:
         ExecutionContext with data migrated
     """
-    return {
-        "data": state.get("context", {}),
-        "messages": state.get("messages", []),
-        "_workflow_id": str(uuid.uuid4()),
-        "_workflow_name": "",
-        "_current_node": state.get("current_node", ""),
-        "_node_results": state.get("results", {}),
-        "_error": state.get("error"),
-        "_iteration": 0,
-        "_visited_nodes": state.get("visited_nodes", []),
-        "_parallel_results": {},
-        "_hitl_pending": False,
-        "_hitl_response": None,
-        "_as_of_date": None,
-        "_lookback_periods": None,
-        "_include_end_date": True,
-        "_is_complete": state.get("is_complete", False),
-        "_success": state.get("error") is None,
-    }
+    return _build_execution_context(
+        initial_data=state.get("context", {}),
+        messages=state.get("messages", []),
+        workflow_id=str(uuid.uuid4()),
+        current_node=state.get("current_node", ""),
+        node_results=state.get("results", {}),
+        error=state.get("error"),
+        visited_nodes=state.get("visited_nodes", []),
+        is_complete=state.get("is_complete", False),
+        success=state.get("error") is None,
+    )
 
 
 def to_adapter_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:

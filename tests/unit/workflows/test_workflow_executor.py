@@ -1,5 +1,7 @@
 """Tests for WorkflowExecutor."""
 
+from __future__ import annotations
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -146,3 +148,66 @@ class TestWorkflowExecutorInit:
                         )
 
         assert captured_ctx.get("files") == ["main.py"]
+
+
+class TestWorkflowExecutorChainHandlers:
+    @pytest.mark.asyncio
+    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_invoke(self, executor):
+        node = MagicMock()
+        node.id = "compute_sync_invoke"
+        node.output_key = "chain_output"
+        node.input_mapping = {"payload": "value"}
+        context = WorkflowContext(data={"value": 42})
+
+        chain_obj = MagicMock()
+        chain_obj.invoke = MagicMock(return_value={"result": "ok"})
+        registry = MagicMock()
+        registry.create.return_value = chain_obj
+
+        async def call_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        with (
+            patch("victor.workflows.executor.get_chain_registry", return_value=registry),
+            patch("victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+        ):
+            result = await executor._execute_chain_handler(node, context, "analysis_chain", 0.0)
+
+        assert result.status is ExecutorNodeStatus.COMPLETED
+        assert result.output == {"result": "ok"}
+        assert context.get("chain_output") == {"result": "ok"}
+        mock_to_thread.assert_awaited_once()
+        called = mock_to_thread.await_args
+        assert called.args[0] is chain_obj.invoke
+        assert called.args[1] == {"payload": 42}
+
+    @pytest.mark.asyncio
+    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_callable(self, executor):
+        node = MagicMock()
+        node.id = "compute_sync_callable"
+        node.output_key = "callable_output"
+        node.input_mapping = {"payload": "value"}
+        context = WorkflowContext(data={"value": "repo"})
+
+        def sync_chain(**kwargs):
+            return {"seen": kwargs}
+
+        registry = MagicMock()
+        registry.create.return_value = sync_chain
+
+        async def call_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        with (
+            patch("victor.workflows.executor.get_chain_registry", return_value=registry),
+            patch("victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+        ):
+            result = await executor._execute_chain_handler(node, context, "callable_chain", 0.0)
+
+        assert result.status is ExecutorNodeStatus.COMPLETED
+        assert result.output == {"seen": {"payload": "repo"}}
+        assert context.get("callable_output") == {"seen": {"payload": "repo"}}
+        mock_to_thread.assert_awaited_once()
+        called = mock_to_thread.await_args
+        assert called.args[0] is sync_chain
+        assert called.kwargs == {"payload": "repo"}

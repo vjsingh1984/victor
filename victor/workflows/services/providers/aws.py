@@ -176,7 +176,6 @@ class AWSServiceProvider(BaseServiceProvider):
     async def _start_rds(self, config: ServiceConfig) -> ServiceHandle:
         """Start or connect to RDS instance."""
         handle = ServiceHandle.create(config)
-        loop = asyncio.get_event_loop()
 
         rds = self.session.client("rds")
         instance_id = config.aws_cluster_id or f"victor-{config.name}"
@@ -184,9 +183,9 @@ class AWSServiceProvider(BaseServiceProvider):
         try:
             # Check if instance exists
             try:
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: rds.describe_db_instances(DBInstanceIdentifier=instance_id),
+                response = await asyncio.to_thread(
+                    rds.describe_db_instances,
+                    DBInstanceIdentifier=instance_id,
                 )
                 instance = response["DBInstances"][0]
                 status = instance["DBInstanceStatus"]
@@ -195,9 +194,9 @@ class AWSServiceProvider(BaseServiceProvider):
                     logger.info(f"RDS instance '{instance_id}' already available")
                 elif status == "stopped":
                     logger.info(f"Starting stopped RDS instance '{instance_id}'")
-                    await loop.run_in_executor(
-                        None,
-                        lambda: rds.start_db_instance(DBInstanceIdentifier=instance_id),
+                    await asyncio.to_thread(
+                        rds.start_db_instance,
+                        DBInstanceIdentifier=instance_id,
                     )
                     await self._wait_for_rds_available(rds, instance_id)
                 else:
@@ -205,9 +204,9 @@ class AWSServiceProvider(BaseServiceProvider):
                     await self._wait_for_rds_available(rds, instance_id)
 
                 # Refresh instance info
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: rds.describe_db_instances(DBInstanceIdentifier=instance_id),
+                response = await asyncio.to_thread(
+                    rds.describe_db_instances,
+                    DBInstanceIdentifier=instance_id,
                 )
                 instance = response["DBInstances"][0]
 
@@ -253,8 +252,6 @@ class AWSServiceProvider(BaseServiceProvider):
         instance_id: str,
     ) -> Dict[str, Any]:
         """Create a new RDS instance."""
-        loop = asyncio.get_event_loop()
-
         params = {
             "DBInstanceIdentifier": instance_id,
             "DBInstanceClass": config.aws_instance_class or "db.t3.micro",
@@ -275,15 +272,15 @@ class AWSServiceProvider(BaseServiceProvider):
         if config.aws_engine_version:
             params["EngineVersion"] = config.aws_engine_version
 
-        await loop.run_in_executor(None, lambda: rds.create_db_instance(**params))
+        await asyncio.to_thread(rds.create_db_instance, **params)
 
         # Wait for instance to be available
         await self._wait_for_rds_available(rds, instance_id)
 
         # Get instance details
-        response = await loop.run_in_executor(
-            None,
-            lambda: rds.describe_db_instances(DBInstanceIdentifier=instance_id),
+        response = await asyncio.to_thread(
+            rds.describe_db_instances,
+            DBInstanceIdentifier=instance_id,
         )
         return response["DBInstances"][0]
 
@@ -294,25 +291,20 @@ class AWSServiceProvider(BaseServiceProvider):
         timeout: int = 900,
     ) -> None:
         """Wait for RDS instance to become available."""
-        loop = asyncio.get_event_loop()
-
         logger.info(f"Waiting for RDS instance '{instance_id}' to be available...")
 
         waiter = rds.get_waiter("db_instance_available")
         try:
-            await loop.run_in_executor(
-                None,
-                lambda: waiter.wait(
-                    DBInstanceIdentifier=instance_id,
-                    WaiterConfig={"Delay": 30, "MaxAttempts": timeout // 30},
-                ),
+            await asyncio.to_thread(
+                waiter.wait,
+                DBInstanceIdentifier=instance_id,
+                WaiterConfig={"Delay": 30, "MaxAttempts": timeout // 30},
             )
         except WaiterError as e:
             raise ServiceHealthError(instance_id, f"RDS instance not available: {e}")
 
     async def _stop_rds(self, handle: ServiceHandle) -> None:
         """Stop RDS instance (doesn't delete)."""
-        loop = asyncio.get_event_loop()
         rds = self.session.client("rds")
         instance_id = handle.metadata.get("instance_id")
 
@@ -321,9 +313,9 @@ class AWSServiceProvider(BaseServiceProvider):
 
         try:
             logger.info(f"Stopping RDS instance '{instance_id}'")
-            await loop.run_in_executor(
-                None,
-                lambda: rds.stop_db_instance(DBInstanceIdentifier=instance_id),
+            await asyncio.to_thread(
+                rds.stop_db_instance,
+                DBInstanceIdentifier=instance_id,
             )
         except ClientError as e:
             if "InvalidDBInstanceState" not in str(e):
@@ -336,7 +328,6 @@ class AWSServiceProvider(BaseServiceProvider):
     async def _start_elasticache(self, config: ServiceConfig) -> ServiceHandle:
         """Start or connect to ElastiCache cluster."""
         handle = ServiceHandle.create(config)
-        loop = asyncio.get_event_loop()
 
         elasticache = self.session.client("elasticache")
         cluster_id = config.aws_cluster_id or f"victor-{config.name}"
@@ -344,12 +335,10 @@ class AWSServiceProvider(BaseServiceProvider):
         try:
             # Check if cluster exists
             try:
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: elasticache.describe_cache_clusters(
-                        CacheClusterId=cluster_id,
-                        ShowCacheNodeInfo=True,
-                    ),
+                response = await asyncio.to_thread(
+                    elasticache.describe_cache_clusters,
+                    CacheClusterId=cluster_id,
+                    ShowCacheNodeInfo=True,
                 )
                 cluster = response["CacheClusters"][0]
                 status = cluster["CacheClusterStatus"]
@@ -360,12 +349,10 @@ class AWSServiceProvider(BaseServiceProvider):
                     await self._wait_for_elasticache_available(elasticache, cluster_id)
 
                     # Refresh
-                    response = await loop.run_in_executor(
-                        None,
-                        lambda: elasticache.describe_cache_clusters(
-                            CacheClusterId=cluster_id,
-                            ShowCacheNodeInfo=True,
-                        ),
+                    response = await asyncio.to_thread(
+                        elasticache.describe_cache_clusters,
+                        CacheClusterId=cluster_id,
+                        ShowCacheNodeInfo=True,
                     )
                     cluster = response["CacheClusters"][0]
 
@@ -413,8 +400,6 @@ class AWSServiceProvider(BaseServiceProvider):
         cluster_id: str,
     ) -> Dict[str, Any]:
         """Create a new ElastiCache cluster."""
-        loop = asyncio.get_event_loop()
-
         params = {
             "CacheClusterId": cluster_id,
             "Engine": "redis",
@@ -426,18 +411,16 @@ class AWSServiceProvider(BaseServiceProvider):
             ],
         }
 
-        await loop.run_in_executor(None, lambda: elasticache.create_cache_cluster(**params))
+        await asyncio.to_thread(elasticache.create_cache_cluster, **params)
 
         # Wait for cluster to be available
         await self._wait_for_elasticache_available(elasticache, cluster_id)
 
         # Get cluster details
-        response = await loop.run_in_executor(
-            None,
-            lambda: elasticache.describe_cache_clusters(
-                CacheClusterId=cluster_id,
-                ShowCacheNodeInfo=True,
-            ),
+        response = await asyncio.to_thread(
+            elasticache.describe_cache_clusters,
+            CacheClusterId=cluster_id,
+            ShowCacheNodeInfo=True,
         )
         return response["CacheClusters"][0]
 
@@ -448,18 +431,14 @@ class AWSServiceProvider(BaseServiceProvider):
         timeout: int = 600,
     ) -> None:
         """Wait for ElastiCache cluster to become available."""
-        loop = asyncio.get_event_loop()
-
         logger.info(f"Waiting for ElastiCache cluster '{cluster_id}' to be available...")
 
         waiter = elasticache.get_waiter("cache_cluster_available")
         try:
-            await loop.run_in_executor(
-                None,
-                lambda: waiter.wait(
-                    CacheClusterId=cluster_id,
-                    WaiterConfig={"Delay": 15, "MaxAttempts": timeout // 15},
-                ),
+            await asyncio.to_thread(
+                waiter.wait,
+                CacheClusterId=cluster_id,
+                WaiterConfig={"Delay": 15, "MaxAttempts": timeout // 15},
             )
         except WaiterError as e:
             raise ServiceHealthError(cluster_id, f"ElastiCache not available: {e}")
@@ -478,7 +457,6 @@ class AWSServiceProvider(BaseServiceProvider):
     async def _start_msk(self, config: ServiceConfig) -> ServiceHandle:
         """Connect to MSK cluster."""
         handle = ServiceHandle.create(config)
-        loop = asyncio.get_event_loop()
 
         kafka = self.session.client("kafka")
         cluster_arn = config.aws_cluster_id
@@ -488,9 +466,9 @@ class AWSServiceProvider(BaseServiceProvider):
 
         try:
             # Get bootstrap brokers
-            response = await loop.run_in_executor(
-                None,
-                lambda: kafka.get_bootstrap_brokers(ClusterArn=cluster_arn),
+            response = await asyncio.to_thread(
+                kafka.get_bootstrap_brokers,
+                ClusterArn=cluster_arn,
             )
 
             bootstrap_servers = response.get("BootstrapBrokerString")
@@ -526,7 +504,6 @@ class AWSServiceProvider(BaseServiceProvider):
     async def _start_dynamodb(self, config: ServiceConfig) -> ServiceHandle:
         """Ensure DynamoDB table exists."""
         handle = ServiceHandle.create(config)
-        loop = asyncio.get_event_loop()
 
         dynamodb = self.session.client("dynamodb")
         table_name = config.aws_db_name or config.name
@@ -534,9 +511,9 @@ class AWSServiceProvider(BaseServiceProvider):
         try:
             # Check if table exists
             try:
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: dynamodb.describe_table(TableName=table_name),
+                response = await asyncio.to_thread(
+                    dynamodb.describe_table,
+                    TableName=table_name,
                 )
                 status = response["Table"]["TableStatus"]
 
@@ -544,9 +521,9 @@ class AWSServiceProvider(BaseServiceProvider):
                     logger.info(f"DynamoDB table '{table_name}' in state: {status}")
                     # Wait for active
                     waiter = dynamodb.get_waiter("table_exists")
-                    await loop.run_in_executor(
-                        None,
-                        lambda: waiter.wait(TableName=table_name),
+                    await asyncio.to_thread(
+                        waiter.wait,
+                        TableName=table_name,
                     )
 
             except ClientError as e:
@@ -579,7 +556,6 @@ class AWSServiceProvider(BaseServiceProvider):
     async def _start_sqs(self, config: ServiceConfig) -> ServiceHandle:
         """Ensure SQS queue exists and get URL."""
         handle = ServiceHandle.create(config)
-        loop = asyncio.get_event_loop()
 
         sqs = self.session.client("sqs")
         queue_name = config.aws_db_name or config.name
@@ -587,21 +563,19 @@ class AWSServiceProvider(BaseServiceProvider):
         try:
             # Get queue URL (creates if doesn't exist with these attributes)
             try:
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: sqs.get_queue_url(QueueName=queue_name),
+                response = await asyncio.to_thread(
+                    sqs.get_queue_url,
+                    QueueName=queue_name,
                 )
                 queue_url = response["QueueUrl"]
             except ClientError as e:
                 if "NonExistentQueue" in str(e):
                     # Create queue
                     logger.info(f"Creating SQS queue '{queue_name}'")
-                    response = await loop.run_in_executor(
-                        None,
-                        lambda: sqs.create_queue(
-                            QueueName=queue_name,
-                            tags={"victor:managed": "true"},
-                        ),
+                    response = await asyncio.to_thread(
+                        sqs.create_queue,
+                        QueueName=queue_name,
+                        tags={"victor:managed": "true"},
                     )
                     queue_url = response["QueueUrl"]
                 else:

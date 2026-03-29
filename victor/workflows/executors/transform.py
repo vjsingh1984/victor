@@ -110,7 +110,7 @@ class TransformNodeExecutor:
                 duration_seconds=time.time() - start_time,
             )
 
-            raise
+            return state
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if this executor supports the given node type."""

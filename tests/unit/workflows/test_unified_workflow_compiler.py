@@ -1589,3 +1589,69 @@ class TestCachedCompiledGraph:
 
         schema = cached.get_graph_schema()
         assert isinstance(schema, dict)
+
+    @pytest.mark.asyncio
+    async def test_cached_graph_invoke_uses_shared_initial_state(self):
+        """CachedCompiledGraph should seed execution with the canonical state shape."""
+        from victor.workflows.unified_compiler import CachedCompiledGraph
+
+        captured: Dict[str, Any] = {}
+
+        class FakeCompiledGraph:
+            async def invoke(self, state, *, config=None, thread_id=None):
+                captured["state"] = state
+                captured["thread_id"] = thread_id
+                return MagicMock(
+                    success=True,
+                    state=state,
+                    error=None,
+                    node_history=[],
+                    iterations=0,
+                )
+
+        cached = CachedCompiledGraph(
+            compiled_graph=FakeCompiledGraph(),
+            workflow_name="test_workflow",
+            max_iterations=17,
+        )
+
+        result = await cached.invoke({"input": "value"}, thread_id="thread-123")
+
+        assert result.success is True
+        assert captured["thread_id"] == "thread-123"
+        assert captured["state"]["_workflow_id"]
+        assert captured["state"]["_workflow_name"] == "test_workflow"
+        assert captured["state"]["_current_node"] == ""
+        assert captured["state"]["_node_results"] == {}
+        assert captured["state"]["_parallel_results"] == {}
+        assert captured["state"]["_hitl_pending"] is False
+        assert captured["state"]["_hitl_response"] is None
+        assert captured["state"]["_max_iterations"] == 17
+        assert captured["state"]["input"] == "value"
+
+    def test_prepare_state_preserves_existing_workflow_metadata(self):
+        """CachedCompiledGraph should not overwrite caller-provided metadata."""
+        from victor.workflows.unified_compiler import CachedCompiledGraph
+
+        cached = CachedCompiledGraph(
+            compiled_graph=MagicMock(),
+            workflow_name="fallback_workflow",
+        )
+
+        prepared = cached._prepare_state(
+            {
+                "_workflow_id": "wf-123",
+                "_workflow_name": "provided_workflow",
+                "_current_node": "step1",
+                "_node_results": {"step1": {"success": True}},
+                "_parallel_results": {"branch": {"done": True}},
+                "input": "value",
+            }
+        )
+
+        assert prepared["_workflow_id"] == "wf-123"
+        assert prepared["_workflow_name"] == "provided_workflow"
+        assert prepared["_current_node"] == "step1"
+        assert prepared["_node_results"] == {"step1": {"success": True}}
+        assert prepared["_parallel_results"] == {"branch": {"done": True}}
+        assert prepared["input"] == "value"

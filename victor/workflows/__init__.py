@@ -206,6 +206,7 @@ from victor.workflows.executors import (
 from victor.workflows.runtime_types import (
     WorkflowState,
     GraphNodeResult as CompiledGraphNodeResult,
+    create_initial_workflow_state,
 )
 from victor.workflows.unified_executor import (
     ExecutorConfig,
@@ -475,6 +476,7 @@ __all__ = [
     # YAML to StateGraph Compiler
     "WorkflowState",
     "CompiledGraphNodeResult",
+    "create_initial_workflow_state",
     "CompilerConfig",
     "YAMLToStateGraphCompiler",
     "NodeExecutorFactory",

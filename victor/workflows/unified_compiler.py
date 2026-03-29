@@ -53,7 +53,6 @@ import hashlib
 import json
 import logging
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -73,6 +72,10 @@ from typing import (
 )
 
 from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
+from victor.workflows.runtime_types import (
+    GraphNodeResult as NodeExecutionResult,
+    create_initial_workflow_state,
+)
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -139,30 +142,7 @@ class UnifiedCompilerConfig:
     enable_checkpointing: bool = True
 
 
-# =============================================================================
-# Node Execution Result
-# =============================================================================
-
-
-@dataclass
-class NodeExecutionResult:
-    """Result from executing a workflow node.
-
-    Attributes:
-        node_id: ID of the executed node
-        success: Whether execution succeeded
-        output: Output data from the node
-        error: Error message if failed
-        duration_seconds: Execution time
-        tool_calls_used: Number of tool calls made
-    """
-
-    node_id: str
-    success: bool
-    output: Any = None
-    error: Optional[str] = None
-    duration_seconds: float = 0.0
-    tool_calls_used: int = 0
+# `NodeExecutionResult` remains exported here as a deprecated compatibility alias.
 
 
 # =============================================================================
@@ -364,15 +344,12 @@ class CachedCompiledGraph:
 
     def _prepare_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare initial state with workflow metadata."""
-        exec_state = dict(state)
-        if "_workflow_id" not in exec_state:
-            exec_state["_workflow_id"] = uuid.uuid4().hex
-        if "_workflow_name" not in exec_state:
-            exec_state["_workflow_name"] = self.workflow_name
-        if "_node_results" not in exec_state:
-            exec_state["_node_results"] = {}
-        if "_parallel_results" not in exec_state:
-            exec_state["_parallel_results"] = {}
+        exec_state = create_initial_workflow_state(
+            workflow_id=state.get("_workflow_id"),
+            workflow_name=state.get("_workflow_name", self.workflow_name),
+            current_node=state.get("_current_node", ""),
+            initial_state=state,
+        )
         return exec_state
 
     def get_graph_schema(self) -> Dict[str, Any]:
