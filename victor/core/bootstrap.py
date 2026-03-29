@@ -565,11 +565,26 @@ def _register_analytics_services(container: ServiceContainer, settings: Settings
 
 
 def _register_embedding_services(container: ServiceContainer, settings: Settings) -> None:
-    """Register embedding/ML services."""
+    """Register embedding/ML services.
+
+    Registers both the EmbeddingServiceProtocol (for protocol-based injection)
+    and the concrete EmbeddingService class (for direct injection), sharing
+    the same singleton instance via get_instance().
+    """
+    from victor.storage.embeddings.service import EmbeddingService
+
+    model_name = settings.unified_embedding_model
 
     container.register(
         EmbeddingServiceProtocol,
-        lambda c: LazyEmbeddingService(settings.unified_embedding_model),
+        lambda c: EmbeddingService.get_instance(model_name=model_name),
+        ServiceLifetime.SINGLETON,
+    )
+
+    # Also register the concrete class so components can inject it directly
+    container.register(
+        EmbeddingService,
+        lambda c: EmbeddingService.get_instance(model_name=model_name),
         ServiceLifetime.SINGLETON,
     )
 

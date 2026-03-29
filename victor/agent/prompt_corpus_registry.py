@@ -1115,9 +1115,9 @@ class PromptCorpusRegistry:
         """
         if self._embedding_model is None:
             try:
-                from victor.storage.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import get_embedding_service
 
-                self._embedding_model = EmbeddingService.get_instance()
+                self._embedding_model = get_embedding_service()
                 logger.info(
                     f"Using shared EmbeddingService singleton "
                     f"(model: {self._embedding_model.model_name})"

@@ -583,3 +583,38 @@ class EmbeddingService:
         # Dot product
         similarities = np.dot(corpus_norms, query_norm)
         return np.asarray(similarities)
+
+
+def get_embedding_service(
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+    device: Optional[str] = None,
+) -> "EmbeddingService":
+    """Get the EmbeddingService, preferring DI container over singleton.
+
+    Resolution order:
+    1. DI container (if bootstrapped and service registered)
+    2. Singleton via EmbeddingService.get_instance()
+
+    This function provides a migration path away from the singleton pattern.
+    New code should inject EmbeddingService via constructor parameters or
+    the DI container directly.
+
+    Args:
+        model_name: Model name (only used if creating a new instance).
+        device: Device (only used if creating a new instance).
+
+    Returns:
+        EmbeddingService instance.
+    """
+    try:
+        from victor.core.container import get_container
+
+        container = get_container()
+        if container is not None:
+            service = container.get_optional(EmbeddingService)
+            if service is not None:
+                return service
+    except Exception:
+        pass
+
+    return EmbeddingService.get_instance(model_name=model_name, device=device)

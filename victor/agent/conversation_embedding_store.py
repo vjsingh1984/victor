@@ -620,9 +620,9 @@ async def get_conversation_embedding_store(
 
     if _embedding_store is None:
         if embedding_service is None:
-            from victor.storage.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import get_embedding_service
 
-            embedding_service = EmbeddingService.get_instance()
+            embedding_service = get_embedding_service()
 
         _embedding_store = ConversationEmbeddingStore(embedding_service)
         await _embedding_store.initialize()

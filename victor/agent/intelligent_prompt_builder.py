@@ -608,9 +608,9 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             from victor.agent.conversation_embedding_store import (
                 get_conversation_embedding_store,
             )
-            from victor.storage.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import get_embedding_service
 
-            embedding_service = EmbeddingService.get_instance()
+            embedding_service = get_embedding_service()
             embedding_store = await get_conversation_embedding_store(embedding_service)
         except ImportError:
             logger.debug("[IntelligentPromptBuilder] Embedding services not available")

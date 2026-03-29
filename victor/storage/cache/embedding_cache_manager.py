@@ -416,13 +416,13 @@ class EmbeddingCacheManager:
         Returns:
             Number of phrases indexed
         """
-        from victor.storage.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import get_embedding_service
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
         if progress_callback:
             progress_callback("Loading embedding model...")
 
-        service = EmbeddingService.get_instance()
+        service = get_embedding_service()
 
         if progress_callback:
             progress_callback("Rebuilding task classifiers...")

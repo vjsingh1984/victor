@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
-from victor.storage.embeddings.service import EmbeddingService
+from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -729,7 +729,7 @@ class IntentClassifier:
         from victor.config.settings import get_project_paths
 
         self.cache_dir = cache_dir or get_project_paths().global_embeddings_dir
-        self.embedding_service = embedding_service or EmbeddingService.get_instance()
+        self.embedding_service = embedding_service or get_embedding_service()
         self.continuation_threshold = continuation_threshold
         self.completion_threshold = completion_threshold
         self.asking_input_threshold = asking_input_threshold

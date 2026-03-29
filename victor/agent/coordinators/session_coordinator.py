@@ -685,14 +685,14 @@ class SessionCoordinator:
         pending_semantic_cache = None
 
         try:
-            from victor.storage.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import get_embedding_service
             from victor.agent.conversation_embedding_store import (
                 ConversationEmbeddingStore,
             )
             import victor.agent.conversation_embedding_store as ces_module
 
             # Get the shared embedding service
-            embedding_service = EmbeddingService.get_instance()
+            embedding_service = get_embedding_service()
 
             # Use singleton pattern - check if already exists
             if ces_module._embedding_store is not None:

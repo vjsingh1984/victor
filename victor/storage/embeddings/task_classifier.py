@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from victor.classification import TaskType, NudgeEngine, get_nudge_engine
 from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
-from victor.storage.embeddings.service import EmbeddingService
+from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 if TYPE_CHECKING:
     from victor.classification.nudge_engine import NudgeEngine as NudgeEngineType
@@ -1315,7 +1315,7 @@ class TaskTypeClassifier:
         from victor.config.settings import get_project_paths
 
         self.cache_dir = cache_dir or get_project_paths().global_embeddings_dir
-        self.embedding_service = embedding_service or EmbeddingService.get_instance()
+        self.embedding_service = embedding_service or get_embedding_service()
         self.threshold = threshold
         # Use injected NudgeEngine or get singleton from classification module
         self._nudge_engine = nudge_engine or get_nudge_engine()

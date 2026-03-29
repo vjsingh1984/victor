@@ -242,9 +242,9 @@ def _rebuild_tool_embeddings_sync() -> int:
 
 async def _rebuild_conversation_embeddings_async() -> int:
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-    from victor.storage.embeddings.service import EmbeddingService
+    from victor.storage.embeddings.service import get_embedding_service
 
-    embedding_service = EmbeddingService.get_instance()
+    embedding_service = get_embedding_service()
     store = ConversationEmbeddingStore(embedding_service)
     try:
         await store.initialize()

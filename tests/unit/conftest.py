@@ -45,3 +45,22 @@ def reset_api_keys_logger():
     logger.handlers = original_handlers
     logger.level = original_level
     logger.propagate = original_propagate
+
+
+@pytest.fixture(autouse=True)
+def reset_embedding_singleton():
+    """Reset EmbeddingService singleton between tests to prevent state leakage.
+
+    The singleton pattern means first caller wins model choice. Without
+    this fixture, test ordering can cause stale embeddings from a different
+    model to be returned.
+    """
+    yield
+    # Only import and reset if the module was loaded (avoid importing heavy deps)
+    import sys
+
+    if "victor.storage.embeddings.service" in sys.modules:
+        from victor.storage.embeddings.service import EmbeddingService
+
+        if EmbeddingService._instance is not None:
+            EmbeddingService.reset_instance()
