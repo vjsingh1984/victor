@@ -666,6 +666,15 @@ module = [
     "victor.ui.*",  # 73 files - Fixed 2 errors in init.py
 ]
 
+# Deferred explicit overrides from stash audit (2026-03-28):
+# These targets still fail current mypy validation and must remain covered
+# by the catch-all ignore block until their type debt is resolved.
+# - victor.verticals.contrib.coding.tools.graph_tool
+# - victor.verticals.contrib.coding.tools.language_analyzer
+# - victor.agent.orchestrator
+# - victor.processing.native.*
+# - victor.observability.dashboard.app
+
 # Remaining modules requiring type fixes
 [[tool.mypy.overrides]]
 module = [
