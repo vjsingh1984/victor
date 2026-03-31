@@ -18,20 +18,28 @@ This module holds the native extension availability flag and reference,
 shared by all submodules in victor.processing.native.
 """
 
+from __future__ import annotations
+
 import logging
+from types import ModuleType
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Try to import the native extension
 _NATIVE_AVAILABLE = False
-_native = None
+_native: ModuleType | None = None
 
 try:
-    import victor_native as _native
+    import victor_native as _victor_native
 
+    _native = _victor_native
     _NATIVE_AVAILABLE = True
-    logger.info(f"Native extensions loaded (version {_native.__version__})")
+    version = getattr(_native, "__version__", None)
+    if isinstance(version, str):
+        logger.info("Native extensions loaded (version %s)", version)
+    else:
+        logger.info("Native extensions loaded")
 except ImportError:
     logger.debug("Native extensions not available, using pure Python fallback")
 
@@ -43,6 +51,10 @@ def is_native_available() -> bool:
 
 def get_native_version() -> Optional[str]:
     """Get the version of the native extension, if available."""
-    if _NATIVE_AVAILABLE:
-        return _native.__version__
+    if _native is not None:
+        version = getattr(_native, "__version__", None)
+        if isinstance(version, str):
+            return version
+        if version is not None:
+            return str(version)
     return None
