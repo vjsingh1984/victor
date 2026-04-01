@@ -26,7 +26,9 @@ class TestCliPromptSession:
     def test_fallback_to_in_memory_on_error(self):
         from victor.ui.commands.chat import _create_cli_prompt_session
 
-        with patch("victor.config.settings.get_project_paths", side_effect=RuntimeError("no paths")):
+        with patch(
+            "victor.config.settings.get_project_paths", side_effect=RuntimeError("no paths")
+        ):
             # Should not raise — falls back to InMemoryHistory
             session = _create_cli_prompt_session()
             from prompt_toolkit.history import InMemoryHistory

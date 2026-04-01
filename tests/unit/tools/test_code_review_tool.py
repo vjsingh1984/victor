@@ -525,7 +525,9 @@ class TestHelperFunctions:
 
     def test_get_glob_patterns_for_languages_all(self):
         """Test getting glob patterns for all languages."""
-        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import (
+            _get_glob_patterns_for_languages,
+        )
 
         patterns = _get_glob_patterns_for_languages(None)
         assert len(patterns) > 0
@@ -533,28 +535,36 @@ class TestHelperFunctions:
 
     def test_get_glob_patterns_for_python(self):
         """Test getting glob patterns for Python."""
-        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import (
+            _get_glob_patterns_for_languages,
+        )
 
         patterns = _get_glob_patterns_for_languages(["python"])
         assert "*.py" in patterns
 
     def test_get_glob_patterns_for_javascript(self):
         """Test getting glob patterns for JavaScript."""
-        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import (
+            _get_glob_patterns_for_languages,
+        )
 
         patterns = _get_glob_patterns_for_languages(["javascript"])
         assert len(patterns) > 0
 
     def test_get_glob_patterns_unknown_language(self):
         """Test glob patterns default to Python for unknown language."""
-        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import (
+            _get_glob_patterns_for_languages,
+        )
 
         patterns = _get_glob_patterns_for_languages(["unknown_xyz"])
         assert patterns == ["*.py"]
 
     def test_get_glob_patterns_multiple_languages(self):
         """Test glob patterns for multiple languages."""
-        from victor.verticals.contrib.coding.tools.code_review_tool import _get_glob_patterns_for_languages
+        from victor.verticals.contrib.coding.tools.code_review_tool import (
+            _get_glob_patterns_for_languages,
+        )
 
         patterns = _get_glob_patterns_for_languages(["python", "javascript"])
         assert len(patterns) >= 2

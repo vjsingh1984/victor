@@ -132,7 +132,9 @@ class TestWorkflowParser:
             "beta": _make_workflow("beta"),
         }
         parser = WorkflowParser(loader)
-        request = WorkflowCompilationRequest(source="workflows:\n  alpha: {}\n  beta: {}", validate=True)
+        request = WorkflowCompilationRequest(
+            source="workflows:\n  alpha: {}\n  beta: {}", validate=True
+        )
 
         with pytest.raises(ValueError, match="Multiple workflows found"):
             parser.parse(request)
@@ -233,9 +235,10 @@ class TestNativeWorkflowGraphCompiler:
         assert native_result.state["a"] == legacy_result.state["a"]
         assert native_result.state["b"] == legacy_result.state["b"]
         assert native_result.state["finished"] == legacy_result.state["finished"] is True
-        assert native_result.state["_parallel_results"].keys() == legacy_result.state[
-            "_parallel_results"
-        ].keys()
+        assert (
+            native_result.state["_parallel_results"].keys()
+            == legacy_result.state["_parallel_results"].keys()
+        )
 
     def test_native_graph_compiler_rejects_unregistered_node_types(self) -> None:
         unknown = SimpleNamespace(

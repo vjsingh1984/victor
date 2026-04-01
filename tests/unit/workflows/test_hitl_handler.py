@@ -33,7 +33,9 @@ async def test_default_hitl_handler_uses_to_thread_for_approval_prompt() -> None
 
     with (
         patch("builtins.input", return_value="y") as mock_input,
-        patch("victor.workflows.hitl.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+        patch(
+            "victor.workflows.hitl.asyncio.to_thread", side_effect=call_to_thread
+        ) as mock_to_thread,
     ):
         response = await handler.request_human_input(_request(HITLNodeType.APPROVAL))
 
@@ -54,7 +56,9 @@ async def test_default_hitl_handler_uses_to_thread_for_freeform_input() -> None:
 
     with (
         patch("builtins.input", return_value=" ship it ") as mock_input,
-        patch("victor.workflows.hitl.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+        patch(
+            "victor.workflows.hitl.asyncio.to_thread", side_effect=call_to_thread
+        ) as mock_to_thread,
     ):
         response = await handler.request_human_input(_request(HITLNodeType.INPUT))
 

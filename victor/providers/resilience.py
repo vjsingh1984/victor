@@ -749,14 +749,14 @@ class ResilientProvider:
             # Build augmented messages for fallback with partial content
             fallback_messages = list(messages)
             if partial_content:
-                collected = "".join(
-                    getattr(c, "content", "") or "" for c in partial_content
-                )
+                collected = "".join(getattr(c, "content", "") or "" for c in partial_content)
                 if collected.strip():
-                    fallback_messages.append({
-                        "role": "assistant",
-                        "content": collected,
-                    })
+                    fallback_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": collected,
+                        }
+                    )
                     logger.info(
                         "Passing %d chars of partial content to fallback",
                         len(collected),
@@ -767,9 +767,7 @@ class ResilientProvider:
                 fb_name = getattr(fallback, "name", "unknown")
                 try:
                     logger.info(f"Trying fallback stream: {fb_name}")
-                    stream = fallback.stream(
-                        fallback_messages, model=model, **kwargs
-                    )
+                    stream = fallback.stream(fallback_messages, model=model, **kwargs)
                     async for chunk in stream:
                         yield chunk
                     self._stats["fallback_successes"] += 1

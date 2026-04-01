@@ -60,29 +60,15 @@ class TestVerticalMetadata:
 
     def test_extract_name_from_classname_assistant_suffix(self):
         """Test name extraction from class names with 'Assistant' suffix."""
-        assert (
-            VerticalMetadata._extract_name_from_classname("CodingAssistant") == "coding"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("DevOpsAssistant")
-            == "devops"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("ResearchAssistant")
-            == "research"
-        )
+        assert VerticalMetadata._extract_name_from_classname("CodingAssistant") == "coding"
+        assert VerticalMetadata._extract_name_from_classname("DevOpsAssistant") == "devops"
+        assert VerticalMetadata._extract_name_from_classname("ResearchAssistant") == "research"
 
     def test_extract_name_from_classname_vertical_suffix(self):
         """Test name extraction from class names with 'Vertical' suffix."""
-        assert (
-            VerticalMetadata._extract_name_from_classname("CodingVertical") == "coding"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("DevOpsVertical") == "devops"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("RAGVertical") == "rag"
-        )
+        assert VerticalMetadata._extract_name_from_classname("CodingVertical") == "coding"
+        assert VerticalMetadata._extract_name_from_classname("DevOpsVertical") == "devops"
+        assert VerticalMetadata._extract_name_from_classname("RAGVertical") == "rag"
 
     def test_extract_name_from_classname_no_suffix_emits_warning(self):
         """Test that classes without recognized suffixes emit deprecation warning."""
@@ -174,6 +160,7 @@ class TestVerticalMetadata:
 
     def test_is_contrib_detection(self):
         """Test detection of contrib verticals."""
+
         # Create a mock contrib vertical
         class ContribVertical(MockVerticalBase):
             pass
@@ -186,6 +173,7 @@ class TestVerticalMetadata:
 
     def test_is_external_detection(self):
         """Test detection of external verticals."""
+
         # Create a mock external vertical
         class ExternalVertical(MockVerticalBase):
             pass
@@ -232,10 +220,12 @@ class TestVerticalMetadata:
 
     def test_multiple_suffixes_priority(self):
         """Test that Assistant suffix has priority over Vertical suffix."""
+
         # This is unlikely in practice but tests the priority logic
         # Assistant suffix is checked first, so "AssistantVertical" -> "assistant"
         class AssistantVertical(MockVerticalBase):
             """Has both suffixes."""
+
             pass
 
         # Should detect "Assistant" first (priority order in code)
@@ -282,6 +272,7 @@ class TestVerticalMetadataIntegration:
 
     def test_metadata_preserves_all_attributes(self):
         """Test that metadata preserves all important class attributes."""
+
         class CompleteVertical(MockVerticalBase):
             name = "complete"
             version = "2.3.4"
@@ -297,6 +288,7 @@ class TestVerticalMetadataIntegration:
 
     def test_metadata_with_module_and_qualname(self):
         """Test that metadata correctly captures module and qualname."""
+
         class OuterClass:
             class InnerVertical(MockVerticalBase):
                 name = "inner"

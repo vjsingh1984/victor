@@ -772,8 +772,7 @@ class VerticalRegistry:
                 elif existing_is_contrib and not new_is_contrib:
                     # External overriding contrib — expected upgrade
                     logger.info(
-                        "External vertical '%s' (%s) overrides deprecated "
-                        "contrib version (%s).",
+                        "External vertical '%s' (%s) overrides deprecated " "contrib version (%s).",
                         name,
                         new_module,
                         existing_module,

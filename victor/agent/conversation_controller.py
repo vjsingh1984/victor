@@ -684,9 +684,7 @@ class ConversationController:
 
         # Fallback: direct insertion (backward compat)
         if len(self.messages) > 1:
-            reminder_msg = Message(
-                role="assistant", content=f"[Context reminder: {combined}]"
-            )
+            reminder_msg = Message(role="assistant", content=f"[Context reminder: {combined}]")
             self._history._messages.insert(1, reminder_msg)
             logger.debug(f"Injected compaction context: {combined[:100]}...")
             return True

@@ -104,7 +104,6 @@ logger = logging.getLogger(__name__)
 # Re-export from canonical location for backward compatibility
 from victor.core.shared_types import ConversationStage  # noqa: F401
 
-
 # Stage ordering for adjacency calculations (since values are strings, not ints)
 STAGE_ORDER: Dict[ConversationStage, int] = {
     stage: idx for idx, stage in enumerate(ConversationStage)

@@ -114,7 +114,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: should be fast even with 50 nodes
-        assert duration_ms < 15, f"Topological sort with 50 nodes took {duration_ms:.2f}ms, target < 15ms"
+        assert (
+            duration_ms < 15
+        ), f"Topological sort with 50 nodes took {duration_ms:.2f}ms, target < 15ms"
 
         # Verify all nodes are included
         assert len(load_order.order) == 50
@@ -133,7 +135,9 @@ class TestDependencyResolutionPerformance:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Assert: priority sorting should be fast
-        assert duration_ms < 5, f"Priority sorting with 50 nodes took {duration_ms:.2f}ms, target < 5ms"
+        assert (
+            duration_ms < 5
+        ), f"Priority sorting with 50 nodes took {duration_ms:.2f}ms, target < 5ms"
 
     def test_cycle_detection_performance(self):
         """Test circular dependency detection performance."""
@@ -265,7 +269,9 @@ class TestDependencyGraphScalability:
         duration_ms = (time.perf_counter() - start) * 1000
 
         # Should be very fast (idempotent operations)
-        assert duration_ms < 10, f"100 idempotent operations took {duration_ms:.2f}ms, target < 10ms"
+        assert (
+            duration_ms < 10
+        ), f"100 idempotent operations took {duration_ms:.2f}ms, target < 10ms"
 
 
 if __name__ == "__main__":

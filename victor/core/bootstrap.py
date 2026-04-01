@@ -351,29 +351,19 @@ _BOOTSTRAP_PHASES = [
         depends_on=("core", "events", "analytics", "embedding"),
     ),
     BootstrapPhase("capabilities", _phase_capabilities, depends_on=("plugins",)),
-    BootstrapPhase(
-        "coding", _phase_coding, depends_on=("capabilities",), optional=True
-    ),
+    BootstrapPhase("coding", _phase_coding, depends_on=("capabilities",), optional=True),
     BootstrapPhase("signature", _phase_signature, depends_on=("settings",)),
-    BootstrapPhase(
-        "orchestrator", _phase_orchestrator, depends_on=("capabilities",)
-    ),
-    BootstrapPhase(
-        "solid", _phase_solid, depends_on=("orchestrator",), optional=True
-    ),
+    BootstrapPhase("orchestrator", _phase_orchestrator, depends_on=("capabilities",)),
+    BootstrapPhase("solid", _phase_solid, depends_on=("orchestrator",), optional=True),
     BootstrapPhase("workflow", _phase_workflow, depends_on=("settings",)),
-    BootstrapPhase(
-        "compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)
-    ),
+    BootstrapPhase("compiler_plugins", _phase_compiler_plugins, depends_on=("settings",)),
     BootstrapPhase("extensions", _phase_extensions, depends_on=("events",)),
     BootstrapPhase(
         "vertical",
         _phase_vertical,
         depends_on=("capabilities", "orchestrator"),
     ),
-    BootstrapPhase(
-        "overrides", _phase_overrides, depends_on=("vertical",)
-    ),
+    BootstrapPhase("overrides", _phase_overrides, depends_on=("vertical",)),
     BootstrapPhase("finalize", _phase_finalize, depends_on=("overrides",)),
 ]
 

@@ -120,12 +120,20 @@ class VerticalMetadata:
                             name=name,
                             canonical_name=cls._normalize_name(name),
                             display_name=cls._make_display_name(name),
-                            version=manifest.get("version", getattr(vertical_class, "version", "1.0.0")),
-                            api_version=manifest.get("api_version", getattr(vertical_class, "VERTICAL_API_VERSION", 1)),
+                            version=manifest.get(
+                                "version", getattr(vertical_class, "version", "1.0.0")
+                            ),
+                            api_version=manifest.get(
+                                "api_version", getattr(vertical_class, "VERTICAL_API_VERSION", 1)
+                            ),
                             module_path=getattr(vertical_class, "__module__", "<unknown>"),
-                            qualname=getattr(vertical_class, "__qualname__", vertical_class.__name__),
-                            is_contrib="verticals.contrib" in getattr(vertical_class, "__module__", ""),
-                            is_external="verticals.contrib" not in getattr(vertical_class, "__module__", ""),
+                            qualname=getattr(
+                                vertical_class, "__qualname__", vertical_class.__name__
+                            ),
+                            is_contrib="verticals.contrib"
+                            in getattr(vertical_class, "__module__", ""),
+                            is_external="verticals.contrib"
+                            not in getattr(vertical_class, "__module__", ""),
                         )
                 else:
                     # ExtensionManifest object
@@ -246,8 +254,7 @@ class VerticalMetadata:
         )
 
         logger.debug(
-            f"Using classname '{classname}' as vertical name "
-            f"(no recognized suffix pattern)"
+            f"Using classname '{classname}' as vertical name " f"(no recognized suffix pattern)"
         )
         return classname.lower()
 

@@ -36,11 +36,37 @@ _BUDGET_HINTS = {
 
 # Patterns: list of (compiled regex, QueryType) in priority order
 _QUERY_PATTERNS: List[Tuple[re.Pattern, QueryType]] = [
-    (re.compile(r"\b(what\s+is|how\s+does|explain|describe|tell\s+me\s+about|who\s+is|where\s+is|when\s+did)\b", re.IGNORECASE), QueryType.QUICK_QUESTION),
-    (re.compile(r"\b(explore|map|find\s+all|survey|list\s+all|trace|walk\s+through|scan)\b", re.IGNORECASE), QueryType.EXPLORATION),
-    (re.compile(r"\b(fix|debug|error|bug|crash|exception|traceback|failing|broken|not\s+working)\b", re.IGNORECASE), QueryType.DEBUGGING),
-    (re.compile(r"\b(review|evaluate|check|assess|audit|inspect|examine)\b", re.IGNORECASE), QueryType.REVIEW),
-    (re.compile(r"\b(implement|create|add|build|write|generate|make|develop|refactor)\b", re.IGNORECASE), QueryType.IMPLEMENTATION),
+    (
+        re.compile(
+            r"\b(what\s+is|how\s+does|explain|describe|tell\s+me\s+about|who\s+is|where\s+is|when\s+did)\b",
+            re.IGNORECASE,
+        ),
+        QueryType.QUICK_QUESTION,
+    ),
+    (
+        re.compile(
+            r"\b(explore|map|find\s+all|survey|list\s+all|trace|walk\s+through|scan)\b",
+            re.IGNORECASE,
+        ),
+        QueryType.EXPLORATION,
+    ),
+    (
+        re.compile(
+            r"\b(fix|debug|error|bug|crash|exception|traceback|failing|broken|not\s+working)\b",
+            re.IGNORECASE,
+        ),
+        QueryType.DEBUGGING,
+    ),
+    (
+        re.compile(r"\b(review|evaluate|check|assess|audit|inspect|examine)\b", re.IGNORECASE),
+        QueryType.REVIEW,
+    ),
+    (
+        re.compile(
+            r"\b(implement|create|add|build|write|generate|make|develop|refactor)\b", re.IGNORECASE
+        ),
+        QueryType.IMPLEMENTATION,
+    ),
 ]
 
 
@@ -66,6 +92,7 @@ class QueryClassifier:
         if self._complexity_service is not None:
             return self._complexity_service
         from victor.framework.task.complexity import TaskComplexityService
+
         self._complexity_service = TaskComplexityService(use_semantic=False, use_rl=False)
         return self._complexity_service
 

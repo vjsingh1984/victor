@@ -145,6 +145,7 @@ class TestAgentInit:
         assert agent._vertical_config is None
         assert agent._state is not None
         assert agent._state_observers == []
+
     def test_init_with_vertical(self, mock_orchestrator, mock_vertical):
         """Agent should store vertical and vertical_config when provided."""
         from victor.framework.agent import Agent

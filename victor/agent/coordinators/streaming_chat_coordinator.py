@@ -254,15 +254,11 @@ class StreamingChatCoordinator:
 
                 yield chunk
         except Exception as e:
-            logger.error(
-                "Stream failed after %d chunks: %s", len(content_parts), e
-            )
+            logger.error("Stream failed after %d chunks: %s", len(content_parts), e)
             if content_parts:
                 partial = "".join(content_parts)
                 # Add partial content to conversation so it's not lost
-                self._chat_context.add_message(
-                    "assistant", partial + "\n\n[Stream interrupted]"
-                )
+                self._chat_context.add_message("assistant", partial + "\n\n[Stream interrupted]")
             raise
 
         # Add complete assistant response to history

@@ -193,7 +193,11 @@ class AgentNodeExecutor:
                 return pool.get_default_orchestrator()
 
         # Fall back to service container if execution context exposes one
-        if self._context and hasattr(self._context, "services") and self._context.services is not None:
+        if (
+            self._context
+            and hasattr(self._context, "services")
+            and self._context.services is not None
+        ):
             from victor.workflows.orchestrator_pool import OrchestratorPool
 
             services = self._context.services

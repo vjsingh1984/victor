@@ -33,7 +33,9 @@ def test_run_sync_executes_coroutine_from_sync_context():
 @pytest.mark.asyncio
 async def test_run_sync_raises_from_async_context():
     """run_sync must reject nested event-loop usage."""
-    with pytest.raises(RuntimeError, match="Cannot use run_sync\\(\\) from within an async context"):
+    with pytest.raises(
+        RuntimeError, match="Cannot use run_sync\\(\\) from within an async context"
+    ):
         run_sync(_sample_value())
 
 

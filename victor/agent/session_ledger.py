@@ -301,9 +301,7 @@ class SessionLedger:
         Deduplicates by (category, key) pairs and merges files_read dicts.
         """
         with self._lock:
-            existing_keys = {
-                (e.category, e.key) for e in self._entries
-            }
+            existing_keys = {(e.category, e.key) for e in self._entries}
             for entry in other._entries:
                 if (entry.category, entry.key) not in existing_keys:
                     self._entries.append(entry)

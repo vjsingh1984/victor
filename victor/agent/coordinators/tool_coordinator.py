@@ -685,6 +685,7 @@ class ToolCoordinator:
         if not tool_calls:
             # All calls were hallucinated — return empty result
             from victor.agent.tool_pipeline import PipelineExecutionResult
+
             return PipelineExecutionResult(
                 results=[],
                 successful_calls=0,

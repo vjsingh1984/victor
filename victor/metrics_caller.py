@@ -14,8 +14,8 @@ normalizer = ArgumentNormalizer(provider_name="mock")
 # Sample arguments – some malformed, some correct
 samples = [
     {"operations": "[{'type': 'modify', 'path': 'file.txt'}]"},  # Python style quotes
-    {"json": "{'key': 'value'}"},                               # Invalid JSON
-    {"valid": {"foo": "bar"}},                                 # Already valid
+    {"json": "{'key': 'value'}"},  # Invalid JSON
+    {"valid": {"foo": "bar"}},  # Already valid
 ]
 
 for i, args in enumerate(samples, 1):

@@ -17,11 +17,13 @@ class TestDockerOperationWhitelist:
         mock_settings = MagicMock()
         mock_settings.docker_allow_dangerous_operations = False
 
-        with patch(
-            "victor.tools.docker_tool.check_docker_available", return_value=True
-        ), patch(
-            "victor.tools.docker_tool.get_settings", return_value=mock_settings,
-            create=True,
+        with (
+            patch("victor.tools.docker_tool.check_docker_available", return_value=True),
+            patch(
+                "victor.tools.docker_tool.get_settings",
+                return_value=mock_settings,
+                create=True,
+            ),
         ):
             # Patch the import inside the function
             with patch.dict(
@@ -40,11 +42,12 @@ class TestDockerOperationWhitelist:
     @pytest.mark.asyncio
     async def test_ps_allowed_by_default(self):
         """ps (a safe operation) should not be blocked regardless of settings."""
-        with patch(
-            "victor.tools.docker_tool.check_docker_available", return_value=True
-        ), patch(
-            "victor.tools.docker_tool._run_docker_command_async",
-            return_value=(True, "", ""),
+        with (
+            patch("victor.tools.docker_tool.check_docker_available", return_value=True),
+            patch(
+                "victor.tools.docker_tool._run_docker_command_async",
+                return_value=(True, "", ""),
+            ),
         ):
             result = await docker(operation="ps")
 
@@ -56,14 +59,16 @@ class TestDockerOperationWhitelist:
         mock_settings = MagicMock()
         mock_settings.docker_allow_dangerous_operations = True
 
-        with patch(
-            "victor.tools.docker_tool.check_docker_available", return_value=True
-        ), patch.dict(
-            "sys.modules",
-            {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
-        ), patch(
-            "victor.tools.docker_tool._run_docker_command_async",
-            return_value=(True, "output", ""),
+        with (
+            patch("victor.tools.docker_tool.check_docker_available", return_value=True),
+            patch.dict(
+                "sys.modules",
+                {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
+            ),
+            patch(
+                "victor.tools.docker_tool._run_docker_command_async",
+                return_value=(True, "output", ""),
+            ),
         ):
             result = await docker(
                 operation="exec",
@@ -80,15 +85,12 @@ class TestDockerOperationWhitelist:
         mock_settings.docker_allow_dangerous_operations = False
 
         for op in DANGEROUS_OPERATIONS:
-            with patch(
-                "victor.tools.docker_tool.check_docker_available", return_value=True
-            ), patch.dict(
-                "sys.modules",
-                {
-                    "victor.config.settings": MagicMock(
-                        get_settings=lambda: mock_settings
-                    )
-                },
+            with (
+                patch("victor.tools.docker_tool.check_docker_available", return_value=True),
+                patch.dict(
+                    "sys.modules",
+                    {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
+                ),
             ):
                 result = await docker(
                     operation=op,

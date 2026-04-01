@@ -16,8 +16,9 @@ def _provider() -> k8s_module.KubernetesServiceProvider:
         CoreV1Api=lambda api_client=None: MagicMock(),
         AppsV1Api=lambda api_client=None: MagicMock(),
     )
-    with patch.object(k8s_module, "K8S_AVAILABLE", True), patch.object(
-        k8s_module, "client", fake_client
+    with (
+        patch.object(k8s_module, "K8S_AVAILABLE", True),
+        patch.object(k8s_module, "client", fake_client),
     ):
         provider = k8s_module.KubernetesServiceProvider()
     provider._api_client = object()

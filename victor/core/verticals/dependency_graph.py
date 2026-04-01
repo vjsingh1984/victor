@@ -205,14 +205,18 @@ class ExtensionDependencyGraph:
                 if required:
                     raise ValueError(f"Required dependency '{dependency_name}' not in graph")
                 # Optional dependency - track it but don't fail
-                logger.debug(f"Optional dependency '{dependency_name}' not in graph for '{vertical_name}'")
+                logger.debug(
+                    f"Optional dependency '{dependency_name}' not in graph for '{vertical_name}'"
+                )
                 return
 
             # Add dependency relationship
             self._nodes[vertical_name].dependencies.add(dependency_name)
             self._nodes[dependency_name].dependents.add(vertical_name)
 
-            logger.debug(f"Added dependency: '{vertical_name}' -> '{dependency_name}' (required={required})")
+            logger.debug(
+                f"Added dependency: '{vertical_name}' -> '{dependency_name}' (required={required})"
+            )
 
     def get_dependencies(self, vertical_name: str) -> Set[str]:
         """Get dependencies for a vertical.

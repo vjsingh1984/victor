@@ -286,9 +286,7 @@ class FrameworkShim:
             session_id=self._session_id,
         )
 
-        logger.debug(
-            f"Wired observability: session_id={self._session_id}"
-        )
+        logger.debug(f"Wired observability: session_id={self._session_id}")
 
     # =========================================================================
     # Public Properties

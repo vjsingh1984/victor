@@ -190,9 +190,7 @@ class ProviderLogger:
 
         def _log_success(**kwargs: Any) -> None:
             _logged["done"] = True
-            self._log_api_call_success(
-                call_id, endpoint, model, start_time, **kwargs
-            )
+            self._log_api_call_success(call_id, endpoint, model, start_time, **kwargs)
 
         try:
             yield _log_success
@@ -203,7 +201,10 @@ class ProviderLogger:
             # Auto-log success if the provider didn't call the callback
             if not _logged["done"]:
                 self._log_api_call_success(
-                    call_id, endpoint, model, start_time,
+                    call_id,
+                    endpoint,
+                    model,
+                    start_time,
                 )
 
     def _log_api_call_success(
@@ -291,9 +292,7 @@ class ProviderLogger:
 
         # Tier 3: String fallback (for third-party exceptions)
         error_str = str(error).lower()
-        return any(
-            p in error_str for p in ("timeout", "rate limit", "connection reset")
-        )
+        return any(p in error_str for p in ("timeout", "rate limit", "connection reset"))
 
     def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """

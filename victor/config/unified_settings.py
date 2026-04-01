@@ -5,6 +5,7 @@ for backward compatibility. New code should import Settings directly:
 
     from victor.config.settings import Settings
 """
+
 from __future__ import annotations
 
 import logging

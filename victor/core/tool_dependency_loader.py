@@ -800,9 +800,7 @@ def create_vertical_tool_dependency_provider(
     _increment_resolution_stat("total_requests")
     vertical_name = normalize_vertical_name(vertical)
     effective_canonicalize = (
-        canonicalize
-        if canonicalize is not None
-        else get_canonicalization_setting(vertical_name)
+        canonicalize if canonicalize is not None else get_canonicalization_setting(vertical_name)
     )
     cache_key = (vertical_name, effective_canonicalize)
 
@@ -864,9 +862,7 @@ def create_vertical_tool_dependency_provider(
     # The registry will provide defaults for unknown verticals
     if not VerticalBehaviorConfigRegistry.has_config(vertical_name):
         # This is now informational, not an error - unknown verticals get defaults
-        logger.debug(
-            f"Vertical '{vertical_name}' has no explicit configuration, using defaults"
-        )
+        logger.debug(f"Vertical '{vertical_name}' has no explicit configuration, using defaults")
 
     # Fallback 2: package resource YAML (works for wheel/pip installs).
     checked_packages: List[str] = []

@@ -648,13 +648,9 @@ async def run_oneshot(
             if renderer_choice in {"rich-text", "text"}:
                 use_live = False
             renderer = (
-                LiveDisplayRenderer(console)
-                if use_live
-                else FormatterRenderer(formatter, console)
+                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
             )
-            await stream_response(
-                agent, message, renderer, suppress_thinking=not show_reasoning
-            )
+            await stream_response(agent, message, renderer, suppress_thinking=not show_reasoning)
         else:
             # Use streaming pipeline with BufferedRenderer to capture
             # tool calls and reasoning that agent.chat() would swallow
@@ -667,9 +663,7 @@ async def run_oneshot(
                 show_reasoning=show_reasoning,
                 plain=formatter._plain if hasattr(formatter, "_plain") else False,
             )
-            await stream_response(
-                agent, message, buffered, suppress_thinking=not show_reasoning
-            )
+            await stream_response(agent, message, buffered, suppress_thinking=not show_reasoning)
             buffered.flush(console)
 
         success = True
@@ -911,8 +905,7 @@ def _create_cli_prompt_session():
                 db_path = get_project_paths().conversation_db
                 if db_path.exists():
                     with sqlite3.connect(db_path) as conn:
-                        cursor = conn.execute(
-                            """
+                        cursor = conn.execute("""
                             SELECT DISTINCT content
                             FROM messages
                             WHERE role = 'user'
@@ -924,8 +917,7 @@ def _create_cli_prompt_session():
                               AND content NOT LIKE '{%'
                             ORDER BY timestamp ASC
                             LIMIT 100
-                            """
-                        )
+                            """)
                         for (msg,) in cursor.fetchall():
                             history.store_string(msg)
             except Exception:
@@ -1017,7 +1009,9 @@ async def _run_cli_repl(
                     else FormatterRenderer(create_formatter(), console)
                 )
                 content_buffer = await stream_response(
-                    agent, user_input, renderer,
+                    agent,
+                    user_input,
+                    renderer,
                     suppress_thinking=not show_reasoning,
                 )
                 content_buffer = sanitize_response(content_buffer)

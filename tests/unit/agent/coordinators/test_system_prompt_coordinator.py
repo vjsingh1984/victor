@@ -68,9 +68,7 @@ def coordinator(mock_prompt_builder, mock_task_analyzer, mock_tools):
 class TestSystemPromptCoordinator:
     """Test suite for SystemPromptCoordinator."""
 
-    def test_build_system_prompt_large_context(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_build_system_prompt_large_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt includes parallel read budget for >= 32K context."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,
@@ -85,9 +83,7 @@ class TestSystemPromptCoordinator:
         assert "PARALLEL READ BUDGET" in result
         assert "You are a helpful assistant." in result
 
-    def test_build_system_prompt_small_context(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_build_system_prompt_small_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt omits parallel read budget for < 32K context."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,
@@ -102,9 +98,7 @@ class TestSystemPromptCoordinator:
         assert "PARALLEL READ BUDGET" not in result
         assert result == "You are a helpful assistant."
 
-    def test_resolve_shell_variant_delegates(
-        self, coordinator, mock_tools
-    ):
+    def test_resolve_shell_variant_delegates(self, coordinator, mock_tools):
         """Shell variant resolution delegates to shell_resolver module."""
         with patch(
             "victor.agent.shell_resolver.resolve_shell_variant",
@@ -112,34 +106,24 @@ class TestSystemPromptCoordinator:
         ) as mock_resolve:
             result = coordinator.resolve_shell_variant("bash")
             assert result == "shell_readonly"
-            mock_resolve.assert_called_once_with(
-                "bash", mock_tools, None
-            )
+            mock_resolve.assert_called_once_with("bash", mock_tools, None)
 
     def test_classify_task_keywords(self, coordinator, mock_task_analyzer):
         """Task keyword classification delegates to TaskAnalyzer."""
         result = coordinator.classify_task_keywords("fix the bug")
         assert result["task_type"] == "general"
-        mock_task_analyzer.classify_task_keywords.assert_called_once_with(
-            "fix the bug"
-        )
+        mock_task_analyzer.classify_task_keywords.assert_called_once_with("fix the bug")
 
-    def test_classify_task_with_context(
-        self, coordinator, mock_task_analyzer
-    ):
+    def test_classify_task_with_context(self, coordinator, mock_task_analyzer):
         """Context-aware task classification delegates to TaskAnalyzer."""
         history = [{"role": "user", "content": "hello"}]
-        result = coordinator.classify_task_with_context(
-            "write a function", history
-        )
+        result = coordinator.classify_task_with_context("write a function", history)
         assert result["task_type"] == "coding"
         mock_task_analyzer.classify_task_with_context.assert_called_once_with(
             "write a function", history
         )
 
-    def test_classify_task_with_context_no_history(
-        self, coordinator, mock_task_analyzer
-    ):
+    def test_classify_task_with_context_no_history(self, coordinator, mock_task_analyzer):
         """Context classification works without history."""
         coordinator.classify_task_with_context("write a function")
         mock_task_analyzer.classify_task_with_context.assert_called_once_with(
@@ -155,9 +139,7 @@ class TestSystemPromptCoordinator:
             # Should not raise
             coordinator._emit_prompt_used_event("test prompt")
 
-    def test_emit_prompt_used_event_local_provider(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_emit_prompt_used_event_local_provider(self, mock_prompt_builder, mock_task_analyzer):
         """Local provider gets 'detailed' prompt style in RL event."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,
@@ -190,9 +172,7 @@ class TestSystemPromptCoordinator:
             event = mock_hooks.emit.call_args[0][0]
             assert event.metadata["prompt_style"] == "structured"
 
-    def test_emit_prompt_used_event_exception_suppressed(
-        self, coordinator
-    ):
+    def test_emit_prompt_used_event_exception_suppressed(self, coordinator):
         """RL hook exceptions are suppressed, not propagated."""
         with patch(
             "victor.framework.rl.hooks.get_rl_hooks",

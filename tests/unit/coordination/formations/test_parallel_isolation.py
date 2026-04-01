@@ -63,16 +63,15 @@ class TestParallelContextIsolation:
         async def capture_context(task, context):
             # Record the context's shared_state id
             captured_contexts.append(id(context.shared_state))
-            return MemberResult(
-                member_id="test", success=True, output="ok"
-            )
+            return MemberResult(member_id="test", success=True, output="ok")
 
         agents = [_make_agent(f"agent-{i}") for i in range(3)]
         for agent in agents:
             agent.execute = AsyncMock(side_effect=capture_context)
 
         context = TeamContext(
-            "team-1", "parallel",
+            "team-1",
+            "parallel",
             shared_state={"data": [1, 2, 3], "nested": {"key": "value"}},
         )
 
@@ -92,25 +91,19 @@ class TestParallelContextIsolation:
             # Mutate context — should only affect this copy
             context.set("counter", 999)
             await asyncio.sleep(0.01)  # Yield control
-            return MemberResult(
-                member_id="test", success=True, output="ok"
-            )
+            return MemberResult(member_id="test", success=True, output="ok")
 
         agents = [_make_agent(f"agent-{i}") for i in range(5)]
         for agent in agents:
             agent.execute = AsyncMock(side_effect=mutating_agent)
 
-        context = TeamContext(
-            "team-1", "parallel", shared_state={"counter": 0}
-        )
+        context = TeamContext("team-1", "parallel", shared_state={"counter": 0})
 
         formation = ParallelFormation()
         await formation.execute(agents, context, _make_task())
 
         # All agents should have seen counter=0 (not 999 from another agent)
-        assert all(v == 0 for v in seen_values), (
-            f"Agents saw mutated state: {seen_values}"
-        )
+        assert all(v == 0 for v in seen_values), f"Agents saw mutated state: {seen_values}"
 
     async def test_nested_dict_isolation(self):
         """Deep nested structures should be isolated between agents."""
@@ -120,16 +113,15 @@ class TestParallelContextIsolation:
             seen_nested.append(context.shared_state["nested"]["key"])
             context.shared_state["nested"]["key"] = "mutated"
             await asyncio.sleep(0.01)
-            return MemberResult(
-                member_id="test", success=True, output="ok"
-            )
+            return MemberResult(member_id="test", success=True, output="ok")
 
         agents = [_make_agent(f"agent-{i}") for i in range(3)]
         for agent in agents:
             agent.execute = AsyncMock(side_effect=nested_mutator)
 
         context = TeamContext(
-            "team-1", "parallel",
+            "team-1",
+            "parallel",
             shared_state={"nested": {"key": "original"}},
         )
 
@@ -145,9 +137,8 @@ class TestParallelContextIsolation:
         async def make_writer(agent_id):
             async def writer_agent(task, context):
                 context.set(f"result_{agent_id}", f"value_{agent_id}")
-                return MemberResult(
-                    member_id=agent_id, success=True, output="ok"
-                )
+                return MemberResult(member_id=agent_id, success=True, output="ok")
+
             return writer_agent
 
         agents = [_make_agent(f"agent-{i}") for i in range(3)]

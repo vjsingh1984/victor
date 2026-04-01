@@ -129,7 +129,11 @@ class TestRagSyncBridge:
         mock_list.assert_called_once_with()
         mock_stats.assert_called_once_with()
         mock_delete.assert_called_once_with("doc-123")
-        assert mock_run_sync.call_args_list == [call(list_coro), call(stats_coro), call(delete_coro)]
+        assert mock_run_sync.call_args_list == [
+            call(list_coro),
+            call(stats_coro),
+            call(delete_coro),
+        ]
 
     def test_demo_docs_uses_shared_sync_bridge(self) -> None:
         coro = object()

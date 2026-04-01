@@ -196,9 +196,7 @@ class SQLiteSessionPersistence:
                 else execution_state
             ),
             "session_ledger": (
-                session_ledger.to_dict()
-                if hasattr(session_ledger, "to_dict")
-                else session_ledger
+                session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
             ),
             "compaction_hierarchy": compaction_hierarchy,
         }

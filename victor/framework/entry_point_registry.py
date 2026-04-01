@@ -38,25 +38,27 @@ from importlib.metadata import entry_points
 logger = logging.getLogger(__name__)
 
 # All Victor entry point groups used by the framework
-ENTRY_POINT_GROUPS = frozenset({
-    "victor.verticals",
-    "victor.plugins",
-    "victor.tool_dependencies",
-    "victor.safety_rules",
-    "victor.rl_configs",
-    "victor.prompt_contributors",
-    "victor.mode_configs",
-    "victor.workflow_providers",
-    "victor.team_spec_providers",
-    "victor.capability_providers",
-    "victor.service_providers",
-    "victor.escape_hatches",
-    "victor.commands",
-    "victor.api_routers",
-    "victor.capabilities",
-    "victor.sdk.capabilities",
-    "victor.chunking_strategies",
-})
+ENTRY_POINT_GROUPS = frozenset(
+    {
+        "victor.verticals",
+        "victor.plugins",
+        "victor.tool_dependencies",
+        "victor.safety_rules",
+        "victor.rl_configs",
+        "victor.prompt_contributors",
+        "victor.mode_configs",
+        "victor.workflow_providers",
+        "victor.team_spec_providers",
+        "victor.capability_providers",
+        "victor.service_providers",
+        "victor.escape_hatches",
+        "victor.commands",
+        "victor.api_routers",
+        "victor.capabilities",
+        "victor.sdk.capabilities",
+        "victor.chunking_strategies",
+    }
+)
 
 
 @dataclass
@@ -415,8 +417,7 @@ def _cached_entry_points(group: str) -> tuple:
         Tuple of entry point objects for the group
     """
     logger.warning(
-        f"_cached_entry_points('{group}') is deprecated. "
-        f"Use UnifiedEntryPointRegistry instead."
+        f"_cached_entry_points('{group}') is deprecated. " f"Use UnifiedEntryPointRegistry instead."
     )
 
     registry = get_entry_point_registry()

@@ -486,9 +486,7 @@ class Agent:
                     try:
                         observer(old_state, self._state)
                     except Exception:
-                        logger.warning(
-                            "State observer error", exc_info=True
-                        )
+                        logger.warning("State observer error", exc_info=True)
                 old_stage = new_stage
 
             yield event

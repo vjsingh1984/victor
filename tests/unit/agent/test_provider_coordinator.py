@@ -220,7 +220,9 @@ class TestProviderCoordinator:
         assert coordinator.switch_count == mock_manager.switch_count
 
     @pytest.mark.asyncio
-    async def test_switch_provider_async_notifies_hooks(self, coordinator, mock_manager, mock_state):
+    async def test_switch_provider_async_notifies_hooks(
+        self, coordinator, mock_manager, mock_state
+    ):
         """Async switch_provider path delegates to manager and notifies hooks."""
         callback = MagicMock()
         coordinator._post_switch_hooks = [callback]

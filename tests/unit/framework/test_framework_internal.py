@@ -138,9 +138,7 @@ class TestSetupObservabilityIntegration:
 
             setup_observability_integration(mock_orchestrator, session_id="test-session-123")
 
-            MockIntegration.assert_called_once_with(
-                session_id="test-session-123"
-            )
+            MockIntegration.assert_called_once_with(session_id="test-session-123")
 
 
 class TestVerticalApplicationDelegation:

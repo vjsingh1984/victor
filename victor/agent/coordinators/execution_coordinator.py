@@ -306,15 +306,15 @@ class ExecutionCoordinator:
             if self._token_tracker is not None:
                 self._token_tracker.accumulate(response.usage)
             else:
-                self._chat_context._cumulative_token_usage[
-                    "prompt_tokens"
-                ] += response.usage.get("prompt_tokens", 0)
+                self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
                 self._chat_context._cumulative_token_usage[
                     "completion_tokens"
                 ] += response.usage.get("completion_tokens", 0)
-                self._chat_context._cumulative_token_usage[
-                    "total_tokens"
-                ] += response.usage.get("total_tokens", 0)
+                self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
 
     async def _check_context_compaction(
         self,

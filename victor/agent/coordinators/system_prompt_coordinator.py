@@ -144,12 +144,8 @@ class SystemPromptCoordinator:
             # Calculate prompt characteristics
             prompt_lower = prompt.lower()
             has_examples = "example" in prompt_lower or "e.g." in prompt_lower
-            has_thinking = (
-                "step by step" in prompt_lower or "think" in prompt_lower
-            )
-            has_constraints = (
-                "must" in prompt_lower or "always" in prompt_lower
-            )
+            has_thinking = "step by step" in prompt_lower or "think" in prompt_lower
+            has_constraints = "must" in prompt_lower or "always" in prompt_lower
 
             event = RLEvent(
                 type=RLEventType.PROMPT_USED,
@@ -185,9 +181,7 @@ class SystemPromptCoordinator:
         """
         from victor.agent.shell_resolver import resolve_shell_variant
 
-        return resolve_shell_variant(
-            tool_name, self._get_tools(), self._get_mode_controller()
-        )
+        return resolve_shell_variant(tool_name, self._get_tools(), self._get_mode_controller())
 
     def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
@@ -214,6 +208,4 @@ class SystemPromptCoordinator:
         Returns:
             Dictionary with classification results.
         """
-        return self._task_analyzer.classify_task_with_context(
-            user_message, history
-        )
+        return self._task_analyzer.classify_task_with_context(user_message, history)

@@ -333,9 +333,7 @@ async def _auth_login_async(*, provider: str, force: bool) -> None:
         cached = mgr._load_cached()
         if cached is not None and not cached.is_expired:
             console.print(f"[green]✓[/] Already authenticated with {provider}")
-            console.print(
-                f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
-            )
+            console.print(f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}")
             console.print("[dim]Use --force to re-authenticate[/]")
             return
 

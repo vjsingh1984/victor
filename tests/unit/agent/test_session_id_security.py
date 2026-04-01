@@ -13,7 +13,6 @@ from victor.agent.session_id import (
     validate_session_id,
 )
 
-
 # ---------------------------------------------------------------------------
 # Phase 1A: server_session_secret auto-generation
 # ---------------------------------------------------------------------------
@@ -57,9 +56,7 @@ class TestSessionIdEntropy:
         """Generated session IDs must have 3 dash-separated parts."""
         sid = generate_session_id(project_root=Path("/tmp/testproj"))
         parts = sid.split("-", maxsplit=2)
-        assert len(parts) == 3, (
-            f"Expected 3 components, got {len(parts)}: {sid}"
-        )
+        assert len(parts) == 3, f"Expected 3 components, got {len(parts)}: {sid}"
 
     def test_thousand_generated_ids_are_unique(self):
         """1000 generated IDs must all be distinct (entropy prevents collisions)."""

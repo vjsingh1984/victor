@@ -99,9 +99,7 @@ class TestAsyncSafeCacheManager:
             return "async_value"
 
         async def test():
-            result = await self.cache.get_or_create_async(
-                "test", "key1", async_factory
-            )
+            result = await self.cache.get_or_create_async("test", "key1", async_factory)
             assert result == "async_value"
 
         asyncio.run(test())
@@ -113,9 +111,7 @@ class TestAsyncSafeCacheManager:
             return "sync_value"
 
         async def test():
-            result = await self.cache.get_or_create_async(
-                "test", "key1", sync_factory
-            )
+            result = await self.cache.get_or_create_async("test", "key1", sync_factory)
             assert result == "sync_value"
 
         asyncio.run(test())
@@ -222,6 +218,7 @@ class TestAsyncSafeCacheManager:
 
         def worker(key):
             try:
+
                 def factory():
                     time.sleep(0.01)
                     return f"value_{key}"

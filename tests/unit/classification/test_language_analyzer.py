@@ -1312,7 +1312,10 @@ class TestRegistryAdvancedFunctions:
 
     def test_register_custom_analyzer(self):
         """Test registering a custom analyzer."""
-        from victor.verticals.contrib.coding.tools.language_analyzer import LanguageRegistry, BaseLanguageAnalyzer
+        from victor.verticals.contrib.coding.tools.language_analyzer import (
+            LanguageRegistry,
+            BaseLanguageAnalyzer,
+        )
 
         # Create a custom analyzer class
         class CustomAnalyzer(BaseLanguageAnalyzer):

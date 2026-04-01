@@ -136,7 +136,9 @@ class WorkflowParser:
                     return workflow
 
             definitions = {
-                name: workflow for name, workflow in loaded.items() if isinstance(workflow, WorkflowDefinition)
+                name: workflow
+                for name, workflow in loaded.items()
+                if isinstance(workflow, WorkflowDefinition)
             }
             if len(definitions) == 1:
                 return next(iter(definitions.values()))
@@ -246,7 +248,9 @@ class NativeWorkflowGraphCompiler:
                 continue
 
             if isinstance(node, ConditionNode):
-                graph.add_conditional_edge(node_id, self._create_condition_router(node), node.branches)
+                graph.add_conditional_edge(
+                    node_id, self._create_condition_router(node), node.branches
+                )
                 continue
 
             if isinstance(node, ParallelNode):
@@ -275,7 +279,9 @@ class NativeWorkflowGraphCompiler:
                 if node.node_type == WorkflowNodeType.HITL
             ]
 
-        logger.debug("Compiling parsed workflow '%s' via native StateGraph backend", parsed.workflow_name)
+        logger.debug(
+            "Compiling parsed workflow '%s' via native StateGraph backend", parsed.workflow_name
+        )
         return graph.compile(
             checkpointer=self._build_checkpointer(),
             max_iterations=workflow.max_iterations,
@@ -312,10 +318,7 @@ class NativeWorkflowGraphCompiler:
             parallel_results = dict(current_state.get("_parallel_results", {}))
             node_results = dict(current_state.get("_node_results", {}))
 
-            tasks = [
-                executor(copy.deepcopy(current_state))
-                for _, executor in child_executors
-            ]
+            tasks = [executor(copy.deepcopy(current_state)) for _, executor in child_executors]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for (child_node, _), result in zip(child_executors, results):
@@ -337,10 +340,7 @@ class NativeWorkflowGraphCompiler:
             current_state["_parallel_results"] = parallel_results
             node_results[parallel_node.id] = GraphNodeResult(
                 node_id=parallel_node.id,
-                success=all(
-                    result.get("success", False)
-                    for result in parallel_results.values()
-                ),
+                success=all(result.get("success", False) for result in parallel_results.values()),
                 output=parallel_results,
                 duration_seconds=time.time() - start_time,
             )
@@ -375,7 +375,9 @@ class LegacyWorkflowGraphCompiler:
     def compile(self, parsed: ParsedWorkflowDefinition) -> "CompiledGraphProtocol":
         """Compile a parsed workflow definition into an executable graph."""
         compiler = self._compiler_factory()
-        logger.debug("Compiling parsed workflow '%s' via legacy graph backend", parsed.workflow_name)
+        logger.debug(
+            "Compiling parsed workflow '%s' via legacy graph backend", parsed.workflow_name
+        )
         return compiler.compile(parsed.workflow)
 
     def _create_legacy_compiler(self) -> Any:

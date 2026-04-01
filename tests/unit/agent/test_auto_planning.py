@@ -38,9 +38,7 @@ def _make_coordinator(query_classifier=None, orchestrator=None):
     )
 
     mock_exec = AsyncMock()
-    mock_exec.execute_agentic_loop = AsyncMock(
-        return_value=MagicMock(content="direct response")
-    )
+    mock_exec.execute_agentic_loop = AsyncMock(return_value=MagicMock(content="direct response"))
 
     coordinator = SyncChatCoordinator(
         chat_context=mock_chat_ctx,
@@ -83,7 +81,9 @@ class TestAutoPlanning:
     async def test_explicit_true_always_plans(self):
         coordinator, _ = _make_coordinator()
         with patch.object(coordinator, "_should_use_planning", return_value=True):
-            with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
+            with patch.object(
+                coordinator, "_chat_with_planning", new_callable=AsyncMock
+            ) as mock_plan:
                 mock_plan.return_value = MagicMock(content="planned")
                 await coordinator.chat("anything", use_planning=True)
                 mock_plan.assert_called_once()
@@ -105,7 +105,9 @@ class TestAutoPlanning:
         coordinator, _ = _make_coordinator(query_classifier=None)
         # Without classifier, use_planning=None falls back to keyword heuristic
         with patch.object(coordinator, "_should_use_planning", return_value=False):
-            with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
+            with patch.object(
+                coordinator, "_chat_with_planning", new_callable=AsyncMock
+            ) as mock_plan:
                 await coordinator.chat("analyze architecture", use_planning=None)
                 mock_plan.assert_not_called()
 

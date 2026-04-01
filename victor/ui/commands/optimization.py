@@ -229,9 +229,7 @@ async def _profile_async(
         click.echo("\nNo bottlenecks detected!")
 
     if workflow_profile.opportunities:
-        click.echo(
-            f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):"
-        )
+        click.echo(f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):")
         for i, opportunity in enumerate(workflow_profile.opportunities[:5], 1):
             click.echo(f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}")
             click.echo(f"     Expected improvement: {opportunity.expected_improvement:.1%}")
@@ -286,9 +284,7 @@ async def _suggest_async(
         click.echo(f"   Confidence: {suggestion.confidence:.1%}")
 
         if suggestion.estimated_cost_reduction > 0:
-            click.echo(
-                f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}"
-            )
+            click.echo(f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}")
         if suggestion.estimated_duration_reduction > 0:
             click.echo(f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s")
         click.echo()

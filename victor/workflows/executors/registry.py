@@ -42,10 +42,7 @@ class WorkflowNodeExecutorRegistry:
         with self._lock:
             existing = self._registrations.get(node_type)
             if existing is not None:
-                if (
-                    existing.executor_factory is executor_factory
-                    and existing.replace == replace
-                ):
+                if existing.executor_factory is executor_factory and existing.replace == replace:
                     return
                 if not replace:
                     raise ValueError(

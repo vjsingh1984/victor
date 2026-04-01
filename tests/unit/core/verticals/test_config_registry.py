@@ -84,12 +84,8 @@ class TestVerticalBehaviorConfig:
         """Test merging two configs (removed - merge method not implemented)."""
         # Merge functionality not currently needed
         # VerticalBehaviorConfig is frozen, so merging creates new instances
-        config1 = VerticalBehaviorConfig(
-            canonicalize_tool_names=True, load_priority=10
-        )
-        config2 = VerticalBehaviorConfig(
-            canonicalize_tool_names=False, load_priority=20
-        )
+        config1 = VerticalBehaviorConfig(canonicalize_tool_names=True, load_priority=10)
+        config2 = VerticalBehaviorConfig(canonicalize_tool_names=False, load_priority=20)
 
         # Since configs are frozen, we just verify they're independent
         assert config1.canonicalize_tool_names is True

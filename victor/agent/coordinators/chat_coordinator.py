@@ -304,9 +304,7 @@ class ChatCoordinator:
                     else:
                         for key in orch._cumulative_token_usage:
                             if key in ctx.cumulative_usage:
-                                orch._cumulative_token_usage[key] += (
-                                    ctx.cumulative_usage[key]
-                                )
+                                orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
                         # Calculate total if not tracked by provider
                         if orch._cumulative_token_usage["total_tokens"] == 0:
                             orch._cumulative_token_usage["total_tokens"] = (

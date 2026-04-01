@@ -313,12 +313,14 @@ class VerticalLoadTelemetry:
         slow_ops = []
         for span in self._spans:
             if span.duration_ms and span.duration_ms > threshold_ms:
-                slow_ops.append({
-                    "vertical": span.vertical_name,
-                    "operation": span.operation,
-                    "duration_ms": span.duration_ms,
-                    "status": span.status,
-                })
+                slow_ops.append(
+                    {
+                        "vertical": span.vertical_name,
+                        "operation": span.operation,
+                        "duration_ms": span.duration_ms,
+                        "status": span.status,
+                    }
+                )
         return slow_ops
 
     def clear(self) -> None:

@@ -118,7 +118,11 @@ class TestEntryPointScanPerformance:
         # Simulate 300 get operations (100 iterations * 3 groups)
         for _ in range(100):
             # Try to get various groups
-            for group in ["victor.prompt_contributors", "victor.mode_configs", "victor.workflow_providers"]:
+            for group in [
+                "victor.prompt_contributors",
+                "victor.mode_configs",
+                "victor.workflow_providers",
+            ]:
                 try:
                     get_entry_point_group(group)
                 except Exception:
@@ -155,8 +159,12 @@ class TestEntryPointScanPerformance:
         assert speedup >= 10, f"Warm scan is only {speedup:.2f}x faster, target >= 10x"
 
         # Results should be identical (metrics should match)
-        assert metrics1.total_groups == metrics2.total_groups, "Cached scan should return same group count"
-        assert metrics1.total_entry_points == metrics2.total_entry_points, "Cached scan should return same entry point count"
+        assert (
+            metrics1.total_groups == metrics2.total_groups
+        ), "Cached scan should return same group count"
+        assert (
+            metrics1.total_entry_points == metrics2.total_entry_points
+        ), "Cached scan should return same entry point count"
 
     def test_scan_consistency(self):
         """Test that multiple scans produce consistent results."""
@@ -188,7 +196,9 @@ class TestEntryPointScalability:
 
         # Even with many groups, should be fast
         duration_ms = duration * 1000
-        assert duration_ms < 100, f"Scan took {duration_ms:.2f}ms with {metrics.total_groups} groups"
+        assert (
+            duration_ms < 100
+        ), f"Scan took {duration_ms:.2f}ms with {metrics.total_groups} groups"
 
     def test_memory_efficiency(self):
         """Test that registry doesn't leak memory."""

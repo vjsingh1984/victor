@@ -6,7 +6,10 @@ from unittest.mock import patch
 
 import pytest
 
-from victor.workflows.adapters import AdapterWorkflowState, WorkflowState as AdapterWorkflowStateAlias
+from victor.workflows.adapters import (
+    AdapterWorkflowState,
+    WorkflowState as AdapterWorkflowStateAlias,
+)
 from victor.workflows.adapters import WorkflowToGraphAdapter
 from victor.core.async_utils import run_sync as shared_run_sync, run_sync_in_thread
 from victor.core.container import ServiceContainer
@@ -345,6 +348,7 @@ def test_node_executor_factory_loads_custom_registry_registrations() -> None:
     clear_registered_workflow_node_executors()
 
     try:
+
         class CustomExecutor:
             def __init__(self, context=None):
                 self.context = context

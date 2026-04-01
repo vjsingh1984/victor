@@ -18,9 +18,7 @@ def mock_reminder_manager():
 
 @pytest.fixture
 def controller_with_manager(mock_reminder_manager):
-    controller = ConversationController(
-        context_reminder_manager=mock_reminder_manager
-    )
+    controller = ConversationController(context_reminder_manager=mock_reminder_manager)
     controller.set_system_prompt("System prompt")
     controller.add_message("user", "Hello")
     return controller
@@ -58,14 +56,10 @@ class TestCompactionReminderRouting:
         assert result is True
         # Should have inserted a direct message
         msgs = controller_without_manager.messages
-        reminders = [
-            m for m in msgs if m.role == "assistant" and "Context reminder" in m.content
-        ]
+        reminders = [m for m in msgs if m.role == "assistant" and "Context reminder" in m.content]
         assert len(reminders) == 1
 
-    def test_compaction_summary_updates_state(
-        self, controller_with_manager, mock_reminder_manager
-    ):
+    def test_compaction_summary_updates_state(self, controller_with_manager, mock_reminder_manager):
         controller_with_manager._compaction_summaries = ["S1", "S2", "S3"]
         controller_with_manager.inject_compaction_context()
 

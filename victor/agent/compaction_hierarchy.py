@@ -126,8 +126,7 @@ class HierarchicalCompactionManager:
         """Serialize for persistence."""
         return {
             "individual_summaries": [
-                {"summary": s, "turn_index": t}
-                for s, t in self._individual_summaries
+                {"summary": s, "turn_index": t} for s, t in self._individual_summaries
             ],
             "epochs": [
                 {
@@ -154,8 +153,7 @@ class HierarchicalCompactionManager:
             epoch_threshold=data.get("epoch_threshold", 6),
         )
         manager._individual_summaries = [
-            (item["summary"], item["turn_index"])
-            for item in data.get("individual_summaries", [])
+            (item["summary"], item["turn_index"]) for item in data.get("individual_summaries", [])
         ]
         manager._epochs = [
             CompactionEpoch(

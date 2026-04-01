@@ -153,6 +153,7 @@ class TestDeprecationWarnings:
 
     def test_legacy_assistant_emits_warning(self):
         """Test that classes without explicit name emit warnings for non-standard naming."""
+
         # Create a class without explicit name attribute and non-standard naming
         class MyNonStandardClass(VerticalBase):
             """Class that doesn't follow naming convention."""
@@ -180,7 +181,10 @@ class TestDeprecationWarnings:
             # Should emit deprecation warning for not following convention
             assert len(w) > 0
             warning_messages = [str(warning.message) for warning in w]
-            assert any("naming convention" in msg.lower() or "deprecated" in msg.lower() for msg in warning_messages)
+            assert any(
+                "naming convention" in msg.lower() or "deprecated" in msg.lower()
+                for msg in warning_messages
+            )
 
     def test_vertical_suffix_no_warning(self):
         """Test that 'Vertical' suffix does NOT emit deprecation warning."""

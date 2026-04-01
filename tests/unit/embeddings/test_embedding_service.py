@@ -290,7 +290,10 @@ class TestEmbeddingGeneration:
 
         with (
             patch.object(service, "embed_text_sync", return_value=expected) as mock_sync,
-            patch("victor.storage.embeddings.service.asyncio.get_event_loop", side_effect=AssertionError),
+            patch(
+                "victor.storage.embeddings.service.asyncio.get_event_loop",
+                side_effect=AssertionError,
+            ),
         ):
             embedding = await service.embed_text("test text", use_cache=False)
 
@@ -326,7 +329,10 @@ class TestEmbeddingGeneration:
 
         with (
             patch.object(service, "embed_batch_sync", return_value=expected) as mock_sync,
-            patch("victor.storage.embeddings.service.asyncio.get_event_loop", side_effect=AssertionError),
+            patch(
+                "victor.storage.embeddings.service.asyncio.get_event_loop",
+                side_effect=AssertionError,
+            ),
         ):
             embeddings = await service.embed_batch(texts)
 

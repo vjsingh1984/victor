@@ -745,9 +745,7 @@ class ErrorHandler:
             if len(self._recent_signatures) > 200:
                 cutoff = now - self._dedup_window
                 self._recent_signatures = {
-                    k: v
-                    for k, v in self._recent_signatures.items()
-                    if v > cutoff
+                    k: v for k, v in self._recent_signatures.items() if v > cutoff
                 }
 
             self._error_history.append(error_info)

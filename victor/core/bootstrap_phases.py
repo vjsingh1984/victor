@@ -68,9 +68,7 @@ def topological_sort(phases: List[BootstrapPhase]) -> List[BootstrapPhase]:
         phase = by_name[name]
         for dep in phase.depends_on:
             if dep not in by_name:
-                raise ValueError(
-                    f"Phase '{name}' depends on unknown phase '{dep}'"
-                )
+                raise ValueError(f"Phase '{name}' depends on unknown phase '{dep}'")
             visit(dep)
         in_stack.remove(name)
         visited.add(name)
@@ -114,9 +112,7 @@ def execute_phases(
                     logger.debug("Phase '%s' skipped (condition not met)", phase.name)
                     continue
             except Exception as e:
-                logger.debug(
-                    "Phase '%s' condition check failed: %s", phase.name, e
-                )
+                logger.debug("Phase '%s' condition check failed: %s", phase.name, e)
                 if not phase.optional:
                     raise
                 continue
@@ -127,9 +123,7 @@ def execute_phases(
             logger.debug("Phase '%s' completed", phase.name)
         except Exception as e:
             if phase.optional:
-                logger.warning(
-                    "Optional phase '%s' failed: %s", phase.name, e
-                )
+                logger.warning("Optional phase '%s' failed: %s", phase.name, e)
             else:
                 logger.error("Critical phase '%s' failed: %s", phase.name, e)
                 raise

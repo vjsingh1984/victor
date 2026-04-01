@@ -40,7 +40,6 @@ from victor.core.verticals.capability_negotiator import (
 )
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -280,9 +279,7 @@ class TestUnifiedEntryPoints:
         mock_get_cache.return_value = mock_cache
 
         registry = PluginRegistry()
-        with patch.object(
-            registry, "_load_plugin_from_value", return_value=vertical_cls
-        ):
+        with patch.object(registry, "_load_plugin_from_value", return_value=vertical_cls):
             with warnings.catch_warnings(record=True):
                 warnings.simplefilter("always")
                 plugins = registry.discover(force=True)
@@ -419,9 +416,7 @@ class TestAOTManifestIntegration:
 
         registry = PluginRegistry()
         plugin_instance = _FullPlugin("test")
-        with patch.object(
-            registry, "_load_plugin_from_value", return_value=plugin_instance
-        ):
+        with patch.object(registry, "_load_plugin_from_value", return_value=plugin_instance):
             plugins = registry.discover(force=False)
 
         # EntryPointCache should NOT be called (AOT hit)
@@ -484,9 +479,7 @@ class TestEntryPointCacheWiring:
         registry.discover(force=True)
 
         mock_get_cache.assert_called()
-        mock_cache.get_entry_points.assert_any_call(
-            "victor.plugins", force_refresh=True
-        )
+        mock_cache.get_entry_points.assert_any_call("victor.plugins", force_refresh=True)
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
     @patch("victor.core.plugins.registry.get_entry_point_cache")

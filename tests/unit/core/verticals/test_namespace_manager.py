@@ -83,9 +83,7 @@ class TestNamespacedPluginKey:
 
     def test_create_key_with_version(self):
         """Test creating a key with version."""
-        key = NamespacedPluginKey(
-            namespace="external", plugin_name="my_tool", version="1.0.0"
-        )
+        key = NamespacedPluginKey(namespace="external", plugin_name="my_tool", version="1.0.0")
 
         assert key.namespace == "external"
         assert key.plugin_name == "my_tool"
@@ -113,9 +111,7 @@ class TestNamespacedPluginKey:
 
     def test_key_str(self):
         """Test string representation of key."""
-        key = NamespacedPluginKey(
-            namespace="external", plugin_name="my_tool", version="1.0.0"
-        )
+        key = NamespacedPluginKey(namespace="external", plugin_name="my_tool", version="1.0.0")
 
         assert str(key) == "external:my_tool:1.0.0"
         assert str(key) == key.full_key

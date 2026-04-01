@@ -308,7 +308,9 @@ async def _setup_benchmark_async(
     from victor.evaluation.benchmarks import SWEBenchRunner
     from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
 
-    runner = SWEBenchRunner(split="lite") if benchmark_lower == "swe-bench-lite" else SWEBenchRunner()
+    runner = (
+        SWEBenchRunner(split="lite") if benchmark_lower == "swe-bench-lite" else SWEBenchRunner()
+    )
     config = EvaluationConfig(
         benchmark=BenchmarkType.SWE_BENCH,
         model="setup-only",
@@ -469,7 +471,9 @@ async def _run_benchmark_async(
                 description=f"Task {task_idx + 1}/{total}: {result.status.value}",
             )
 
-        progress.update(task, description="Resuming evaluation..." if resume else "Running evaluation...")
+        progress.update(
+            task, description="Resuming evaluation..." if resume else "Running evaluation..."
+        )
         return await harness.run_evaluation(
             config=config,
             agent_callback=agent_callback,

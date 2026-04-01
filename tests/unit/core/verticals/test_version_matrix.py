@@ -66,16 +66,12 @@ class TestCompatibilityRule:
     def test_invalid_version_constraint(self):
         """Test that invalid version constraint raises ValueError."""
         with pytest.raises(ValueError, match="Invalid version constraint"):
-            CompatibilityRule(
-                vertical_name="test", min_framework_version=">=invalid"
-            )
+            CompatibilityRule(vertical_name="test", min_framework_version=">=invalid")
 
     def test_invalid_excluded_version(self):
         """Test that invalid excluded version raises ValueError."""
         with pytest.raises(ValueError, match="Invalid version constraint"):
-            CompatibilityRule(
-                vertical_name="test", excluded_versions={"invalid"}
-            )
+            CompatibilityRule(vertical_name="test", excluded_versions={"invalid"})
 
 
 class TestCompatibilityResult:

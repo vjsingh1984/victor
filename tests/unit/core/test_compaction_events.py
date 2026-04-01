@@ -35,9 +35,7 @@ class TestCompactionEvents:
             event_bus=mock_event_bus,
         )
 
-        with patch(
-            "victor.core.events.emit_helper.emit_event_sync"
-        ) as mock_emit:
+        with patch("victor.core.events.emit_helper.emit_event_sync") as mock_emit:
             compactor.check_and_compact()
 
             mock_emit.assert_called_once()

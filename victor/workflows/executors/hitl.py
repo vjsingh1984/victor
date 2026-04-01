@@ -50,7 +50,11 @@ class HITLNodeExecutor:
 
         success = True
         error = None
-        if isinstance(response, dict) and response.get("approved") is False and node.fallback.value == "abort":
+        if (
+            isinstance(response, dict)
+            and response.get("approved") is False
+            and node.fallback.value == "abort"
+        ):
             error = f"HITL node '{node.id}' rejected: {response.get('reason', 'rejected')}"
             current_state["_error"] = error
             success = False

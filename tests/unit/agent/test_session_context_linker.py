@@ -70,7 +70,10 @@ class TestSessionContextLinker:
         ctx = linker.build_resume_context("test-session-123")
 
         assert "auth.py" in ctx.resume_summary
-        assert "factory pattern" in ctx.resume_summary.lower() or "decided" in ctx.resume_summary.lower()
+        assert (
+            "factory pattern" in ctx.resume_summary.lower()
+            or "decided" in ctx.resume_summary.lower()
+        )
 
     def test_resume_summary_empty_session(self, linker, mock_persistence):
         mock_persistence.load_session.return_value = None
@@ -105,9 +108,7 @@ class TestSessionContextLinker:
         }
 
         linker = SessionContextLinker(session_persistence=mock_persistence)
-        result = linker.build_cross_session_context(
-            "query", ["s1"], max_chars=500
-        )
+        result = linker.build_cross_session_context("query", ["s1"], max_chars=500)
 
         assert len(result) <= 600  # Some tolerance for formatting
 

@@ -267,9 +267,7 @@ class VerticalBehaviorConfigRegistry:
             raise ValueError("Vertical name cannot be empty")
 
         if not isinstance(config, VerticalBehaviorConfig):
-            raise ValueError(
-                f"Config must be VerticalBehaviorConfig instance, got {type(config)}"
-            )
+            raise ValueError(f"Config must be VerticalBehaviorConfig instance, got {type(config)}")
 
         cls._configs[name] = config
         logger.debug(f"Registered behavior configuration for vertical '{name}'")
@@ -438,4 +436,3 @@ def is_strict_mode_enabled(vertical_name: str) -> bool:
     """
     config = VerticalBehaviorConfigRegistry.get(vertical_name)
     return config.strict_mode
-

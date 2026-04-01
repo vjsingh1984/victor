@@ -343,9 +343,7 @@ class InfrastructureBuildersMixin:
                 if provider is None:
                     provider = getattr(self, "provider", None)
                 if provider is not None:
-                    summarizer = LLMCompactionSummarizer(
-                        provider=provider, fallback=fallback
-                    )
+                    summarizer = LLMCompactionSummarizer(provider=provider, fallback=fallback)
                     logger.debug("LLMCompactionSummarizer created with LedgerAware fallback")
                     return summarizer
             except Exception as e:

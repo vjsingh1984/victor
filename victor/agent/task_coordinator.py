@@ -304,9 +304,7 @@ class TaskCoordinator:
                         f"Analysis task: increased tool_budget from {original_budget} to {self._tool_budget}"
                     )
             else:
-                logger.info(
-                    f"Analysis task: respecting user-set tool_budget={self._tool_budget}"
-                )
+                logger.info(f"Analysis task: respecting user-set tool_budget={self._tool_budget}")
 
             conversation_controller.add_message(
                 "system",

@@ -356,8 +356,12 @@ def test_rag_mode_config_and_enhanced_safety_root_shims_delegate_to_runtime_modu
     assert RAGWorkflowProvider is RuntimeRAGWorkflowProvider
     assert create_root_rag_safety_rules is create_runtime_rag_safety_rules
     assert get_rag_capability_configs is get_runtime_rag_capability_configs
-    assert _is_instance_by_name(RAGAssistant.get_capability_provider(), RuntimeRAGCapabilityProvider)
-    assert _is_instance_by_name(RAGAssistant.get_mode_config_provider(), RuntimeRAGModeConfigProvider)
+    assert _is_instance_by_name(
+        RAGAssistant.get_capability_provider(), RuntimeRAGCapabilityProvider
+    )
+    assert _is_instance_by_name(
+        RAGAssistant.get_mode_config_provider(), RuntimeRAGModeConfigProvider
+    )
 
 
 def test_rag_enrichment_root_shim_delegates_to_runtime_module() -> None:

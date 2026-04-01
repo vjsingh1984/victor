@@ -35,16 +35,12 @@ def test_contrib_register_emits_deprecation_warning(module_path):
     ctx = MagicMock()
 
     # Simulate no external package installed so register() proceeds to the warning
-    with patch(
-        "victor.verticals.contrib._compat.external_package_installed", return_value=False
-    ):
+    with patch("victor.verticals.contrib._compat.external_package_installed", return_value=False):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             plugin.register(ctx)
 
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
             assert (
                 len(deprecation_warnings) >= 1
             ), f"Expected DeprecationWarning from {module_path}.register(), got: {[x.message for x in w]}"
@@ -68,16 +64,12 @@ def test_contrib_register_skips_when_external_installed(module_path):
 
     ctx = MagicMock()
 
-    with patch(
-        "victor.verticals.contrib._compat.external_package_installed", return_value=True
-    ):
+    with patch("victor.verticals.contrib._compat.external_package_installed", return_value=True):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             plugin.register(ctx)
 
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
             assert len(deprecation_warnings) == 0, (
                 f"Expected no DeprecationWarning when external package is installed, "
                 f"got: {[str(x.message) for x in deprecation_warnings]}"

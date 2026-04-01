@@ -54,9 +54,7 @@ class TestCriticalPhaseFailure:
     """Critical phases (provider_runtime, interaction_runtime) must raise."""
 
     def test_provider_runtime_failure_raises(self):
-        orch = _make_orchestrator(
-            failing_phases={"provider_runtime": RuntimeError("no provider")}
-        )
+        orch = _make_orchestrator(failing_phases={"provider_runtime": RuntimeError("no provider")})
         manager = InitializationPhaseManager()
 
         with pytest.raises(InitializationError) as exc_info:
@@ -119,9 +117,7 @@ class TestNonCriticalPhaseFailure:
         assert len(result.phases) == 8
 
     def test_memory_runtime_failure_continues(self):
-        orch = _make_orchestrator(
-            failing_phases={"memory_runtime": RuntimeError("no memory")}
-        )
+        orch = _make_orchestrator(failing_phases={"memory_runtime": RuntimeError("no memory")})
         manager = InitializationPhaseManager()
 
         result = manager.run_all_phases(orch)
@@ -130,9 +126,7 @@ class TestNonCriticalPhaseFailure:
         failed_names = [p.name for p in result.failed_phases]
         assert "memory_runtime" in failed_names
         # Other phases still ran
-        succeeded_names = [
-            p.name for p in result.phases if p.success
-        ]
+        succeeded_names = [p.name for p in result.phases if p.success]
         assert "provider_runtime" in succeeded_names
         assert "interaction_runtime" in succeeded_names
 
@@ -141,9 +135,7 @@ class TestDependencySkipping:
     """Phases with unmet dependencies are skipped."""
 
     def test_provider_failure_skips_resilience_and_coordination(self):
-        orch = _make_orchestrator(
-            failing_phases={"provider_runtime": RuntimeError("no provider")}
-        )
+        orch = _make_orchestrator(failing_phases={"provider_runtime": RuntimeError("no provider")})
         manager = InitializationPhaseManager()
 
         with pytest.raises(InitializationError):
@@ -269,9 +261,9 @@ class TestHappyPath:
         result = manager.run_all_phases(orch)
 
         for phase in result.phases:
-            assert len(phase.components_created) > 0, (
-                f"Phase '{phase.name}' should list created components"
-            )
+            assert (
+                len(phase.components_created) > 0
+            ), f"Phase '{phase.name}' should list created components"
 
     def test_all_phases_have_positive_duration(self):
         orch = _make_orchestrator()
@@ -301,9 +293,7 @@ class TestInitializationError:
         assert "connection refused" in str(err)
 
     def test_error_is_exception(self):
-        err = InitializationError(
-            phase="test", error="fail", completed_phases=[]
-        )
+        err = InitializationError(phase="test", error="fail", completed_phases=[])
         assert isinstance(err, Exception)
 
 

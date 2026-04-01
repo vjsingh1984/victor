@@ -38,11 +38,13 @@ class TestTokenTracker:
 
     def test_accumulate_single_response(self) -> None:
         tracker = TokenTracker()
-        tracker.accumulate({
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-        })
+        tracker.accumulate(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            }
+        )
         usage = tracker.get_usage()
         assert usage["prompt_tokens"] == 100
         assert usage["completion_tokens"] == 50
@@ -61,13 +63,15 @@ class TestTokenTracker:
 
     def test_accumulate_with_cache_tokens(self) -> None:
         tracker = TokenTracker()
-        tracker.accumulate({
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "cache_read_tokens": 30,
-            "cache_write_tokens": 20,
-        })
+        tracker.accumulate(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+                "cache_read_tokens": 30,
+                "cache_write_tokens": 20,
+            }
+        )
         usage = tracker.get_usage()
         assert usage["cache_read_tokens"] == 30
         assert usage["cache_write_tokens"] == 20
@@ -116,13 +120,15 @@ class TestTokenTrackerReset:
 
     def test_reset_clears_all_counters(self) -> None:
         tracker = TokenTracker()
-        tracker.accumulate({
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150,
-            "cache_read_tokens": 30,
-            "cache_write_tokens": 20,
-        })
+        tracker.accumulate(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+                "cache_read_tokens": 30,
+                "cache_write_tokens": 20,
+            }
+        )
         tracker.reset()
         assert all(v == 0 for v in tracker.get_usage().values())
 
@@ -164,11 +170,13 @@ class TestTokenTrackerThreadSafety:
 
         def accumulate_many() -> None:
             for _ in range(iterations_per_thread):
-                tracker.accumulate({
-                    "prompt_tokens": 1,
-                    "completion_tokens": 1,
-                    "total_tokens": 2,
-                })
+                tracker.accumulate(
+                    {
+                        "prompt_tokens": 1,
+                        "completion_tokens": 1,
+                        "total_tokens": 2,
+                    }
+                )
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = [executor.submit(accumulate_many) for _ in range(num_threads)]

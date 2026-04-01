@@ -4,7 +4,10 @@ from types import SimpleNamespace
 from victor.config.settings import Settings
 from victor.core.bootstrap import bootstrap_container
 from victor.core.plugins.context import HostPluginContext
-from victor.workflows.compiler_protocols import ExecutionContextProtocol, NodeExecutorFactoryProtocol
+from victor.workflows.compiler_protocols import (
+    ExecutionContextProtocol,
+    NodeExecutorFactoryProtocol,
+)
 from victor.workflows.executors.registry import clear_registered_workflow_node_executors
 from victor.workflows.orchestrator_pool import OrchestratorPool
 

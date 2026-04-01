@@ -392,9 +392,7 @@ class ResumeCommand(BaseSlashCommand):
 
             if resume_ctx.ledger and hasattr(ctx.agent, "session_ledger"):
                 ctx.agent.session_ledger = resume_ctx.ledger
-                logger.info(
-                    f"Restored session ledger: {len(resume_ctx.ledger.entries)} entries"
-                )
+                logger.info(f"Restored session ledger: {len(resume_ctx.ledger.entries)} entries")
 
             if resume_ctx.execution_state and hasattr(ctx.agent, "session_state_accessor"):
                 accessor = ctx.agent.session_state_accessor
@@ -426,7 +424,11 @@ class ResumeCommand(BaseSlashCommand):
                 _hm = getattr(_cc, "_hierarchical_manager", None)
                 if _hm:
                     active_ctx = _hm.get_active_context()
-                    if active_ctx and hasattr(_cc, "_compaction_summaries") and not _cc._compaction_summaries:
+                    if (
+                        active_ctx
+                        and hasattr(_cc, "_compaction_summaries")
+                        and not _cc._compaction_summaries
+                    ):
                         _cc._compaction_summaries.append(active_ctx)
                     try:
                         _cc.inject_compaction_context()

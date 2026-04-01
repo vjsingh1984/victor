@@ -190,7 +190,9 @@ class VersionCompatibilityMatrix:
                     rule = CompatibilityRule(**rule_data)
                     self._rules[rule.vertical_name] = rule
                 except (TypeError, ValueError) as e:
-                    logger.warning(f"Failed to load default rule for '{rule_data.get('vertical_name')}': {e}")
+                    logger.warning(
+                        f"Failed to load default rule for '{rule_data.get('vertical_name')}': {e}"
+                    )
 
             self._loaded = True
             logger.debug(f"Loaded {len(self._rules)} default compatibility rules")
@@ -466,7 +468,9 @@ def check_vertical_compatibility(
         ...     print("Compatible!")
     """
     matrix = get_compatibility_matrix()
-    return matrix.check_compatibility(vertical_name, vertical_version, framework_version, available_features)
+    return matrix.check_compatibility(
+        vertical_name, vertical_version, framework_version, available_features
+    )
 
 
 __all__ = [

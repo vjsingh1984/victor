@@ -81,10 +81,7 @@ async def test_aws_provider_start_sqs_uses_to_thread_for_create_queue() -> None:
         handle = await provider._start_sqs(config)
 
     assert handle.metadata["queue_name"] == "test-queue"
-    assert (
-        handle.connection_info["SQS_QUEUE_URL"]
-        == "https://sqs.us-east-1.amazonaws.com/123/test"
-    )
+    assert handle.connection_info["SQS_QUEUE_URL"] == "https://sqs.us-east-1.amazonaws.com/123/test"
     assert handle.connection_info["SQS_QUEUE_NAME"] == "test-queue"
     assert mock_to_thread.await_count == 2
     first = mock_to_thread.await_args_list[0]

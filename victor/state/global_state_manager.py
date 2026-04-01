@@ -366,16 +366,12 @@ class GlobalStateManager:
 
                 manager = self._managers.get(scope)
                 if not manager:
-                    raise ValueError(
-                        f"Cannot restore scope {scope.value}: no manager registered"
-                    )
+                    raise ValueError(f"Cannot restore scope {scope.value}: no manager registered")
 
                 try:
                     await manager.restore(snapshot)
                 except Exception as e:
-                    logger.error(
-                        f"Failed to restore snapshot for scope {scope.value}: {e}"
-                    )
+                    logger.error(f"Failed to restore snapshot for scope {scope.value}: {e}")
                     raise
 
         logger.info(f"Restored checkpoint across {len(checkpoint)} scopes")

@@ -43,7 +43,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-BUILTIN_NODE_EXECUTOR_TYPES = ("agent", "compute", "transform", "parallel", "condition", "team", "hitl")
+BUILTIN_NODE_EXECUTOR_TYPES = (
+    "agent",
+    "compute",
+    "transform",
+    "parallel",
+    "condition",
+    "team",
+    "hitl",
+)
 
 
 class NodeExecutorFactory:

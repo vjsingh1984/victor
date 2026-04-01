@@ -78,7 +78,11 @@ class TestToolPreFilter:
 
         mock_pipeline = MagicMock()
         mock_registry = MagicMock()
-        mock_registry.get_tool_names.return_value = known_tools or {"read_file", "write_file", "shell"}
+        mock_registry.get_tool_names.return_value = known_tools or {
+            "read_file",
+            "write_file",
+            "shell",
+        }
 
         coordinator = ToolCoordinator(
             tool_pipeline=mock_pipeline,

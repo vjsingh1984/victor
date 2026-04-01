@@ -30,10 +30,20 @@ from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, check_docker_available
 
-SAFE_OPERATIONS = frozenset({
-    "ps", "start", "stop", "restart", "logs",
-    "stats", "inspect", "images", "networks", "volumes",
-})
+SAFE_OPERATIONS = frozenset(
+    {
+        "ps",
+        "start",
+        "stop",
+        "restart",
+        "logs",
+        "stats",
+        "inspect",
+        "images",
+        "networks",
+        "volumes",
+    }
+)
 DANGEROUS_OPERATIONS = frozenset({"exec", "rm", "rmi", "pull", "run"})
 
 
@@ -146,9 +156,7 @@ async def docker(
             from victor.config.settings import get_settings
 
             settings = get_settings()
-            allow_dangerous = getattr(
-                settings, "docker_allow_dangerous_operations", False
-            )
+            allow_dangerous = getattr(settings, "docker_allow_dangerous_operations", False)
         except Exception:
             allow_dangerous = False
         if not allow_dangerous:

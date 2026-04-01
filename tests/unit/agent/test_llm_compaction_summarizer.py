@@ -12,7 +12,9 @@ from victor.providers.base import Message
 @pytest.fixture
 def mock_provider():
     provider = MagicMock()
-    provider.chat.return_value = "User asked about JWT auth. Read auth/middleware.py. Plan: add validate_token()."
+    provider.chat.return_value = (
+        "User asked about JWT auth. Read auth/middleware.py. Plan: add validate_token()."
+    )
     return provider
 
 

@@ -26,7 +26,9 @@ class TestDemoDocsSyncBridge:
 
     def test_main_uses_shared_sync_bridge_for_query(self) -> None:
         coro = object()
-        args = SimpleNamespace(path=None, pattern=None, query="auth flow", stats=False, victor=False)
+        args = SimpleNamespace(
+            path=None, pattern=None, query="auth flow", stats=False, victor=False
+        )
 
         with (
             patch.object(demo_docs.argparse.ArgumentParser, "parse_args", return_value=args),
@@ -50,7 +52,9 @@ class TestDemoDocsSyncBridge:
 
         with (
             patch.object(demo_docs.argparse.ArgumentParser, "parse_args", return_value=args),
-            patch.object(demo_docs, "ingest_project_docs", Mock(return_value=coro)) as mock_ingest_docs,
+            patch.object(
+                demo_docs, "ingest_project_docs", Mock(return_value=coro)
+            ) as mock_ingest_docs,
             patch.object(demo_docs, "run_sync", return_value={"*.rst": 4}) as mock_run_sync,
             patch("builtins.print"),
         ):

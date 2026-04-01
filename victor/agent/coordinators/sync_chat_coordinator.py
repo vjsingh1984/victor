@@ -130,7 +130,9 @@ class SyncChatCoordinator:
             if self._query_classifier:
                 classification = self._query_classifier.classify(user_message)
                 # Update system prompt with task-aware guidance
-                if self._orchestrator and hasattr(self._orchestrator, "update_system_prompt_for_query"):
+                if self._orchestrator and hasattr(
+                    self._orchestrator, "update_system_prompt_for_query"
+                ):
                     self._orchestrator.update_system_prompt_for_query(classification)
                 if classification.should_plan:
                     return await self._chat_with_planning(user_message)

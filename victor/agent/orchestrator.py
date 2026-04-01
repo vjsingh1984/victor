@@ -2667,9 +2667,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with classification results
         """
-        return self._system_prompt_coordinator.classify_task_with_context(
-            user_message, history
-        )
+        return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.

@@ -153,8 +153,8 @@ class VerticalLoader:
                 # Only warn for genuine collisions, not expected external/contrib coexistence.
                 reg_module = getattr(vertical, "__module__", "")
                 ep_module = getattr(ep_vertical, "__module__", "")
-                is_expected_override = (
-                    ("verticals.contrib" in reg_module) != ("verticals.contrib" in ep_module)
+                is_expected_override = ("verticals.contrib" in reg_module) != (
+                    "verticals.contrib" in ep_module
                 )
                 if not is_expected_override:
                     logger.warning(
@@ -888,7 +888,7 @@ class VerticalLoader:
 
         except (ImportError, AttributeError) as exc:
             logger.debug("Version compatibility check skipped: %s", exc)
-        except ValueError as exc:
+        except ValueError:
             # Re-raise ValueError as it indicates incompatibility
             raise
         except Exception as exc:
@@ -956,9 +956,7 @@ class VerticalLoader:
             from victor.core.verticals.dependency_graph import DependencyCycleError
 
             if isinstance(exc, DependencyCycleError):
-                raise ValueError(
-                    f"Vertical '{manifest.name}' has circular dependencies: {exc}"
-                )
+                raise ValueError(f"Vertical '{manifest.name}' has circular dependencies: {exc}")
             else:
                 raise
 

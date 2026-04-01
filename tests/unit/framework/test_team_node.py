@@ -478,15 +478,18 @@ class TestTeamNodeSyncExecute:
         """Test that sync execute properly wraps async execute."""
         coro = object()
 
-        with patch.object(
-            simple_team_node,
-            "execute_async",
-            new=Mock(return_value=coro),
-        ) as mock_execute, patch.object(
-            nodes_module,
-            "run_sync",
-            return_value={"team_result": "ok"},
-        ) as mock_run_sync:
+        with (
+            patch.object(
+                simple_team_node,
+                "execute_async",
+                new=Mock(return_value=coro),
+            ) as mock_execute,
+            patch.object(
+                nodes_module,
+                "run_sync",
+                return_value={"team_result": "ok"},
+            ) as mock_run_sync,
+        ):
             graph_state = {"key": "value"}
 
             result = simple_team_node.execute(None, graph_state)
@@ -503,15 +506,18 @@ class TestTeamNodeSyncExecute:
         """Test that sync execute uses the shared bridge from async contexts."""
         coro = object()
 
-        with patch.object(
-            simple_team_node,
-            "execute_async",
-            new=Mock(return_value=coro),
-        ) as mock_execute, patch.object(
-            nodes_module,
-            "run_sync",
-            return_value={"team_result": "ok"},
-        ) as mock_run_sync:
+        with (
+            patch.object(
+                simple_team_node,
+                "execute_async",
+                new=Mock(return_value=coro),
+            ) as mock_execute,
+            patch.object(
+                nodes_module,
+                "run_sync",
+                return_value={"team_result": "ok"},
+            ) as mock_run_sync,
+        ):
             result = simple_team_node.execute(None, {"key": "value"})
 
         mock_execute.assert_called_once_with(None, {"key": "value"})

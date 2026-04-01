@@ -86,9 +86,7 @@ def get_global_manager() -> GlobalStateManager:
 
                 # Register all scope managers
                 manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-                manager.register_manager(
-                    StateScope.CONVERSATION, ConversationStateManager()
-                )
+                manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
                 manager.register_manager(StateScope.TEAM, TeamStateManager())
                 manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
 

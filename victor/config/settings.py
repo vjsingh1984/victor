@@ -337,11 +337,7 @@ class ProviderConfig(BaseSettings):
         for name in secret_fields:
             val = getattr(self, name, None)
             if val is not None:
-                result[name] = (
-                    val.get_secret_value()
-                    if isinstance(val, SecretStr)
-                    else val
-                )
+                result[name] = val.get_secret_value() if isinstance(val, SecretStr) else val
         return result
 
 
@@ -883,9 +879,7 @@ class ExplorationSettings(_BaseModel):
     max_continuation_prompts_default: int = 3
     max_continuation_prompts_action: int = 5
     max_continuation_prompts_analysis: int = 6
-    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
-        default_factory=dict
-    )
+    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(default_factory=dict)
     enable_continuation_rl_learning: bool = False
 
 
@@ -973,14 +967,10 @@ class Settings(BaseSettings):
 
     # Change listeners for runtime config updates.
     # Stored at class level so all instances share the same listener list.
-    _change_listeners: ClassVar[
-        List[Callable[[str, Any, Any], None]]
-    ] = []
+    _change_listeners: ClassVar[List[Callable[[str, Any, Any], None]]] = []
 
     @classmethod
-    def add_change_listener(
-        cls, callback: Callable[[str, Any, Any], None]
-    ) -> None:
+    def add_change_listener(cls, callback: Callable[[str, Any, Any], None]) -> None:
         """Register callback for settings changes.
 
         Callbacks receive ``(field_name, old_value, new_value)`` when
@@ -994,9 +984,7 @@ class Settings(BaseSettings):
         if callback in cls._change_listeners:
             cls._change_listeners.remove(callback)
 
-    def notify_change(
-        self, field_name: str, old_value: Any, new_value: Any
-    ) -> None:
+    def notify_change(self, field_name: str, old_value: Any, new_value: Any) -> None:
         """Notify all registered listeners of a settings change.
 
         This must be called explicitly after updating a setting via
@@ -1084,21 +1072,11 @@ class Settings(BaseSettings):
     enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
     hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
     plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
-    prompt_policy: Optional[PromptPolicySettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    conversation: Optional[ConversationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    exploration: Optional[ExplorationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    serialization: Optional[SerializationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
-    automation: Optional[AutomationSettings] = Field(
-        default=None, exclude=True, repr=False
-    )
+    prompt_policy: Optional[PromptPolicySettings] = Field(default=None, exclude=True, repr=False)
+    conversation: Optional[ConversationSettings] = Field(default=None, exclude=True, repr=False)
+    exploration: Optional[ExplorationSettings] = Field(default=None, exclude=True, repr=False)
+    serialization: Optional[SerializationSettings] = Field(default=None, exclude=True, repr=False)
+    automation: Optional[AutomationSettings] = Field(default=None, exclude=True, repr=False)
     code_correction: Optional[CodeCorrectionSettings] = Field(
         default=None, exclude=True, repr=False
     )
@@ -2070,7 +2048,8 @@ class Settings(BaseSettings):
     @field_validator("server_session_secret", mode="before")
     @classmethod
     def _autogenerate_session_secret(
-        cls, v: Optional[SecretStr],
+        cls,
+        v: Optional[SecretStr],
     ) -> SecretStr:
         """Auto-generate a cryptographically secure session secret when None."""
         if v is None:
@@ -2096,9 +2075,7 @@ class Settings(BaseSettings):
             "xai",
         ]
         if v.lower() not in valid_providers:
-            raise ValueError(
-                f"Invalid provider: {v}. Must be one of {valid_providers}"
-            )
+            raise ValueError(f"Invalid provider: {v}. Must be one of {valid_providers}")
         return v.lower()
 
     @field_validator("write_approval_mode")
@@ -2107,9 +2084,7 @@ class Settings(BaseSettings):
         """Validate write approval mode."""
         valid_modes = ["off", "risky_only", "all_writes"]
         if v not in valid_modes:
-            raise ValueError(
-                f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}"
-            )
+            raise ValueError(f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}")
         return v
 
     @field_validator("tool_validation_mode")
@@ -2118,9 +2093,7 @@ class Settings(BaseSettings):
         """Validate tool validation mode."""
         valid_modes = ["strict", "lenient", "off"]
         if v not in valid_modes:
-            raise ValueError(
-                f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}"
-            )
+            raise ValueError(f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}")
         return v
 
     @field_validator("context_compaction_strategy")
@@ -2130,8 +2103,7 @@ class Settings(BaseSettings):
         valid_strategies = ["simple", "tiered", "semantic", "hybrid"]
         if v not in valid_strategies:
             raise ValueError(
-                f"Invalid context_compaction_strategy: {v}. "
-                f"Must be one of {valid_strategies}"
+                f"Invalid context_compaction_strategy: {v}. " f"Must be one of {valid_strategies}"
             )
         return v
 
@@ -2139,14 +2111,9 @@ class Settings(BaseSettings):
     def validate_hybrid_search_weights(self) -> "Settings":
         """Validate that hybrid search weights sum to 1.0."""
         if self.enable_hybrid_search:
-            total_weight = (
-                self.hybrid_search_semantic_weight
-                + self.hybrid_search_keyword_weight
-            )
+            total_weight = self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
             if abs(total_weight - 1.0) > 0.01:
-                raise ValueError(
-                    f"Hybrid search weights must sum to 1.0, got {total_weight}"
-                )
+                raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
         return self
 
     @model_validator(mode="after")
@@ -2163,8 +2130,7 @@ class Settings(BaseSettings):
             val = getattr(self, field_name, "")
             if val and val not in known_providers:
                 warnings.warn(
-                    f"Unknown {field_name}='{val}'. "
-                    f"Known providers: {sorted(known_providers)}",
+                    f"Unknown {field_name}='{val}'. " f"Known providers: {sorted(known_providers)}",
                     UserWarning,
                     stacklevel=2,
                 )
@@ -2222,9 +2188,7 @@ class Settings(BaseSettings):
                     profiles_data = yaml.safe_load(f) or {}
 
                 # Extract profile if specified
-                if profile_name and profile_name in profiles_data.get(
-                    "profiles", {}
-                ):
+                if profile_name and profile_name in profiles_data.get("profiles", {}):
                     profile_config = profiles_data["profiles"][profile_name]
                     # Only take settings that exist in Settings
                     for key, value in profile_config.items():
@@ -2256,9 +2220,7 @@ class Settings(BaseSettings):
         if cli_args:
             # Filter out None values and non-field keys
             filtered_args = {
-                k: v
-                for k, v in cli_args.items()
-                if v is not None and k in cls.model_fields
+                k: v for k, v in cli_args.items() if v is not None and k in cls.model_fields
             }
             if filtered_args:
                 settings = settings.model_copy(update=filtered_args)

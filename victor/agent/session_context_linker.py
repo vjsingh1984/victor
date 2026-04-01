@@ -128,9 +128,7 @@ class SessionContextLinker:
                 file_list = ", ".join(sorted(files.keys())[:5])
                 summary_parts.append(f"read: {file_list}")
 
-            decisions = [
-                e.summary for e in ledger.entries if e.category == "decision"
-            ]
+            decisions = [e.summary for e in ledger.entries if e.category == "decision"]
             if decisions:
                 summary_parts.append(f"decided: {'; '.join(decisions[:3])}")
 
@@ -156,9 +154,7 @@ class SessionContextLinker:
             resume_summary=resume_summary,
         )
 
-    def find_related_sessions(
-        self, query: str, limit: int = 3
-    ) -> List[Dict[str, Any]]:
+    def find_related_sessions(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
         """Semantic search across sessions for cross-session linking.
 
         Args:

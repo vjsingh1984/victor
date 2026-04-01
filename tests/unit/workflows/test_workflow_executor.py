@@ -169,7 +169,9 @@ class TestWorkflowExecutorChainHandlers:
 
         with (
             patch("victor.workflows.executor.get_chain_registry", return_value=registry),
-            patch("victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+            patch(
+                "victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread
+            ) as mock_to_thread,
         ):
             result = await executor._execute_chain_handler(node, context, "analysis_chain", 0.0)
 
@@ -200,7 +202,9 @@ class TestWorkflowExecutorChainHandlers:
 
         with (
             patch("victor.workflows.executor.get_chain_registry", return_value=registry),
-            patch("victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread) as mock_to_thread,
+            patch(
+                "victor.workflows.executor.asyncio.to_thread", side_effect=call_to_thread
+            ) as mock_to_thread,
         ):
             result = await executor._execute_chain_handler(node, context, "callable_chain", 0.0)
 

@@ -304,9 +304,7 @@ class AsyncSafeCacheManager:
             if key is None:
                 # Invalidate all keys in namespace
                 prefix = f"{namespace}:"
-                to_delete = [
-                    k for k in self._cache.keys() if k.startswith(prefix)
-                ]
+                to_delete = [k for k in self._cache.keys() if k.startswith(prefix)]
                 for k in to_delete:
                     del self._cache[k]
                     if k in self._locks:

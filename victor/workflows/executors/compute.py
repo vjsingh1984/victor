@@ -98,7 +98,11 @@ class ComputeNodeExecutor:
         tool_registry = None
         if self._context and hasattr(self._context, "tool_registry"):
             tool_registry = self._context.tool_registry
-        elif self._context and hasattr(self._context, "services") and self._context.services is not None:
+        elif (
+            self._context
+            and hasattr(self._context, "services")
+            and self._context.services is not None
+        ):
             from victor.tools.registry import ToolRegistry
 
             services = self._context.services

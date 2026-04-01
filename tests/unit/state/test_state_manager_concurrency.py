@@ -33,7 +33,6 @@ from victor.state.managers import (
 )
 from victor.state.factory import get_global_manager, reset_global_manager
 
-
 ALL_MANAGERS = [
     WorkflowStateManager,
     ConversationStateManager,

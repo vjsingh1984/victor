@@ -92,9 +92,7 @@ class InitializationPhaseManager:
         result = InitializationResult()
         succeeded_phases: Set[str] = set()
 
-        phases: List[
-            tuple[str, Callable[[], None], List[str], bool, List[str]]
-        ] = [
+        phases: List[tuple[str, Callable[[], None], List[str], bool, List[str]]] = [
             (
                 "provider_runtime",
                 orchestrator._initialize_provider_runtime,
@@ -175,13 +173,10 @@ class InitializationPhaseManager:
 
         for name, initializer, components, critical, dependencies in phases:
             # Check if all dependencies succeeded
-            missing_deps = [
-                dep for dep in dependencies if dep not in succeeded_phases
-            ]
+            missing_deps = [dep for dep in dependencies if dep not in succeeded_phases]
             if missing_deps:
                 reason = (
-                    f"skipped due to failed/skipped dependencies: "
-                    f"{', '.join(missing_deps)}"
+                    f"skipped due to failed/skipped dependencies: " f"{', '.join(missing_deps)}"
                 )
                 phase_result = PhaseResult(
                     name=name,

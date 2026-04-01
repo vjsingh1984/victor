@@ -36,7 +36,9 @@ class TestSyncEventWrapperBridge:
         with (
             patch.object(sync_wrapper_module.asyncio, "get_running_loop", return_value=object()),
             patch.object(sync_wrapper_module, "run_sync") as mock_run_sync,
-            patch.object(sync_wrapper_module, "run_sync_in_thread", return_value=True) as mock_run_sync_in_thread,
+            patch.object(
+                sync_wrapper_module, "run_sync_in_thread", return_value=True
+            ) as mock_run_sync_in_thread,
         ):
             result = wrapper.publish(event)
 

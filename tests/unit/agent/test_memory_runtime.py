@@ -67,7 +67,10 @@ def test_session_coordinator_init_embedding_store_bridges_sync_initialization():
             "victor.storage.embeddings.service.EmbeddingService.get_instance",
             return_value=embedding_service,
         ),
-        patch("victor.agent.conversation_embedding_store.ConversationEmbeddingStore", return_value=store),
+        patch(
+            "victor.agent.conversation_embedding_store.ConversationEmbeddingStore",
+            return_value=store,
+        ),
         patch("victor.agent.conversation_embedding_store._embedding_store", None),
         patch("victor.agent.tool_result_cache.ToolResultCache", return_value=semantic_cache),
         patch(
@@ -109,7 +112,10 @@ def test_session_coordinator_init_embedding_store_schedules_on_running_loop():
             "victor.storage.embeddings.service.EmbeddingService.get_instance",
             return_value=embedding_service,
         ),
-        patch("victor.agent.conversation_embedding_store.ConversationEmbeddingStore", return_value=store),
+        patch(
+            "victor.agent.conversation_embedding_store.ConversationEmbeddingStore",
+            return_value=store,
+        ),
         patch("victor.agent.conversation_embedding_store._embedding_store", None),
         patch("victor.agent.tool_result_cache.ToolResultCache", return_value=semantic_cache),
         patch(

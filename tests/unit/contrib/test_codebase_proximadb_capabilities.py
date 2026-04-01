@@ -136,7 +136,9 @@ def test_codebase_index_get_stats_uses_shared_sync_bridge_for_embedding_stats() 
     index._watcher_enabled = False
     index._observer = None
 
-    with patch.object(indexer_core_module, "run_sync", return_value={"vectors": 3}) as mock_run_sync:
+    with patch.object(
+        indexer_core_module, "run_sync", return_value={"vectors": 3}
+    ) as mock_run_sync:
         stats = index.get_stats()
 
     provider.get_stats.assert_called_once_with()

@@ -194,9 +194,7 @@ def register_vertical(
             VerticalRegistry.register(cls)
             logger.debug(f"Registered vertical '{name}' ({cls.__name__})")
         except ImportError:
-            logger.debug(
-                f"VerticalRegistry not available - skipping registration for '{name}'"
-            )
+            logger.debug(f"VerticalRegistry not available - skipping registration for '{name}'")
 
         # Register behavior configuration if manifest is available
         if ExtensionManifest is not None:

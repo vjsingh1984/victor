@@ -773,7 +773,9 @@ async def _execute_workflow_async(
 
         all_profiles = node_profiles | {profile}
 
-        console.print(f"[dim]Creating orchestrators for profiles: {', '.join(sorted(all_profiles))}[/]")
+        console.print(
+            f"[dim]Creating orchestrators for profiles: {', '.join(sorted(all_profiles))}[/]"
+        )
 
         for prof, nodes in sorted(profile_to_nodes.items()):
             logger.debug(f"Profile '{prof}' assigned to nodes: {', '.join(nodes)}")

@@ -545,8 +545,7 @@ class RequestQueue:
             import warnings
 
             warnings.warn(
-                "RequestQueue was not shut down. "
-                "Call shutdown() or use 'async with'.",
+                "RequestQueue was not shut down. " "Call shutdown() or use 'async with'.",
                 ResourceWarning,
                 stacklevel=2,
             )

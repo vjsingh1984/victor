@@ -373,7 +373,9 @@ class TestConfigSyncBridge:
                 return_value=MagicMock(is_valid=True),
             ),
             patch.object(config_cmd, "format_validation_result", return_value="ok"),
-            patch("victor.providers.registry.ProviderRegistry.list_providers", return_value=["ollama"]),
+            patch(
+                "victor.providers.registry.ProviderRegistry.list_providers", return_value=["ollama"]
+            ),
             patch.object(config_cmd, "_check_connectivity", mock_async),
             patch.object(config_cmd, "run_sync", return_value=None) as mock_run_sync,
             patch("builtins.print"),
@@ -689,7 +691,10 @@ class TestChatSyncBridge:
             patch.object(chat_cmd, "create_formatter", return_value=formatter),
             patch.object(chat_cmd.InputReader, "read_message", return_value="hello"),
             patch.object(chat_cmd, "load_settings", return_value=settings),
-            patch("victor.config.validation.validate_configuration", return_value=SimpleNamespace(is_valid=True)),
+            patch(
+                "victor.config.validation.validate_configuration",
+                return_value=SimpleNamespace(is_valid=True),
+            ),
             patch.object(chat_cmd, "run_oneshot", mock_async),
             patch.object(chat_cmd, "run_sync", return_value=None) as mock_run_sync,
             patch.object(chat_cmd.console, "print"),
@@ -729,7 +734,10 @@ class TestChatSyncBridge:
             patch.object(chat_cmd, "create_formatter", return_value=formatter),
             patch.object(chat_cmd.InputReader, "read_message", return_value=None),
             patch.object(chat_cmd, "load_settings", return_value=settings),
-            patch("victor.config.validation.validate_configuration", return_value=SimpleNamespace(is_valid=True)),
+            patch(
+                "victor.config.validation.validate_configuration",
+                return_value=SimpleNamespace(is_valid=True),
+            ),
             patch.object(chat_cmd, "run_interactive", mock_async),
             patch.object(chat_cmd, "run_sync", return_value=None) as mock_run_sync,
             patch.object(chat_cmd.console, "print"),

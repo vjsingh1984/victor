@@ -96,6 +96,7 @@ class TestAgentBuildOptions:
         assert not options.thinking
         assert not options.airgapped
         assert options.enable_observability
+
     def test_custom_values(self):
         """Test custom option values."""
         options = AgentBuildOptions(
