@@ -56,17 +56,6 @@ _CORE_NAMES = PUBLIC_API_NAMES + ["discover"]
 
 # === LAZY: Feature groups loaded on demand via PEP 562 ===
 _LAZY_IMPORTS: dict[str, list[str]] = {
-    "victor.framework.cqrs_bridge": [
-        "CQRSBridge",
-        "FrameworkEventAdapter",
-        "ObservabilityToCQRSBridge",
-        "create_cqrs_bridge",
-        "create_event_adapter",
-        "cqrs_event_to_framework",
-        "framework_event_to_cqrs",
-        "framework_event_to_observability",
-        "observability_event_to_framework",
-    ],
     "victor.framework.event_registry": [
         "BaseEventConverter",
         "EventConverterProtocol",

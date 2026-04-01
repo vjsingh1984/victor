@@ -686,8 +686,17 @@ def _resolve_ref(
     else:
         full_path = Path(file_path)
 
+    # Validate resolved path stays within base_dir (prevent path traversal)
+    resolved = full_path.resolve()
+    if base_dir:
+        base_resolved = base_dir.resolve()
+        if not str(resolved).startswith(str(base_resolved)):
+            raise YAMLWorkflowError(
+                f"Path traversal detected: {ref} resolves outside base directory"
+            )
+
     # Check cache
-    cache_key = str(full_path.resolve())
+    cache_key = str(resolved)
     if cache_key not in ref_cache:
         if not full_path.exists():
             raise YAMLWorkflowError(f"Referenced file not found: {full_path}")

@@ -10,12 +10,14 @@ from typing import Any, Dict, List
 from victor_sdk import (
     CapabilityIds,
     CapabilityRequirement,
+    ExtensionType,
     PromptMetadata,
     StageDefinition,
     ToolNames,
     VerticalBase,
 )
 
+from victor.core.verticals.registration import register_vertical
 from victor.verticals.contrib.devops.prompt_metadata import (
     DEVOPS_GROUNDING_RULES,
     DEVOPS_PROMPT_PRIORITY,
@@ -25,6 +27,17 @@ from victor.verticals.contrib.devops.prompt_metadata import (
 )
 
 
+@register_vertical(
+    name="devops",
+    version="1.0.0",
+    api_version=1,
+    min_framework_version=">=0.5.0",
+    provides={ExtensionType.TOOLS, ExtensionType.SAFETY},
+    canonicalize_tool_names=False,  # Preserves distinct tool names like 'grep' vs 'code_search'
+    tool_dependency_strategy="entry_point",
+    strict_mode=False,
+    load_priority=50,
+)
 class DevOpsAssistant(VerticalBase):
     """DevOps assistant for infrastructure, deployment, and CI/CD automation.
 

@@ -195,7 +195,6 @@ def apply_vertical_to_orchestrator(
 def setup_observability_integration(
     orchestrator: Any,
     session_id: Optional[str] = None,
-    enable_cqrs_bridge: bool = False,
 ) -> Any:
     """Set up ObservabilityIntegration for the orchestrator.
 
@@ -205,17 +204,15 @@ def setup_observability_integration(
     Args:
         orchestrator: AgentOrchestrator instance
         session_id: Optional session ID for event correlation
-        enable_cqrs_bridge: Whether to enable CQRS event bridging
 
     Returns:
         ObservabilityIntegration instance
     """
     from victor.observability.integration import ObservabilityIntegration
 
-    # Create integration with optional session ID and CQRS bridge
+    # Create integration with optional session ID
     integration = ObservabilityIntegration(
         session_id=session_id,
-        enable_cqrs_bridge=enable_cqrs_bridge,
     )
 
     # Wire into orchestrator

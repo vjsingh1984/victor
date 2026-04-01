@@ -34,7 +34,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass
-from importlib.metadata import entry_points
 from typing import Any, Iterable, List, Optional, Protocol, Sequence
 
 logger = logging.getLogger(__name__)
@@ -68,18 +67,24 @@ def load_fastapi_router_registrations(
     registrations: List[APIRouterRegistration] = []
 
     try:
-        eps = entry_points(group=entry_point_group)
-    except TypeError:
-        all_eps = entry_points()
-        eps = all_eps.get(entry_point_group, [])
+        from victor.framework.entry_point_registry import get_entry_point_registry
+
+        registry = get_entry_point_registry()
+        group_obj = registry.get_group(entry_point_group)
+
+        if not group_obj:
+            return registrations
+
+        entry_points_list = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()]
     except Exception as exc:
         logger.debug("Failed to discover API router entry points: %s", exc)
         return registrations
 
-    for ep in eps:
+    for ep, loaded in entry_points_list:
         try:
-            loaded = ep.load()
-            provider = loaded() if isinstance(loaded, type) else loaded
+            # Load entry point if not already loaded
+            provider = loaded if loaded is not False else ep.load()
+            provider = provider() if isinstance(provider, type) else provider
             raw = _invoke_provider(provider, workspace_root=workspace_root)
             normalized = _normalize_router_items(
                 raw,

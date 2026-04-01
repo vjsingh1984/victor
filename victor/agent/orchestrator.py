@@ -58,6 +58,7 @@ import ast
 import asyncio
 import json
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
@@ -191,6 +192,7 @@ from victor.agent.tool_output_formatter import (
 from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
 from victor.agent.streaming_controller import StreamingControllerConfig, StreamingSession
 from victor.agent.task_analyzer import get_task_analyzer
+from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 from victor.agent.tool_registrar import ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
@@ -764,6 +766,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Background task tracking for graceful shutdown
         self._background_tasks: set[asyncio.Task] = set()
+        self._bg_task_lock = threading.Lock()
+
+        # Tool error dedup (bounded to prevent memory leak in long sessions)
+        self._shown_tool_errors: set = set()
+        self._tool_context_cache: Optional[dict] = None
 
         # Result cache for pure/idempotent tools (via factory)
         self.tool_cache = self._factory.create_tool_cache()
@@ -972,6 +979,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # TaskAnalyzer: Unified task analysis facade
         self._task_analyzer = get_task_analyzer()
+
+        # SystemPromptCoordinator: Prompt building, shell resolution, task classification
+        self._system_prompt_coordinator = SystemPromptCoordinator(
+            prompt_builder=self.prompt_builder,
+            get_context_window=self._get_model_context_window,
+            provider_name=self.provider_name,
+            model_name=self.model,
+            get_tools=lambda: self.tools,
+            get_mode_controller=lambda: self.mode_controller,
+            task_analyzer=self._task_analyzer,
+            session_id=getattr(self, "_session_id", ""),
+        )
 
         # RLCoordinator: Framework-level RL with unified SQLite storage (via factory)
         self._rl_coordinator = self._factory.create_rl_coordinator()
@@ -2110,11 +2129,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             loop = asyncio.get_running_loop()
             task = loop.create_task(coro, name=name)
 
-            # Track the task
-            self._background_tasks.add(task)
+            # Track the task (lock protects concurrent add/discard)
+            with self._bg_task_lock:
+                self._background_tasks.add(task)
 
             # Remove from tracking when done
-            task.add_done_callback(self._background_tasks.discard)
+            def _discard_task(t: asyncio.Task) -> None:
+                with self._bg_task_lock:
+                    self._background_tasks.discard(t)
+
+            task.add_done_callback(_discard_task)
 
             logger.debug(f"Created background task: {name}")
             return task
@@ -2556,79 +2580,34 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
 
-        Includes dynamic parallel read budget based on model's context window.
+        Delegates to SystemPromptCoordinator.build_system_prompt() when
+        available. Falls back to inline logic during __init__ before
+        the coordinator is created.
         """
-        base_prompt = self.prompt_builder.build()
+        if hasattr(self, "_system_prompt_coordinator"):
+            return self._system_prompt_coordinator.build_system_prompt()
 
-        # Calculate dynamic parallel read budget based on model context window
+        # Fallback for calls during __init__ before coordinator is created
+        base_prompt = self.prompt_builder.build()
         context_window = self._get_model_context_window()
         budget = calculate_parallel_read_budget(context_window)
-
-        # Inject dynamic budget hint for models with reasonable context
-        # Only add for models with >= 32K context (smaller models benefit from sequential reads)
         if context_window >= 32768:
-            budget_hint = budget.to_prompt_hint()
-            final_prompt = f"{base_prompt}\n\n{budget_hint}"
-        else:
-            final_prompt = base_prompt
-
-        # Emit prompt_used event for RL learning
-        self._emit_prompt_used_event(final_prompt)
-
-        return final_prompt
+            return f"{base_prompt}\n\n{budget.to_prompt_hint()}"
+        return base_prompt
 
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
 
-        Args:
-            prompt: The final system prompt that was built
+        Delegates to SystemPromptCoordinator._emit_prompt_used_event().
         """
-        try:
-            from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
-
-            hooks = get_rl_hooks()
-            if hooks is None:
-                return
-
-            # Determine prompt style based on provider type
-            # Cloud providers use concise style, local uses detailed
-            provider_name = getattr(self.provider, "name", "unknown")
-            is_local = provider_name.lower() in {"ollama", "lmstudio", "vllm"}
-            prompt_style = "detailed" if is_local else "structured"
-
-            # Calculate prompt characteristics
-            has_examples = "example" in prompt.lower() or "e.g." in prompt.lower()
-            has_thinking = "step by step" in prompt.lower() or "think" in prompt.lower()
-            has_constraints = "must" in prompt.lower() or "always" in prompt.lower()
-
-            event = RLEvent(
-                type=RLEventType.PROMPT_USED,
-                success=True,  # Prompt was successfully built
-                quality_score=0.5,  # Neutral until we get outcome feedback
-                provider=provider_name,
-                model=self.model,
-                task_type="general",  # Will be updated with actual task type
-                metadata={
-                    "prompt_style": prompt_style,
-                    "prompt_length": len(prompt),
-                    "has_examples": has_examples,
-                    "has_thinking_prompt": has_thinking,
-                    "has_constraints": has_constraints,
-                    "session_id": getattr(self, "_session_id", ""),
-                },
-            )
-            hooks.emit(event)
-            logger.debug(f"Emitted prompt_used event: style={prompt_style}")
-
-        except Exception as e:
-            # RL hook failure should never block prompt building
-            logger.debug(f"Failed to emit prompt_used event: {e}")
+        self._system_prompt_coordinator._emit_prompt_used_event(prompt)
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
-        """Resolve shell aliases to the appropriate enabled shell variant."""
-        from victor.agent.shell_resolver import resolve_shell_variant
+        """Resolve shell aliases to the appropriate enabled shell variant.
 
-        return resolve_shell_variant(tool_name, self.tools, self.mode_controller)
+        Delegates to SystemPromptCoordinator.resolve_shell_variant().
+        """
+        return self._system_prompt_coordinator.resolve_shell_variant(tool_name)
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
         """Prefix a prompt with the thinking disable prefix if supported.
@@ -2664,31 +2643,33 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
-        Delegates to TaskAnalyzer.classify_task_keywords().
+        Delegates to SystemPromptCoordinator.classify_task_keywords().
 
         Args:
             user_message: The user's input message
 
         Returns:
-            Dictionary with classification results (see TaskAnalyzer.classify_task_keywords)
+            Dictionary with classification results
         """
-        return self._task_analyzer.classify_task_keywords(user_message)
+        return self._system_prompt_coordinator.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
         self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Delegates to TaskAnalyzer.classify_task_with_context().
+        Delegates to SystemPromptCoordinator.classify_task_with_context().
 
         Args:
             user_message: The user's input message
             history: Optional conversation history for context boosting
 
         Returns:
-            Dictionary with classification results (see TaskAnalyzer.classify_task_with_context)
+            Dictionary with classification results
         """
-        return self._task_analyzer.classify_task_with_context(user_message, history)
+        return self._system_prompt_coordinator.classify_task_with_context(
+            user_message, history
+        )
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
@@ -2801,10 +2782,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
 
+        Enforces max_conversation_history ceiling by removing oldest
+        non-system messages when the limit is reached.
+
         Args:
             role: Message role (user, assistant, system)
             content: Message content
         """
+        max_history = getattr(self.settings, "max_conversation_history", 100)
+        if len(self.conversation.messages) >= max_history:
+            # Remove oldest non-system message to stay within ceiling
+            for i, msg in enumerate(self.conversation.messages):
+                if msg.get("role") != "system":
+                    self.conversation.messages.pop(i)
+                    break
+
         self.conversation.add_message(role, content)
 
         # Persist to memory manager if available
@@ -3278,14 +3270,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             start = time.monotonic()
 
-            context = {
-                "code_manager": self.code_manager,
-                "provider": self.provider,
-                "model": self.model,
-                "tool_registry": self.tools,
-                "workflow_registry": self.workflow_registry,
-                "settings": self.settings,
-            }
+            context = self._get_tool_context()
 
             exec_result = await self.tool_executor.execute(
                 tool_name=tool_name,
@@ -3384,12 +3369,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 # Only show "Tool not found" errors once per tool name
                 _not_found = "not found" in str(error_display).lower()
                 _shown_key = f"notfound:{tool_name}" if _not_found else None
-                if not hasattr(self, "_shown_tool_errors"):
-                    self._shown_tool_errors: set = set()
                 if _shown_key and _shown_key in self._shown_tool_errors:
                     logger.debug("Suppressed repeated '%s' error display", tool_name)
                 else:
-                    if _shown_key:
+                    if _shown_key and len(self._shown_tool_errors) < 500:
                         self._shown_tool_errors.add(_shown_key)
                     self.console.print(
                         f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
@@ -3409,6 +3392,23 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     }
                 )
         return results
+
+    def _get_tool_context(self) -> dict:
+        """Get cached tool execution context dict.
+
+        Reuses the same dict across tool calls within a conversation turn
+        to avoid repeated allocation in the hot path.
+        """
+        if self._tool_context_cache is None:
+            self._tool_context_cache = {
+                "code_manager": self.code_manager,
+                "provider": self.provider,
+                "model": self.model,
+                "tool_registry": self.tools,
+                "workflow_registry": self.workflow_registry,
+                "settings": self.settings,
+            }
+        return self._tool_context_cache
 
     def reset_conversation(self) -> None:
         """Clear conversation history and session state.
@@ -3439,6 +3439,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.executed_tools.clear()
         self._consecutive_blocked_attempts = 0
         self._total_blocked_attempts = 0
+        self._shown_tool_errors.clear()
+        self._tool_context_cache = None
 
         logger.debug("Conversation and session state reset (via LifecycleManager)")
 

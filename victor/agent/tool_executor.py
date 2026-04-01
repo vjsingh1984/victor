@@ -151,6 +151,7 @@ class ToolExecutionResult:
         self.normalization_strategy = normalization_strategy
         self.correlation_id = correlation_id
         self.error_info = error_info
+        self.truncation_info: Any = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization/logging.
@@ -273,6 +274,7 @@ class ToolExecutor:
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
         self._failed_signatures: set[Tuple[str, str]] = set()
+        self._max_failed_signatures = 1000
         self._validation_failures: int = 0  # Track validation failures for metrics
         self._errors_by_category: Dict[str, int] = {}  # Track errors by category
 
@@ -761,7 +763,8 @@ class ToolExecutor:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure
             sig = (tool_name, str(sorted(normalized_args.items())))
-            self._failed_signatures.add(sig)
+            if len(self._failed_signatures) < self._max_failed_signatures:
+                self._failed_signatures.add(sig)
 
         # Emit RL event for tool execution (for learner activation)
         self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
@@ -769,7 +772,22 @@ class ToolExecutor:
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
 
-        return ToolExecutionResult(
+        # Enforce output size bounds to prevent context window blowout
+        truncation_info = None
+        if success and isinstance(result, str) and len(result) > 25600:
+            from victor.tools.output_utils import truncate_by_lines
+
+            result, truncation_info = truncate_by_lines(result)
+            if truncation_info.was_truncated:
+                logger.warning(
+                    "Tool %s output truncated: %d→%d lines (%s)",
+                    tool_name,
+                    truncation_info.total_lines,
+                    truncation_info.lines_returned,
+                    truncation_info.truncation_reason,
+                )
+
+        exec_result = ToolExecutionResult(
             tool_name=tool_name,
             success=success,
             result=result,
@@ -780,6 +798,8 @@ class ToolExecutor:
             correlation_id=correlation_id,
             error_info=error_info,
         )
+        exec_result.truncation_info = truncation_info
+        return exec_result
 
     def _run_before_hooks(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Run before hooks for a tool execution.
@@ -929,7 +949,12 @@ class ToolExecutor:
 
                 # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
                 arguments.pop("_exec_ctx", None)
-                result = await tool.execute(_exec_ctx=context, **arguments)
+                # Per-tool timeout: tools can declare timeout_seconds, default 30s
+                per_attempt_timeout = getattr(tool, "timeout_seconds", 30.0)
+                result = await asyncio.wait_for(
+                    tool.execute(_exec_ctx=context, **arguments),
+                    timeout=per_attempt_timeout,
+                )
 
                 # Run after hooks - critical hooks can raise errors
                 self._run_after_hooks(tool.name, result)

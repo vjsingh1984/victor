@@ -110,6 +110,11 @@ class VerticalLoader:
         self._plugin_refresh_count: int = 0
         self._plugin_refresh_last_ms: float = 0.0
 
+        # Dependency graph for resolving load order
+        from victor.core.verticals.dependency_graph import ExtensionDependencyGraph
+
+        self._dependency_graph = ExtensionDependencyGraph()
+
     @property
     def active_vertical(self) -> Optional[Type[VerticalBase]]:
         """Get the currently active vertical."""
@@ -179,6 +184,9 @@ class VerticalLoader:
 
             # Capability negotiation: validate manifest before activation
             self._negotiate_manifest(runtime_vertical)
+
+            # Dependency validation: check dependencies before activation
+            self._validate_dependencies(runtime_vertical)
 
             self._activate(runtime_vertical)
             return runtime_vertical
@@ -706,6 +714,78 @@ class VerticalLoader:
             self._vertical_last_discovery_ms = 0.0
             self._tool_last_discovery_ms = 0.0
 
+    def _build_dependency_graph(self) -> None:
+        """Build dependency graph from discovered verticals.
+
+        Constructs the dependency graph by collecting manifests from all
+        discovered verticals and adding their dependencies to the graph.
+        """
+        from victor.core.verticals.dependency_graph import ExtensionDependencyGraph
+
+        # Create fresh graph
+        self._dependency_graph = ExtensionDependencyGraph()
+
+        # Get all discovered verticals
+        discovered = self.discover_verticals()
+
+        # Add each vertical to the graph
+        for vertical_name, vertical_class in discovered.items():
+            try:
+                manifest = vertical_class.get_manifest()
+                self._dependency_graph.add_vertical(
+                    vertical_name,
+                    manifest.version,
+                    manifest,
+                    manifest.load_priority,
+                )
+            except (AttributeError, NotImplementedError):
+                # Vertical doesn't have manifest support
+                self._dependency_graph.add_vertical(
+                    vertical_name,
+                    getattr(vertical_class, "version", "1.0.0"),
+                    None,
+                    0,
+                )
+
+        # Add dependency relationships
+        for vertical_name, vertical_class in discovered.items():
+            try:
+                manifest = vertical_class.get_manifest()
+                for dep in manifest.extension_dependencies:
+                    try:
+                        self._dependency_graph.add_dependency(
+                            vertical_name,
+                            dep.extension_name,
+                            required=not dep.optional,
+                        )
+                    except ValueError as e:
+                        # Dependency not in graph
+                        if not dep.optional:
+                            logger.warning(
+                                f"Required dependency '{dep.extension_name}' "
+                                f"not found for vertical '{vertical_name}': {e}"
+                            )
+            except (AttributeError, NotImplementedError):
+                pass
+
+        logger.debug(f"Built dependency graph with {len(discovered)} verticals")
+
+    def get_dependency_graph(self) -> "ExtensionDependencyGraph":
+        """Get the dependency graph.
+
+        Returns:
+            ExtensionDependencyGraph instance
+        """
+        return self._dependency_graph
+
+    def get_dependency_graph_depth(self) -> int:
+        """Get the depth of the dependency graph.
+
+        Returns:
+            Maximum depth of dependency chains
+        """
+        return self._dependency_graph.get_graph_depth()
+
     def _negotiate_manifest(self, vertical: Type[VerticalBase]) -> None:
         """Run capability negotiation on the vertical's manifest.
 
@@ -759,6 +839,128 @@ class VerticalLoader:
         except (ImportError, AttributeError) as exc:
             # Graceful degradation if manifest/negotiator not available
             logger.debug("Manifest negotiation skipped: %s", exc)
+
+        # 3. Version Compatibility Matrix Check
+        try:
+            from victor.core.verticals.version_matrix import (
+                VersionCompatibilityMatrix,
+                get_compatibility_matrix,
+            )
+            from victor.version import VERSION as FRAMEWORK_VERSION
+            from packaging.version import parse as parse_version
+
+            vertical_version = getattr(manifest, "version", "1.0.0")
+            vertical_name = manifest.name
+
+            # Get compatibility matrix
+            matrix = get_compatibility_matrix()
+
+            # Load default rules if not loaded
+            if not matrix.is_loaded():
+                matrix.load_default_rules()
+
+            # Check compatibility
+            result = matrix.check_compatibility(
+                vertical_name=vertical_name,
+                vertical_version=vertical_version,
+                framework_version=FRAMEWORK_VERSION,
+            )
+
+            if result.is_incompatible:
+                raise ValueError(
+                    f"Vertical '{vertical_name}' is incompatible with framework {FRAMEWORK_VERSION}: "
+                    f"{result.message}"
+                )
+
+            if result.status.value == "degraded":
+                logger.warning(
+                    "Vertical '%s' is running in degraded mode: %s",
+                    vertical_name,
+                    result.message,
+                )
+
+            if result.required_features:
+                logger.warning(
+                    "Vertical '%s' requires features that are not available: %s",
+                    vertical_name,
+                    ", ".join(sorted(result.required_features)),
+                )
+
+        except (ImportError, AttributeError) as exc:
+            logger.debug("Version compatibility check skipped: %s", exc)
+        except ValueError as exc:
+            # Re-raise ValueError as it indicates incompatibility
+            raise
+        except Exception as exc:
+            logger.debug("Version compatibility check failed: %s", exc)
+
+    def _validate_dependencies(self, vertical: Type[VerticalBase]) -> None:
+        """Validate vertical dependencies before activation.
+
+        Checks that:
+        1. All required dependencies are available
+        2. No circular dependencies exist
+        3. Load order can be resolved
+
+        Args:
+            vertical: Vertical class to validate
+
+        Raises:
+            ValueError: If dependencies cannot be satisfied
+        """
+        try:
+            manifest = vertical.get_manifest()
+        except (ImportError, AttributeError, NotImplementedError):
+            # No manifest - skip dependency validation
+            return
+
+        if not manifest.extension_dependencies:
+            # No dependencies - nothing to validate
+            return
+
+        # Rebuild dependency graph to ensure it's up-to-date
+        self._build_dependency_graph()
+
+        # Check for circular dependencies
+        try:
+            load_sequence = self._dependency_graph.get_load_sequence(manifest.name)
+
+            # Check if all dependencies in sequence are available
+            discovered = self.discover_verticals()
+            missing = set(load_sequence) - set(discovered.keys())
+
+            if missing:
+                # Filter out optional dependencies
+                required_missing = set()
+                for dep_name in missing:
+                    for dep in manifest.extension_dependencies:
+                        if dep.extension_name == dep_name and not dep.optional:
+                            required_missing.add(dep_name)
+
+                if required_missing:
+                    raise ValueError(
+                        f"Vertical '{manifest.name}' requires dependencies "
+                        f"that are not available: {', '.join(sorted(required_missing))}"
+                    )
+
+                # Warn about optional missing dependencies
+                optional_missing = missing - required_missing
+                if optional_missing:
+                    logger.warning(
+                        "Vertical '%s' has optional dependencies that are not available: %s",
+                        manifest.name,
+                        ", ".join(sorted(optional_missing)),
+                    )
+
+        except Exception as exc:
+            from victor.core.verticals.dependency_graph import DependencyCycleError
+
+            if isinstance(exc, DependencyCycleError):
+                raise ValueError(
+                    f"Vertical '{manifest.name}' has circular dependencies: {exc}"
+                )
+            else:
+                raise
 
     def _fire_plugin_lifecycle(self, hook: str, vertical_name: str) -> None:
         """Fire a lifecycle hook on the plugin associated with a vertical name."""

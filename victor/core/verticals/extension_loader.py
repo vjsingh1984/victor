@@ -95,6 +95,7 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional,
 from victor.core.verticals.extension_cache_manager import ExtensionCacheManager
 from victor.core.verticals.extension_module_resolver import ExtensionModuleResolver
 from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
+from victor.core.verticals.vertical_metadata import VerticalMetadata
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -905,7 +906,9 @@ class VerticalExtensionLoader(ABC):
         if provider is not None:
             return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction (replaces .replace() pattern)
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         return cls._resolve_class_or_factory_extension(
             "mode_config_provider",
             "mode_config",
@@ -1078,7 +1081,9 @@ class VerticalExtensionLoader(ABC):
             if provider is not None:
                 return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         return cls._resolve_class_or_factory_extension(
             "rl_config_provider",
             "rl",
@@ -1092,7 +1097,9 @@ class VerticalExtensionLoader(ABC):
         Returns:
             RLHooks instance or None
         """
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         return cls._resolve_class_or_factory_extension(
             "rl_hooks",
             "rl",
@@ -1118,7 +1125,9 @@ class VerticalExtensionLoader(ABC):
         if provider is not None:
             return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         class_name = f"{vertical_name}TeamSpecProvider"
         candidate_paths = [
             path
@@ -1185,7 +1194,9 @@ class VerticalExtensionLoader(ABC):
         if provider is not None:
             return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         return cls._resolve_class_or_factory_extension(
             "capability_provider",
             "capabilities",
@@ -1206,7 +1217,9 @@ class VerticalExtensionLoader(ABC):
         if provider is not None:
             return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         class_name = f"{vertical_name}ServiceProvider"
         candidate_paths = cls._find_available_candidates("service_provider")
         last_error: Optional[Exception] = None
@@ -1729,7 +1742,9 @@ class VerticalExtensionLoader(ABC):
         if provider is not None:
             return provider
 
-        vertical_name = cls.__name__.replace("Assistant", "").replace("Vertical", "")
+        # Use VerticalMetadata for type-safe name extraction
+        metadata = VerticalMetadata.from_class(cls)
+        vertical_name = metadata.canonical_name
         class_name = f"{vertical_name}WorkflowProvider"
 
         candidate_paths: List[str] = []

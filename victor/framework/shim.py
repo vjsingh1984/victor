@@ -118,7 +118,6 @@ class FrameworkShim:
         vertical: Optional[Union[Type["VerticalBase"], str]] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
-        enable_cqrs_bridge: bool = False,
     ) -> None:
         """Initialize the FrameworkShim.
 
@@ -134,7 +133,6 @@ class FrameworkShim:
             enable_observability: Whether to wire ObservabilityIntegration.
             session_id: Optional session ID for event correlation.
                 If not provided, a new UUID will be generated.
-            enable_cqrs_bridge: Whether to enable CQRS event bridging.
         """
         import warnings
 
@@ -153,8 +151,6 @@ class FrameworkShim:
         self._vertical = self._resolve_vertical(vertical)
         self._enable_observability = enable_observability
         self._session_id = session_id or str(uuid.uuid4())
-        self._enable_cqrs_bridge = enable_cqrs_bridge
-
         # Set after create_orchestrator()
         self._orchestrator: Optional["AgentOrchestrator"] = None
         self._observability: Optional["ObservabilityIntegration"] = None
@@ -288,12 +284,10 @@ class FrameworkShim:
         self._observability = setup_observability_integration(
             self._orchestrator,
             session_id=self._session_id,
-            enable_cqrs_bridge=self._enable_cqrs_bridge,
         )
 
         logger.debug(
-            f"Wired observability: session_id={self._session_id}, "
-            f"cqrs_bridge={self._enable_cqrs_bridge}"
+            f"Wired observability: session_id={self._session_id}"
         )
 
     # =========================================================================

@@ -115,7 +115,8 @@ class VerticalRuntimeAdapter:
         warnings.warn(
             "VerticalRuntimeAdapter.resolve_definition() is deprecated. "
             "Use vertical.get_definition() directly on VerticalBase implementations. "
-            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            "See docs/MIGRATION_GUIDE.md for migration examples. "
+            "Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -155,7 +156,8 @@ class VerticalRuntimeAdapter:
         warnings.warn(
             "VerticalRuntimeAdapter.build_runtime_binding() is deprecated. "
             "Use vertical.get_config() directly on VerticalBase implementations. "
-            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            "See docs/MIGRATION_GUIDE.md for migration examples. "
+            "Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -262,7 +264,8 @@ class VerticalRuntimeAdapter:
         warnings.warn(
             "VerticalRuntimeAdapter.create_agent() is deprecated. "
             "Use Agent.create(vertical=...) directly with VerticalBase implementations. "
-            "See docs/MIGRATION_GUIDE.md for migration examples.",
+            "See docs/MIGRATION_GUIDE.md for migration examples. "
+            "Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )

@@ -1006,7 +1006,24 @@ class UnifiedWorkflowCompiler:
         yaml_path: Path,
         workflow_name: Optional[str],
     ) -> str:
-        """Generate cache key for YAML file compilation."""
+        """Generate cache key for YAML file compilation.
+
+        .. note::
+            The cache key currently includes only the main YAML file's
+            mtime.  Workflows that use ``$ref`` to include external node
+            definitions (resolved in ``yaml_loader._expand_refs``) will
+            **not** be invalidated when those referenced files change.
+            Incorporating ``$ref`` mtimes would require pre-parsing the
+            YAML before generating the cache key, creating a circular
+            dependency with the compilation cache.
+
+        TODO: To support ``$ref`` cache invalidation, consider a
+        two-phase approach: (1) quick-scan the raw YAML text for
+        ``$ref:`` patterns, resolve file paths, and collect their
+        mtimes before hashing; or (2) store the set of referenced file
+        paths after first compilation and verify their mtimes on
+        subsequent cache lookups.
+        """
         try:
             mtime = yaml_path.stat().st_mtime
         except OSError:

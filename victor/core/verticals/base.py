@@ -872,7 +872,8 @@ class VerticalRegistry:
         and register it if it's a valid vertical class.
         """
         import logging
-        from importlib.metadata import entry_points
+
+        from victor.framework.entry_point_registry import get_entry_point_registry
 
         logger = logging.getLogger(__name__)
         discovered: Dict[str, Type[VerticalBase]] = {}
@@ -881,19 +882,21 @@ class VerticalRegistry:
         if cls._external_discovered:
             return discovered
 
-        try:
-            # Python 3.10+ API: entry_points() returns a SelectableGroups object
-            # Use group parameter for filtering
-            eps = entry_points(group=cls.ENTRY_POINT_GROUP)
-        except TypeError:
-            # Fallback for older Python versions (shouldn't happen with Python 3.10+)
-            all_eps = entry_points()
-            eps = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+        # Use UnifiedEntryPointRegistry for single-pass lazy scanning
+        registry = get_entry_point_registry()
+        group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
-        for ep in eps:
+        # Convert to list of entry points
+        eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+
+        for ep, loaded in eps:
             try:
                 # Load the entry point (imports the module and gets the object)
-                vertical_class = ep.load()
+                # Entry point may already be loaded from the registry
+                if loaded is not False:
+                    vertical_class = loaded
+                else:
+                    vertical_class = ep.load()
 
                 # Validate that it's a proper VerticalBase subclass
                 if not cls._validate_external_vertical(vertical_class, ep.name):

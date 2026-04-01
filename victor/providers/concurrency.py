@@ -49,6 +49,7 @@ import asyncio
 import logging
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, TypeVar
@@ -461,6 +462,8 @@ class RequestQueue:
             "total_wait_time": 0.0,
             "total_tokens": 0,
         }
+        # Rolling window of recent wait times for percentile tracking
+        self._wait_times: deque = deque(maxlen=1000)
 
         logger.info(
             f"ConcurrentRequestManager initialized. "
@@ -528,6 +531,25 @@ class RequestQueue:
         self._workers.clear()
         self._started = False
         logger.info("ConcurrentRequestManager shutdown complete")
+
+    async def __aenter__(self) -> "RequestQueue":
+        """Enable async context manager usage."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Shutdown on context exit."""
+        await self.shutdown()
+
+    def __del__(self) -> None:
+        if self._started:
+            import warnings
+
+            warnings.warn(
+                "RequestQueue was not shut down. "
+                "Call shutdown() or use 'async with'.",
+                ResourceWarning,
+                stacklevel=2,
+            )
 
     async def submit(
         self,
@@ -669,6 +691,7 @@ class RequestQueue:
             total_wait = request_wait + token_wait
 
             self._stats["total_wait_time"] += total_wait
+            self._wait_times.append(total_wait)
 
             if total_wait > 0:
                 logger.debug(
@@ -725,6 +748,19 @@ class RequestQueue:
                 if (self._stats["total_completed"] + self._stats["total_failed"]) > 0
                 else 0
             ),
+            **self._compute_wait_time_percentiles(),
+        }
+
+    def _compute_wait_time_percentiles(self) -> Dict[str, float]:
+        """Compute wait time percentiles from recent requests."""
+        if not self._wait_times:
+            return {"wait_time_p50": 0.0, "wait_time_p95": 0.0, "wait_time_p99": 0.0}
+        sorted_times = sorted(self._wait_times)
+        n = len(sorted_times)
+        return {
+            "wait_time_p50": sorted_times[int(n * 0.50)],
+            "wait_time_p95": sorted_times[min(int(n * 0.95), n - 1)],
+            "wait_time_p99": sorted_times[min(int(n * 0.99), n - 1)],
         }
 
     def reset_stats(self):
@@ -737,6 +773,7 @@ class RequestQueue:
             "total_wait_time": 0.0,
             "total_tokens": 0,
         }
+        self._wait_times.clear()
 
 
 # Pre-configured rate limits for different providers

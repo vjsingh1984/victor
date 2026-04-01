@@ -40,6 +40,7 @@ Related module:
 import asyncio
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional, TypeVar, Awaitable
@@ -182,7 +183,7 @@ class CircuitBreaker:
         self._total_calls = 0
         self._total_failures = 0
         self._total_rejected = 0
-        self._state_changes: list[tuple[float, CircuitState, CircuitState]] = []
+        self._state_changes: deque[tuple[float, CircuitState, CircuitState]] = deque(maxlen=100)
 
     @property
     def state(self) -> CircuitState:

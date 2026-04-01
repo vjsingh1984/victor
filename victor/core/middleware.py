@@ -159,6 +159,14 @@ class Middleware(ABC, Generic[TRequest, TResponse]):
     Subclasses can override any of these hooks.
     """
 
+    def __init__(self, priority: int = 100) -> None:
+        """Initialize middleware.
+
+        Args:
+            priority: Execution priority (lower runs first). Default 100.
+        """
+        self.priority = priority
+
     @property
     def name(self) -> str:
         """Get middleware name."""
@@ -305,6 +313,7 @@ class _FocusedMiddlewareAdapter(Middleware):
     """Internal adapter that wraps focused protocol middleware into the full interface."""
 
     def __init__(self, focused: Union[RequestMiddleware, ResponseMiddleware, ErrorMiddleware]):
+        super().__init__()
         self._focused = focused
 
     @property
@@ -457,8 +466,11 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
 
         chain = final
 
+        # Sort by priority (stable sort preserves insertion order for equal priorities)
+        sorted_middleware = sorted(self._middleware, key=lambda m: m.priority)
+
         # Wrap from end to start
-        for middleware in reversed(self._middleware):
+        for middleware in reversed(sorted_middleware):
             current_chain = chain
 
             async def make_next(mw: Middleware, next_fn: NextHandler) -> TResponse:
@@ -510,6 +522,7 @@ class LoggingMiddleware(Middleware):
         log_level: int = logging.INFO,
         log_request: bool = True,
         log_response: bool = True,
+        priority: int = 100,
     ) -> None:
         """Initialize logging middleware.
 
@@ -517,7 +530,9 @@ class LoggingMiddleware(Middleware):
             log_level: Logging level.
             log_request: Whether to log requests.
             log_response: Whether to log responses.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._level = log_level
         self._log_request = log_request
         self._log_response = log_response
@@ -556,12 +571,14 @@ class TimingMiddleware(Middleware):
     Records timing information in context metadata.
     """
 
-    def __init__(self, metric_key: str = "timing") -> None:
+    def __init__(self, metric_key: str = "timing", priority: int = 100) -> None:
         """Initialize timing middleware.
 
         Args:
             metric_key: Key to store timing in metadata.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._key = metric_key
 
     async def before(self, context: MiddlewareContext) -> bool:
@@ -596,6 +613,7 @@ class ErrorHandlingMiddleware(Middleware):
         handlers: Optional[Dict[Type[Exception], Callable[[Exception], Any]]] = None,
         default_handler: Optional[Callable[[Exception], Any]] = None,
         reraise: bool = True,
+        priority: int = 100,
     ) -> None:
         """Initialize error handling middleware.
 
@@ -603,7 +621,9 @@ class ErrorHandlingMiddleware(Middleware):
             handlers: Exception type to handler mapping.
             default_handler: Default handler for unhandled exceptions.
             reraise: Whether to reraise unhandled exceptions.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._handlers = handlers or {}
         self._default = default_handler
         self._reraise = reraise
@@ -645,6 +665,7 @@ class RetryMiddleware(Middleware):
         retry_on: tuple = (Exception,),
         delay: float = 1.0,
         backoff: float = 2.0,
+        priority: int = 100,
     ) -> None:
         """Initialize retry middleware.
 
@@ -653,7 +674,9 @@ class RetryMiddleware(Middleware):
             retry_on: Exception types to retry on.
             delay: Initial delay between retries.
             backoff: Backoff multiplier.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._max_retries = max_retries
         self._retry_on = retry_on
         self._delay = delay
@@ -690,12 +713,14 @@ class TimeoutMiddleware(Middleware):
         pipeline.use(TimeoutMiddleware(timeout=30.0))
     """
 
-    def __init__(self, timeout: float = 30.0) -> None:
+    def __init__(self, timeout: float = 30.0, priority: int = 100) -> None:
         """Initialize timeout middleware.
 
         Args:
             timeout: Timeout in seconds.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._timeout = timeout
 
     async def __call__(
@@ -730,6 +755,7 @@ class CachingMiddleware(Middleware):
         cache: Dict[str, Any],
         key_fn: Callable[[MiddlewareContext], Optional[str]],
         ttl: float = 300.0,
+        priority: int = 100,
     ) -> None:
         """Initialize caching middleware.
 
@@ -737,7 +763,9 @@ class CachingMiddleware(Middleware):
             cache: Cache dictionary.
             key_fn: Function to generate cache key.
             ttl: Cache TTL in seconds.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._cache = cache
         self._key_fn = key_fn
         self._ttl = ttl
@@ -783,12 +811,15 @@ class ValidationMiddleware(Middleware):
     def __init__(
         self,
         validator: Callable[[MiddlewareContext], None],
+        priority: int = 100,
     ) -> None:
         """Initialize validation middleware.
 
         Args:
             validator: Validation function that raises on invalid.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._validator = validator
 
     async def before(self, context: MiddlewareContext) -> bool:
@@ -811,13 +842,16 @@ class MetricsMiddleware(Middleware):
         self,
         registry: Optional[Any] = None,
         prefix: str = "middleware",
+        priority: int = 100,
     ) -> None:
         """Initialize metrics middleware.
 
         Args:
             registry: Metrics registry.
             prefix: Metric name prefix.
+            priority: Execution priority (lower runs first).
         """
+        super().__init__(priority=priority)
         self._registry = registry
         self._prefix = prefix
         self._request_count = 0

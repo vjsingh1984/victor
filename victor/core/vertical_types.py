@@ -432,7 +432,8 @@ class TieredToolConfig:
         if self.semantic_pool and "semantic_pool" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.semantic_pool is deprecated. "
-                "Use get_effective_semantic_pool() instead.",
+                "Use get_effective_semantic_pool() instead. "
+                "Will be removed in v1.0.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -440,7 +441,8 @@ class TieredToolConfig:
         if self.stage_tools and "stage_tools" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.stage_tools is deprecated. "
-                "Use get_tools_for_stage_from_registry() instead.",
+                "Use get_tools_for_stage_from_registry() instead. "
+                "Will be removed in v1.0.",
                 DeprecationWarning,
                 stacklevel=2,
             )

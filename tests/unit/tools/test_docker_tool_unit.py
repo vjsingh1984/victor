@@ -18,9 +18,19 @@ Updated for async subprocess migration - uses AsyncMock for _run_docker_command_
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from victor.tools.docker_tool import docker
+
+
+def _allow_dangerous_docker():
+    """Return a context manager that mocks settings to allow dangerous ops."""
+    mock_settings = MagicMock()
+    mock_settings.docker_allow_dangerous_operations = True
+    return patch.dict(
+        "sys.modules",
+        {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
+    )
 
 
 class TestDockerTool:
@@ -98,10 +108,11 @@ class TestDockerOperations:
     async def test_docker_rmi(self):
         """Test docker rmi operation."""
         mock_run = AsyncMock(return_value=(True, "Deleted: sha256:abc", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-            with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
-                result = await docker(operation="rmi", resource_id="test:latest")
-                assert result["success"] is True
+        with _allow_dangerous_docker():
+            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+                    result = await docker(operation="rmi", resource_id="test:latest")
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_docker_networks(self):
@@ -141,20 +152,22 @@ class TestDockerOperations:
     async def test_docker_run(self):
         """Test docker run operation - uses options dict."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-            with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
-                result = await docker(
-                    operation="run", options={"image": "alpine", "command": "echo test"}
-                )
-                # Note: run is not a supported operation - test for actual behavior
-                if result["success"]:
-                    assert (
-                        "container" in result.get("output", "").lower()
-                        or "id" in result.get("output", "").lower()
+        with _allow_dangerous_docker():
+            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+                    result = await docker(
+                        operation="run",
+                        options={"image": "alpine", "command": "echo test"},
                     )
-                else:
-                    # Run operation is not implemented
-                    assert "Unknown operation" in result.get("error", "")
+                    # Note: run is not a supported operation - test for actual behavior
+                    if result["success"]:
+                        assert (
+                            "container" in result.get("output", "").lower()
+                            or "id" in result.get("output", "").lower()
+                        )
+                    else:
+                        # Run operation is not implemented
+                        assert "Unknown operation" in result.get("error", "")
 
     @pytest.mark.asyncio
     async def test_docker_ps_with_options(self):
@@ -185,10 +198,11 @@ class TestDockerOperations:
     async def test_docker_rm(self):
         """Test docker rm operation."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-            with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
-                result = await docker(operation="rm", resource_id="container-id")
-                assert result["success"] is True
+        with _allow_dangerous_docker():
+            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+                    result = await docker(operation="rm", resource_id="container-id")
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_docker_rm_missing_container(self):
@@ -201,12 +215,15 @@ class TestDockerOperations:
     async def test_docker_pull(self):
         """Test docker pull operation."""
         mock_run = AsyncMock(return_value=(True, "Downloaded image", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-            with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
-                result = await docker(
-                    operation="pull", resource_id="alpine:latest", resource_type="image"
-                )
-                assert result["success"] is True
+        with _allow_dangerous_docker():
+            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+                    result = await docker(
+                        operation="pull",
+                        resource_id="alpine:latest",
+                        resource_type="image",
+                    )
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_docker_pull_missing_image(self):
@@ -233,14 +250,15 @@ class TestDockerOperations:
     async def test_docker_exec(self):
         """Test docker exec operation."""
         mock_run = AsyncMock(return_value=(True, "output", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-            with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
-                result = await docker(
-                    operation="exec",
-                    resource_id="container-id",
-                    options={"command": "ls -la"},
-                )
-                assert result["success"] is True
+        with _allow_dangerous_docker():
+            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+                    result = await docker(
+                        operation="exec",
+                        resource_id="container-id",
+                        options={"command": "ls -la"},
+                    )
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_docker_exec_missing_resource(self):

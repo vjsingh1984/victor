@@ -38,6 +38,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Dict, Optional
 
 from victor.state.global_state_manager import GlobalStateManager
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 _global_manager: Optional[GlobalStateManager] = None
 _tracer: Optional[StateTracer] = None
+_factory_lock = threading.Lock()
 
 
 def get_global_manager() -> GlobalStateManager:
@@ -78,15 +80,20 @@ def get_global_manager() -> GlobalStateManager:
     global _global_manager, _tracer
 
     if _global_manager is None:
-        _global_manager = GlobalStateManager()
+        with _factory_lock:
+            if _global_manager is None:
+                manager = GlobalStateManager()
 
-        # Register all scope managers
-        _global_manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
-        _global_manager.register_manager(StateScope.CONVERSATION, ConversationStateManager())
-        _global_manager.register_manager(StateScope.TEAM, TeamStateManager())
-        _global_manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
+                # Register all scope managers
+                manager.register_manager(StateScope.WORKFLOW, WorkflowStateManager())
+                manager.register_manager(
+                    StateScope.CONVERSATION, ConversationStateManager()
+                )
+                manager.register_manager(StateScope.TEAM, TeamStateManager())
+                manager.register_manager(StateScope.GLOBAL, GlobalStateManagerImpl())
 
-        logger.info("GlobalStateManager initialized with all scope managers")
+                _global_manager = manager
+                logger.info("GlobalStateManager initialized with all scope managers")
 
     return _global_manager
 
@@ -221,8 +228,9 @@ def reset_global_manager() -> None:
     """
     global _global_manager, _tracer
 
-    _global_manager = None
-    _tracer = None
+    with _factory_lock:
+        _global_manager = None
+        _tracer = None
 
     logger.info("GlobalStateManager reset")
 

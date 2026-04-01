@@ -97,7 +97,7 @@ class TestSetupObservabilityIntegration:
 
             result = setup_observability_integration(mock_orchestrator)
 
-            MockIntegration.assert_called_once_with(session_id=None, enable_cqrs_bridge=False)
+            MockIntegration.assert_called_once_with(session_id=None)
             mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
             mock_orchestrator.set_observability.assert_called_once_with(mock_integration)
             assert result == mock_integration
@@ -139,22 +139,8 @@ class TestSetupObservabilityIntegration:
             setup_observability_integration(mock_orchestrator, session_id="test-session-123")
 
             MockIntegration.assert_called_once_with(
-                session_id="test-session-123", enable_cqrs_bridge=False
+                session_id="test-session-123"
             )
-
-    def test_setup_with_cqrs_bridge(self):
-        """Test setup with CQRS bridge enabled."""
-        mock_orchestrator = MagicMock()
-
-        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
-            mock_integration = MagicMock()
-            MockIntegration.return_value = mock_integration
-
-            setup_observability_integration(
-                mock_orchestrator, session_id="s1", enable_cqrs_bridge=True
-            )
-
-            MockIntegration.assert_called_once_with(session_id="s1", enable_cqrs_bridge=True)
 
 
 class TestVerticalApplicationDelegation:

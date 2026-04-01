@@ -14,8 +14,11 @@
 
 """Base provider interface for LLM providers."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -368,17 +371,28 @@ class BaseProvider(ABC):
                     raw_error=error,
                 )
 
-        # Tier 2: String-based classification
+        # Tier 2: String-based classification (deprecated — providers should use
+        # proper exception types or HTTP status codes instead)
         if any(
             t in error_str
             for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
         ):
+            logger.warning(
+                "String-based error classification triggered for auth error "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
             return ProviderAuthError(
                 message=f"Authentication failed: {error}",
                 provider=self.name,
                 raw_error=error,
             )
         if any(t in error_str for t in ("rate limit", "429", "too many requests")):
+            logger.warning(
+                "String-based error classification triggered for rate limit "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
             return ProviderRateLimitError(
                 message=f"Rate limit exceeded: {error}",
                 provider=self.name,
@@ -386,6 +400,11 @@ class BaseProvider(ABC):
                 raw_error=error,
             )
         if any(t in error_str for t in ("timeout", "timed out")):
+            logger.warning(
+                "String-based error classification triggered for timeout "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
             return ProviderTimeoutError(
                 message=f"Request timed out: {error}",
                 provider=self.name,
@@ -539,6 +558,14 @@ class BaseProvider(ABC):
     async def close(self) -> None:
         """Close any open connections or resources."""
         pass
+
+    async def __aenter__(self) -> "BaseProvider":
+        """Enable async context manager usage."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Close provider on context exit."""
+        await self.close()
 
     def is_circuit_open(self) -> bool:
         """Check if the circuit breaker is open (failing fast).

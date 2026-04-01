@@ -24,6 +24,12 @@ SOLID Principles:
 - ISP: Implements focused IStateManager interface
 - DIP: High-level modules depend on IStateManager abstraction
 
+Thread Safety:
+- All methods are protected by asyncio.Lock to prevent data corruption
+  under concurrent access (e.g., parallel team formations).
+- Observer notifications happen outside the lock to prevent deadlocks,
+  but use a snapshot of the observer list captured inside the lock.
+
 Replacements:
 - WorkflowStateManager replaces ExecutionContext
 - ConversationStateManager replaces ConversationStateMachine
@@ -50,31 +56,26 @@ from victor.state.protocols import IStateManager, IStateObserver, StateScope
 logger = logging.getLogger(__name__)
 
 
-class WorkflowStateManager:
-    """State manager for workflow scope.
+class BaseStateManager:
+    """Base state manager with full lock protection on all operations.
 
-    Replaces ExecutionContext directly (no adapter).
-    Manages state for single workflow executions.
+    All concrete state managers inherit from this class. The asyncio.Lock
+    ensures safe concurrent access from parallel team formations and
+    multi-agent workflows.
 
-    SOLID: SRP (workflow state only), implements IStateManager
-
-    Attributes:
-        scope: StateScope.WORKFLOW
-
-    Example:
-        >>> manager = WorkflowStateManager()
-        >>> await manager.set("task_id", "task-123")
-        >>> task_id = await manager.get("task_id")
+    Note on re-entrancy: asyncio.Lock is NOT re-entrant. Methods that
+    compose other locked methods (e.g. update() calling set()) use
+    private _unlocked variants to avoid deadlock.
     """
 
-    def __init__(self) -> None:
-        """Initialize workflow state manager."""
-        self.scope: StateScope = StateScope.WORKFLOW
+    def __init__(self, scope: StateScope, scope_label: str) -> None:
+        self.scope: StateScope = scope
         self._state: Dict[str, Any] = {}
         self._observers: List[IStateObserver] = []
         self._lock = asyncio.Lock()
+        self._scope_label = scope_label
 
-        logger.debug("WorkflowStateManager initialized")
+        logger.debug("%s initialized", scope_label)
 
     async def get(self, key: str, default: Any = None) -> Any:
         """Get a value by key.
@@ -96,36 +97,31 @@ class WorkflowStateManager:
             key: The key to set
             value: The value to store
             notify: Whether to notify observers (default: True)
-
-        Performance: Only notifies observers if value actually changed.
-        Notifications run in parallel for multiple observers.
         """
         async with self._lock:
-            old_value = self._state.get(key)
-
-            # Skip notification if value hasn't changed (key exists and same value)
-            if old_value == value and key in self._state:
-                # Value unchanged, skip notification (but still update state)
+            old_value, observers = self._set_unlocked(key, value)
+            if old_value is _UNCHANGED:
                 return
 
-            self._state[key] = value
+        if notify and observers:
+            await self._notify_observers(observers, key, old_value, value)
 
-        # Notify observers in parallel if requested (outside lock)
-        if notify and self._observers:
-            await asyncio.gather(
-                *[
-                    observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=value,
-                    )
-                    for observer in self._observers
-                ],
-                return_exceptions=True,  # Don't fail on observer errors
-            )
+        logger.debug("%s state set: %s = %s", self._scope_label, key, str(value)[:50])
 
-        logger.debug(f"Workflow state set: {key} = {str(value)[:50]}")
+    def _set_unlocked(self, key: str, value: Any) -> tuple:
+        """Set a value without acquiring the lock. Must be called under lock.
+
+        Returns:
+            (old_value, observers_snapshot) or (_UNCHANGED, []) if no change.
+        """
+        old_value = self._state.get(key)
+
+        if old_value == value and key in self._state:
+            return (_UNCHANGED, [])
+
+        self._state[key] = value
+        observers = list(self._observers)
+        return (old_value, observers)
 
     async def delete(self, key: str) -> None:
         """Delete a value by key.
@@ -133,21 +129,13 @@ class WorkflowStateManager:
         Args:
             key: The key to delete
         """
-        if key in self._state:
-            old_value = self._state[key]
-            del self._state[key]
+        async with self._lock:
+            if key not in self._state:
+                return
+            old_value = self._state.pop(key)
+            observers = list(self._observers)
 
-            # Notify observers
-            for observer in self._observers:
-                try:
-                    await observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=None,
-                    )
-                except Exception as e:
-                    logger.warning(f"Observer notification failed: {e}")
+        await self._notify_observers(observers, key, old_value, None)
 
     async def exists(self, key: str) -> bool:
         """Check if key exists.
@@ -158,7 +146,8 @@ class WorkflowStateManager:
         Returns:
             True if key exists, False otherwise
         """
-        return key in self._state
+        async with self._lock:
+            return key in self._state
 
     async def keys(self, pattern: str = "*") -> List[str]:
         """Get all keys matching pattern.
@@ -169,32 +158,45 @@ class WorkflowStateManager:
         Returns:
             List of keys matching pattern
         """
-        if pattern == "*":
-            return list(self._state.keys())
-
-        return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
+        async with self._lock:
+            if pattern == "*":
+                return list(self._state.keys())
+            return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
 
     async def get_all(self) -> Dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
-            Dictionary of all key-value pairs
+            Dictionary of all key-value pairs (shallow copy)
         """
-        return dict(self._state)
+        async with self._lock:
+            return dict(self._state)
 
     async def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple keys at once.
+        """Update multiple keys atomically.
+
+        Uses _set_unlocked to avoid re-entrant lock acquisition.
+        Observer notifications are batched after all keys are set.
 
         Args:
             updates: Dictionary of key-value pairs to update
         """
-        for key, value in updates.items():
-            await self.set(key, value)
+        pending_notifications: list = []
+
+        async with self._lock:
+            for key, value in updates.items():
+                old_value, observers = self._set_unlocked(key, value)
+                if old_value is not _UNCHANGED and observers:
+                    pending_notifications.append((observers, key, old_value, value))
+
+        for observers, key, old_value, value in pending_notifications:
+            await self._notify_observers(observers, key, old_value, value)
 
     async def clear(self) -> None:
         """Clear all state."""
-        self._state.clear()
-        logger.debug("Workflow state cleared")
+        async with self._lock:
+            self._state.clear()
+        logger.debug("%s state cleared", self._scope_label)
 
     async def snapshot(self) -> Dict[str, Any]:
         """Create immutable snapshot for checkpointing.
@@ -202,7 +204,8 @@ class WorkflowStateManager:
         Returns:
             Dictionary snapshot of current state
         """
-        return dict(self._state)
+        async with self._lock:
+            return dict(self._state)
 
     async def restore(self, snapshot: Dict[str, Any]) -> None:
         """Restore from snapshot.
@@ -210,8 +213,13 @@ class WorkflowStateManager:
         Args:
             snapshot: Snapshot dictionary to restore from
         """
-        self._state = dict(snapshot)
-        logger.debug(f"Workflow state restored from snapshot ({len(snapshot)} keys)")
+        async with self._lock:
+            self._state = dict(snapshot)
+        logger.debug(
+            "%s state restored from snapshot (%d keys)",
+            self._scope_label,
+            len(snapshot),
+        )
 
     def add_observer(self, observer: IStateObserver) -> None:
         """Add state change observer.
@@ -231,17 +239,65 @@ class WorkflowStateManager:
         if observer in self._observers:
             self._observers.remove(observer)
 
+    async def _notify_observers(
+        self,
+        observers: List[IStateObserver],
+        key: str,
+        old_value: Any,
+        new_value: Any,
+    ) -> None:
+        """Notify a snapshot of observers outside the lock.
 
-class ConversationStateManager:
+        Args:
+            observers: Snapshot of observer list captured inside the lock
+            key: The key that changed
+            old_value: Previous value
+            new_value: New value
+        """
+        await asyncio.gather(
+            *[
+                observer.on_state_changed(
+                    scope=self.scope,
+                    key=key,
+                    old_value=old_value,
+                    new_value=new_value,
+                )
+                for observer in observers
+            ],
+            return_exceptions=True,
+        )
+
+
+class _Sentinel:
+    """Sentinel object to distinguish 'no change' from None."""
+
+    pass
+
+
+_UNCHANGED = _Sentinel()
+
+
+class WorkflowStateManager(BaseStateManager):
+    """State manager for workflow scope.
+
+    Replaces ExecutionContext directly (no adapter).
+    Manages state for single workflow executions.
+
+    Example:
+        >>> manager = WorkflowStateManager()
+        >>> await manager.set("task_id", "task-123")
+        >>> task_id = await manager.get("task_id")
+    """
+
+    def __init__(self) -> None:
+        super().__init__(StateScope.WORKFLOW, "Workflow")
+
+
+class ConversationStateManager(BaseStateManager):
     """State manager for conversation scope.
 
     Replaces ConversationStateMachine directly (no adapter).
     Manages state for multi-turn conversations.
-
-    SOLID: SRP (conversation state only), implements IStateManager
-
-    Attributes:
-        scope: StateScope.CONVERSATION
 
     Example:
         >>> manager = ConversationStateManager()
@@ -250,176 +306,14 @@ class ConversationStateManager:
     """
 
     def __init__(self) -> None:
-        """Initialize conversation state manager."""
-        self.scope: StateScope = StateScope.CONVERSATION
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
-
-        logger.debug("ConversationStateManager initialized")
-
-    async def get(self, key: str, default: Any = None) -> Any:
-        """Get a value by key.
-
-        Args:
-            key: The key to retrieve
-            default: Default value if key doesn't exist
-
-        Returns:
-            The value associated with key, or default if not found
-        """
-        return self._state.get(key, default)
-
-    async def set(self, key: str, value: Any, notify: bool = True) -> None:
-        """Set a value by key.
-
-        Args:
-            key: The key to set
-            value: The value to store
-            notify: Whether to notify observers (default: True)
-
-        Performance: Only notifies observers if value actually changed.
-        Notifications run in parallel for multiple observers.
-        """
-        old_value = self._state.get(key)
-
-        # Skip notification if value hasn't changed (key exists and same value)
-        if old_value == value and key in self._state:
-            return
-
-        self._state[key] = value
-
-        # Notify observers in parallel if requested
-        if notify and self._observers:
-            await asyncio.gather(
-                *[
-                    observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=value,
-                    )
-                    for observer in self._observers
-                ],
-                return_exceptions=True,
-            )
-
-        logger.debug(f"Conversation state set: {key} = {str(value)[:50]}")
-
-    async def delete(self, key: str) -> None:
-        """Delete a value by key.
-
-        Args:
-            key: The key to delete
-        """
-        if key in self._state:
-            old_value = self._state[key]
-            del self._state[key]
-
-            # Notify observers
-            for observer in self._observers:
-                try:
-                    await observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=None,
-                    )
-                except Exception as e:
-                    logger.warning(f"Observer notification failed: {e}")
-
-    async def exists(self, key: str) -> bool:
-        """Check if key exists.
-
-        Args:
-            key: The key to check
-
-        Returns:
-            True if key exists, False otherwise
-        """
-        return key in self._state
-
-    async def keys(self, pattern: str = "*") -> List[str]:
-        """Get all keys matching pattern.
-
-        Args:
-            pattern: Glob pattern to match keys (default: "*" for all)
-
-        Returns:
-            List of keys matching pattern
-        """
-        if pattern == "*":
-            return list(self._state.keys())
-
-        return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
-
-    async def get_all(self) -> Dict[str, Any]:
-        """Get all state as dictionary.
-
-        Returns:
-            Dictionary of all key-value pairs
-        """
-        return dict(self._state)
-
-    async def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple keys at once.
-
-        Args:
-            updates: Dictionary of key-value pairs to update
-        """
-        for key, value in updates.items():
-            await self.set(key, value)
-
-    async def clear(self) -> None:
-        """Clear all state."""
-        self._state.clear()
-        logger.debug("Conversation state cleared")
-
-    async def snapshot(self) -> Dict[str, Any]:
-        """Create immutable snapshot for checkpointing.
-
-        Returns:
-            Dictionary snapshot of current state
-        """
-        return dict(self._state)
-
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
-        """Restore from snapshot.
-
-        Args:
-            snapshot: Snapshot dictionary to restore from
-        """
-        self._state = dict(snapshot)
-        logger.debug(f"Conversation state restored from snapshot ({len(snapshot)} keys)")
-
-    def add_observer(self, observer: IStateObserver) -> None:
-        """Add state change observer.
-
-        Args:
-            observer: Observer to notify of state changes
-        """
-        if observer not in self._observers:
-            self._observers.append(observer)
-
-    def remove_observer(self, observer: IStateObserver) -> None:
-        """Remove state change observer.
-
-        Args:
-            observer: Observer to remove
-        """
-        if observer in self._observers:
-            self._observers.remove(observer)
+        super().__init__(StateScope.CONVERSATION, "Conversation")
 
 
-class TeamStateManager:
+class TeamStateManager(BaseStateManager):
     """State manager for team scope.
 
     Replaces TeamContext directly (no adapter).
     Manages state for multi-agent team coordination.
-
-    SOLID: SRP (team state only), implements IStateManager
-
-    Attributes:
-        scope: StateScope.TEAM
 
     Example:
         >>> manager = TeamStateManager()
@@ -428,176 +322,14 @@ class TeamStateManager:
     """
 
     def __init__(self) -> None:
-        """Initialize team state manager."""
-        self.scope: StateScope = StateScope.TEAM
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
-
-        logger.debug("TeamStateManager initialized")
-
-    async def get(self, key: str, default: Any = None) -> Any:
-        """Get a value by key.
-
-        Args:
-            key: The key to retrieve
-            default: Default value if key doesn't exist
-
-        Returns:
-            The value associated with key, or default if not found
-        """
-        return self._state.get(key, default)
-
-    async def set(self, key: str, value: Any, notify: bool = True) -> None:
-        """Set a value by key.
-
-        Args:
-            key: The key to set
-            value: The value to store
-            notify: Whether to notify observers (default: True)
-
-        Performance: Only notifies observers if value actually changed.
-        Notifications run in parallel for multiple observers.
-        """
-        old_value = self._state.get(key)
-
-        # Skip notification if value hasn't changed (key exists and same value)
-        if old_value == value and key in self._state:
-            return
-
-        self._state[key] = value
-
-        # Notify observers in parallel if requested
-        if notify and self._observers:
-            await asyncio.gather(
-                *[
-                    observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=value,
-                    )
-                    for observer in self._observers
-                ],
-                return_exceptions=True,
-            )
-
-        logger.debug(f"Team state set: {key} = {str(value)[:50]}")
-
-    async def delete(self, key: str) -> None:
-        """Delete a value by key.
-
-        Args:
-            key: The key to delete
-        """
-        if key in self._state:
-            old_value = self._state[key]
-            del self._state[key]
-
-            # Notify observers
-            for observer in self._observers:
-                try:
-                    await observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=None,
-                    )
-                except Exception as e:
-                    logger.warning(f"Observer notification failed: {e}")
-
-    async def exists(self, key: str) -> bool:
-        """Check if key exists.
-
-        Args:
-            key: The key to check
-
-        Returns:
-            True if key exists, False otherwise
-        """
-        return key in self._state
-
-    async def keys(self, pattern: str = "*") -> List[str]:
-        """Get all keys matching pattern.
-
-        Args:
-            pattern: Glob pattern to match keys (default: "*" for all)
-
-        Returns:
-            List of keys matching pattern
-        """
-        if pattern == "*":
-            return list(self._state.keys())
-
-        return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
-
-    async def get_all(self) -> Dict[str, Any]:
-        """Get all state as dictionary.
-
-        Returns:
-            Dictionary of all key-value pairs
-        """
-        return dict(self._state)
-
-    async def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple keys at once.
-
-        Args:
-            updates: Dictionary of key-value pairs to update
-        """
-        for key, value in updates.items():
-            await self.set(key, value)
-
-    async def clear(self) -> None:
-        """Clear all state."""
-        self._state.clear()
-        logger.debug("Team state cleared")
-
-    async def snapshot(self) -> Dict[str, Any]:
-        """Create immutable snapshot for checkpointing.
-
-        Returns:
-            Dictionary snapshot of current state
-        """
-        return dict(self._state)
-
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
-        """Restore from snapshot.
-
-        Args:
-            snapshot: Snapshot dictionary to restore from
-        """
-        self._state = dict(snapshot)
-        logger.debug(f"Team state restored from snapshot ({len(snapshot)} keys)")
-
-    def add_observer(self, observer: IStateObserver) -> None:
-        """Add state change observer.
-
-        Args:
-            observer: Observer to notify of state changes
-        """
-        if observer not in self._observers:
-            self._observers.append(observer)
-
-    def remove_observer(self, observer: IStateObserver) -> None:
-        """Remove state change observer.
-
-        Args:
-            observer: Observer to remove
-        """
-        if observer in self._observers:
-            self._observers.remove(observer)
+        super().__init__(StateScope.TEAM, "Team")
 
 
-class GlobalStateManagerImpl:
+class GlobalStateManagerImpl(BaseStateManager):
     """State manager for global scope.
 
     Manages cross-cutting application state.
     Used for configuration, settings, and global state.
-
-    SOLID: SRP (global state only), implements IStateManager
-
-    Attributes:
-        scope: StateScope.GLOBAL
 
     Example:
         >>> manager = GlobalStateManagerImpl()
@@ -606,164 +338,7 @@ class GlobalStateManagerImpl:
     """
 
     def __init__(self) -> None:
-        """Initialize global state manager."""
-        self.scope: StateScope = StateScope.GLOBAL
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
-
-        logger.debug("GlobalStateManagerImpl initialized")
-
-    async def get(self, key: str, default: Any = None) -> Any:
-        """Get a value by key.
-
-        Args:
-            key: The key to retrieve
-            default: Default value if key doesn't exist
-
-        Returns:
-            The value associated with key, or default if not found
-        """
-        return self._state.get(key, default)
-
-    async def set(self, key: str, value: Any, notify: bool = True) -> None:
-        """Set a value by key.
-
-        Args:
-            key: The key to set
-            value: The value to store
-            notify: Whether to notify observers (default: True)
-
-        Performance: Only notifies observers if value actually changed.
-        Notifications run in parallel for multiple observers.
-        """
-        old_value = self._state.get(key)
-
-        # Skip notification if value hasn't changed (key exists and same value)
-        if old_value == value and key in self._state:
-            return
-
-        self._state[key] = value
-
-        # Notify observers in parallel if requested
-        if notify and self._observers:
-            await asyncio.gather(
-                *[
-                    observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=value,
-                    )
-                    for observer in self._observers
-                ],
-                return_exceptions=True,
-            )
-
-        logger.debug(f"Global state set: {key} = {str(value)[:50]}")
-
-    async def delete(self, key: str) -> None:
-        """Delete a value by key.
-
-        Args:
-            key: The key to delete
-        """
-        if key in self._state:
-            old_value = self._state[key]
-            del self._state[key]
-
-            # Notify observers
-            for observer in self._observers:
-                try:
-                    await observer.on_state_changed(
-                        scope=self.scope,
-                        key=key,
-                        old_value=old_value,
-                        new_value=None,
-                    )
-                except Exception as e:
-                    logger.warning(f"Observer notification failed: {e}")
-
-    async def exists(self, key: str) -> bool:
-        """Check if key exists.
-
-        Args:
-            key: The key to check
-
-        Returns:
-            True if key exists, False otherwise
-        """
-        return key in self._state
-
-    async def keys(self, pattern: str = "*") -> List[str]:
-        """Get all keys matching pattern.
-
-        Args:
-            pattern: Glob pattern to match keys (default: "*" for all)
-
-        Returns:
-            List of keys matching pattern
-        """
-        if pattern == "*":
-            return list(self._state.keys())
-
-        return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
-
-    async def get_all(self) -> Dict[str, Any]:
-        """Get all state as dictionary.
-
-        Returns:
-            Dictionary of all key-value pairs
-        """
-        return dict(self._state)
-
-    async def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple keys at once.
-
-        Args:
-            updates: Dictionary of key-value pairs to update
-        """
-        for key, value in updates.items():
-            await self.set(key, value)
-
-    async def clear(self) -> None:
-        """Clear all state."""
-        self._state.clear()
-        logger.debug("Global state cleared")
-
-    async def snapshot(self) -> Dict[str, Any]:
-        """Create immutable snapshot for checkpointing.
-
-        Returns:
-            Dictionary snapshot of current state
-        """
-        return dict(self._state)
-
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
-        """Restore from snapshot.
-
-        Args:
-            snapshot: Snapshot dictionary to restore from
-        """
-        self._state = dict(snapshot)
-        logger.debug(f"Global state restored from snapshot ({len(snapshot)} keys)")
-
-    def add_observer(self, observer: IStateObserver) -> None:
-        """Add state change observer.
-
-        Args:
-            observer: Observer to notify of state changes
-        """
-        if observer not in self._observers:
-            self._observers.append(observer)
-
-    def remove_observer(self, observer: IStateObserver) -> None:
-        """Remove state change observer.
-
-        Args:
-            observer: Observer to remove
-        """
-        if observer in self._observers:
-            self._observers.remove(observer)
+        super().__init__(StateScope.GLOBAL, "Global")
 
 
 __all__ = [

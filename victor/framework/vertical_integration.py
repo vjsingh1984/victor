@@ -184,7 +184,8 @@ def _warn_legacy_extension_registry_api(api_name: str) -> None:
     """Emit deprecation warning for inactive legacy extension-registry APIs."""
     message = (
         f"{api_name} is deprecated. {_LEGACY_EXTENSION_REGISTRY_GUIDANCE} "
-        "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry."
+        "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry. "
+        "This will be removed in v1.0."
     )
     warnings.warn(message, DeprecationWarning, stacklevel=3)
     logger.warning(message)

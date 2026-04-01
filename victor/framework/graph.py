@@ -1094,7 +1094,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_started event: {e}")
+            logger.warning(f"Failed to emit graph_started event: {e}")
 
     def emit_node_start(self, node_id: str, iteration: int):
         """Emit node start event."""
@@ -1115,7 +1115,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit node_start event: {e}")
+            logger.warning(f"Failed to emit node_start event: {e}")
 
     def emit_node_complete(self, node_id: str, iteration: int, duration: float):
         """Emit node complete event."""
@@ -1138,7 +1138,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit node_end event: {e}")
+            logger.warning(f"Failed to emit node_end event: {e}")
 
     def emit_graph_completed(
         self, success: bool, iterations: int, duration: float, node_count: int
@@ -1163,7 +1163,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_completed event: {e}")
+            logger.warning(f"Failed to emit graph_completed event: {e}")
 
     def emit_graph_error(self, error: str, iterations: int, duration: float):
         """Emit graph error event."""
@@ -1185,7 +1185,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_error event: {e}")
+            logger.warning(f"Failed to emit graph_error event: {e}")
 
 
 class CompiledGraph(Generic[StateType]):
@@ -1298,7 +1298,7 @@ class CompiledGraph(Generic[StateType]):
             )
         except Exception as e:
             # Don't let event emission failures break graph execution
-            logger.debug(f"Failed to emit {event_type} event: {e}")
+            logger.warning(f"Failed to emit {event_type} event: {e}")
 
     async def invoke(
         self,

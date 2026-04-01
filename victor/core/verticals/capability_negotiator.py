@@ -62,6 +62,7 @@ class CapabilityNegotiator:
         1. API version is within the supported range.
         2. All required extension types are available in the framework.
         3. Warns about provided types the framework doesn't recognise.
+        4. Extension dependencies are satisfied.
         """
         result = NegotiationResult()
 
@@ -95,6 +96,9 @@ class CapabilityNegotiator:
             names = ", ".join(sorted(e.value for e in unknown_provided))
             result.warnings.append(f"Vertical provides unknown extension types (ignored): {names}")
             result.degraded_features.update(unknown_provided)
+
+        # 4. Extension dependencies validation
+        self._validate_extension_dependencies(manifest, result)
 
         if result.compatible:
             logger.debug(
@@ -146,3 +150,92 @@ class CapabilityNegotiator:
                 )
         except Exception as exc:
             result.warnings.append(f"Could not parse min_framework_version '{min_ver}': {exc}")
+
+    def _validate_extension_dependencies(
+        self, manifest: ExtensionManifest, result: NegotiationResult
+    ) -> None:
+        """Validate extension dependencies from manifest.
+
+        Checks that all extension dependencies are satisfied:
+        - Required extensions are installed
+        - Minimum version constraints are met
+        - No circular dependencies
+
+        Args:
+            manifest: The extension manifest to validate
+            result: NegotiationResult to append errors/warnings to
+        """
+        if not manifest.extension_dependencies:
+            return
+
+        try:
+            from importlib.metadata import version as get_version, PackageNotFoundError
+            from packaging.specifiers import SpecifierSet
+            from packaging.version import parse as parse_version
+        except ImportError:
+            logger.debug("packaging not installed; skipping extension dependency check")
+            return
+
+        from victor.core.verticals.base import VerticalRegistry
+
+        for dep in manifest.extension_dependencies:
+            dep_name = dep.extension_name
+
+            # Check if extension is registered
+            registered = VerticalRegistry.is_registered(dep_name)
+            installed = False
+            installed_version = None
+
+            # Try to get installed version from package metadata
+            try:
+                # Try victor-{name} convention first
+                package_name = f"victor-{dep_name}"
+                installed_version = get_version(package_name)
+                installed = True
+            except PackageNotFoundError:
+                try:
+                    # Try plain name
+                    installed_version = get_version(dep_name)
+                    installed = True
+                except PackageNotFoundError:
+                    installed = False
+
+            # Check if dependency is satisfied
+            dep_satisfied = registered or installed
+
+            if not dep_satisfied:
+                if dep.optional:
+                    result.warnings.append(
+                        f"Optional extension dependency '{dep_name}' is not installed or registered"
+                    )
+                else:
+                    result.compatible = False
+                    result.errors.append(
+                        f"Required extension dependency '{dep_name}' is not installed or registered. "
+                        f"Install the victor-{dep_name} package or ensure it's registered."
+                    )
+                continue
+
+            # Check version constraint if specified
+            if dep.min_version and installed_version:
+                try:
+                    spec = SpecifierSet(dep.min_version)
+                    installed_ver = parse_version(installed_version)
+
+                    if installed_ver not in spec:
+                        if dep.optional:
+                            result.warnings.append(
+                                f"Optional extension dependency '{dep_name}' version {installed_version} "
+                                f"does not meet requirement {dep.min_version}"
+                            )
+                        else:
+                            result.compatible = False
+                            result.errors.append(
+                                f"Extension dependency '{dep_name}' version {installed_version} "
+                                f"does not meet requirement {dep.min_version}"
+                            )
+                except Exception as exc:
+                    result.warnings.append(
+                        f"Could not parse version constraint '{dep.min_version}' "
+                        f"for dependency '{dep_name}': {exc}"
+                    )

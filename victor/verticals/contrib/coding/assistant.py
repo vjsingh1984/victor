@@ -33,12 +33,26 @@ from typing import Any, Dict, List
 from victor_sdk import (
     CapabilityIds,
     CapabilityRequirement,
+    ExtensionType,
     StageDefinition,
     ToolNames,
     VerticalBase,
 )
 
+from victor.core.verticals.registration import register_vertical
 
+
+@register_vertical(
+    name="coding",
+    version="2.0.0",
+    api_version=1,
+    min_framework_version=">=0.5.0",
+    provides={ExtensionType.TOOLS, ExtensionType.WORKFLOWS, ExtensionType.MIDDLEWARE},
+    canonicalize_tool_names=True,
+    tool_dependency_strategy="entry_point",
+    strict_mode=False,
+    load_priority=100,  # High priority as it's the default vertical
+)
 class CodingAssistant(VerticalBase):
     """Software development assistant vertical.
 

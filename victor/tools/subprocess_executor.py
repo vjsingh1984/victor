@@ -412,6 +412,7 @@ async def run_command_async(
             )
 
     try:
+        logger.debug("Executing command via shell: %.200s", command)
         process = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,

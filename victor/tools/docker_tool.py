@@ -30,6 +30,12 @@ from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, check_docker_available
 
+SAFE_OPERATIONS = frozenset({
+    "ps", "start", "stop", "restart", "logs",
+    "stats", "inspect", "images", "networks", "volumes",
+})
+DANGEROUS_OPERATIONS = frozenset({"exec", "rm", "rmi", "pull", "run"})
+
 
 async def _run_docker_command_async(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
     """Run Docker command asynchronously.
@@ -133,6 +139,26 @@ async def docker(
         options = {}
 
     operation = operation.lower()
+
+    if operation in DANGEROUS_OPERATIONS:
+        # Check settings for explicit opt-in
+        try:
+            from victor.config.settings import get_settings
+
+            settings = get_settings()
+            allow_dangerous = getattr(
+                settings, "docker_allow_dangerous_operations", False
+            )
+        except Exception:
+            allow_dangerous = False
+        if not allow_dangerous:
+            return {
+                "success": False,
+                "error": (
+                    f"Operation '{operation}' is restricted. "
+                    "Set docker_allow_dangerous_operations=true to enable."
+                ),
+            }
 
     # Container operations
     if operation == "ps":

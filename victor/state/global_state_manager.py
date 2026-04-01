@@ -185,17 +185,17 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        old_value = await manager.get(key)
-        await manager.delete(key)
+        async with self._lock:
+            old_value = await manager.get(key)
+            await manager.delete(key)
 
-        # Trace transition
-        if self._tracer:
-            self._tracer.record_transition(
-                scope=scope.value,
-                key=key,
-                old_value=old_value,
-                new_value=None,
-            )
+            if self._tracer:
+                self._tracer.record_transition(
+                    scope=scope.value,
+                    key=key,
+                    old_value=old_value,
+                    new_value=None,
+                )
 
     async def exists(
         self,
@@ -305,7 +305,8 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        await manager.clear()
+        async with self._lock:
+            await manager.clear()
         logger.info(f"Cleared all state from scope: {scope.value}")
 
     async def create_checkpoint(self) -> Dict[str, Any]:
@@ -355,22 +356,27 @@ class GlobalStateManager:
         Example:
             >>> await state.restore_checkpoint(checkpoint)
         """
-        for scope_value, snapshot in checkpoint.items():
-            try:
-                scope = StateScope(scope_value)
-            except ValueError:
-                logger.warning(f"Invalid scope in checkpoint: {scope_value}")
-                continue
+        async with self._lock:
+            for scope_value, snapshot in checkpoint.items():
+                try:
+                    scope = StateScope(scope_value)
+                except ValueError:
+                    logger.warning(f"Invalid scope in checkpoint: {scope_value}")
+                    continue
 
-            manager = self._managers.get(scope)
-            if not manager:
-                raise ValueError(f"Cannot restore scope {scope.value}: " f"no manager registered")
+                manager = self._managers.get(scope)
+                if not manager:
+                    raise ValueError(
+                        f"Cannot restore scope {scope.value}: no manager registered"
+                    )
 
-            try:
-                await manager.restore(snapshot)
-            except Exception as e:
-                logger.error(f"Failed to restore snapshot for scope {scope.value}: {e}")
-                raise
+                try:
+                    await manager.restore(snapshot)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to restore snapshot for scope {scope.value}: {e}"
+                    )
+                    raise
 
         logger.info(f"Restored checkpoint across {len(checkpoint)} scopes")
 

@@ -47,7 +47,6 @@ from victor.observability.request_correlation import get_request_correlation_id
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.observability.cqrs_adapter import CQRSEventAdapter, UnifiedEventBridge
 
 logger = logging.getLogger(__name__)
 
@@ -76,39 +75,23 @@ class ObservabilityIntegration:
         self,
         event_bus: Optional["ObservabilityBus"] = None,
         session_id: Optional[str] = None,
-        enable_cqrs_bridge: bool = False,
     ) -> None:
         """Initialize the integration.
 
         Args:
             event_bus: ObservabilityBus to use (default: singleton).
             session_id: Optional session ID for correlation.
-            enable_cqrs_bridge: Whether to enable CQRS event bridging.
-                When enabled, events are automatically forwarded between
-                the observability ObservabilityBus and CQRS EventDispatcher.
         """
         self._bus = event_bus or get_observability_bus()
         self._session_id = session_id
         self._wired_components: List[str] = []
         self._tool_start_times: Dict[str, float] = {}
-        self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
-
-        # Note: session_id is stored in self._session_id for use in event emissions
-        # The new ObservabilityBus doesn't have set_session_id() method
-
-        if enable_cqrs_bridge:
-            self._setup_cqrs_bridge()
 
     @property
     def event_bus(self) -> "ObservabilityBus":
         """Get the event bus."""
         return self._bus
-
-    @property
-    def cqrs_bridge(self) -> Optional["UnifiedEventBridge"]:
-        """Get the CQRS bridge if enabled."""
-        return self._cqrs_bridge
 
     @property
     def state_hook_manager(self) -> Optional[StateHookManager]:
@@ -207,51 +190,6 @@ class ObservabilityIntegration:
                 stage: history.get_stage_visit_count(stage) for stage in unique_stages
             },
         }
-
-    def _setup_cqrs_bridge(self) -> None:
-        """Set up the CQRS event bridge.
-
-        Creates a UnifiedEventBridge that connects the observability
-        EventBus to the CQRS EventDispatcher for bidirectional event flow.
-        """
-        from victor.observability.cqrs_adapter import create_unified_bridge
-
-        self._cqrs_bridge = create_unified_bridge(
-            event_bus=self._bus,
-            auto_start=True,
-        )
-        self._wired_components.append("cqrs_bridge")
-        logger.debug("CQRS event bridge enabled")
-
-    def enable_cqrs_bridge(self) -> "UnifiedEventBridge":
-        """Enable CQRS event bridging.
-
-        Creates and starts a UnifiedEventBridge if not already enabled.
-
-        Returns:
-            The UnifiedEventBridge instance.
-
-        Example:
-            integration = ObservabilityIntegration()
-            bridge = integration.enable_cqrs_bridge()
-
-            # Events now flow between EventBus and CQRS EventDispatcher
-        """
-        if self._cqrs_bridge is None:
-            self._setup_cqrs_bridge()
-        return self._cqrs_bridge
-
-    def disable_cqrs_bridge(self) -> None:
-        """Disable CQRS event bridging.
-
-        Stops the bridge if it was enabled.
-        """
-        if self._cqrs_bridge is not None:
-            self._cqrs_bridge.stop()
-            self._cqrs_bridge = None
-            if "cqrs_bridge" in self._wired_components:
-                self._wired_components.remove("cqrs_bridge")
-            logger.debug("CQRS event bridge disabled")
 
     def set_session_id(self, session_id: str) -> None:
         """Set the session ID for event correlation.
@@ -584,36 +522,21 @@ class ObservabilityIntegration:
 def setup_observability(
     orchestrator: "AgentOrchestrator",
     session_id: Optional[str] = None,
-    enable_cqrs_bridge: bool = False,
 ) -> ObservabilityIntegration:
     """Convenience function to set up observability for an orchestrator.
 
     Args:
         orchestrator: Orchestrator to wire.
         session_id: Optional session ID.
-        enable_cqrs_bridge: Whether to enable CQRS event bridging.
-            When enabled, events are automatically forwarded between
-            the observability EventBus and CQRS EventDispatcher.
 
     Returns:
         Configured ObservabilityIntegration instance.
 
     Example:
-        # Basic usage
         integration = setup_observability(orchestrator)
-
-        # With CQRS bridge for event sourcing integration
-        integration = setup_observability(orchestrator, enable_cqrs_bridge=True)
-
-        # Subscribe to CQRS events
-        if integration.cqrs_bridge:
-            from victor.core import EventDispatcher
-            dispatcher = integration.cqrs_bridge.adapter.event_dispatcher
-            dispatcher.subscribe_all(lambda e: print(f"CQRS event: {e}"))
     """
     integration = ObservabilityIntegration(
         session_id=session_id,
-        enable_cqrs_bridge=enable_cqrs_bridge,
     )
     integration.wire_orchestrator(orchestrator)
     return integration

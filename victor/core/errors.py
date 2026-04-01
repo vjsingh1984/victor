@@ -24,6 +24,8 @@ This module provides:
 from __future__ import annotations
 
 import logging
+import threading
+import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
@@ -608,6 +610,10 @@ class ErrorHandler:
         self.include_traceback = include_traceback
         self._error_history: List[ErrorInfo] = []
         self._max_history = 100
+        self._history_lock = threading.Lock()
+        # Deduplication: skip duplicate errors within 5s window
+        self._recent_signatures: Dict[str, float] = {}
+        self._dedup_window = 5.0
 
     def handle(
         self,
@@ -723,18 +729,40 @@ class ErrorHandler:
             )
 
     def _add_to_history(self, error_info: ErrorInfo) -> None:
-        """Add error to history (for debugging/reporting)."""
-        self._error_history.append(error_info)
-        if len(self._error_history) > self._max_history:
-            self._error_history = self._error_history[-self._max_history :]
+        """Add error to history, deduplicating within a time window."""
+        sig = f"{error_info.category}:{error_info.message[:100]}"
+        now = time.time()
+
+        with self._history_lock:
+            # Skip duplicate errors within dedup window
+            last_seen = self._recent_signatures.get(sig)
+            if last_seen and (now - last_seen) < self._dedup_window:
+                return
+
+            self._recent_signatures[sig] = now
+
+            # Prune old signatures periodically
+            if len(self._recent_signatures) > 200:
+                cutoff = now - self._dedup_window
+                self._recent_signatures = {
+                    k: v
+                    for k, v in self._recent_signatures.items()
+                    if v > cutoff
+                }
+
+            self._error_history.append(error_info)
+            if len(self._error_history) > self._max_history:
+                self._error_history = self._error_history[-self._max_history :]
 
     def get_recent_errors(self, count: int = 10) -> List[ErrorInfo]:
         """Get recent errors from history."""
-        return self._error_history[-count:]
+        with self._history_lock:
+            return list(self._error_history[-count:])
 
     def clear_history(self) -> None:
         """Clear error history."""
-        self._error_history = []
+        with self._history_lock:
+            self._error_history.clear()
 
 
 # Alias for builtin FileNotFoundError

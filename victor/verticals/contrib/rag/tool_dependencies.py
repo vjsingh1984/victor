@@ -91,7 +91,8 @@ class RAGToolDependencyProvider(YAMLToolDependencyProvider):
 
         warnings.warn(
             "RAGToolDependencyProvider is deprecated. "
-            "Use create_vertical_tool_dependency_provider('rag') instead.",
+            "Use create_vertical_tool_dependency_provider('rag') instead. "
+            "Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )

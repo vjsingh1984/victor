@@ -20,7 +20,7 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Callable, ClassVar, Dict, Optional, Union, List
 
 logger = logging.getLogger(__name__)
 
@@ -319,8 +319,30 @@ class ProviderConfig(BaseSettings):
         return reveal_secret(self.api_key)
 
     def to_runtime_dict(self) -> Dict[str, Any]:
-        """Serialize provider config with secrets unwrapped for runtime use."""
-        return unwrap_secrets(self.model_dump(exclude_none=True))
+        """Serialize provider config with secrets safely unwrapped.
+
+        Excludes SecretStr fields from model_dump to prevent intermediate
+        plaintext in stack traces, then adds them back explicitly.
+        """
+        secret_fields = {
+            name
+            for name, info in self.model_fields.items()
+            if info.annotation is SecretStr
+            or (
+                hasattr(info.annotation, "__args__")
+                and SecretStr in getattr(info.annotation, "__args__", ())
+            )
+        }
+        result = self.model_dump(exclude_none=True, exclude=secret_fields)
+        for name in secret_fields:
+            val = getattr(self, name, None)
+            if val is not None:
+                result[name] = (
+                    val.get_secret_value()
+                    if isinstance(val, SecretStr)
+                    else val
+                )
+        return result
 
 
 class ProfileConfig(BaseSettings):
@@ -643,6 +665,7 @@ class SecuritySettings(_BaseModel):
     max_file_changes: Optional[int] = None
     security_dependency_scan: bool = False
     security_iac_scan: bool = False
+    docker_allow_dangerous_operations: bool = False
 
 
 class EventSettings(_BaseModel):
@@ -947,6 +970,48 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="allow",
     )
+
+    # Change listeners for runtime config updates.
+    # Stored at class level so all instances share the same listener list.
+    _change_listeners: ClassVar[
+        List[Callable[[str, Any, Any], None]]
+    ] = []
+
+    @classmethod
+    def add_change_listener(
+        cls, callback: Callable[[str, Any, Any], None]
+    ) -> None:
+        """Register callback for settings changes.
+
+        Callbacks receive ``(field_name, old_value, new_value)`` when
+        :meth:`notify_change` is called after a configuration update.
+        """
+        cls._change_listeners.append(callback)
+
+    @classmethod
+    def remove_change_listener(cls, callback: Callable) -> None:
+        """Remove a previously registered change listener."""
+        if callback in cls._change_listeners:
+            cls._change_listeners.remove(callback)
+
+    def notify_change(
+        self, field_name: str, old_value: Any, new_value: Any
+    ) -> None:
+        """Notify all registered listeners of a settings change.
+
+        This must be called explicitly after updating a setting via
+        ``model_copy(update=...)`` or direct attribute assignment.
+        Automatic interception via ``__setattr__`` is intentionally
+        avoided because Pydantic's ``BaseSettings`` relies on its own
+        attribute-setting machinery during construction and validation.
+        """
+        if old_value == new_value:
+            return
+        for listener in self._change_listeners:
+            try:
+                listener(field_name, old_value, new_value)
+            except Exception:
+                pass
 
     @model_validator(mode="before")
     @classmethod
@@ -1409,6 +1474,9 @@ class Settings(BaseSettings):
     # Security scan extensions
     security_dependency_scan: bool = False
     security_iac_scan: bool = False
+
+    # Docker security
+    docker_allow_dangerous_operations: bool = False
 
     # LMStudio resource guard
     lmstudio_max_vram_gb: Optional[float] = (
@@ -1938,7 +2006,7 @@ class Settings(BaseSettings):
             warnings.warn(
                 "Flat settings field access (e.g. settings.default_provider) is deprecated. "
                 "Use nested groups instead (e.g. settings.provider.default_provider). "
-                "Flat fields will be removed in a future version.",
+                "Flat fields will be removed in v1.0.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1998,6 +2066,18 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Validators ported from VictorSettings
     # ==========================================================================
+
+    @field_validator("server_session_secret", mode="before")
+    @classmethod
+    def _autogenerate_session_secret(
+        cls, v: Optional[SecretStr],
+    ) -> SecretStr:
+        """Auto-generate a cryptographically secure session secret when None."""
+        if v is None:
+            import secrets as _secrets
+
+            return SecretStr(_secrets.token_urlsafe(32))
+        return v
 
     @field_validator("default_provider")
     @classmethod

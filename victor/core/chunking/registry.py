@@ -84,23 +84,28 @@ class ChunkingRegistry:
     def _discover_external_strategies(self) -> None:
         """Discover strategies via 'victor.chunking_strategies' entry point."""
         import logging
-        from importlib.metadata import entry_points
 
         try:
-            eps = entry_points(group="victor.chunking_strategies")
-            for ep in eps:
-                try:
-                    strategy_cls = ep.load()
-                    if isinstance(strategy_cls, type):
-                        strategy = strategy_cls(self.config)
-                    else:
-                        strategy = strategy_cls
+            from victor.framework.entry_point_registry import get_entry_point_registry
 
-                    if isinstance(strategy, ChunkingStrategy):
-                        self.register(strategy)
-                        logger.debug(f"Discovered external strategy: {strategy.name}")
-                except Exception as e:
-                    logger.warning(f"Failed to load chunking strategy '{ep.name}': {e}")
+            registry = get_entry_point_registry()
+            group_obj = registry.get_group("victor.chunking_strategies")
+
+            if group_obj:
+                for ep_name, (ep, loaded) in group_obj.entry_points.items():
+                    try:
+                        # Load entry point if not already loaded
+                        strategy_cls = loaded if loaded is not False else ep.load()
+                        if isinstance(strategy_cls, type):
+                            strategy = strategy_cls(self.config)
+                        else:
+                            strategy = strategy_cls
+
+                        if isinstance(strategy, ChunkingStrategy):
+                            self.register(strategy)
+                            logger.debug(f"Discovered external strategy: {strategy.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load chunking strategy '{ep_name}': {e}")
         except Exception:
             pass
 

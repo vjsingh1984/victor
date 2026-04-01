@@ -728,14 +728,18 @@ class InMemoryEventBackend:
                         self._pending_tasks.add(task)
                         task.add_done_callback(self._pending_tasks.discard)
                     except Exception:
-                        # Silently skip all errors - event loop issues, closed loops, etc.
-                        pass
+                        logger.warning(
+                            "Failed to dispatch event handler",
+                            exc_info=True,
+                        )
 
             except asyncio.CancelledError:
                 break
             except Exception:
-                # Silently suppress all dispatch loop errors
-                pass
+                logger.warning(
+                    "Unexpected error in event dispatch loop",
+                    exc_info=True,
+                )
 
     async def _safe_call_handler(self, handler: EventHandler, event: MessagingEvent) -> None:
         """Safely call a handler, catching exceptions."""

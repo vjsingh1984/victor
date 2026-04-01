@@ -97,6 +97,7 @@ from victor.agent.coordinators.safety_coordinator import (
     SafetyCategory,
 )
 from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 
 __all__ = [
     "ChatCoordinator",
@@ -140,4 +141,6 @@ __all__ = [
     # E1 M3: Extracted from ToolCoordinator
     "ToolObservabilityHandler",
     "ToolRetryExecutor",
+    # Phase 6: System prompt business logic extraction
+    "SystemPromptCoordinator",
 ]

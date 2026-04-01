@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
     from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
     from victor.agent.streaming.pipeline import StreamingChatPipeline
+    from victor.agent.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -81,13 +82,21 @@ class ChatCoordinator:
         orchestrator: Any object satisfying ChatOrchestratorProtocol
     """
 
-    def __init__(self, orchestrator: "ChatOrchestratorProtocol") -> None:
+    def __init__(
+        self,
+        orchestrator: "ChatOrchestratorProtocol",
+        token_tracker: Optional["TokenTracker"] = None,
+    ) -> None:
         """Initialize the ChatCoordinator.
 
         Args:
             orchestrator: Object satisfying ChatOrchestratorProtocol
+            token_tracker: Optional centralized token tracker. When provided,
+                streaming token usage is accumulated through the tracker
+                instead of direct dict mutation on the orchestrator.
         """
         self._orchestrator = orchestrator
+        self._token_tracker = token_tracker
 
         # Lazy-initialized handlers
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
@@ -128,6 +137,7 @@ class ChatCoordinator:
                 tool_context=adapter,
                 provider_context=adapter,
                 execution_provider=adapter,
+                token_tracker=self._token_tracker,
             )
         return self._execution_coordinator
 
@@ -289,15 +299,20 @@ class ChatCoordinator:
             if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
                 ctx = orch._current_stream_context
                 if hasattr(ctx, "cumulative_usage"):
-                    for key in orch._cumulative_token_usage:
-                        if key in ctx.cumulative_usage:
-                            orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
-                    # Calculate total if not tracked by provider
-                    if orch._cumulative_token_usage["total_tokens"] == 0:
-                        orch._cumulative_token_usage["total_tokens"] = (
-                            orch._cumulative_token_usage["prompt_tokens"]
-                            + orch._cumulative_token_usage["completion_tokens"]
-                        )
+                    if self._token_tracker is not None:
+                        self._token_tracker.accumulate(ctx.cumulative_usage)
+                    else:
+                        for key in orch._cumulative_token_usage:
+                            if key in ctx.cumulative_usage:
+                                orch._cumulative_token_usage[key] += (
+                                    ctx.cumulative_usage[key]
+                                )
+                        # Calculate total if not tracked by provider
+                        if orch._cumulative_token_usage["total_tokens"] == 0:
+                            orch._cumulative_token_usage["total_tokens"] = (
+                                orch._cumulative_token_usage["prompt_tokens"]
+                                + orch._cumulative_token_usage["completion_tokens"]
+                            )
 
     # =====================================================================
     # Stream Preparation and Context

@@ -185,6 +185,12 @@ class ServiceNotFoundError(Exception):
         super().__init__(f"Service not registered: {name}")
 
 
+class ServiceResolutionError(Exception):
+    """Raised when a service cannot be resolved (e.g., circular dependency)."""
+
+    pass
+
+
 class ServiceAlreadyRegisteredError(Exception):
     """Raised when trying to register a service that already exists."""
 
@@ -228,6 +234,7 @@ class ServiceContainer:
         self._descriptors: Dict[Type, ServiceDescriptor] = {}
         self._lock = threading.RLock()
         self._disposed = False
+        self._resolving: set = set()  # Circular dependency detection
 
     def register(
         self,
@@ -334,16 +341,32 @@ class ServiceContainer:
 
         Raises:
             ServiceNotFoundError: If service is not registered
+            ServiceResolutionError: If circular dependency detected
         """
         descriptor = self._get_descriptor(service_type)
 
+        # Circular dependency detection
+        if service_type in self._resolving:
+            chain = " -> ".join(t.__name__ for t in self._resolving)
+            raise ServiceResolutionError(
+                f"Circular dependency detected: {chain} -> {service_type.__name__}"
+            )
+
         if descriptor.lifetime == ServiceLifetime.TRANSIENT:
-            return descriptor.create_instance(self)
+            self._resolving.add(service_type)
+            try:
+                return descriptor.create_instance(self)
+            finally:
+                self._resolving.discard(service_type)
 
         # Singleton or Scoped (scoped in root container acts as singleton)
         with self._lock:
             if descriptor.instance is None:
-                descriptor.instance = descriptor.create_instance(self)
+                self._resolving.add(service_type)
+                try:
+                    descriptor.instance = descriptor.create_instance(self)
+                finally:
+                    self._resolving.discard(service_type)
             return descriptor.instance
 
     def get_optional(self, service_type: Type[T]) -> Optional[T]:

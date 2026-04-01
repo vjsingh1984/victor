@@ -67,6 +67,10 @@ from victor.core.yaml_utils import safe_load as yaml_safe_load
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_dependency_schema import ToolDependencySpec
 from victor.core.tool_types import ToolDependency
+from victor.core.verticals.config_registry import (
+    get_canonicalization_setting,
+    VerticalBehaviorConfigRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -657,15 +661,9 @@ def invalidate_provider_cache(yaml_path: Optional[str] = None) -> int:
         return count
 
 
-# Mapping of vertical names to their canonicalization settings
-# Some verticals disable canonicalization to preserve distinct tool names
-_VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
-    "coding": True,
-    "devops": False,  # Preserves distinct 'grep' vs 'code_search'
-    "research": False,  # Preserves original tool names from ToolNames constants
-    "rag": True,
-    "dataanalysis": False,  # Preserves 'code_search' as distinct from 'grep'
-}
+# NOTE: _VERTICAL_CANONICALIZE_SETTINGS has been removed in favor of
+# VerticalBehaviorConfigRegistry. Use get_canonicalization_setting() instead.
+# This configuration is now managed via ExtensionManifest in each vertical.
 
 # Resolution telemetry counters for runtime diagnostics.
 _TOOL_DEPENDENCY_RESOLUTION_STATS: Dict[str, int] = {
@@ -804,7 +802,7 @@ def create_vertical_tool_dependency_provider(
     effective_canonicalize = (
         canonicalize
         if canonicalize is not None
-        else _VERTICAL_CANONICALIZE_SETTINGS.get(vertical_name, True)
+        else get_canonicalization_setting(vertical_name)
     )
     cache_key = (vertical_name, effective_canonicalize)
 
@@ -861,10 +859,14 @@ def create_vertical_tool_dependency_provider(
                 e,
             )
 
-    if vertical_name not in _VERTICAL_CANONICALIZE_SETTINGS:
-        _increment_resolution_stat("unknown_vertical_errors")
-        available = ", ".join(sorted(_VERTICAL_CANONICALIZE_SETTINGS.keys()))
-        raise ValueError(f"Unknown vertical '{vertical}'. Available: {available}")
+    # Check if vertical is known (has explicit configuration or is registered)
+    # Note: We no longer restrict to a hardcoded list - any vertical can be used
+    # The registry will provide defaults for unknown verticals
+    if not VerticalBehaviorConfigRegistry.has_config(vertical_name):
+        # This is now informational, not an error - unknown verticals get defaults
+        logger.debug(
+            f"Vertical '{vertical_name}' has no explicit configuration, using defaults"
+        )
 
     # Fallback 2: package resource YAML (works for wheel/pip installs).
     checked_packages: List[str] = []

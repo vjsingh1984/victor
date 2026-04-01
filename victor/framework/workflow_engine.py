@@ -377,16 +377,17 @@ class WorkflowEngine:
                 )
                 duration = time.time() - start_time
 
-                # Handle polymorphic result types (LSP compliance)
+                # Handle polymorphic result types
                 # Result can be GraphExecutionResult object or dict
-                if hasattr(result, "state"):
-                    # GraphExecutionResult from graph.py
+                from victor.framework.graph import GraphExecutionResult
+
+                if isinstance(result, GraphExecutionResult):
                     final_state = (
                         result.state if isinstance(result.state, dict) else {"result": result.state}
                     )
-                    nodes_executed = getattr(result, "node_history", [])
-                    success = getattr(result, "success", True)
-                    error = getattr(result, "error", None)
+                    nodes_executed = result.node_history
+                    success = result.success
+                    error = result.error
                 elif isinstance(result, dict):
                     # Direct dict result
                     final_state = result

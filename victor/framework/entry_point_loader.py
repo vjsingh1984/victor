@@ -23,6 +23,7 @@ Design Principles:
     - Verticals register capabilities via entry points
     - Graceful fallback when verticals are not installed
     - Clear separation between framework and vertical code
+    - Single-pass scanning for performance (via UnifiedEntryPointRegistry)
 
 Entry Point Groups:
     victor.tool_dependencies  - Tool dependency provider factories
@@ -48,6 +49,15 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 from importlib.metadata import entry_points
 
 from victor.framework.config import SafetyEnforcer
+
+# Import unified registry for single-pass scanning
+from victor.framework.entry_point_registry import (
+    EntryPointGroup,
+    UnifiedEntryPointRegistry,
+    get_entry_point,
+    get_entry_point_group,
+    scan_all_entry_points,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,14 +166,45 @@ def _resolve_loaded_entry_point_target(target: Any) -> Any:
 
 @functools.lru_cache(maxsize=16)
 def _cached_entry_points(group: str) -> tuple:
-    """Cache entry_points() result per group. Returns tuple for hashability."""
-    return tuple(entry_points(group=group))
+    """Get entry points for a group using unified registry.
+
+    DEPRECATED: Use UnifiedEntryPointRegistry directly for better performance.
+    This function maintains backward compatibility with existing code.
+
+    Args:
+        group: Entry point group name
+
+    Returns:
+        Tuple of entry point objects
+    """
+    logger.debug(f"_cached_entry_points('{group}') called - using unified registry")
+
+    # Use unified registry
+    registry = UnifiedEntryPointRegistry.get_instance()
+    group_obj = registry.get_group(group)
+
+    if not group_obj:
+        return ()
+
+    # Convert to tuple format for backward compatibility
+    return tuple(ep for ep, _ in group_obj.entry_points.values())
 
 
 def clear_entry_point_loader_cache() -> None:
-    """Clear cached entry-point lookups for this module."""
+    """Clear cached entry-point lookups for this module.
+
+    Clears both the legacy LRU cache and the unified registry cache.
+    """
     _cached_entry_points.cache_clear()
     _increment_loader_stat("cache_clears")
+
+    # Also clear the unified registry
+    try:
+        registry = UnifiedEntryPointRegistry.get_instance()
+        registry.invalidate()
+        logger.debug("Cleared unified entry point registry")
+    except Exception as e:
+        logger.warning(f"Failed to clear unified entry point registry: {e}")
 
 
 def _resilient_load_entry_point(
@@ -210,39 +251,30 @@ def load_runtime_extension_from_entry_points(
     _increment_group_loader_stat(group, "calls")
     normalized_vertical = normalize_vertical_name(vertical)
 
+    # Use unified registry for better performance
+    registry = UnifiedEntryPointRegistry.get_instance()
+
+    # Ensure entry points are scanned (lazy initialization)
     try:
-        eps = _cached_entry_points(group)
+        registry.scan_all()
     except Exception as e:
         _increment_group_loader_stat(group, "failures")
         logger.debug(
-            "Failed to inspect entry-point group '%s' for vertical '%s': %s",
-            group,
+            "Failed to scan entry-point groups for vertical '%s': %s",
             vertical,
             e,
         )
         return None
 
-    for ep in eps:
-        if normalize_vertical_name(ep.name) != normalized_vertical:
-            continue
+    # Get the specific entry point using unified registry
+    loaded_ep = registry.get(group, normalized_vertical)
 
-        try:
-            resolved = _resolve_loaded_entry_point_target(ep.load())
-        except Exception as e:
-            _increment_group_loader_stat(group, "failures")
-            logger.debug(
-                "Failed to load entry point '%s' from group '%s': %s",
-                ep.name,
-                group,
-                e,
-            )
-            continue
-
-        if resolved is None:
-            continue
-
-        _increment_group_loader_stat(group, "hits")
-        return resolved
+    if loaded_ep is not None:
+        # Resolve loaded entry point target if needed
+        resolved = _resolve_loaded_entry_point_target(loaded_ep)
+        if resolved is not None:
+            _increment_group_loader_stat(group, "hits")
+            return resolved
 
     _increment_group_loader_stat(group, "none_returns")
     return None

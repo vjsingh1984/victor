@@ -643,18 +643,29 @@ def bootstrap_capabilities() -> None:
     # 2. Discover enhanced providers from entry points
     #    Scan both 'victor.capabilities' (legacy) and 'victor.sdk.capabilities'
     #    to bridge framework and SDK capability registration systems.
+    #    Uses UnifiedEntryPointRegistry for single-pass lazy scanning.
     try:
-        from importlib.metadata import entry_points
+        from victor.framework.entry_point_registry import get_entry_point_registry
+
+        registry_instance = get_entry_point_registry()
 
         for group in ("victor.capabilities", "victor.sdk.capabilities"):
-            eps = entry_points(group=group)
-            for ep in eps:
+            group_obj = registry_instance.get_group(group)
+            if not group_obj:
+                continue
+
+            for ep_name, (ep, loaded) in group_obj.entry_points.items():
                 try:
-                    register_func = ep.load()
+                    # Load entry point if not already loaded
+                    if not loaded:
+                        register_func = ep.load()
+                    else:
+                        register_func = loaded
+
                     register_func(registry)
-                    logger.debug(f"Loaded capability entry point: {group}:{ep.name}")
+                    logger.debug(f"Loaded capability entry point: {group}:{ep_name}")
                 except Exception as e:
-                    logger.debug(f"Skipped capability {group}:{ep.name}: {e}")
+                    logger.debug(f"Skipped capability {group}:{ep_name}: {e}")
     except Exception as e:
         logger.debug(f"Entry point discovery failed: {e}")
 

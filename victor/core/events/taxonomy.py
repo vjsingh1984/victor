@@ -597,7 +597,8 @@ def emit_deprecation_warning(
     warnings.warn(
         f"Event type '{old_type}' from {module} is deprecated. "
         f"Use UnifiedEventType.{new_type.name} ('{new_type.value}') from "
-        f"victor.core.events.taxonomy instead.",
+        f"victor.core.events.taxonomy instead. "
+        f"Scheduled for removal in v1.0.",
         DeprecationWarning,
         stacklevel=3,
     )

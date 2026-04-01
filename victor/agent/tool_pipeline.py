@@ -1023,6 +1023,10 @@ class ToolPipeline:
         Args:
             file_path: Path of the file that was read
         """
+        # Evict oldest entries if at capacity (prevent unbounded growth)
+        if len(self._read_file_timestamps) >= 2000:
+            oldest_key = next(iter(self._read_file_timestamps))
+            del self._read_file_timestamps[oldest_key]
         self._read_file_timestamps[file_path] = time.monotonic()
         logger.debug(f"Recorded file read: {file_path}")
 

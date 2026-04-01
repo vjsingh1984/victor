@@ -101,7 +101,6 @@ class TestLazyLoading:
         """Importing victor.framework should NOT load optional modules."""
         # Remove cached modules to test fresh import behavior
         mods_to_check = [
-            "victor.framework.cqrs_bridge",
             "victor.framework.health",
             "victor.framework.metrics",
             "victor.framework.resilience",
