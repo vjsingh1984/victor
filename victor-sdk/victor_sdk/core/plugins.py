@@ -20,9 +20,10 @@ implement to register themselves with the Victor framework.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Protocol, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol, Type, runtime_checkable
 
-import typer
+if TYPE_CHECKING:
+    import typer
 
 
 @runtime_checkable
@@ -57,7 +58,7 @@ class PluginContext(Protocol):
         """
         ...
 
-    def register_command(self, name: str, app: typer.Typer) -> None:
+    def register_command(self, name: str, app: "typer.Typer") -> None:
         """Register a Typer CLI application as a sub-command.
 
         Args:
@@ -125,7 +126,7 @@ class VictorPlugin(Protocol):
         """
         ...
 
-    def get_cli_app(self) -> Optional[typer.Typer]:
+    def get_cli_app(self) -> Optional["typer.Typer"]:
         """Return a Typer application to be registered as a sub-command.
 
         .. deprecated::
