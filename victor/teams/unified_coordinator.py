@@ -60,7 +60,7 @@ from victor.teams.types import (
 )
 
 if TYPE_CHECKING:
-    from victor.teams.protocols import ITeamMember
+    from victor.protocols.team import ITeamMember
 
 logger = logging.getLogger(__name__)
 
