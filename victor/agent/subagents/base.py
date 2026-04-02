@@ -73,6 +73,40 @@ logger = logging.getLogger(__name__)
 from victor.core.shared_types import SubAgentRole  # noqa: F401
 
 
+# Local IAgent protocol to avoid circular import at runtime
+# The canonical IAgent is in victor.protocols.team but we can't import it
+# at module level due to circular dependencies
+class _IAgentProtocol(Protocol):
+    """Local IAgent protocol for type checking.
+
+    This protocol is used instead of importing IAgent from victor.protocols.team
+    to avoid circular import issues at module initialization time.
+    """
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this agent."""
+        ...
+
+    @property
+    def role(self) -> Any:
+        """Role of this agent."""
+        ...
+
+    @property
+    def persona(self) -> Optional[Any]:
+        """Persona of this agent."""
+        ...
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+        """Execute a task using this agent."""
+        ...
+
+    async def receive_message(self, message: Any) -> Optional[Any]:
+        """Receive a message from another agent."""
+        ...
+
+
 @dataclass
 class SubAgentConfig:
     """Configuration for a sub-agent instance.
@@ -144,7 +178,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent("IAgent"):  # type: ignore[misc]
+class SubAgent(_IAgentProtocol):  # type: ignore[misc]
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
