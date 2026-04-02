@@ -70,6 +70,11 @@ from victor_sdk.core.exceptions import (
 
 # Vertical protocols
 from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_sdk.verticals.protocols.capabilities import (
+    CapabilityProvider,
+    ChainProvider,
+    PersonaProvider,
+)
 
 # Extension manifest
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
@@ -163,6 +168,10 @@ __all__ = [
     "VerticalProtocolError",
     # Base class
     "VerticalBase",
+    # Capability protocols
+    "CapabilityProvider",
+    "ChainProvider",
+    "PersonaProvider",
     # Extension manifest
     "ExtensionManifest",
     "ExtensionType",
