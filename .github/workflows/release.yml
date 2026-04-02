@@ -150,6 +150,8 @@ jobs:
   build-native:
     name: Build Native (${{ matrix.os }})
     needs: test
+    # Temporarily disabled - victor-sdk 0.6.0 must be published first
+    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -213,6 +215,8 @@ jobs:
   build-binary:
     name: Build Binary (${{ matrix.os }})
     needs: test
+    # Temporarily disabled - victor-sdk 0.6.0 must be published first
+    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -274,6 +278,8 @@ jobs:
   build-docker:
     name: Build Docker Image
     needs: test
+    # Temporarily disabled - victor-sdk 0.6.0 must be published first
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -445,7 +451,7 @@ jobs:
   # ==========================================================================
   publish-testpypi:
     name: Publish to TestPyPI
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
+    needs: [build-python, generate-checksums, create-release]
     if: github.event.inputs.publish_testpypi == 'true' || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc')
     runs-on: ubuntu-latest
     environment:
@@ -487,7 +493,7 @@ jobs:
   # ==========================================================================
   publish-sdk-pypi:
     name: Publish victor-sdk to PyPI
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
+    needs: [build-python, generate-checksums, create-release]
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
     runs-on: ubuntu-latest
     permissions:
@@ -532,7 +538,9 @@ jobs:
   # ==========================================================================
   publish-docker:
     name: Publish Docker Image
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, create-release]
+    needs: [build-python, generate-checksums, create-release]
+    # Temporarily disabled - Docker image requires victor-sdk 0.6.0 on PyPI first
+    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -594,7 +602,7 @@ jobs:
 
   generate-checksums:
     name: Generate Checksums
-    needs: [build-python, build-native, build-binary, build-docker]
+    needs: [build-python]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -619,7 +627,7 @@ jobs:
   # ==========================================================================
   create-release:
     name: Create GitHub Release
-    needs: [build-python, build-native, build-binary, build-docker, generate-checksums, generate-sbom]
+    needs: [build-python, generate-checksums, generate-sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
