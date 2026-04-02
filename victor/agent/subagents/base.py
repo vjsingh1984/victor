@@ -53,7 +53,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Protocol, Union
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
