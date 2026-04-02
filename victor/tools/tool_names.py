@@ -19,6 +19,11 @@ or `victor_sdk.constants`. This module remains for backward compatibility
 with existing victor-ai callers during the migration.
 """
 
+from __future__ import annotations
+
+from typing import Any, Optional
+
+# Try to import from SDK first
 try:
     from victor_sdk.constants import (
         CANONICAL_TO_ALIASES,
@@ -34,44 +39,73 @@ try:
     _SDK_AVAILABLE = True
 except ImportError:
     # SDK not installed yet (e.g., during victor-ai installation)
-    # Provide fallback implementations to prevent import errors
+    # Create lazy loader that will import from SDK when first accessed
     _SDK_AVAILABLE = False
 
-    # Fallback type definitions
-    from typing import Protocol
-    from typing_extensions import runtime_checkable
+    # Lazy loader for SDK constants
+    _SDK_CONSTANTS: Optional[dict] = None
 
-    @runtime_checkable
-    class ToolNames(Protocol):
-        """Protocol for tool names when SDK is not available."""
+    def _get_sdk_constants() -> dict:
+        """Lazy load SDK constants when first accessed."""
+        global _SDK_CONSTANTS
+        if _SDK_CONSTANTS is None:
+            try:
+                from victor_sdk.constants import (
+                    CANONICAL_TO_ALIASES,
+                    TOOL_ALIASES,
+                    ToolNameEntry,
+                    ToolNames,
+                    get_aliases,
+                    get_all_canonical_names,
+                    get_canonical_name,
+                    get_name_mapping,
+                    is_valid_tool_name,
+                )
+                _SDK_CONSTANTS = {
+                    "CANONICAL_TO_ALIASES": CANONICAL_TO_ALIASES,
+                    "TOOL_ALIASES": TOOL_ALIASES,
+                    "ToolNameEntry": ToolNameEntry,
+                    "ToolNames": ToolNames,
+                    "get_aliases": get_aliases,
+                    "get_all_canonical_names": get_all_canonical_names,
+                    "get_canonical_name": get_canonical_name,
+                    "get_name_mapping": get_name_mapping,
+                    "is_valid_tool_name": is_valid_tool_name,
+                }
+            except ImportError:
+                # SDK still not available, provide minimal fallback
+                _SDK_CONSTANTS = {
+                    "CANONICAL_TO_ALIASES": {},
+                    "TOOL_ALIASES": {},
+                    "ToolNameEntry": None,
+                    "ToolNames": type("ToolNames", (), {}),
+                    "get_aliases": lambda name: [],
+                    "get_all_canonical_names": lambda: [],
+                    "get_canonical_name": lambda name: name,
+                    "get_name_mapping": lambda: {},
+                    "is_valid_tool_name": lambda name: bool(name),
+                }
+        return _SDK_CONSTANTS
 
-    @runtime_checkable
-    class ToolNameEntry(Protocol):
-        """Protocol for tool name entry when SDK is not available."""
+    class _LazyLoader:
+        """Lazy loader for SDK constants that forwards to the real implementation."""
 
-    # Fallback values
-    CANONICAL_TO_ALIASES = {}  # type: ignore
-    TOOL_ALIASES = {}  # type: ignore
+        def __getattr__(self, name: str) -> Any:
+            return _get_sdk_constants()[name]
 
-    def get_aliases(name: str):  # type: ignore
-        """Fallback implementation when SDK is not available."""
-        return []
+    # Create lazy loader instance
+    _lazy_loader = _LazyLoader()
 
-    def get_all_canonical_names():  # type: ignore
-        """Fallback implementation when SDK is not available."""
-        return []
-
-    def get_canonical_name(name: str):  # type: ignore
-        """Fallback implementation when SDK is not available."""
-        return name
-
-    def get_name_mapping():  # type: ignore
-        """Fallback implementation when SDK is not available."""
-        return {}
-
-    def is_valid_tool_name(name: str) -> bool:  # type: ignore
-        """Fallback implementation when SDK is not available."""
-        return bool(name)
+    # Export lazy loader as module-level names
+    ToolNames = _lazy_loader.ToolNames  # type: ignore
+    ToolNameEntry = _lazy_loader.ToolNameEntry  # type: ignore
+    CANONICAL_TO_ALIASES = _lazy_loader.CANONICAL_TO_ALIASES  # type: ignore
+    TOOL_ALIASES = _lazy_loader.TOOL_ALIASES  # type: ignore
+    get_aliases = _lazy_loader.get_aliases  # type: ignore
+    get_all_canonical_names = _lazy_loader.get_all_canonical_names  # type: ignore
+    get_canonical_name = _lazy_loader.get_canonical_name  # type: ignore
+    get_name_mapping = _lazy_loader.get_name_mapping  # type: ignore
+    is_valid_tool_name = _lazy_loader.is_valid_tool_name  # type: ignore
 
 __all__ = [
     "ToolNames",
