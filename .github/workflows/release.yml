@@ -69,12 +69,11 @@ jobs:
           pip install --force-reinstall --no-deps -e .
           pip install -e ".[dev]"
           pip uninstall -y victor || true
-          pip install "scipy>=1.10" || echo "Warning: scipy installation failed"
           python -c "from victor import Agent, __version__; print(f'✓ Agent import works (victor {__version__})')"
 
       - name: Run tests
         run: |
-          pytest tests/unit -v --tb=short -n auto --dist loadscope -m "not slow" --maxfail=10
+          pytest tests/unit -v --tb=short -n auto --dist loadscope --maxfail=20
 
       - name: Run linting
         run: |
