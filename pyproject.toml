@@ -160,6 +160,9 @@ ci = [
     # API dependencies for integration tests
     "strawberry-graphql[fastapi]>=0.243",
 
+    # Statistical analysis (ab_testing)
+    "scipy>=1.13",
+
     # Coverage and reporting
     "pytest-cov>=4.1",
     "codecov>=2.1",

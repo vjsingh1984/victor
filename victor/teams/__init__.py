@@ -154,6 +154,67 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
 
 
+def create_coordinator(
+    orchestrator: Optional["AgentOrchestrator"] = None,
+    lightweight: bool = False,
+    enable_observability: bool = False,
+    enable_rl: bool = False,
+) -> ITeamCoordinator:
+    """Create a team coordinator instance.
+
+    This is a factory function that creates the appropriate coordinator
+    based on the provided parameters. Use this instead of directly
+    instantiating coordinator classes.
+
+    Args:
+        orchestrator: The agent orchestrator for coordination context.
+            Required for production coordinators.
+        lightweight: If True, create a lightweight coordinator for testing.
+            Lightweight coordinators have minimal dependencies and are
+            suitable for unit tests.
+        enable_observability: If True, enable observability features
+            (metrics, traces, events).
+        enable_rl: If True, enable reinforcement learning features.
+
+    Returns:
+        A coordinator instance implementing ITeamCoordinator.
+
+    Example:
+        from victor.teams import create_coordinator
+
+        # Production coordinator with full features
+        coordinator = create_coordinator(
+            orchestrator=my_orchestrator,
+            enable_observability=True,
+            enable_rl=True,
+        )
+
+        # Lightweight coordinator for testing
+        coordinator = create_coordinator(lightweight=True)
+    """
+    # Import here to avoid circular dependency
+    from victor.framework import AgentTeam
+
+    if lightweight:
+        # For testing, use framework's AgentTeam (lightweight coordinator)
+        # This doesn't require an orchestrator
+        return AgentTeam()  # type: ignore
+    else:
+        # Production coordinator
+        if orchestrator is None:
+            raise ValueError(
+                "orchestrator is required for production coordinators. "
+                "Use lightweight=True for testing without an orchestrator."
+            )
+
+        # Create UnifiedTeamCoordinator with requested features
+        return UnifiedTeamCoordinator(
+            orchestrator=orchestrator,
+            enable_observability=enable_observability,
+            enable_rl=enable_rl,
+        )
+
+
 def __getattr__(name: str) -> Any:
     """Lazy load protocols to avoid circular import.
 

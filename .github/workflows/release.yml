@@ -60,12 +60,14 @@ jobs:
 
       - name: Install victor-sdk from local wheel
         run: |
+          pip uninstall -y victor-ai victor-sdk || true
           pip install victor-sdk/dist/*.whl
           python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
 
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
+          python -c "from victor import Agent; print(f'✓ Agent import works')"
 
       - name: Run tests
         run: |
