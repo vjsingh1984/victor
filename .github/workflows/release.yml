@@ -61,13 +61,12 @@ jobs:
       - name: Install victor-sdk from local wheel
         run: |
           pip uninstall -y victor-ai victor-sdk || true
-          pip cache remove victor-ai victor-sdk || true
-          rm -rf /opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/victor* || true
           pip install victor-sdk/dist/*.whl
           python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
 
       - name: Install dependencies
         run: |
+          pip install --force-reinstall --no-deps -e .
           pip install -e ".[dev]"
           python -c "from victor import Agent, __version__; print(f'✓ Agent import works (victor {__version__})')"
 
