@@ -59,13 +59,11 @@ from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAda
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
-    from victor.protocols.team import IAgent
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
 
 # Import from canonical location to avoid circular dependencies
-# Note: IAgent imported conditionally above to avoid circular import
 from victor.teams.types import AgentMessage
 
 logger = logging.getLogger(__name__)
@@ -146,7 +144,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent(IAgent):
+class SubAgent("IAgent"):  # type: ignore[misc]
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
