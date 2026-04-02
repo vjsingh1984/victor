@@ -498,99 +498,14 @@ class StreamingHandlerProtocol(Protocol):
 
 
 __all__ = [
-    # Factory protocols
-    "IAgentFactory",
-    "IAgent",
-    # Tool selection data classes
-    "ToolSelectionContext",
-    "ToolSelectorFeatures",
-    # Provider protocols
-    "ProviderManagerProtocol",
-    # Tool protocols
-    "ToolRegistryProtocol",
-    "ToolSelectorProtocol",
-    "ToolPipelineProtocol",
-    "ToolExecutorProtocol",
-    # Conversation protocols
-    "ConversationControllerProtocol",
-    "ConversationStateMachineProtocol",
-    "MessageHistoryProtocol",
     # Streaming protocols
     "StreamingToolChunk",
     "StreamingToolAdapterProtocol",
     "StreamingControllerProtocol",
-    # Analysis protocols
-    "TaskAnalyzerProtocol",
-    "ComplexityClassifierProtocol",
-    "ActionAuthorizerProtocol",
-    "SearchRouterProtocol",
-    # Observability protocols
-    "ObservabilityProtocol",
-    "MetricsCollectorProtocol",
-    # Cache protocols
-    "ToolCacheProtocol",
-    # Task tracking protocols
-    "TaskTrackerProtocol",
-    # Output formatting protocols
-    "ToolOutputFormatterProtocol",
-    "ResponseSanitizerProtocol",
-    # Utility protocols
-    "ArgumentNormalizerProtocol",
-    "ProjectContextProtocol",
-    # Component lifecycle protocols
-    "CodeExecutionManagerProtocol",
-    "WorkflowRegistryProtocol",
-    "ToolRegistrarProtocol",
-    "UsageAnalyticsProtocol",
-    "ToolSequenceTrackerProtocol",
-    "ContextCompactorProtocol",
-    # Mode controller protocols
-    "ModeControllerProtocol",
-    # Deduplication protocols
-    "ToolDeduplicationTrackerProtocol",
-    # Embedding store protocols
-    "ConversationEmbeddingStoreProtocol",
-    # Recovery protocols
-    "RecoveryHandlerProtocol",
     "StreamingRecoveryCoordinatorProtocol",
-    # Utility service protocols
-    "DebugLoggerProtocol",
-    "TaskTypeHinterProtocol",
-    "ReminderManagerProtocol",
-    "RLCoordinatorProtocol",
-    "SafetyCheckerProtocol",
-    "AutoCommitterProtocol",
-    "MCPBridgeProtocol",
-    # Infrastructure service protocols
-    "ToolDependencyGraphProtocol",
-    "ToolPluginRegistryProtocol",
-    "SemanticToolSelectorProtocol",
-    "ProviderRegistryProtocol",
-    # Analytics & observability protocols
-    "UsageLoggerProtocol",
-    "StreamingMetricsCollectorProtocol",
-    "IntentClassifierProtocol",
-    # Helper/adapter service protocols
-    "SystemPromptBuilderProtocol",
-    "ParallelExecutorProtocol",
-    "ResponseCompleterProtocol",
+    "ChunkGeneratorProtocol",
     "StreamingHandlerProtocol",
-    # Tool access control protocols
-    "AccessPrecedence",
-    "ToolAccessDecision",
-    "ToolAccessContext",
-    "IToolAccessController",
-    # Budget management protocols
-    "BudgetType",
-    "BudgetStatus",
-    "BudgetConfig",
-    "IBudgetManager",
-    # New coordinator protocols (WS-D)
-    "ToolCoordinatorProtocol",
-    "StateCoordinatorProtocol",
-    "PromptCoordinatorProtocol",
-    # Vertical storage protocol (DIP compliance)
-    "VerticalStorageProtocol",
+    "StreamingMetricsCollectorProtocol",
 ]
 
 

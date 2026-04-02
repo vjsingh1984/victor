@@ -129,16 +129,15 @@ def register_vertical(
     if not name:
         raise ValueError("Vertical name cannot be empty")
 
-    # Import ExtensionType and ExtensionManifest here to avoid circular imports
+    # Import ExtensionManifest here to avoid circular imports
     try:
-        from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+        from victor_sdk.verticals.manifest import ExtensionManifest
     except ImportError:
         # Fallback for when victor-sdk is not available
         logger.warning(
             "victor_sdk not available - creating minimal manifest. "
             "Full metadata requires victor-sdk package."
         )
-        ExtensionType = None  # type: ignore
         ExtensionManifest = None  # type: ignore
 
     def decorator(cls: Type) -> Type:

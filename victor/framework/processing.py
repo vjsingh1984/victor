@@ -30,25 +30,25 @@ from __future__ import annotations
 
 __all__ = [
     # Editing
-    "OperationType",
-    "EditOperation",
-    "EditTransaction",
-    "FileEditor",
+    "OperationType",  # noqa: F822
+    "EditOperation",  # noqa: F822
+    "EditTransaction",  # noqa: F822
+    "FileEditor",  # noqa: F822
     # Native processing
-    "get_default_text_chunker",
+    "get_default_text_chunker",  # noqa: F822
     # Completion protocol
-    "InsertTextFormat",
-    "CompletionTriggerKind",
-    "CompletionContext",
-    "CompletionParams",
-    "CompletionItemLabelDetails",
-    "CompletionItem",
-    "InlineCompletionItem",
-    "InlineCompletionParams",
-    "CompletionList",
-    "InlineCompletionList",
-    "CompletionCapabilities",
-    "CompletionMetrics",
+    "InsertTextFormat",  # noqa: F822
+    "CompletionTriggerKind",  # noqa: F822
+    "CompletionContext",  # noqa: F822
+    "CompletionParams",  # noqa: F822
+    "CompletionItemLabelDetails",  # noqa: F822
+    "CompletionItem",  # noqa: F822
+    "InlineCompletionItem",  # noqa: F822
+    "InlineCompletionParams",  # noqa: F822
+    "CompletionList",  # noqa: F822
+    "InlineCompletionList",  # noqa: F822
+    "CompletionCapabilities",  # noqa: F822
+    "CompletionMetrics",  # noqa: F822
 ]
 
 

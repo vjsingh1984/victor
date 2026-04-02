@@ -29,24 +29,24 @@ Usage:
 from __future__ import annotations
 
 __all__ = [
-    "DiagnosticSeverity",
-    "CompletionItemKind",
-    "SymbolKind",
-    "DiagnosticTag",
-    "Position",
-    "Range",
-    "Location",
-    "LocationLink",
-    "DiagnosticRelatedInformation",
-    "Diagnostic",
-    "CompletionItem",
-    "Hover",
-    "DocumentSymbol",
-    "SymbolInformation",
-    "TextEdit",
-    "TextDocumentIdentifier",
-    "VersionedTextDocumentIdentifier",
-    "TextDocumentEdit",
+    "DiagnosticSeverity",  # noqa: F822
+    "CompletionItemKind",  # noqa: F822
+    "SymbolKind",  # noqa: F822
+    "DiagnosticTag",  # noqa: F822
+    "Position",  # noqa: F822
+    "Range",  # noqa: F822
+    "Location",  # noqa: F822
+    "LocationLink",  # noqa: F822
+    "DiagnosticRelatedInformation",  # noqa: F822
+    "Diagnostic",  # noqa: F822
+    "CompletionItem",  # noqa: F822
+    "Hover",  # noqa: F822
+    "DocumentSymbol",  # noqa: F822
+    "SymbolInformation",  # noqa: F822
+    "TextEdit",  # noqa: F822
+    "TextDocumentIdentifier",  # noqa: F822
+    "VersionedTextDocumentIdentifier",  # noqa: F822
+    "TextDocumentEdit",  # noqa: F822
 ]
 
 

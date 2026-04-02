@@ -57,6 +57,7 @@ from victor.core.verticals.base import VerticalBase, VerticalRegistry
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
     from victor.config.settings import Settings
+    from victor.core.verticals.dependency_graph import ExtensionDependencyGraph
     from victor.core.verticals.protocols import VerticalExtensions
 
 logger = logging.getLogger(__name__)

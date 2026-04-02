@@ -201,15 +201,16 @@ class VerticalLoadTelemetry:
             success: Whether the load succeeded
             duration_ms: Time taken to load
         """
-        span_id = f"{vertical_name}:load_extension:{extension_type}"
-
         span = VerticalLoadSpan(
             vertical_name=vertical_name,
             operation="load_extension",
             start_time_ns=time.time_ns() - int(duration_ms * 1_000_000),
             end_time_ns=time.time_ns(),
             status="success" if success else "error",
-            metadata={"extension_type": extension_type},
+            metadata={
+                "extension_type": extension_type,
+                "span_id": f"{vertical_name}:load_extension:{extension_type}",
+            },
         )
 
         self._spans.append(span)
