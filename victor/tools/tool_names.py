@@ -113,6 +113,15 @@ class _DictLoader:
     def get(self, key: str, default: Any = None) -> Any:
         return self._load().get(key, default)
 
+    def keys(self):
+        return self._load().keys()
+
+    def values(self):
+        return self._load().values()
+
+    def items(self):
+        return self._load().items()
+
 CANONICAL_TO_ALIASES = _DictLoader()  # type: ignore
 TOOL_ALIASES = _DictLoader()  # type: ignore
 
