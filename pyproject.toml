@@ -161,7 +161,7 @@ ci = [
     "strawberry-graphql[fastapi]>=0.243",
 
     # Statistical analysis (ab_testing)
-    "scipy>=1.13",
+    "scipy>=1.10",
 
     # Coverage and reporting
     "pytest-cov>=4.1",
