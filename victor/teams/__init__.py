@@ -104,8 +104,10 @@ from victor.teams.types import (
     TeamResult,
 )
 
-# Protocols
-from victor.teams.protocols import (
+# Protocols (import from canonical location to avoid circular import)
+# Note: victor.teams.protocols is a re-export shim - import from victor.protocols.team directly
+from victor.protocols.team import (
+    IAgent,
     IEnhancedTeamCoordinator,
     IMessageBusProvider,
     IObservableCoordinator,
@@ -113,6 +115,8 @@ from victor.teams.protocols import (
     ISharedMemoryProvider,
     ITeamCoordinator,
     ITeamMember,
+    TeamCoordinatorProtocol,
+    TeamMemberProtocol,
 )
 
 # Coordinator
