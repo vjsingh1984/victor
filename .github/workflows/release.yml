@@ -402,6 +402,8 @@ jobs:
   build-vscode:
     name: Build VS Code Extension
     needs: test
+    # Temporarily disabled - requires victor-sdk 0.6.0 on PyPI first
+    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -574,6 +576,8 @@ jobs:
   generate-sbom:
     name: Generate SBOM
     needs: [build-python]
+    # Temporarily disabled - requires victor-sdk 0.6.0 on PyPI first
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -627,7 +631,7 @@ jobs:
   # ==========================================================================
   create-release:
     name: Create GitHub Release
-    needs: [build-python, generate-checksums, generate-sbom]
+    needs: [build-python, generate-checksums]
     runs-on: ubuntu-latest
     permissions:
       contents: write
