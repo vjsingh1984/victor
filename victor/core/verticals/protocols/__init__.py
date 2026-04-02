@@ -42,56 +42,63 @@ Legacy import path (still works):
 # Re-export promoted protocols from SDK (canonical source)
 # =============================================================================
 
-from victor_sdk.verticals.protocols.promoted import (
-    # Tool Selection
-    ToolSelectionStrategyProtocol,
-    VerticalToolSelectionProviderProtocol,
-    TieredToolConfigProviderProtocol,
-    VerticalTieredToolProviderProtocol,
-    # Safety
-    SafetyExtensionProtocol,
-    # Team
-    TeamSpecProviderProtocol,
-    VerticalTeamProviderProtocol,
-    # Middleware
-    MiddlewareProtocol,
-    # Prompt
-    PromptContributorProtocol,
-    # Mode
-    ModeConfigProviderProtocol,
-    # Workflow
-    WorkflowProviderProtocol,
-    VerticalWorkflowProviderProtocol,
-    # Service
-    ServiceProviderProtocol,
-    # RL
-    RLConfigProviderProtocol,
-    VerticalRLProviderProtocol,
-    # Enrichment
-    EnrichmentStrategyProtocol,
-    VerticalEnrichmentProviderProtocol,
-    # Capability
-    CapabilityProviderProtocol,
-    ChainProviderProtocol,
-    PersonaProviderProtocol,
-    VerticalPersonaProviderProtocol,
-    # Stage Contract
-    StageContract,
-    StageValidator,
-    StageValidationResult,
-    ValidationError,
-    validate_stage_contract,
-    StageContractMixin,
-)
+try:
+    from victor_sdk.verticals.protocols.promoted import (
+        # Tool Selection
+        ToolSelectionStrategyProtocol,
+        VerticalToolSelectionProviderProtocol,
+        TieredToolConfigProviderProtocol,
+        VerticalTieredToolProviderProtocol,
+        # Safety
+        SafetyExtensionProtocol,
+        # Team
+        TeamSpecProviderProtocol,
+        VerticalTeamProviderProtocol,
+        # Middleware
+        MiddlewareProtocol,
+        # Prompt
+        PromptContributorProtocol,
+        # Mode
+        ModeConfigProviderProtocol,
+        # Workflow
+        WorkflowProviderProtocol,
+        VerticalWorkflowProviderProtocol,
+        # Service
+        ServiceProviderProtocol,
+        # RL
+        RLConfigProviderProtocol,
+        VerticalRLProviderProtocol,
+        # Enrichment
+        EnrichmentStrategyProtocol,
+        VerticalEnrichmentProviderProtocol,
+        # Capability
+        CapabilityProviderProtocol,
+        ChainProviderProtocol,
+        PersonaProviderProtocol,
+        VerticalPersonaProviderProtocol,
+        # Stage Contract
+        StageContract,
+        StageValidator,
+        StageValidationResult,
+        ValidationError,
+        validate_stage_contract,
+        StageContractMixin,
+    )
 
-# Re-export promoted data types from SDK
-from victor_sdk.verticals.protocols.promoted_types import (
-    MiddlewarePriority,
-    MiddlewareResult,
-    ModeConfig,
-    ToolSelectionContext,
-    ToolSelectionResult,
-)
+    # Re-export promoted data types from SDK
+    from victor_sdk.verticals.protocols.promoted_types import (
+        MiddlewarePriority,
+        MiddlewareResult,
+        ModeConfig,
+        ToolSelectionContext,
+        ToolSelectionResult,
+    )
+
+    _SDK_AVAILABLE = True
+except ImportError:
+    # SDK not installed yet (e.g., during victor-ai installation)
+    # These will be available after victor-sdk is installed
+    _SDK_AVAILABLE = False
 
 # Re-export SafetyPattern from its original location (dataclass, not Protocol)
 from victor.security.safety.types import SafetyPattern
@@ -100,24 +107,26 @@ from victor.security.safety.types import SafetyPattern
 from victor.core.vertical_types import TaskTypeHint
 
 # Backward compat alias for ToolSelectionContext
-VerticalToolSelectionContext = ToolSelectionContext
+if _SDK_AVAILABLE:
+    VerticalToolSelectionContext = ToolSelectionContext
 
 # =============================================================================
 # ISP-Compliant Vertical Providers (re-exported from SDK)
 # =============================================================================
 
-from victor_sdk.verticals.protocols import (
-    MiddlewareProvider,
-    SafetyProvider,
-    WorkflowProvider,
-    TeamProvider,
-    RLProvider,
-    EnrichmentProvider,
-    ToolProvider,
-    HandlerProvider,
-    CapabilityProvider,
-    ModeConfigProvider,
-)
+if _SDK_AVAILABLE:
+    from victor_sdk.verticals.protocols import (
+        MiddlewareProvider,
+        SafetyProvider,
+        WorkflowProvider,
+        TeamProvider,
+        RLProvider,
+        EnrichmentProvider,
+        ToolProvider,
+        HandlerProvider,
+        CapabilityProvider,
+        ModeConfigProvider,
+    )
 
 # These provider protocols are defined locally (have methods not in SDK versions)
 from victor.core.verticals.protocols.providers import (
@@ -159,17 +168,17 @@ class VerticalExtensions:
         tiered_tool_config: Tiered tool configuration for context-efficient selection
     """
 
-    middleware: List[MiddlewareProtocol] = field(default_factory=list)
-    safety_extensions: List[SafetyExtensionProtocol] = field(default_factory=list)
-    prompt_contributors: List[PromptContributorProtocol] = field(default_factory=list)
-    mode_config_provider: Optional[ModeConfigProviderProtocol] = None
-    tool_dependency_provider: Optional[ToolDependencyProviderProtocol] = None
-    workflow_provider: Optional[WorkflowProviderProtocol] = None
-    service_provider: Optional[ServiceProviderProtocol] = None
-    rl_config_provider: Optional[RLConfigProviderProtocol] = None
-    team_spec_provider: Optional[TeamSpecProviderProtocol] = None
-    enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
-    tool_selection_strategy: Optional[ToolSelectionStrategyProtocol] = None
+    middleware: List["MiddlewareProtocol"] = field(default_factory=list)
+    safety_extensions: List["SafetyExtensionProtocol"] = field(default_factory=list)
+    prompt_contributors: List["PromptContributorProtocol"] = field(default_factory=list)
+    mode_config_provider: Optional["ModeConfigProviderProtocol"] = None
+    tool_dependency_provider: Optional["ToolDependencyProviderProtocol"] = None
+    workflow_provider: Optional["WorkflowProviderProtocol"] = None
+    service_provider: Optional["ServiceProviderProtocol"] = None
+    rl_config_provider: Optional["RLConfigProviderProtocol"] = None
+    team_spec_provider: Optional["TeamSpecProviderProtocol"] = None
+    enrichment_strategy: Optional["EnrichmentStrategyProtocol"] = None
+    tool_selection_strategy: Optional["ToolSelectionStrategyProtocol"] = None
     tiered_tool_config: Optional[TieredToolConfig] = None
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
@@ -197,7 +206,7 @@ class VerticalExtensions:
             patterns.extend(ext.get_file_patterns())
         return patterns
 
-    def get_all_mode_configs(self) -> Dict[str, ModeConfig]:
+    def get_all_mode_configs(self) -> Dict[str, "ModeConfig"]:
         """Get mode configs from provider.
 
         Returns:
