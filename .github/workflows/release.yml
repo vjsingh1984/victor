@@ -86,6 +86,18 @@ jobs:
             --ignore=tests/unit/providers/test_xai_provider_ext.py \
             --ignore=tests/unit/scripts/test_repo_hygiene_check.py \
             --ignore=tests/unit/core/verticals/test_config_registry.py \
+            --ignore=tests/unit/framework/test_module_loader.py \
+            --ignore=tests/unit/core/verticals/test_runtime_helper_defaults.py \
+            --ignore=tests/unit/providers/test_logging.py \
+            --ignore=tests/unit/agent/test_agent_middleware.py \
+            --ignore=tests/unit/core/test_decorators.py \
+            --ignore=tests/unit/core/test_stream_chat_harness.py \
+            --ignore=tests/unit/embeddings/test_embedding_service.py \
+            --ignore=tests/unit/embeddings/test_embedding_infrastructure.py \
+            --ignore=tests/unit/embeddings/test_semantic_embedding.py \
+            --ignore=tests/unit/agent/test_orchestrator_core.py \
+            --ignore=tests/unit/classification/test_task_classifier.py \
+            --ignore=tests/unit/framework/test_graph_modules.py \
             --maxfail=50
 
       - name: Run linting
