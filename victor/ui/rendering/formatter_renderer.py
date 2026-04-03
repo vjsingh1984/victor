@@ -77,6 +77,7 @@ class FormatterRenderer:
         elapsed: float,
         arguments: dict[str, Any],
         error: str | None = None,
+        follow_up_suggestions: list[dict[str, Any]] | None = None,
     ) -> None:
         """Handle tool execution result.
 
@@ -92,6 +93,7 @@ class FormatterRenderer:
             tool_name=name,
             success=success,
             error=error,
+            follow_up_suggestions=follow_up_suggestions,
         )
         self.resume()
 

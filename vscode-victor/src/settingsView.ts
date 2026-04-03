@@ -15,6 +15,7 @@ interface VictorSettings {
     provider: string;
     model: string;
     mode: string;
+    serverUrl: string;
     serverPort: number;
     autoStart: boolean;
     showInlineCompletions: boolean;
@@ -50,8 +51,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
     resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
-        token: vscode.CancellationToken
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
     ): void {
         this._view = webviewView;
 
@@ -78,7 +79,7 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
                     await this._loadModels();
                     break;
                 case 'testConnection':
-                    await this._testConnection();
+                    await this._testConnection(data.settings);
                     break;
             }
         });
@@ -100,7 +101,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             provider: config.get('provider', 'anthropic'),
             model: config.get('model', 'claude-sonnet-4-20250514'),
             mode: config.get('mode', 'build'),
-            serverPort: config.get('serverPort', 8000),
+            serverUrl: this._normalizeServerUrl(config.get('serverUrl', '')),
+            serverPort: config.get('serverPort', 8765),
             autoStart: config.get('autoStart', false),
             showInlineCompletions: config.get('showInlineCompletions', true),
             semanticSearchEnabled: config.get('semanticSearch.enabled', true),
@@ -108,12 +110,53 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         };
     }
 
+    private _normalizeServerUrl(serverUrl: string | undefined): string {
+        return (serverUrl || '').trim().replace(/\/+$/, '');
+    }
+
+    private _resolveBaseUrl(settings?: Partial<VictorSettings>): string {
+        const config = vscode.workspace.getConfiguration('victor');
+        const serverUrl = this._normalizeServerUrl(settings?.serverUrl ?? config.get<string>('serverUrl', ''));
+
+        if (serverUrl) {
+            let parsed: URL;
+            try {
+                parsed = new URL(serverUrl);
+            } catch {
+                throw new Error('Server URL must be a valid http:// or https:// URL');
+            }
+
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                throw new Error('Server URL must use http:// or https://');
+            }
+
+            return serverUrl;
+        }
+
+        const rawPort = settings?.serverPort ?? config.get<number>('serverPort', 8765);
+        const serverPort = Number.isFinite(rawPort) ? rawPort : 8765;
+        return `http://localhost:${serverPort}`;
+    }
+
     private async _saveSettings(settings: VictorSettings): Promise<void> {
         const config = vscode.workspace.getConfiguration('victor');
+        const serverUrl = this._normalizeServerUrl(settings.serverUrl);
+
+        try {
+            if (serverUrl) {
+                this._resolveBaseUrl({ serverUrl });
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                error instanceof Error ? error.message : 'Invalid Victor server URL'
+            );
+            return;
+        }
 
         await config.update('provider', settings.provider, true);
         await config.update('model', settings.model, true);
         await config.update('mode', settings.mode, true);
+        await config.update('serverUrl', serverUrl || undefined, true);
         await config.update('serverPort', settings.serverPort, true);
         await config.update('autoStart', settings.autoStart, true);
         await config.update('showInlineCompletions', settings.showInlineCompletions, true);
@@ -132,12 +175,10 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         }
     }
 
-    private async _testConnection(): Promise<void> {
-        const config = vscode.workspace.getConfiguration('victor');
-        const port = config.get('serverPort', 8000);
-
+    private async _testConnection(settings?: Partial<VictorSettings>): Promise<void> {
         try {
-            const response = await fetch(`http://localhost:${port}/health`);
+            const baseUrl = this._resolveBaseUrl(settings);
+            const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/health`);
             if (response.ok) {
                 this._view?.webview.postMessage({
                     type: 'connectionStatus',
@@ -147,11 +188,11 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             } else {
                 throw new Error('Server not healthy');
             }
-        } catch {
+        } catch (error) {
             this._view?.webview.postMessage({
                 type: 'connectionStatus',
                 status: 'disconnected',
-                message: 'Server not running',
+                message: error instanceof Error ? error.message : 'Server not running',
             });
         }
     }
@@ -209,7 +250,7 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         });
     }
 
-    private _getHtmlContent(webview: vscode.Webview): string {
+    private _getHtmlContent(_webview: vscode.Webview): string {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -239,6 +280,13 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
         .setting {
             margin-bottom: 12px;
+        }
+
+        .setting-hint {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.4;
         }
 
         label {
@@ -482,8 +530,19 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         <div class="section-title">Server Settings</div>
 
         <div class="setting">
+            <label for="serverUrl">Server URL (optional)</label>
+            <input type="text" id="serverUrl" placeholder="http://127.0.0.1:8765">
+            <div class="setting-hint">
+                Use a full URL for a remote or shared Victor server. When set, it overrides Server Port.
+            </div>
+        </div>
+
+        <div class="setting">
             <label for="serverPort">Server Port</label>
-            <input type="number" id="serverPort" min="1024" max="65535" value="8000">
+            <input type="number" id="serverPort" min="1024" max="65535" value="8765">
+            <div class="setting-hint" id="serverConnectionHint">
+                Leave Server URL empty to connect to a local Victor server on this port.
+            </div>
         </div>
 
         <div class="setting checkbox-setting">
@@ -551,11 +610,13 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         function applySettings(settings) {
             document.getElementById('provider').value = settings.provider;
             document.getElementById('mode').value = settings.mode;
+            document.getElementById('serverUrl').value = settings.serverUrl || '';
             document.getElementById('serverPort').value = settings.serverPort;
             document.getElementById('autoStart').checked = settings.autoStart;
             document.getElementById('showInlineCompletions').checked = settings.showInlineCompletions;
             document.getElementById('semanticSearchEnabled').checked = settings.semanticSearchEnabled;
             document.getElementById('semanticSearchMaxResults').value = settings.semanticSearchMaxResults;
+            updateServerConnectionMode();
 
             // Update provider selection in UI
             updateProviderSelection(settings.provider);
@@ -681,12 +742,28 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
                 provider: document.getElementById('provider').value,
                 model: document.getElementById('model').value,
                 mode: document.getElementById('mode').value,
+                serverUrl: document.getElementById('serverUrl').value.trim(),
                 serverPort: parseInt(document.getElementById('serverPort').value),
                 autoStart: document.getElementById('autoStart').checked,
                 showInlineCompletions: document.getElementById('showInlineCompletions').checked,
                 semanticSearchEnabled: document.getElementById('semanticSearchEnabled').checked,
                 semanticSearchMaxResults: parseInt(document.getElementById('semanticSearchMaxResults').value),
             };
+        }
+
+        function updateServerConnectionMode() {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            const serverPortInput = document.getElementById('serverPort');
+            const hint = document.getElementById('serverConnectionHint');
+            const usingRemoteServer = serverUrl.length > 0;
+
+            serverPortInput.disabled = usingRemoteServer;
+            serverPortInput.title = usingRemoteServer
+                ? 'Server Port is ignored while Server URL is set.'
+                : 'Port used when connecting to a local Victor server.';
+            hint.textContent = usingRemoteServer
+                ? 'Using Server URL. Clear it to reconnect to localhost with Server Port.'
+                : 'Leave Server URL empty to connect to a local Victor server on this port.';
         }
 
         function saveSettings() {
@@ -708,7 +785,10 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
         }
 
         function testConnection() {
-            vscode.postMessage({ type: 'testConnection' });
+            vscode.postMessage({
+                type: 'testConnection',
+                settings: getSettings(),
+            });
         }
 
         function showConnectionStatus(status, message) {
@@ -716,6 +796,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
             statusDiv.className = 'status ' + status;
             statusDiv.textContent = message;
         }
+
+        document.getElementById('serverUrl').addEventListener('input', updateServerConnectionMode);
 
         // Initial load
         loadSettings();

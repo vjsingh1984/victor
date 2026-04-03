@@ -32,8 +32,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  trivy-critical:
+    name: Critical Filesystem Scan (Trivy, Blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy critical scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-critical-results.sarif'
+          severity: 'CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy critical results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-critical-results.sarif
+
   dependency-audit:
-    name: Dependency Audit
+    name: Dependency Audit (High+Critical Blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,14 +70,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run pip-audit
+      - name: Run pip-audit (blocking on high+ severity)
         uses: pypa/gh-action-pip-audit@v1.0.8
         with:
           inputs: "-e ."
-        continue-on-error: true
+        # Blocks on any known vulnerability. Exceptions must be documented in
+        # .pip-audit-known-vulnerabilities if a transitive dependency cannot be
+        # updated immediately. See SECURITY.md § Dependency Audit Exceptions.
+        continue-on-error: false
 
   code-security:
-    name: Code Security (Bandit)
+    name: Code Security (Bandit, High-Severity Blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -65,24 +94,38 @@ jobs:
       - name: Install Bandit
         run: pip install bandit[toml]
 
-      - name: Run Bandit
+      - name: Run Bandit (high+critical severity blocking)
         run: |
           bandit -r victor/ \
             -f json \
             -o bandit-report.json \
+            --severity-level high \
+            --confidence-level high \
+            --exit-zero-if-no-results
+        # Blocks on HIGH severity + HIGH confidence findings.
+        # Lower severity findings are still reported in the artifact.
+        # To add exceptions, use # nosec inline or .bandit config.
+
+      - name: Run Bandit full report (advisory)
+        if: always()
+        run: |
+          bandit -r victor/ \
+            -f json \
+            -o bandit-report-full.json \
             || true
-        continue-on-error: true
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bandit-report
-          path: bandit-report.json
+          path: |
+            bandit-report.json
+            bandit-report-full.json
           retention-days: 30
 
   sast-scan:
-    name: SAST Scan (Semgrep)
+    name: SAST Scan (Semgrep, Advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -93,6 +136,7 @@ jobs:
         with:
           config: auto
           sarif: true
+        # Advisory until repo-specific exclusions are tuned and documented.
         continue-on-error: true
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
@@ -105,7 +149,7 @@ jobs:
         continue-on-error: true
 
   license-scan:
-    name: License Compliance
+    name: License Compliance (Advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -126,6 +170,7 @@ jobs:
             --output-file=license-report.json \
             --with-system \
             || true
+        # Advisory because license compatibility still requires human review and policy decisions.
         continue-on-error: true
 
       - name: Upload license report

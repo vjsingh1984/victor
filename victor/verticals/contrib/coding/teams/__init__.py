@@ -112,6 +112,7 @@ __all__ = [
     "CODING_PERSONAS",
     # Helper functions from personas
     "get_persona",
+    "get_personas",
     "get_personas_for_role",
     "get_persona_by_expertise",
     "apply_persona_to_spec",
@@ -157,6 +158,12 @@ class CodingTeamSpecProvider:
             List of team type names
         """
         return list_team_types()
+
+
+def get_personas() -> Dict[str, CodingPersona]:
+    """Return the coding vertical's persona registry."""
+
+    return CODING_PERSONAS
 
 
 def register_coding_teams() -> int:

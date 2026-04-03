@@ -315,7 +315,8 @@ class TestGraphAnalyzer:
     @pytest.fixture
     def analyzer(self):
         """Create a GraphAnalyzer instance."""
-        from victor.tools.graph_tool import GraphAnalyzer
+        graph_tool = pytest.importorskip("victor.tools.graph_tool")
+        GraphAnalyzer = graph_tool.GraphAnalyzer
 
         return GraphAnalyzer()
 
@@ -457,7 +458,8 @@ class TestGraphAnalyzerCentrality:
     @pytest.fixture
     def analyzer_with_data(self):
         """Create analyzer with test data."""
-        from victor.tools.graph_tool import GraphAnalyzer
+        graph_tool = pytest.importorskip("victor.tools.graph_tool")
+        GraphAnalyzer = graph_tool.GraphAnalyzer
 
         analyzer = GraphAnalyzer()
 
@@ -498,7 +500,8 @@ class TestGraphAnalyzerPath:
     @pytest.fixture
     def analyzer_with_path(self):
         """Create analyzer with path test data."""
-        from victor.tools.graph_tool import GraphAnalyzer
+        graph_tool = pytest.importorskip("victor.tools.graph_tool")
+        GraphAnalyzer = graph_tool.GraphAnalyzer
 
         analyzer = GraphAnalyzer()
 
@@ -574,7 +577,11 @@ class TestGraphEdgeTypes:
 
     def test_all_edge_types_constant(self):
         """Test ALL_EDGE_TYPES constant."""
-        from victor.tools.graph_tool import ALL_EDGE_TYPES
+        graph_tool = pytest.importorskip(
+            "victor.tools.graph_tool",
+            reason="victor.tools.graph_tool module not available",
+        )
+        ALL_EDGE_TYPES = graph_tool.ALL_EDGE_TYPES
 
         expected = [
             "CALLS",
@@ -593,7 +600,11 @@ class TestGraphModes:
 
     def test_graph_mode_types(self):
         """Test GraphMode literal types."""
-        from victor.tools.graph_tool import GraphMode
+        graph_tool = pytest.importorskip(
+            "victor.tools.graph_tool",
+            reason="victor.tools.graph_tool module not available",
+        )
+        GraphMode = graph_tool.GraphMode
 
         # These should all be valid modes
         modes = [

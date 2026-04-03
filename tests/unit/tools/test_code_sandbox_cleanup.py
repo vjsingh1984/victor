@@ -186,6 +186,10 @@ class TestContainerLabeling:
 class TestSandboxResourceCleanup:
     """Integration-style tests for resource cleanup scenarios."""
 
+    def setup_method(self):
+        """Ensure clean state before each test."""
+        _active_sandboxes.clear()
+
     def test_multiple_sandboxes_all_cleaned(self):
         """Verify multiple sandboxes are all cleaned up."""
         sandboxes = []

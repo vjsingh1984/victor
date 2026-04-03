@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pure workflow compiler - NO execution logic.
-
-Compiles YAML workflows into executable StateGraph instances.
-This is a stub that delegates to legacy implementation during migration.
-"""
+"""Workflow compiler facade with explicit parse/validate/compile stages."""
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from victor.workflows.compiler.boundary import (
+    NativeWorkflowGraphCompiler,
+    WorkflowCompilationRequest,
+    WorkflowDefinitionValidator,
+    WorkflowParser,
+)
+
 if TYPE_CHECKING:
-    from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.compiler_protocols import (
         CompiledGraphProtocol,
         NodeExecutorFactoryProtocol,
@@ -35,12 +36,12 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowCompiler:
-    """Pure compiler for YAML workflows.
+    """DI-facing compiler with explicit parsing and validation boundaries.
 
     Responsibility (SRP):
-    - Load YAML from file/string
-    - Validate workflow definition
-    - Build StateGraph from definition
+    - Normalize source requests into parsed workflow definitions
+    - Validate workflow definitions through a dedicated validation stage
+    - Build executable graphs from validated definitions
     - Return CompiledGraphProtocol
 
     Non-responsibility:
@@ -57,7 +58,7 @@ class WorkflowCompiler:
     Attributes:
         _yaml_loader: Loads and parses YAML
         _validator: Validates workflow structure
-        _node_executor_factory: Creates executor functions
+        _graph_compiler: Compiles validated definitions into executable graphs
 
     Example:
         compiler = WorkflowCompiler(
@@ -75,6 +76,9 @@ class WorkflowCompiler:
         yaml_loader: Any,
         validator: Any,
         node_executor_factory: "NodeExecutorFactoryProtocol",
+        workflow_parser: Optional[WorkflowParser] = None,
+        workflow_definition_validator: Optional[WorkflowDefinitionValidator] = None,
+        graph_compiler: Optional[Any] = None,
     ):
         """Initialize the compiler.
 
@@ -82,10 +86,20 @@ class WorkflowCompiler:
             yaml_loader: YAMLWorkflowLoader instance
             validator: WorkflowValidator instance
             node_executor_factory: NodeExecutorFactoryProtocol instance
+            workflow_parser: Optional parser override for testing/injection
+            workflow_definition_validator: Optional validator stage override
+            graph_compiler: Optional compiler backend override
         """
         self._yaml_loader = yaml_loader
         self._validator = validator
         self._node_executor_factory = node_executor_factory
+        self._workflow_parser = workflow_parser or WorkflowParser(yaml_loader)
+        self._workflow_definition_validator = (
+            workflow_definition_validator or WorkflowDefinitionValidator(validator)
+        )
+        self._graph_compiler = graph_compiler or NativeWorkflowGraphCompiler(
+            node_executor_factory=node_executor_factory
+        )
 
     def compile(
         self,
@@ -114,35 +128,17 @@ class WorkflowCompiler:
             result = await compiled.invoke({"input": "data"})
         """
         logger.info(f"Compiling workflow: {source[:100]}...")
-
-        # TODO: Implement proper compilation
-        # For now, delegate to legacy implementation
-        return self._compile_legacy(source, workflow_name=workflow_name, validate=validate)
-
-    def _compile_legacy(
-        self,
-        source: str,
-        *,
-        workflow_name: Optional[str] = None,
-        validate: bool = True,
-    ) -> "CompiledGraphProtocol":
-        """Delegate to legacy implementation (temporary stub)."""
-        from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
-        # Create legacy compiler
-        legacy_compiler = YAMLToStateGraphCompiler(
-            orchestrator=None,  # Will be set by execution context
-            orchestrators=None,  # Will be set by execution context
-        )
-
-        # Load YAML
-        yaml_def = self._yaml_loader.load(source)
-
-        # Compile using legacy implementation
-        return legacy_compiler.compile(
-            yaml_def,
+        request = WorkflowCompilationRequest(
+            source=source,
             workflow_name=workflow_name,
+            validate=validate,
         )
+        parsed = self._workflow_parser.parse(request)
+
+        if validate:
+            parsed = self._workflow_definition_validator.validate(parsed)
+
+        return self._graph_compiler.compile(parsed)
 
 
 __all__ = [

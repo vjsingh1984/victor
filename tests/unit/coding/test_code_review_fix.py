@@ -4,7 +4,7 @@
 import os
 import pytest
 import asyncio
-from victor.tools.code_review_tool import code_review
+from victor.verticals.contrib.coding.tools.code_review_tool import code_review
 
 # Get project root for absolute paths
 PROJECT_ROOT = os.path.dirname(

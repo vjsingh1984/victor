@@ -16,11 +16,50 @@
 
 from __future__ import annotations
 
+from typing import Optional, Tuple
+
 from rich.panel import Panel
 from rich.table import Table
 
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import get_command_registry, register_command
+
+
+def get_builtin_tool_help(name: str) -> Optional[Tuple[str, str]]:
+    """Return embedded help text for common tools exposed via prompts.
+
+    Slash help is command-oriented, but some high-value tools are easier to
+    discover if `/help` can explain their primary usage patterns directly.
+    """
+    normalized = name.strip().lower().lstrip("/")
+    if normalized != "graph":
+        return None
+
+    content = (
+        "[bold]graph[/]\n\n"
+        "Use this tool for call-graph and execution-flow questions.\n\n"
+        "[dim]Common modes:[/]\n"
+        'graph(mode="callers", node="parse_json", depth=2) - who calls a function\n'
+        'graph(mode="callees", node="main", depth=2) - what a function calls\n'
+        'graph(mode="trace", node="main", depth=3) - trace execution from an entry point\n\n'
+        "[dim]Useful prompts:[/]\n"
+        '"Who calls parse_json?"\n'
+        '"What does main call?"\n'
+        '"Trace execution from main"\n\n'
+        "[dim]Tip:[/] Add [bold]file[/] when the symbol name is ambiguous."
+    )
+    return ("graph", content)
+
+
+def print_builtin_tool_help(ctx: CommandContext, name: str) -> bool:
+    """Print embedded help for a supported tool name."""
+    tool_help = get_builtin_tool_help(name)
+    if tool_help is None:
+        return False
+
+    title, content = tool_help
+    ctx.console.print(Panel(content, title=f"Help: {title}", border_style="blue"))
+    return True
 
 
 @register_command
@@ -57,6 +96,8 @@ class HelpCommand(BaseSlashCommand):
                         border_style="blue",
                     )
                 )
+            elif print_builtin_tool_help(ctx, cmd_name):
+                return
             else:
                 ctx.console.print(f"[yellow]Unknown command:[/] /{cmd_name}")
             return
@@ -127,7 +168,7 @@ class StatusCommand(BaseSlashCommand):
 
         agent = ctx.agent
         history = agent.conversation
-        tool_calls = getattr(agent, "_tool_calls", 0)
+        tool_calls = getattr(agent, "tool_calls_used", 0)
         tool_budget = ctx.settings.tool_call_budget
 
         content = (
@@ -144,7 +185,7 @@ class StatusCommand(BaseSlashCommand):
             content += f"[bold]Stage:[/] {stage.name}\n"
 
         # Add mode controller info
-        mode_controller = getattr(agent, "_mode_controller", None)
+        mode_controller = getattr(agent, "mode_controller", None)
         if mode_controller:
             current_mode = mode_controller.get_current_mode()
             content += f"[bold]Mode:[/] {current_mode.value}\n"

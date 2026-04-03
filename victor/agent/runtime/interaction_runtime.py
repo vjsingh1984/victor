@@ -25,6 +25,7 @@ class InteractionRuntimeComponents:
 def create_interaction_runtime_components(
     *,
     orchestrator: Any,
+    factory: Any,
     tool_pipeline: Any,
     tool_registry: Any,
     tool_selector: Any,
@@ -41,7 +42,11 @@ def create_interaction_runtime_components(
     def _build_chat_coordinator() -> Any:
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
-        return ChatCoordinator(orchestrator)
+        coordinator = ChatCoordinator(orchestrator)
+        if hasattr(factory, "create_streaming_chat_pipeline"):
+            pipeline = factory.create_streaming_chat_pipeline(coordinator)
+            coordinator.set_streaming_pipeline(pipeline)
+        return coordinator
 
     def _build_tool_coordinator() -> Any:
         from victor.agent.coordinators.tool_coordinator import ToolCoordinator

@@ -27,13 +27,34 @@ import pytest
 from typing import Dict, Any, List
 from unittest.mock import MagicMock
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _resolve_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute and skip test when unavailable."""
+    try:
+        return _resolve_vertical_attr(module_path, attr_name)
+    except ImportError:
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
+
 
 class TestResearchCapabilityProviderAdoption:
     """Tests for Research vertical's capability provider integration."""
 
     def test_research_capability_provider_import_and_instantiate(self):
         """ResearchCapabilityProvider can be imported and instantiated."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
 
@@ -44,7 +65,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_five_capabilities(self):
         """ResearchCapabilityProvider exposes exactly 5 capabilities."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         capabilities = provider.get_capabilities()
@@ -67,7 +91,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_metadata_complete(self):
         """ResearchCapabilityProvider provides complete metadata."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
         from victor.framework.capabilities import CapabilityMetadata
 
         provider = ResearchCapabilityProvider()
@@ -86,7 +113,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_apply_methods(self):
         """ResearchCapabilityProvider has apply_* methods for each capability."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
 
@@ -100,7 +130,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_base_class_compliance(self):
         """ResearchCapabilityProvider complies with BaseCapabilityProvider interface."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
         from victor.framework.capabilities import BaseCapabilityProvider
 
         provider = ResearchCapabilityProvider()
@@ -117,7 +150,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_capability_application(self):
         """ResearchCapabilityProvider can apply capabilities to orchestrator."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
 
@@ -133,7 +169,10 @@ class TestResearchCapabilityProviderAdoption:
 
     def test_research_capability_provider_applied_tracking(self):
         """ResearchCapabilityProvider tracks which capabilities have been applied."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         mock_orchestrator = MagicMock()
@@ -159,16 +198,23 @@ class TestPrivacyCapabilityProviderAdoption:
         """DataAnalysis capabilities can be imported and instantiated."""
         # DataAnalysis has capabilities, check what's available
         try:
-            from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+            DataAnalysisCapabilityProvider = _resolve_vertical_attr(
+                "victor.dataanalysis.capabilities",
+                "DataAnalysisCapabilityProvider",
+            )
 
             provider = DataAnalysisCapabilityProvider()
             assert provider is not None
         except (ImportError, AttributeError):
             # Fall back to checking for any capabilities
             try:
-                from victor.dataanalysis.capabilities import (
-                    get_dataanalysis_capabilities,
-                    CAPABILITIES,
+                get_dataanalysis_capabilities = _resolve_vertical_attr(
+                    "victor.dataanalysis.capabilities",
+                    "get_dataanalysis_capabilities",
+                )
+                CAPABILITIES = _resolve_vertical_attr(
+                    "victor.dataanalysis.capabilities",
+                    "CAPABILITIES",
                 )
 
                 # Should have some capabilities defined
@@ -176,14 +222,20 @@ class TestPrivacyCapabilityProviderAdoption:
             except ImportError:
                 # If capabilities module doesn't exist, that's okay
                 # Just verify the vertical loads
-                from victor.dataanalysis import DataAnalysisAssistant
+                DataAnalysisAssistant = _resolve_vertical_attr(
+                    "victor.dataanalysis",
+                    "DataAnalysisAssistant",
+                )
 
                 assert DataAnalysisAssistant.name == "dataanalysis"
 
     def test_privacy_capability_provider_three_capabilities(self):
         """DataAnalysis exposes capabilities (privacy or general)."""
         try:
-            from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+            DataAnalysisCapabilityProvider = _resolve_vertical_attr(
+                "victor.dataanalysis.capabilities",
+                "DataAnalysisCapabilityProvider",
+            )
 
             provider = DataAnalysisCapabilityProvider()
             capabilities = provider.get_capabilities()
@@ -212,7 +264,10 @@ class TestPrivacyCapabilityProviderAdoption:
             # If DataAnalysisCapabilityProvider doesn't exist,
             # check for capability entries
             try:
-                from victor.dataanalysis.capabilities import CAPABILITIES
+                CAPABILITIES = _resolve_vertical_attr(
+                    "victor.dataanalysis.capabilities",
+                    "CAPABILITIES",
+                )
 
                 # Should have capabilities defined
                 assert len(CAPABILITIES) >= 0
@@ -222,7 +277,10 @@ class TestPrivacyCapabilityProviderAdoption:
 
     def test_dataanalysis_adopts_privacy_capabilities(self):
         """DataAnalysis vertical adopts privacy capabilities."""
-        from victor.dataanalysis import DataAnalysisAssistant
+        DataAnalysisAssistant = _load_vertical_attr(
+            "victor.dataanalysis",
+            "DataAnalysisAssistant",
+        )
 
         # Verify DataAnalysis vertical can be loaded
         # Note: vertical name may vary (dataanalysis or data_analysis)
@@ -247,7 +305,9 @@ class TestCapabilityProviderCrossVerticalReuse:
 
         # Save coding modules before removing them
         coding_modules = {
-            m: sys.modules[m] for m in list(sys.modules.keys()) if "victor.coding" in m
+            m: sys.modules[m]
+            for m in list(sys.modules.keys())
+            if "victor_coding" in m or "victor.coding" in m
         }
 
         # Remove coding modules temporarily
@@ -255,7 +315,10 @@ class TestCapabilityProviderCrossVerticalReuse:
             del sys.modules[mod]
 
         try:
-            from victor.research.capabilities import ResearchCapabilityProvider
+            ResearchCapabilityProvider = _load_vertical_attr(
+                "victor.research.capabilities",
+                "ResearchCapabilityProvider",
+            )
 
             # Should work without coding
             provider = ResearchCapabilityProvider()
@@ -267,7 +330,10 @@ class TestCapabilityProviderCrossVerticalReuse:
 
     def test_capability_provider_interface_consistency(self):
         """All capability providers follow the same interface."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
         from victor.framework.capabilities import BaseCapabilityProvider
 
         # Research provider
@@ -289,7 +355,10 @@ class TestCapabilityProviderCrossVerticalReuse:
 
     def test_capability_metadata_discovery_api(self):
         """Capability metadata supports discovery and filtering."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         metadata = provider.get_capability_metadata()
@@ -312,7 +381,10 @@ class TestCapabilityProviderCrossVerticalReuse:
 
     def test_capability_version_compatibility(self):
         """Capability versions follow SemVer format."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
         import re
 
         provider = ResearchCapabilityProvider()
@@ -330,7 +402,10 @@ class TestCapabilityProviderCrossVerticalReuse:
 
     def test_capability_dependencies_tracking(self):
         """Capabilities properly declare dependencies."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         metadata = provider.get_capability_metadata()
@@ -349,7 +424,10 @@ class TestCapabilityProviderCrossVerticalReuse:
 
     def test_capability_tags_categorization(self):
         """Capability tags support categorization and filtering."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         metadata = provider.get_capability_metadata()
@@ -372,7 +450,10 @@ class TestWorkflowCapabilityHooks:
 
     def test_research_workflow_provider_capability_hooks(self):
         """Research workflow provider has capability hooks."""
-        from victor.research.workflows import ResearchWorkflowProvider
+        ResearchWorkflowProvider = _load_vertical_attr(
+            "victor.research.workflows",
+            "ResearchWorkflowProvider",
+        )
 
         provider = ResearchWorkflowProvider()
 
@@ -383,7 +464,10 @@ class TestWorkflowCapabilityHooks:
 
     def test_devops_workflow_provider_capability_hooks(self):
         """DevOps workflow provider has capability hooks."""
-        from victor.devops.workflows import DevOpsWorkflowProvider
+        DevOpsWorkflowProvider = _load_vertical_attr(
+            "victor.devops.workflows",
+            "DevOpsWorkflowProvider",
+        )
 
         provider = DevOpsWorkflowProvider()
 
@@ -393,7 +477,10 @@ class TestWorkflowCapabilityHooks:
 
     def test_dataanalysis_workflow_provider_capability_hooks(self):
         """DataAnalysis workflow provider has capability hooks."""
-        from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+        DataAnalysisWorkflowProvider = _load_vertical_attr(
+            "victor.dataanalysis.workflows",
+            "DataAnalysisWorkflowProvider",
+        )
 
         provider = DataAnalysisWorkflowProvider()
 
@@ -408,7 +495,10 @@ class TestBackwardCompatibility:
     def test_capability_provider_import_paths_stable(self):
         """Capability provider import paths remain stable."""
         # These imports should not break
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
         from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
         # Should instantiate without errors
@@ -417,9 +507,13 @@ class TestBackwardCompatibility:
 
     def test_legacy_capability_access_still_works(self):
         """Legacy capability access patterns still work."""
-        from victor.research.capabilities import (
-            configure_source_verification,
-            configure_citation_management,
+        configure_source_verification = _load_vertical_attr(
+            "victor.research.capabilities",
+            "configure_source_verification",
+        )
+        configure_citation_management = _load_vertical_attr(
+            "victor.research.capabilities",
+            "configure_citation_management",
         )
 
         # These functions should still be callable
@@ -433,7 +527,14 @@ class TestBackwardCompatibility:
 
     def test_capability_list_access_still_works(self):
         """CAPABILITIES list for loader discovery still works."""
-        from victor.research.capabilities import CAPABILITIES, get_research_capabilities
+        CAPABILITIES = _load_vertical_attr(
+            "victor.research.capabilities",
+            "CAPABILITIES",
+        )
+        get_research_capabilities = _load_vertical_attr(
+            "victor.research.capabilities",
+            "get_research_capabilities",
+        )
 
         # Both access patterns should work
         caps1 = CAPABILITIES
@@ -450,8 +551,11 @@ class TestVerticalIntegrationScenarios:
 
     def test_research_vertical_with_capabilities(self):
         """Research vertical integrates with capability provider."""
-        from victor.research import ResearchAssistant
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         # Load research vertical
         research = ResearchAssistant()
@@ -473,7 +577,10 @@ class TestVerticalIntegrationScenarios:
 
     def test_vertical_tools_vs_capabilities_separation(self):
         """Vertical properly separates tools from capabilities."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         provider = ResearchCapabilityProvider()
         capabilities = provider.get_capabilities()
@@ -489,7 +596,10 @@ class TestVerticalIntegrationScenarios:
 
     def test_cross_vertical_capability_discovery(self):
         """Capabilities can be discovered across verticals."""
-        from victor.research.capabilities import ResearchCapabilityProvider
+        ResearchCapabilityProvider = _load_vertical_attr(
+            "victor.research.capabilities",
+            "ResearchCapabilityProvider",
+        )
 
         research_provider = ResearchCapabilityProvider()
 

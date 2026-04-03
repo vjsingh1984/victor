@@ -388,42 +388,6 @@ class TestVerticalRegistryIntegration:
         assert "coding" in names
 
 
-class TestCQRSBridgeIntegration:
-    """Integration tests for CQRS bridge functionality."""
-
-    @pytest.fixture
-    def mock_settings(self):
-        """Create mock settings."""
-        settings = MagicMock()
-        settings.provider = "anthropic"
-        return settings
-
-    @pytest.fixture
-    def mock_orchestrator(self):
-        """Create mock orchestrator."""
-        return MagicMock()
-
-    @pytest.mark.asyncio
-    async def test_cqrs_bridge_can_be_enabled(self, mock_settings, mock_orchestrator):
-        """Test CQRS bridge can be enabled via FrameworkShim."""
-        with patch(
-            "victor.agent.orchestrator.AgentOrchestrator.from_settings",
-            new_callable=AsyncMock,
-        ) as mock_from_settings:
-            mock_from_settings.return_value = mock_orchestrator
-
-            shim = FrameworkShim(
-                mock_settings,
-                enable_observability=True,
-                enable_cqrs_bridge=True,
-            )
-            await shim.create_orchestrator()
-
-            # CQRS bridge should be enabled in observability
-            assert shim.observability is not None
-            # The CQRS bridge flag is passed to ObservabilityIntegration
-
-
 class TestBackwardCompatibility:
     """Tests ensuring backward compatibility with legacy code."""
 

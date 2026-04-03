@@ -35,10 +35,16 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, TypedDict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from victor.workflows.executors.registry import (
+    clear_registered_workflow_node_executors,
+    register_workflow_node_executor,
+)
 
 # =============================================================================
 # Test Fixtures
@@ -237,6 +243,51 @@ def reset_workflow_caches():
 # =============================================================================
 
 
+class TestNodeExecutorFactoryCompatibility:
+    """Tests for the deprecated unified-compiler factory shim."""
+
+    @pytest.mark.asyncio
+    async def test_factory_uses_shared_custom_executor_registry(self):
+        """Custom node registrations should flow through the shared factory."""
+        from victor.workflows.unified_compiler import NodeExecutorFactory
+
+        class CustomExecutor:
+            def __init__(self, context=None):
+                self.context = context
+
+            async def execute(self, node, state):
+                state = dict(state)
+                state["custom_output"] = node.id
+                return state
+
+        custom_node = SimpleNamespace(id="custom", node_type="custom_plugin")
+
+        try:
+            clear_registered_workflow_node_executors()
+            register_workflow_node_executor("custom_plugin", CustomExecutor)
+
+            factory = NodeExecutorFactory()
+            executor = factory.create_executor(custom_node)
+            result = await executor({})
+
+            assert factory.supports_node_type("custom_plugin") is True
+            assert result["custom_output"] == "custom"
+        finally:
+            clear_registered_workflow_node_executors()
+
+    def test_set_runner_registry_updates_factory_compatibility_state(self):
+        """UnifiedWorkflowCompiler should keep the runner registry on the shim."""
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        compiler = UnifiedWorkflowCompiler()
+        registry = object()
+
+        compiler.set_runner_registry(registry)
+
+        assert compiler._runner_registry is registry
+        assert compiler._executor_factory._runner_registry is registry
+
+
 class TestCompilationFromYAML:
     """Tests for compiling workflows from YAML sources."""
 
@@ -271,6 +322,20 @@ class TestCompilationFromYAML:
         compiled = compiler.compile_yaml(yaml_file, workflow_name="test_workflow")
 
         assert isinstance(compiled, CachedCompiledGraph)
+
+    @pytest.mark.asyncio
+    async def test_compile_yaml_content_preserves_shared_parser_metadata(
+        self, sample_yaml_content: str
+    ):
+        """YAML content compilation should use the shared parser metadata contract."""
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+
+        compiler = UnifiedWorkflowCompiler()
+        compiled = compiler.compile_yaml_content(sample_yaml_content, workflow_name="test_workflow")
+
+        assert isinstance(compiled, CachedCompiledGraph)
+        assert compiled.workflow_name == "test_workflow"
+        assert compiled.source_path is None
 
     @pytest.mark.asyncio
     async def test_compile_yaml_with_agent_timeout(
@@ -374,6 +439,51 @@ class TestCompilationFromDefinition:
 
         assert isinstance(compiled, CachedCompiledGraph)
         assert compiled.compiled_graph is not None
+
+    @pytest.mark.asyncio
+    async def test_compile_definition_uses_shared_custom_executor_registry(self):
+        """Definition compilation should honor the shared custom executor registry."""
+        from victor.workflows.definition import WorkflowDefinition, WorkflowNode
+        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
+
+        class CustomExecutor:
+            def __init__(self, context=None):
+                self.context = context
+
+            async def execute(self, node, state):
+                next_state = dict(state)
+                next_state["custom_output"] = node.id
+                return next_state
+
+        @dataclass
+        class CustomNode(WorkflowNode):
+            @property
+            def node_type(self) -> str:
+                return "custom_plugin"
+
+        workflow = WorkflowDefinition(
+            name="custom_workflow",
+            nodes={
+                "custom": CustomNode(
+                    id="custom",
+                    name="Custom Node",
+                ),
+            },
+            start_node="custom",
+        )
+
+        try:
+            clear_registered_workflow_node_executors()
+            register_workflow_node_executor("custom_plugin", CustomExecutor)
+
+            compiler = UnifiedWorkflowCompiler()
+            compiled = compiler.compile_definition(workflow, cache_key="custom-workflow")
+            result = await compiled.invoke({})
+
+            assert result.success is True
+            assert result.state["custom_output"] == "custom"
+        finally:
+            clear_registered_workflow_node_executors()
 
 
 class TestCompilationFromGraphDSL:
@@ -1493,3 +1603,69 @@ class TestCachedCompiledGraph:
 
         schema = cached.get_graph_schema()
         assert isinstance(schema, dict)
+
+    @pytest.mark.asyncio
+    async def test_cached_graph_invoke_uses_shared_initial_state(self):
+        """CachedCompiledGraph should seed execution with the canonical state shape."""
+        from victor.workflows.unified_compiler import CachedCompiledGraph
+
+        captured: Dict[str, Any] = {}
+
+        class FakeCompiledGraph:
+            async def invoke(self, state, *, config=None, thread_id=None):
+                captured["state"] = state
+                captured["thread_id"] = thread_id
+                return MagicMock(
+                    success=True,
+                    state=state,
+                    error=None,
+                    node_history=[],
+                    iterations=0,
+                )
+
+        cached = CachedCompiledGraph(
+            compiled_graph=FakeCompiledGraph(),
+            workflow_name="test_workflow",
+            max_iterations=17,
+        )
+
+        result = await cached.invoke({"input": "value"}, thread_id="thread-123")
+
+        assert result.success is True
+        assert captured["thread_id"] == "thread-123"
+        assert captured["state"]["_workflow_id"]
+        assert captured["state"]["_workflow_name"] == "test_workflow"
+        assert captured["state"]["_current_node"] == ""
+        assert captured["state"]["_node_results"] == {}
+        assert captured["state"]["_parallel_results"] == {}
+        assert captured["state"]["_hitl_pending"] is False
+        assert captured["state"]["_hitl_response"] is None
+        assert captured["state"]["_max_iterations"] == 17
+        assert captured["state"]["input"] == "value"
+
+    def test_prepare_state_preserves_existing_workflow_metadata(self):
+        """CachedCompiledGraph should not overwrite caller-provided metadata."""
+        from victor.workflows.unified_compiler import CachedCompiledGraph
+
+        cached = CachedCompiledGraph(
+            compiled_graph=MagicMock(),
+            workflow_name="fallback_workflow",
+        )
+
+        prepared = cached._prepare_state(
+            {
+                "_workflow_id": "wf-123",
+                "_workflow_name": "provided_workflow",
+                "_current_node": "step1",
+                "_node_results": {"step1": {"success": True}},
+                "_parallel_results": {"branch": {"done": True}},
+                "input": "value",
+            }
+        )
+
+        assert prepared["_workflow_id"] == "wf-123"
+        assert prepared["_workflow_name"] == "provided_workflow"
+        assert prepared["_current_node"] == "step1"
+        assert prepared["_node_results"] == {"step1": {"success": True}}
+        assert prepared["_parallel_results"] == {"branch": {"done": True}}
+        assert prepared["input"] == "value"

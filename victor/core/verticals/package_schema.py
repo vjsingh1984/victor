@@ -17,6 +17,27 @@ from pydantic import BaseModel, Field, field_validator
 from victor.core.verticals.base import VerticalBase
 
 
+def normalize_victor_requirement(requirement: str) -> str:
+    """Normalize Victor requirement strings to a full requirement expression."""
+    req = requirement.strip()
+    if req.startswith("victor-ai"):
+        return req
+    return f"victor-ai{req}"
+
+
+def is_victor_version_compatible(current_version: str, requirement: str) -> bool:
+    """Return True if the current Victor version satisfies the requirement."""
+    try:
+        from packaging.requirements import Requirement
+        from packaging.version import Version
+
+        req = Requirement(normalize_victor_requirement(requirement))
+        return Version(current_version) in req.specifier
+    except Exception:
+        # Preserve existing behavior: treat parsing issues as non-fatal.
+        return True
+
+
 class AuthorInfo(BaseModel):
     """Author information for a vertical package."""
 
@@ -149,10 +170,7 @@ class VerticalPackageMetadata(BaseModel):
         try:
             from packaging.requirements import Requirement
 
-            # Ensure it starts with package name
-            if not v.startswith("victor-ai"):
-                v = f"victor-ai{v}"
-            Requirement(v)
+            Requirement(normalize_victor_requirement(v))
         except Exception as e:
             raise ValueError(f"Invalid Victor requirement '{v}': {e}") from e
         return v

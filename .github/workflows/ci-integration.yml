@@ -100,6 +100,9 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Install victor-sdk from local repository first (includes constants module)
+          pip install -e ./victor-sdk
+          # Then install victor-ai (which depends on victor-sdk)
           pip install -e ".[dev,verticals]"
 
       - name: Verify vertical packages are installed

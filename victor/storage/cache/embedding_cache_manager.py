@@ -43,6 +43,7 @@ Usage:
     await manager.rebuild_task_classifiers()
 """
 
+import asyncio
 import logging
 import shutil
 from dataclasses import dataclass, field
@@ -50,6 +51,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
+
+from victor.core.async_utils import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -413,13 +416,13 @@ class EmbeddingCacheManager:
         Returns:
             Number of phrases indexed
         """
-        from victor.storage.embeddings.service import EmbeddingService
+        from victor.storage.embeddings.service import get_embedding_service
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
         if progress_callback:
             progress_callback("Loading embedding model...")
 
-        service = EmbeddingService.get_instance()
+        service = get_embedding_service()
 
         if progress_callback:
             progress_callback("Rebuilding task classifiers...")
@@ -453,23 +456,15 @@ class EmbeddingCacheManager:
         Returns:
             Number of phrases indexed
         """
-        import asyncio
-
         try:
-            # Check if we're in an async context
             asyncio.get_running_loop()
-            # We are - this is an error, caller must use async API
-            raise RuntimeError(
-                "Cannot call rebuild_task_classifiers_sync from async context. "
-                "Use 'await rebuild_task_classifiers()' instead."
-            )
-        except RuntimeError as e:
-            # Check if this is our error or the "no running loop" error
-            if "Cannot call rebuild_task_classifiers_sync" in str(e):
-                # Our error - re-raise it
-                raise
-            # No running loop, we're in sync context - safe to use asyncio.run
-            return asyncio.run(self.rebuild_task_classifiers(progress_callback))
+        except RuntimeError:
+            return run_sync(self.rebuild_task_classifiers(progress_callback))
+
+        raise RuntimeError(
+            "Cannot call rebuild_task_classifiers_sync from async context. "
+            "Use 'await rebuild_task_classifiers()' instead."
+        )
 
     def needs_rebuild(self, cache_type: CacheType, max_age_hours: int = 24) -> bool:
         """Check if cache needs rebuilding based on age.

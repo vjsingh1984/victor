@@ -14,8 +14,11 @@
 
 """Base provider interface for LLM providers."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -260,6 +263,9 @@ class BaseProvider(ABC):
         self.max_retries = max_retries
         self.extra_config = kwargs
 
+        # Retry strategy (lazily initialized on first rate-limit retry)
+        self._retry_strategy: Any = None
+
         # Circuit breaker for resilience
         self._use_circuit_breaker = use_circuit_breaker
         self._circuit_breaker: Optional[CircuitBreaker] = None
@@ -311,6 +317,107 @@ class BaseProvider(ABC):
         if self._circuit_breaker:
             return self._circuit_breaker.get_stats()
         return None
+
+    def classify_error(self, error: Exception) -> ProviderError:
+        """Classify a raw exception into the appropriate ProviderError subtype.
+
+        Providers can override this for provider-specific error handling.
+        The base implementation uses a three-tier strategy:
+        1. Pass through existing ProviderError subtypes unchanged
+        2. Check HTTP status codes (if available on the exception)
+        3. String-based pattern matching as final fallback
+
+        Args:
+            error: The raw exception from the provider API call.
+
+        Returns:
+            A ProviderError (or subtype) wrapping the original exception.
+        """
+        # Tier 0: Already classified
+        if isinstance(error, ProviderError):
+            return error
+
+        wrapped_error = (
+            getattr(error, "last_error", None)
+            or getattr(error, "raw_error", None)
+            or getattr(error, "cause", None)
+            or getattr(error, "__cause__", None)
+        )
+        if isinstance(wrapped_error, Exception) and wrapped_error is not error:
+            return self.classify_error(wrapped_error)
+
+        error_str = str(error).lower()
+
+        # Tier 1: Check HTTP status code attributes
+        # Also check .response.status_code for httpx.HTTPStatusError compatibility
+        status = (
+            getattr(error, "status_code", None)
+            or getattr(error, "code", None)
+            or getattr(getattr(error, "response", None), "status_code", None)
+        )
+        if isinstance(status, int):
+            if status == 401 or status == 403:
+                return ProviderAuthError(
+                    message=f"Authentication failed: {error}",
+                    provider=self.name,
+                    status_code=status,
+                    raw_error=error,
+                )
+            if status == 429:
+                return ProviderRateLimitError(
+                    message=f"Rate limit exceeded: {error}",
+                    provider=self.name,
+                    status_code=429,
+                    raw_error=error,
+                )
+
+        # Tier 2: String-based classification (deprecated — providers should use
+        # proper exception types or HTTP status codes instead)
+        if any(
+            t in error_str
+            for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
+        ):
+            logger.warning(
+                "String-based error classification triggered for auth error "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
+            return ProviderAuthError(
+                message=f"Authentication failed: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+        if any(t in error_str for t in ("rate limit", "429", "too many requests")):
+            logger.warning(
+                "String-based error classification triggered for rate limit "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
+            return ProviderRateLimitError(
+                message=f"Rate limit exceeded: {error}",
+                provider=self.name,
+                status_code=429,
+                raw_error=error,
+            )
+        if any(t in error_str for t in ("timeout", "timed out")):
+            logger.warning(
+                "String-based error classification triggered for timeout "
+                "from %s. Provider should use proper exception types.",
+                self.name,
+            )
+            return ProviderTimeoutError(
+                message=f"Request timed out: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+
+        # Default: generic ProviderError
+        return ProviderError(
+            message=f"{self.name} API error: {error}",
+            provider=self.name,
+            status_code=status if isinstance(status, int) else None,
+            raw_error=error,
+        )
 
     @property
     @abstractmethod
@@ -452,6 +559,14 @@ class BaseProvider(ABC):
         """Close any open connections or resources."""
         pass
 
+    async def __aenter__(self) -> "BaseProvider":
+        """Enable async context manager usage."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Close provider on context exit."""
+        await self.close()
+
     def is_circuit_open(self) -> bool:
         """Check if the circuit breaker is open (failing fast).
 
@@ -468,9 +583,11 @@ class BaseProvider(ABC):
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """Execute a function with circuit breaker protection.
+        """Execute a function with circuit breaker and retry-on-rate-limit.
 
-        Use this method in subclass implementations to protect API calls.
+        When ``max_retries > 0``, rate-limit errors (429) are automatically
+        retried with exponential backoff and jitter, respecting ``Retry-After``
+        headers. Set ``max_retries=0`` to raise immediately (old behavior).
 
         Args:
             func: Async function to execute
@@ -482,11 +599,30 @@ class BaseProvider(ABC):
 
         Raises:
             CircuitBreakerError: If circuit is open
-            Exception: If func raises and circuit records failure
+            ProviderRateLimitError: If rate-limit retries are exhausted
+            Exception: If func raises a non-retryable error
         """
-        if self._circuit_breaker:
-            return await self._circuit_breaker.execute(func, *args, **kwargs)
-        return await func(*args, **kwargs)
+
+        async def _call() -> Any:
+            if self._circuit_breaker:
+                return await self._circuit_breaker.execute(func, *args, **kwargs)
+            return await func(*args, **kwargs)
+
+        if self.max_retries <= 0:
+            return await _call()
+
+        # Use ProviderRetryStrategy for automatic retry on 429/transient errors
+        if self._retry_strategy is None:
+            from victor.providers.resilience import (
+                ProviderRetryConfig,
+                ProviderRetryStrategy,
+            )
+
+            self._retry_strategy = ProviderRetryStrategy(
+                ProviderRetryConfig(max_retries=self.max_retries)
+            )
+
+        return await self._retry_strategy.execute(_call)
 
     def reset_circuit_breaker(self) -> None:
         """Manually reset the circuit breaker to closed state."""

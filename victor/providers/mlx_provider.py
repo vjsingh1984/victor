@@ -321,7 +321,9 @@ class MLXProvider(BaseProvider):
         """
         self._model = None
         self._tokenizer = None
-        self._provider_logger.logger.debug(f"MLX provider resources released for model: {self.model_path}")
+        self._provider_logger.logger.debug(
+            f"MLX provider resources released for model: {self.model_path}"
+        )
 
     async def _make_request(
         self,

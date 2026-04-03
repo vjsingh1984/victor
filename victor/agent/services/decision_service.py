@@ -1,0 +1,395 @@
+"""LLM Decision Service implementation.
+
+Provides centralized LLM-assisted decision making for the agent orchestration
+loop. Heuristics remain the fast path; the LLM is only consulted when
+heuristic confidence falls below a configurable threshold.
+
+Key features:
+    - Heuristic-first: returns immediately if confidence >= threshold
+    - Micro-budget: bounded LLM calls per conversation turn (default 10)
+    - Cache: 60s TTL deduplicates rapid-fire calls within a turn
+    - Timeout: 2s hard limit with heuristic fallback
+    - Works with all 22 providers (no structured output API required)
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import logging
+import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+
+from victor.agent.decisions.prompts import DECISION_PROMPTS
+from victor.agent.decisions.schemas import DecisionType
+from victor.agent.services.protocols.decision_service import (
+    DecisionMetrics,
+    DecisionResult,
+)
+from victor.core.async_utils import run_sync
+
+if TYPE_CHECKING:
+    from victor.providers.base import BaseProvider
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LLMDecisionServiceConfig:
+    """Configuration for the LLM decision service."""
+
+    confidence_threshold: float = 0.7
+    micro_budget: int = 10
+    timeout_ms: int = 2000
+    cache_ttl: int = 60
+    temperature: float = 0.0
+    max_tokens_override: Optional[int] = None
+
+
+class LLMDecisionService:
+    """Centralized LLM-assisted decision service.
+
+    Uses the underlying provider as a fallback classifier when heuristic
+    confidence is low. Designed for minimal token usage (5-20 tokens per call)
+    with budget control, caching, and timeout protection.
+    """
+
+    def __init__(
+        self,
+        provider: BaseProvider,
+        model: str,
+        config: Optional[LLMDecisionServiceConfig] = None,
+    ) -> None:
+        self._provider = provider
+        self._model = model
+        self._config = config or LLMDecisionServiceConfig()
+
+        # Per-turn budget tracking
+        self._budget_used: int = 0
+
+        # Simple TTL cache: key -> (result, expiry_time)
+        self._cache: Dict[str, Tuple[DecisionResult, float]] = {}
+
+        # Metrics
+        self._metrics = DecisionMetrics()
+
+    async def decide(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Make a decision, consulting the LLM if heuristic confidence is low."""
+        start = time.monotonic()
+
+        # Fast path: heuristic is confident enough
+        if heuristic_confidence >= self._config.confidence_threshold:
+            self._metrics.total_calls += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="heuristic",
+                confidence=heuristic_confidence,
+                latency_ms=_elapsed_ms(start),
+            )
+
+        # Cache check
+        cache_key = self._cache_key(decision_type, context)
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            self._metrics.total_calls += 1
+            self._metrics.cache_hits += 1
+            cached.latency_ms = _elapsed_ms(start)
+            return cached
+
+        # Budget check
+        if self._budget_used >= self._config.micro_budget:
+            self._metrics.total_calls += 1
+            self._metrics.budget_exhaustions += 1
+            logger.debug(
+                "LLM decision budget exhausted (%d/%d), using heuristic fallback",
+                self._budget_used,
+                self._config.micro_budget,
+            )
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="budget_exhausted",
+                confidence=heuristic_confidence,
+                latency_ms=_elapsed_ms(start),
+            )
+
+        # LLM call with timeout
+        try:
+            timeout_s = self._config.timeout_ms / 1000.0
+            result = await asyncio.wait_for(
+                self._call_llm(decision_type, context),
+                timeout=timeout_s,
+            )
+            self._budget_used += 1
+            self._metrics.total_calls += 1
+            self._metrics.llm_calls += 1
+
+            result.latency_ms = _elapsed_ms(start)
+            self._update_latency(result.latency_ms)
+
+            # Cache the result
+            self._cache[cache_key] = (result, time.monotonic() + self._config.cache_ttl)
+
+            logger.debug(
+                "LLM decision: type=%s result=%s confidence=%.2f latency=%.0fms",
+                decision_type.value,
+                result.result,
+                result.confidence,
+                result.latency_ms,
+            )
+            return result
+
+        except asyncio.TimeoutError:
+            self._metrics.total_calls += 1
+            self._metrics.timeouts += 1
+            logger.debug(
+                "LLM decision timed out after %dms, using heuristic fallback",
+                self._config.timeout_ms,
+            )
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="timeout_fallback",
+                confidence=heuristic_confidence,
+                latency_ms=_elapsed_ms(start),
+            )
+
+        except Exception:
+            self._metrics.total_calls += 1
+            logger.debug("LLM decision call failed, using heuristic fallback", exc_info=True)
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="heuristic",
+                confidence=heuristic_confidence,
+                latency_ms=_elapsed_ms(start),
+            )
+
+    def decide_sync(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Synchronous version of decide().
+
+        If an event loop is already running, returns the heuristic fallback
+        rather than blocking.
+        """
+        # Fast path: heuristic is confident enough
+        if heuristic_confidence >= self._config.confidence_threshold:
+            self._metrics.total_calls += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="heuristic",
+                confidence=heuristic_confidence,
+            )
+
+        # Cache check (works in sync)
+        cache_key = self._cache_key(decision_type, context)
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            self._metrics.total_calls += 1
+            self._metrics.cache_hits += 1
+            return cached
+
+        # Budget check
+        if self._budget_used >= self._config.micro_budget:
+            self._metrics.total_calls += 1
+            self._metrics.budget_exhaustions += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="budget_exhausted",
+                confidence=heuristic_confidence,
+            )
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return run_sync(
+                self.decide(
+                    decision_type,
+                    context,
+                    heuristic_result=heuristic_result,
+                    heuristic_confidence=heuristic_confidence,
+                )
+            )
+
+        # Can't block a running loop; return heuristic fallback
+        self._metrics.total_calls += 1
+        return DecisionResult(
+            decision_type=decision_type,
+            result=heuristic_result,
+            source="heuristic",
+            confidence=heuristic_confidence,
+        )
+
+    @property
+    def budget_remaining(self) -> int:
+        """Number of LLM decision calls remaining in the current turn budget."""
+        return max(0, self._config.micro_budget - self._budget_used)
+
+    def reset_budget(self) -> None:
+        """Reset the per-turn LLM call budget and evict expired cache entries."""
+        self._budget_used = 0
+        self._evict_expired_cache()
+
+    def is_healthy(self) -> bool:
+        """Check if the decision service is operational."""
+        return self._provider is not None
+
+    def get_metrics(self) -> DecisionMetrics:
+        """Get aggregate metrics for monitoring."""
+        return self._metrics
+
+    async def _call_llm(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+    ) -> DecisionResult:
+        """Build prompt, call provider, parse structured response."""
+        prompt_config = DECISION_PROMPTS[decision_type]
+
+        # Build user message from template
+        try:
+            user_message = prompt_config.user_template.format(**context)
+        except KeyError as e:
+            logger.warning("Missing context key for %s: %s", decision_type.value, e)
+            raise
+
+        messages = [
+            {"role": "system", "content": prompt_config.system},
+            {"role": "user", "content": user_message},
+        ]
+
+        max_tokens = self._config.max_tokens_override or prompt_config.max_tokens
+
+        response = await self._provider.chat(
+            messages=messages,
+            model=self._model,
+            temperature=self._config.temperature,
+            max_tokens=max_tokens,
+            tools=None,
+        )
+
+        # Extract text content from response
+        raw_text = self._extract_response_text(response)
+        tokens_used = self._extract_token_count(response)
+
+        # Parse JSON response with schema validation
+        parsed = self._parse_response(raw_text, prompt_config.schema)
+
+        # Extract confidence from the parsed model if it has one
+        confidence = getattr(parsed, "confidence", 0.8)
+
+        return DecisionResult(
+            decision_type=decision_type,
+            result=parsed,
+            source="llm",
+            confidence=confidence,
+            tokens_used=tokens_used,
+        )
+
+    def _extract_response_text(self, response: Any) -> str:
+        """Extract text content from a provider response."""
+        # Handle CompletionResponse with .content attribute
+        if hasattr(response, "content"):
+            content = response.content
+            if isinstance(content, str):
+                return content
+            # Some providers return content as a list of blocks
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        return block["text"]
+                    if hasattr(block, "text"):
+                        return block.text
+        # Handle dict responses
+        if isinstance(response, dict):
+            if "content" in response:
+                return str(response["content"])
+            if "text" in response:
+                return str(response["text"])
+        return str(response)
+
+    def _extract_token_count(self, response: Any) -> int:
+        """Extract token usage from a provider response."""
+        if hasattr(response, "usage"):
+            usage = response.usage
+            if hasattr(usage, "total_tokens"):
+                return usage.total_tokens
+            if isinstance(usage, dict):
+                return usage.get("total_tokens", 0)
+        return 0
+
+    def _parse_response(self, raw_text: str, schema: type) -> Any:
+        """Parse raw LLM text into a Pydantic model."""
+        # Strip markdown code fences if present
+        text = raw_text.strip()
+        if text.startswith("```"):
+            lines = text.split("\n")
+            # Remove first and last lines (code fence markers)
+            lines = [line for line in lines[1:] if not line.startswith("```")]
+            text = "\n".join(lines).strip()
+
+        try:
+            data = json.loads(text)
+            return schema.model_validate(data)
+        except (json.JSONDecodeError, Exception) as e:
+            self._metrics.parse_failures += 1
+            logger.debug("Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200])
+            raise
+
+    def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
+        """Generate a cache key from decision type and context."""
+        key_data = f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
+        return hashlib.md5(key_data.encode()).hexdigest()  # noqa: S324
+
+    def _get_cached(self, cache_key: str) -> Optional[DecisionResult]:
+        """Get a cached result if it exists and hasn't expired."""
+        entry = self._cache.get(cache_key)
+        if entry is None:
+            return None
+        result, expiry = entry
+        if time.monotonic() > expiry:
+            del self._cache[cache_key]
+            return None
+        return DecisionResult(
+            decision_type=result.decision_type,
+            result=result.result,
+            source="cache",
+            confidence=result.confidence,
+            tokens_used=0,
+        )
+
+    def _evict_expired_cache(self) -> None:
+        """Remove expired cache entries."""
+        now = time.monotonic()
+        expired = [k for k, (_, expiry) in self._cache.items() if now > expiry]
+        for key in expired:
+            del self._cache[key]
+
+    def _update_latency(self, latency_ms: float) -> None:
+        """Update running average latency."""
+        self._metrics._latency_sum += latency_ms
+        if self._metrics.llm_calls > 0:
+            self._metrics.avg_latency_ms = self._metrics._latency_sum / self._metrics.llm_calls
+
+
+def _elapsed_ms(start: float) -> float:
+    """Calculate elapsed milliseconds since start."""
+    return (time.monotonic() - start) * 1000

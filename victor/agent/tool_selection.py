@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-import yaml
+from victor.core.yaml_utils import safe_load as yaml_safe_load
 
 from victor.agent.conversation_state import ConversationStage
 from victor.tools.enums import SchemaLevel
@@ -796,7 +796,7 @@ class ToolSelector(ModeAwareMixin):
         config_path = Path(__file__).parent.parent / "config" / "vertical_tools.yaml"
         try:
             if config_path.exists():
-                self._vertical_config_cache = yaml.safe_load(config_path.read_text())
+                self._vertical_config_cache = yaml_safe_load(config_path.read_text())
                 logger.debug(f"Loaded vertical tools config from {config_path}")
             else:
                 self._vertical_config_cache = {}

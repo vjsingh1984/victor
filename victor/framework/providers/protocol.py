@@ -1,0 +1,322 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Protocol-based team specification providers.
+
+This module defines protocols for team spec providers, allowing verticals
+to enhance the framework with team specifications without creating direct
+dependencies.
+
+Architecture:
+- Framework provides protocols + safe defaults
+- Verticals implement protocols (optional)
+- Entry points enable auto-discovery
+- No direct imports from framework to verticals
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Protocol, Dict, Any, runtime_checkable, List
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class TeamSpecProviderProtocol(Protocol):
+    """Protocol for providing team specifications.
+
+    Verticals can implement this protocol to provide team specs.
+    The framework provides a safe default that returns empty specs.
+
+    Example:
+        class CodingTeamSpecProvider:
+            def get_team_specs(self) -> Dict[str, Any]:
+                return {
+                    "code_review": {
+                        "name": "Code Review Team",
+                        "members": [...]
+                    }
+                }
+    """
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        """Return team specifications from this provider.
+
+        Returns:
+            Dictionary mapping team names to team spec dicts
+        """
+        ...
+
+
+@runtime_checkable
+class WorkflowProviderProtocol(Protocol):
+    """Protocol for providing workflow specifications."""
+
+    def get_workflows(self) -> Dict[str, Any]:
+        """Return workflow specifications from this provider.
+
+        Returns:
+            Dictionary mapping workflow names to workflow spec dicts
+        """
+        ...
+
+
+@runtime_checkable
+class SafetyRulesProviderProtocol(Protocol):
+    """Protocol for providing safety rules."""
+
+    def get_safety_rules(self) -> Dict[str, Any]:
+        """Return safety rules from this provider.
+
+        Returns:
+            Dictionary mapping rule names to rule configurations
+        """
+        ...
+
+
+# =============================================================================
+# Safe Default Implementations (contrib layer)
+# =============================================================================
+
+
+class DefaultTeamSpecProvider:
+    """Safe default implementation - provides no teams.
+
+    This ensures the framework works without any verticals installed.
+    """
+
+    def get_team_specs(self) -> Dict[str, Any]:
+        return {}
+
+
+class DefaultWorkflowProvider:
+    """Safe default implementation - provides no workflows."""
+
+    def get_workflows(self) -> Dict[str, Any]:
+        return {}
+
+
+class DefaultSafetyRulesProvider:
+    """Safe default implementation - provides no safety rules."""
+
+    def get_safety_rules(self) -> Dict[str, Any]:
+        return {}
+
+
+# =============================================================================
+# Provider Registry with Entry Points Discovery
+# =============================================================================
+
+
+class ProviderRegistry:
+    """
+    Registry for protocol-based providers with entry points discovery.
+
+    This registry:
+    1. Starts with safe defaults (framework works standalone)
+    2. Loads enhanced providers from installed packages via entry points
+    3. Allows manual registration for testing
+    4. Provides combined results from all providers
+
+    Entry Points:
+        Packages can register providers via entry points:
+        [project.entry-points."victor.framework.teams.providers"]
+        coding = "victor_coding.teams:CodingTeamSpecProvider"
+
+    Usage:
+        registry = ProviderRegistry()
+        all_team_specs = registry.get_all_team_specs()
+    """
+
+    def __init__(self):
+        self._team_providers: List[TeamSpecProviderProtocol] = [DefaultTeamSpecProvider()]
+        self._workflow_providers: List[WorkflowProviderProtocol] = [DefaultWorkflowProvider()]
+        self._safety_providers: List[SafetyRulesProviderProtocol] = [DefaultSafetyRulesProvider()]
+
+        # Track vertical names for namespacing
+        self._team_provider_names: Dict[str, str] = {}  # provider -> vertical_name
+        self._workflow_provider_names: Dict[str, str] = {}
+        self._safety_provider_names: Dict[str, str] = {}
+
+        # Load from entry points (optional verticals)
+        self._load_from_entry_points()
+
+    def _load_from_entry_points(self):
+        """Load providers from installed packages via entry points."""
+        try:
+            import importlib.metadata
+
+            # Load team spec providers
+            try:
+                for entry_point in importlib.metadata.entry_points(
+                    group="victor.framework.teams.providers"
+                ):
+                    try:
+                        provider_class = entry_point.load()
+                        provider = provider_class()
+                        if isinstance(provider, TeamSpecProviderProtocol):
+                            self._team_providers.append(provider)
+                            self._team_provider_names[id(provider)] = entry_point.name
+                            logger.info(f"Loaded team provider: {entry_point.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load team provider {entry_point.name}: {e}")
+            except Exception as e:
+                logger.debug(f"No team provider entry points found: {e}")
+
+            # Load workflow providers
+            try:
+                for entry_point in importlib.metadata.entry_points(
+                    group="victor.framework.workflows.providers"
+                ):
+                    try:
+                        provider_class = entry_point.load()
+                        provider = provider_class()
+                        if isinstance(provider, WorkflowProviderProtocol):
+                            self._workflow_providers.append(provider)
+                            self._workflow_provider_names[id(provider)] = entry_point.name
+                            logger.info(f"Loaded workflow provider: {entry_point.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load workflow provider {entry_point.name}: {e}")
+            except Exception as e:
+                logger.debug(f"No workflow provider entry points found: {e}")
+
+            # Load safety rules providers
+            try:
+                for entry_point in importlib.metadata.entry_points(
+                    group="victor.framework.safety.providers"
+                ):
+                    try:
+                        provider_class = entry_point.load()
+                        provider = provider_class()
+                        if isinstance(provider, SafetyRulesProviderProtocol):
+                            self._safety_providers.append(provider)
+                            self._safety_provider_names[id(provider)] = entry_point.name
+                            logger.info(f"Loaded safety provider: {entry_point.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load safety provider {entry_point.name}: {e}")
+            except Exception as e:
+                logger.debug(f"No safety provider entry points found: {e}")
+
+        except Exception as e:
+            logger.debug(f"Entry points discovery failed: {e}")
+
+    def register_team_provider(self, provider: TeamSpecProviderProtocol):
+        """Directly register a team spec provider (for testing or manual setup)."""
+        self._team_providers.append(provider)
+
+    def register_workflow_provider(self, provider: WorkflowProviderProtocol):
+        """Directly register a workflow provider (for testing or manual setup)."""
+        self._workflow_providers.append(provider)
+
+    def register_safety_provider(self, provider: SafetyRulesProviderProtocol):
+        """Directly register a safety rules provider (for testing or manual setup)."""
+        self._safety_providers.append(provider)
+
+    def get_all_team_specs(self) -> Dict[str, Any]:
+        """Collect all team specs from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to team spec dicts.
+            Example: {"coding": {"feature_team": TeamSpec(), ...}, ...}
+        """
+        all_specs: Dict[str, Any] = {}
+        for provider in self._team_providers:
+            try:
+                specs = provider.get_team_specs()
+                if specs:
+                    # Get vertical name from entry point name
+                    vertical_name = self._team_provider_names.get(id(provider))
+                    if vertical_name:
+                        # Namespace by vertical: {vertical: {team_name: TeamSpec}}
+                        all_specs[vertical_name] = specs
+                    else:
+                        # Default provider (no vertical namespace)
+                        all_specs.update(specs)
+            except Exception as e:
+                logger.warning(f"Failed to get team specs from {provider}: {e}")
+        return all_specs
+
+    def get_all_workflows(self) -> Dict[str, Any]:
+        """Collect all workflows from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to workflow spec dicts.
+        """
+        all_specs: Dict[str, Any] = {}
+        for provider in self._workflow_providers:
+            try:
+                specs = provider.get_workflows()
+                if specs:
+                    vertical_name = self._workflow_provider_names.get(id(provider))
+                    if vertical_name:
+                        all_specs[vertical_name] = specs
+                    else:
+                        all_specs.update(specs)
+            except Exception as e:
+                logger.warning(f"Failed to get workflows from {provider}: {e}")
+        return all_specs
+
+    def get_all_safety_rules(self) -> Dict[str, Any]:
+        """Collect all safety rules from registered providers.
+
+        Returns:
+            Dictionary mapping vertical names to safety rule dicts.
+        """
+        all_specs: Dict[str, Any] = {}
+        for provider in self._safety_providers:
+            try:
+                specs = provider.get_safety_rules()
+                if specs:
+                    vertical_name = self._safety_provider_names.get(id(provider))
+                    if vertical_name:
+                        all_specs[vertical_name] = specs
+                    else:
+                        all_specs.update(specs)
+            except Exception as e:
+                logger.warning(f"Failed to get safety rules from {provider}: {e}")
+        return all_specs
+
+
+# Global registry instance
+_provider_registry: ProviderRegistry | None = None
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """Get the global provider registry instance."""
+    global _provider_registry
+    if _provider_registry is None:
+        _provider_registry = ProviderRegistry()
+    return _provider_registry
+
+
+def reset_provider_registry():
+    """Reset the global provider registry (for testing)."""
+    global _provider_registry
+    _provider_registry = None
+
+
+__all__ = [
+    "TeamSpecProviderProtocol",
+    "WorkflowProviderProtocol",
+    "SafetyRulesProviderProtocol",
+    "DefaultTeamSpecProvider",
+    "DefaultWorkflowProvider",
+    "DefaultSafetyRulesProvider",
+    "ProviderRegistry",
+    "get_provider_registry",
+    "reset_provider_registry",
+]

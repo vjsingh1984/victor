@@ -25,6 +25,7 @@ import logging
 import pytest
 from unittest.mock import MagicMock, patch
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.core.vertical_types import MiddlewarePriority
 from victor.framework.middleware import (
     GitSafetyMiddleware,
@@ -38,6 +39,15 @@ from victor.framework.middleware import (
     ValidationSeverity,
     ValidatorProtocol,
 )
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
 
 # =============================================================================
 # LoggingMiddleware Tests
@@ -64,12 +74,13 @@ class TestLoggingMiddleware:
     @pytest.mark.asyncio
     async def test_after_tool_call_logs_success(self, middleware, caplog):
         """LoggingMiddleware should log after successful tool call."""
-        # First call before to set up timing
-        await middleware.before_tool_call("test_tool", {"arg1": "value1"})
+        # Use the same arguments dict so call_id matches between before/after
+        args = {"arg1": "value1"}
+        await middleware.before_tool_call("test_tool", args)
 
-        with caplog.at_level(logging.DEBUG):
+        with caplog.at_level(logging.DEBUG, logger="victor.framework.middleware"):
             result = await middleware.after_tool_call(
-                "test_tool", {"arg1": "value1"}, "result", success=True
+                "test_tool", args, "result", success=True
             )
 
         assert result is None  # No modification
@@ -860,7 +871,7 @@ class TestMiddlewareIntegration:
     @pytest.mark.integration
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
-        from victor_devops.assistant import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
 
         middleware_list = DevOpsAssistant.get_middleware()
 

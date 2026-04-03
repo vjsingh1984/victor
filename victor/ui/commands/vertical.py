@@ -12,169 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Vertical registry commands for managing third-party vertical packages.
+"""Vertical management commands."""
 
-This module provides CLI commands for:
-- Installing verticals from PyPI, git, or local paths
-- Listing available and installed verticals
-- Searching the vertical registry
-- Displaying detailed vertical information
-- Uninstalling verticals
-"""
-
+import json
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from victor.core.verticals.registry_manager import (
     InstalledVertical,
-    PackageSpec,
     VerticalRegistryManager,
+    VerticalRuntimeInvalidationReason,
 )
+from victor.ui.commands.scaffold import new_vertical
 
+# Initialize components
 vertical_app = typer.Typer(
     name="vertical",
-    help="Manage vertical packages - install, list, search, and uninstall.",
+    help="Manage verticals (DEPRECATED: use 'victor plugin' instead)",
+    deprecated=True,
 )
 console = Console()
 
+_DEPRECATION_MSG = (
+    "[yellow]Warning:[/] 'victor vertical' is deprecated and will be removed in v0.8.0. "
+    "Use 'victor plugin' instead — it shows both verticals and plugins in a unified view."
+)
 
-@vertical_app.command("install")
-def install_vertical(
-    package: str = typer.Argument(
-        ...,
-        help="Package specification (e.g., 'victor-security', 'git+https://...', '/local/path')",
-    ),
-    no_validate: bool = typer.Option(
-        False,
-        "--no-validate",
-        help="Skip validation checks before installation",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-n",
-        help="Show what would be installed without actually installing",
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Show detailed installation output",
-    ),
-) -> None:
-    """Install a vertical package from PyPI, git, or local path.
 
-    Examples:
-        # Install from PyPI
-        victor vertical install victor-security
-
-        # Install with version constraint
-        victor vertical install "victor-security>=1.0.0"
-
-        # Install from git
-        victor vertical install "git+https://github.com/user/victor-security.git"
-
-        # Install from local path
-        victor vertical install ./path/to/package
-
-        # Install with extras
-        victor vertical install "victor-security[full]"
-
-        # Dry run
-        victor vertical install victor-security --dry-run
-    """
-    # Parse package spec
-    try:
-        spec = PackageSpec.parse(package)
-    except ValueError as e:
-        console.print(f"[red]Error: Invalid package specification: {e}[/]")
-        raise typer.Exit(1)
-
-    # Display header
-    console.print()
-    console.print(
-        Panel(
-            f"[bold blue]Installing vertical package[/]\n"
-            f"[dim]Name:[/] {spec.name}\n"
-            f"[dim]Source:[/] {spec.source.value}\n"
-            f"[dim]Spec:[/] {package}",
-            title="Victor Vertical Registry",
-            border_style="blue",
-        )
-    )
+def _deprecation_notice() -> None:
+    """Print deprecation notice."""
+    console.print(_DEPRECATION_MSG)
     console.print()
 
-    # Create registry manager
-    manager = VerticalRegistryManager(dry_run=dry_run)
 
-    # Install
-    validate = not no_validate
-    success, message = manager.install(spec, validate=validate, verbose=verbose)
-
-    if success:
-        console.print(f"[green]Success:[/] {message}")
-        console.print()
-        console.print("[bold]Next steps:[/]")
-        console.print(f"  1. Restart Victor to load the new vertical")
-        console.print(f"  2. Use 'victor vertical info {spec.name}' to see details")
-        console.print()
-    else:
+def _handle_error(message: str, detail: Optional[str] = None) -> None:
+    """Handle and display errors."""
+    if detail:
         console.print(f"[red]Error:[/] {message}")
-        raise typer.Exit(1)
-
-
-@vertical_app.command("uninstall")
-def uninstall_vertical(
-    name: str = typer.Argument(
-        ...,
-        help="Name of the vertical to uninstall",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-n",
-        help="Show what would be uninstalled without actually uninstalling",
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Show detailed uninstallation output",
-    ),
-) -> None:
-    """Uninstall a vertical package.
-
-    Examples:
-        victor vertical uninstall victor-security
-        victor vertical uninstall victor-security --dry-run
-    """
-    # Display header
-    console.print()
-    console.print(
-        Panel(
-            f"[bold blue]Uninstalling vertical package[/]\n" f"[dim]Name:[/] {name}",
-            title="Victor Vertical Registry",
-            border_style="blue",
-        )
-    )
-    console.print()
-
-    # Create registry manager
-    manager = VerticalRegistryManager(dry_run=dry_run)
-
-    # Uninstall
-    success, message = manager.uninstall(name, verbose=verbose)
-
-    if success:
-        console.print(f"[green]Success:[/] {message}")
-        console.print()
-        console.print("[bold]Next steps:[/]")
-        console.print(f"  1. Restart Victor to complete removal")
+        console.print(f"[dim]{detail}[/]")
         console.print()
     else:
         console.print(f"[red]Error:[/] {message}")
@@ -210,6 +89,9 @@ def list_verticals(
 ) -> None:
     """List vertical packages with optional filtering.
 
+    .. deprecated:: 0.7.0
+        Use ``victor plugin list --type vertical`` instead.
+
     Shows built-in, installed, and available verticals with filtering options.
 
     Examples:
@@ -224,367 +106,167 @@ def list_verticals(
 
         # List by tags
         victor vertical list --tags "security,scanning"
-
-        # List with verbose output
-        victor vertical list --verbose
     """
-    # Validate source
-    valid_sources = ["all", "installed", "builtin", "available"]
-    if source not in valid_sources:
-        console.print(f"[red]Error: Invalid source '{source}'[/]")
-        console.print(f"[dim]Valid sources: {', '.join(valid_sources)}[/]")
-        raise typer.Exit(1)
-
-    # Create registry manager
+    _deprecation_notice()
     manager = VerticalRegistryManager()
 
-    # Get verticals
-    console.print()
-    console.print(f"[dim]Loading verticals (source: {source})...[/]")
-    verticals = manager.list_verticals(source=source)
+    with console.status("[bold blue]Loading vertical list..."):
+        try:
+            verticals = manager.list_verticals(source=source)
+        except Exception as e:
+            _handle_error("Failed to list verticals", str(e))
+            return
 
-    # Apply filters
+    # Filter by category if provided
     if category:
         verticals = [v for v in verticals if v.metadata and v.metadata.category == category]
-        if verticals:
-            console.print(f"[dim]Filtering by category: {category}[/]")
 
+    # Filter by tags if provided
     if tags:
         tag_list = [t.strip().lower() for t in tags.split(",")]
         verticals = [
-            v for v in verticals if v.metadata and any(tag in v.metadata.tags for tag in tag_list)
+            v
+            for v in verticals
+            if v.metadata
+            and any(tg in [mt.lower() for mt in v.metadata.tags] for tg in tag_list)
         ]
-        if verticals:
-            console.print(f"[dim]Filtering by tags: {tags}[/]")
 
     if not verticals:
-        console.print(f"[yellow]No verticals found matching the criteria[/]")
+        console.print(f"[yellow]No verticals found matching source='{source}'[/]")
         return
 
-    # Display table
-    table = Table(title=f"Verticals ({source})", show_header=True)
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Version", style="green")
-    table.add_column("Type", style="yellow")
+    table = Table(title="Vertical Ecosystem")
+    table.add_column("Name", style="cyan")
+    table.add_column("Version", style="magenta")
+    table.add_column("Source", style="green")
+    table.add_column("Description")
 
     if verbose:
-        table.add_column("Category", style="magenta")
-        table.add_column("Tools", style="blue")
-        table.add_column("Workflows", style="blue")
-        table.add_column("Description", style="white")
-    else:
-        table.add_column("Description", style="white")
+        table.add_column("Capabilities")
+        table.add_column("Tools")
 
-    for vertical in sorted(verticals, key=lambda v: v.name):
-        # Get description from metadata or use default
-        if vertical.metadata:
-            description = vertical.metadata.description
-        else:
-            description = "No description available"
-
-        # Truncate if too long
-        if len(description) > 60:
-            description = description[:57] + "..."
-
-        # Type indicator
-        vtype = "Built-in" if vertical.is_builtin else "External"
+    for v in verticals:
+        row = [
+            v.name,
+            v.version,
+            "Builtin" if v.is_builtin else "External",
+            v.metadata.description if v.metadata else "[dim]No description available[/]",
+        ]
 
         if verbose:
-            # Get additional metadata
-            category = vertical.metadata.category if vertical.metadata else "-"
-            tools = (
-                ", ".join(vertical.metadata.class_spec.provides_tools[:3])
-                if vertical.metadata and vertical.metadata.class_spec.provides_tools
-                else "-"
-            )
-            if vertical.metadata and len(vertical.metadata.class_spec.provides_tools) > 3:
-                tools += "..."
+            cs = v.metadata.class_spec if v.metadata else None
+            caps = ", ".join(cs.provides_capabilities) if cs and cs.provides_capabilities else "-"
+            tool_list = cs.provides_tools if cs and cs.provides_tools else []
+            tools = ", ".join(tool_list[:5]) if tool_list else "-"
+            if len(tool_list) > 5:
+                tools += f" (+{len(tool_list) - 5} more)"
+            row.extend([caps, tools])
 
-            workflows = (
-                ", ".join(vertical.metadata.class_spec.provides_workflows[:3])
-                if vertical.metadata and vertical.metadata.class_spec.provides_workflows
-                else "-"
-            )
-            if vertical.metadata and len(vertical.metadata.class_spec.provides_workflows) > 3:
-                workflows += "..."
-
-            table.add_row(
-                vertical.name,
-                vertical.version,
-                vtype,
-                category,
-                tools,
-                workflows,
-                description,
-            )
-        else:
-            table.add_row(
-                vertical.name,
-                vertical.version,
-                vtype,
-                description,
-            )
+        table.add_row(*row)
 
     console.print(table)
-    console.print()
-    console.print(f"[dim]Total: {len(verticals)} vertical(s)[/]")
-
-    # Show hint for filtering
-    if not category and not tags:
-        console.print(
-            "[dim]Tip: Use --category or --tags to filter results, --verbose for more details[/]"
-        )
-    console.print()
-
-
-@vertical_app.command("search")
-def search_verticals(
-    query: str = typer.Argument(
-        ...,
-        help="Search query (matches name, description, tags)",
-    ),
-) -> None:
-    """Search for vertical packages.
-
-    Searches through all verticals (built-in, installed, and available)
-    matching the query.
-
-    Examples:
-        victor vertical search security
-        victor vertical search "data analysis"
-        victor vertical search monitoring
-    """
-    # Create registry manager
-    manager = VerticalRegistryManager()
-
-    # Search
-    console.print()
-    console.print(f"[dim]Searching for '{query}'...[/]")
-    results = manager.search(query)
-
-    if not results:
-        console.print(f"[yellow]No verticals found matching '{query}'[/]")
-        return
-
-    # Display table
-    table = Table(title=f"Search Results: '{query}'", show_header=True)
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Version", style="green")
-    table.add_column("Type", style="yellow")
-    table.add_column("Description", style="white")
-
-    for vertical in results[:10]:  # Limit to 10 results
-        # Get description from metadata or use default
-        if vertical.metadata:
-            description = vertical.metadata.description
-        else:
-            description = "No description available"
-
-        # Highlight query match in description
-        query_lower = query.lower()
-        if query_lower in description.lower():
-            # Simple highlighting (first match)
-            idx = description.lower().index(query_lower)
-            description = (
-                description[:idx]
-                + "[bold red]"
-                + description[idx : idx + len(query)]
-                + "[/]"
-                + description[idx + len(query) :]
-            )
-
-        # Truncate if too long
-        if len(description) > 60:
-            description = description[:57] + "..."
-
-        # Type indicator
-        vtype = "Built-in" if vertical.is_builtin else "External"
-
-        table.add_row(
-            vertical.name,
-            vertical.version,
-            vtype,
-            description,
-        )
-
-    console.print(table)
-    console.print()
-    console.print(f"[dim]Found {len(results)} result(s)[/]")
-    console.print()
+    console.print(f"\n[dim]Found {len(verticals)} vertical(s)[/]")
 
 
 @vertical_app.command("info")
-def show_vertical_info(
-    name: str = typer.Argument(
-        ...,
-        help="Name of the vertical to show information for",
-    ),
-) -> None:
-    """Show detailed information about a vertical.
-
-    Displays metadata, dependencies, compatibility info, etc.
-
-    Examples:
-        victor vertical info security
-        victor vertical info victor-security
-    """
-    # Create registry manager
+def vertical_info(name: str) -> None:
+    """Show detailed information for a vertical."""
     manager = VerticalRegistryManager()
 
-    # Get info
-    console.print()
-    console.print(f"[dim]Loading information for '{name}'...[/]")
-    vertical = manager.get_info(name)
+    try:
+        vertical = manager.get_info(name)
+        if not vertical:
+            _handle_error(f"Vertical '{name}' not found")
+            return
 
-    if not vertical:
-        console.print(f"[yellow]Vertical '{name}' not found[/]")
-        console.print()
-        console.print("[dim]Use 'victor vertical list' to see available verticals[/]")
-        raise typer.Exit(1)
+        console.print(f"\n[bold cyan]Vertical: {vertical.name}[/]")
+        console.print(f"[bold]Version:[/] {vertical.version}")
+        console.print(f"[bold]Source:[/] {'Built-in' if vertical.is_builtin else 'External'}")
+        console.print(f"[bold]Location:[/] {vertical.location or 'Embedded'}")
 
-    # Display info
-    console.print()
-    console.print(
-        Panel(
-            f"[bold cyan]{vertical.name}[/]\n"
-            f"[dim]Version:[/] {vertical.version}\n"
-            f"[dim]Type:[/] {'Built-in' if vertical.is_builtin else 'External'}\n"
-            f"[dim]Location:[/] {vertical.location}",
-            title="Vertical Information",
-            border_style="cyan",
-        )
-    )
-    console.print()
+        if vertical.metadata:
+            m = vertical.metadata
+            console.print(f"\n[bold]Description:[/] {m.description}")
+            if m.authors:
+                author_names = [a.name if hasattr(a, "name") else str(a) for a in m.authors]
+                console.print(f"[bold]Authors:[/] {', '.join(author_names)}")
+            if m.category:
+                console.print(f"[bold]Category:[/] {m.category}")
+            if m.tags:
+                console.print(f"[bold]Tags:[/] {', '.join(m.tags)}")
 
-    # Display metadata if available
-    if vertical.metadata:
-        metadata = vertical.metadata
+            if m.class_spec:
+                if m.class_spec.provides_capabilities:
+                    console.print("\n[bold]Capabilities:[/]")
+                    for cap in m.class_spec.provides_capabilities:
+                        console.print(f"  • {cap}")
 
-        # Description
-        console.print("[bold]Description:[/]")
-        console.print(f"  {metadata.description}")
-        console.print()
+                if m.class_spec.provides_tools:
+                    console.print("\n[bold]Provides Tools:[/]")
+                    for tool in m.class_spec.provides_tools:
+                        console.print(f"  • {tool}")
 
-        # Authors
-        if metadata.authors:
-            console.print("[bold]Authors:[/]")
-            for author in metadata.authors:
-                if author.email:
-                    console.print(f"  - {author.name} <{author.email}>")
-                else:
-                    console.print(f"  - {author.name}")
-            console.print()
+                if m.class_spec.provides_workflows:
+                    console.print("\n[bold]Provides Workflows:[/]")
+                    for wf in m.class_spec.provides_workflows:
+                        console.print(f"  • {wf}")
+        else:
+            console.print("\n[yellow]No detailed metadata available[/]")
 
-        # Links
-        console.print("[bold]Links:[/]")
-        if metadata.homepage:
-            console.print(f"  Homepage:     {metadata.homepage}")
-        if metadata.repository:
-            console.print(f"  Repository:   {metadata.repository}")
-        if metadata.documentation:
-            console.print(f"  Documentation: {metadata.documentation}")
-        if metadata.issues:
-            console.print(f"  Issues:       {metadata.issues}")
-        console.print()
-
-        # Requirements
-        console.print("[bold]Requirements:[/]")
-        console.print(f"  Victor:       {metadata.requires_victor}")
-        console.print(f"  License:      {metadata.license}")
-        console.print(f"  Python:       {metadata.compatibility.python_version}")
-        console.print()
-
-        # Class specification
-        console.print("[bold]Entry Point:[/]")
-        console.print(f"  Module:       {metadata.class_spec.module}")
-        console.print(f"  Class:        {metadata.class_spec.class_name}")
-        console.print()
-
-        # Capabilities
-        if metadata.class_spec.provides_tools:
-            console.print("[bold]Provides Tools:[/]")
-            for tool in metadata.class_spec.provides_tools:
-                console.print(f"  - {tool}")
-            console.print()
-
-        if metadata.class_spec.provides_workflows:
-            console.print("[bold]Provides Workflows:[/]")
-            for workflow in metadata.class_spec.provides_workflows:
-                console.print(f"  - {workflow}")
-            console.print()
-
-        if metadata.class_spec.provides_capabilities:
-            console.print("[bold]Provides Capabilities:[/]")
-            for capability in metadata.class_spec.provides_capabilities:
-                console.print(f"  - {capability}")
-            console.print()
-
-        # Dependencies
-        if metadata.dependencies.python:
-            console.print("[bold]Python Dependencies:[/]")
-            for dep in metadata.dependencies.python:
-                console.print(f"  - {dep}")
-            console.print()
-
-        if metadata.dependencies.verticals:
-            console.print("[bold]Vertical Dependencies:[/]")
-            for dep in metadata.dependencies.verticals:
-                console.print(f"  - {dep}")
-            console.print()
-
-        # Tags
-        if metadata.tags:
-            tags_str = ", ".join(metadata.tags)
-            console.print(f"[bold]Tags:[/] {tags_str}")
-            console.print()
-
-    else:
-        console.print("[yellow]No detailed metadata available[/]")
-        console.print()
+    except Exception as e:
+        _handle_error(f"Failed to load information for '{name}'", str(e))
 
 
-@vertical_app.command("create")
-def create_vertical(
-    name: str = typer.Argument(
-        ...,
-        help="Name of the new vertical (e.g., 'security', 'analytics')",
-    ),
-    description: str = typer.Option(
-        None,
-        "--description",
-        "-d",
-        help="Description of the vertical's purpose",
-    ),
-    service_provider: bool = typer.Option(
-        False,
-        "--service-provider",
-        "-s",
-        help="Include service_provider.py for DI container registration",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Overwrite existing files if vertical already exists",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-n",
-        help="Show what would be created without actually creating files",
-    ),
+@vertical_app.command("install")
+def install_vertical(
+    package: str = typer.Argument(..., help="Package name, path, or URL"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force re-installation"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed"),
 ) -> None:
-    """Generate a new vertical structure from templates.
+    """Install a new vertical plugin."""
+    manager = VerticalRegistryManager()
 
-    This is a convenience alias for 'victor vertical create' from the scaffold command.
-    For more details, see 'victor vertical create --help'.
+    if dry_run:
+        console.print(f"[yellow]Dry run:[/] Would install package '{package}'")
+        return
 
-    Examples:
-        victor vertical create security --description "Security analysis assistant"
-        victor vertical create analytics -d "Data analytics" --service-provider
-        victor vertical create ml --dry-run
-    """
-    # Import the scaffold command
+    with console.status(f"[bold blue]Installing {package}..."):
+        try:
+            result = manager.install(package, force=force)
+            if result:
+                console.print(f"[green]Successfully installed {package}[/]")
+            else:
+                _handle_error(f"Failed to install {package}")
+        except Exception as e:
+            _handle_error("Installation failed", str(detail=str(e)))
+
+
+@vertical_app.command("uninstall")
+def uninstall_vertical(name: str) -> None:
+    """Uninstall a vertical plugin."""
+    manager = VerticalRegistryManager()
+
+    with console.status(f"[bold blue]Uninstalling {name}..."):
+        try:
+            if manager.uninstall(name):
+                console.print(f"[green]Successfully uninstalled {name}[/]")
+            else:
+                _handle_error(f"Failed to uninstall {name}")
+        except Exception as e:
+            _handle_error("Uninstallation failed", str(e))
+
+
+@vertical_app.command("new")
+def scaffold_vertical(
+    name: str = typer.Argument(..., help="Name of the new vertical"),
+    description: str = typer.Option("A new Victor vertical", "--description", "-d"),
+    service_provider: bool = typer.Option(
+        False, "--service", help="Include service provider boilerplate"
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite if directory exists"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
+) -> None:
+    """Scaffold a new vertical package."""
     from victor.ui.commands.scaffold import new_vertical
 
     # Call the scaffold command

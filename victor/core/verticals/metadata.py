@@ -24,11 +24,13 @@ Extracted from VerticalBase for SRP compliance.
 
 from __future__ import annotations
 
+import importlib
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
 
 from victor.core.vertical_types import TieredToolTemplate
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
 
 if TYPE_CHECKING:
     from victor.core.vertical_types import TieredToolConfig
@@ -100,9 +102,9 @@ class VerticalMetadataProvider(ABC):
     def get_capability_configs(cls) -> Dict[str, Any]:
         """Get capability configurations for this vertical.
 
-        Override to provide vertical-specific capability configurations
-        that will be stored in VerticalContext instead of direct
-        orchestrator attribute assignment.
+        Default implementation resolves a ``get_capability_configs()`` helper from
+        the vertical's ``capabilities`` module using the runtime import resolver.
+        Verticals can still override this when they need custom behavior.
 
         This replaces the previous pattern of setting attributes like:
         - orchestrator.rag_config = {...}
@@ -121,6 +123,38 @@ class VerticalMetadataProvider(ABC):
         Returns:
             Dict mapping config names to configuration values
         """
+        vertical_name = getattr(cls, "name", None)
+        if not isinstance(vertical_name, str) or not vertical_name:
+            return {}
+
+        last_error: Optional[Exception] = None
+        for module_path in vertical_runtime_module_candidates(vertical_name, "capabilities"):
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+            factory = getattr(module, "get_capability_configs", None)
+            if factory is None:
+                continue
+            if not callable(factory):
+                logger.warning(
+                    "Capability config loader on '%s' for vertical '%s' is not callable",
+                    module_path,
+                    vertical_name,
+                )
+                continue
+
+            configs = factory()
+            return dict(configs or {})
+
+        if last_error is not None:
+            logger.debug(
+                "No capability config loader resolved for vertical '%s': %s",
+                vertical_name,
+                last_error,
+            )
         return {}
 
     @classmethod

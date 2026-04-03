@@ -32,23 +32,54 @@ Custom verticals enable you to:
 3. **Define workflows** - Multi-step processes for complex tasks
 4. **Integrate extensions** - Custom middleware, safety checks, and handlers
 
+### Authoring Modes
+
+Victor is in a migration period with two authoring styles:
+
+| Use case | Recommended surface | Notes |
+|----------|---------------------|-------|
+| External/package verticals | `victor_sdk` | Preferred path for new work. Use `VerticalBase`, `ToolNames`, `CapabilityIds`, and `get_definition()` |
+| Bundled/runtime-integrated verticals | `victor.core` / `victor.framework` | Legacy/internal path while runtime boundaries are being cleaned up |
+
+If you are publishing a standalone vertical package, depend on `victor-sdk`
+only. The runtime-specific sections later in this guide still describe legacy
+core-integrated extension points and remain relevant mainly for bundled
+victor-ai verticals during migration.
+
+For step-by-step migration from the legacy core-coupled pattern to the
+SDK-first contract, see [victor-sdk/MIGRATION_GUIDE.md](/Users/vijaysingh/code/codingagent/victor-sdk/MIGRATION_GUIDE.md).
+
+For a complete standalone package example that follows the SDK-only authoring
+model and runtime entry-point discovery, see
+[examples/external_vertical/README.md](/Users/vijaysingh/code/codingagent/examples/external_vertical/README.md).
+
+For the target definition-vs-runtime package split used by the migration plan, see
+[vertical-package-layout-target-2026-03-10.md](/Users/vijaysingh/code/codingagent/docs/development/vertical-package-layout-target-2026-03-10.md).
+
 ## VerticalBase Interface
 
-All verticals inherit from `VerticalBase` and must implement two abstract methods:
+External verticals should inherit from the SDK `VerticalBase` and implement the
+definition-layer hooks that feed `get_definition()`:
 
 ```python
-from typing import List
-from victor.core.verticals import VerticalBase
+from victor_sdk import ToolNames, VerticalBase
 
 class MyVertical(VerticalBase):
-    # Required class attributes
     name = "my_vertical"  # Unique identifier
     description = "Description of what this vertical does"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_tools(cls) -> list[str]:
         """Return list of tool names available to this vertical."""
-        return ["read", "write", "grep"]
+        return [ToolNames.READ, ToolNames.WRITE, ToolNames.GREP]
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -61,6 +92,8 @@ class MyVertical(VerticalBase):
 | Member | Type | Description |
 |--------|------|-------------|
 | `name` | `str` | Unique identifier for the vertical (lowercase, underscores) |
+| `get_name()` | `classmethod` | Returns the canonical vertical identifier |
+| `get_description()` | `classmethod` | Returns the human-readable description |
 | `get_tools()` | `classmethod` | Returns list of tool names to enable |
 | `get_system_prompt()` | `classmethod` | Returns the system prompt text |
 
@@ -71,6 +104,11 @@ class MyVertical(VerticalBase):
 | `description` | `""` | Human-readable description |
 | `version` | `"1.0.0"` | Semantic version of the vertical |
 | `get_stages()` | 7-stage workflow | Stage definitions for task progression |
+| `get_definition()` | Derived from hooks | Returns validated SDK manifest data |
+| `get_tool_requirements()` | `get_tools()` | Typed tool requirements for manifest-first authoring |
+| `get_capability_requirements()` | `[]` | Typed runtime capability requirements |
+| `get_team_declarations()` | `{}` | Declarative team layouts for SDK-first authoring |
+| `get_team_metadata()` | Derived from hooks | Typed team metadata bridge for `get_definition()` |
 | `get_provider_hints()` | Default hints | Provider selection preferences |
 | `get_evaluation_criteria()` | Basic criteria | Quality evaluation criteria |
 | `get_middleware()` | `[]` | Middleware implementations |
@@ -81,9 +119,13 @@ class MyVertical(VerticalBase):
 | `get_workflow_provider()` | `None` | YAML workflow provider |
 | `get_handlers()` | `{}` | Compute handlers for workflows |
 | `get_tool_graph()` | `None` | Tool execution graph |
-| `get_team_specs()` | `None` | Multi-agent team configurations |
+| `get_team_specs()` | `None` | Legacy/runtime team configuration fallback |
 
 ## Creating a Custom Vertical
+
+The walkthrough below shows a runtime-integrated vertical inside the Victor
+repository. For standalone packages, use the SDK-only pattern shown in the
+sections above and in `victor-sdk/README.md`.
 
 ### Step 1: Define the Vertical Class
 
@@ -220,6 +262,10 @@ Be thorough but prioritize high-severity issues."""
 ```
 
 ### Step 2: Create the Package Structure
+
+For new SDK-first packages, prefer the target split linked above. The example
+below shows the older in-repo runtime-integrated layout that still exists in bundled
+contrib verticals during migration.
 
 Organize your vertical as a package:
 
@@ -520,20 +566,28 @@ def get_workflow_provider(cls) -> Optional[WorkflowProviderProtocol]:
 
 ## External Plugin Registration
 
-External packages can register verticals without modifying Victor's source code using Python entry points.
+External packages should register runtime integrations through the `victor.plugins`
+entry point. That gives the package a `PluginContext` with access to framework
+registration hooks for verticals, commands, tools, chunkers, and custom workflow
+node executors.
 
 ### Package Structure
 
 ```
 victor-security/
     pyproject.toml
-    victor_security/
+    src/victor_security/
         __init__.py
         assistant.py
-        workflows/
+        prompts.py
+        victor-vertical.toml
+        tool_dependencies.py
+        runtime/
             __init__.py
-            security_audit.yaml
-        escape_hatches.py
+            workflows/
+                __init__.py
+                security_audit.yaml
+            escape_hatches.py
 ```
 
 ### Entry Point Configuration
@@ -543,37 +597,110 @@ victor-security/
 [project]
 name = "victor-security"
 version = "1.0.0"
-dependencies = ["victor-ai>=0.4.0"]
+dependencies = ["victor-sdk>=1.0.0"]
 
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityAssistant"
+[project.optional-dependencies]
+runtime = ["victor-ai>=0.4.0"]
+
+[project.entry-points."victor.plugins"]
+security = "victor_security:plugin"
 ```
 
 ### Package Implementation
 
 ```python
 # victor_security/__init__.py
+from victor_security.plugin import plugin
+
+__all__ = ["plugin"]
+```
+
+```python
+# victor_security/plugin.py
+from victor_sdk import PluginContext, VictorPlugin
 from victor_security.assistant import SecurityAssistant
 
-__all__ = ["SecurityAssistant"]
+
+class SecurityPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "security"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+
+
+plugin = SecurityPlugin()
 ```
 
 ```python
 # victor_security/assistant.py
-from typing import List
-from victor.core.verticals import VerticalBase
+from victor_sdk import ToolNames, VerticalBase
+
 
 class SecurityAssistant(VerticalBase):
     name = "security"
     description = "Security analysis and vulnerability assessment"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
-        return ["read", "grep", "shell", "web_search"]
+    def get_tools(cls) -> list[str]:
+        return [
+            ToolNames.READ,
+            ToolNames.GREP,
+            ToolNames.SHELL,
+            ToolNames.WEB_SEARCH,
+        ]
 
     @classmethod
     def get_system_prompt(cls) -> str:
         return "You are a security analyst..."
+```
+
+### Registering Custom Workflow Node Executors
+
+If your package introduces a custom workflow node type, register its executor
+through the same plugin context instead of patching the core workflow factory.
+
+```python
+# victor_security/plugin.py
+from victor_sdk import PluginContext, VictorPlugin
+from victor.workflows import CompiledGraphNodeResult
+
+
+class ThreatModelExecutor:
+    def __init__(self, container=None):
+        self._container = container
+
+    async def execute(self, node, state):
+        result = {"threat_model": f"modeled:{node.id}"}
+        state.setdefault("_node_results", {})[node.id] = CompiledGraphNodeResult(
+            node_id=node.id,
+            success=True,
+            output=result,
+            metadata={"node_type": "threat_model"},
+        )
+        state.update(result)
+        return state
+
+
+class SecurityPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "security"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+        context.register_workflow_node_executor("threat_model", ThreatModelExecutor)
+```
+
+For application-local extensions that are not packaged as plugins, the same
+registration helpers are also available from `victor.workflows`:
+
+```python
+from victor.workflows import register_workflow_node_executor
+
+
+register_workflow_node_executor("threat_model", ThreatModelExecutor)
 ```
 
 ### Installation and Discovery
@@ -582,9 +709,15 @@ class SecurityAssistant(VerticalBase):
 # Install the external package
 pip install victor-security
 
-# Victor automatically discovers and registers the vertical
+# Or install with runtime helpers if the package ships them
+pip install "victor-security[runtime]"
+
+# Victor automatically discovers and registers the plugin
 victor chat --vertical security
 ```
+
+`victor.verticals` remains a legacy compatibility entry point for definition-only
+packages, but new runtime-integrated extensions should use `victor.plugins`.
 
 ### Validation Requirements
 
@@ -891,10 +1024,10 @@ def get_team_spec_provider(cls) -> Optional[TeamSpecProviderProtocol]:
 
 ### Tool Names
 
-Use canonical tool names from `victor.tools.tool_names`:
+Use canonical tool names and capability IDs from `victor_sdk`:
 
 ```python
-from victor.tools.tool_names import ToolNames
+from victor_sdk import CapabilityIds, ToolNames
 
 tools = [
     ToolNames.READ,        # "read"
@@ -905,6 +1038,12 @@ tools = [
     ToolNames.GIT,         # "git"
     ToolNames.WEB_SEARCH,  # "web_search"
     ToolNames.WEB_FETCH,   # "web_fetch"
+]
+
+capabilities = [
+    CapabilityIds.FILE_OPS,   # "file_ops"
+    CapabilityIds.GIT,        # "git"
+    CapabilityIds.WEB_ACCESS, # "web_access"
 ]
 ```
 

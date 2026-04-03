@@ -28,28 +28,31 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
-    WorkflowProviderProtocol,
-    ServiceProviderProtocol,
-    TieredToolConfig,
-    VerticalExtensions,
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    ExtensionType,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
 )
 
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import (
-    FileOperationsCapability,
-    PromptContributionCapability,
+from victor.core.verticals.registration import register_vertical
+
+
+@register_vertical(
+    name="coding",
+    version="2.0.0",
+    api_version=1,
+    min_framework_version=">=0.5.0",
+    provides={ExtensionType.TOOLS, ExtensionType.WORKFLOWS, ExtensionType.MIDDLEWARE},
+    canonicalize_tool_names=True,
+    tool_dependency_strategy="entry_point",
+    strict_mode=False,
+    load_priority=100,  # High priority as it's the default vertical
 )
-
-
 class CodingAssistant(VerticalBase):
     """Software development assistant vertical.
 
@@ -60,69 +63,44 @@ class CodingAssistant(VerticalBase):
     - Testing and verification
     - Git operations and version control
 
-    The CodingAssistant provides full integration with the framework
-    through extension protocols, enabling:
-    - Code correction middleware for validation
-    - Git safety checks for dangerous operations
-    - Task-type-specific prompt hints
-    - Mode configurations for different scenarios
-    - Tool dependency graph for intelligent selection
+    The definition layer is SDK-only. Runtime middleware, prompt contributors,
+    service providers, and other integrations are attached by the package root
+    runtime wrapper and shared host-side loaders.
 
     Example:
-        from victor.coding import CodingAssistant
+        from victor.verticals.contrib.coding.assistant import CodingAssistant
 
-        # Get vertical configuration
-        config = CodingAssistant.get_config()
-
-        # Get extensions for framework integration
-        extensions = CodingAssistant.get_extensions()
-
-        # Create agent with this vertical
-        agent = await Agent.create(
-            tools=config.tools,
-            vertical=CodingAssistant,
-        )
+        definition = CodingAssistant.get_definition()
+        prompt = definition.system_prompt
     """
 
     name = "coding"
     description = "Software development assistant for code exploration, writing, and refactoring"
     version = "2.0.0"  # Extension support
 
-    # =========================================================================
-    # Phase 3: Framework Capabilities
-    # =========================================================================
-    # Reuse framework capabilities to reduce code duplication
+    @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
 
-    # Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
+        return cls.name
 
-    # Framework prompt contributions (common hints like read_first, verify_changes)
-    _prompt_contrib = PromptContributionCapability()
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
 
-    # =========================================================================
-    # Extension Caching
-    # =========================================================================
-    # Individual extension caching is provided by VerticalBase._get_cached_extension()
-    # Composite extensions caching is provided by VerticalBase.get_extensions()
-    # Use clear_config_cache() to invalidate all caches.
+        return cls.description
 
     @classmethod
     def get_tools(cls) -> List[str]:
         """Get tools optimized for software development.
 
-        Phase 3: Uses framework FileOperationsCapability for common file operations
-        to reduce code duplication and maintain consistency across verticals.
-
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers, including the shared file-operation
+        tool group, so the definition layer does not need framework capability objects.
 
         Returns:
             List of tool names including filesystem, git, shell, and code tools.
         """
-        from victor.tools.tool_names import ToolNames
-
-        # Phase 3: Start with framework file operations (read, write, edit, grep)
-        # This reduces duplication and ensures consistency across verticals
-        tools = cls._file_ops.get_tool_list()
+        tools = list(ToolNames.file_operations())
 
         # Add coding-specific tools
         tools.extend(
@@ -155,6 +133,30 @@ class CodingAssistant(VerticalBase):
         )
 
         return tools
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the coding definition layer.
+
+        Returns:
+            Structured SDK capability requirements used by the runtime adapter.
+        """
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Read, write, and edit repository files.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.GIT,
+                optional=True,
+                purpose="Inspect and update repository state when git tooling is available.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.LSP,
+                optional=True,
+                purpose="Enable symbol, reference, and language-intelligence workflows.",
+            ),
+        ]
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -196,59 +198,72 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get coding-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
 
         Returns:
             Stage definitions optimized for software development workflow.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the coding request",
-                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW, ToolNames.GREP},
+                optional_tools=[
+                    ToolNames.READ,
+                    ToolNames.LS,
+                    ToolNames.OVERVIEW,
+                    ToolNames.GREP,
+                ],
                 keywords=["what", "how", "explain", "where", "show me"],
                 next_stages={"PLANNING", "READING"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning the implementation approach",
-                tools={ToolNames.GREP, ToolNames.PLAN, ToolNames.OVERVIEW, ToolNames.READ},
+                optional_tools=[
+                    ToolNames.GREP,
+                    ToolNames.PLAN,
+                    ToolNames.OVERVIEW,
+                    ToolNames.READ,
+                ],
                 keywords=["plan", "approach", "design", "architecture", "strategy"],
                 next_stages={"READING", "EXECUTION"},
             ),
             "READING": StageDefinition(
                 name="READING",
                 description="Reading code and gathering context",
-                tools={
+                optional_tools=[
                     ToolNames.READ,
                     ToolNames.CODE_SEARCH,
                     ToolNames.GREP,
                     ToolNames.LSP,
                     ToolNames.SYMBOL,
                     ToolNames.REFS,
-                },
+                ],
                 keywords=["read", "show", "find", "look", "check", "search"],
                 next_stages={"ANALYSIS", "EXECUTION"},
             ),
             "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Analyzing code structure and dependencies",
-                tools={ToolNames.LSP, ToolNames.SYMBOL, ToolNames.REFS, ToolNames.OVERVIEW},
+                optional_tools=[
+                    ToolNames.LSP,
+                    ToolNames.SYMBOL,
+                    ToolNames.REFS,
+                    ToolNames.OVERVIEW,
+                ],
                 keywords=["analyze", "review", "understand", "why", "how does"],
                 next_stages={"EXECUTION", "PLANNING"},
             ),
             "EXECUTION": StageDefinition(
                 name="EXECUTION",
                 description="Implementing changes",
-                tools={
+                optional_tools=[
                     ToolNames.WRITE,
                     ToolNames.EDIT,
                     ToolNames.SHELL,
                     ToolNames.GIT,
                     ToolNames.RENAME,
-                },
+                ],
                 keywords=[
                     "change",
                     "modify",
@@ -266,154 +281,43 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
             "VERIFICATION": StageDefinition(
                 name="VERIFICATION",
                 description="Testing and validating changes",
-                tools={ToolNames.SHELL, ToolNames.TEST, ToolNames.GIT, ToolNames.READ},
+                optional_tools=[
+                    ToolNames.SHELL,
+                    ToolNames.TEST,
+                    ToolNames.GIT,
+                    ToolNames.READ,
+                ],
                 keywords=["test", "verify", "check", "validate", "run", "build"],
                 next_stages={"COMPLETION", "EXECUTION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Committing and summarizing",
-                tools={ToolNames.GIT},
+                optional_tools=[ToolNames.GIT],
                 keywords=["done", "finish", "complete", "commit", "summarize"],
                 next_stages=set(),
             ),
         }
 
     @classmethod
-    def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
-        """Add coding-specific configuration.
+    def get_metadata(cls) -> Dict[str, Any]:
+        """Return coding-specific serializable metadata for the definition layer."""
 
-        Args:
-            config: Base configuration.
-
-        Returns:
-            Customized configuration.
-        """
-        config.metadata["supports_lsp"] = True
-        config.metadata["supports_git"] = True
-        config.metadata["max_file_size"] = 1_000_000  # 1MB
-        config.metadata["supported_languages"] = [
-            "python",
-            "typescript",
-            "javascript",
-            "rust",
-            "go",
-            "java",
-            "c",
-            "cpp",
-        ]
-        return config
-
-    # =========================================================================
-    # Extension Protocol Methods
-    # =========================================================================
-
-    @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
-        """Get coding-specific middleware (cached).
-
-        Returns:
-            List of middleware implementations
-        """
-
-        def _create_middleware() -> List[MiddlewareProtocol]:
-            from victor.verticals.contrib.coding.middleware import (
-                CodeCorrectionMiddleware,
-                GitSafetyMiddleware,
-            )
-
-            return [
-                CodeCorrectionMiddleware(enabled=True, auto_fix=True),
-                GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
-            ]
-
-        return cls._get_cached_extension("middleware", _create_middleware)
-
-    @classmethod
-    def get_service_provider(cls) -> Optional[ServiceProviderProtocol]:
-        """Get coding-specific service provider (cached).
-
-        Returns:
-            Service provider for DI registration
-        """
-        return cls._get_extension_factory("service_provider", "victor.coding.service_provider")
-
-    @classmethod
-    def get_composed_chains(cls) -> Dict[str, Any]:
-        """Get pre-built LCEL-composed tool chains (cached).
-
-        Provides LCEL composition chains for common coding tasks:
-        - explore_file: Read file and analyze symbols
-        - analyze_function: Get function details with references
-        - safe_edit: Edit with verification
-        - git_status: Parallel git state collection
-        - search_with_context: Code search with result context
-        - lint: Language-aware linting
-        - test_discovery: Find test files
-        - review_analysis: Parallel review data collection
-
-        Returns:
-            Dict mapping chain names to Runnable instances
-        """
-
-        def _create() -> Dict[str, Any]:
-            from victor.verticals.contrib.coding.composed_chains import CODING_CHAINS
-
-            return CODING_CHAINS
-
-        return cls._get_cached_extension("composed_chains", _create)
-
-    @classmethod
-    def get_personas(cls) -> Dict[str, Any]:
-        """Get persona definitions for team members (cached).
-
-        Provides rich persona definitions with:
-        - Expertise categories
-        - Communication styles
-        - Decision-making preferences
-        - Behavioral traits
-
-        Available personas:
-        - code_archaeologist: Deep code analysis expert
-        - security_auditor: Security-focused reviewer
-        - architect: Solution designer
-        - refactoring_strategist: Safe refactoring planner
-        - craftsman: Clean code implementer
-        - debugger: Bug hunting specialist
-        - quality_guardian: Code review expert
-        - test_specialist: Testing expert
-
-        Returns:
-            Dict mapping persona names to CodingPersona instances
-        """
-
-        def _create() -> Dict[str, Any]:
-            from victor.verticals.contrib.coding.teams import CODING_PERSONAS
-
-            return CODING_PERSONAS
-
-        return cls._get_cached_extension("personas", _create)
-
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get coding capability configurations for centralized storage.
-
-        Returns coding capability configurations for VerticalContext storage.
-        This replaces direct orchestrator attribute assignment patterns like:
-        - orchestrator.code_style = {...}
-        - orchestrator.test_config = {...}
-        - orchestrator.lsp_config = {...}
-
-        Returns:
-            Dict with coding capability configurations
-        """
-        from victor.verticals.contrib.coding.capabilities import get_capability_configs
-
-        return get_capability_configs()
-
-    # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
-    # Individual extension getters use _get_cached_extension() from VerticalBase.
-    # To clear all caches, use cls.clear_config_cache().
+        return {
+            "supports_lsp": True,
+            "supports_git": True,
+            "max_file_size": 1_000_000,
+            "supported_languages": [
+                "python",
+                "typescript",
+                "javascript",
+                "rust",
+                "go",
+                "java",
+                "c",
+                "cpp",
+            ],
+        }
 
 
 __all__ = ["CodingAssistant"]

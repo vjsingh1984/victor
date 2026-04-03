@@ -15,7 +15,7 @@
 """Tests for decorators module."""
 
 import pytest
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from unittest.mock import patch
 import logging
 
@@ -798,3 +798,62 @@ class TestDecoratorDrivenSemanticSelection:
         assert tool_obj.progress_params == []
         # Default execution category
         assert tool_obj.execution_category == ExecutionCategory.READ_ONLY
+
+
+class TestExecCtxSchemaExclusion:
+    """Tests for _exec_ctx being excluded from tool JSON schema."""
+
+    def test_exec_ctx_excluded_from_schema(self):
+        """_exec_ctx should not appear in tool JSON schema sent to LLM."""
+
+        @tool(name="test_tool_ctx_excl")
+        async def my_tool(query: str, _exec_ctx: Optional[Dict] = None):
+            """Test tool.
+
+            Args:
+                query: A query.
+                _exec_ctx: Execution context.
+            """
+            return {"result": query}
+
+        tool_obj = my_tool.Tool
+        assert "_exec_ctx" not in tool_obj.parameters.get("properties", {})
+        assert "_exec_ctx" not in tool_obj.parameters.get("required", [])
+        # query should still be present
+        assert "query" in tool_obj.parameters["properties"]
+
+    def test_exec_ctx_excluded_even_when_required(self):
+        """_exec_ctx should be excluded even if it has no default."""
+
+        @tool(name="test_tool_ctx_req")
+        async def my_tool(query: str, _exec_ctx: Dict):
+            """Test tool.
+
+            Args:
+                query: A query.
+                _exec_ctx: Execution context.
+            """
+            return {"result": query}
+
+        tool_obj = my_tool.Tool
+        assert "_exec_ctx" not in tool_obj.parameters.get("properties", {})
+        assert "_exec_ctx" not in tool_obj.parameters.get("required", [])
+
+    @pytest.mark.asyncio
+    async def test_exec_ctx_still_passed_to_function(self):
+        """_exec_ctx should still be forwarded by execute() even though not in schema."""
+
+        @tool(name="test_tool_ctx_pass")
+        async def my_tool(query: str, _exec_ctx: Optional[Dict] = None):
+            """Test tool.
+
+            Args:
+                query: A query.
+                _exec_ctx: Execution context.
+            """
+            return {"result": query, "had_ctx": _exec_ctx is not None}
+
+        tool_obj = my_tool.Tool
+        result = await tool_obj.execute({"settings": {}}, query="test")
+        assert result.success is True
+        assert result.output["had_ctx"] is True

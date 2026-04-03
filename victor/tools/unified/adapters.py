@@ -20,8 +20,11 @@ without changes, providing a smooth migration path.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
+
+from victor.core.async_utils import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -209,17 +212,11 @@ class ToolRegistryAdapter:
             tool = args[0]
 
             # Convert to UnifiedToolRegistry format
-            import asyncio
-
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Running in async context, create task
-                    asyncio.create_task(self._unified.register(tool, enabled=enabled))
-                else:
-                    # Not running, run in sync
-                    asyncio.run(self._unified.register(tool, enabled=enabled))
-
+                asyncio.get_running_loop()
+                asyncio.create_task(self._unified.register(tool, enabled=enabled))
+            except RuntimeError:
+                run_sync(self._unified.register(tool, enabled=enabled))
             except Exception as e:
                 logger.warning(f"Failed to register tool: {e}")
 
@@ -243,15 +240,12 @@ class ToolRegistryAdapter:
         Returns:
             True if removed
         """
-        import asyncio
-
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(self._unified.unregister(name))
-                return True  # Assume success for async
-            else:
-                return asyncio.run(self._unified.unregister(name))
+            asyncio.get_running_loop()
+            asyncio.create_task(self._unified.unregister(name))
+            return True  # Assume success for async
+        except RuntimeError:
+            return run_sync(self._unified.unregister(name))
         except Exception as e:
             logger.warning(f"Failed to unregister tool {name}: {e}")
             return False
@@ -265,15 +259,12 @@ class ToolRegistryAdapter:
         Returns:
             True if enabled
         """
-        import asyncio
-
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(self._unified.enable(name))
-                return True
-            else:
-                return asyncio.run(self._unified.enable(name))
+            asyncio.get_running_loop()
+            asyncio.create_task(self._unified.enable(name))
+            return True
+        except RuntimeError:
+            return run_sync(self._unified.enable(name))
         except Exception:
             return False
 
@@ -286,15 +277,12 @@ class ToolRegistryAdapter:
         Returns:
             True if disabled
         """
-        import asyncio
-
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(self._unified.disable(name))
-                return True
-            else:
-                return asyncio.run(self._unified.disable(name))
+            asyncio.get_running_loop()
+            asyncio.create_task(self._unified.disable(name))
+            return True
+        except RuntimeError:
+            return run_sync(self._unified.disable(name))
         except Exception:
             return False
 
@@ -367,9 +355,7 @@ def migrate_to_unified_registry() -> None:
     from victor.agent import shared_tool_registry
 
     shared_tool_registry.SharedToolRegistry = SharedToolRegistryAdapter
-    shared_tool_registry.SharedToolRegistry.get_instance = (
-        SharedToolRegistryAdapter.get_instance
-    )
+    shared_tool_registry.SharedToolRegistry.get_instance = SharedToolRegistryAdapter.get_instance
 
     # Note: ToolRegistry is typically instantiated per-session,
     # so we update it via __init__ instead

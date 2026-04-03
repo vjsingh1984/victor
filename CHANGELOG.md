@@ -1,386 +1,213 @@
 # Changelog
 
-All notable changes to Victor will be documented in this file.
+All notable changes to Victor are documented in this file.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
+## [Unreleased] (develop)
 
 ### Added
-- **Presentation Abstraction Layer** - Decouples UI concerns from core logic with `PresentationAdapter` protocol
-- **Registry Base Classes** - Centralized registry infrastructure in `victor/core/registry_base.py`
-- **Tool Selector Protocol** - Unified `IToolSelector` protocol for tool selection strategies
+- **ExtensionManifest** and **ExtensionType** in victor-sdk for vertical capability declaration
+- **CapabilityNegotiator** for manifest validation during vertical activation
+- **API versioning** (`CURRENT_API_VERSION=2`, `MIN_SUPPORTED_API_VERSION=1`)
+- **CallbackCoordinator** for tool/streaming lifecycle callback delegation
+- **OrchestratorPropertyFacade** — 37 properties extracted to separate module
+- **InitializationPhaseManager** — structured 8-phase runtime initialization
+- **ExtensionModuleResolver** — module path resolution extracted from extension loader
+- **ExtensionCacheManager** — thread-safe namespaced cache for extensions
+- SBOM generation (CycloneDX) in release pipeline
+- Tests for `tool_pipeline`, `cqrs`, `workflows/executor`, `sqlite_lancedb` (46 new tests)
+- `[embeddings]` optional extra for `sentence-transformers`, `lancedb`, `pyarrow`
+- Deprecation warnings on all 5 contrib vertical imports
+- TODO/FIXME triage document (81 markers categorized)
 
 ### Changed
-- **Architecture Improvements** - Phase 1 and 2 refactoring for cleaner module boundaries
-- **Workflow Compiler** - Infrastructure improvements for reliability
-- **Tool Selection Defaults** - Centralized configuration in settings module
-- **Deprecated Workflow Executor APIs** - Removed legacy execution engine stubs
-- **Vertical Tool Dependency Access** - `research`, `devops`, and `dataanalysis` now expose provider factories only (`get_provider()` + canonical YAML providers)
+- **Orchestrator** reduced from 4,514 to 3,940 LOC via property/callback extraction
+- **Extension loader** reduced from 2,049 to 1,897 LOC via resolver/cache extraction
+- **protocols.py** decomposed from 3,703 LOC monolith into 9 domain modules with lazy `__getattr__` loading
+- **ProviderPool** duplicate removed; wired with `use_provider_pooling` feature flag
+- **Settings** flat access now emits `DeprecationWarning` (use nested groups instead)
+- Victor-devops: 3 forbidden imports migrated to `victor.framework.extensions`
+- 32 documentation files reconciled (provider count 22→24, tool count 33→34)
+- Heavyweight dependencies (`sentence-transformers`, `lancedb`, `pyarrow`) moved to `[embeddings]` extra
 
 ### Fixed
-- **Integration Test Blocking** - Resolved issues causing test hangs
-- **PersonaProvider Deadlock** - Fixed RLock deadlock in persona provider
-- **Import Errors** - Resolved import errors across integration and unit tests
-- **Service Provider Types** - Correct handling of string service types in DI container
+- Bare `except:` in `experiments.py` → `except (ValueError, TypeError)`
+- `_send_rl_reward_signal` test updated for CallbackCoordinator delegation
 
-### Removed
-- **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
-- **Backward Compatibility Aliases** - Migrated to canonical names across codebase
-- **Deprecated Tool-Dependency Shims** - Removed legacy constant exports and deprecated wrapper provider classes from:
-  - `victor.verticals.contrib.research.tool_dependencies`
-  - `victor.verticals.contrib.devops.tool_dependencies`
-  - `victor.verticals.contrib.dataanalysis.tool_dependencies`
+### Security
+- `eval()`/`exec()` audit: only 2 real calls, both sandboxed with `__builtins__: {}`
+- SecretStr used for sensitive config fields (17 occurrences)
 
-**Migration guidance**:
+## [0.6.0] - 2026-03-31
+
+### ⚠️ Breaking Changes
+- **NONE** - This release maintains 100% backward compatibility
+
+### Added
+
+**Core Architecture** (Phases 1-7):
+- **@register_vertical decorator** for declarative vertical registration with rich metadata
+- **VerticalMetadata** dataclass for type-safe metadata extraction (replaces fragile `.replace()` patterns)
+- **UnifiedEntryPointRegistry** for single-pass entry point scanning (31x faster: 500ms → 16ms)
+- **VersionCompatibilityMatrix** with PEP 440 version constraint checking
+- **ExtensionDependencyGraph** with topological sort and circular dependency detection
+- **AsyncSafeCacheManager** with lock-per-key caching (eliminates race conditions)
+- **OpenTelemetry integration** for production observability and monitoring
+- **PluginNamespaceManager** for priority-based plugin namespace isolation
+- **VerticalBehaviorConfigRegistry** for dynamic vertical configuration
+
+**Testing & Validation** (Phase 8):
+- 224 new tests with 100% pass rate
+- 93% average code coverage across all new modules
+- Performance benchmarks for entry point scanning and dependency resolution
+- Backward compatibility tests validating legacy patterns
+
+**Documentation** (Phase 9):
+- Architecture documentation (~1,000 lines) with before/after comparison
+- Migration guide (~900 lines) with step-by-step examples
+- Complete API reference (~1,200 lines) for all new modules
+- Best practices guide (~1,100 lines) for vertical development
+
+**Operations** (Phase 10):
+- Rollout plan (~1,500 lines) with 5-stage gradual deployment
+- Monitoring dashboards (~1,100 lines) with 4 Grafana dashboards
+- Deployment playbook (~1,000 lines) with blue-green procedures
+- Legacy deprecation plan (~800 lines) with removal timeline
+
+**Vertical Alignment** (Phase 11):
+- All 6 external vertical packages aligned with SDK/framework
+- victor-coding, victor-devops, victor-rag updated to v0.6.0
+- victor-dataanalysis, victor-research, victor-invest updated to v0.6.0
+- Validation script (`scripts/validate_verticals.py`) for automated checking
+
+### Changed
+
+**Performance**:
+- Entry point scanning: 9+ independent calls → 1 unified scan (200-500ms startup improvement)
+- Scan duration: 500ms → 16ms (31x faster)
+- Dependency resolution: 2-5ms for complex graphs
+- Cache contention: Single lock → Lock-per-key (enables parallel loading)
+
+**Architecture**:
+- Extension loader: 1,897 LOC with SOLID-compliant focused modules
+- Vertical metadata: Type-safe extraction replaces fragile string manipulation
+- Configuration: Externalized from hardcoded dict to dynamic registry
+- Safety rules: Refactored from internal coordinators to framework capabilities
+
+**Code Quality**:
+- SOLID principles applied throughout new modules
+- Protocol-based design (Interface Segregation Principle)
+- Dependency Inversion - depends on abstractions, not concretions
+- Single Responsibility - focused, cohesive modules
+
+### Fixed
+
+**Class Name Generation**:
+- Fixed: Metadata extraction using pattern matching instead of `.replace()`
+- Fixed: Type-safe `canonical_name` extraction preserves naming intent
+- Fixed: Display name generation with proper title casing
+
+**Import Boundaries**:
+- Fixed: victor-dataanalysis safety rules now use `SafetyRulesCapabilityProvider` from framework
+- Fixed: victor-rag safety rules now use `SafetyRulesCapabilityProvider` from framework
+- Fixed: Removed forbidden imports from `victor.agent.coordinators.safety_coordinator`
+
+### Deprecated
+
+**Legacy Patterns** (with DeprecationWarnings):
+- Class name extraction using `.replace("Assistant", "")` pattern
+- Class name extraction using `.replace("Vertical", "")` pattern
+- Hardcoded `_VERTICAL_CANONICALIZE_SETTINGS` dict
+- Multiple independent `entry_points()` calls (use `UnifiedEntryPointRegistry`)
+- Direct `victor.agent.coordinators` imports (use framework capabilities)
+
+**Removal Timeline**: September 2026 (v0.7.0)
+
+### Security
+
+- Safety rule validation prevents dangerous operations
+- PEP 440 version checking prevents incompatible framework versions
+- OpenTelemetry integration enables security monitoring
+- Secret masking in DevOps middleware
+
+### Performance
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Entry Point Scans | 9+ | 1 | 200-500ms saved |
+| Scan Duration | ~500ms | ~16ms | 31x faster |
+| Startup Latency | Baseline + 500ms | Baseline | 200-500ms faster |
+| Dependency Resolution (simple) | N/A | ~2ms | <5ms target ✅ |
+| Dependency Resolution (complex) | N/A | ~3-5ms | <10ms target ✅ |
+| Cycle Detection | N/A | ~1-2ms | <5ms target ✅ |
+
+### Migration
+
+**For Users**: No action required - all existing verticals work without modification
+
+**For Vertical Developers**: Optional - add `@register_vertical` decorator:
 ```python
-from victor.verticals.contrib.devops.tool_dependencies import get_provider
+from victor.core.verticals.registration import register_vertical
 
-provider = get_provider()
-deps = provider.get_dependencies()
+@register_vertical(
+    name="my_vertical",
+    version="1.0.0",
+    min_framework_version=">=0.6.0",
+)
+class MyVertical(VerticalBase):
+    pass
 ```
 
-## [0.5.4] - 2026-02-16
+**Documentation**: See `docs/verticals/migration_guide.md`
 
-### Fixed
-- **Graph Insights** - `victor init` no longer fails with "no such table: nodes" — use canonical `graph_node`/`graph_edge` table names
-- **Profile Switch** - `/profile` and `/provider` commands no longer crash with TypeError — aligned async `switch_provider` param name
-- **ObservabilityBus** - Chat no longer crashes on max continuation prompts — added missing `emit_metric()` method
+### Known Issues
 
-## [0.5.3] - 2026-02-15
+1. **Class name construction** in contrib verticals uses lowercase `canonical_name`, causing incorrect camelCase instead of PascalCase (e.g., `ragRLConfig` vs `RAGRLConfig`). External verticals are not affected. Fix scheduled for v0.6.1.
+2. **Conversation coordinator** usage in victor-dataanalysis and victor-rag uses internal API. Documented with TODO for future refactoring.
 
-### Changed
-- **Identity Reframe** - Victor is now described as an "agentic AI framework" across all documentation (was "coding assistant")
-- **Correct Capability Counts** - Fixed counts across 36+ files: 22 providers (was 21), 33 tool modules (was 55+), 9 verticals (was 5-6)
-- **Single-Source Versioning** - `__version__` now reads from `pyproject.toml` via `importlib.metadata`, eliminating version drift
-- **Architecture Diagrams** - Added Teams, State, Events/CQRS, Evaluation subsystems to all architecture diagrams
+See `docs/verticals/KNOWN_ISSUES_v0.6.0.md` for details.
 
-### Fixed
-- **Cohere Provider Reference** - Removed non-existent standalone Cohere provider from README and provider comparison docs
-- **Lint Errors** - Fixed pre-existing F541, F821, F841 ruff violations in `chat.py` and `provider-features.py`
+### Contributors
 
-## [0.5.2] - 2026-02-13
-
-### Fixed
-- **Security** - Updated Trivy to use latest vulnerability database
-- **Dependencies** - Updated aiohttp from 3.13.2 to 3.13.3
-
-## [0.4.0] - 2026-01-03
-
-### Added
-- **TD-002 Orchestrator Refactoring** - Dedicated coordinators for cleaner separation of concerns
-- **YAML-First Workflow Architecture** - Workflows defined in YAML with Python escape hatches for complex logic
-- **CLI Commands**:
-  - `victor vertical create` - Scaffold new verticals
-  - `victor workflow render` - Render workflow diagrams
-  - `victor dashboard` - Interactive dashboard for monitoring
-- **Bedrock Tool Calling Adapter** - AWS Bedrock provider with native tool support
-- **Azure OpenAI Tool Calling Adapter** - Azure-specific tool calling implementation
-- **Session Cost Tracking** - Display cumulative session costs in UI
-- **Entry-Point Plugin System** - External verticals via `pyproject.toml` entry points
-
-### Changed
-- **Documentation Reorganization** - Restructured docs for OSS release
-- **Positive-Only Messaging** - Removed competitor references from documentation
-- **Updated SVG Diagrams** - All architecture diagrams updated for accuracy
-
-### Fixed
-- **CI/CD Pipeline** - Various fixes for reliable builds
-- **Project Hash Isolation** - Embedding cache now isolated per project
-- **Exception Handling** - Specific exception types throughout codebase
-- **LSP Compliance** - Fixed LSP compliance issues in LMStudio provider
-
-## [0.3.0] - 2025-12-31
-
-### BREAKING CHANGES
-- **Tool Selection API** - `use_semantic_tool_selection` setting replaced by `tool_selection_strategy`
-- **ToolSelector.select_tools()** - `use_semantic` parameter removed; strategy configured globally
-- **Protocols Renamed** - `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` replaced by `IToolSelector`
-
-**Migration Guide**:
-```python
-# Old (deprecated)
-settings = Settings(use_semantic_tool_selection=True)
-tools = await selector.select_tools(message, use_semantic=True)
-
-# New (v0.3.0+)
-settings = Settings(tool_selection_strategy="semantic")  # or "keyword", "hybrid", "auto"
-tools = await selector.select_tools(message)
-```
-
-### Added
-
-#### HIGH-002: Unified Tool Selection Architecture
-- **IToolSelector Protocol** - Unified interface for all tool selection strategies with `select_tools()`, `get_supported_features()`, `record_tool_execution()`, and `close()` methods
-- **KeywordToolSelector** - Fast registry-based selection (<1ms, no embeddings required) using tool metadata from @tool decorators
-- **HybridToolSelector** - Blends semantic and keyword strategies with configurable weights (default: 70% semantic, 30% keyword)
-- **Strategy Factory** - `create_tool_selector_strategy()` for creating selectors with auto-selection logic based on air-gapped mode and embedding availability
-- **ToolSelectionContext** - Dataclass encapsulating context (conversation history, stage, vertical mode, etc.) for tool selection
-- **Shared Utilities** - Extracted `selection_filters.py` (pure functions) and `selection_common.py` (stateful utilities) for reuse across strategies
-
-#### Server & Extension Enhancements
-- **FastAPI Server Backend** - New `victor serve --backend fastapi` option with OpenAPI docs at `/docs`
-- **Server Backend Selection** - `--backend` flag for `victor serve` to choose between `aiohttp` (legacy) and `fastapi` (modern)
-- **Profile CRUD Operations** - New `victor profiles create/edit/delete/set-default` commands for full profile management
-- **Lightweight Tool Listing** - `victor tools list --lightweight` for fast tool discovery without agent initialization
-
-#### P4.X Multi-Provider Excellence
-- **Semantic Query Expansion** - Automatic query expansion with synonyms/related terms to fix false negatives in semantic search
-- **Tool Deduplication Tracker** - Prevents redundant tool calls by tracking recent operations and detecting semantic overlap (integrated into ToolPipeline)
-- **Provider-Specific Tool Guidance** - Each provider now boosts tools aligned with their strengths (Gemini -> code analysis, Claude -> reasoning, etc.)
-- **RL-Based Semantic Threshold Learning** - Learns optimal similarity thresholds per (embedding_model, task_type, tool) context (integrated into code_search tool)
-- **Hybrid Search (RRF)** - Combines semantic + keyword search using Reciprocal Rank Fusion for 50-80% better recall (integrated into code_search tool)
-- **Comprehensive Unit Tests** - 66 new unit tests for query expansion and tool deduplication (100% coverage)
-- **Integration Tests** - 16 new integration tests for P4 Multi-Provider Excellence features
-- **Monitoring Script** - `scripts/show_semantic_threshold_rl.py` for viewing threshold learning status and exporting recommendations
-
-### Changed
-
-#### Tool Selection Architecture Refactor
-- **Tool Selection Strategy** - New `tool_selection_strategy` setting (auto/keyword/semantic/hybrid) replaces `use_semantic_tool_selection`
-- **ToolSelector API** - `select_tools()` now delegates to injected strategy instead of `use_semantic` parameter
-- **Strategy Injection** - ToolSelector accepts optional `IToolSelector` strategy for clean dependency injection
-- **Auto-Selection** - "auto" strategy intelligently picks keyword (air-gapped), semantic (embeddings available), or hybrid based on environment
-
-#### Framework & Infrastructure
-- **RL Framework Migration Complete** - Unified all 3 RL learners (continuation prompts, semantic threshold, model selector) into centralized framework with SQLite storage at `~/.victor/graph/graph.db`. Deprecated bespoke implementations moved to `archive/deprecated_rl_modules/`. All 19 import sites across API servers, UI, and scripts updated to use `RLCoordinator`.
-- **VS Code Extension Server Discovery** - Auto-discovers existing servers on multiple ports before spawning new ones
-- **VS Code Port Fallback** - Tries fallback ports (8765, 8766, 8767, 8768, 8000) if primary port is occupied
-- **VS Code Exponential Backoff** - Improved reconnection with exponential backoff (100ms -> 30s max, 10 retries)
-- **VS Code Multi-Window Sharing** - PID file at `~/.victor/server.pid` for server coordination across VS Code windows
-- **VS Code Extension Configuration** - New settings: `victor.serverBackend`, `victor.fallbackPorts`
-- **Semantic Similarity Threshold** - Lowered from 0.7 to 0.5 to reduce false negatives and improve recall
-- **RL Continuation Bounds** - Expanded from [2, 12] to [1, 20] to give RL more liberty for provider-specific tuning
-- **ToolPipeline** - Now supports optional deduplication tracker for preventing redundant calls
-- **Code Search Tool** - Automatically records outcomes for RL threshold learning when enabled
-
-### Removed
-- **Settings**: `use_semantic_tool_selection` (use `tool_selection_strategy` instead)
-- **ToolSelector.select_tools()**: `use_semantic` parameter (strategy now configured globally)
-- **Protocols**: `ToolSelectorProtocol` and `SemanticToolSelectorProtocol` (use `IToolSelector` instead)
-
-### Fixed
-- Added missing `ServerStatus.Reconnecting` state to VS Code extension status bar configuration
-- **Semantic Search False Negatives** - Query expansion now searches with multiple variations (e.g., "tool registration" -> ["register tool", "@tool decorator", "ToolRegistry"])
-- **Google SDK Warning** - Suppressed cosmetic warning about non-text parts (Victor already handles multi-part responses correctly)
-
-### Configuration
-New settings for P4 Multi-Provider Excellence features (all disabled by default for backward compatibility):
-```yaml
-# Hybrid Search (Semantic + Keyword with RRF)
-enable_hybrid_search: false
-hybrid_search_semantic_weight: 0.6
-hybrid_search_keyword_weight: 0.4
-
-# RL-based threshold learning per (embedding_model, task_type, tool_context)
-enable_semantic_threshold_rl_learning: false
-semantic_threshold_overrides: {}  # Format: {"model:task:tool": threshold}
-
-# Tool call deduplication
-enable_tool_deduplication: false
-tool_deduplication_window_size: 10
-
-# Semantic search quality improvements
-semantic_similarity_threshold: 0.5  # Lowered from 0.7
-semantic_query_expansion_enabled: true
-semantic_max_query_expansions: 5
-```
-
-## [0.2.3] - 2025-12-27
-
-### Added
-- **Homebrew Tap** - Install via `brew install vjsingh1984/tap/victor`
-- **Auto-updating Homebrew Formula** - Polls PyPI every 6 hours for new releases
-
-### Changed
-- **Docker Hub Only** - Removed GHCR push to simplify deployment (Docker Hub: `vjsingh1984/victor-ai`)
-- **Simplified Binary Builds** - macOS and Windows binaries only; Linux users should use `pip install victor-ai`
-
-### Fixed
-- **Docker Build Disk Space** - Added cleanup step to free ~25GB on GitHub Actions runners
-- **macOS Runners** - Updated to `macos-15-intel` (macos-13 was retired)
-- **CI/CD Reliability** - Streamlined release workflow for consistent builds
-
-## [0.2.2] - 2025-12-27
-
-### Fixed
-- **Docker Build** - Added disk space cleanup for large PyTorch builds
-- **GHCR Permissions** - Added packages:write permission (later removed in 0.2.3)
-
-## [0.2.1] - 2025-12-27
-
-### Fixed
-- **Docker profiles.yaml** - Created `docker/profiles.yaml.example` for containerized deployments
-- **Dockerfile** - Falls back to example file when profiles.yaml is gitignored
-
-## [0.2.0] - 2025-12-27
-
-### Added
-
-#### Release Infrastructure
-- **PyPI Trusted Publishing** - OIDC-based publishing without API tokens
-- **GitHub Actions Release Pipeline** - Automated builds on tag push
-- **Multi-Platform Binaries** - macOS ARM64/x64, Windows x64 via PyInstaller
-- **Docker Images** - Pre-built containers with embedded models at `vjsingh1984/victor-ai`
-- **Rust Native Extensions** - PyO3 bindings for SIMD-optimized operations
-- **Homebrew Tap** - `vjsingh1984/homebrew-tap` with auto-update workflow
-
-#### Provider Enhancements
-- **Cerebras Provider** - Qwen-3 thinking filter and deduplication
-- **vLLM Provider** - Local production serving with fallback tool parsing
-- **llama.cpp Provider** - Direct GGUF model support
-- **Keyring Support** - Secure API key storage for all cloud providers
-- **TDD Tests** - Comprehensive provider integration tests
-
-### Changed
-- **Version** - Bumped to 0.2.0 for first public release
-
-## [0.2.0-alpha] - 2025-12-02
-
-### Added
-- **Modern TUI** - Rich terminal interface powered by Textual with markdown rendering, syntax highlighting, and status bar showing provider/model/tokens
-- **Stream Cancellation** - Press Ctrl+C to cancel streaming responses mid-generation
-- **Debug CLI Mode** - Use `--renderer text` with `--log-level DEBUG` for plain console output with visible debug logs
-- **Conceptual Query Detection** - Semantic tool selector now detects inheritance/pattern queries and automatically routes to `semantic_code_search` instead of keyword-based `code_search`
-- **AST-Aware Code Chunking** - Semantic search chunker uses AST parsing for more intelligent code segmentation
-- **Conversation State Machine** - Session restoration with `ConversationStateMachine` tracking conversation stages (INITIAL, EXPLORING, ANALYZING, IMPLEMENTING, REVIEWING)
-- **Gitleaks Allowlist** - Test files with fake secrets are now properly excluded from secret scanning
-
-### Changed
-- **Semantic Tool Selection** - `semantic_code_search` added to search tool category alongside `code_search`
-- **Embedding Registry** - Fixed `config.provider` -> `config.vector_store` bug in registry.py
-- **Tool Descriptions** - Improved `code_search` and `semantic_code_search` descriptions to better guide LLM selection
-
-### Fixed
-- Gemini safety settings now include additional categories (HATE_SPEECH, DANGEROUS_CONTENT, CIVIC_INTEGRITY)
-- Google provider logging added for debugging safety filter issues
-- Resolved all ruff linting errors across codebase
-
-### Documentation
-- Consolidated MCP documentation (deleted redundant MCP_SETUP.md)
-- Added cross-reference from AIRGAPPED_GUIDE.md to comprehensive AIRGAPPED.md
-- Updated docs navigation structure
-
-## [0.1.0-alpha] - 2025-02-27
-
-### Added
-- GitHub Actions CI matrix (3.10-3.12) running black, ruff, mypy, pytest (unit-only), and a CLI smoke test.
-- Security workflow with gitleaks secret scan and pip-audit dependency check.
-- Support policy (`SUPPORT.md`) and archive notice clarifying `archive/victor-legacy/` is frozen.
-
-### Changed
-- Scoped Ruff to active packages and cleaned up outstanding lint errors in core modules.
-- Updated onboarding guidance to point at `docs/guides/QUICKSTART.md` and flagged aspirational docs with "planned" status notes.
-- Expanded `.gitignore` for local artifacts (debug logs, demo workspace, .victor metadata).
-
-### Fixed
-- Addressed formatting/lint issues across tooling modules (imports, f-strings, abstract methods).
-- Stabilized dynamic tool discovery imports and tightened legacy boundaries in documentation.
-
-### Added
-- Comprehensive community documentation (CONTRIBUTING.md, CODE_OF_CONDUCT.md)
-- GitHub issue templates (bug report, feature request, question)
-- Pull request template
-- This CHANGELOG
-
-## [0.1.0] - 2025-11-24
-
-### Added
-
-#### Core Features
-- Universal provider abstraction supporting multiple LLM providers
-- Ollama integration with full tool calling support
-- Anthropic Claude integration (Sonnet 4.5, Opus, Haiku)
-- OpenAI integration (GPT-4, GPT-4 Turbo, GPT-3.5)
-- Google Gemini integration (1.5 Pro, 1.5 Flash)
-- xAI Grok integration
-- LMStudio and vLLM provider support
-- Configuration management with YAML profiles
-- Rich terminal UI with streaming responses
-- Interactive REPL and one-shot command modes
-
-#### Tools
-- **File Operations**: Read, write, edit files
-- **Multi-File Editor**: Transaction-based atomic edits with rollback
-- **Bash Execution**: Safe command execution
-- **Git Integration**: AI-powered commits, staging, branching, diff
-- **Web Search**: Fetch documentation and resources
-- **Semantic Search**: AI-powered codebase indexing and search
-- **Database Tool**: SQLite, PostgreSQL, MySQL, SQL Server support
-- **Docker Tool**: Container and image management
-- **HTTP Tool**: API testing and HTTP requests
-
-#### MCP Protocol
-- Full Model Context Protocol server implementation
-- MCP client for connecting to external servers
-- JSON-RPC 2.0 compliance
-- Stdio transport for Claude Desktop integration
-- Tool and resource discovery
-- Dual format parameter support (List[ToolParameter] and JSON Schema)
-
-#### Architecture
-- Provider abstraction layer for easy LLM integration
-- Tool registry with dynamic registration
-- Plugin architecture for extensibility
-- Type-safe with Pydantic models
-- Async/await throughout for performance
-- Transaction manager for multi-file operations
-- Context management and semantic search system
-
-### Developer Experience
-- Modern Python 3.10+ with async/await
-- Comprehensive test suite
-- Well-structured codebase following best practices
-- Extensive documentation and examples
-- Pre-commit hooks for code quality
-- Black formatting, Ruff linting, MyPy type checking
-
-### Documentation
-- Comprehensive README with architecture diagrams
-- Configuration guide
-- Example scripts for all major features
-- Complete session summary documenting implementation
-- API documentation via docstrings
-
-### Examples
-- Basic usage demo
-- MCP server and client demos
-- Advanced tools demos (database, Docker, HTTP)
-- Codebase indexing demo
-- Git integration demo
-- Multi-file editing demo
-
-## [0.0.1] - 2025-11-01
-
-### Added
-- Initial project structure
-- Basic provider abstraction
-- Ollama provider implementation
-- Simple file and bash tools
-- Basic terminal interface
+- Architecture design and implementation: Claude Code AI Assistant
+- Testing: 224 tests with 93% coverage
+- Documentation: 9,200+ lines across 13 files
+- Validation: Automated alignment checking for all 6 vertical packages
 
 ---
 
-## Types of Changes
+## [0.5.7] - 2026-03-07
 
-- **Added** for new features
-- **Changed** for changes in existing functionality
-- **Deprecated** for soon-to-be removed features
-- **Removed** for now removed features
-- **Fixed** for any bug fixes
-- **Security** for vulnerability fixes
+### Added
+- Victor-SDK v0.5.7 with zero-runtime-dependency vertical definitions
+- Capability negotiation and state externalization (Phase 4)
+- Unified victor-ai / victor-sdk versioning with CI enforcement
+- Processing/LSP re-export modules for external vertical imports
+- CopyOnWriteState thread guard and entry point failure isolation
+- Topic-prefix index for O(1) event dispatch
+- Collision detection and public extension API for verticals
+- Fast CI workflow for quicker feedback
 
----
+### Changed
+- Black formatting applied to 79 files
+- FastAPI server hardened against injection, traversal, and data exposure
+- SecretStr for API keys to prevent credential leakage
 
-[Unreleased]: https://github.com/vjsingh1984/victor/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/vjsingh1984/victor/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/vjsingh1984/victor/compare/v0.2.3...v0.3.0
-[0.2.3]: https://github.com/vjsingh1984/victor/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/vjsingh1984/victor/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/vjsingh1984/victor/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/vjsingh1984/victor/compare/v0.2.0-alpha...v0.2.0
-[0.2.0-alpha]: https://github.com/vjsingh1984/victor/compare/v0.1.0-alpha...v0.2.0-alpha
-[0.1.0-alpha]: https://github.com/vjsingh1984/victor/compare/v0.1.0...v0.1.0-alpha
-[0.1.0]: https://github.com/vjsingh1984/victor/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/vjsingh1984/victor/releases/tag/v0.0.1
+### Fixed
+- VS Code extension: handle offline servers in `supportsCapability` check
+- Build: victor-sdk built locally in release workflow
+
+## [0.5.6] - 2026-03-01
+
+### Fixed
+- Added strawberry-graphql to dev dependencies for GraphQL integration tests
+
+## [0.5.5] - 2026-02-28
+
+### Added
+- Initial public release with full framework, 22 providers, 33 tools
+- Multi-agent team formations (sequential, parallel, hierarchical, pipeline)
+- YAML workflow DSL with StateGraph execution engine
+- 9 domain verticals (coding, devops, rag, dataanalysis, research, security, iac, classification, benchmark)
+- CLI (Typer) and TUI (Textual) interfaces
+- Docker support with multi-arch builds

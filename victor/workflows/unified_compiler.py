@@ -53,7 +53,6 @@ import hashlib
 import json
 import logging
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -70,6 +69,12 @@ from typing import (
     Type,
     TypeVar,
     Union,
+)
+
+from victor.workflows.executors.compatibility import CompatibilityNodeExecutorFactory
+from victor.workflows.runtime_types import (
+    GraphNodeResult as NodeExecutionResult,
+    create_initial_workflow_state,
 )
 
 if TYPE_CHECKING:
@@ -95,7 +100,6 @@ if TYPE_CHECKING:
     from victor.workflows.graph_compiler import (
         CompilerConfig,
         WorkflowGraphCompiler,
-        WorkflowDefinitionCompiler,
     )
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
@@ -138,934 +142,85 @@ class UnifiedCompilerConfig:
     enable_checkpointing: bool = True
 
 
-# =============================================================================
-# Node Execution Result
-# =============================================================================
-
-
-@dataclass
-class NodeExecutionResult:
-    """Result from executing a workflow node.
-
-    Attributes:
-        node_id: ID of the executed node
-        success: Whether execution succeeded
-        output: Output data from the node
-        error: Error message if failed
-        duration_seconds: Execution time
-        tool_calls_used: Number of tool calls made
-    """
-
-    node_id: str
-    success: bool
-    output: Any = None
-    error: Optional[str] = None
-    duration_seconds: float = 0.0
-    tool_calls_used: int = 0
+# `NodeExecutionResult` remains exported here as a deprecated compatibility alias.
 
 
 # =============================================================================
-# Node Executor Factory (DRY Consolidation)
+# Shared Factory Compatibility
 # =============================================================================
 
 
-class NodeExecutorFactory:
-    """Factory for creating node executors (DRY consolidation).
-
-    Extracts common node execution logic from all compilers into shared
-    factory methods. This eliminates code duplication across:
-    - WorkflowGraphCompiler
-    - YAMLToStateGraphCompiler
-    - WorkflowDefinitionCompiler
-
-    Example:
-        factory = NodeExecutorFactory(orchestrator, tool_registry)
-        executor = factory.create_executor(node)
-        new_state = await executor(current_state)
-    """
+class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
+    """Compatibility shim over the canonical workflow node executor factory."""
 
     def __init__(
         self,
         orchestrator: Optional["AgentOrchestrator"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         runner_registry: Optional["NodeRunnerRegistry"] = None,
-        emitter: Optional[Any] = None,  # ObservabilityEmitter
+        emitter: Optional[Any] = None,
     ):
-        """Initialize the factory.
-
-        Args:
-            orchestrator: Agent orchestrator for executing agent nodes
-            tool_registry: Tool registry for executing compute nodes
-            runner_registry: Optional NodeRunner registry for unified execution
-            emitter: Optional ObservabilityEmitter for streaming events
-        """
-        self.orchestrator = orchestrator
-        self.tool_registry = tool_registry
+        super().__init__(
+            orchestrator=orchestrator,
+            tool_registry=tool_registry,
+        )
         self._runner_registry = runner_registry
         self._emitter = emitter
-
-        # Keys that need deep copy for isolation in parallel execution
         self._mutable_state_keys = frozenset(
             {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
         )
 
     def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Create an isolated copy of state for parallel execution.
-
-        Uses selective copying strategy:
-        - Shallow copy for most keys (user data assumed immutable)
-        - Deep copy only for internal mutable tracking structures
-
-        This is significantly faster than full deepcopy while maintaining
-        isolation for parallel node execution.
-
-        Args:
-            state: Current workflow state
-
-        Returns:
-            Isolated state copy for child node execution
-        """
-        # Start with shallow copy
         child_state = dict(state)
-
-        # Deep copy only mutable internal structures
         for key in self._mutable_state_keys:
             if key in child_state:
                 child_state[key] = copy.deepcopy(child_state[key])
-
         return child_state
+
+    def register_executor_type(
+        self,
+        node_type: str,
+        executor_class: Any,
+        *,
+        replace: bool = False,
+    ) -> None:
+        self._delegate.register_executor_type(node_type, executor_class, replace=replace)
 
     def create_executor(
         self,
         node: "WorkflowNode",
     ) -> Callable[[Dict[str, Any]], Any]:
-        """Create an executor function for a workflow node.
+        original_resolver = self._delegate._resolve_execution_context
+        self._delegate._resolve_execution_context = self._resolve_execution_context
+        try:
+            return self._delegate.create_executor(node)
+        finally:
+            self._delegate._resolve_execution_context = original_resolver
 
-        Args:
-            node: The workflow node to create an executor for
+    def create_agent_executor(self, node: "AgentNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
 
-        Returns:
-            Async callable that takes state and returns updated state
-        """
-        from victor.workflows.definition import (
-            AgentNode,
-            ComputeNode,
-            ConditionNode,
-            ParallelNode,
-            TransformNode,
-            TeamNodeWorkflow,
-        )
+    def create_compute_executor(self, node: "ComputeNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
 
-        if isinstance(node, AgentNode):
-            return self.create_agent_executor(node)
-        elif isinstance(node, ComputeNode):
-            return self.create_compute_executor(node)
-        elif isinstance(node, ConditionNode):
-            return self.create_condition_router(node)
-        elif isinstance(node, ParallelNode):
-            return self.create_parallel_executor(node)
-        elif isinstance(node, TransformNode):
-            return self.create_transform_executor(node)
-        elif isinstance(node, TeamNodeWorkflow):
-            return self.create_team_executor(node)
-        else:
-            return self._create_passthrough_executor(node)
-
-    def create_agent_executor(
-        self,
-        node: "AgentNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create executor for an AgentNode.
-
-        Spawns a sub-agent with the specified role and goal to process
-        the task using LLM inference and tool execution.
-
-        If the node has a retry_policy configured, the execution will
-        automatically retry on failure with exponential backoff.
-
-        If the node has a timeout_seconds configured, the execution will
-        be cancelled if it exceeds the timeout.
-        """
-        orchestrator = self.orchestrator
-        emitter = self._emitter
-        retry_policy = node.retry_policy
-        timeout_seconds = node.timeout_seconds
-
-        async def execute_agent(state: Dict[str, Any]) -> Dict[str, Any]:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-            node_name = node.name
-
-            # Emit NODE_START if emitter is configured
-            if emitter and hasattr(emitter, "emit_node_start"):
-                emitter.emit_node_start(node.id, node_name)
-
-            try:
-                # Build input context from input_mapping
-                input_context = {}
-                for param_name, context_key in node.input_mapping.items():
-                    if context_key in state:
-                        input_context[param_name] = state[context_key]
-
-                # Build the goal with context substitution
-                goal = node.goal
-                for key, value in state.items():
-                    if not key.startswith("_"):
-                        goal = goal.replace(f"${{{key}}}", str(value))
-                        goal = goal.replace(f"$ctx.{key}", str(value))
-
-                if orchestrator is None:
-                    # Fallback: store placeholder result
-                    logger.warning(
-                        f"No orchestrator available for agent node '{node.id}', "
-                        "using placeholder execution"
-                    )
-                    output = {
-                        "node_id": node.id,
-                        "role": node.role,
-                        "goal": goal,
-                        "status": "placeholder",
-                        "input_context": input_context,
-                    }
-                else:
-                    # Execute via SubAgentOrchestrator
-                    from victor.agent.subagents import (
-                        SubAgentOrchestrator,
-                        SubAgentRole,
-                    )
-
-                    # Map role string to SubAgentRole enum
-                    role_map = {
-                        "researcher": SubAgentRole.RESEARCHER,
-                        "planner": SubAgentRole.PLANNER,
-                        "executor": SubAgentRole.EXECUTOR,
-                        "reviewer": SubAgentRole.REVIEWER,
-                        "writer": SubAgentRole.WRITER,
-                        "analyst": SubAgentRole.RESEARCHER,  # Alias
-                    }
-                    role = role_map.get(node.role.lower(), SubAgentRole.EXECUTOR)
-
-                    # Create sub-agent orchestrator
-                    sub_orchestrator = SubAgentOrchestrator(orchestrator)
-
-                    # Create the coroutine for execution
-                    async def _run_sub_agent():
-                        return await sub_orchestrator.execute_task(
-                            role=role,
-                            task=goal,
-                            context=input_context,
-                            tool_budget=node.tool_budget,
-                            allowed_tools=node.allowed_tools,
-                        )
-
-                    # Execute with timeout if configured
-                    if timeout_seconds:
-                        try:
-                            result = await asyncio.wait_for(
-                                _run_sub_agent(),
-                                timeout=timeout_seconds,
-                            )
-                        except asyncio.TimeoutError:
-                            duration = time.time() - start_time
-                            error_msg = (
-                                f"Agent node '{node.id}' timed out after " f"{timeout_seconds}s"
-                            )
-                            logger.warning(error_msg)
-                            state["_error"] = error_msg
-                            state["_timeout"] = True
-                            if "_node_results" not in state:
-                                state["_node_results"] = {}
-                            state["_node_results"][node.id] = NodeExecutionResult(
-                                node_id=node.id,
-                                success=False,
-                                error=error_msg,
-                                duration_seconds=duration,
-                            )
-                            if emitter and hasattr(emitter, "emit_node_error"):
-                                emitter.emit_node_error(
-                                    node.id,
-                                    error=error_msg,
-                                    node_name=node_name,
-                                    duration=duration,
-                                )
-                            return state
-                    else:
-                        result = await _run_sub_agent()
-
-                    output = {
-                        "response": result.response if result else None,
-                        "success": result.success if result else False,
-                        "tool_calls": result.tool_calls_used if result else 0,
-                    }
-
-                # Store output in state
-                output_key = node.output_key or node.id
-                state[output_key] = output
-
-                # Update node results
-                duration = time.time() - start_time
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_COMPLETE if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_complete"):
-                    emitter.emit_node_complete(
-                        node.id,
-                        node_name,
-                        duration=duration,
-                        output=output,
-                    )
-
-            except Exception as e:
-                logger.error(f"Agent node '{node.id}' failed: {e}", exc_info=True)
-                duration = time.time() - start_time
-                state["_error"] = f"Agent node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_ERROR if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_error"):
-                    emitter.emit_node_error(
-                        node.id,
-                        error=str(e),
-                        node_name=node_name,
-                        duration=duration,
-                    )
-
-            return state
-
-        # Wrap with retry if policy is configured
-        if retry_policy:
-            from victor.workflows.resilience import (
-                retry_policy_to_strategy,
-                RetryExecutor,
-            )
-
-            strategy = retry_policy_to_strategy(retry_policy)
-            retry_executor = RetryExecutor(strategy)
-
-            async def execute_agent_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
-                """Wrapper that applies retry policy to agent execution."""
-                result = await retry_executor.execute_async(lambda: execute_agent(state))
-                if result.success:
-                    return result.result
-                else:
-                    # Return last state with error info
-                    state = dict(state)
-                    state["_retry_exhausted"] = True
-                    state["_retry_attempts"] = result.attempts
-                    state["_error"] = (
-                        f"Agent node '{node.id}' failed after {result.attempts} attempts"
-                    )
-                    if emitter and hasattr(emitter, "emit_node_error"):
-                        emitter.emit_node_error(
-                            node.id,
-                            error=f"Retry exhausted after {result.attempts} attempts",
-                            node_name=node.name,
-                            duration=0,
-                        )
-                    return state
-
-            return execute_agent_with_retry
-
-        return execute_agent
-
-    def create_compute_executor(
-        self,
-        node: "ComputeNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create executor for a ComputeNode.
-
-        Executes tools directly without LLM inference, using registered
-        handlers for domain-specific logic.
-
-        If the node has a retry_policy configured, the execution will
-        automatically retry on failure with exponential backoff.
-        """
-        tool_registry = self.tool_registry
-        emitter = self._emitter
-        retry_policy = node.retry_policy
-
-        async def execute_compute(state: Dict[str, Any]) -> Dict[str, Any]:
-            start_time = time.time()
-            state = dict(state)  # Make mutable copy
-            tool_calls_used = 0
-            node_name = node.name
-
-            # Emit NODE_START if emitter is configured
-            if emitter and hasattr(emitter, "emit_node_start"):
-                emitter.emit_node_start(node.id, node_name)
-
-            try:
-                # Build params from input_mapping
-                params = {}
-                for param_name, context_key in node.input_mapping.items():
-                    # Handle $ctx.key syntax
-                    if isinstance(context_key, str) and context_key.startswith("$ctx."):
-                        context_key = context_key[5:]
-                    if context_key in state:
-                        params[param_name] = state[context_key]
-                    else:
-                        params[param_name] = context_key
-
-                # Check for custom handler
-                if node.handler:
-                    from victor.workflows.executor import get_compute_handler
-
-                    handler = get_compute_handler(node.handler)
-                    if handler:
-                        # Create minimal WorkflowContext wrapper
-                        from victor.workflows.executor import WorkflowContext
-
-                        context = WorkflowContext(dict(state))
-                        result = await handler(node, context, tool_registry)
-
-                        # Transfer context changes back to state
-                        for key, value in context.data.items():
-                            if not key.startswith("_"):
-                                state[key] = value
-
-                        output = result.output if result else None
-                        tool_calls_used = result.tool_calls_used if result else 0
-                    else:
-                        logger.warning(f"Handler '{node.handler}' not found for node '{node.id}'")
-                        output = {"error": f"Handler '{node.handler}' not found"}
-                else:
-                    # Execute tools directly
-                    outputs = {}
-                    if tool_registry and node.tools:
-                        for tool_name in node.tools:
-                            # Check constraints
-                            if not node.constraints.allows_tool(tool_name):
-                                logger.debug(f"Tool '{tool_name}' blocked by constraints")
-                                continue
-
-                            try:
-                                result = await asyncio.wait_for(
-                                    tool_registry.execute(
-                                        tool_name,
-                                        _exec_ctx={
-                                            "workflow_context": state,
-                                            "constraints": node.constraints.to_dict(),
-                                        },
-                                        **params,
-                                    ),
-                                    timeout=node.constraints.timeout,
-                                )
-                                tool_calls_used += 1
-
-                                if result.success:
-                                    outputs[tool_name] = result.output
-                                else:
-                                    outputs[tool_name] = {"error": result.error}
-
-                                if node.fail_fast and not result.success:
-                                    break
-
-                            except asyncio.TimeoutError:
-                                outputs[tool_name] = {"error": "Timeout"}
-                                if node.fail_fast:
-                                    break
-                            except Exception as e:
-                                outputs[tool_name] = {"error": str(e)}
-                                if node.fail_fast:
-                                    break
-                    else:
-                        outputs = {"status": "no_tools_executed", "params": params}
-
-                    output = outputs
-
-                # Store output in state
-                output_key = node.output_key or node.id
-                state[output_key] = output
-
-                # Update node results
-                duration = time.time() - start_time
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=True,
-                    output=output,
-                    duration_seconds=duration,
-                    tool_calls_used=tool_calls_used,
-                )
-
-                # Emit NODE_COMPLETE if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_complete"):
-                    emitter.emit_node_complete(
-                        node.id,
-                        node_name,
-                        duration=duration,
-                        output=output,
-                    )
-
-            except Exception as e:
-                logger.error(f"Compute node '{node.id}' failed: {e}", exc_info=True)
-                duration = time.time() - start_time
-                state["_error"] = f"Compute node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=duration,
-                    tool_calls_used=tool_calls_used,
-                )
-
-                # Emit NODE_ERROR if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_error"):
-                    emitter.emit_node_error(
-                        node.id,
-                        error=str(e),
-                        node_name=node_name,
-                        duration=duration,
-                    )
-
-            return state
-
-        # Wrap with retry if policy is configured
-        if retry_policy:
-            from victor.workflows.resilience import (
-                retry_policy_to_strategy,
-                RetryExecutor,
-            )
-
-            strategy = retry_policy_to_strategy(retry_policy)
-            retry_executor = RetryExecutor(strategy)
-
-            async def execute_compute_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
-                """Wrapper that applies retry policy to compute execution."""
-                result = await retry_executor.execute_async(lambda: execute_compute(state))
-                if result.success:
-                    return result.result
-                else:
-                    # Return last state with error info
-                    state = dict(state)
-                    state["_retry_exhausted"] = True
-                    state["_retry_attempts"] = result.attempts
-                    state["_error"] = (
-                        f"Compute node '{node.id}' failed after {result.attempts} attempts"
-                    )
-                    if emitter and hasattr(emitter, "emit_node_error"):
-                        emitter.emit_node_error(
-                            node.id,
-                            error=f"Retry exhausted after {result.attempts} attempts",
-                            node_name=node.name,
-                            duration=0,
-                        )
-                    return state
-
-            return execute_compute_with_retry
-
-        return execute_compute
-
-    def create_condition_router(
-        self,
-        node: "ConditionNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create a router function for a condition node.
-
-        The router evaluates the condition and returns the state unchanged.
-        Routing is handled by conditional edges in the graph.
-        """
-
-        async def condition_exec(state: Dict[str, Any]) -> Dict[str, Any]:
-            state = dict(state)
-            if "_node_results" not in state:
-                state["_node_results"] = {}
-            state["_node_results"][node.id] = NodeExecutionResult(
-                node_id=node.id,
-                success=True,
-                output={"passthrough": True},
-            )
-            return state
-
-        return condition_exec
+    def create_condition_router(self, node: "ConditionNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
 
     def create_parallel_executor(
         self,
         node: "ParallelNode",
         child_nodes: Optional[List["WorkflowNode"]] = None,
     ) -> Callable[[Dict[str, Any]], Any]:
-        """Create executor for a ParallelNode.
+        return self.create_executor(node)
 
-        Executes child nodes in true parallel using asyncio.gather().
-        Each parallel branch gets an independent state copy.
+    def create_transform_executor(self, node: "TransformNode") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
 
-        Args:
-            node: The ParallelNode definition
-            child_nodes: Optional list of child node definitions
-        """
-        factory = self
-        emitter = self._emitter
+    def create_team_executor(self, node: "TeamNodeWorkflow") -> Callable[[Dict[str, Any]], Any]:
+        return self.create_executor(node)
 
-        # Pre-create executors for child nodes if provided
-        child_executors = []
-        if child_nodes:
-            for child in child_nodes:
-                child_executors.append((child, factory.create_executor(child)))
-
-        async def execute_parallel(state: Dict[str, Any]) -> Dict[str, Any]:
-            start_time = time.time()
-            state = dict(state)
-            node_name = node.name
-
-            # Emit NODE_START if emitter is configured
-            if emitter and hasattr(emitter, "emit_node_start"):
-                emitter.emit_node_start(node.id, node_name)
-
-            if "_parallel_results" not in state:
-                state["_parallel_results"] = {}
-
-            try:
-                if child_executors:
-                    # Execute all child nodes in true parallel with asyncio.gather
-                    async def run_child(child_node: "WorkflowNode", executor: Callable) -> tuple:
-                        # Use selective copy instead of full deepcopy for performance
-                        # Shallow copies most keys, deep copies only mutable internal structures
-                        child_state = factory._copy_state_for_parallel(state)
-                        try:
-                            result_state = await executor(child_state)
-                            return (child_node.id, True, result_state)
-                        except Exception as e:
-                            return (child_node.id, False, str(e))
-
-                    # Create tasks for all children
-                    tasks = [run_child(child, executor) for child, executor in child_executors]
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                    # Process results
-                    for result in results:
-                        if isinstance(result, Exception):
-                            logger.error(f"Parallel execution failed: {result}")
-                            continue
-
-                        child_id, success, result_data = result
-                        if success and isinstance(result_data, dict):
-                            # Merge state changes from parallel execution
-                            for key, value in result_data.items():
-                                if not key.startswith("_"):
-                                    state[key] = value
-                            state["_parallel_results"][child_id] = {
-                                "success": True,
-                                "output": result_data.get(child_id),
-                            }
-                        else:
-                            state["_parallel_results"][child_id] = {
-                                "success": False,
-                                "error": str(result_data),
-                            }
-
-                # Apply join strategy
-                if node.join_strategy == "all":
-                    all_success = all(
-                        r.get("success", False) for r in state["_parallel_results"].values()
-                    )
-                    if not all_success:
-                        state["_error"] = "Not all parallel nodes succeeded"
-                elif node.join_strategy == "any":
-                    any_success = any(
-                        r.get("success", False) for r in state["_parallel_results"].values()
-                    )
-                    if not any_success:
-                        state["_error"] = "No parallel nodes succeeded"
-
-                # Record parallel node result
-                duration = time.time() - start_time
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success="_error" not in state,
-                    output=state["_parallel_results"],
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_COMPLETE if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_complete"):
-                    emitter.emit_node_complete(
-                        node.id,
-                        node_name,
-                        duration=duration,
-                        output=state["_parallel_results"],
-                    )
-
-            except Exception as e:
-                logger.error(f"Parallel node '{node.id}' failed: {e}", exc_info=True)
-                duration = time.time() - start_time
-                state["_error"] = f"Parallel node '{node.id}' failed: {e}"
-
-                if emitter and hasattr(emitter, "emit_node_error"):
-                    emitter.emit_node_error(
-                        node.id,
-                        error=str(e),
-                        node_name=node_name,
-                        duration=duration,
-                    )
-
-            return state
-
-        return execute_parallel
-
-    def create_transform_executor(
-        self,
-        node: "TransformNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create executor for a TransformNode.
-
-        Applies a transformation function to the workflow state.
-        """
-        emitter = self._emitter
-
-        async def execute_transform(state: Dict[str, Any]) -> Dict[str, Any]:
-            start_time = time.time()
-            state = dict(state)
-            node_name = node.name
-
-            # Emit NODE_START if emitter is configured
-            if emitter and hasattr(emitter, "emit_node_start"):
-                emitter.emit_node_start(node.id, node_name)
-
-            try:
-                # Execute transform function
-                transformed = node.transform(state)
-
-                # Merge transformed data back into state
-                for key, value in transformed.items():
-                    state[key] = value
-
-                # Update node results
-                duration = time.time() - start_time
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=True,
-                    output={"transformed_keys": list(transformed.keys())},
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_COMPLETE if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_complete"):
-                    emitter.emit_node_complete(
-                        node.id,
-                        node_name,
-                        duration=duration,
-                        output={"transformed_keys": list(transformed.keys())},
-                    )
-
-            except Exception as e:
-                logger.error(f"Transform node '{node.id}' failed: {e}", exc_info=True)
-                duration = time.time() - start_time
-                state["_error"] = f"Transform node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=duration,
-                )
-
-                if emitter and hasattr(emitter, "emit_node_error"):
-                    emitter.emit_node_error(
-                        node.id,
-                        error=str(e),
-                        node_name=node_name,
-                        duration=duration,
-                    )
-
-            return state
-
-        return execute_transform
-
-    def create_team_executor(
-        self,
-        node: "TeamNodeWorkflow",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create executor for a TeamNode.
-
-        Spawns an ad-hoc multi-agent team using victor/teams/ infrastructure
-        and merges the result back into the workflow state.
-        """
-        from victor.framework.workflows.nodes import TeamNode
-        from victor.framework.state_merging import MergeMode
-        from victor.agent.subagents import SubAgentRole
-        from victor.teams.types import TeamMember, TeamFormation
-
-        orchestrator = self.orchestrator
-        emitter = self._emitter
-
-        async def execute_team(state: Dict[str, Any]) -> Dict[str, Any]:
-            start_time = time.time()
-            state = dict(state)
-            node_name = node.name
-
-            # Emit NODE_START if emitter is configured
-            if emitter and hasattr(emitter, "emit_node_start"):
-                emitter.emit_node_start(node.id, node_name)
-
-            try:
-                # Convert team members from dict to TeamMember objects
-                role_map = {
-                    "researcher": SubAgentRole.RESEARCHER,
-                    "planner": SubAgentRole.PLANNER,
-                    "executor": SubAgentRole.EXECUTOR,
-                    "reviewer": SubAgentRole.REVIEWER,
-                    "writer": SubAgentRole.WRITER,
-                    "analyst": SubAgentRole.RESEARCHER,
-                }
-
-                members = []
-                for member_dict in node.members:
-                    role = role_map.get(
-                        member_dict.get("role", "executor").lower(), SubAgentRole.EXECUTOR
-                    )
-                    member = TeamMember(
-                        id=member_dict.get("id", f"{role.value}_{len(members)}"),
-                        role=role,
-                        name=member_dict.get("name", member_dict.get("id", "Member")),
-                        goal=member_dict.get("goal", ""),
-                        tool_budget=member_dict.get("tool_budget", 15),
-                        allowed_tools=member_dict.get("allowed_tools"),
-                        can_delegate=member_dict.get("can_delegate", False),
-                        delegation_targets=member_dict.get("delegation_targets"),
-                        is_manager=member_dict.get("is_manager", False),
-                        backstory=member_dict.get("backstory", ""),
-                        expertise=member_dict.get("expertise", []),
-                        personality=member_dict.get("personality", ""),
-                    )
-                    members.append(member)
-
-                # Map formation string to enum
-                formation_map = {
-                    "sequential": TeamFormation.SEQUENTIAL,
-                    "parallel": TeamFormation.PARALLEL,
-                    "hierarchical": TeamFormation.HIERARCHICAL,
-                    "pipeline": TeamFormation.PIPELINE,
-                    "consensus": TeamFormation.CONSENSUS,
-                }
-                formation = formation_map.get(node.team_formation.lower(), TeamFormation.SEQUENTIAL)
-
-                # Map merge mode string to enum
-                merge_mode_map = {
-                    "team_wins": MergeMode.TEAM_WINS,
-                    "graph_wins": MergeMode.GRAPH_WINS,
-                    "merge": MergeMode.MERGE,
-                    "error": MergeMode.ERROR,
-                }
-                merge_mode = merge_mode_map.get(node.merge_mode.lower(), MergeMode.TEAM_WINS)
-
-                # Create TeamNode config
-                from victor.framework.workflows.nodes import TeamNodeConfig
-
-                config = TeamNodeConfig(
-                    timeout_seconds=node.timeout_seconds,
-                    merge_strategy=node.merge_strategy,
-                    merge_mode=merge_mode,
-                    output_key=node.output_key,
-                    continue_on_error=node.continue_on_error,
-                )
-
-                # Create TeamNode and execute
-                team_node = TeamNode(
-                    id=node.id,
-                    name=node.name,
-                    goal=node.goal,
-                    team_formation=formation,
-                    members=members,
-                    config=config,
-                    shared_context=node.shared_context,
-                    max_iterations=node.max_iterations,
-                    total_tool_budget=node.total_tool_budget,
-                )
-
-                # Execute team (async)
-                merged_state = await team_node.execute_async(orchestrator, state)
-
-                # Update node results
-                duration = time.time() - start_time
-                if "_node_results" not in merged_state:
-                    merged_state["_node_results"] = {}
-
-                team_result = merged_state.get(node.output_key, {})
-                merged_state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=team_result.get("success", True),
-                    output=team_result,
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_COMPLETE if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_complete"):
-                    emitter.emit_node_complete(
-                        node.id,
-                        node_name,
-                        duration=duration,
-                        output=team_result,
-                    )
-
-                return merged_state
-
-            except Exception as e:
-                logger.error(f"Team node '{node.id}' failed: {e}", exc_info=True)
-                duration = time.time() - start_time
-                state["_error"] = f"Team node '{node.id}' failed: {e}"
-                if "_node_results" not in state:
-                    state["_node_results"] = {}
-                state["_node_results"][node.id] = NodeExecutionResult(
-                    node_id=node.id,
-                    success=False,
-                    error=str(e),
-                    duration_seconds=duration,
-                )
-
-                # Emit NODE_ERROR if emitter is configured
-                if emitter and hasattr(emitter, "emit_node_error"):
-                    emitter.emit_node_error(
-                        node.id,
-                        error=str(e),
-                        node_name=node_name,
-                        duration=duration,
-                    )
-
-                # Return state with error
-                return state if node.continue_on_error else state
-
-        return execute_team
-
-    def _create_passthrough_executor(
-        self,
-        node: "WorkflowNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
-        """Create a passthrough executor for unknown node types."""
-
-        async def passthrough(state: Dict[str, Any]) -> Dict[str, Any]:
-            state = dict(state)
-            if "_node_results" not in state:
-                state["_node_results"] = {}
-            state["_node_results"][node.id] = NodeExecutionResult(
-                node_id=node.id,
-                success=True,
-                output={"passthrough": True},
-            )
-            return state
-
-        return passthrough
+    def supports_node_type(self, node_type: str) -> bool:
+        return self._delegate.supports_node_type(node_type)
 
 
 # =============================================================================
@@ -1189,15 +344,12 @@ class CachedCompiledGraph:
 
     def _prepare_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare initial state with workflow metadata."""
-        exec_state = dict(state)
-        if "_workflow_id" not in exec_state:
-            exec_state["_workflow_id"] = uuid.uuid4().hex
-        if "_workflow_name" not in exec_state:
-            exec_state["_workflow_name"] = self.workflow_name
-        if "_node_results" not in exec_state:
-            exec_state["_node_results"] = {}
-        if "_parallel_results" not in exec_state:
-            exec_state["_parallel_results"] = {}
+        exec_state = create_initial_workflow_state(
+            workflow_id=state.get("_workflow_id"),
+            workflow_name=state.get("_workflow_name", self.workflow_name),
+            current_node=state.get("_current_node", ""),
+            initial_state=state,
+        )
         return exec_state
 
     def get_graph_schema(self) -> Dict[str, Any]:
@@ -1329,7 +481,8 @@ class UnifiedWorkflowCompiler:
 
         # Lazy-loaded compilers
         self._graph_compiler: Optional["WorkflowGraphCompiler"] = None
-        self._definition_compiler: Optional["WorkflowDefinitionCompiler"] = None
+        self._definition_validator: Optional[Any] = None
+        self._definition_graph_compiler: Optional[Any] = None
 
         # Compilation stats
         self._compile_stats = {
@@ -1384,15 +537,55 @@ class UnifiedWorkflowCompiler:
             self._graph_compiler = WorkflowGraphCompiler(config)
         return self._graph_compiler
 
-    def _get_definition_compiler(self) -> "WorkflowDefinitionCompiler":
-        """Get or create WorkflowDefinition compiler."""
-        if self._definition_compiler is None:
-            from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
+    def _get_definition_validator(self) -> Any:
+        """Get or create the shared definition validator stage."""
+        if self._definition_validator is None:
+            from victor.workflows.compiler.boundary import WorkflowDefinitionValidator
 
-            self._definition_compiler = WorkflowDefinitionCompiler(
-                runner_registry=self._runner_registry,
+            self._definition_validator = WorkflowDefinitionValidator()
+        return self._definition_validator
+
+    def _get_definition_graph_compiler(self) -> Any:
+        """Get or create the shared native definition compiler backend."""
+        if self._definition_graph_compiler is None:
+            from victor.workflows.compiler.boundary import NativeWorkflowGraphCompiler
+
+            self._definition_graph_compiler = NativeWorkflowGraphCompiler(
+                node_executor_factory=self._executor_factory,
+                enable_checkpointing=self._config.enable_checkpointing,
             )
-        return self._definition_compiler
+        return self._definition_graph_compiler
+
+    def _compile_definition_graph(
+        self,
+        definition: "WorkflowDefinition",
+        *,
+        source: str,
+        workflow_name: Optional[str] = None,
+        source_path: Optional[Path] = None,
+        validate: Optional[bool] = None,
+    ) -> "CompiledGraph":
+        """Compile a workflow definition through the shared boundary backend."""
+        from victor.workflows.compiler.boundary import (
+            ParsedWorkflowDefinition,
+            WorkflowCompilationRequest,
+        )
+
+        should_validate = self._config.validate_before_compile if validate is None else validate
+        parsed = ParsedWorkflowDefinition(
+            request=WorkflowCompilationRequest(
+                source=source,
+                workflow_name=workflow_name or definition.name,
+                validate=should_validate,
+            ),
+            workflow=definition,
+            source_path=source_path,
+        )
+
+        if should_validate:
+            parsed = self._get_definition_validator().validate(parsed)
+
+        return self._get_definition_graph_compiler().compile(parsed)
 
     def _compute_config_hash(
         self,
@@ -1403,6 +596,71 @@ class UnifiedWorkflowCompiler:
         condition_names = tuple(sorted(condition_registry.keys())) if condition_registry else ()
         transform_names = tuple(sorted(transform_registry.keys())) if transform_registry else ()
         return hash((condition_names, transform_names))
+
+    def _create_yaml_loader(
+        self,
+        *,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        base_dir: Optional[Path] = None,
+    ) -> Any:
+        """Build a YAML loader for the deprecated unified compiler facade."""
+        from victor.workflows.yaml_loader import YAMLWorkflowConfig, YAMLWorkflowLoader
+
+        config = YAMLWorkflowConfig(
+            condition_registry=condition_registry or {},
+            transform_registry=transform_registry or {},
+            base_dir=base_dir,
+        )
+        return YAMLWorkflowLoader(
+            enable_cache=self._config.enable_caching,
+            cache_ttl=self._config.cache_ttl,
+            config=config,
+        )
+
+    def _create_workflow_parser(
+        self,
+        *,
+        workflow_name: Optional[str] = None,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        base_dir: Optional[Path] = None,
+    ) -> Any:
+        """Build the shared parser stage for deprecated YAML compilation paths."""
+        from victor.workflows.compiler.boundary import WorkflowParser
+
+        loader = self._create_yaml_loader(
+            condition_registry=condition_registry,
+            transform_registry=transform_registry,
+            base_dir=base_dir,
+        )
+        return WorkflowParser(loader)
+
+    def _parse_workflow_definition(
+        self,
+        source: str,
+        *,
+        workflow_name: Optional[str] = None,
+        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        base_dir: Optional[Path] = None,
+    ) -> Any:
+        """Parse and normalize a workflow source through the shared boundary parser."""
+        from victor.workflows.compiler.boundary import WorkflowCompilationRequest
+
+        parser = self._create_workflow_parser(
+            workflow_name=workflow_name,
+            condition_registry=condition_registry,
+            transform_registry=transform_registry,
+            base_dir=base_dir,
+        )
+        return parser.parse(
+            WorkflowCompilationRequest(
+                source=source,
+                workflow_name=workflow_name,
+                validate=self._config.validate_before_compile,
+            )
+        )
 
     # =========================================================================
     # YAML Compilation
@@ -1435,11 +693,6 @@ class UnifiedWorkflowCompiler:
             FileNotFoundError: If YAML file not found
             ValueError: If workflow validation fails
         """
-        from victor.workflows.yaml_loader import (
-            YAMLWorkflowConfig,
-            load_workflow_from_file,
-        )
-
         path = Path(yaml_path)
         if not path.exists():
             raise FileNotFoundError(f"YAML file not found: {path}")
@@ -1463,7 +716,12 @@ class UnifiedWorkflowCompiler:
             if cached_def is not None:
                 self._compile_stats["cache_hits"] += 1
                 logger.debug(f"Definition cache hit for {path}:{workflow_name}")
-                compiled = self._get_definition_compiler().compile(cached_def)
+                compiled = self._compile_definition_graph(
+                    cached_def,
+                    source=str(path),
+                    workflow_name=name,
+                    source_path=path,
+                )
                 return CachedCompiledGraph(
                     compiled_graph=compiled,
                     workflow_name=name,
@@ -1476,26 +734,14 @@ class UnifiedWorkflowCompiler:
                     max_retries=cached_def.max_retries,
                 )
 
-        # Load and parse YAML
-        config = YAMLWorkflowConfig(
-            condition_registry=condition_registry or {},
-            transform_registry=transform_registry or {},
+        parsed = self._parse_workflow_definition(
+            str(path),
+            workflow_name=workflow_name,
+            condition_registry=condition_registry,
+            transform_registry=transform_registry,
             base_dir=path.parent,
         )
-
-        result = load_workflow_from_file(
-            str(yaml_path),
-            workflow_name=workflow_name,
-            config=config,
-        )
-
-        # Handle dict or single workflow result
-        if isinstance(result, dict):
-            if not result:
-                raise ValueError(f"No workflows found in {yaml_path}")
-            workflow_def = next(iter(result.values()))
-        else:
-            workflow_def = result
+        workflow_def = parsed.workflow
 
         # Cache the definition if enabled
         if self._config.enable_caching:
@@ -1506,7 +752,12 @@ class UnifiedWorkflowCompiler:
         self._compile_stats["yaml_compiles"] += 1
 
         # Compile to CompiledGraph
-        compiled = self._get_definition_compiler().compile(workflow_def)
+        compiled = self._compile_definition_graph(
+            workflow_def,
+            source=str(path),
+            workflow_name=name,
+            source_path=parsed.source_path or path,
+        )
         return CachedCompiledGraph(
             compiled_graph=compiled,
             workflow_name=name,
@@ -1539,30 +790,25 @@ class UnifiedWorkflowCompiler:
         Returns:
             CachedCompiledGraph ready for execution
         """
-        from victor.workflows.yaml_loader import (
-            YAMLWorkflowConfig,
-            load_workflow_from_yaml,
-        )
-
         # Generate cache key from content hash
         cache_key = self._generate_content_cache_key(yaml_content, workflow_name)
-
-        # Load and parse YAML
-        config = YAMLWorkflowConfig(
-            condition_registry=condition_registry or {},
-            transform_registry=transform_registry or {},
+        parsed = self._parse_workflow_definition(
+            yaml_content,
+            workflow_name=workflow_name,
+            condition_registry=condition_registry,
+            transform_registry=transform_registry,
         )
-        result = load_workflow_from_yaml(yaml_content, workflow_name, config)
-
-        if isinstance(result, dict):
-            workflow_def = result.get(workflow_name) or next(iter(result.values()))
-        else:
-            workflow_def = result
+        workflow_def = parsed.workflow
 
         self._compile_stats["yaml_content_compiles"] += 1
 
         # Compile to CompiledGraph
-        compiled = self._get_definition_compiler().compile(workflow_def)
+        compiled = self._compile_definition_graph(
+            workflow_def,
+            source=yaml_content,
+            workflow_name=workflow_name,
+            source_path=parsed.source_path,
+        )
         return CachedCompiledGraph(
             compiled_graph=compiled,
             workflow_name=workflow_name,
@@ -1596,12 +842,6 @@ class UnifiedWorkflowCompiler:
         Raises:
             ValueError: If workflow validation fails
         """
-        # Validate if configured
-        if self._config.validate_before_compile:
-            errors = definition.validate()
-            if errors:
-                raise ValueError(f"Workflow validation failed: {'; '.join(errors)}")
-
         # Generate cache key if not provided
         if not cache_key:
             cache_key = self._generate_definition_cache_key(definition)
@@ -1609,7 +849,11 @@ class UnifiedWorkflowCompiler:
         self._compile_stats["definition_compiles"] += 1
 
         # Compile to CompiledGraph
-        compiled = self._get_definition_compiler().compile(definition)
+        compiled = self._compile_definition_graph(
+            definition,
+            source=f"definition://{definition.name}",
+            workflow_name=definition.name,
+        )
         return CachedCompiledGraph(
             compiled_graph=compiled,
             workflow_name=definition.name,
@@ -1749,7 +993,7 @@ class UnifiedWorkflowCompiler:
         self._runner_registry = registry
         # Reset compilers to use new registry
         self._graph_compiler = None
-        self._definition_compiler = None
+        self._definition_graph_compiler = None
         # Update executor factory
         self._executor_factory._runner_registry = registry
 
@@ -1762,7 +1006,24 @@ class UnifiedWorkflowCompiler:
         yaml_path: Path,
         workflow_name: Optional[str],
     ) -> str:
-        """Generate cache key for YAML file compilation."""
+        """Generate cache key for YAML file compilation.
+
+        .. note::
+            The cache key currently includes only the main YAML file's
+            mtime.  Workflows that use ``$ref`` to include external node
+            definitions (resolved in ``yaml_loader._expand_refs``) will
+            **not** be invalidated when those referenced files change.
+            Incorporating ``$ref`` mtimes would require pre-parsing the
+            YAML before generating the cache key, creating a circular
+            dependency with the compilation cache.
+
+        TODO: To support ``$ref`` cache invalidation, consider a
+        two-phase approach: (1) quick-scan the raw YAML text for
+        ``$ref:`` patterns, resolve file paths, and collect their
+        mtimes before hashing; or (2) store the set of referenced file
+        paths after first compilation and verify their mtimes on
+        subsequent cache lookups.
+        """
         try:
             mtime = yaml_path.stat().st_mtime
         except OSError:

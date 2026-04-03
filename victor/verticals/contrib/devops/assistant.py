@@ -3,19 +3,41 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from __future__ import annotations
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
+from typing import Any, Dict, List
+
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    ExtensionType,
+    PromptMetadata,
+    StageDefinition,
+    ToolNames,
+    VerticalBase,
+)
+
+from victor.core.verticals.registration import register_vertical
+from victor.verticals.contrib.devops.prompt_metadata import (
+    DEVOPS_GROUNDING_RULES,
+    DEVOPS_PROMPT_PRIORITY,
+    DEVOPS_PROMPT_TEMPLATES,
+    DEVOPS_SYSTEM_PROMPT_SECTION,
+    DEVOPS_TASK_TYPE_HINTS,
 )
 
 
+@register_vertical(
+    name="devops",
+    version="1.0.0",
+    api_version=1,
+    min_framework_version=">=0.5.0",
+    provides={ExtensionType.TOOLS, ExtensionType.SAFETY},
+    canonicalize_tool_names=False,  # Preserves distinct tool names like 'grep' vs 'code_search'
+    tool_dependency_strategy="entry_point",
+    strict_mode=False,
+    load_priority=50,
+)
 class DevOpsAssistant(VerticalBase):
     """DevOps assistant for infrastructure, deployment, and CI/CD automation.
 
@@ -27,13 +49,23 @@ class DevOpsAssistant(VerticalBase):
     version = "1.0.0"
 
     @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
+
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
+
+        return cls.description
+
+    @classmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tools for DevOps tasks.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return [
             # Core filesystem
             ToolNames.READ,  # read_file → read
@@ -62,67 +94,129 @@ class DevOpsAssistant(VerticalBase):
         return cls._get_system_prompt()
 
     @classmethod
+    def get_prompt_templates(cls) -> Dict[str, str]:
+        """Return serializable prompt templates for the DevOps definition."""
+
+        return dict(DEVOPS_PROMPT_TEMPLATES)
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Dict[str, Any]]:
+        """Return serializable task-type hints for the DevOps definition."""
+
+        return {task_type: dict(config) for task_type, config in DEVOPS_TASK_TYPE_HINTS.items()}
+
+    @classmethod
+    def get_prompt_metadata(cls) -> PromptMetadata:
+        """Return full prompt metadata, including runtime adapter hints."""
+
+        metadata = super().get_prompt_metadata()
+        return PromptMetadata(
+            templates=metadata.templates,
+            task_type_hints=metadata.task_type_hints,
+            metadata={
+                "system_prompt_section": DEVOPS_SYSTEM_PROMPT_SECTION,
+                "grounding_rules": DEVOPS_GROUNDING_RULES,
+                "priority": DEVOPS_PROMPT_PRIORITY,
+            },
+        )
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the DevOps definition."""
+
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Inspect and modify infrastructure configuration files and repository assets.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.SHELL_ACCESS,
+                purpose="Run infrastructure, deployment, and validation commands from the shell.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.GIT,
+                purpose="Inspect version control history and prepare safe infrastructure changes.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.CONTAINER_RUNTIME,
+                purpose="Build, inspect, and validate container images and runtime settings.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.VALIDATION,
+                purpose="Validate configurations and run tests before deployment changes are finalized.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.WEB_ACCESS,
+                optional=True,
+                purpose="Fetch remote documentation and platform references when local sources are insufficient.",
+            ),
+        ]
+
+    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
         """
-        from victor.tools.tool_names import ToolNames
-
         return {
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Understanding the infrastructure request",
-                tools={ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW},
+                optional_tools=[ToolNames.READ, ToolNames.LS, ToolNames.OVERVIEW],
                 keywords=["what", "how", "explain", "infrastructure", "setup"],
                 next_stages={"ASSESSMENT", "PLANNING"},
             ),
             "ASSESSMENT": StageDefinition(
                 name="ASSESSMENT",
                 description="Assessing current infrastructure state",
-                tools={ToolNames.READ, ToolNames.SHELL, ToolNames.GREP, ToolNames.GIT},
+                optional_tools=[ToolNames.READ, ToolNames.SHELL, ToolNames.GREP, ToolNames.GIT],
                 keywords=["check", "status", "current", "existing", "review"],
                 next_stages={"PLANNING", "IMPLEMENTATION"},
             ),
             "PLANNING": StageDefinition(
                 name="PLANNING",
                 description="Planning infrastructure changes",
-                tools={ToolNames.READ, ToolNames.GREP, ToolNames.WEB_SEARCH, ToolNames.WEB_FETCH},
+                optional_tools=[
+                    ToolNames.READ,
+                    ToolNames.GREP,
+                    ToolNames.WEB_SEARCH,
+                    ToolNames.WEB_FETCH,
+                ],
                 keywords=["plan", "design", "architecture", "strategy"],
                 next_stages={"IMPLEMENTATION"},
             ),
             "IMPLEMENTATION": StageDefinition(
                 name="IMPLEMENTATION",
                 description="Implementing infrastructure changes",
-                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER},
+                optional_tools=[ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL, ToolNames.DOCKER],
                 keywords=["create", "build", "configure", "implement", "deploy"],
                 next_stages={"VALIDATION", "DEPLOYMENT"},
             ),
             "VALIDATION": StageDefinition(
                 name="VALIDATION",
                 description="Validating configurations and testing",
-                tools={ToolNames.SHELL, ToolNames.READ, ToolNames.TEST},
+                optional_tools=[ToolNames.SHELL, ToolNames.READ, ToolNames.TEST],
                 keywords=["test", "validate", "verify", "check"],
                 next_stages={"DEPLOYMENT", "IMPLEMENTATION"},
             ),
             "DEPLOYMENT": StageDefinition(
                 name="DEPLOYMENT",
                 description="Deploying to target environment",
-                tools={ToolNames.SHELL, ToolNames.GIT, ToolNames.DOCKER},
+                optional_tools=[ToolNames.SHELL, ToolNames.GIT, ToolNames.DOCKER],
                 keywords=["deploy", "push", "release", "launch"],
                 next_stages={"MONITORING", "COMPLETION"},
             ),
             "MONITORING": StageDefinition(
                 name="MONITORING",
                 description="Setting up monitoring and observability",
-                tools={ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL},
+                optional_tools=[ToolNames.WRITE, ToolNames.EDIT, ToolNames.SHELL],
                 keywords=["monitor", "observe", "alert", "metrics"],
                 next_stages={"COMPLETION"},
             ),
             "COMPLETION": StageDefinition(
                 name="COMPLETION",
                 description="Documenting and finalizing",
-                tools={ToolNames.WRITE, ToolNames.GIT},
+                optional_tools=[ToolNames.WRITE, ToolNames.GIT],
                 keywords=["done", "complete", "document", "finish"],
                 next_stages=set(),
             ),
@@ -173,52 +267,3 @@ When creating configurations:
 3. Note any prerequisites or dependencies
 4. Suggest validation commands to verify correctness
 """
-
-    @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
-        """Get DevOps-specific middleware.
-
-        Uses MiddlewareComposer for consistent middleware composition:
-        - GitSafetyMiddleware: Block dangerous git operations (strict for infrastructure)
-        - SecretMaskingMiddleware: Mask secrets in tool results
-        - LoggingMiddleware: Audit logging for tool calls
-
-        DevOps has stricter git safety since infrastructure changes are critical.
-
-        Returns:
-            List of middleware implementations
-        """
-        from victor.framework.middleware import MiddlewareComposer
-
-        return (
-            MiddlewareComposer()
-            .git_safety(
-                block_dangerous=True,  # Strict for infrastructure
-                warn_on_risky=True,
-                protected_branches={"production", "staging"},  # Additional protected branches
-            )
-            .secret_masking(
-                replacement="[REDACTED]",
-                mask_in_arguments=True,  # Also mask secrets in inputs
-            )
-            .logging(
-                include_arguments=True,
-                include_results=True,
-            )
-            .build()
-        )
-
-    @classmethod
-    def get_capability_provider(cls):
-        """Get the capability provider for DevOpsAssistant.
-
-        Returns:
-            DevOpsCapabilityProvider instance
-        """
-        from victor.verticals.contrib.devops.capabilities import DevOpsCapabilityProvider
-
-        return DevOpsCapabilityProvider()
-
-    # =========================================================================
-    # New Framework Integrations (Workflows, RL, Teams)
-    # =========================================================================

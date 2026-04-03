@@ -270,27 +270,23 @@ class AzureOpenAIProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 payload = self._build_request_payload(
                     messages, model, temperature, max_tokens, tools, False, **kwargs
                 )
 
                 url = self._get_deployment_url(model)
-                response = await self._execute_with_circuit_breaker(self.client.post, url, json=payload)
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, url, json=payload
+                )
                 response.raise_for_status()
 
                 parsed = self._parse_response(response.json(), model)
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint="/chat/completions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -315,12 +311,24 @@ class AzureOpenAIProvider(BaseProvider):
                     error_body = e.response.text[:500] if e.response.text else ""
                     error_str = error_body.lower()
 
-                    if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                    if any(
+                        term in error_str
+                        for term in [
+                            "auth",
+                            "unauthorized",
+                            "invalid key",
+                            "invalid api",
+                            "api_key",
+                            "401",
+                        ]
+                    ):
                         raise ProviderAuthError(
                             message=f"Authentication failed: {error_body}",
                             provider=self.name,
                         ) from e
-                    elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                    elif any(
+                        term in error_str for term in ["rate limit", "429", "too many requests"]
+                    ):
                         raise ProviderRateLimitError(
                             message=f"Rate limit exceeded: {error_body}",
                             provider=self.name,

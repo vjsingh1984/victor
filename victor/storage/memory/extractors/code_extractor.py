@@ -108,11 +108,13 @@ class CodeEntityExtractor(EntityExtractor):
         self._treesitter_available = False
 
         if use_treesitter:
-            try:
-                from victor_coding.codebase.indexer import CodebaseIndexer
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
-                self._treesitter_available = True
-            except ImportError:
+            self._treesitter_available = CapabilityRegistry.get_instance().is_enhanced(
+                CodebaseIndexFactoryProtocol
+            )
+            if not self._treesitter_available:
                 logger.debug("Tree-sitter not available, using regex fallback")
 
     @property

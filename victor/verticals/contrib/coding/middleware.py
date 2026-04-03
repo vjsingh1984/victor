@@ -415,10 +415,20 @@ class GitSafetyMiddleware(_FrameworkGitSafety):
         super().__init__(block_dangerous=block_dangerous, warn_on_risky=warn_on_risky, **kwargs)
 
 
+def get_middleware() -> list[MiddlewareProtocol]:
+    """Return the coding vertical's default runtime middleware chain."""
+
+    return [
+        CodeCorrectionMiddleware(enabled=True, auto_fix=True),
+        GitSafetyMiddleware(block_dangerous=False, warn_on_risky=True),
+    ]
+
+
 __all__ = [
     "CodingMiddleware",
     "CodeCorrectionMiddleware",
     "GitSafetyMiddleware",
+    "get_middleware",
     "CODE_TOOLS",
     "CODE_ARGUMENT_NAMES",
 ]

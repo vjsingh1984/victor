@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from victor.analysis.module_analyzer import ModuleAnalyzer, ModuleMetrics
+from victor.core.analysis.module_analyzer import ModuleAnalyzer, ModuleMetrics
 
 
 @pytest.fixture

@@ -171,6 +171,7 @@ class TestMiddlewarePipeline:
 
         class TrackingMiddleware(Middleware):
             def __init__(self):
+                super().__init__()
                 self.called = False
 
             async def before(self, context):
@@ -196,6 +197,7 @@ class TestMiddlewarePipeline:
 
         class OrderMiddleware(Middleware):
             def __init__(self, name):
+                super().__init__()
                 self._name = name
 
             @property

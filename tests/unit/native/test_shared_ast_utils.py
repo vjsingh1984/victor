@@ -3,7 +3,7 @@
 
 """Tests for shared_ast_utils module."""
 
-from victor.tools.shared_ast_utils import (
+from victor.verticals.contrib.coding.codebase.utils.shared_ast_utils import (
     calculate_cognitive_complexity,
     calculate_complexity,
     calculate_maintainability_index,

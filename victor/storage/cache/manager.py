@@ -78,6 +78,35 @@ class CacheProtocol(Protocol):
         ...
 
 
+class CacheLifecycleProtocol(Protocol):
+    """Extended protocol for cache lifecycle management.
+
+    Provides a unified interface for TTL enforcement, eviction policies,
+    size management, and cache health reporting. All cache implementations
+    should satisfy this protocol in addition to CacheProtocol.
+    """
+
+    def get_stats(self) -> "CacheStats":
+        """Return current cache statistics (hits, misses, evictions)."""
+        ...
+
+    def evict_expired(self) -> int:
+        """Remove all entries past their TTL. Returns count of evicted entries."""
+        ...
+
+    def get_size(self) -> int:
+        """Return current number of entries in the cache."""
+        ...
+
+    def get_memory_usage_bytes(self) -> int:
+        """Estimate current memory usage in bytes."""
+        ...
+
+    def shutdown(self) -> None:
+        """Gracefully shut down the cache (flush pending writes, release resources)."""
+        ...
+
+
 @dataclass
 class CacheStats:
     """Cache statistics."""

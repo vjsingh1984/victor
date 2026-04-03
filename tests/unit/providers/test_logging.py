@@ -163,7 +163,9 @@ class TestLogProviderOperation:
         """Test custom logger parameter."""
         custom_logger = logging.getLogger("custom.test")
         with caplog.at_level(logging.INFO):
-            with log_provider_operation("init", "test", "test-model", logger_instance=custom_logger):
+            with log_provider_operation(
+                "init", "test", "test-model", logger_instance=custom_logger
+            ):
                 pass
 
         # Should have logged to custom logger

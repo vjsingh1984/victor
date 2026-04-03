@@ -7,10 +7,10 @@ license = "Apache-2.0"
 requires_victor = ">=0.5.0"
 
 python_package = "victor-ai"
-homepage = "https://github.com/vijay-singh/codingagent"
-repository = "https://github.com/vijay-singh/codingagent"
+homepage = "https://github.com/vjsingh1984/victor"
+repository = "https://github.com/vjsingh1984/victor"
 documentation = "https://docs.victor.dev"
-issues = "https://github.com/vijay-singh/codingagent/issues"
+issues = "https://github.com/vjsingh1984/victor/issues"
 
 category = "data"
 tags = ["data-analysis", "pandas", "visualization", "statistics", "ml"]

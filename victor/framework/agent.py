@@ -20,7 +20,10 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Type, Union
+
+logger = logging.getLogger(__name__)
 
 from victor.framework.config import AgentConfig
 from victor.framework.errors import AgentError, CancellationError, ProviderError
@@ -33,7 +36,6 @@ if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.teams import TeamFormation
     from victor.framework.agent_components import AgentSession
-    from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.teams import AgentTeam, TeamMemberSpec
     from victor.observability.integration import ObservabilityIntegration
     from victor.core.events import ObservabilityBus
@@ -103,10 +105,6 @@ class Agent:
         self._vertical_config = vertical_config
         self._state = State(orchestrator)
         self._state_observers: List[StateObserver] = []
-        # CQRS integration (optional)
-        self._cqrs_bridge: Optional["CQRSBridge"] = None
-        self._cqrs_session_id: Optional[str] = None
-        self._cqrs_adapter: Optional["FrameworkEventAdapter"] = None
         # LSP capability (language intelligence)
         self._lsp: Optional[Any] = None
 
@@ -144,7 +142,7 @@ class Agent:
             profile: Profile name from ~/.victor/profiles.yaml
             workspace: Working directory for file operations
             config: Advanced configuration (overrides other options)
-            vertical: Optional vertical class (e.g., CodingAssistant, ResearchAssistant).
+            vertical: Optional vertical class or name (e.g., 'coding', 'research').
                 When provided, the vertical's configuration (tools, system_prompt,
                 stages) is automatically applied.
             enable_observability: Auto-initialize ObservabilityIntegration for
@@ -171,8 +169,7 @@ class Agent:
             # With vertical (domain-specific assistant)
             # Note: External vertical packages must be installed separately
             # pip install victor-coding  # or victor-ai[coding]
-            # from victor_coding import CodingAssistant
-            # agent = await Agent.create(vertical=CodingAssistant)
+            agent = await Agent.create(vertical="coding")
 
             # With observability events
             agent = await Agent.create(session_id="my-session")
@@ -184,6 +181,7 @@ class Agent:
             )
         """
         from victor.framework._internal import create_orchestrator_from_options
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
         # Extract configuration from vertical if provided
         # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
@@ -192,7 +190,8 @@ class Agent:
         system_prompt: Optional[str] = None
 
         if vertical:
-            vertical_config = vertical.get_config()
+            vertical_binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
+            vertical_config = vertical_binding.runtime_config
             # Vertical tools override explicit tools if not provided
             # Note: Pipeline also handles this, but we do it here for tools kwarg compat
             if tools is None:
@@ -478,9 +477,6 @@ class Agent:
         old_stage = self._state.stage
 
         async for event in stream_with_events(self._orchestrator, prompt):
-            # Forward to CQRS if enabled
-            self._forward_event_to_cqrs(event)
-
             # Check for state changes and notify observers
             new_stage = self._state.stage
             if new_stage != old_stage:
@@ -490,7 +486,7 @@ class Agent:
                     try:
                         observer(old_state, self._state)
                     except Exception:
-                        pass  # Don't let observer errors break streaming
+                        logger.warning("State observer error", exc_info=True)
                 old_stage = new_stage
 
             yield event
@@ -738,139 +734,6 @@ class Agent:
         return event_bus.backend.subscribe(topic_pattern, handler)
 
     # =========================================================================
-    # CQRS Integration
-    # =========================================================================
-
-    async def enable_cqrs(
-        self,
-        session_id: Optional[str] = None,
-        enable_event_sourcing: bool = True,
-    ) -> "CQRSBridge":
-        """Enable CQRS architecture for this agent.
-
-        This connects the agent to the CQRS subsystem, enabling:
-        - Event sourcing for all agent operations
-        - Command/Query separation
-        - Session projections for read models
-        - Event replay and audit
-
-        Args:
-            session_id: Optional session ID for correlation.
-            enable_event_sourcing: Whether to source events.
-
-        Returns:
-            CQRSBridge instance for direct access.
-
-        Example:
-            bridge = await agent.enable_cqrs()
-
-            # Events are now automatically sourced
-            async for event in agent.stream("Analyze code"):
-                print(event.content)
-
-            # Query session history
-            history = await bridge.get_conversation_history(bridge._adapters.keys()[0])
-        """
-        from victor.framework.cqrs_bridge import CQRSBridge
-
-        if not self._cqrs_bridge:
-            self._cqrs_bridge = await CQRSBridge.create(
-                enable_event_sourcing=enable_event_sourcing,
-                enable_observability=self.event_bus is not None,
-            )
-
-        # Connect this agent
-        self._cqrs_session_id = self._cqrs_bridge.connect_agent(
-            self,
-            session_id=session_id,
-        )
-
-        return self._cqrs_bridge
-
-    @property
-    def cqrs_bridge(self) -> Optional["CQRSBridge"]:
-        """Get the CQRS bridge if enabled.
-
-        Returns:
-            CQRSBridge instance or None.
-        """
-        return self._cqrs_bridge
-
-    @property
-    def cqrs_session_id(self) -> Optional[str]:
-        """Get the CQRS session ID if enabled.
-
-        Returns:
-            Session ID or None.
-        """
-        return self._cqrs_session_id
-
-    async def cqrs_get_session(self) -> Dict[str, Any]:
-        """Get current session via CQRS query.
-
-        Requires CQRS to be enabled via enable_cqrs().
-
-        Returns:
-            Session details.
-
-        Raises:
-            AgentError: If CQRS is not enabled.
-        """
-        if not self._cqrs_bridge or not self._cqrs_session_id:
-            raise AgentError("CQRS not enabled. Call enable_cqrs() first.")
-
-        return await self._cqrs_bridge.get_session(self._cqrs_session_id)
-
-    async def cqrs_get_history(self, limit: int = 100) -> Dict[str, Any]:
-        """Get conversation history via CQRS query.
-
-        Requires CQRS to be enabled via enable_cqrs().
-
-        Args:
-            limit: Maximum messages to retrieve.
-
-        Returns:
-            Conversation history.
-
-        Raises:
-            AgentError: If CQRS is not enabled.
-        """
-        if not self._cqrs_bridge or not self._cqrs_session_id:
-            raise AgentError("CQRS not enabled. Call enable_cqrs() first.")
-
-        return await self._cqrs_bridge.get_conversation_history(
-            self._cqrs_session_id,
-            limit=limit,
-        )
-
-    async def cqrs_get_metrics(self) -> Dict[str, Any]:
-        """Get session metrics via CQRS query.
-
-        Requires CQRS to be enabled via enable_cqrs().
-
-        Returns:
-            Session metrics.
-
-        Raises:
-            AgentError: If CQRS is not enabled.
-        """
-        if not self._cqrs_bridge or not self._cqrs_session_id:
-            raise AgentError("CQRS not enabled. Call enable_cqrs() first.")
-
-        return await self._cqrs_bridge.get_metrics(self._cqrs_session_id)
-
-    def _forward_event_to_cqrs(self, event: AgentExecutionEvent) -> None:
-        """Forward a framework event to CQRS subsystem.
-
-        Called internally during streaming to source events.
-
-        Args:
-            event: Framework AgentExecutionEvent to forward.
-        """
-        if self._cqrs_adapter:
-            self._cqrs_adapter.forward(event)
-
-    # =========================================================================
     # Workflow and Team Execution
     # =========================================================================
 
@@ -1072,24 +935,27 @@ class Agent:
 
     async def close(self) -> None:
         """Clean up resources."""
-        # Clean up CQRS bridge
-        if self._cqrs_bridge:
-            if self._cqrs_session_id:
-                self._cqrs_bridge.disconnect_agent(self._cqrs_session_id)
-            self._cqrs_bridge.close()
-            self._cqrs_bridge = None
-            self._cqrs_session_id = None
-            self._cqrs_adapter = None
-
         # Clean up orchestrator
         if hasattr(self._orchestrator, "close"):
             await self._orchestrator.close()
+        self._orchestrator = None  # Prevent __del__ warning after proper close
 
     async def __aenter__(self) -> "Agent":
         return self
 
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
+
+    def __del__(self) -> None:
+        if hasattr(self, "_orchestrator") and self._orchestrator is not None:
+            import warnings
+
+            warnings.warn(
+                "Agent was not closed. Use 'async with' or call "
+                "'await agent.close()' to release resources.",
+                ResourceWarning,
+                stacklevel=2,
+            )
 
     def __repr__(self) -> str:
         return f"Agent(provider={self._provider}, model={self._model}, state={self._state})"
@@ -1169,6 +1035,13 @@ class ChatSession:
             List of message dictionaries with role and content
         """
         return self._delegate.history
+
+    async def __aenter__(self) -> "ChatSession":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        # ChatSession is lightweight; Agent.close() handles heavy resources
+        pass
 
     # Expose the underlying AgentSession for advanced usage
     def get_session(self) -> "AgentSession":

@@ -63,13 +63,16 @@ class TreeSitterEntityExtractor(EntityExtractor):
     def _get_extractor(self):
         """Lazily initialize Tree-sitter extractor."""
         if self._extractor is None:
-            try:
-                from victor_coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import TreeSitterExtractorProtocol
 
-                self._extractor = TreeSitterExtractor(auto_discover=self._auto_discover)
-            except ImportError as e:
-                logger.warning(f"Tree-sitter not available: {e}")
-                raise
+            registry = CapabilityRegistry.get_instance()
+            provider = registry.get(TreeSitterExtractorProtocol)
+            if provider is not None and registry.is_enhanced(TreeSitterExtractorProtocol):
+                self._extractor = provider
+            else:
+                logger.warning("Tree-sitter not available: victor-coding not installed")
+                raise ImportError("Tree-sitter requires victor-coding package")
         return self._extractor
 
     async def extract(

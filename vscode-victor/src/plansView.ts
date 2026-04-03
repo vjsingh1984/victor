@@ -227,6 +227,7 @@ export class PlansViewProvider implements vscode.TreeDataProvider<PlanTreeItem>,
 
     private _plans: Map<string, ExecutionPlan> = new Map();
     private _disposables: vscode.Disposable[] = [];
+    private _capabilityAvailable: boolean | null = null;
 
     constructor(
         private readonly _client: VictorClient,
@@ -403,6 +404,10 @@ export class PlansViewProvider implements vscode.TreeDataProvider<PlanTreeItem>,
     // =========================================================================
 
     private _getPlanItems(): PlanTreeItem[] {
+        if (this._capabilityAvailable === false) {
+            return [new PlanInfoItem('Plans unavailable', 'This Victor server does not expose plan APIs', 'circle-slash')];
+        }
+
         if (this._plans.size === 0) {
             return [new PlanInfoItem('No plans', 'Use PLAN mode to create a plan', 'info')];
         }
@@ -439,6 +444,15 @@ export class PlansViewProvider implements vscode.TreeDataProvider<PlanTreeItem>,
 
     private async _loadPlans(): Promise<void> {
         try {
+            const plansAvailable = await this._client.supportsCapability('plans');
+            this._capabilityAvailable = plansAvailable;
+            if (!plansAvailable) {
+                this._plans.clear();
+                this.refresh();
+                this._log('Plans capability unavailable on current server');
+                return;
+            }
+
             // Load plans from backend
             const backendPlans = await this._client.listPlans();
 

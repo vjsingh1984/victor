@@ -48,11 +48,19 @@ from __future__ import annotations
 import logging
 import time
 import threading
+import warnings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
+
+# Import SDK base class for dependency inversion
+from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
 # Import focused capability providers for SRP compliance
 from victor.core.verticals.metadata import VerticalMetadataProvider
@@ -179,10 +187,10 @@ class VerticalConfig:
 
 
 class VerticalBase(
+    SdkVerticalBase,  # Inherit from SDK for dependency inversion
     VerticalMetadataProvider,
     VerticalExtensionLoader,
     VerticalWorkflowProvider,
-    ABC,
 ):
     """Abstract base class for domain-specific assistants.
 
@@ -236,6 +244,8 @@ class VerticalBase(
         that inherit from VerticalBase require no changes.
     """
 
+    VERTICAL_API_VERSION: ClassVar[int] = 1
+
     # Config cache (keyed by namespaced class identity, stores VerticalConfig)
     _config_cache: Dict[str, "VerticalConfig"] = {}
     _config_cache_lock: ClassVar[threading.RLock] = threading.RLock()
@@ -246,6 +256,56 @@ class VerticalBase(
     def _config_cache_key(cls) -> str:
         """Get namespaced cache key for this class."""
         return f"{cls.__name__}:{cls.__module__}:{cls.__qualname__}"
+
+    # =========================================================================
+    # Composition API (Phase 4 - SOLID Refactoring)
+    # =========================================================================
+
+    @classmethod
+    def compose(cls) -> "CapabilityComposer":
+        """Create a composer for this vertical.
+
+        Provides a fluent builder API for composing vertical capabilities
+        declaratively instead of using inheritance.
+
+        Example:
+            from victor.core.verticals.base import VerticalBase
+
+            MyVertical = (
+                VerticalBase
+                .compose()
+                .with_metadata("my_vertical", "My assistant", "1.0.0")
+                .with_stages(custom_stages)
+                .with_extensions([SafetyExtension(), LoggingExtension()])
+                .build()
+            )
+
+        Returns:
+            CapabilityComposer for building this vertical
+
+        Note:
+            This is an alternative to inheritance-based verticals.
+            When feature flag USE_COMPOSITION_OVER_INHERITANCE is enabled,
+            composition-based verticals will be used preferentially.
+        """
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+        from victor.core.verticals.composition import CapabilityComposer
+
+        # Check if composition mode is enabled
+        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE):
+            logger.debug(f"[{cls.__name__}] Using composition mode")
+
+        return CapabilityComposer(cls)
+
+    @classmethod
+    def get_composer(cls) -> Optional["CapabilityComposer"]:
+        """Get the composer if using composition mode.
+
+        Returns:
+            CapabilityComposer if this vertical was built via composition,
+            None otherwise
+        """
+        return getattr(cls, "_composer", None)
 
     # =========================================================================
     # Required Abstract Methods
@@ -277,6 +337,41 @@ class VerticalBase(
             System prompt text with domain expertise.
         """
         pass
+
+    # =========================================================================
+    # SDK Protocol Implementation (Dependency Inversion)
+    # =========================================================================
+
+    @classmethod
+    def get_name(cls) -> str:
+        """Return vertical identifier (SDK protocol implementation).
+
+        Returns:
+            Vertical name from class attribute.
+        """
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return vertical description (SDK protocol implementation).
+
+        Returns:
+            Vertical description from class attribute.
+        """
+        return cls.description
+
+    @classmethod
+    def _get_toolset(cls) -> ToolSet:
+        """Convert tool names to ToolSet (SDK protocol implementation).
+
+        This implements the SDK's abstract method by creating a ToolSet
+        from the tool names returned by get_tools().
+
+        Returns:
+            ToolSet object with tools from get_tools().
+        """
+        tool_names = cls.get_tools()
+        return ToolSet.from_tools(tool_names)
 
     # =========================================================================
     # Framework Capability Helpers (Phase 1)
@@ -536,6 +631,18 @@ class VerticalBase(
         cls._lsp_capability = lsp_capability
 
     @classmethod
+    def register_tools(cls, registry: Any) -> None:
+        """Hook for verticals to register custom tools during activation.
+
+        Override this method to register vertical-specific tools with the
+        tool registry or orchestrator when the vertical is activated.
+
+        Args:
+            registry: Tool registry or orchestrator to register tools with.
+        """
+        pass
+
+    @classmethod
     def get_tool_set(cls) -> ToolSet:
         """Get the ToolSet for this vertical.
 
@@ -563,16 +670,20 @@ class VerticalBase(
         Returns:
             Configured Agent instance.
         """
-        from victor.framework import Agent
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
-        config = cls.get_config()
-        agent_kwargs = config.to_agent_kwargs()
-        agent_kwargs.update(kwargs)
+        warnings.warn(
+            "VerticalBase.create_agent() is deprecated and will be removed in v0.8.0. "
+            "Use victor.framework.Agent.create(vertical=YourVertical, ...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        return await Agent.create(
+        return await VerticalRuntimeAdapter.create_agent(
+            cls,
             provider=provider,
             model=model,
-            **agent_kwargs,
+            **kwargs,
         )
 
 
@@ -603,12 +714,27 @@ class VerticalRegistry:
     """
 
     _registry: Dict[str, Type[VerticalBase]] = {}
+    _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
+    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
+    CURRENT_API_VERSION: ClassVar[int] = 1
+
+    @classmethod
+    def _is_contrib_module(cls, module_path: str) -> bool:
+        """Check if a module path belongs to a built-in contrib vertical."""
+        return "verticals.contrib" in module_path
 
     @classmethod
     def register(cls, vertical: Type[VerticalBase]) -> None:
-        """Register a vertical.
+        """Register a vertical with external-over-contrib priority.
+
+        Priority rules:
+        - External packages always take priority over built-in contrib verticals.
+        - If an external vertical is already registered and a contrib version
+          tries to register, the contrib is silently skipped.
+        - If a contrib vertical is already registered and an external version
+          registers, the external quietly overrides it.
 
         Args:
             vertical: Vertical class to register.
@@ -616,9 +742,55 @@ class VerticalRegistry:
         Raises:
             ValueError: If vertical has no name.
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         if not vertical.name:
             raise ValueError(f"Vertical {vertical.__name__} has no name defined")
-        cls._registry[vertical.name] = vertical
+
+        name = vertical.name
+        new_module = getattr(vertical, "__module__", "<unknown>")
+
+        if name in cls._registry:
+            existing = cls._registry[name]
+            existing_module = getattr(existing, "__module__", "<unknown>")
+            if existing is not vertical:
+                existing_is_contrib = cls._is_contrib_module(existing_module)
+                new_is_contrib = cls._is_contrib_module(new_module)
+
+                if not existing_is_contrib and new_is_contrib:
+                    # External already registered; contrib trying to overwrite — skip
+                    logger.debug(
+                        "Skipping contrib vertical '%s' (%s) — external version "
+                        "already registered from %s.",
+                        name,
+                        new_module,
+                        existing_module,
+                    )
+                    return
+                elif existing_is_contrib and not new_is_contrib:
+                    # External overriding contrib — expected upgrade
+                    logger.info(
+                        "External vertical '%s' (%s) overrides deprecated " "contrib version (%s).",
+                        name,
+                        new_module,
+                        existing_module,
+                    )
+                else:
+                    # Genuine collision (both external or both contrib)
+                    logger.warning(
+                        "Vertical name collision: '%s' already registered by %s "
+                        "(module: %s). Overwriting with %s (module: %s).",
+                        name,
+                        existing.__name__,
+                        existing_module,
+                        vertical.__name__,
+                        new_module,
+                    )
+
+        cls._registry[name] = vertical
+        cls._provenance[name] = new_module
 
     @classmethod
     def unregister(cls, name: str) -> None:
@@ -670,6 +842,7 @@ class VerticalRegistry:
                 test affects other tests that expect built-ins to be available.
         """
         cls._registry.clear()
+        cls._provenance.clear()
         cls._external_discovered = False
 
         if reregister_builtins:
@@ -684,7 +857,7 @@ class VerticalRegistry:
 
         Scans installed packages for the 'victor.verticals' entry point group
         and registers any valid vertical classes found. External verticals must:
-        - Inherit from VerticalBase
+        - Inherit from the SDK VerticalBase protocol
         - Have a non-empty 'name' attribute
 
         Returns:
@@ -695,10 +868,9 @@ class VerticalRegistry:
             security = "victor_security:SecurityAssistant"
 
         This would load SecurityAssistant from the victor_security package
-        and register it if it's a valid VerticalBase subclass.
+        and register it if it's a valid vertical class.
         """
         import logging
-        from importlib.metadata import entry_points
 
         logger = logging.getLogger(__name__)
         discovered: Dict[str, Type[VerticalBase]] = {}
@@ -707,19 +879,44 @@ class VerticalRegistry:
         if cls._external_discovered:
             return discovered
 
+        # Delegate to PluginRegistry when it has already discovered,
+        # avoiding a redundant entry point scan.
         try:
-            # Python 3.10+ API: entry_points() returns a SelectableGroups object
-            # Use group parameter for filtering
-            eps = entry_points(group=cls.ENTRY_POINT_GROUP)
-        except TypeError:
-            # Fallback for older Python versions (shouldn't happen with Python 3.10+)
-            all_eps = entry_points()
-            eps = all_eps.get(cls.ENTRY_POINT_GROUP, [])
+            from victor.core.plugins.registry import PluginRegistry
 
-        for ep in eps:
+            plugin_registry = PluginRegistry.get_instance()
+            if plugin_registry.is_discovered:
+                for name, vertical_class in plugin_registry.get_vertical_classes().items():
+                    if name not in cls._registry:
+                        cls.register(vertical_class)
+                        discovered[name] = vertical_class
+                cls._external_discovered = True
+                if discovered:
+                    logger.info(
+                        "Discovered %d external vertical(s) via PluginRegistry: %s",
+                        len(discovered),
+                        ", ".join(discovered.keys()),
+                    )
+                return discovered
+        except Exception:
+            pass  # Fall through to direct entry point scan
+
+        # Fallback: direct entry point scan (only if PluginRegistry unavailable)
+        from victor.framework.entry_point_registry import get_entry_point_registry
+
+        registry = get_entry_point_registry()
+        group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
+
+        eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+
+        for ep, loaded in eps:
             try:
                 # Load the entry point (imports the module and gets the object)
-                vertical_class = ep.load()
+                # Entry point may already be loaded from the registry
+                if loaded is not False:
+                    vertical_class = loaded
+                else:
+                    vertical_class = ep.load()
 
                 # Validate that it's a proper VerticalBase subclass
                 if not cls._validate_external_vertical(vertical_class, ep.name):
@@ -787,8 +984,9 @@ class VerticalRegistry:
             )
             return False
 
-        # Check if it inherits from VerticalBase
-        if not issubclass(vertical_class, VerticalBase):
+        # Check if it inherits from the SDK protocol base.
+        # Runtime VerticalBase subclasses satisfy this automatically.
+        if not issubclass(vertical_class, SdkVerticalBase):
             logger.warning(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
                 f"does not inherit from VerticalBase. Skipping."
@@ -802,6 +1000,28 @@ class VerticalRegistry:
                 f"has no 'name' attribute defined. Skipping."
             )
             return False
+
+        # Check API version compatibility
+        api_version = getattr(vertical_class, "VERTICAL_API_VERSION", None)
+        if api_version is None:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has no VERTICAL_API_VERSION. Assuming version 1."
+            )
+            api_version = 1
+        if api_version < cls.MINIMUM_SUPPORTED_API_VERSION:
+            logger.error(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"API version {api_version} is below minimum supported "
+                f"version {cls.MINIMUM_SUPPORTED_API_VERSION}. Skipping."
+            )
+            return False
+        if api_version > cls.CURRENT_API_VERSION:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"API version {api_version} is newer than current "
+                f"version {cls.CURRENT_API_VERSION}. It may use unsupported features."
+            )
 
         # Check if abstract methods are implemented
         # VerticalBase requires get_tools() and get_system_prompt()
@@ -845,3 +1065,34 @@ class VerticalRegistry:
         This allows discover_external_verticals() to run again.
         """
         cls._external_discovered = False
+        try:
+            from victor.core.verticals.vertical_loader import get_vertical_loader
+
+            get_vertical_loader().reset_discovery_state()
+        except Exception:
+            pass
+
+        try:
+            from victor.framework.module_loader import get_entry_point_cache
+
+            get_entry_point_cache().invalidate(cls.ENTRY_POINT_GROUP)
+        except Exception:
+            pass
+
+        try:
+            from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+
+            clear_entry_point_loader_cache()
+        except Exception:
+            pass
+
+        try:
+            from victor.core.tool_dependency_loader import (
+                clear_tool_dependency_entry_point_cache,
+                clear_vertical_tool_dependency_provider_cache,
+            )
+
+            clear_tool_dependency_entry_point_cache()
+            clear_vertical_tool_dependency_provider_cache()
+        except Exception:
+            pass

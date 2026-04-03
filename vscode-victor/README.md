@@ -125,7 +125,7 @@ npm run compile
 
 If your Victor server sets `VICTOR_SERVER_API_KEY`:
 - In VS Code settings, set `victor.serverApiKey` to the same token.
-- Set `victor.serverPort` or `victor.serverUrl` to point at your server (default `http://localhost:8000` if you started `uvicorn web.server.main:app --port 8000`).
+- Set `victor.serverPort` or `victor.serverUrl` to point at your server (default `http://localhost:8765` if you started `victor serve --port 8765`).
 - The extension will send `Authorization: Bearer <token>`, prefetch a signed `session_token`, and reuse it for WebSocket reconnects automatically.
 
 ## Commands
@@ -159,6 +159,7 @@ Open Settings (`Ctrl+,`) and search for "Victor":
 
 ```json
 {
+  "victor.serverUrl": "http://127.0.0.1:8765",
   "victor.serverPort": 8765,
   "victor.autoStart": true,
   "victor.profile": "default",
@@ -169,6 +170,7 @@ Open Settings (`Ctrl+,`) and search for "Victor":
 
 | Setting | Description | Default |
 |---------|-------------|---------|
+| `serverUrl` | Full Victor server URL for remote/shared deployments. Overrides `serverPort` when set. | `http://127.0.0.1:8765` |
 | `serverPort` | Port for Victor server | `8765` |
 | `autoStart` | Auto-start server on activation | `true` |
 | `profile` | Victor profile from ~/.victor/profiles.yaml | `default` |
@@ -206,7 +208,9 @@ When `victor.autoStart` is `true`:
 
 Set `victor.autoStart` to `false`, then:
 - Use Command Palette → "Victor: Start Server"
-- Or run in terminal: `uvicorn web.server.main:app --host 127.0.0.1 --port 8000`
+- Or run in terminal: `victor serve --host 127.0.0.1 --port 8765`
+
+Some panels depend on optional server capabilities such as agents, plans, teams, workflows, or MCP. On slimmer Victor deployments those panels now stay available in the UI but show an explicit "unavailable on this server" placeholder instead of repeatedly failing.
 
 ### Status Bar
 

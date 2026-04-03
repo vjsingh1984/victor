@@ -205,7 +205,8 @@ class TestNodeExecutorFactory:
     async def test_factory_creates_all_executor_types(self, container):
         """Test that factory can create all executor types."""
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
-        from victor.workflows.definition import AgentNode, ComputeNode
+        from victor.workflows.definition import AgentNode, ComputeNode, TeamNodeWorkflow
+        from victor.workflows.hitl import HITLNode, HITLNodeType
 
         factory = container.get(NodeExecutorFactoryProtocol)
 
@@ -225,6 +226,26 @@ class TestNodeExecutorFactory:
         assert compute_executor is not None
         assert callable(compute_executor)
 
+        team_node = TeamNodeWorkflow(
+            id="team",
+            name="Team",
+            goal="Coordinate",
+            members=[{"id": "lead", "role": "researcher", "goal": "Inspect"}],
+        )
+        team_executor = factory.create_executor(team_node)
+        assert team_executor is not None
+        assert callable(team_executor)
+
+        hitl_node = HITLNode(
+            id="approve",
+            name="Approve",
+            hitl_type=HITLNodeType.APPROVAL,
+            prompt="Approve deploy?",
+        )
+        hitl_executor = factory.create_executor(hitl_node)
+        assert hitl_executor is not None
+        assert callable(hitl_executor)
+
     @pytest.mark.asyncio
     async def test_factory_supports_all_node_types(self, container):
         """Test that factory supports all expected node types."""
@@ -237,31 +258,24 @@ class TestNodeExecutorFactory:
         assert factory.supports_node_type("transform")
         assert factory.supports_node_type("parallel")
         assert factory.supports_node_type("condition")
+        assert factory.supports_node_type("team")
+        assert factory.supports_node_type("hitl")
 
 
 @pytest.mark.integration
 @pytest.mark.workflows
 class TestAdapterLayer:
-    """Test adapter layer for backward compatibility."""
+    """Test that adapter layer raises ImportError after removal (E5 M3)."""
 
-    @pytest.mark.asyncio
-    async def test_adapter_instantiation(self, container):
-        """Test that adapter can be instantiated."""
-        from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter
+    def test_adapter_import_raises(self):
+        """Importing removed adapter classes should raise ImportError."""
+        with pytest.raises(ImportError, match="removed in E5 M3"):
+            from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter  # noqa: F401
 
-        adapter = UnifiedWorkflowCompilerAdapter(settings=container.get(Settings))
-        assert adapter is not None
-
-    @pytest.mark.asyncio
-    async def test_adapter_compile(self, container, simple_workflow_yaml):
-        """Test that adapter can compile workflows."""
-        from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter
-
-        adapter = UnifiedWorkflowCompilerAdapter(settings=container.get(Settings))
-        compiled = adapter.compile(simple_workflow_yaml)
-
-        assert compiled is not None
-        assert hasattr(compiled, "invoke")
+    def test_compiled_graph_adapter_import_raises(self):
+        """Importing removed CompiledGraphAdapter should raise ImportError."""
+        with pytest.raises(ImportError, match="removed in E5 M3"):
+            from victor.workflows.adapter import CompiledGraphAdapter  # noqa: F401
 
 
 @pytest.mark.integration

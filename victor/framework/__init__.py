@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Victor Framework - Simplified API for AI coding agents.
 
 This module provides a "golden path" API that covers 90% of use cases
@@ -47,125 +49,13 @@ Escape Hatch:
 """
 
 # === CORE: Always imported (the 5 concepts + errors + protocols) ===
-from victor.framework.agent import Agent, ChatSession
-from victor.framework.config import AgentConfig
-from victor.framework.protocols import (
-    ChunkType,
-    ConversationStateProtocol,
-    MessagesProtocol,
-    OrchestratorProtocol,
-    OrchestratorStreamChunk,
-    ProviderProtocol,
-    StreamingProtocol,
-    SystemPromptProtocol,
-    ToolsProtocol,
-    verify_protocol_conformance,
-)
-from victor.framework.errors import (
-    AgentError,
-    BudgetExhaustedError,
-    CancellationError,
-    ConfigurationError,
-    ProviderError,
-    StateTransitionError,
-    ToolError,
-)
-from victor.framework.events import (
-    AgentExecutionEvent,
-    EventType,
-    content_event,
-    error_event,
-    milestone_event,
-    progress_event,
-    stage_change_event,
-    stream_end_event,
-    stream_start_event,
-    thinking_event,
-    tool_call_event,
-    tool_error_event,
-    tool_result_event,
-)
-from victor.framework.state import Stage, State, StateHooks, StateObserver
-from victor.framework.task import FrameworkTaskType, Task, TaskResult
-from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
-from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
+from victor.framework._api import *  # noqa: F401,F403
+from victor.framework._api import PUBLIC_API_NAMES
 
-# Core names always available
-_CORE_NAMES = [
-    # Core classes (the 5 concepts)
-    "Agent",
-    "Task",
-    "Tools",
-    "State",
-    "AgentExecutionEvent",
-    # Agent
-    "ChatSession",
-    # Task
-    "TaskResult",
-    "FrameworkTaskType",
-    # Tools
-    "ToolSet",
-    "ToolCategory",
-    "ToolsInput",
-    # State
-    "Stage",
-    "StateHooks",
-    "StateObserver",
-    # Protocols
-    "OrchestratorProtocol",
-    "ConversationStateProtocol",
-    "ProviderProtocol",
-    "ToolsProtocol",
-    "SystemPromptProtocol",
-    "MessagesProtocol",
-    "StreamingProtocol",
-    "OrchestratorStreamChunk",
-    "ChunkType",
-    "verify_protocol_conformance",
-    # Events
-    "EventType",
-    "content_event",
-    "thinking_event",
-    "tool_call_event",
-    "tool_result_event",
-    "tool_error_event",
-    "stage_change_event",
-    "stream_start_event",
-    "stream_end_event",
-    "error_event",
-    "progress_event",
-    "milestone_event",
-    # Config
-    "AgentConfig",
-    # Shim
-    "FrameworkShim",
-    "get_vertical",
-    "list_verticals",
-    # Errors
-    "AgentError",
-    "ProviderError",
-    "ToolError",
-    "ConfigurationError",
-    "BudgetExhaustedError",
-    "CancellationError",
-    "StateTransitionError",
-    # Discovery
-    "discover",
-]
+_CORE_NAMES = PUBLIC_API_NAMES + ["discover"]
 
 # === LAZY: Feature groups loaded on demand via PEP 562 ===
 _LAZY_IMPORTS: dict[str, list[str]] = {
-    "victor.framework.cqrs_bridge": [
-        "CQRSBridge",
-        "FrameworkEventAdapter",
-        "ObservabilityToCQRSBridge",
-        "create_cqrs_bridge",
-        "create_event_adapter",
-        "cqrs_event_to_framework",
-        "framework_event_to_cqrs",
-        "framework_event_to_observability",
-        "observability_event_to_framework",
-    ],
     "victor.framework.event_registry": [
         "BaseEventConverter",
         "EventConverterProtocol",
@@ -259,6 +149,7 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "ToolHealthCheck",
         "create_default_health_checker",
         "HealthCheckResult",
+        "ProviderHealthResult",
         "ProviderHealthStatus",
         "ProviderHealthChecker",
         "ProviderHealthReport",
@@ -561,6 +452,74 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "format_exception_for_user",
     ],
 }
+
+# Phase 9 export counts for testing
+_RESILIENCE_EXPORTS = [
+    "CircuitBreaker",
+    "CircuitBreakerError",
+    "CircuitBreakerRegistry",
+    "CircuitState",
+    "CircuitBreakerConfig",
+    "CircuitBreakerState",
+    "CircuitOpenError",
+    "ProviderUnavailableError",
+    "ResilientProvider",
+    "ProviderRetryConfig",
+    "RetryExhaustedError",
+    "ProviderRetryStrategy",
+    "ExponentialBackoffStrategy",
+    "FixedDelayStrategy",
+    "LinearBackoffStrategy",
+    "NoRetryStrategy",
+    "RetryContext",
+    "RetryExecutor",
+    "RetryOutcome",
+    "RetryResult",
+    "BaseRetryStrategy",
+    "connection_retry_strategy",
+    "provider_retry_strategy",
+    "tool_retry_strategy",
+    "with_retry",
+    "with_retry_sync",
+]
+
+_HEALTH_EXPORTS = [
+    "BaseHealthCheck",
+    "CacheHealthCheck",
+    "CallableHealthCheck",
+    "ComponentHealth",
+    "HealthCheckProtocol",
+    "HealthChecker",
+    "HealthReport",
+    "HealthStatus",
+    "MemoryHealthCheck",
+    "ProviderHealthCheck",
+    "ToolHealthCheck",
+    "create_default_health_checker",
+    "HealthCheckResult",
+    "ProviderHealthResult",
+    "ProviderHealthStatus",
+    "ProviderHealthChecker",
+    "ProviderHealthReport",
+    "get_provider_health_checker",
+    "reset_provider_health_checker",
+]
+
+_METRICS_EXPORTS = [
+    "Counter",
+    "Gauge",
+    "Histogram",
+    "Metric",
+    "MetricLabels",
+    "MetricsCollector",
+    "MetricsRegistry",
+    "Timer",
+    "TimerContext",
+    "get_meter",
+    "get_tracer",
+    "is_telemetry_enabled",
+    "setup_opentelemetry",
+]
 
 # Aliased imports: name -> (module, real_name)
 _ALIASED_IMPORTS: dict[str, tuple[str, str]] = {

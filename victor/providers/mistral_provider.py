@@ -37,9 +37,12 @@ References:
 """
 
 import json
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from victor.providers.base import (
     BaseProvider,
@@ -232,7 +235,7 @@ class MistralProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 payload = self._build_request_payload(
                     messages=messages,
@@ -254,13 +257,7 @@ class MistralProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint="/chat/completions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -296,28 +293,7 @@ class MistralProvider(BaseProvider):
                         raw_error=e,
                     ) from e
             except Exception as e:
-                # Skip if already a ProviderError
-                if isinstance(e, ProviderError):
-                    raise
-                # Convert to specific provider error types based on error message
-                error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    raise ProviderError(
-                        message=f"Mistral API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,

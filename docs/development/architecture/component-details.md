@@ -45,7 +45,7 @@ Senior systems architect analysis of framework-vertical integration.
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
 │  │ToolPipeline  │ │Conversation  │ │ Provider     │ │ StateGraph   │        │
 │  │ • execute    │ │ Controller   │ │ Manager      │ │ • nodes      │        │
-│  │ • cache      │ │ • history    │ │ • 22 LLMs    │ │ • edges      │        │
+│  │ • cache      │ │ • history    │ │ • 24 LLMs    │ │ • edges      │        │
 │  │ • analytics  │ │ • stages     │ │ • fallback   │ │ • checkpoints│        │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │
 └──────────────────────────────────┬──────────────────────────────────────────┘
@@ -158,6 +158,49 @@ HANDLER_REGISTRY.register("code_validation", CodeValidationHandler)
 
 ### ISP Compliance (GOOD)
 
+---
+
+## 4. Capability Entry Points & Optional Vertical Packages
+
+### Current Wiring
+
+- `victor.core.capability_registry` exposes a singleton registry that lazily bootstraps via `bootstrap_capabilities()` (see `victor/core/bootstrap.py:450-520`). During bootstrap we register STUB implementations from `victor.contrib.*` and overlay anything exposed through the `victor.capabilities` entry-point group.
+- `victor.core.verticals.vertical_loader.VerticalLoader` scans the `victor.verticals`, `victor.tools`, and related entry-point groups. Discovered classes are cached and registered in `VerticalRegistry`, which lets higher layers request a vertical (e.g., `coding`) without hard dependencies.
+- `victor.core.verticals.extension_loader.VerticalExtensionLoader` still uses the implicit namespace import pattern `victor.{vertical_name}.<module>` for safety, prompts, workflows, etc. This works when an external wheel publishes a namespace package (e.g., `victor-coding` ships a `victor/coding/` module), but produces noisy warnings when the optional wheel is not installed.
+
+### Observed Failure Mode
+
+Running `victor chat` without installing `victor-coding` leads to repeated warnings such as:
+```
+service extension failed to load for vertical 'coding': No module named 'victor.coding'
+```
+The warnings originate from `_get_extension_factory()` inside the extension loader when it tries to import `victor.coding.safety`, `victor.coding.prompts`, `victor.coding.workflows`, etc. As soon as the module import fails, the loader logs the warning and the `coding` vertical degrades to a stubbed state (no workflow/services), which later cascades into tool-selection fallbacks and hallucinated file reads.
+
+### Future-Proof Fix Plan
+
+1. **Capability Health Check at Bootstrap**  
+    - Add a bootstrap hook in `victor/core/bootstrap.py` that inspects `VerticalLoader.discover_verticals()` output.  
+    - When a requested vertical (per CLI flag or default) is absent, emit a single actionable warning that mentions the missing wheel (`victor-coding`) and the entry-point (`victor.verticals`).  
+    - Surface the same signal via `UsageAnalytics` and Observability events so upstream orchestration can treat “missing capability” as a structured health event instead of letting ImportErrors leak into logs.
+
+2. **Namespace Import Compatibility Shim**  
+   - Create `victor/coding/__init__.py` as a thin compatibility layer that re-exports from `victor_coding` when it exists.  
+   - Update `_get_extension_factory()` to probe both `victor.{name}` and `{victor_name}_` style modules via `importlib.util.find_spec`, preventing repeated warnings every time a capability is accessed.  
+   - Gate the shim behind the capability registry: only try to import when `capabilities.is_enhanced(...)` for the relevant protocol is `True`, otherwise skip straight to stub behavior.
+
+3. **Entry-Point-Driven Extension Binding**  
+   - Extend the `victor.capabilities` entry points so vertical packages can register *all* extension providers (safety, prompt, workflows, RL, etc.) explicitly rather than relying on magic module names.  
+   - `VerticalExtensionLoader` then resolves extensions with a lookup like `capabilities.get(WorkflowProviderProtocol)` before doing the namespace import. This keeps existing packages working yet enables a zero-warning experience when a capability is absent.
+
+4. **Test + Doc Coverage**  
+    - Add an integration test in `tests/integration/verticals/` that runs `victor chat` with the `coding` vertical disabled, asserting that (a) the CLI exits cleanly and (b) logs contain the single structured “capability missing” warning, not raw ImportErrors.  
+    - Document the required entry points (`victor.verticals`, `victor.capabilities`, `victor.tools`, etc.) in `docs/verticals/coding.md` (or a dedicated contributor guide) so plugin authors know what to implement.  
+    - Include a troubleshooting subsection describing how to interpret the structured warnings and which pip install command resolves them.
+
+**Implementation status**: `victor/core/bootstrap.py` now resolves the requested vertical once, feeds it into `_report_capability_health()`, emits a usage+observability metric, and logs a single actionable warning with the matching entry point + `pip install victor-coding` guidance. This ensures “missing capability” shows up as explicit telemetry instead of cascading ImportErrors while we continue rolling out the remaining steps above.
+
+These steps align the new capability-based design with the legacy namespace-import expectations, reduce noise in production logs, and give us the evidence trail we need for future design reviews. Once the shim + entry-point bindings are in place we can proceed with the earlier “Next Steps” (tool availability, persistence adapters, HF token validation) without reintroducing tight coupling to `victor_coding`.
+
 The vertical system demonstrates excellent ISP:
 - 15+ focused protocols in `core/verticals/protocols/providers.py`
 - Verticals implement only needed protocols
@@ -255,7 +298,7 @@ async def load_extensions_async(cls) -> VerticalExtensions:
 |-----------|:------------:|-----------|
 | **Graph DSL** | 9 | LangGraph-compatible with copy-on-write optimization, cyclic support, checkpoints; lacks visual editor |
 | **Multi-Agent** | 8 | 5 formations, team specs, personas; CrewAI has better role definitions, AutoGen has conversation patterns |
-| **Provider Agnostic** | 10 | 22 providers, context preserved across switches; unique USP |
+| **Provider Agnostic** | 10 | 24 providers, context preserved across switches; unique USP |
 | **Observability** | 9 | Protocol-based backends, sampling, backpressure; LangSmith integration would push to 10 |
 | **Extensibility** | 8 | 15+ ISP protocols, entry_points for plugins; LangChain's ecosystem is larger |
 

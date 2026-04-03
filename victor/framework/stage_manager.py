@@ -72,8 +72,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.shared_types import ConversationStage
 from victor.agent.conversation_state import (
-    ConversationStage,
     ConversationStateMachine,
     STAGE_ORDER,
 )

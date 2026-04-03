@@ -16,14 +16,29 @@
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from tree_sitter import Query, QueryCursor
-# Lazy load parser from external victor-coding package
+Query = None
+QueryCursor = None
+
 try:
-    from victor_coding.codebase.tree_sitter_manager import get_parser
-    _PARSER_AVAILABLE = True
+    from tree_sitter import Query as _Query, QueryCursor as _QueryCursor
+
+    Query = _Query
+    QueryCursor = _QueryCursor
 except ImportError:
-    _PARSER_AVAILABLE = False
-    get_parser = None
+    pass
+
+
+def _get_tree_sitter_parser(language: str):
+    """Get a tree-sitter parser via the capability registry."""
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import TreeSitterParserProtocol
+
+    provider = CapabilityRegistry.get_instance().get(TreeSitterParserProtocol)
+    if provider is None:
+        return None
+    return provider.get_parser(language)
+
+
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -100,7 +115,12 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         # Returns full code of the chat() method with line numbers
     """
     try:
-        parser = get_parser("python")
+        parser = _get_tree_sitter_parser("python")
+        if parser is None or Query is None:
+            return {
+                "error": "Code intelligence requires the victor-coding package. "
+                "Install with: pip install victor-coding"
+            }
 
         with open(file_path, "rb") as f:
             content = f.read()
@@ -199,8 +219,15 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
         - Finding text patterns (use search() with mode="literal")
         - Getting the definition code (use symbol() instead)
     """
+    parser = _get_tree_sitter_parser("python")
+    if parser is None or Query is None:
+        return [
+            {
+                "error": "Code intelligence requires the victor-coding package. "
+                "Install with: pip install victor-coding"
+            }
+        ]
     references = []
-    parser = get_parser("python")
     query = Query(parser.language, PYTHON_QUERIES["identifier"])
 
     root_path = Path(search_path)

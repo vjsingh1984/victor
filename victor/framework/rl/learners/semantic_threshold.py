@@ -253,18 +253,21 @@ class SemanticThresholdLearner(BaseLearner):
                     f"raise threshold by {adjustment:.2f}"
                 )
 
-        # Apply adjustment with bounds [0.1, 0.9]
+        # Apply adjustment with bounds [0.15, 0.9]
         recommended = current + adjustment
-        recommended = max(0.1, min(0.9, recommended))
+        recommended = max(0.15, min(0.9, recommended))
 
         stats["recommended_threshold"] = recommended
 
-        if abs(recommended - current) > 0.01:
-            logger.info(
-                f"RL: Updated semantic_threshold for {stats['context_key']}: "
-                f"{current:.2f} → {recommended:.2f} "
-                f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})"
-            )
+        # Skip log spam when threshold is stable (no meaningful update)
+        if abs(recommended - current) < 0.01:
+            return
+
+        logger.info(
+            f"RL: Updated semantic_threshold for {stats['context_key']}: "
+            f"{current:.2f} → {recommended:.2f} "
+            f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})"
+        )
 
     def get_recommendation(
         self, provider: str, model: str, task_type: str

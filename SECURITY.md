@@ -8,6 +8,7 @@ The security of your code and data is a top priority for Victor. This document o
 
 - [Supported Versions](#supported-versions)
 - [Reporting a Vulnerability](#reporting-a-vulnerability)
+- [Current CI Enforcement Baseline](#current-ci-enforcement-baseline)
 - [Code Execution Sandboxing](#code-execution-sandboxing)
 - [Data Handling and Privacy](#data-handling-and-privacy)
 - [Air-Gapped Mode](#air-gapped-mode)
@@ -82,6 +83,39 @@ If you prefer email, contact the maintainer directly at: `singhvjd@gmail.com`
 - Disclose the vulnerability publicly before we've had a chance to address it
 - Access or modify data belonging to other users
 - Perform actions that could harm the availability of Victor services
+
+## Current CI Enforcement Baseline
+
+Current repository policy uses tiered enforcement:
+
+- **Blocking (merge-gating)**:
+  - Secret scanning via `gitleaks` — any verified secret hit fails CI
+  - Trivy filesystem scan — `CRITICAL` findings only (`ignore-unfixed: true`)
+  - Dependency audit via `pip-audit` — known vulnerabilities fail CI
+  - Bandit SAST — `HIGH` severity + `HIGH` confidence findings fail CI
+  - Standard CI/test/lint gates
+- **Advisory (reported, not blocking)**:
+  - Bandit full report — all severity levels captured as artifact
+  - `semgrep` — repo-specific exclusions still being baselined
+  - License reporting — compatibility decisions require human review
+
+### Current Thresholds
+
+| Surface | Enforcement | Threshold | Exception Handling |
+| ------- | ----------- | --------- | ------------------ |
+| Secret scanning | Blocking | Any verified secret hit | Remove the secret or update scanner configuration with explicit justification |
+| Trivy filesystem scan | Blocking | `CRITICAL` findings only | `ignore-unfixed: true`; threshold changes require workflow + doc updates |
+| Dependency audit | Blocking | Any known vulnerability | Exceptions via `.pip-audit-known-vulnerabilities` with justification comment |
+| Bandit (SAST) | Blocking | `HIGH` severity + `HIGH` confidence | Exceptions via `# nosec` inline comment or `.bandit` config with justification |
+| Bandit (full) | Advisory | All findings reported | Review artifact for lower-severity trends |
+| Semgrep | Advisory | All findings reported | Repo-specific exclusions/baselines must be documented before enforcement |
+| License scan | Advisory | Full report only | Human review required for allow/deny decisions |
+
+### Exception Process
+
+1. **Dependency exceptions**: Create `.pip-audit-known-vulnerabilities` listing CVE IDs that cannot be resolved due to transitive dependency constraints. Each entry must include a justification comment and a re-review date.
+2. **SAST exceptions**: Use `# nosec` inline with a comment explaining why the finding is a false positive or accepted risk. Example: `eval(expr, {"__builtins__": {}}, ctx)  # nosec B307 — sandboxed eval`.
+3. **All exceptions are reviewed** at each milestone cut (M1/M2/M3) and removed when the underlying issue is resolved.
 
 ## Code Execution Sandboxing
 

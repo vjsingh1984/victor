@@ -10,6 +10,7 @@ include requirements.txt
 
 # Include all config files
 recursive-include victor/config *.yaml *.yml *.json
+recursive-include victor/verticals/contrib *.yaml *.yml *.toml *.svg
 
 # Include example configurations
 recursive-include examples *.yaml *.yml *.example *.json *.md

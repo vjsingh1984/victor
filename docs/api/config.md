@@ -33,7 +33,7 @@ print(f"Context file: {paths.project_context_file}")
 
 ## Settings Class
 
-Main application settings with environment variable support.
+Main application settings with environment variable support. Settings are stratified into 7 nested config groups while maintaining backward-compatible flat field access.
 
 ```python
 class Settings(BaseSettings):
@@ -54,10 +54,34 @@ settings = Settings(
     default_model="claude-sonnet-4-5-20250514"
 )
 
-# Access settings
+# Flat access (backward compatible)
 print(settings.default_provider)
 print(settings.anthropic_api_key)
+
+# Nested group access (preferred for typed grouping)
+print(settings.provider.default_provider)   # "anthropic"
+print(settings.provider.anthropic_api_key)  # API key
+print(settings.tools.tool_retry_enabled)    # True
+print(settings.resilience.circuit_breaker_failure_threshold)  # 5
+print(settings.security.write_approval_mode)  # "risky_only"
+print(settings.search.codebase_vector_store)  # "lancedb"
+print(settings.events.event_backend_type)     # "in_memory"
+print(settings.pipeline.intelligent_pipeline_enabled)  # True
 ```
+
+### Nested Config Groups
+
+| Group | Access | Fields | Purpose |
+|-------|--------|--------|---------|
+| `settings.provider` | `ProviderSettings` | 13 | Provider connection and model defaults |
+| `settings.tools` | `ToolSettings` | 21 | Tool execution, selection, retry, caching |
+| `settings.search` | `SearchSettings` | 18 | Codebase search and semantic config |
+| `settings.resilience` | `ResilienceSettings` | 17 | Circuit breaker, retry, rate limiting |
+| `settings.security` | `SecuritySettings` | 19 | Server security, sandboxing, approval |
+| `settings.events` | `EventSettings` | 24 | Event system backend and config |
+| `settings.pipeline` | `PipelineSettings` | 30+ | Intelligent pipeline, quality, recovery |
+
+Flat and nested values are synced at construction time via `model_validator(mode="after")`. Flat fields are the source of truth; nested models use `exclude=True` to keep `model_dump()` clean.
 
 ### Environment Variables
 

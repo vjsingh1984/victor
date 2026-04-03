@@ -2,6 +2,38 @@
 
 Complete reference for Victor configuration options from `victor/config/settings.py`.
 
+## Nested Config Groups
+
+Settings are organized into 7 typed nested config groups for better organization. Both flat and nested access are supported:
+
+```python
+from victor.config.settings import Settings
+
+settings = Settings(default_provider="anthropic")
+
+# Flat access (backward compatible)
+settings.default_provider          # "anthropic"
+
+# Nested access (new, preferred for typed grouping)
+settings.provider.default_provider  # "anthropic"
+settings.tools.tool_retry_enabled   # True
+settings.resilience.circuit_breaker_failure_threshold  # 5
+settings.security.write_approval_mode  # "risky_only"
+settings.search.codebase_vector_store  # "lancedb"
+settings.events.event_backend_type     # "in_memory"
+settings.pipeline.intelligent_pipeline_enabled  # True
+```
+
+| Config Group | Fields | Purpose |
+|-------------|--------|---------|
+| `ProviderSettings` | 13 | Provider connection and model defaults |
+| `ToolSettings` | 21 | Tool execution, selection, retry, caching |
+| `SearchSettings` | 18 | Codebase search and semantic configuration |
+| `ResilienceSettings` | 17 | Circuit breaker, retry, rate limiting |
+| `SecuritySettings` | 19 | Server security, sandboxing, approval |
+| `EventSettings` | 24 | Event system backend and configuration |
+| `PipelineSettings` | 30+ | Intelligent pipeline, quality scoring, recovery |
+
 ## Configuration Files
 
 | File | Location | Purpose |

@@ -50,6 +50,8 @@ import importlib
 import logging
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar
 
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
+
 logger = logging.getLogger(__name__)
 
 # Type variable for decorator return types
@@ -452,29 +454,26 @@ class EscapeHatchRegistry:
         Raises:
             ImportError: If the escape_hatches module cannot be imported
         """
-        # Try external package first (e.g., victor_coding.escape_hatches)
-        # Map vertical names to their external package names
-        vertical_to_package = {
-            "coding": "victor_coding",
-            "devops": "victor_devops",
-            "research": "victor_research",
-            "rag": "victor_rag",
-            "dataanalysis": "victor_dataanalysis",
-        }
-
-        package_name = vertical_to_package.get(vertical_name, f"victor_{vertical_name}")
-        module_path = f"{package_name}.escape_hatches"
-
-        try:
-            module = importlib.import_module(module_path)
-        except ImportError:
-            # Fall back to legacy internal path (for backward compatibility during migration)
-            legacy_path = f"victor.{vertical_name}.escape_hatches"
+        candidates = vertical_runtime_module_candidates(vertical_name, "escape_hatches")
+        module = None
+        last_error: Optional[Exception] = None
+        for module_path in candidates:
             try:
-                module = importlib.import_module(legacy_path)
-            except ImportError as e:
-                logger.warning(f"Could not import escape hatches from {module_path} or {legacy_path}: {e}")
-                raise
+                module = importlib.import_module(module_path)
+                break
+            except ImportError as exc:
+                last_error = exc
+                continue
+
+        if module is None:
+            logger.warning(
+                "Could not import escape hatches for vertical '%s' from candidates=%s",
+                vertical_name,
+                candidates,
+            )
+            if last_error is not None:
+                raise last_error
+            raise ImportError(f"No import candidates found for vertical '{vertical_name}'")
 
         conditions = getattr(module, "CONDITIONS", {})
         transforms = getattr(module, "TRANSFORMS", {})

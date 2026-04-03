@@ -288,6 +288,15 @@ class LifecycleManager:
         except Exception as e:
             logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
 
+        # Close cached embedding providers (vector store connections, model handles)
+        try:
+            from victor.storage.vector_stores.registry import EmbeddingRegistry
+
+            await EmbeddingRegistry.close_all()
+            logger.debug("EmbeddingRegistry providers closed")
+        except Exception as e:
+            logger.debug(f"Error closing EmbeddingRegistry: {e}")
+
         logger.info("LifecycleManager shutdown complete")
 
     def get_session_stats(self) -> Dict[str, Any]:

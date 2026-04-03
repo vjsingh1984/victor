@@ -136,13 +136,19 @@ def _load_builtin_category_tools() -> dict:
 
 # Lazy-loaded category tools (populated on first access)
 _BUILTIN_CATEGORY_TOOLS: Optional[dict] = None
+_builtin_tools_lock = threading.Lock()
 
 
 def _get_builtin_category_tools() -> dict:
-    """Get the builtin category tools, loading from YAML if needed."""
+    """Get the builtin category tools, loading from YAML if needed.
+
+    Uses double-checked locking to ensure thread-safe initialization.
+    """
     global _BUILTIN_CATEGORY_TOOLS
     if _BUILTIN_CATEGORY_TOOLS is None:
-        _BUILTIN_CATEGORY_TOOLS = _load_builtin_category_tools()
+        with _builtin_tools_lock:
+            if _BUILTIN_CATEGORY_TOOLS is None:
+                _BUILTIN_CATEGORY_TOOLS = _load_builtin_category_tools()
     return _BUILTIN_CATEGORY_TOOLS
 
 

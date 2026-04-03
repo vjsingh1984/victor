@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-sdk"
+version = "0.6.0"
+description = "Victor SDK - Protocol definitions for vertical development"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+maintainers = [
+    { name = "Vijaykumar Singh", email = "singhvjd@gmail.com" },
+]
+keywords = [
+    "ai",
+    "agents",
+    "llm",
+    "framework",
+    "sdk",
+    "protocols",
+    "verticals",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+# ZERO runtime dependencies except typing-extensions
+dependencies = [
+    "typing-extensions>=4.9",  # For Protocol support
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "mypy>=1.10",
+    "black==26.1.0",
+    "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/vjsingh1984/victor"
+Repository = "https://github.com/vjsingh1984/victor"
+Documentation = "https://docs.victor.dev/sdk"
+Issues = "https://github.com/vjsingh1984/victor/issues"
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["victor_sdk*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "C4"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -25,7 +25,7 @@ Example usage:
         SWEBenchRunner,
         get_harness,
     )
-    import asyncio
+    from victor.core.async_utils import run_sync
 
     async def run_agent(task):
         '''Your agent implementation.'''
@@ -52,7 +52,7 @@ Example usage:
         print(harness.generate_report(result, format="text"))
         print(f"Pass rate: {result.pass_rate:.1%}")
 
-    asyncio.run(evaluate())
+    run_sync(evaluate())
 """
 
 from victor.evaluation.protocol import (

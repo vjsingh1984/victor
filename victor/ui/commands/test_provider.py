@@ -1,8 +1,8 @@
 import typer
-import asyncio
 import logging
 from rich.console import Console
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.providers.registry import ProviderRegistry
 
@@ -36,7 +36,7 @@ def test_provider(
     """Test if a provider is working correctly."""
     if ctx.invoked_subcommand is None:
         console.print(f"Testing provider: [cyan]{provider}[/]")
-        asyncio.run(
+        run_sync(
             test_provider_async(
                 provider,
                 auth_mode=auth_mode,
@@ -69,7 +69,13 @@ async def test_provider_async(
 
         # Check API key for cloud providers (skip for OAuth mode)
         if auth_mode == "api_key" and provider in [
-            "anthropic", "openai", "google", "xai", "grok", "zai", "qwen",
+            "anthropic",
+            "openai",
+            "google",
+            "xai",
+            "grok",
+            "zai",
+            "qwen",
         ]:
             api_key = provider_settings.get("api_key")
             if not api_key:
@@ -180,7 +186,9 @@ async def _test_openai(provider_settings: dict, auth_mode: str = "api_key") -> N
         if "authentication" in error_msg or "api_key" in error_msg or "401" in error_msg:
             console.print(f"[red]✗[/] Invalid credentials: {e}")
             if auth_mode == "oauth":
-                console.print("\nTry re-authenticating: [bold]victor providers auth login openai[/]")
+                console.print(
+                    "\nTry re-authenticating: [bold]victor providers auth login openai[/]"
+                )
             else:
                 console.print(
                     "\nGet your API key from: [bold]https://platform.openai.com/api-keys[/]"
@@ -208,7 +216,7 @@ async def _test_google(provider_settings: dict) -> None:
         google = GoogleProvider(**provider_settings)
     except ImportError:
         console.print("[red]✗[/] Google AI SDK not installed")
-        console.print("Install with: [bold]pip install google-generativeai[/bold]")
+        console.print("Install with: [bold]pip install victor[google][/bold]")
         return
 
     try:
@@ -268,9 +276,7 @@ async def _test_zai(
         error_msg = str(e).lower()
         if "auth" in error_msg or "401" in error_msg:
             console.print(f"[red]✗[/] Invalid API key: {e}")
-            console.print(
-                "\nSet: [bold]export ZAI_API_KEY=your-key[/]"
-            )
+            console.print("\nSet: [bold]export ZAI_API_KEY=your-key[/]")
             console.print("Get key from: [bold]https://open.bigmodel.cn/usercenter/apikeys[/]")
         elif "429" in error_msg or "rate" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
@@ -313,16 +319,10 @@ async def _test_qwen(provider_settings: dict, auth_mode: str = "api_key") -> Non
         if "auth" in error_msg or "401" in error_msg:
             console.print(f"[red]✗[/] Invalid credentials: {e}")
             if auth_mode == "oauth":
-                console.print(
-                    "\nTry re-authenticating: [bold]victor providers auth login qwen[/]"
-                )
+                console.print("\nTry re-authenticating: [bold]victor providers auth login qwen[/]")
             else:
-                console.print(
-                    "\nSet: [bold]export QWEN_API_KEY=your-key[/]"
-                )
-                console.print(
-                    "Get key from: [bold]https://dashscope.console.aliyun.com/apiKey[/]"
-                )
+                console.print("\nSet: [bold]export QWEN_API_KEY=your-key[/]")
+                console.print("Get key from: [bold]https://dashscope.console.aliyun.com/apiKey[/]")
         elif "429" in error_msg or "rate" in error_msg:
             console.print(f"[yellow]⚠[/] Rate limited: {e}")
             console.print("[green]✓[/] Credentials are valid (rate limited)")

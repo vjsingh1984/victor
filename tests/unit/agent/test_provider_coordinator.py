@@ -219,6 +219,52 @@ class TestProviderCoordinator:
         """Test switch_count property delegation."""
         assert coordinator.switch_count == mock_manager.switch_count
 
+    @pytest.mark.asyncio
+    async def test_switch_provider_async_notifies_hooks(
+        self, coordinator, mock_manager, mock_state
+    ):
+        """Async switch_provider path delegates to manager and notifies hooks."""
+        callback = MagicMock()
+        coordinator._post_switch_hooks = [callback]
+
+        result = await coordinator.switch_provider_async("openai", "gpt-4")
+
+        assert result is True
+        mock_manager.switch_provider.assert_awaited_once_with("openai", "gpt-4")
+        callback.assert_called_once_with(mock_state)
+
+    @pytest.mark.asyncio
+    async def test_switch_model_async_notifies_hooks(self, coordinator, mock_manager, mock_state):
+        """Async switch_model path delegates to manager and notifies hooks."""
+        callback = MagicMock()
+        coordinator._post_switch_hooks = [callback]
+
+        result = await coordinator.switch_model_async("gpt-4.1")
+
+        assert result is True
+        mock_manager.switch_model.assert_awaited_once_with("gpt-4.1")
+        callback.assert_called_once_with(mock_state)
+
+    @pytest.mark.asyncio
+    async def test_switch_provider_sync_returns_false_in_async_context(
+        self, coordinator, mock_manager
+    ):
+        """Sync switch_provider rejects nested event-loop usage."""
+        result = coordinator.switch_provider("openai", "gpt-4")
+
+        assert result is False
+        mock_manager.switch_provider.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_switch_model_sync_returns_false_in_async_context(
+        self, coordinator, mock_manager
+    ):
+        """Sync switch_model rejects nested event-loop usage."""
+        result = coordinator.switch_model("gpt-4.1")
+
+        assert result is False
+        mock_manager.switch_model.assert_not_awaited()
+
     def test_get_current_info(self, coordinator, mock_manager):
         """Test get_current_info includes coordinator info."""
         info = coordinator.get_current_info()

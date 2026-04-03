@@ -19,6 +19,7 @@ All agents receive the same task and work independently.
 """
 
 import asyncio
+import copy
 import logging
 from typing import Any, Dict, List
 
@@ -46,12 +47,35 @@ class ParallelFormation(BaseFormationStrategy):
         context: TeamContext,
         task: AgentMessage,
     ) -> List[MemberResult]:
-        """Execute all agents in parallel."""
-        # Create independent tasks for each agent
-        tasks = [self._execute_agent(agent, task, context, i) for i, agent in enumerate(agents)]
+        """Execute all agents in parallel with isolated contexts.
+
+        Each agent receives a deep copy of the shared state to prevent
+        race conditions. After execution, agent contexts are merged back
+        into the parent context using last-writer-wins semantics.
+        """
+        # Create isolated context copies for each agent
+        agent_contexts = [
+            TeamContext(
+                team_id=context.team_id,
+                formation=context.formation,
+                shared_state=copy.deepcopy(context.shared_state),
+                lsp_capability=context.lsp,
+                **context.metadata,
+            )
+            for _ in agents
+        ]
+
+        tasks = [
+            self._execute_agent(agent, task, ctx, i)
+            for i, (agent, ctx) in enumerate(zip(agents, agent_contexts))
+        ]
 
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Merge agent contexts back into parent (last-writer-wins per key)
+        for agent_ctx in agent_contexts:
+            context.update(agent_ctx.shared_state)
 
         # Process results, handling any exceptions
         processed_results = []
@@ -60,9 +84,8 @@ class ParallelFormation(BaseFormationStrategy):
                 logger.error(f"ParallelFormation: agent {agents[i].id} failed: {result}")
                 processed_results.append(
                     MemberResult(
-                        agent_id=agents[i].id,
+                        member_id=agents[i].id,
                         success=False,
-                        content=None,
                         error=str(result),
                         metadata={"index": i},
                     )

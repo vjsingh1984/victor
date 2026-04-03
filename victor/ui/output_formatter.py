@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,6 +47,8 @@ from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
+
+from victor.ui.rendering.markdown import render_markdown_with_hooks
 
 
 class OutputMode(Enum):
@@ -212,6 +216,7 @@ class OutputFormatter:
         success: bool,
         result: Optional[str] = None,
         error: Optional[str] = None,
+        follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """Record tool execution result and output compact single-line format.
 
@@ -229,6 +234,12 @@ class OutputFormatter:
             tool_record["result"] = result[:500]  # Truncate for JSON
         if error:
             tool_record["error"] = error
+        if follow_up_suggestions:
+            tool_record["follow_up_suggestions"] = [
+                suggestion.get("command")
+                for suggestion in follow_up_suggestions[:3]
+                if isinstance(suggestion, dict) and suggestion.get("command")
+            ]
 
         self._tool_calls.append(tool_record)
 
@@ -268,6 +279,13 @@ class OutputFormatter:
             time_display = f"({duration_str.strip('()')})" if duration_str else ""
             error_display = f" [red]{error[:30]}[/]" if error else ""
             self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
+            if success and follow_up_suggestions:
+                for suggestion in follow_up_suggestions[:2]:
+                    if not isinstance(suggestion, dict):
+                        continue
+                    command = suggestion.get("command")
+                    if isinstance(command, str) and command.strip():
+                        self._console.print(f"[dim]  next: {command}[/]")
         elif self.config.mode == OutputMode.PLAIN:
             # Compact single-line format: ✓ tool_name(args) (X.XXs)
             status_icon = "✓" if success else "✗"
@@ -278,6 +296,13 @@ class OutputFormatter:
                 f"{status_icon} {base}{time_display}{error_display}",
                 file=self.config.stderr,
             )
+            if success and follow_up_suggestions:
+                for suggestion in follow_up_suggestions[:2]:
+                    if not isinstance(suggestion, dict):
+                        continue
+                    command = suggestion.get("command")
+                    if isinstance(command, str) and command.strip():
+                        print(f"  next: {command}", file=self.config.stderr)
             # Flush stderr immediately to ensure tool output appears before next content
             self.config.stderr.flush()
 
@@ -459,7 +484,7 @@ class OutputFormatter:
             # For Rich mode, content was already streamed with markdown rendering
             if not self.config.stream:
                 output = content
-                self._console.print(Markdown(content))
+                self._console.print(render_markdown_with_hooks(content))
             else:
                 output = content
                 # Final newline already handled by live display

@@ -895,9 +895,7 @@ class DefaultHITLHandler:
     async def _handle_approval(self, request: HITLRequest) -> HITLResponse:
         """Handle approval request."""
         while True:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, input, "Approve? [y/n]: "
-            )
+            response = await asyncio.to_thread(input, "Approve? [y/n]: ")
             response = response.strip().lower()
 
             if response in ("y", "yes"):
@@ -907,9 +905,7 @@ class DefaultHITLHandler:
                     approved=True,
                 )
             elif response in ("n", "no"):
-                reason = await asyncio.get_event_loop().run_in_executor(
-                    None, input, "Reason (optional): "
-                )
+                reason = await asyncio.to_thread(input, "Reason (optional): ")
                 return HITLResponse(
                     request_id=request.request_id,
                     status=HITLStatus.REJECTED,
@@ -934,9 +930,7 @@ class DefaultHITLHandler:
             print(f"  [{i}] {choice}")
 
         while True:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, input, "Select option number: "
-            )
+            response = await asyncio.to_thread(input, "Select option number: ")
             try:
                 idx = int(response.strip()) - 1
                 if 0 <= idx < len(request.choices):
@@ -953,7 +947,7 @@ class DefaultHITLHandler:
 
     async def _handle_input(self, request: HITLRequest) -> HITLResponse:
         """Handle freeform input."""
-        response = await asyncio.get_event_loop().run_in_executor(None, input, "Your input: ")
+        response = await asyncio.to_thread(input, "Your input: ")
         return HITLResponse(
             request_id=request.request_id,
             status=HITLStatus.APPROVED,
@@ -963,9 +957,7 @@ class DefaultHITLHandler:
 
     async def _handle_confirmation(self, request: HITLRequest) -> HITLResponse:
         """Handle simple confirmation."""
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, input, "Press Enter to continue or 'q' to abort: "
-        )
+        response = await asyncio.to_thread(input, "Press Enter to continue or 'q' to abort: ")
         if response.strip().lower() == "q":
             return HITLResponse(
                 request_id=request.request_id,
@@ -982,9 +974,7 @@ class DefaultHITLHandler:
     async def _handle_review(self, request: HITLRequest) -> HITLResponse:
         """Handle review with modification."""
         print("Review the context above.")
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, input, "Approve as-is [a], modify [m], or reject [r]: "
-        )
+        response = await asyncio.to_thread(input, "Approve as-is [a], modify [m], or reject [r]: ")
         response = response.strip().lower()
 
         if response == "a":
@@ -994,7 +984,7 @@ class DefaultHITLHandler:
                 approved=True,
             )
         elif response == "r":
-            reason = await asyncio.get_event_loop().run_in_executor(None, input, "Reason: ")
+            reason = await asyncio.to_thread(input, "Reason: ")
             return HITLResponse(
                 request_id=request.request_id,
                 status=HITLStatus.REJECTED,
@@ -1006,7 +996,7 @@ class DefaultHITLHandler:
             print("Enter modifications (one per line, empty line to finish):")
             modifications = {}
             while True:
-                line = await asyncio.get_event_loop().run_in_executor(None, input, "")
+                line = await asyncio.to_thread(input, "")
                 if not line:
                     break
                 if "=" in line:

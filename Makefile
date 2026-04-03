@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release
+.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene format clean build build-binary docker release sync-version check-version
 
 # Default target
 help:
@@ -18,7 +18,9 @@ help:
 	@echo "  make install-dev   Install with all dev dependencies"
 	@echo "  make test          Run unit tests"
 	@echo "  make test-all      Run all tests including integration"
+	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
 	@echo "  make lint          Run linters"
+	@echo "  make check-repo-hygiene  Validate workflow/link/metadata drift guards"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
 	@echo ""
@@ -27,6 +29,10 @@ help:
 	@echo "  make build-binary  Build standalone binary"
 	@echo "  make docker        Build Docker image"
 	@echo "  make release       Create a release (VERSION=x.y.z required)"
+	@echo ""
+	@echo "Versioning:"
+	@echo "  make check-version Verify victor-ai/victor-sdk versions are in sync"
+	@echo "  make sync-version  Sync all package versions from VERSION file"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make docs          Generate documentation"
@@ -48,6 +54,9 @@ install-dev:
 test:
 	pytest tests/unit -v --tb=short -n auto --dist loadscope
 
+test-definition-boundaries:
+	pytest tests/unit/core/verticals/test_definition_import_boundaries.py -q
+
 test-all:
 	pytest -v --tb=short -n auto --dist loadscope
 
@@ -63,7 +72,11 @@ test-split:
 lint:
 	ruff check victor tests
 	black --check victor tests
-	mypy victor --ignore-missing-imports || true
+	mypy victor
+	python scripts/ci/repo_hygiene_check.py
+
+check-repo-hygiene:
+	python scripts/ci/repo_hygiene_check.py
 
 format:
 	black victor tests
@@ -112,17 +125,28 @@ docker-push: docker
 	docker tag victor:latest vijayksingh/victor:latest
 	docker push vijayksingh/victor:latest
 
+# Version management (syncs victor-ai and victor-sdk)
+sync-version:  ## Sync all package versions from VERSION file
+	python scripts/sync_version.py
+
+check-version:  ## Verify all package versions are in sync
+	python scripts/check_version_sync.py
+
 # Release (requires VERSION)
 release:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release VERSION=0.1.0)
 endif
 	@echo "Creating release v$(VERSION)..."
-	@# Update version in pyproject.toml
-	sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' pyproject.toml && rm pyproject.toml.bak
+	@# Update VERSION file (single source of truth)
+	echo "$(VERSION)" > VERSION
+	@# Sync all pyproject.toml files from VERSION
+	python scripts/sync_version.py
+	@# Verify consistency
+	python scripts/check_version_sync.py
 	@# Commit and tag
-	git add pyproject.toml
-	git commit -m "Release v$(VERSION)"
+	git add VERSION pyproject.toml victor-sdk/pyproject.toml
+	git commit -m "release: v$(VERSION)"
 	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
 	@echo ""
 	@echo "Release v$(VERSION) created!"

@@ -1,5 +1,4 @@
 import typer
-import asyncio
 import importlib
 import inspect
 import os
@@ -7,6 +6,7 @@ from typing import List, Tuple
 from rich.console import Console
 from rich.table import Table
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 
 # ToolDefinition is imported for type hinting, though not directly used in the logic
@@ -113,7 +113,7 @@ def list_tools(  # Keep the command name as 'list' for the CLI
     if lightweight:
         _list_tools_lightweight()
     else:
-        asyncio.run(_list_tools_async(profile))
+        run_sync(_list_tools_async(profile))
 
 
 def _list_tools_lightweight() -> None:

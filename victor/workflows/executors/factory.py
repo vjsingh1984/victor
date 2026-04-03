@@ -19,9 +19,9 @@ from:
 - victor/workflows/unified_compiler.py (lines 171-600)
 - victor/workflows/yaml_to_graph_compiler.py (lines 168-600)
 
-This is a temporary stub that delegates to the legacy implementation
-during the migration phase. The full implementation will be created in
-Phase 2 of the SOLID refactoring.
+Built-in and explicitly registered custom executor classes are supported.
+Unregistered node types fail fast instead of silently delegating to the legacy
+YAML compiler path.
 
 Design Pattern: Factory
 - Maps node types to executor functions
@@ -32,14 +32,26 @@ Design Pattern: Factory
 from __future__ import annotations
 
 import logging
+import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
-    from victor.workflows.definition import WorkflowNode, WorkflowState
+    from victor.workflows.definition import WorkflowNode
     from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+    from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
+
+BUILTIN_NODE_EXECUTOR_TYPES = (
+    "agent",
+    "compute",
+    "transform",
+    "parallel",
+    "condition",
+    "team",
+    "hitl",
+)
 
 
 class NodeExecutorFactory:
@@ -73,6 +85,38 @@ class NodeExecutorFactory:
 
         self._container: ServiceContainer = container or ServiceContainer()
         self._executor_types: Dict[str, Any] = {}
+        self._register_builtin_executor_types()
+        self._register_extension_executor_types()
+
+    def _register_builtin_executor_types(self) -> None:
+        """Register built-in workflow node executors."""
+        from victor.workflows.executors.agent import AgentNodeExecutor
+        from victor.workflows.executors.compute import ComputeNodeExecutor
+        from victor.workflows.executors.condition import ConditionNodeExecutor
+        from victor.workflows.executors.hitl import HITLNodeExecutor
+        from victor.workflows.executors.parallel import ParallelNodeExecutor
+        from victor.workflows.executors.team import TeamNodeExecutor
+        from victor.workflows.executors.transform import TransformNodeExecutor
+
+        self.register_executor_type("agent", AgentNodeExecutor, replace=True)
+        self.register_executor_type("compute", ComputeNodeExecutor, replace=True)
+        self.register_executor_type("transform", TransformNodeExecutor, replace=True)
+        self.register_executor_type("parallel", ParallelNodeExecutor, replace=True)
+        self.register_executor_type("condition", ConditionNodeExecutor, replace=True)
+        self.register_executor_type("team", TeamNodeExecutor, replace=True)
+        self.register_executor_type("hitl", HITLNodeExecutor, replace=True)
+
+    def _register_extension_executor_types(self) -> None:
+        """Register plugin- or application-provided workflow node executors."""
+        from victor.workflows.executors.registry import get_workflow_node_executor_registry
+
+        registry = get_workflow_node_executor_registry()
+        for registration in registry.get_registrations().values():
+            self.register_executor_type(
+                registration.node_type,
+                registration.executor_factory,
+                replace=registration.replace,
+            )
 
     def register_executor_type(
         self,
@@ -126,37 +170,53 @@ class NodeExecutorFactory:
             executor_fn = factory.create_executor(agent_node)
             result_state = await executor_fn(initial_state)
         """
-        # TODO: Phase 2 - Use new executor implementations
-        # For now, delegate to legacy implementation
-        return self._create_legacy_executor(node)
+        node_type = getattr(getattr(node, "node_type", None), "value", None) or getattr(
+            node, "node_type", "unknown"
+        )
+        registered = self._executor_types.get(node_type)
+        if registered is not None:
+            return self._create_registered_executor(node, registered)
+        raise self._unsupported_node_type_error(node_type)
 
-    def _create_legacy_executor(
-        self, node: "WorkflowNode"
+    def _create_registered_executor(
+        self,
+        node: "WorkflowNode",
+        registered: Any,
     ) -> Callable[["WorkflowState"], "WorkflowState"]:
-        """Create executor using legacy implementation (temporary stub).
+        """Create executor from a registered implementation.
 
-        This delegates to the existing NodeExecutorFactory in
-        yaml_to_graph_compiler.py during the migration phase.
-
-        Args:
-            node: Workflow node definition
-
-        Returns:
-            Legacy executor function
+        Supports both executor classes and direct factory callables.
         """
-        # Import legacy factory
-        from victor.workflows.yaml_to_graph_compiler import NodeExecutorFactory as LegacyFactory
+        if inspect.isclass(registered):
+            executor = registered(context=self._resolve_execution_context())
 
-        # Create legacy factory instance
-        # Note: This will need orchestrator and tool_registry from container
-        legacy_factory = LegacyFactory(
-            orchestrator=None,  # Will be set by execution context
-            orchestrators=None,  # Will be set by execution context
-            tool_registry=None,  # Will be set by execution context
+            async def execute(state: "WorkflowState") -> "WorkflowState":
+                return await executor.execute(node, state)
+
+            return execute
+
+        return registered(node)
+
+    def _unsupported_node_type_error(self, node_type: Any) -> ValueError:
+        """Build a consistent error for unsupported workflow node types."""
+        supported = ", ".join(sorted(self._executor_types))
+        return ValueError(
+            f"Unsupported workflow node type '{node_type}'. "
+            f"Register a custom executor with register_executor_type(). "
+            f"Supported node types: {supported}"
         )
 
-        # Delegate to legacy implementation
-        return legacy_factory.create_executor(node)
+    def _resolve_execution_context(self) -> Any:
+        """Resolve execution context for registered executors."""
+        from victor.workflows.compiler_protocols import ExecutionContextProtocol
+        from victor.workflows.execution_context import ExecutionContext
+
+        if hasattr(self._container, "get_optional"):
+            context = self._container.get_optional(ExecutionContextProtocol)
+            if context is not None:
+                return context
+
+        return ExecutionContext(services=self._container)
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if a node type is supported.
@@ -171,11 +231,10 @@ class NodeExecutorFactory:
             if factory.supports_node_type("agent"):
                 executor = factory.create_executor(agent_node)
         """
-        # During migration, all legacy node types are supported
-        legacy_types = {"agent", "compute", "transform", "parallel", "condition"}
-        return node_type in legacy_types or node_type in self._executor_types
+        return node_type in self._executor_types
 
 
 __all__ = [
+    "BUILTIN_NODE_EXECUTOR_TYPES",
     "NodeExecutorFactory",
 ]

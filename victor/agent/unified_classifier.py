@@ -482,6 +482,7 @@ class UnifiedTaskClassifier:
         enable_semantic: bool = True,
         semantic_confidence_threshold: float = 0.85,
         context_boost_factor: float = 0.15,
+        decision_service: Optional[Any] = None,
     ):
         """Initialize the unified classifier.
 
@@ -490,11 +491,13 @@ class UnifiedTaskClassifier:
             enable_semantic: Whether to use semantic classification when available
             semantic_confidence_threshold: Min confidence to trust semantic over keyword
             context_boost_factor: How much to boost confidence from context (0-1)
+            decision_service: Optional LLMDecisionService for low-confidence augmentation
         """
         self._task_analyzer = task_analyzer
         self._enable_semantic = enable_semantic
         self._semantic_threshold = semantic_confidence_threshold
         self._context_boost = context_boost_factor
+        self._decision_service = decision_service
 
         # Lazy-loaded semantic classifier
         self._semantic_classifier: Optional["TaskTypeClassifier"] = None
@@ -743,6 +746,53 @@ class UnifiedTaskClassifier:
             recommended_tool_budget=budget_map[best_type],
             temperature_adjustment=temp_adjustment,
         )
+
+        # LLM augmentation: if confidence is low and decision service available
+        if self._decision_service is not None and confidence < 0.7:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = self._decision_service.decide_sync(
+                    DecisionType.TASK_TYPE_CLASSIFICATION,
+                    context={"message_excerpt": message[:300]},
+                    heuristic_result=best_type,
+                    heuristic_confidence=confidence,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "task_type"):
+                    type_map = {
+                        "analysis": ClassifierTaskType.ANALYSIS,
+                        "action": ClassifierTaskType.ACTION,
+                        "generation": ClassifierTaskType.GENERATION,
+                        "search": ClassifierTaskType.SEARCH,
+                        "edit": ClassifierTaskType.EDIT,
+                    }
+                    llm_type = type_map.get(decision.result.task_type)
+                    if llm_type is not None and decision.confidence > confidence:
+                        result = ClassificationResult(
+                            task_type=llm_type,
+                            confidence=decision.confidence,
+                            is_action_task=llm_type
+                            in (ClassifierTaskType.ACTION, ClassifierTaskType.GENERATION),
+                            is_analysis_task=llm_type
+                            in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH),
+                            is_generation_task=llm_type == ClassifierTaskType.GENERATION,
+                            needs_execution=has_execution,
+                            source="llm",
+                            keyword_confidence=confidence,
+                            matched_keywords=non_negated,
+                            negated_keywords=negated,
+                            recommended_tool_budget=budget_map.get(llm_type, 20),
+                            temperature_adjustment=(
+                                0.2 if llm_type == ClassifierTaskType.ANALYSIS else 0.0
+                            ),
+                        )
+                        logger.debug(
+                            "LLM classified task type as %s (conf=%.2f)",
+                            llm_type.value,
+                            decision.confidence,
+                        )
+            except Exception:
+                logger.debug("LLM task type classification failed", exc_info=True)
 
         # Cache the result
         if use_cache:

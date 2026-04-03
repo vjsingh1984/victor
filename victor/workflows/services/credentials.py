@@ -791,12 +791,22 @@ class SSOConfig:
 
         Uses OpenAI's public OAuth client for ChatGPT Plus/Pro/Enterprise
         subscription-based access. See FEP-0004.
+
+        Scopes and endpoints sourced from openai/codex (codex-rs/login/src/server.rs).
         """
         return cls(
             provider=SSOProvider.OPENAI_CODEX,
             issuer_url="https://auth.openai.com",
             client_id="app_EMoamEEZ73f0CkXaXp7hrann",
-            scopes=["openid", "profile", "email", "offline_access"],
+            scopes=[
+                "openid",
+                "profile",
+                "email",
+                "offline_access",
+                "api.connectors.read",
+                "api.connectors.invoke",
+            ],
+            redirect_uri="http://localhost:1455/auth/callback",
             use_pkce=True,
         )
 
@@ -953,7 +963,20 @@ class SSOAuthenticator:
         if self.config.audience:
             auth_params["audience"] = self.config.audience
 
-        auth_url = f"{self.config.issuer_url}/authorize?{urllib.parse.urlencode(auth_params)}"
+        # OpenAI Codex-specific params (from openai/codex server.rs)
+        if self.config.provider == SSOProvider.OPENAI_CODEX:
+            auth_params["codex_cli_simplified_flow"] = "true"
+            auth_params["originator"] = "victor"
+
+        # Standard OIDC uses /authorize; OpenAI uses /oauth/authorize
+        if self.config.provider == SSOProvider.OPENAI_CODEX:
+            authorize_path = "/oauth/authorize"
+        elif self.config.provider == SSOProvider.OKTA:
+            authorize_path = "/oauth2/v1/authorize"
+        else:
+            authorize_path = "/authorize"
+
+        auth_url = f"{self.config.issuer_url}{authorize_path}?{urllib.parse.urlencode(auth_params)}"
 
         # Start local callback server
         callback_result: Dict[str, Any] = {}
@@ -985,9 +1008,10 @@ class SSOAuthenticator:
         from aiohttp import web
 
         app = web.Application()
-        app.router.add_get("/callback", handle_callback)
-
         parsed_redirect = urllib.parse.urlparse(self.config.redirect_uri)
+        callback_path = parsed_redirect.path or "/callback"
+        app.router.add_get(callback_path, handle_callback)
+
         port = parsed_redirect.port or 8400
 
         runner = web.AppRunner(app)
@@ -1018,6 +1042,18 @@ class SSOAuthenticator:
         finally:
             await runner.cleanup()
 
+    @staticmethod
+    def _get_ssl_context():
+        """Create SSL context using certifi certs (fixes macOS venv SSL errors)."""
+        import ssl
+
+        try:
+            import certifi
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            return None  # Fall back to system default
+
     async def _exchange_code(
         self,
         code: str,
@@ -1045,7 +1081,9 @@ class SSOAuthenticator:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
 
-        async with aiohttp.ClientSession() as session:
+        ssl_ctx = self._get_ssl_context()
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(token_url, data=data) as response:
                 if response.status != 200:
                     error = await response.text()
@@ -1085,7 +1123,9 @@ class SSOAuthenticator:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
 
-        async with aiohttp.ClientSession() as session:
+        ssl_ctx = self._get_ssl_context()
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx) if ssl_ctx else None
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(token_url, data=data) as response:
                 if response.status != 200:
                     error = await response.text()

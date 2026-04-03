@@ -75,8 +75,7 @@ class MetricsDashboard:
         """
         if not RICH_AVAILABLE:
             raise ImportError(
-                "Rich library is required for the dashboard. "
-                "Install it with: pip install rich"
+                "Rich library is required for the dashboard. " "Install it with: pip install rich"
             )
 
         self._provider = provider or get_dashboard_provider()
@@ -323,8 +322,7 @@ class MetricsDashboard:
         # Show last 10 errors
         for error in data.errors[-10:]:
             timestamp = time.strftime(
-                "%H:%M:%S",
-                time.localtime(error.get("timestamp", time.time()))
+                "%H:%M:%S", time.localtime(error.get("timestamp", time.time()))
             )
             table.add_row(
                 error.get("type", "Unknown"),

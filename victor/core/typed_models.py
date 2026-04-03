@@ -282,53 +282,6 @@ class UsageSummary:
 
 
 # =============================================================================
-# CQRS Event Models
-# =============================================================================
-
-
-@dataclass
-class CQRSEventMetadata:
-    """Metadata for CQRS events."""
-
-    data: Dict[str, Any] = field(default_factory=dict)
-    timestamp: Optional[float] = None
-    correlation_id: Optional[str] = None
-
-
-@dataclass
-class CQRSEvent:
-    """Base CQRS event with typed fields.
-
-    Replaces getattr(cqrs_event, "tool_name", "") pattern.
-    """
-
-    event_type: str
-    tool_name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    metadata: CQRSEventMetadata = field(default_factory=CQRSEventMetadata)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CQRSEvent:
-        """Create from dictionary with safe extraction."""
-        metadata_dict = data.get("metadata", {})
-        metadata = CQRSEventMetadata(
-            data=metadata_dict.get("data", {}),
-            timestamp=metadata_dict.get("timestamp"),
-            correlation_id=metadata_dict.get("correlation_id"),
-        )
-
-        return cls(
-            event_type=data.get("event_type", "unknown"),
-            tool_name=data.get("tool_name", ""),
-            arguments=data.get("arguments", {}),
-            result=data.get("result"),
-            error=data.get("error"),
-            metadata=metadata,
-        )
-
-
 __all__ = [
     # Enums
     "Priority",
@@ -347,7 +300,4 @@ __all__ = [
     # Metrics models
     "ModelMetrics",
     "UsageSummary",
-    # CQRS models
-    "CQRSEventMetadata",
-    "CQRSEvent",
 ]

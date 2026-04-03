@@ -1,0 +1,40 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+File editing utilities for Victor verticals.
+
+This contrib package provides shared file editing functionality that can
+be used by multiple verticals without creating framework-to-vertical
+dependencies.
+
+Components:
+- DiffEditor: Default diff-based file editor implementation
+- EditValidator: Standalone edit validation utility
+
+Usage:
+    from victor.contrib.editing import DiffEditor
+
+    editor = DiffEditor()
+    result = await editor.edit_file(
+        file_path="/path/to/file.py",
+        edits=[EditOperation(old_str="old", new_str="new")],
+    )
+"""
+
+from victor.contrib.editing.diff_editor import DiffEditor
+
+__all__ = [
+    "DiffEditor",
+]

@@ -110,6 +110,9 @@ When exploring code:
 - Use semantic_code_search for conceptual queries ("authentication logic")
 - Use code_search for exact patterns ("def authenticate")
 - Use overview to understand file structure
+- Use graph(mode="callers") for "who calls X?" questions
+- Use graph(mode="callees") for "what does X call?" questions
+- Use graph(mode="trace") for bounded execution-flow questions
 
 When modifying code:
 - Use edit for surgical changes to existing code
@@ -313,6 +316,7 @@ TASK_HINT_DESIGN = """
 [ARCHITECTURE] For architecture/component questions:
 USE STRUCTURED GRAPH FIRST:
 - Call architecture_summary to get module pagerank/centrality with edge_counts + 2-3 callsites (runtime-only).
+- For symbol-level call-graph questions, prefer graph(mode="callers"), graph(mode="callees"), or graph(mode="trace") before ad hoc search.
 - Keep modules vs symbols separate; cite CALLS/INHERITS/IMPORTS counts and callsites (file:line) per hotspot.
 - Prefer runtime code; ignore tests/venv/build outputs unless explicitly requested.
 DOC-FIRST STRATEGY (mandatory order):
@@ -333,6 +337,7 @@ TASK_HINT_REFACTOR = """
 
 TASK_HINT_DEBUG = """
 [DEBUG] Read error context. Trace execution flow. Find root cause before fixing.
+For call-graph questions, use graph(mode="callers") for reverse CALLS, graph(mode="callees") for forward CALLS, and graph(mode="trace") for bounded execution paths.
 """.strip()
 
 TASK_HINT_TEST = """
@@ -356,6 +361,7 @@ TOOL EFFICIENCY:
 - list_directory first to understand structure
 - read_file ONCE per file, remember contents
 - Use semantic_code_search for specific symbols
+- Use graph(mode="callers"|"callees"|"trace") for call-graph questions instead of inferring traversal manually
 - Stop tool calls when you have enough info (usually 3-5 calls)
 """.strip()
 
@@ -364,6 +370,7 @@ EFFECTIVE TOOL USAGE:
 - Use list_directory to understand project structure first
 - Use read_file to examine specific files (one read per file)
 - Use semantic_code_search for finding specific code patterns
+- Use graph(mode="callers"|"callees"|"trace") for call-graph and execution-flow questions
 - Parallel tool calls are allowed for independent operations
 
 TASK APPROACH:

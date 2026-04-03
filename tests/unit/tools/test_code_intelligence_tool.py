@@ -26,8 +26,19 @@ from victor.tools.code_intelligence_tool import (
 )
 from victor.tools.refactor_tool import rename
 
+try:
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import TreeSitterParserProtocol
+
+    _has_victor_coding = CapabilityRegistry.get_instance().is_enhanced(TreeSitterParserProtocol)
+except Exception:
+    _has_victor_coding = False
+
 # Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
+]
 
 
 class TestSymbol:
@@ -149,7 +160,7 @@ class TestClass:
 
         # Mock to raise a generic exception during parsing
         with patch(
-            "victor.tools.code_intelligence_tool.get_parser",
+            "victor.tools.code_intelligence_tool._get_tree_sitter_parser",
             side_effect=RuntimeError("Parse error"),
         ):
             result = await symbol(file_path=str(test_file), symbol_name="test_func")

@@ -104,6 +104,8 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHE
 
 import yaml
 
+from victor.core.yaml_utils import safe_load as yaml_safe_load
+
 # =============================================================================
 # Enums for controlled values (code maintenance)
 # =============================================================================
@@ -684,15 +686,24 @@ def _resolve_ref(
     else:
         full_path = Path(file_path)
 
+    # Validate resolved path stays within base_dir (prevent path traversal)
+    resolved = full_path.resolve()
+    if base_dir:
+        base_resolved = base_dir.resolve()
+        if not str(resolved).startswith(str(base_resolved)):
+            raise YAMLWorkflowError(
+                f"Path traversal detected: {ref} resolves outside base directory"
+            )
+
     # Check cache
-    cache_key = str(full_path.resolve())
+    cache_key = str(resolved)
     if cache_key not in ref_cache:
         if not full_path.exists():
             raise YAMLWorkflowError(f"Referenced file not found: {full_path}")
 
         try:
             content = full_path.read_text()
-            ref_cache[cache_key] = yaml.safe_load(content)
+            ref_cache[cache_key] = yaml_safe_load(content)
         except yaml.YAMLError as e:
             raise YAMLWorkflowError(f"Invalid YAML in referenced file {full_path}: {e}")
 
@@ -1430,7 +1441,7 @@ def load_workflow_from_yaml(
         otherwise Dict of all workflows
     """
     try:
-        data = yaml.safe_load(yaml_content)
+        data = yaml_safe_load(yaml_content)
     except yaml.YAMLError as e:
         raise YAMLWorkflowError(f"Invalid YAML: {e}")
 

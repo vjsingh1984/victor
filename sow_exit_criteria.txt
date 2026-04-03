@@ -1,0 +1,66 @@
+**Exit Criteria for the Moody’s Data Estate – Phase 2 SOW**
+
+The following criteria should be documented in the SOW (or appended as a separate “Exit Criteria” section) to satisfy legal, contractual, and project‑management requirements.  Each milestone in the SOW has a corresponding set of criteria that, when met, triggers the milestone’s acceptance and the associated invoice.
+
+---
+
+### 1. General Acceptance Rules
+* All deliverables must be reviewed and signed off by an authorized representative of **Moody’s Analytics** (or the designated Customer sign‑off authority).
+* Sign‑off must be in writing (email, electronic signature, or signed PDF) and include the sign‑off date.
+* Sign‑off documents must reference the specific milestone, deliverable name, and version.
+* All sign‑offs shall be retained for the duration of the project and for a minimum of 12 months thereafter.
+
+### 2. Milestone‑Specific Exit Criteria
+
+| Milestone | Deliverable | Exit Criteria |
+|-----------|-------------|---------------|
+| **Milestone 1 – Project Kickoff, Discovery & Implementation Plan** | Kick‑off meeting minutes, high‑level architecture diagram, implementation plan (including schedule, resources, and risk register). | • Minutes approved by Customer
+• Architecture diagram signed off
+• Implementation plan signed off and dated
+• Project schedule (Gantt) accepted |
+| **Milestone 2 – Establish CI/CD and Deployment Automation** | Automated pipeline scripts (GitHub Actions/Databricks Jobs), deployment documentation, test harness. | • Pipelines deploy without manual intervention
+• Deployment success rate ≥ 99 % on first run
+• Unit‑test coverage ≥ 80 % 
+• Documentation signed off |
+| **Milestone 3 – Develop and Deploy Ingestion Pipelines** | Functional ingest pipelines for .txt, .csv, .pdf; deployment artifacts; test cases. | • Pipelines ingest 100 % of sample data set (≥ 50 samples per file type)
+• Transformation accuracy ≥ 99.5 % (no data loss)
+• End‑to‑end test suite passes
+• Pipeline metadata and run‑books signed off |
+| **Milestone 4 – Embed Validation and Decommission** | Validation logic integrated, legacy workflow decommissioned, validation reports. | • Validation passes all Customer‑defined KPIs
+• Legacy workflows disabled and confirmed inactive
+• Validation dashboard available and signed off |
+| **Milestone 5 – Configure Data Quality and Final Integration/Optimizations** | Production Kafka ingestion, CDS infra, quality checks, monitoring alerts, final integration tests. | • Kafka ingestion throughput ≥ X MB/s (as defined by Customer)
+• Data quality checks detect < 0.1 % anomalies
+• Monitoring dashboards (Datadog, Grafana, etc.) verified
+• Integration tests pass |
+| **Milestone 6 – Execute Full‑Scale Data Processing & Documentation** | Full‑scale run, final documentation, knowledge‑transfer session, hand‑off package. | • Full‑scale run processes ≥ 99 % of production data volume
+• Stability (no crashes, < 1 % downtime)
+• All operational documentation signed off
+• Knowledge‑transfer meeting minutes approved |
+
+### 3. Quality & Test Requirements (applicable to all milestones)
+
+| Requirement | Acceptance Threshold |
+|-------------|----------------------|
+| **Unit & Integration Tests** | ≥ 80 % coverage; 0 critical bugs in release candidate |
+| **Performance Benchmarks** | Meet or exceed Customer’s specified throughput and latency |
+| **Security & Compliance** | Pass internal security review; meet any applicable data‑protection regulations |
+| **Data Accuracy** | Transformation accuracy ≥ 99.5 % (verified against Customer’s gold standard) |
+| **Documentation** | All deliverables have accompanying documentation (design, user, and ops) that is Customer‑approved |
+
+### 4. Legal & Governance Checks
+
+* All deliverables must be signed off in accordance with the **Databricks Order** and **Customer’s Change Management Process**.
+* No deliverable shall be considered complete until the Customer’s **Compliance Officer** confirms no regulatory or data‑privacy violations.
+* Any change that materially alters scope, timeline, or cost must be documented as a **Change Order** and signed by both parties before work proceeds.
+
+---
+
+#### How to Use
+
+1. **Insert** the table above (or a bullet‑point version) into the SOW under a new “Exit Criteria” section, right after the “Milestones” table.
+2. **Reference** each criterion in the corresponding milestone’s “Exit Criteria” column for clarity.
+3. **Validate** the table with the legal team to ensure alignment with contract terms and regulatory obligations.
+4. **Distribute** the updated SOW to the Customer for approval and signature.
+
+This structured, professional exit‑criteria set will satisfy legal blocking, provide clear expectations for both parties, and facilitate smooth invoicing and project hand‑off.

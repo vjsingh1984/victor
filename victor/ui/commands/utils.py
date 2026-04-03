@@ -20,10 +20,12 @@ from victor.agent.safety import (
     set_confirmation_callback,
 )
 
+from victor.core.container import get_container
+
 try:
-    from victor_coding.codebase.indexer import CodebaseIndex
+    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 except ImportError:
-    CodebaseIndex = None  # type: ignore
+    CodebaseIndexFactoryProtocol = None  # type: ignore[misc,assignment]
 from victor.tools.code_search_tool import _get_or_build_index, _INDEX_CACHE
 
 if TYPE_CHECKING:
@@ -391,12 +393,19 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
 
 async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
     """Check codebase index status at startup and reindex if needed."""
-    if CodebaseIndex is None:
+    if CodebaseIndexFactoryProtocol is None:
+        if not silent:
+            logger.debug("Codebase indexing not available - victor-coding package not installed")
+        return
+
+    _container = get_container()
+    _factory = _container.get_optional(CodebaseIndexFactoryProtocol)
+    if _factory is None:
         if not silent:
             logger.debug("Codebase indexing not available - victor-coding package not installed")
         return
     try:
-        index = CodebaseIndex(root_path=cwd, use_embeddings=False, enable_watcher=False)
+        index = _factory.create(root_path=cwd, use_embeddings=False, enable_watcher=False)
         is_stale, modified, deleted = index.check_staleness_by_mtime()
         if not is_stale:
             if not silent:
@@ -438,6 +447,7 @@ async def preload_semantic_index(
 
         # Get graph stats if available
         graph_stats = ""
+        empty_graph_warning = False
         if index.graph_store:
             try:
                 stats = await index.graph_store.stats()
@@ -445,6 +455,8 @@ async def preload_semantic_index(
                 edge_count = stats.get("edges", 0)
                 if node_count or edge_count:
                     graph_stats = f" | Graph: {node_count} symbols, {edge_count} edges"
+                if node_count == 0:
+                    empty_graph_warning = True
             except Exception:
                 pass
 
@@ -452,6 +464,12 @@ async def preload_semantic_index(
             console_obj.print(f"[green]✓ Semantic index built in {elapsed:.1f}s{graph_stats}[/]")
         else:
             console_obj.print(f"[green]✓ Semantic index loaded in {elapsed:.1f}s{graph_stats}[/]")
+        if empty_graph_warning:
+            console_obj.print(
+                "[yellow]⚠ No symbols were added to the project graph. "
+                "Verify --path points at your repo root and rerun `victor index --reset --debug` "
+                "if you expected code to be indexed.[/yellow]"
+            )
         return True
     except ImportError as e:
         logger.warning(f"Semantic indexing dependencies not available: {e}")

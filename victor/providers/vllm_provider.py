@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -417,7 +419,7 @@ class VLLMProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             # Build request payload
             payload: Dict[str, Any] = {
                 "model": model,
@@ -450,7 +452,9 @@ class VLLMProvider(BaseProvider):
 
                 if response.status_code != 200:
                     error_data = response.json() if response.content else {}
-                    error_msg = error_data.get("detail") or error_data.get("message") or response.text
+                    error_msg = (
+                        error_data.get("detail") or error_data.get("message") or response.text
+                    )
                     raise ProviderError(
                         message=f"vLLM API error: {error_msg}",
                         provider="vllm",
@@ -462,13 +466,7 @@ class VLLMProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint="/v1/chat/completions",
-                    model=model,
-                    start_time=0,  # Will be set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -682,7 +680,9 @@ class VLLMProvider(BaseProvider):
                                 )
 
                         except json.JSONDecodeError:
-                            self._provider_logger.logger.debug(f"Failed to parse streaming chunk: {line}")
+                            self._provider_logger.logger.debug(
+                                f"Failed to parse streaming chunk: {line}"
+                            )
                             continue
 
         except httpx.HTTPStatusError as e:

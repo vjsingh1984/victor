@@ -29,7 +29,10 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from tree_sitter import Query, QueryCursor
 
 from victor.verticals.contrib.coding.languages.base import TreeSitterQueries
-from victor.verticals.contrib.coding.languages.registry import LanguageRegistry, get_language_registry
+from victor.verticals.contrib.coding.languages.registry import (
+    LanguageRegistry,
+    get_language_registry,
+)
 
 if TYPE_CHECKING:
     from tree_sitter import Node, Parser, Tree

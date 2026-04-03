@@ -1047,7 +1047,7 @@ Capabilities are resolved in this order (later overrides earlier):
 
 ### Supported Providers
 
-Victor supports 22 LLM providers out of the box:
+Victor supports 24 LLM providers out of the box:
 
 | Provider | Name | Type | Tool Calling |
 |----------|------|------|--------------|

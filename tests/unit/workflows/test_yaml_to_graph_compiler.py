@@ -20,6 +20,11 @@ import pytest
 from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.workflows.executors.registry import (
+    clear_registered_workflow_node_executors,
+    register_workflow_node_executor,
+)
+
 
 @pytest.fixture(autouse=True)
 def suppress_compiler_logging(caplog):
@@ -186,6 +191,22 @@ class TestNodeExecutorFactory:
         executor = factory.create_executor(node)
         assert callable(executor)
 
+    def test_factory_exposes_profile_aware_orchestrator_pool(self):
+        """Compatibility context should preserve orchestrator-pool lookup."""
+        default_orchestrator = object()
+        profile_orchestrator = object()
+        factory = NodeExecutorFactory(
+            orchestrator=default_orchestrator,
+            orchestrators={"analysis": profile_orchestrator},
+        )
+
+        context = factory._resolve_execution_context()
+
+        assert context.orchestrator is default_orchestrator
+        assert context.orchestrator_pool.get_default_orchestrator() is default_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("analysis") is profile_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("missing") is default_orchestrator
+
     @pytest.mark.asyncio
     async def test_agent_executor_without_orchestrator(self):
         """Test agent executor runs in placeholder mode without orchestrator."""
@@ -245,6 +266,37 @@ class TestNodeExecutorFactory:
 
         assert "compute" in result
         assert result["_node_results"]["compute"].success is True
+
+    @pytest.mark.asyncio
+    async def test_factory_loads_registered_custom_node_executors(self):
+        """Test YAML compiler factory uses the shared custom executor registry."""
+
+        class CustomExecutor:
+            def __init__(self, context=None):
+                self.context = context
+
+            async def execute(self, node, state):
+                state = dict(state)
+                state["custom"] = node.id
+                return state
+
+        class CustomNode:
+            def __init__(self):
+                self.id = "custom"
+                self.node_type = "custom_plugin"
+
+        try:
+            clear_registered_workflow_node_executors()
+            register_workflow_node_executor("custom_plugin", CustomExecutor)
+            factory = NodeExecutorFactory()
+            executor = factory.create_executor(CustomNode())
+
+            result = await executor({})
+
+            assert factory.supports_node_type("custom_plugin") is True
+            assert result["custom"] == "custom"
+        finally:
+            clear_registered_workflow_node_executors()
 
 
 class TestConditionEvaluator:
@@ -365,6 +417,52 @@ class TestYAMLToStateGraphCompiler:
         compiler = YAMLToStateGraphCompiler(config=config)
 
         assert compiler.config.max_iterations == 100
+
+    def test_compile_uses_shared_native_backend(self, monkeypatch):
+        """Compile should route through the shared native workflow backend."""
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        checkpointer = MemoryCheckpointer()
+        config = CompilerConfig(
+            max_iterations=77,
+            timeout=33.0,
+            checkpointer=checkpointer,
+            interrupt_on_hitl=False,
+        )
+        captured: Dict[str, Any] = {}
+
+        class FakeNativeWorkflowGraphCompiler:
+            def __init__(
+                self,
+                node_executor_factory,
+                *,
+                checkpointer_factory=None,
+                enable_checkpointing=True,
+                interrupt_on_hitl=True,
+            ):
+                captured["node_executor_factory"] = node_executor_factory
+                captured["checkpointer_factory"] = checkpointer_factory
+                captured["enable_checkpointing"] = enable_checkpointing
+                captured["interrupt_on_hitl"] = interrupt_on_hitl
+
+            def compile(self, parsed):
+                captured["parsed"] = parsed
+                return "compiled"
+
+        monkeypatch.setattr(
+            "victor.workflows.yaml_to_graph_compiler.NativeWorkflowGraphCompiler",
+            FakeNativeWorkflowGraphCompiler,
+        )
+
+        compiler = YAMLToStateGraphCompiler(config=config)
+        compiled = compiler.compile(workflow)
+
+        assert compiled == "compiled"
+        assert captured["enable_checkpointing"] is True
+        assert captured["interrupt_on_hitl"] is False
+        assert captured["checkpointer_factory"]() is checkpointer
+        assert captured["parsed"].workflow.name == "test"
+        assert captured["parsed"].workflow.max_iterations == 77
+        assert captured["parsed"].workflow.max_execution_timeout_seconds == 33.0
 
     def test_compile_simple_workflow(self):
         """Test compiling a simple linear workflow."""
@@ -522,6 +620,50 @@ class TestConvenienceFunctions:
         compiled = compile_yaml_workflow(workflow)
         assert compiled is not None
 
+    def test_compile_yaml_workflow_passes_keyword_dependencies(self, monkeypatch):
+        """Test compile helper preserves tool registry and config keyword binding."""
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        orchestrator = object()
+        tool_registry = object()
+        config = CompilerConfig(max_iterations=77)
+        captured = {}
+
+        class FakeCompiler:
+            def __init__(
+                self,
+                orchestrator=None,
+                orchestrators=None,
+                tool_registry=None,
+                config=None,
+            ):
+                captured["orchestrator"] = orchestrator
+                captured["orchestrators"] = orchestrators
+                captured["tool_registry"] = tool_registry
+                captured["config"] = config
+
+            def compile(self, workflow):
+                captured["workflow"] = workflow
+                return "compiled"
+
+        monkeypatch.setattr(
+            "victor.workflows.yaml_to_graph_compiler.YAMLToStateGraphCompiler",
+            FakeCompiler,
+        )
+
+        compiled = compile_yaml_workflow(
+            workflow,
+            orchestrator=orchestrator,
+            tool_registry=tool_registry,
+            config=config,
+        )
+
+        assert compiled == "compiled"
+        assert captured["workflow"] is workflow
+        assert captured["orchestrator"] is orchestrator
+        assert captured["orchestrators"] is None
+        assert captured["tool_registry"] is tool_registry
+        assert captured["config"] is config
+
     @pytest.mark.asyncio
     async def test_execute_yaml_workflow(self):
         """Test execute_yaml_workflow function."""
@@ -536,6 +678,57 @@ class TestConvenienceFunctions:
 
         assert result.success is True
         assert result.state.get("done") is True
+
+    @pytest.mark.asyncio
+    async def test_execute_yaml_workflow_passes_keyword_dependencies(self, monkeypatch):
+        """Test execute helper preserves tool registry and config keyword binding."""
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        orchestrator = object()
+        tool_registry = object()
+        config = CompilerConfig(timeout=12.0)
+        captured = {}
+
+        class FakeCompiler:
+            def __init__(
+                self,
+                orchestrator=None,
+                orchestrators=None,
+                tool_registry=None,
+                config=None,
+            ):
+                captured["orchestrator"] = orchestrator
+                captured["orchestrators"] = orchestrators
+                captured["tool_registry"] = tool_registry
+                captured["config"] = config
+
+            async def compile_and_execute(self, workflow, initial_state, thread_id):
+                captured["workflow"] = workflow
+                captured["initial_state"] = initial_state
+                captured["thread_id"] = thread_id
+                return "executed"
+
+        monkeypatch.setattr(
+            "victor.workflows.yaml_to_graph_compiler.YAMLToStateGraphCompiler",
+            FakeCompiler,
+        )
+
+        result = await execute_yaml_workflow(
+            workflow,
+            initial_state={"x": 1},
+            orchestrator=orchestrator,
+            tool_registry=tool_registry,
+            thread_id="thread-1",
+            config=config,
+        )
+
+        assert result == "executed"
+        assert captured["workflow"] is workflow
+        assert captured["initial_state"] == {"x": 1}
+        assert captured["thread_id"] == "thread-1"
+        assert captured["orchestrator"] is orchestrator
+        assert captured["orchestrators"] is None
+        assert captured["tool_registry"] is tool_registry
+        assert captured["config"] is config
 
 
 class TestIntegrationWithYAMLLoader:

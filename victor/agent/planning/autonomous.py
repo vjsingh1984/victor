@@ -449,12 +449,15 @@ class AutonomousPlanner:
                         progress_callback(step, StepStatus.BLOCKED)
                     continue
 
-            # Execute step
+            # Execute step (delegate to sub-agent if appropriate)
             step.status = StepStatus.IN_PROGRESS
             if progress_callback:
                 progress_callback(step, StepStatus.IN_PROGRESS)
 
-            step_result = await self._execute_step(step)
+            if self._should_delegate_step(step):
+                step_result = await self._execute_step_via_subagent(step)
+            else:
+                step_result = await self._execute_step(step)
             step.result = step_result
             step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
 
@@ -560,6 +563,50 @@ class AutonomousPlanner:
             "tester": SubAgentRole.TESTER,
         }
         return mapping.get(role_str or "", SubAgentRole.EXECUTOR)
+
+    def _should_delegate_step(self, step: PlanStep) -> bool:
+        """Determine if a step should be delegated to a sub-agent.
+
+        Returns True if:
+        - Step is RESEARCH type and sub_agent_orchestrator is available
+        - Step has an explicit sub_agent_role and orchestrator is available
+        """
+        if self.sub_agent_orchestrator is None:
+            return False
+        if step.step_type == StepType.RESEARCH:
+            return True
+        if step.sub_agent_role is not None:
+            return True
+        return False
+
+    async def _execute_step_via_subagent(self, step: PlanStep) -> StepResult:
+        """Execute a step by delegating to a sub-agent.
+
+        Maps the step to a SubAgentRole and spawns a focused sub-agent
+        for the task.
+        """
+        start_time = time.time()
+        try:
+            role = self._map_role_string(step.sub_agent_role or "researcher")
+            sub_result = await self.sub_agent_orchestrator.spawn(
+                role=role,
+                task=step.description,
+                tool_budget=step.estimated_tool_calls,
+            )
+            return StepResult(
+                success=sub_result.success,
+                output=sub_result.summary[:1000],
+                tool_calls_used=getattr(sub_result, "tool_calls_used", 0),
+                duration_seconds=time.time() - start_time,
+            )
+        except Exception as e:
+            logger.error(f"Sub-agent delegation failed for step {step.id}: {e}")
+            return StepResult(
+                success=False,
+                output="",
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
 
     async def _execute_step(self, step: PlanStep) -> StepResult:
         """Execute a single step using the orchestrator."""

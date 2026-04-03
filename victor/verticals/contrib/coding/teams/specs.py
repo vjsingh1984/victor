@@ -20,19 +20,10 @@ and code review.
 
 This module uses the framework's multi-agent types (TeamTemplate, TeamSpec,
 TeamMember) while providing domain-specific team configurations for coding tasks.
-
-DEPRECATION NOTICE:
-    CodingTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor.framework.team_schema instead:
-
-        from victor.framework.team_schema import TeamSpec
-
-    CodingTeamSpec is maintained for backwards compatibility.
 """
 
-import warnings
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
@@ -177,137 +168,7 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
     ),
 }
 
-
-# Mapping from TeamFormation to TeamTopology
-_FORMATION_TO_TOPOLOGY: Dict[TeamFormation, TeamTopology] = {
-    TeamFormation.SEQUENTIAL: TeamTopology.PIPELINE,
-    TeamFormation.PIPELINE: TeamTopology.PIPELINE,
-    TeamFormation.PARALLEL: TeamTopology.MESH,
-    TeamFormation.HIERARCHICAL: TeamTopology.HIERARCHY,
-}
-
-
-@dataclass
-class CodingTeamSpec:
-    """Specification for a coding team.
-
-    .. deprecated::
-        CodingTeamSpec is deprecated. Use TeamSpec from
-        victor.framework.team_schema instead. CodingTeamSpec is maintained
-        for backwards compatibility but will be removed in a future version.
-
-    This class provides backward-compatible team specifications while
-    supporting conversion to the framework's TeamTemplate and TeamSpec types.
-
-    Attributes:
-        name: Team name
-        description: Team description
-        formation: How agents are organized
-        members: Team member specifications
-        total_tool_budget: Total tool budget for the team
-        max_iterations: Maximum iterations
-    """
-
-    name: str
-    description: str
-    formation: TeamFormation
-    members: List[TeamMemberSpec]
-    total_tool_budget: int = 100
-    max_iterations: int = 50
-
-    def __post_init__(self):
-        """Emit deprecation warning on instantiation."""
-        warnings.warn(
-            "CodingTeamSpec is deprecated. Use TeamSpec from "
-            "victor.framework.team_schema instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor.framework.team_schema.
-
-        Returns:
-            TeamSpec instance with vertical set to "coding"
-        """
-        return TeamSpec(
-            name=self.name,
-            description=self.description,
-            vertical="coding",
-            formation=self.formation,
-            members=self.members,
-            total_tool_budget=self.total_tool_budget,
-            max_iterations=self.max_iterations,
-        )
-
-    def to_team_template(self) -> TeamTemplate:
-        """Convert to framework TeamTemplate.
-
-        Returns:
-            TeamTemplate instance for use with framework multi-agent system
-        """
-        # Count roles for member_slots
-        role_counts: Dict[str, int] = {}
-        for member in self.members:
-            role_counts[member.role] = role_counts.get(member.role, 0) + 1
-
-        # Determine topology from formation
-        topology = _FORMATION_TO_TOPOLOGY.get(self.formation, TeamTopology.PIPELINE)
-
-        # Determine assignment strategy based on formation
-        if self.formation == TeamFormation.HIERARCHICAL:
-            assignment_strategy = TaskAssignmentStrategy.SKILL_MATCH
-        elif self.formation == TeamFormation.PARALLEL:
-            assignment_strategy = TaskAssignmentStrategy.LOAD_BALANCED
-        else:
-            assignment_strategy = TaskAssignmentStrategy.ROUND_ROBIN
-
-        return TeamTemplate(
-            name=self.name,
-            description=self.description,
-            topology=topology,
-            assignment_strategy=assignment_strategy,
-            member_slots=role_counts,
-            max_iterations=self.max_iterations,
-            config={
-                "total_tool_budget": self.total_tool_budget,
-                "formation": self.formation.value,
-            },
-        )
-
-    def to_framework_team_spec(self) -> FrameworkTeamSpec:
-        """Convert to framework TeamSpec with members.
-
-        Returns:
-            FrameworkTeamSpec instance for use with framework multi-agent system
-        """
-        template = self.to_team_template()
-
-        # Convert members to FrameworkTeamMember instances
-        framework_members: List[FrameworkTeamMember] = []
-        for member in self.members:
-            # Create PersonaTraits from TeamMemberSpec
-            persona = PersonaTraits(
-                name=member.name or f"{member.role.title()} Agent",
-                role=member.role,
-                description=member.backstory or member.goal,
-                communication_style=CommunicationStyle.TECHNICAL,
-                expertise_level=ExpertiseLevel.EXPERT,
-                strengths=member.expertise if member.expertise else [],
-            )
-
-            framework_member = FrameworkTeamMember(
-                persona=persona,
-                role_in_team=member.role,
-                is_leader=member.is_manager,
-                tool_access=[],  # Tools managed at team level
-            )
-            framework_members.append(framework_member)
-
-        return FrameworkTeamSpec(
-            template=template,
-            members=framework_members,
-        )
+# CodingTeamSpec removed (E5 M3) — use TeamSpec from victor.framework.team_schema instead
 
 
 # Pre-defined team specifications with rich personas

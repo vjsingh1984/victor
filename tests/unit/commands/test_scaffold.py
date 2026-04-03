@@ -148,9 +148,10 @@ class TestTemplateRendering:
 
         assert "Copyright 2025" in content
         assert "SecurityAssistant" in content
-        assert "SecuritySafetyExtension" in content
-        assert "SecurityPromptContributor" in content
-        assert "SecurityModeConfigProvider" in content
+        assert "SDK-first definition layer" in content
+        assert "SecuritySafetyExtension" not in content
+        assert "SecurityPromptContributor" not in content
+        assert "SecurityModeConfigProvider" not in content
 
     def test_assistant_template(self):
         """Test assistant.py template renders correctly."""
@@ -172,4 +173,7 @@ class TestTemplateRendering:
 
         assert "class SecurityAssistant(VerticalBase):" in content
         assert 'name = "security"' in content
-        assert "from victor.tools.tool_names import ToolNames" in content
+        assert "from victor_sdk import (" in content
+        assert "CapabilityRequirement" in content
+        assert "ToolRequirement" in content
+        assert "get_definition()" not in content  # scaffolded via VerticalBase

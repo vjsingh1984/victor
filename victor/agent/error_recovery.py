@@ -220,6 +220,7 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
         "get_symbol": "grep",
         "semantic_search": "grep",
         "semantic_code_search": "code_search",
+        "code_search": "grep",  # Second-level fallback
         "tree": "ls",
         "find_files": "glob",
         "analyze_dependencies": "grep",
@@ -228,7 +229,14 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
     def can_handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> bool:
         error_str = str(error).lower()
         return (
-            "not found" in error_str or "unknown tool" in error_str or "unregistered" in error_str
+            "not found" in error_str
+            or "unknown tool" in error_str
+            or "unregistered" in error_str
+            or "dependencies missing" in error_str
+            or "no module named" in error_str
+            or "import error" in error_str
+            or "not installed" in error_str
+            or isinstance(error, (ImportError, ModuleNotFoundError))
         )
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:

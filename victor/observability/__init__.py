@@ -107,14 +107,6 @@ from victor.observability.otel_exporter import (
     AsyncBatchingExporter,
     create_otel_exporter,
 )
-from victor.observability.cqrs_adapter import (
-    AdapterConfig,
-    CQRSEventAdapter,
-    EventDirection,
-    EventMappingRule,
-    UnifiedEventBridge,
-    create_unified_bridge,
-)
 from victor.observability.debugger import AgentDebugger
 from victor.observability.tracing import (
     ExecutionSpan,
@@ -159,13 +151,6 @@ __all__ = [
     "ObservabilityIntegration",
     "ToolEventMiddleware",
     "setup_observability",
-    # CQRS Adapter
-    "AdapterConfig",
-    "CQRSEventAdapter",
-    "EventDirection",
-    "EventMappingRule",
-    "UnifiedEventBridge",
-    "create_unified_bridge",
     # Tracing
     "ExecutionTracer",
     "ExecutionSpan",

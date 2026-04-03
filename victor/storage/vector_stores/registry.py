@@ -184,17 +184,32 @@ class EmbeddingRegistry:
 
     @classmethod
     def reset(cls) -> None:
-        """Reset the provider cache (mainly for testing).
-
-        This clears all cached provider instances. Next call to create()
-        will create fresh instances.
-
-        Warning: This does NOT call close() on cached providers. Callers
-        should close providers explicitly before calling reset() if needed.
-        """
+        """Reset the provider cache (mainly for testing)."""
         with cls._cache_lock:
+            if cls._provider_cache:
+                logger.warning(
+                    "[EmbeddingRegistry] reset() called with %d active providers. "
+                    "Call close_all() first to properly release resources.",
+                    len(cls._provider_cache),
+                )
             cls._provider_cache.clear()
             logger.info("[EmbeddingRegistry] Provider cache cleared")
+
+    @classmethod
+    async def close_all(cls) -> None:
+        """Close all cached providers and clear the cache.
+
+        Call this before reset() or application shutdown to properly
+        release database connections and embedding model resources.
+        """
+        with cls._cache_lock:
+            for key, provider in list(cls._provider_cache.items()):
+                try:
+                    await provider.close()
+                except Exception:
+                    logger.warning("Error closing provider %s", key, exc_info=True)
+            cls._provider_cache.clear()
+            logger.info("[EmbeddingRegistry] All providers closed and cache cleared")
 
     @classmethod
     def get_cache_stats(cls) -> Dict[str, int]:
@@ -238,6 +253,13 @@ def _auto_register_providers() -> None:
         EmbeddingRegistry.register("proximadb", ProximaDBProvider)
     except ImportError:
         pass  # ProximaDB not installed
+
+    try:
+        from victor.storage.vector_stores.proximadb_multi import ProximaDBMultiModelProvider
+
+        EmbeddingRegistry.register("proximadb_multi", ProximaDBMultiModelProvider)
+    except Exception:
+        pass  # ProximaDB SDK not installed
 
 
 # Auto-register on module import

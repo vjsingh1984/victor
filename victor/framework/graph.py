@@ -198,7 +198,7 @@ class CopyOnWriteState(Generic[StateType]):
         - Subsequent writes: O(1), no additional copy
     """
 
-    __slots__ = ("_source", "_copy", "_modified")
+    __slots__ = ("_source", "_copy", "_modified", "_owner_thread", "_owner_task")
 
     def __init__(self, source: StateType):
         """Initialize with source state.
@@ -206,16 +206,50 @@ class CopyOnWriteState(Generic[StateType]):
         Args:
             source: Original state dictionary (not copied until mutation)
         """
+        import asyncio
+        import threading
+
         self._source: StateType = source
         self._copy: Optional[StateType] = None
         self._modified: bool = False
+        self._owner_thread: int = threading.current_thread().ident or 0
+        # Track asyncio task identity to catch cross-task sharing
+        try:
+            self._owner_task: Optional[int] = id(asyncio.current_task())
+        except RuntimeError:
+            self._owner_task = None
 
     def _ensure_copy(self) -> StateType:
         """Ensure we have a mutable copy of the state.
 
         Returns:
             The mutable copy of the state
+
+        Raises:
+            RuntimeError: In debug mode, if accessed from a different thread
+                or asyncio task than the one that created this wrapper.
         """
+        import asyncio
+        import threading
+
+        current = threading.current_thread().ident or 0
+        if current != self._owner_thread and __debug__:
+            raise RuntimeError(
+                f"CopyOnWriteState thread violation: created on thread "
+                f"{self._owner_thread}, mutated from thread {current}. "
+                f"Each thread must use its own CopyOnWriteState wrapper."
+            )
+        if self._owner_task is not None and __debug__:
+            try:
+                current_task_id = id(asyncio.current_task())
+            except RuntimeError:
+                current_task_id = None
+            if current_task_id is not None and current_task_id != self._owner_task:
+                raise RuntimeError(
+                    "CopyOnWriteState task violation: created in a different "
+                    "asyncio task. Each task must use its own CopyOnWriteState "
+                    "wrapper."
+                )
         if not self._modified:
             self._copy = copy.deepcopy(self._source)
             self._modified = True
@@ -1060,7 +1094,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_started event: {e}")
+            logger.warning(f"Failed to emit graph_started event: {e}")
 
     def emit_node_start(self, node_id: str, iteration: int):
         """Emit node start event."""
@@ -1081,7 +1115,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit node_start event: {e}")
+            logger.warning(f"Failed to emit node_start event: {e}")
 
     def emit_node_complete(self, node_id: str, iteration: int, duration: float):
         """Emit node complete event."""
@@ -1104,7 +1138,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit node_end event: {e}")
+            logger.warning(f"Failed to emit node_end event: {e}")
 
     def emit_graph_completed(
         self, success: bool, iterations: int, duration: float, node_count: int
@@ -1129,7 +1163,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_completed event: {e}")
+            logger.warning(f"Failed to emit graph_completed event: {e}")
 
     def emit_graph_error(self, error: str, iterations: int, duration: float):
         """Emit graph error event."""
@@ -1151,7 +1185,7 @@ class GraphEventEmitter:
                 },
             )
         except Exception as e:
-            logger.debug(f"Failed to emit graph_error event: {e}")
+            logger.warning(f"Failed to emit graph_error event: {e}")
 
 
 class CompiledGraph(Generic[StateType]):
@@ -1168,6 +1202,7 @@ class CompiledGraph(Generic[StateType]):
         entry_point: str,
         state_schema: Optional[Type[StateType]] = None,
         config: Optional[GraphConfig] = None,
+        strict_edges: bool = False,
     ):
         """Initialize compiled graph.
 
@@ -1177,12 +1212,15 @@ class CompiledGraph(Generic[StateType]):
             entry_point: Starting node ID
             state_schema: Optional type for state validation
             config: Execution configuration
+            strict_edges: If True, raise EdgeResolutionError when a conditional
+                edge doesn't match any case instead of falling through to END.
         """
         self._nodes = nodes
         self._edges = edges
         self._entry_point = entry_point
         self._state_schema = state_schema
         self._config = config or GraphConfig()
+        self._strict_edges = strict_edges
         self._debug_hook: Optional[Any] = None  # DebugHook for debugging
 
     def set_debug_hook(self, hook: Optional[Any]) -> None:
@@ -1260,7 +1298,7 @@ class CompiledGraph(Generic[StateType]):
             )
         except Exception as e:
             # Don't let event emission failures break graph execution
-            logger.debug(f"Failed to emit {event_type} event: {e}")
+            logger.warning(f"Failed to emit {event_type} event: {e}")
 
     async def invoke(
         self,
@@ -1493,6 +1531,15 @@ class CompiledGraph(Generic[StateType]):
             target = edge.get_target(state)
             if target:
                 return target
+
+        # No conditional edge matched
+        if self._strict_edges:
+            from victor.framework.errors import EdgeResolutionError
+
+            raise EdgeResolutionError(
+                f"No conditional edge from '{current_node}' matched the "
+                f"current state. Use strict_edges=False to allow fallthrough."
+            )
 
         # Default to first edge if no conditional matches
         if edges and edges[0].edge_type == EdgeType.NORMAL:
@@ -1769,6 +1816,7 @@ class StateGraph(Generic[StateType]):
     def compile(
         self,
         checkpointer: Optional[CheckpointerProtocol] = None,
+        strict_edges: bool = False,
         **config_kwargs: Any,
     ) -> CompiledGraph[StateType]:
         """Compile the graph for execution.
@@ -1777,6 +1825,8 @@ class StateGraph(Generic[StateType]):
 
         Args:
             checkpointer: Optional checkpointer for persistence
+            strict_edges: If True, raise EdgeResolutionError when a conditional
+                edge doesn't match any case instead of falling through to END.
             **config_kwargs: Additional config options
 
         Returns:
@@ -1802,6 +1852,7 @@ class StateGraph(Generic[StateType]):
             entry_point=self._entry_point,
             state_schema=self._state_schema,
             config=config,
+            strict_edges=strict_edges,
         )
 
     def _validate(self) -> List[str]:

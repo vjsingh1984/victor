@@ -102,10 +102,7 @@ async def ollama_agent(ollama_model: str):
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    not _check_ollama_available(),
-    reason="Ollama server not available"
-)
+@pytest.mark.skipif(not _check_ollama_available(), reason="Ollama server not available")
 class TestFirstAgentNotebook:
     """Integration tests for the first agent notebook.
 

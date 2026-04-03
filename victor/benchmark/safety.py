@@ -85,7 +85,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Dangerous system operation",
                 severity=10,
             ),
-
             # Example: Use helper for file deletion pattern
             self.create_file_deletion_rule(
                 rule_id="benchmark_file_deletion",
@@ -93,7 +92,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Database/data file deletion",
                 severity=9,
             ),
-
             # Example: Use helper for completely blocked operation
             self.create_blocked_operation_rule(
                 rule_id="benchmark_production_modify",
@@ -101,7 +99,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Cannot modify production systems",
                 category=SafetyCategory.SHELL,
             ),
-
             # Example: Use helper for git operations
             self.create_git_force_push_rule(
                 rule_id="benchmark_git_force_push",

@@ -447,7 +447,7 @@ Victor provides tool presets for common use cases:
 |--------|----------------|----------|
 | `"minimal"` | filesystem | Simple file operations |
 | `"default"` | filesystem, search | General purpose |
-| `"full"` | All 33 tools | Maximum capabilities |
+| `"full"` | All 34 tools | Maximum capabilities |
 
 **Examples**:
 

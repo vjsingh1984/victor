@@ -20,7 +20,7 @@ Covers HIGH-002: Unified Tool Selection Architecture - Release 2, Phase 3.
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.protocols import ToolSelectionContext
+from victor.agent.protocols.tool_protocols import ToolSelectionContext
 from victor.providers.base import ToolDefinition
 from victor.tools.base import BaseTool, ToolRegistry, ToolResult
 from victor.tools.keyword_tool_selector import KeywordToolSelector

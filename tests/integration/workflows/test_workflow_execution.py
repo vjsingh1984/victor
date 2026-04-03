@@ -29,6 +29,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.workflows import (
     WorkflowBuilder,
     WorkflowDefinition,
@@ -37,6 +38,16 @@ from victor.workflows import (
     ExecutorNodeStatus,
     load_workflow_from_yaml,
 )
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None:
+        pytest.skip(f"Vertical module not available: {module_path}")
+    if not hasattr(module, attr_name):
+        pytest.skip(f"Missing attribute '{attr_name}' in module '{module_path}'")
+    return getattr(module, attr_name)
 
 
 @pytest.fixture
@@ -354,7 +365,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_coding_workflow_provider(self):
         """Test Coding vertical workflow provider."""
-        from victor.coding import CodingAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
 
         provider = CodingAssistant.get_workflow_provider()
         assert provider is not None
@@ -365,7 +376,10 @@ class TestVerticalWorkflowIntegration:
 
     def test_data_analysis_workflow_provider(self):
         """Test Data Analysis vertical workflow provider."""
-        from victor.dataanalysis import DataAnalysisAssistant
+        DataAnalysisAssistant = _load_vertical_attr(
+            "victor.dataanalysis",
+            "DataAnalysisAssistant",
+        )
 
         provider = DataAnalysisAssistant.get_workflow_provider()
         assert provider is not None
@@ -375,7 +389,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_research_workflow_provider(self):
         """Test Research vertical workflow provider."""
-        from victor.research import ResearchAssistant
+        ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
 
         provider = ResearchAssistant.get_workflow_provider()
         assert provider is not None
@@ -386,7 +400,7 @@ class TestVerticalWorkflowIntegration:
 
     def test_devops_workflow_provider(self):
         """Test DevOps vertical workflow provider."""
-        from victor.devops import DevOpsAssistant
+        DevOpsAssistant = _load_vertical_attr("victor.devops", "DevOpsAssistant")
 
         provider = DevOpsAssistant.get_workflow_provider()
         assert provider is not None
@@ -396,10 +410,13 @@ class TestVerticalWorkflowIntegration:
 
     def test_workflow_definition_validity(self):
         """Test that all vertical workflows pass validation."""
-        from victor.coding import CodingAssistant
-        from victor.dataanalysis import DataAnalysisAssistant
-        from victor.devops import DevOpsAssistant
-        from victor.research import ResearchAssistant
+        CodingAssistant = _load_vertical_attr("victor.coding", "CodingAssistant")
+        DataAnalysisAssistant = _load_vertical_attr(
+            "victor.dataanalysis",
+            "DataAnalysisAssistant",
+        )
+        DevOpsAssistant = _load_vertical_attr("victor.devops", "DevOpsAssistant")
+        ResearchAssistant = _load_vertical_attr("victor.research", "ResearchAssistant")
 
         verticals = [
             CodingAssistant,

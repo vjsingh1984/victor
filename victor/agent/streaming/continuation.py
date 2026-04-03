@@ -15,7 +15,9 @@
 """Continuation decision handler for streaming chat.
 
 This module provides the ContinuationHandler class which encapsulates
-the continuation decision logic extracted from _stream_chat_impl (P0 SRP refactor).
+the continuation decision logic that previously lived inside the legacy
+``ChatCoordinator._stream_chat_impl`` and is now invoked through the
+``StreamingChatPipeline``.
 
 The handler processes ContinuationStrategy action results and applies them
 to the streaming context, yielding appropriate chunks and returning control

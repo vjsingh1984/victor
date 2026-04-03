@@ -191,6 +191,8 @@ class TestConcreteImplementations:
         assert factory.supports_node_type("transform")
         assert factory.supports_node_type("parallel")
         assert factory.supports_node_type("condition")
+        assert factory.supports_node_type("team")
+        assert factory.supports_node_type("hitl")
 
     def test_agent_executor_satisfies_protocol(self):
         """Verify AgentNodeExecutor satisfies protocol."""
@@ -280,6 +282,32 @@ class TestConcreteImplementations:
 
         # Verify it supports condition nodes
         assert executor.supports_node_type("condition")
+        assert not executor.supports_node_type("agent")
+
+    def test_team_executor_satisfies_protocol(self):
+        """Verify TeamNodeExecutor satisfies protocol."""
+        from victor.workflows.executors.team import TeamNodeExecutor
+
+        executor = TeamNodeExecutor(context=None)
+
+        assert hasattr(executor, "execute")
+        assert callable(executor.execute)
+        assert hasattr(executor, "supports_node_type")
+        assert callable(executor.supports_node_type)
+        assert executor.supports_node_type("team")
+        assert not executor.supports_node_type("agent")
+
+    def test_hitl_executor_satisfies_protocol(self):
+        """Verify HITLNodeExecutor satisfies protocol."""
+        from victor.workflows.executors.hitl import HITLNodeExecutor
+
+        executor = HITLNodeExecutor(context=None)
+
+        assert hasattr(executor, "execute")
+        assert callable(executor.execute)
+        assert hasattr(executor, "supports_node_type")
+        assert callable(executor.supports_node_type)
+        assert executor.supports_node_type("hitl")
         assert not executor.supports_node_type("agent")
 
 

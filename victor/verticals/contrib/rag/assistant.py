@@ -27,19 +27,20 @@ Features:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
+from victor_sdk import (
+    CapabilityIds,
+    CapabilityRequirement,
+    StageDefinition,
     TieredToolConfig,
-    VerticalExtensions,
+    ToolNames,
+    VerticalBase,
 )
-from victor.framework.tool_naming import ToolNames
+from victor.verticals.contrib.rag.prompt_metadata import (
+    RAG_PROMPT_TEMPLATES,
+    RAG_TASK_TYPE_HINTS,
+)
 
 
 class RAGAssistant(VerticalBase):
@@ -54,11 +55,8 @@ class RAGAssistant(VerticalBase):
     Example:
         from victor.rag import RAGAssistant
 
-        config = RAGAssistant.get_config()
-        agent = await Agent.create(
-            tools=config.tools,
-            vertical=RAGAssistant,
-        )
+        definition = RAGAssistant.get_definition()
+        agent = await Agent.create(vertical=RAGAssistant)
     """
 
     name = "rag"
@@ -66,10 +64,22 @@ class RAGAssistant(VerticalBase):
     version = "1.0.0"
 
     @classmethod
+    def get_name(cls) -> str:
+        """Return the stable identifier for this vertical."""
+
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        """Return the human-readable vertical description."""
+
+        return cls.description
+
+    @classmethod
     def get_tools(cls) -> List[str]:
         """Get tools for RAG operations.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses canonical tool names from the SDK registry.
 
         Returns:
             List of RAG-specific tool names
@@ -89,6 +99,34 @@ class RAGAssistant(VerticalBase):
             ToolNames.WEB_FETCH,
             # Shell for document processing
             ToolNames.SHELL,
+        ]
+
+    @classmethod
+    def get_capability_requirements(cls) -> List[CapabilityRequirement]:
+        """Declare runtime capabilities required by the RAG definition layer."""
+
+        return [
+            CapabilityRequirement(
+                capability_id=CapabilityIds.FILE_OPS,
+                purpose="Read local documents and inspect repository content before ingesting.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.DOCUMENT_INGESTION,
+                purpose="Ingest source files and URLs into the knowledge base.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.RETRIEVAL,
+                purpose="Search indexed content and answer questions from retrieved context.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.VECTOR_INDEXING,
+                purpose="Build and maintain embedding-backed indexes for retrieval workflows.",
+            ),
+            CapabilityRequirement(
+                capability_id=CapabilityIds.WEB_ACCESS,
+                optional=True,
+                purpose="Fetch remote documents and web sources for ingestion when enabled.",
+            ),
         ]
 
     @classmethod
@@ -128,10 +166,22 @@ You: [Use rag_query tool with query="authentication"]
 """
 
     @classmethod
+    def get_prompt_templates(cls) -> Dict[str, str]:
+        """Get serializable prompt templates for the definition contract."""
+
+        return dict(RAG_PROMPT_TEMPLATES)
+
+    @classmethod
+    def get_task_type_hints(cls) -> Dict[str, Dict[str, Any]]:
+        """Get serializable task-type hints for the definition contract."""
+
+        return {task_type: dict(config) for task_type, config in RAG_TASK_TYPE_HINTS.items()}
+
+    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Get RAG-specific workflow stages.
 
-        Uses canonical tool names from victor.tools.tool_names.
+        Uses SDK-owned canonical tool identifiers.
 
         Returns:
             Stage definitions for RAG workflow
@@ -140,31 +190,35 @@ You: [Use rag_query tool with query="authentication"]
             "INITIAL": StageDefinition(
                 name="INITIAL",
                 description="Ready to accept RAG queries",
-                tools={"rag_search", "rag_query", "rag_list", "rag_stats"},
+                optional_tools=["rag_list", "rag_query", "rag_search", "rag_stats"],
                 next_stages={"INGESTING", "SEARCHING", "QUERYING"},
             ),
             "INGESTING": StageDefinition(
                 name="INGESTING",
                 description="Ingesting documents into knowledge base",
-                tools={"rag_ingest", ToolNames.READ, ToolNames.LS, ToolNames.WEB_FETCH},
+                optional_tools=[
+                    "rag_ingest",
+                    ToolNames.LS,
+                    ToolNames.READ,
+                    ToolNames.WEB_FETCH,
+                ],
                 next_stages={"INITIAL", "SEARCHING"},
             ),
             "SEARCHING": StageDefinition(
                 name="SEARCHING",
                 description="Searching knowledge base",
-                tools={"rag_search", "rag_query"},
+                optional_tools=["rag_query", "rag_search"],
                 next_stages={"INITIAL", "QUERYING", "SYNTHESIZING"},
             ),
             "QUERYING": StageDefinition(
                 name="QUERYING",
                 description="Processing query with retrieved context",
-                tools={"rag_query"},
+                optional_tools=["rag_query"],
                 next_stages={"SYNTHESIZING", "SEARCHING"},
             ),
             "SYNTHESIZING": StageDefinition(
                 name="SYNTHESIZING",
                 description="Synthesizing answer from retrieved context",
-                tools=set(),  # LLM response only
                 next_stages={"INITIAL"},
             ),
         }
@@ -206,67 +260,3 @@ You: [Use rag_query tool with query="authentication"]
             # Analysis tasks should not have write tools
             readonly_only_for_analysis=True,
         )
-
-    # Extension providers delegated to base class (OCP/caching compliance)
-    # RAG previously overrode get_extensions() directly, bypassing base class caching.
-    # Now we implement the individual getter methods and let VerticalBase.get_extensions()
-    # handle caching and aggregation.
-
-    @classmethod
-    def get_middleware(cls) -> list:
-        """Get RAG middleware (none needed).
-
-        Returns:
-            Empty list - RAG doesn't use custom middleware
-        """
-        return []
-
-    @classmethod
-    def get_safety_extension(cls):
-        """Get RAG safety extension.
-
-        Returns:
-            RAGSafetyExtension instance
-        """
-        return cls._get_extension_factory("safety_extension", "victor_rag.safety")
-
-    @classmethod
-    def get_prompt_contributor(cls):
-        """Get RAG prompt contributor.
-
-        Returns:
-            RAGPromptContributor instance
-        """
-        return cls._get_extension_factory("prompt_contributor", "victor_rag.prompts")
-
-    @classmethod
-    def get_rl_config_provider(cls):
-        """Get the RL configuration provider for RAG vertical.
-
-        Returns:
-            RAGRLConfig instance
-        """
-        return cls._get_extension_factory("rl_config_provider", "victor_rag.rl")
-
-    @classmethod
-    def get_team_spec_provider(cls):
-        """Get the team specification provider for RAG vertical.
-
-        Returns:
-            RAGTeamSpecProvider instance
-        """
-        return cls._get_extension_factory("team_spec_provider", "victor_rag.teams")
-
-    @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
-        """Get RAG capability configurations for centralized storage.
-
-        Returns default RAG configuration for VerticalContext storage.
-        This replaces direct orchestrator.rag_config assignment.
-
-        Returns:
-            Dict with default RAG capability configurations
-        """
-        from victor.verticals.contrib.rag.capabilities import get_capability_configs
-
-        return get_capability_configs()

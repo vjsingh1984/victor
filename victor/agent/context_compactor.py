@@ -289,6 +289,7 @@ class ContextCompactor:
         config: Optional[CompactorConfig] = None,
         pruning_learner: Optional["ContextPruningLearner"] = None,
         provider_type: str = "cloud",
+        event_bus: Optional[Any] = None,
     ):
         """Initialize the context compactor.
 
@@ -297,11 +298,13 @@ class ContextCompactor:
             config: Optional compactor configuration
             pruning_learner: Optional RL learner for adaptive pruning decisions
             provider_type: Provider type for RL state (cloud, local)
+            event_bus: Optional event bus for compaction events (ObservabilityBus)
         """
         self.controller = controller
         self.config = config or CompactorConfig()
         self.pruning_learner = pruning_learner
         self.provider_type = provider_type
+        self._event_bus = event_bus
         self._last_compaction_turn: int = 0
         self._total_chars_freed: int = 0
         self._total_tokens_freed: int = 0
@@ -493,6 +496,24 @@ class ContextCompactor:
             new_utilization=metrics_after.utilization,
             details=details,
         )
+
+        # Emit compaction event if event bus available
+        if self._event_bus and messages_removed > 0:
+            try:
+                from victor.core.events.emit_helper import emit_event_sync
+
+                emit_event_sync(
+                    self._event_bus,
+                    "context.compacted",
+                    {
+                        "messages_removed": messages_removed,
+                        "chars_freed": chars_freed,
+                        "trigger": trigger.value,
+                        "summary": "; ".join(details),
+                    },
+                )
+            except Exception as e:
+                logger.debug(f"Failed to emit compaction event: {e}")
 
         logger.info(
             f"Compaction complete: {messages_removed} messages removed, "

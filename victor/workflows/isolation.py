@@ -864,6 +864,39 @@ class IsolationMapper:
     )
 
     @classmethod
+    def apply_settings(cls, settings: Any) -> None:
+        """Apply SandboxSettings from Victor config to default isolation.
+
+        Reads settings.sandbox (SandboxSettings) and updates the
+        DEFAULT_CONFIG accordingly.
+
+        Args:
+            settings: Victor Settings instance.
+        """
+        sandbox = getattr(settings, "sandbox", None)
+        if sandbox is None:
+            return
+
+        enabled = getattr(sandbox, "sandbox_enabled", False)
+        if not enabled:
+            cls.DEFAULT_CONFIG = IsolationConfig(
+                sandbox_type="none",
+                network_allowed=True,
+                filesystem_readonly=False,
+            )
+            return
+
+        mode = getattr(sandbox, "sandbox_filesystem_mode", "workspace-only")
+        network = not getattr(sandbox, "sandbox_network_isolation", False)
+        readonly = mode == "workspace-only"
+
+        cls.DEFAULT_CONFIG = IsolationConfig(
+            sandbox_type="process",
+            network_allowed=network,
+            filesystem_readonly=readonly,
+        )
+
+    @classmethod
     def from_constraints(
         cls,
         constraints: "ConstraintsProtocol",

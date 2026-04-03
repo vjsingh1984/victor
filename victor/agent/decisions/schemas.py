@@ -1,0 +1,89 @@
+"""Pydantic models for structured LLM decision output.
+
+Each schema is designed for minimal token usage (5-20 tokens) to keep
+LLM decision calls fast and cheap. Fields use constrained types to
+enable strict validation of LLM responses.
+"""
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class DecisionType(str, Enum):
+    """Types of decisions the LLM decision service can make."""
+
+    TASK_COMPLETION = "task_completion"
+    INTENT_CLASSIFICATION = "intent_classification"
+    TASK_TYPE_CLASSIFICATION = "task_type_classification"
+    QUESTION_CLASSIFICATION = "question_classification"
+    LOOP_DETECTION = "loop_detection"
+    ERROR_CLASSIFICATION = "error_classification"
+    CONTINUATION_ACTION = "continuation_action"
+
+
+class TaskCompletionDecision(BaseModel):
+    """Is the task done?"""
+
+    is_complete: bool = Field(description="Whether the task appears complete")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the assessment")
+    phase: Literal["working", "finalizing", "done", "stuck"] = Field(
+        description="Current phase of task execution"
+    )
+
+
+class IntentDecision(BaseModel):
+    """What is the model doing?"""
+
+    intent: Literal["continuation", "completion", "asking_input", "stuck_loop"] = Field(
+        description="Classified intent of the model's response"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+
+
+class TaskTypeDecision(BaseModel):
+    """What kind of task is this?"""
+
+    task_type: Literal["analysis", "action", "generation", "search", "edit"] = Field(
+        description="Classified type of the task"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+
+
+class QuestionTypeDecision(BaseModel):
+    """Should we auto-continue past this question?"""
+
+    question_type: Literal["rhetorical", "continuation", "clarification", "info"] = Field(
+        description="Type of question being asked"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+
+
+class LoopDetection(BaseModel):
+    """Is the model stuck in a loop?"""
+
+    is_loop: bool = Field(description="Whether a loop is detected")
+    loop_type: Literal["stalling", "circular", "repetition", "none"] = Field(
+        description="Type of loop detected"
+    )
+
+
+class ErrorClassDecision(BaseModel):
+    """Can we retry this error?"""
+
+    error_type: Literal["permanent", "transient", "retryable"] = Field(
+        description="Classification of the error"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+
+
+class ContinuationDecision(BaseModel):
+    """What action should we take next?"""
+
+    action: Literal["finish", "prompt_tool_call", "request_summary", "return_to_user"] = Field(
+        description="Recommended next action"
+    )
+    reason: str = Field(max_length=100, description="Brief reason for the recommendation")

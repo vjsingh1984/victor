@@ -1,5 +1,9 @@
 # Victor Framework: Comprehensive Improvement Roadmap
 
+> Archived planning document. The canonical active roadmap lives in
+> [`../roadmap.md`](../roadmap.md). Targets and status in this file may be
+> superseded.
+
 **Status**: ✅ **Phases P0-P2 COMPLETED** (2025-02-21)
 **Created**: 2025-02-18
 **Authors**: Victor Architecture Team

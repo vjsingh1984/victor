@@ -179,7 +179,7 @@ class CodingCapabilityProvider(BaseCapabilityProvider):
 | Principle | Implementation | File |
 |-----------|----------------|------|
 | **SRP** | Each StepHandler handles one concern | [`step_handlers.py`](../../../victor/framework/step_handlers.py) |
-| **OCP** | ExtensionHandlerRegistry for pluggable handlers | [`vertical_integration.py:287`](../../../victor/framework/vertical_integration.py#L287) |
+| **OCP** | ExtensionsStepHandler extension registry for pluggable handlers | [`step_handlers.py`](../../../victor/framework/step_handlers.py) |
 | **LSP** | StepHandlerProtocol ensures substitutability | [`step_handlers.py:278`](../../../victor/framework/step_handlers.py#L278) |
 | **ISP** | Focused protocols (CapabilityRegistry, SubAgentContext) | [`protocols.py`](../../../victor/framework/protocols.py) |
 | **DIP** | `_check_capability`/`_invoke_capability` use protocols | [`step_handlers.py:120`](../../../victor/framework/step_handlers.py#L120) |
@@ -209,20 +209,20 @@ registry = StepHandlerRegistry.default()
 registry.add_handler(MyCustomStepHandler())
 ```
 
-### Adding Extension Handlers
+### Adding Extension Handlers (Active Path)
 
 ```python
-from victor.framework.vertical_integration import register_extension_handler
+from victor.framework.step_handlers import ExtensionsStepHandler, StepHandlerRegistry, ExtensionHandler
 
 def handle_my_extension(orchestrator, ext_value, extensions, context, result):
-    # Handle extension type
-    pass
+    # Handle extension type from vertical.get_extensions()
+    result.add_info("Handled my_extension")
 
-register_extension_handler(
-    name="my_extension",
-    attr_name="my_extension_provider",
-    handler=handle_my_extension,
-    order=60,
+registry = StepHandlerRegistry.default()
+extensions = registry.get_handler("extensions")
+assert isinstance(extensions, ExtensionsStepHandler)
+extensions.extension_registry.register(
+    ExtensionHandler("my_extension_provider", handle_my_extension, priority=60)
 )
 ```
 

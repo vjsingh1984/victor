@@ -389,6 +389,30 @@ class TestConversationMemoryAdapter:
         # Should fall back to keyword matching in recent messages
         assert isinstance(results, list)
 
+    @pytest.mark.asyncio
+    async def test_search_prefers_async_conversation_store_api(self):
+        """Adapter should await the async semantic search API when available."""
+        store = MockConversationStore()
+        store.aget_semantically_relevant_messages = AsyncMock(
+            return_value=[
+                (
+                    MockConversationMessage(
+                        id="msg_async",
+                        role_value="assistant",
+                        content="Authentication middleware failed",
+                    ),
+                    0.91,
+                )
+            ]
+        )
+        adapter = ConversationMemoryAdapter(store, session_id="session_async")
+
+        results = await adapter.search(MemoryQuery(query="auth", limit=5))
+
+        assert len(results) == 1
+        assert results[0].id == "msg_async"
+        store.aget_semantically_relevant_messages.assert_awaited_once()
+
     def test_is_available(self, adapter):
         """Test availability check."""
         assert adapter.is_available() is True

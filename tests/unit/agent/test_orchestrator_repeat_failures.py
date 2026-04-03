@@ -73,14 +73,20 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
         max_tokens=10,
     )
 
-    # Inject a failing tool into the tools registry and pipeline
+    # Inject a failing tool into the orchestrator's existing tools registry
     failing_tool = AlwaysFailTool()
-    orch.tools = ToolRegistry()
     orch.tools.register(failing_tool)
     # Update all components that reference the tools registry
     orch.tool_executor.tools = orch.tools
     orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
     orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
+    # Also update tool coordinator's registry so is_tool_enabled works
+    if hasattr(orch._tool_coordinator, "_tools"):
+        orch._tool_coordinator._tools = orch.tools
+    # Ensure is_tool_enabled returns True for our test tool
+    orch.is_tool_enabled = lambda name: name == "always_fail" or name in {
+        t.name for t in orch.tools.list_tools()
+    }
 
     # Simulate a single tool call repeated twice
     tool_calls = [

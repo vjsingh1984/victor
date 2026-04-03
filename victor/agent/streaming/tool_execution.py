@@ -15,7 +15,8 @@
 """Tool execution handler for streaming chat.
 
 This module provides the ToolExecutionHandler class which encapsulates
-the tool execution logic extracted from _stream_chat_impl (P0 SRP refactor).
+the tool execution logic that used to live in ``ChatCoordinator._stream_chat_impl``.
+The canonical orchestration now happens via ``StreamingChatPipeline``.
 
 The handler manages:
 - Budget warnings and exhaustion

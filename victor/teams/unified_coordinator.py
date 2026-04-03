@@ -36,6 +36,7 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -59,7 +60,7 @@ from victor.teams.types import (
 )
 
 if TYPE_CHECKING:
-    from victor.teams.protocols import ITeamMember
+    from victor.protocols.team import ITeamMember
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         # Communication
         self._message_history: List[AgentMessage] = []
+        self._message_lock = asyncio.Lock()
         self._shared_context: Dict[str, Any] = {}
 
         # LSP capability for language intelligence
@@ -261,8 +263,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 "formation": self._formation.value,
             }
 
-        # Initialize shared context
-        self._shared_context = dict(context)
+        # Initialize shared context (deep copy for isolation)
+        self._shared_context = copy.deepcopy(dict(context))
         self._message_history = []
         start_time = time.time()
 
@@ -335,7 +337,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         Returns:
             List of responses from members
         """
-        self._message_history.append(message)
+        async with self._message_lock:
+            self._message_history.append(message)
         responses: List[Optional[AgentMessage]] = []
 
         for member in self._members:
@@ -343,7 +346,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 try:
                     response = await member.receive_message(message)
                     if response:
-                        self._message_history.append(response)
+                        async with self._message_lock:
+                            self._message_history.append(response)
                     responses.append(response)
                 except Exception as e:
                     logger.warning(f"Member {member.id} failed to receive: {e}")
@@ -363,7 +367,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         if not message.recipient_id:
             return None
 
-        self._message_history.append(message)
+        async with self._message_lock:
+            self._message_history.append(message)
 
         # Find recipient
         for member in self._members:
@@ -371,7 +376,8 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 try:
                     response = await member.receive_message(message)
                     if response:
-                        self._message_history.append(response)
+                        async with self._message_lock:
+                            self._message_history.append(response)
                     return response
                 except Exception as e:
                     logger.warning(f"Member {member.id} failed to receive: {e}")

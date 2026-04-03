@@ -175,26 +175,23 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
         handle = ServiceHandle.create(config)
         namespace = config.k8s_namespace or self._namespace
-        loop = asyncio.get_event_loop()
 
         try:
             # Create deployment
             deployment = self._build_deployment(config, handle)
-            await loop.run_in_executor(
-                None,
-                lambda: self.apps_v1.create_namespaced_deployment(
-                    namespace=namespace, body=deployment
-                ),
+            await asyncio.to_thread(
+                self.apps_v1.create_namespaced_deployment,
+                namespace=namespace,
+                body=deployment,
             )
 
             # Create service if ports defined
             if config.ports:
                 service = self._build_service(config, handle)
-                await loop.run_in_executor(
-                    None,
-                    lambda: self.core_v1.create_namespaced_service(
-                        namespace=namespace, body=service
-                    ),
+                await asyncio.to_thread(
+                    self.core_v1.create_namespaced_service,
+                    namespace=namespace,
+                    body=service,
                 )
 
             handle.state = ServiceState.STARTING
@@ -331,7 +328,6 @@ class KubernetesServiceProvider(BaseServiceProvider):
         self, handle: ServiceHandle, namespace: str, timeout: int = 300
     ) -> None:
         """Wait for deployment to have ready replicas."""
-        loop = asyncio.get_event_loop()
         start_time = datetime.now(timezone.utc)
         deployment_name = handle.service_id
 
@@ -345,11 +341,10 @@ class KubernetesServiceProvider(BaseServiceProvider):
                 )
 
             try:
-                deployment = await loop.run_in_executor(
-                    None,
-                    lambda: self.apps_v1.read_namespaced_deployment(
-                        name=deployment_name, namespace=namespace
-                    ),
+                deployment = await asyncio.to_thread(
+                    self.apps_v1.read_namespaced_deployment,
+                    name=deployment_name,
+                    namespace=namespace,
                 )
 
                 ready = deployment.status.ready_replicas or 0
@@ -370,15 +365,13 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
     async def _get_service_endpoint(self, handle: ServiceHandle, namespace: str) -> Dict[str, Any]:
         """Get service endpoint (host and ports)."""
-        loop = asyncio.get_event_loop()
         service_name = handle.service_id
 
         try:
-            service = await loop.run_in_executor(
-                None,
-                lambda: self.core_v1.read_namespaced_service(
-                    name=service_name, namespace=namespace
-                ),
+            service = await asyncio.to_thread(
+                self.core_v1.read_namespaced_service,
+                name=service_name,
+                namespace=namespace,
             )
 
             # For ClusterIP, use service DNS name
@@ -397,32 +390,28 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
     async def _do_stop(self, handle: ServiceHandle, grace_period: float) -> None:
         """Delete Kubernetes Deployment and Service."""
-        loop = asyncio.get_event_loop()
         namespace = handle.metadata.get("namespace", self._namespace)
         deployment_name = handle.service_id
 
         try:
             # Delete deployment
-            await loop.run_in_executor(
-                None,
-                lambda: self.apps_v1.delete_namespaced_deployment(
-                    name=deployment_name,
-                    namespace=namespace,
-                    body=client.V1DeleteOptions(
-                        grace_period_seconds=int(grace_period),
-                        propagation_policy="Foreground",
-                    ),
+            await asyncio.to_thread(
+                self.apps_v1.delete_namespaced_deployment,
+                name=deployment_name,
+                namespace=namespace,
+                body=client.V1DeleteOptions(
+                    grace_period_seconds=int(grace_period),
+                    propagation_policy="Foreground",
                 ),
             )
 
             # Delete service
             if handle.config.ports:
                 try:
-                    await loop.run_in_executor(
-                        None,
-                        lambda: self.core_v1.delete_namespaced_service(
-                            name=deployment_name, namespace=namespace
-                        ),
+                    await asyncio.to_thread(
+                        self.core_v1.delete_namespaced_service,
+                        name=deployment_name,
+                        namespace=namespace,
                     )
                 except ApiException:
                     pass
@@ -440,17 +429,14 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
     async def get_logs(self, handle: ServiceHandle, tail: int = 100) -> str:
         """Get pod logs."""
-        loop = asyncio.get_event_loop()
         namespace = handle.metadata.get("namespace", self._namespace)
 
         try:
             # Get pods for deployment
-            pods = await loop.run_in_executor(
-                None,
-                lambda: self.core_v1.list_namespaced_pod(
-                    namespace=namespace,
-                    label_selector=f"{self._label_prefix}/id={handle.service_id}",
-                ),
+            pods = await asyncio.to_thread(
+                self.core_v1.list_namespaced_pod,
+                namespace=namespace,
+                label_selector=f"{self._label_prefix}/id={handle.service_id}",
             )
 
             if not pods.items:
@@ -458,13 +444,11 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
             # Get logs from first pod
             pod = pods.items[0]
-            logs = await loop.run_in_executor(
-                None,
-                lambda: self.core_v1.read_namespaced_pod_log(
-                    name=pod.metadata.name,
-                    namespace=namespace,
-                    tail_lines=tail,
-                ),
+            logs = await asyncio.to_thread(
+                self.core_v1.read_namespaced_pod_log,
+                name=pod.metadata.name,
+                namespace=namespace,
+                tail_lines=tail,
             )
 
             return logs
@@ -474,17 +458,14 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
     async def _run_command_in_service(self, handle: ServiceHandle, command: str) -> Tuple[int, str]:
         """Execute command in pod."""
-        loop = asyncio.get_event_loop()
         namespace = handle.metadata.get("namespace", self._namespace)
 
         try:
             # Get pods for deployment
-            pods = await loop.run_in_executor(
-                None,
-                lambda: self.core_v1.list_namespaced_pod(
-                    namespace=namespace,
-                    label_selector=f"{self._label_prefix}/id={handle.service_id}",
-                ),
+            pods = await asyncio.to_thread(
+                self.core_v1.list_namespaced_pod,
+                namespace=namespace,
+                label_selector=f"{self._label_prefix}/id={handle.service_id}",
             )
 
             if not pods.items:
@@ -493,18 +474,16 @@ class KubernetesServiceProvider(BaseServiceProvider):
             pod = pods.items[0]
 
             # Execute command
-            resp = await loop.run_in_executor(
-                None,
-                lambda: stream(
-                    self.core_v1.connect_get_namespaced_pod_exec,
-                    name=pod.metadata.name,
-                    namespace=namespace,
-                    command=["/bin/sh", "-c", command],
-                    stderr=True,
-                    stdin=False,
-                    stdout=True,
-                    tty=False,
-                ),
+            resp = await asyncio.to_thread(
+                stream,
+                self.core_v1.connect_get_namespaced_pod_exec,
+                name=pod.metadata.name,
+                namespace=namespace,
+                command=["/bin/sh", "-c", command],
+                stderr=True,
+                stdin=False,
+                stdout=True,
+                tty=False,
             )
 
             return 0, resp
@@ -514,48 +493,41 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
     async def cleanup_all(self, namespace: Optional[str] = None) -> int:
         """Clean up all managed resources in namespace."""
-        loop = asyncio.get_event_loop()
         ns = namespace or self._namespace
         count = 0
 
         try:
             # Delete all managed deployments
-            deployments = await loop.run_in_executor(
-                None,
-                lambda: self.apps_v1.list_namespaced_deployment(
-                    namespace=ns,
-                    label_selector=f"{self._label_prefix}/managed=true",
-                ),
+            deployments = await asyncio.to_thread(
+                self.apps_v1.list_namespaced_deployment,
+                namespace=ns,
+                label_selector=f"{self._label_prefix}/managed=true",
             )
 
             for dep in deployments.items:
                 try:
-                    await loop.run_in_executor(
-                        None,
-                        lambda d=dep: self.apps_v1.delete_namespaced_deployment(
-                            name=d.metadata.name, namespace=ns
-                        ),
+                    await asyncio.to_thread(
+                        self.apps_v1.delete_namespaced_deployment,
+                        name=dep.metadata.name,
+                        namespace=ns,
                     )
                     count += 1
                 except ApiException:
                     pass
 
             # Delete all managed services
-            services = await loop.run_in_executor(
-                None,
-                lambda: self.core_v1.list_namespaced_service(
-                    namespace=ns,
-                    label_selector=f"{self._label_prefix}/managed=true",
-                ),
+            services = await asyncio.to_thread(
+                self.core_v1.list_namespaced_service,
+                namespace=ns,
+                label_selector=f"{self._label_prefix}/managed=true",
             )
 
             for svc in services.items:
                 try:
-                    await loop.run_in_executor(
-                        None,
-                        lambda s=svc: self.core_v1.delete_namespaced_service(
-                            name=s.metadata.name, namespace=ns
-                        ),
+                    await asyncio.to_thread(
+                        self.core_v1.delete_namespaced_service,
+                        name=svc.metadata.name,
+                        namespace=ns,
                     )
                 except ApiException:
                     pass

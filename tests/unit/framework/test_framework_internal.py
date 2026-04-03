@@ -97,7 +97,7 @@ class TestSetupObservabilityIntegration:
 
             result = setup_observability_integration(mock_orchestrator)
 
-            MockIntegration.assert_called_once_with(session_id=None, enable_cqrs_bridge=False)
+            MockIntegration.assert_called_once_with(session_id=None)
             mock_integration.wire_orchestrator.assert_called_once_with(mock_orchestrator)
             mock_orchestrator.set_observability.assert_called_once_with(mock_integration)
             assert result == mock_integration
@@ -138,23 +138,7 @@ class TestSetupObservabilityIntegration:
 
             setup_observability_integration(mock_orchestrator, session_id="test-session-123")
 
-            MockIntegration.assert_called_once_with(
-                session_id="test-session-123", enable_cqrs_bridge=False
-            )
-
-    def test_setup_with_cqrs_bridge(self):
-        """Test setup with CQRS bridge enabled."""
-        mock_orchestrator = MagicMock()
-
-        with patch("victor.observability.integration.ObservabilityIntegration") as MockIntegration:
-            mock_integration = MagicMock()
-            MockIntegration.return_value = mock_integration
-
-            setup_observability_integration(
-                mock_orchestrator, session_id="s1", enable_cqrs_bridge=True
-            )
-
-            MockIntegration.assert_called_once_with(session_id="s1", enable_cqrs_bridge=True)
+            MockIntegration.assert_called_once_with(session_id="test-session-123")
 
 
 class TestVerticalApplicationDelegation:
@@ -340,6 +324,71 @@ class TestStreamWithEvents:
         assert tool_events[0].tool_name == "read"
         assert tool_events[0].tool_id == "call_1"
         assert tool_events[0].arguments == {"path": "/test"}
+
+    @pytest.mark.asyncio
+    async def test_stream_uses_event_registry_for_chunk_conversion(self):
+        """Chunk events should be converted through EventRegistry."""
+        from victor.framework.event_registry import EventRegistry, EventTarget
+
+        mock_orchestrator = MagicMock()
+
+        async def mock_stream_chat(prompt):
+            chunk = MagicMock()
+            chunk.content = "hello"
+            chunk.metadata = {
+                "reasoning_content": "thinking...",
+                "tool_start": {
+                    "name": "read",
+                    "id": "call_start",
+                    "arguments": {"path": "/tmp/a.py"},
+                },
+                "tool_result": {
+                    "name": "read",
+                    "id": "call_start",
+                    "result": "ok",
+                    "success": True,
+                },
+            }
+            chunk.tool_calls = [{"name": "grep", "id": "call_2", "arguments": {"pattern": "TODO"}}]
+            yield chunk
+
+        mock_orchestrator.stream_chat = mock_stream_chat
+
+        real_registry = EventRegistry.get_instance()
+        proxy_registry = MagicMock()
+        proxy_registry.from_external.side_effect = (
+            lambda data, external_type, target, metadata=None: real_registry.from_external(
+                data,
+                external_type,
+                target,
+                metadata=metadata,
+            )
+        )
+
+        events = []
+        with patch("victor.framework._internal.get_event_registry", return_value=proxy_registry):
+            async for event in stream_with_events(mock_orchestrator, "test"):
+                events.append(event)
+
+        # 5 chunk-derived conversions: thinking, content, tool_start, tool_result, tool_call
+        assert proxy_registry.from_external.call_count == 5
+        assert [call.args[1] for call in proxy_registry.from_external.call_args_list] == [
+            "reasoning_content",
+            "content",
+            "tool_start",
+            "tool_result",
+            "tool_call",
+        ]
+        assert all(
+            call.args[2] == EventTarget.STREAM_CHUNK
+            for call in proxy_registry.from_external.call_args_list
+        )
+
+        event_types = [event.type for event in events]
+        assert EventType.THINKING in event_types
+        assert EventType.CONTENT in event_types
+        assert EventType.TOOL_CALL in event_types
+        assert EventType.TOOL_RESULT in event_types
 
     @pytest.mark.asyncio
     async def test_stream_error_handling(self):

@@ -1552,18 +1552,13 @@ class WorkflowExecutor:
                 if asyncio.iscoroutinefunction(chain_obj.invoke):
                     result = await chain_obj.invoke(input_params)
                 else:
-                    # Run sync invoke in executor
-                    loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(
-                        None, lambda: chain_obj.invoke(input_params)
-                    )
+                    result = await asyncio.to_thread(chain_obj.invoke, input_params)
             elif callable(chain_obj):
                 # Simple callable chain
                 if asyncio.iscoroutinefunction(chain_obj):
                     result = await chain_obj(**input_params)
                 else:
-                    loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(None, lambda: chain_obj(**input_params))
+                    result = await asyncio.to_thread(chain_obj, **input_params)
             else:
                 # Chain is not callable - treat as static data
                 result = chain_obj

@@ -63,6 +63,12 @@ class SecretSeverity(Enum):
     MEDIUM = "medium"  # Generic secrets
     LOW = "low"  # Potentially sensitive
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_secret_severity(self)
+
 
 @dataclass
 class SecretMatch:

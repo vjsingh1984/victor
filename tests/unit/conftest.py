@@ -45,3 +45,85 @@ def reset_api_keys_logger():
     logger.handlers = original_handlers
     logger.level = original_level
     logger.propagate = original_propagate
+
+
+@pytest.fixture(autouse=True)
+def reset_embedding_singleton():
+    """Reset EmbeddingService singleton between tests to prevent state leakage.
+
+    The singleton pattern means first caller wins model choice. Without
+    this fixture, test ordering can cause stale embeddings from a different
+    model to be returned.
+    """
+    yield
+    # Only import and reset if the module was loaded (avoid importing heavy deps)
+    import sys
+
+    if "victor.storage.embeddings.service" in sys.modules:
+        from victor.storage.embeddings.service import EmbeddingService
+
+        if EmbeddingService._instance is not None:
+            EmbeddingService.reset_instance()
+
+
+@pytest.fixture(autouse=True)
+def reset_global_state_manager():
+    """Reset GlobalStateManager singleton between tests to prevent state leakage."""
+    yield
+    import sys
+
+    if "victor.state.factory" in sys.modules:
+        from victor.state.factory import reset_global_manager
+
+        reset_global_manager()
+
+
+@pytest.fixture(autouse=True)
+def isolate_environment_variables():
+    """Isolate environment variables between tests.
+
+    Clears API key env vars and mocks get_api_key to prevent
+    tests from loading real credentials.
+    """
+    import os
+    from unittest.mock import patch
+
+    api_key_vars = [
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GOOGLE_API_KEY",
+        "AZURE_OPENAI_API_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "DEEPSEEK_API_KEY",
+        "GROQ_API_KEY",
+        "MISTRAL_API_KEY",
+        "TOGETHER_API_KEY",
+        "FIREWORKS_API_KEY",
+        "XAI_API_KEY",
+        "REPLICATE_API_TOKEN",
+        "HUGGINGFACE_API_KEY",
+    ]
+    saved = {k: os.environ.pop(k, None) for k in api_key_vars}
+
+    with patch("victor.config.api_keys.get_api_key", return_value=None):
+        yield
+
+    for k, v in saved.items():
+        if v is not None:
+            os.environ[k] = v
+
+
+@pytest.fixture(autouse=True)
+def reset_service_container():
+    """Reset DI service container between tests to prevent state leakage."""
+    yield
+    import sys
+
+    if "victor.core.bootstrap" in sys.modules:
+        try:
+            from victor.core.bootstrap import reset_container
+
+            reset_container()
+        except ImportError:
+            pass  # Module not loaded, nothing to reset

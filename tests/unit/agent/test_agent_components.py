@@ -39,7 +39,6 @@ def mock_agent():
     agent = MagicMock()
     agent._orchestrator = MagicMock()
     agent._state_observers = []
-    agent._cqrs_adapter = None
     agent.event_bus = None
     agent._builder_metadata = {}
     agent._presets_applied = []
@@ -97,7 +96,6 @@ class TestAgentBuildOptions:
         assert not options.thinking
         assert not options.airgapped
         assert options.enable_observability
-        assert not options.enable_cqrs
 
     def test_custom_values(self):
         """Test custom option values."""
@@ -106,13 +104,11 @@ class TestAgentBuildOptions:
             model="gpt-4",
             temperature=0.5,
             thinking=True,
-            enable_cqrs=True,
         )
         assert options.provider == "openai"
         assert options.model == "gpt-4"
         assert options.temperature == 0.5
         assert options.thinking
-        assert options.enable_cqrs
 
 
 # =============================================================================
@@ -224,16 +220,6 @@ class TestAgentBuilder:
         builder = AgentBuilder().session_id("my-session-123")
         assert builder._options.session_id == "my-session-123"
 
-    def test_with_cqrs_chain(self):
-        """Test fluent CQRS setting."""
-        builder = AgentBuilder().with_cqrs(True, event_sourcing=True)
-        assert builder._options.enable_cqrs
-        assert builder._options.cqrs_event_sourcing
-
-        builder2 = AgentBuilder().with_cqrs(True, event_sourcing=False)
-        assert builder2._options.enable_cqrs
-        assert not builder2._options.cqrs_event_sourcing
-
     def test_metadata_chain(self):
         """Test fluent metadata setting."""
         builder = AgentBuilder().metadata("key1", "value1").metadata("key2", 123)
@@ -250,7 +236,6 @@ class TestAgentBuilder:
             .max_tokens(4096)
             .thinking(True)
             .with_observability(True)
-            .with_cqrs(True)
             .metadata("purpose", "testing")
         )
 
@@ -261,7 +246,6 @@ class TestAgentBuilder:
         assert opts.max_tokens == 4096
         assert opts.thinking
         assert opts.enable_observability
-        assert opts.enable_cqrs
         assert opts.metadata["purpose"] == "testing"
 
     def test_get_options_returns_copy(self):
@@ -574,8 +558,6 @@ class TestBridgeConfiguration:
     def test_default_config(self):
         """Test default configuration."""
         config = BridgeConfiguration()
-        assert config.enable_cqrs
-        assert config.enable_event_sourcing
         assert config.enable_observability
         assert config.enable_metrics
         assert config.auto_forward_events
@@ -583,12 +565,8 @@ class TestBridgeConfiguration:
     def test_custom_config(self):
         """Test custom configuration."""
         config = BridgeConfiguration(
-            enable_cqrs=False,
-            enable_event_sourcing=False,
             auto_forward_events=False,
         )
-        assert not config.enable_cqrs
-        assert not config.enable_event_sourcing
         assert not config.auto_forward_events
 
 
@@ -604,28 +582,25 @@ class TestAgentBridge:
 
     def test_bridge_with_config(self, mock_agent):
         """Test bridge with custom config."""
-        config = BridgeConfiguration(enable_cqrs=False)
+        config = BridgeConfiguration()
         bridge = AgentBridge(mock_agent, config)
-        assert bridge._config.enable_cqrs is False
+        assert bridge._config.enable_observability is True
 
     @pytest.mark.asyncio
-    async def test_connect_without_cqrs(self, mock_agent):
-        """Test connect without CQRS enabled."""
-        config = BridgeConfiguration(enable_cqrs=False)
-        bridge = AgentBridge(mock_agent, config)
+    async def test_connect(self, mock_agent):
+        """Test connect."""
+        bridge = AgentBridge(mock_agent)
 
         session_id = await bridge.connect()
 
         assert bridge.connected
         assert session_id is not None
         assert bridge.session_id == session_id
-        assert bridge.cqrs_bridge is None
 
     @pytest.mark.asyncio
     async def test_connect_already_connected_raises(self, mock_agent):
         """Test connect when already connected raises error."""
-        config = BridgeConfiguration(enable_cqrs=False)
-        bridge = AgentBridge(mock_agent, config)
+        bridge = AgentBridge(mock_agent)
         await bridge.connect()
 
         with pytest.raises(AgentError, match="already connected"):
@@ -634,8 +609,7 @@ class TestAgentBridge:
     @pytest.mark.asyncio
     async def test_disconnect(self, mock_agent):
         """Test disconnect."""
-        config = BridgeConfiguration(enable_cqrs=False)
-        bridge = AgentBridge(mock_agent, config)
+        bridge = AgentBridge(mock_agent)
         await bridge.connect()
 
         await bridge.disconnect()
@@ -650,35 +624,9 @@ class TestAgentBridge:
         await bridge.disconnect()  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_get_session_info_not_connected(self, mock_agent):
-        """Test get_session_info when not connected raises error."""
-        bridge = AgentBridge(mock_agent)
-
-        with pytest.raises(AgentError, match="not connected"):
-            await bridge.get_session_info()
-
-    @pytest.mark.asyncio
-    async def test_get_conversation_history_not_connected(self, mock_agent):
-        """Test get_conversation_history when not connected raises error."""
-        bridge = AgentBridge(mock_agent)
-
-        with pytest.raises(AgentError, match="not connected"):
-            await bridge.get_conversation_history()
-
-    @pytest.mark.asyncio
-    async def test_get_metrics_not_connected(self, mock_agent):
-        """Test get_metrics when not connected raises error."""
-        bridge = AgentBridge(mock_agent)
-
-        with pytest.raises(AgentError, match="not connected"):
-            await bridge.get_metrics()
-
-    @pytest.mark.asyncio
     async def test_context_manager(self, mock_agent):
         """Test bridge as context manager."""
-        config = BridgeConfiguration(enable_cqrs=False)
-
-        async with AgentBridge(mock_agent, config) as bridge:
+        async with AgentBridge(mock_agent) as bridge:
             assert bridge.connected
 
         assert not bridge.connected
@@ -689,28 +637,6 @@ class TestAgentBridge:
         repr_str = repr(bridge)
         assert "AgentBridge" in repr_str
         assert "disconnected" in repr_str
-
-
-class TestAgentBridgeWithCQRS:
-    """Tests for AgentBridge with CQRS integration."""
-
-    @pytest.mark.asyncio
-    async def test_connect_with_cqrs(self, mock_agent):
-        """Test connect with CQRS enabled."""
-        # Mock CQRS bridge at the import location
-        with patch("victor.framework.cqrs_bridge.CQRSBridge") as mock_cqrs_class:
-            mock_cqrs = AsyncMock()
-            mock_cqrs_class.create = AsyncMock(return_value=mock_cqrs)
-            mock_cqrs.connect_agent = MagicMock()
-
-            config = BridgeConfiguration(enable_cqrs=True)
-            bridge = AgentBridge(mock_agent, config)
-
-            await bridge.connect()
-
-            assert bridge.connected
-            assert bridge.cqrs_bridge is mock_cqrs
-            mock_cqrs.connect_agent.assert_called_once()
 
 
 # =============================================================================
@@ -738,9 +664,7 @@ class TestFactoryFunctions:
     @pytest.mark.asyncio
     async def test_create_bridge_context_manager(self, mock_agent):
         """Test create_bridge context manager."""
-        config = BridgeConfiguration(enable_cqrs=False)
-
-        async with create_bridge(mock_agent, config) as bridge:
+        async with create_bridge(mock_agent) as bridge:
             assert isinstance(bridge, AgentBridge)
             assert bridge.connected
 
@@ -787,7 +711,6 @@ class TestAgentBuilderIntegration:
         with patch("victor.framework.agent.Agent") as mock_agent_class:
             mock_agent = MagicMock()
             mock_agent.get_orchestrator.return_value = MagicMock()
-            mock_agent.enable_cqrs = AsyncMock()
             mock_agent_class.create = AsyncMock(return_value=mock_agent)
 
             builder = (
@@ -803,20 +726,6 @@ class TestAgentBuilderIntegration:
                 call_kwargs.get("provider") == "openai"
                 or mock_agent_class.create.call_args.args[0] == "openai"
             )
-
-    @pytest.mark.asyncio
-    async def test_build_with_cqrs_enabled(self):
-        """Test build enables CQRS when configured."""
-        with patch("victor.framework.agent.Agent") as mock_agent_class:
-            mock_agent = MagicMock()
-            mock_agent.get_orchestrator.return_value = MagicMock()
-            mock_agent.enable_cqrs = AsyncMock()
-            mock_agent_class.create = AsyncMock(return_value=mock_agent)
-
-            builder = AgentBuilder().with_cqrs(True)
-            await builder.build()
-
-            mock_agent.enable_cqrs.assert_called_once()
 
 
 # =============================================================================
@@ -970,7 +879,7 @@ class TestAgentBuilderContainerIntegration:
         with patch("victor.framework.agent.Agent") as mock_agent_class:
             mock_agent = MagicMock()
             mock_agent.get_orchestrator.return_value = MagicMock()
-            mock_agent.enable_cqrs = AsyncMock()
+
             mock_agent_class.create = AsyncMock(return_value=mock_agent)
 
             builder = AgentBuilder(container=container)
@@ -998,7 +907,7 @@ class TestAgentBuilderContainerIntegration:
             mock_agent = MagicMock()
             mock_orchestrator = MagicMock()
             mock_agent.get_orchestrator.return_value = mock_orchestrator
-            mock_agent.enable_cqrs = AsyncMock()
+
             mock_agent_class.create = AsyncMock(return_value=mock_agent)
 
             # Get the configurator to verify filters are added
@@ -1032,7 +941,7 @@ class TestAgentBuilderContainerIntegration:
             mock_agent = MagicMock()
             mock_orchestrator = MagicMock()
             mock_agent.get_orchestrator.return_value = mock_orchestrator
-            mock_agent.enable_cqrs = AsyncMock()
+
             mock_agent_class.create = AsyncMock(return_value=mock_agent)
 
             # Patch at the source module where get_tool_configurator is defined

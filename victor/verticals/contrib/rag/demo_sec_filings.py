@@ -54,6 +54,8 @@ from typing import Dict, List, Optional, Tuple
 
 import aiohttp
 
+from victor.core.async_utils import run_sync
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -735,17 +737,17 @@ def main():
         return
 
     if args.stats:
-        asyncio.run(show_stats())
+        run_sync(show_stats())
         return
 
     if args.clear:
         print("\nClearing SEC filings from RAG store...")
-        count = asyncio.run(clear_sec_filings())
+        count = run_sync(clear_sec_filings())
         print(f"Removed {count} SEC filing documents")
         return
 
     if args.query:
-        asyncio.run(
+        run_sync(
             query_filings(
                 args.query,
                 synthesize=args.synthesize,
@@ -775,7 +777,7 @@ def main():
     print(f"Max concurrent: {args.max_concurrent}")
     print(f"{'=' * 60}\n")
 
-    results = asyncio.run(
+    results = run_sync(
         ingest_sec_filings(
             companies=companies,
             filing_type=args.filing_type,

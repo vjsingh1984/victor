@@ -38,12 +38,15 @@ Example:
 
 from __future__ import annotations
 
-import importlib
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
+from victor.core.verticals.import_resolver import (
+    import_module_with_fallback,
+    module_import_candidates,
+)
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import WorkflowDefinition
 
@@ -190,8 +193,17 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         if not module_path:
             return None
 
+        module, resolved_path = import_module_with_fallback(module_path)
+
+        if module is None:
+            logger.warning(
+                "Failed to import capability provider from %s (candidates=%s)",
+                module_path,
+                module_import_candidates(module_path),
+            )
+            return None
+
         try:
-            module = importlib.import_module(module_path)
             # Look for concrete capability provider classes (not abstract base)
             for attr_name in dir(module):
                 # Skip private attributes and the abstract base
@@ -221,13 +233,19 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                         # Abstract class or can't be instantiated, skip
                         continue
 
-            logger.warning(f"No concrete capability provider class found in {module_path}")
-            return None
-        except ImportError as e:
-            logger.warning(f"Failed to import capability provider from {module_path}: {e}")
+            logger.warning(
+                "No concrete capability provider class found in %s (resolved as %s)",
+                module_path,
+                resolved_path,
+            )
             return None
         except Exception as e:
-            logger.warning(f"Failed to instantiate capability provider from {module_path}: {e}")
+            logger.warning(
+                "Failed to instantiate capability provider from %s (resolved as %s): %s",
+                module_path,
+                resolved_path,
+                e,
+            )
             return None
 
     def _get_workflows_directory(self) -> Path:
@@ -244,32 +262,33 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             def _get_workflows_directory(self) -> Path:
                 return Path("/custom/path/to/workflows")
         """
-        # Default: derive from escape hatches module path
-        # e.g., "victor.research.escape_hatches" -> victor/research/workflows/
         module_path = self._get_escape_hatches_module()
-        # Remove ".escape_hatches" suffix and convert to path
-        base_module = module_path.rsplit(".", 1)[0]  # "victor.research"
-        module_parts = base_module.split(".")
-
-        # Get the directory of the first module part (victor)
-        try:
-            base_module_obj = importlib.import_module(module_parts[0])
-            if hasattr(base_module_obj, "__path__"):
-                base_path = Path(base_module_obj.__path__[0])
-            elif hasattr(base_module_obj, "__file__") and base_module_obj.__file__:
-                base_path = Path(base_module_obj.__file__).parent
-            else:
-                raise ImportError(f"Cannot determine path for module {module_parts[0]}")
-
-            # Navigate to the submodule directory
-            for part in module_parts[1:]:
-                base_path = base_path / part
-
-            return base_path / "workflows"
-        except (ImportError, AttributeError) as e:
-            logger.warning(f"Failed to determine workflows directory: {e}")
-            # Fallback: use current file's parent as base
+        module, resolved_path = import_module_with_fallback(module_path)
+        if module is None:
+            logger.warning(
+                "Failed to determine workflows directory: cannot import %s (candidates=%s)",
+                module_path,
+                module_import_candidates(module_path),
+            )
             return Path(__file__).parent
+
+        module_file = getattr(module, "__file__", None)
+        if module_file:
+            return Path(module_file).parent / "workflows"
+
+        module_paths = getattr(module, "__path__", None)
+        if module_paths:
+            try:
+                return Path(module_paths[0]) / "workflows"
+            except Exception:
+                pass
+
+        logger.warning(
+            "Failed to determine workflows directory for %s (resolved as %s)",
+            module_path,
+            resolved_path,
+        )
+        return Path(__file__).parent
 
     def _load_escape_hatches(self) -> Tuple[
         Dict[str, Callable[[Dict[str, Any]], str]],
@@ -285,20 +304,33 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             AttributeError: If CONDITIONS or TRANSFORMS are not defined
         """
         module_path = self._get_escape_hatches_module()
+        module, resolved_path = import_module_with_fallback(module_path)
+        if module is None:
+            logger.warning(
+                "Failed to import escape hatches from %s (candidates=%s)",
+                module_path,
+                module_import_candidates(module_path),
+            )
+            return {}, {}
+
         try:
-            module = importlib.import_module(module_path)
             conditions = getattr(module, "CONDITIONS", {})
             transforms = getattr(module, "TRANSFORMS", {})
             logger.debug(
-                f"Loaded escape hatches from {module_path}: "
-                f"{len(conditions)} conditions, {len(transforms)} transforms"
+                "Loaded escape hatches from %s (resolved as %s): %d conditions, %d transforms",
+                module_path,
+                resolved_path,
+                len(conditions),
+                len(transforms),
             )
             return conditions, transforms
-        except ImportError as e:
-            logger.warning(f"Failed to import escape hatches from {module_path}: {e}")
-            return {}, {}
         except AttributeError as e:
-            logger.warning(f"Missing CONDITIONS/TRANSFORMS in {module_path}: {e}")
+            logger.warning(
+                "Missing CONDITIONS/TRANSFORMS in %s (resolved as %s): %s",
+                module_path,
+                resolved_path,
+                e,
+            )
             return {}, {}
 
     def _get_config(self) -> "YAMLWorkflowConfig":

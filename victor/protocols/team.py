@@ -49,10 +49,9 @@ from typing import (
 )
 
 # Import types from victor.teams.types (canonical location for types)
-from victor.teams.types import AgentMessage, TeamFormation
-
+# Moved to TYPE_CHECKING to avoid circular import with victor.agent.teams.coordinator
 if TYPE_CHECKING:
-    from victor.teams.types import MemberResult, TeamResult
+    from victor.teams.types import AgentMessage, MemberResult, TeamFormation, TeamResult
 
 
 @runtime_checkable
@@ -120,7 +119,7 @@ class ITeamMember(IAgent, Protocol):
         """
         ...
 
-    async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+    async def receive_message(self, message: "AgentMessage") -> Optional["AgentMessage"]:
         """Receive and optionally respond to a message.
 
         Args:
@@ -151,7 +150,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    def set_formation(self, formation: TeamFormation) -> "ITeamCoordinator":
+    def set_formation(self, formation: "TeamFormation") -> "ITeamCoordinator":
         """Set the team formation pattern.
 
         Args:
@@ -174,7 +173,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: "AgentMessage") -> List[Optional["AgentMessage"]]:
         """Broadcast a message to all team members.
 
         Args:

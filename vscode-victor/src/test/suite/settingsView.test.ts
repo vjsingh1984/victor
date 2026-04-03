@@ -15,7 +15,8 @@ suite('SettingsViewProvider Test Suite', () => {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4-20250514',
                 mode: 'build',
-                serverPort: 8000,
+                serverUrl: 'http://127.0.0.1:8765',
+                serverPort: 8765,
                 serverApiKey: 'secret',
                 autoStart: false,
                 showInlineCompletions: true,
@@ -26,7 +27,8 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.strictEqual(settings.provider, 'anthropic');
             assert.strictEqual(settings.model, 'claude-sonnet-4-20250514');
             assert.strictEqual(settings.mode, 'build');
-            assert.strictEqual(settings.serverPort, 8000);
+            assert.strictEqual(settings.serverUrl, 'http://127.0.0.1:8765');
+            assert.strictEqual(settings.serverPort, 8765);
         });
 
         test('Should have valid mode values', () => {
@@ -47,6 +49,22 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.ok(isValidPort(65535));
             assert.ok(!isValidPort(80));
             assert.ok(!isValidPort(70000));
+        });
+
+        test('Should validate remote server URLs', () => {
+            const isValidServerUrl = (serverUrl: string): boolean => {
+                try {
+                    const parsed = new URL(serverUrl);
+                    return ['http:', 'https:'].includes(parsed.protocol);
+                } catch {
+                    return false;
+                }
+            };
+
+            assert.ok(isValidServerUrl('http://127.0.0.1:8765'));
+            assert.ok(isValidServerUrl('https://victor.example.com'));
+            assert.ok(!isValidServerUrl('ws://victor.example.com'));
+            assert.ok(!isValidServerUrl('not-a-url'));
         });
     });
 
@@ -105,7 +123,8 @@ suite('SettingsViewProvider Test Suite', () => {
                     provider: 'openai',
                     model: 'gpt-4-turbo',
                     mode: 'build',
-                    serverPort: 8000,
+                    serverUrl: 'https://victor.example.com',
+                    serverPort: 8765,
                     autoStart: false,
                     showInlineCompletions: true,
                     semanticSearchEnabled: true,
@@ -278,7 +297,8 @@ suite('SettingsViewProvider Test Suite', () => {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4',
                 mode: 'build',
-                serverPort: 8000,
+                serverUrl: '',
+                serverPort: 8765,
                 serverApiKey: '',
                 autoStart: false
             };
@@ -293,7 +313,8 @@ suite('SettingsViewProvider Test Suite', () => {
             assert.strictEqual(merged.provider, 'openai');
             assert.strictEqual(merged.model, 'gpt-4');
             assert.strictEqual(merged.mode, 'build');
-            assert.strictEqual(merged.serverPort, 8000);
+            assert.strictEqual(merged.serverUrl, '');
+            assert.strictEqual(merged.serverPort, 8765);
             assert.strictEqual(merged.serverApiKey, '');
         });
     });
@@ -348,12 +369,17 @@ suite('SettingsViewProvider Test Suite', () => {
     // Test health check
     suite('Health Check', () => {
         test('Should build health URL', () => {
-            const buildHealthUrl = (port: number): string => {
-                return `http://localhost:${port}/health`;
+            const buildHealthUrl = (port: number, serverUrl?: string): string => {
+                const baseUrl = serverUrl || `http://localhost:${port}`;
+                return `${baseUrl}/health`;
             };
 
-            assert.strictEqual(buildHealthUrl(8000), 'http://localhost:8000/health');
+            assert.strictEqual(buildHealthUrl(8765), 'http://localhost:8765/health');
             assert.strictEqual(buildHealthUrl(9000), 'http://localhost:9000/health');
+            assert.strictEqual(
+                buildHealthUrl(8765, 'https://victor.example.com'),
+                'https://victor.example.com/health'
+            );
         });
     });
 
@@ -364,6 +390,7 @@ suite('SettingsViewProvider Test Suite', () => {
                 'provider',
                 'model',
                 'mode',
+                'serverUrl',
                 'serverPort',
                 'autoStart',
                 'showInlineCompletions',
@@ -371,8 +398,9 @@ suite('SettingsViewProvider Test Suite', () => {
                 'semanticSearch.maxResults'
             ];
 
-            assert.strictEqual(configKeys.length, 8);
+            assert.strictEqual(configKeys.length, 9);
             assert.ok(configKeys.includes('provider'));
+            assert.ok(configKeys.includes('serverUrl'));
             assert.ok(configKeys.includes('semanticSearch.enabled'));
         });
 

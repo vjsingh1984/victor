@@ -113,6 +113,19 @@ categories:
       - teams
       - jira
 
+  notebook:
+    description: "Jupyter notebook operations"
+    tools:
+      - notebook_edit
+
+  task_management:
+    description: "Session-scoped task tracking"
+    tools:
+      - task_create
+      - task_update
+      - task_list
+      - task_get
+
   custom:
     description: "User-defined tools"
     tools: []
@@ -146,6 +159,8 @@ presets:
       - documentation
       - analysis
       - communication
+      - notebook
+      - task_management
 
   airgapped:
     description: "No network access (offline mode)"
@@ -168,6 +183,7 @@ presets:
       - git
       - testing
       - refactoring
+      - notebook
 
   research:
     description: "Optimized for research tasks"

@@ -32,6 +32,7 @@ suite('Extension Test Suite', () => {
         const config = vscode.workspace.getConfiguration('victor');
 
         // Check default configuration values
+        assert.strictEqual(config.get('serverUrl'), 'http://127.0.0.1:8765');
         assert.strictEqual(config.get('serverPort'), 8765);
         assert.strictEqual(config.get('profile'), 'default');  // Uses profile system now
         assert.strictEqual(config.get('mode'), 'build');

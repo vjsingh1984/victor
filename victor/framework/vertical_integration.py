@@ -55,9 +55,8 @@ This module contains two distinct components with different responsibilities:
    - Usage: Called by FrameworkShim, Agent.create(), SDK initialization
    - Pattern: Facade + Template Method with step handlers
    - Example:
-        pipeline = VerticalIntegrationPipeline()
-        result = pipeline.apply(orchestrator, CodingAssistant)
-
+       pipeline = VerticalIntegrationPipeline()
+       result = pipeline.apply(orchestrator, vertical)
 2. **VerticalIntegrationAdapter** (victor/agent/vertical_integration_adapter.py):
    - Purpose: Provide runtime implementation for middleware/safety application
    - Phase: Runtime (during request processing)
@@ -102,7 +101,7 @@ Usage:
     pipeline = VerticalIntegrationPipeline()
 
     # Apply vertical
-    result = pipeline.apply(orchestrator, CodingAssistant)
+    result = pipeline.apply(orchestrator, vertical)
 
     # Check result
     if result.success:
@@ -129,8 +128,11 @@ import logging
 import json
 import threading
 import time
+import warnings
 import weakref
 from dataclasses import dataclass, field
+
+from victor.framework.integration_registry import IntegrationPlanRegistry
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -172,6 +174,21 @@ logger = logging.getLogger(__name__)
 
 _INTEGRATION_PLAN_VERSION = 1
 _INTEGRATION_PLAN_SKIP_REASON = "integration_plan_noop"
+_LEGACY_EXTENSION_REGISTRY_GUIDANCE = (
+    "Legacy extension-registry APIs in victor.framework.vertical_integration are deprecated and "
+    "inactive in the default pipeline. Use StepHandlerRegistry + ExtensionsStepHandler."
+)
+
+
+def _warn_legacy_extension_registry_api(api_name: str) -> None:
+    """Emit deprecation warning for inactive legacy extension-registry APIs."""
+    message = (
+        f"{api_name} is deprecated. {_LEGACY_EXTENSION_REGISTRY_GUIDANCE} "
+        "See victor.framework.step_handlers.ExtensionsStepHandler.extension_registry. "
+        "This will be removed in v1.0."
+    )
+    warnings.warn(message, DeprecationWarning, stacklevel=3)
+    logger.warning(message)
 
 
 # =============================================================================
@@ -342,16 +359,25 @@ class ExtensionHandlerRegistry:
 _default_extension_registry: Optional[ExtensionHandlerRegistry] = None
 
 
-def get_extension_handler_registry() -> ExtensionHandlerRegistry:
-    """Get the default extension handler registry.
-
-    Returns:
-        The default extension handler registry
-    """
+def _get_legacy_extension_registry_no_warn() -> ExtensionHandlerRegistry:
+    """Get legacy extension registry without emitting deprecation warnings."""
     global _default_extension_registry
     if _default_extension_registry is None:
         _default_extension_registry = ExtensionHandlerRegistry.default()
     return _default_extension_registry
+
+
+def get_extension_handler_registry() -> ExtensionHandlerRegistry:
+    """Get the default extension handler registry.
+
+    Deprecated:
+        This registry is not used by the active step-handler pipeline.
+
+    Returns:
+        The default extension handler registry
+    """
+    _warn_legacy_extension_registry_api("get_extension_handler_registry()")
+    return _get_legacy_extension_registry_no_warn()
 
 
 def register_extension_handler(
@@ -361,6 +387,9 @@ def register_extension_handler(
     order: int = 100,
 ) -> None:
     """Register a new extension handler (OCP extension point).
+
+    Deprecated:
+        Handlers registered here are inactive for the default integration path.
 
     This is a compatibility adapter only. The active integration path uses
     `victor.framework.step_handlers.ExtensionsStepHandler` and its registry.
@@ -385,7 +414,8 @@ def register_extension_handler(
             order=60,
         )
     """
-    registry = get_extension_handler_registry()
+    _warn_legacy_extension_registry_api("register_extension_handler()")
+    registry = _get_legacy_extension_registry_no_warn()
     registry.register(name, attr_name, handler, order)
 
 
@@ -772,7 +802,7 @@ class VerticalIntegrationPipeline:
         pipeline = VerticalIntegrationPipeline()
 
         # Apply with full vertical class
-        result = pipeline.apply(orchestrator, CodingAssistant)
+        result = pipeline.apply(orchestrator, vertical)
 
         # Apply with vertical name (from registry)
         result = pipeline.apply(orchestrator, "coding")
@@ -780,7 +810,7 @@ class VerticalIntegrationPipeline:
         # Apply with custom configuration
         result = pipeline.apply(
             orchestrator,
-            CodingAssistant,
+            "coding",
             config_overrides={"tool_budget": 30},
         )
 
@@ -846,6 +876,8 @@ class VerticalIntegrationPipeline:
         self._applied_plan_by_orchestrator: "weakref.WeakKeyDictionary[Any, Dict[str, Any]]" = (
             weakref.WeakKeyDictionary()
         )
+        # Persistent plan registry (survives GC, replaces WeakKeyDictionary for lookups)
+        self._plan_registry = IntegrationPlanRegistry.get_instance()
         self._integration_plan_metrics: Dict[str, int] = {
             "compiled": 0,
             "reused": 0,
@@ -857,10 +889,10 @@ class VerticalIntegrationPipeline:
         # Legacy pipeline-level extension registry is intentionally inactive.
         # Active extension integration lives in step_handlers.ExtensionsStepHandler.
         if extension_registry is not None:
-            logger.debug(
-                "Ignoring legacy extension_registry argument for VerticalIntegrationPipeline; "
-                "use StepHandlerRegistry/ExtensionsStepHandler extension points instead."
+            _warn_legacy_extension_registry_api(
+                "VerticalIntegrationPipeline(extension_registry=...)"
             )
+            logger.debug("Ignoring provided legacy extension_registry in active step-handler path.")
 
         # Initialize step handler registry
         if step_registry is not None:
@@ -916,6 +948,10 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+        vertical_class = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_class)
+
         result.vertical_name = vertical_class.name
 
         cache_key: Optional[str] = None
@@ -948,7 +984,7 @@ class VerticalIntegrationPipeline:
                 result.add_warning(f"Pre-hook error: {e}")
 
         # Create context
-        context = self._create_context(vertical_class, result)
+        context = self._create_context(orchestrator, vertical_class, result)
         if context is None:
             return result
         result.context = context
@@ -961,6 +997,8 @@ class VerticalIntegrationPipeline:
                 "Ensure step handlers are initialized. "
                 "Use create_integration_pipeline() factory for proper setup."
             )
+
+        self._validate_step_handler_dependency_contract(result)
 
         cached_plan: Optional[Dict[str, Any]] = None
         skip_handlers: Set[str] = set()
@@ -1265,6 +1303,7 @@ class VerticalIntegrationPipeline:
             for key in list(self._integration_plan_metrics.keys()):
                 self._integration_plan_metrics[key] = 0
         self._applied_plan_by_orchestrator = weakref.WeakKeyDictionary()
+        self._plan_registry.clear()
 
     def _hash_plan_payload(self, payload: Any) -> str:
         """Create a deterministic fingerprint for plan payloads."""
@@ -1426,6 +1465,12 @@ class VerticalIntegrationPipeline:
 
     def _get_applied_plan_for_orchestrator(self, orchestrator: Any) -> Optional[Dict[str, Any]]:
         """Get previously applied plan metadata for this orchestrator."""
+        # Check persistent registry first (survives GC)
+        registry_plan = self._plan_registry.get_plan(orchestrator)
+        if registry_plan is not None:
+            return registry_plan
+
+        # Fallback to WeakKeyDictionary (legacy, kept for backward compat)
         try:
             cached = self._applied_plan_by_orchestrator.get(orchestrator)
         except TypeError:
@@ -1452,6 +1497,9 @@ class VerticalIntegrationPipeline:
 
     def _set_applied_plan_for_orchestrator(self, orchestrator: Any, plan: Dict[str, Any]) -> None:
         """Store applied plan metadata for orchestrator delta/no-op checks."""
+        # Write to persistent registry (primary)
+        self._plan_registry.set_plan(orchestrator, plan)
+        # Also write to WeakKeyDictionary (legacy, kept for backward compat)
         try:
             self._applied_plan_by_orchestrator[orchestrator] = copy.deepcopy(plan)
         except TypeError:
@@ -1678,7 +1726,7 @@ class VerticalIntegrationPipeline:
 
         Example:
             pipeline = VerticalIntegrationPipeline()
-            result = await pipeline.apply_async(orchestrator, CodingAssistant)
+            result = await pipeline.apply_async(orchestrator, "coding")
         """
 
         # Resolve vertical
@@ -1687,6 +1735,10 @@ class VerticalIntegrationPipeline:
             result = IntegrationResult(vertical_name=str(vertical))
             result.add_error(f"Vertical not found: {vertical}")
             return result
+
+        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+        vertical_cls = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_cls)
 
         cache_key: Optional[str] = None
         cache_hit = False
@@ -1712,7 +1764,7 @@ class VerticalIntegrationPipeline:
 
         # Create context and result
         result = IntegrationResult(vertical_name=vertical_cls.name)
-        context = self._create_context(vertical_cls, result)
+        context = self._create_context(orchestrator, vertical_cls, result)
         if context is None:
             result.add_error("Failed to create vertical context")
             return result
@@ -1722,6 +1774,8 @@ class VerticalIntegrationPipeline:
         if self._step_registry is None:
             result.add_error("StepHandlerRegistry required for vertical integration")
             return result
+
+        self._validate_step_handler_dependency_contract(result)
 
         cached_plan: Optional[Dict[str, Any]] = None
         skip_handlers: Set[str] = set()
@@ -1867,6 +1921,81 @@ class VerticalIntegrationPipeline:
         parallel_safe = bool(getattr(handler, "parallel_safe", False))
         has_side_effects = bool(getattr(handler, "side_effects", True))
         return parallel_safe and not has_side_effects
+
+    def _collect_dependency_contract_violations(self, handlers: List[Any]) -> List[str]:
+        """Collect step-handler dependency contract violations.
+
+        Validates that:
+        - each handler has a unique name in the active registry
+        - each declared dependency points to an active handler name
+        """
+        if not handlers:
+            return []
+
+        known_names: Set[str] = set()
+        duplicate_names: Set[str] = set()
+        violations: List[str] = []
+
+        for index, handler in enumerate(handlers):
+            handler_name = str(getattr(handler, "name", f"handler_{index}"))
+            if handler_name in known_names:
+                duplicate_names.add(handler_name)
+            known_names.add(handler_name)
+
+        if duplicate_names:
+            duplicates = ", ".join(sorted(duplicate_names))
+            violations.append(f"duplicate handler name(s): {duplicates}")
+
+        for index, handler in enumerate(handlers):
+            handler_name = str(getattr(handler, "name", f"handler_{index}"))
+            declared_dependencies = tuple(getattr(handler, "depends_on", ()) or ())
+            missing_dependencies = sorted(
+                {str(dep) for dep in declared_dependencies if str(dep) not in known_names}
+            )
+            if missing_dependencies:
+                missing_names = ", ".join(missing_dependencies)
+                violations.append(
+                    f"handler '{handler_name}' depends on missing handler(s): {missing_names}"
+                )
+
+        return violations
+
+    def _validate_step_handler_dependency_contract(self, result: IntegrationResult) -> bool:
+        """Validate active step-handler dependency metadata.
+
+        Returns:
+            True when contract is valid, False when violations are recorded.
+        """
+        if self._step_registry is None:
+            return True
+
+        handlers = self._step_registry.get_ordered_handlers()
+        violations = self._collect_dependency_contract_violations(handlers)
+        if not violations:
+            return True
+
+        status = "error" if self._strict_mode else "warning"
+        for violation in violations:
+            message = f"Step-handler dependency contract violation: {violation}"
+            if self._strict_mode:
+                result.add_error(message)
+            else:
+                result.add_warning(message)
+
+        result.record_step_status(
+            "dependency_contract",
+            status,
+            details={
+                "strict_mode": self._strict_mode,
+                "violations": violations,
+            },
+        )
+        logger.warning(
+            "Step-handler dependency contract violations detected (%s): %s",
+            status,
+            "; ".join(violations),
+        )
+        return False
 
     def _build_execution_levels(self, handlers: List[Any]) -> List[List[Any]]:
         """Build deterministic execution levels from metadata dependencies.
@@ -2152,7 +2281,10 @@ class VerticalIntegrationPipeline:
         return vertical
 
     def _create_context(
-        self, vertical: Type["VerticalBase"], result: IntegrationResult
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        result: IntegrationResult,
     ) -> Optional[VerticalContext]:
         """Create the VerticalContext for this vertical.
 
@@ -2164,11 +2296,37 @@ class VerticalIntegrationPipeline:
             VerticalContext or None on error
         """
         try:
-            config = vertical.get_config()
+            from victor.framework.sdk_capability_registry import (
+                resolve_capability_requirements,
+            )
+            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
+
+            binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
             context = create_vertical_context(
                 name=vertical.name,
-                config=config,
+                config=binding.runtime_config,
             )
+            capability_resolutions = resolve_capability_requirements(
+                binding.definition.capability_requirements,
+                orchestrator=orchestrator,
+                available_tools=binding.definition.get_tool_names(),
+            )
+            if capability_resolutions:
+                context.apply_capability_configs(
+                    {
+                        "sdk_capability_resolutions": [
+                            resolution.to_dict() for resolution in capability_resolutions
+                        ],
+                    }
+                )
+                for resolution in capability_resolutions:
+                    if resolution.available:
+                        continue
+                    prefix = "Optional" if resolution.optional else "Required"
+                    result.add_warning(
+                        f"{prefix} SDK capability '{resolution.capability_id}' is not currently satisfied: "
+                        f"{resolution.reason or 'runtime binding unresolved'}"
+                    )
             return context
         except Exception as e:
             result.add_error(f"Failed to create context: {e}")
@@ -2235,7 +2393,7 @@ def create_integration_pipeline(
         # With parallel execution (Phase 2.2)
         pipeline = create_integration_pipeline(enable_parallel=True)
 
-        result = await pipeline.apply_async(orchestrator, CodingAssistant)
+        result = await pipeline.apply_async(orchestrator, "coding")
     """
     return VerticalIntegrationPipeline(
         strict_mode=strict,

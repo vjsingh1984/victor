@@ -14,23 +14,29 @@
 
 """Session ID generation and utilities.
 
-Generates unique session IDs in the format: {project_root}-{base62_timestamp}
+Generates unique session IDs in the format:
+    {project_root}-{base62_timestamp}-{random_suffix}
 
-Example: abc123-9Kx7Z2
+Example: abc123-9Kx7Z2-aB3dEf_g1w==
 - project_root: First 6 chars of project directory name (base62-encoded if needed)
 - base62_timestamp: Millisecond timestamp in base62 (sortable, compact)
+- random_suffix: Cryptographic entropy via secrets.token_urlsafe(8)
+
+Legacy 2-part format ({project_root}-{base62_timestamp}) is still accepted
+when parsing/validating.
 
 This provides:
 - Project context in the session ID
 - Lexicographically sortable by timestamp
 - Compact representation (13 chars vs 15 for timestamp format)
-- Collision-resistant across projects
+- Collision-resistant across projects and concurrent generation
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
 import time
 from pathlib import Path
 from typing import Optional
@@ -119,22 +125,13 @@ def get_project_root_hash(project_root: Path) -> str:
 def generate_session_id(project_root: Optional[Path] = None) -> str:
     """Generate a unique session ID.
 
-    Format: {project_root}-{base62_timestamp}
+    Format: {project_root}-{base62_timestamp}-{random_suffix}
 
     Args:
         project_root: Path to project root (auto-detected if None)
 
     Returns:
-        Session ID string (e.g., "abc123-9Kx7Z2")
-
-    Examples:
-        >>> generate_session_id(Path("/home/user/myproject"))
-        'myproj-9Kx7Z2'
-
-        >>> # Can be sorted chronologically
-        >>> ids = [generate_session_id() for _ in range(3)]
-        >>> sorted(ids) == ids  # base62 timestamps are sortable
-        True
+        Session ID string (e.g., "abc123-9Kx7Z2-aB3dEf_g1w==")
     """
     from victor.config.settings import get_project_paths
 
@@ -151,8 +148,11 @@ def generate_session_id(project_root: Optional[Path] = None) -> str:
     # Encode timestamp to base62
     base62_timestamp = encode_base62(timestamp_ms)
 
-    # Combine: {root_hash}-{base62_timestamp}
-    session_id = f"{root_hash}-{base62_timestamp}"
+    # Add cryptographic entropy suffix for collision resistance
+    random_suffix = secrets.token_urlsafe(8)
+
+    # Combine: {root_hash}-{base62_timestamp}-{random_suffix}
+    session_id = f"{root_hash}-{base62_timestamp}-{random_suffix}"
 
     logger.debug(f"Generated session ID: {session_id} for project: {project_root}")
     return session_id
@@ -161,8 +161,11 @@ def generate_session_id(project_root: Optional[Path] = None) -> str:
 def parse_session_id(session_id: str) -> dict[str, str | int]:
     """Parse a session ID into components.
 
+    Supports both legacy 2-part format ({root}-{timestamp}) and new
+    3-part format ({root}-{timestamp}-{entropy}).
+
     Args:
-        session_id: Session ID string (e.g., "abc123-9Kx7Z2")
+        session_id: Session ID string (e.g., "abc123-9Kx7Z2-aB3dEf_g1w==")
 
     Returns:
         Dictionary with components:
@@ -170,23 +173,17 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
         - base62_timestamp: Base62 encoded timestamp
         - timestamp_ms: Decoded timestamp in milliseconds
         - timestamp_iso: ISO format timestamp
-
-    Example:
-        >>> parse = parse_session_id("abc123-9Kx7Z2")
-        >>> parse['project_root']
-        'abc123'
-        >>> parse['base62_timestamp']
-        '9Kx7Z2'
-        >>> isinstance(parse['timestamp_ms'], int)
-        True
+        - entropy: Random suffix (empty string for legacy IDs)
     """
     try:
-        parts = session_id.split("-")
+        parts = session_id.split("-", maxsplit=2)
 
-        if len(parts) != 2:
+        if len(parts) < 2 or len(parts) > 3:
             raise ValueError(f"Invalid session ID format: {session_id}")
 
-        project_root, base62_timestamp = parts
+        project_root = parts[0]
+        base62_timestamp = parts[1]
+        entropy = parts[2] if len(parts) == 3 else ""
 
         # Decode timestamp
         timestamp_ms = decode_base62(base62_timestamp)
@@ -201,6 +198,7 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
             "base62_timestamp": base62_timestamp,
             "timestamp_ms": timestamp_ms,
             "timestamp_iso": timestamp_iso,
+            "entropy": entropy,
         }
     except Exception as e:
         logger.error(f"Failed to parse session ID {session_id}: {e}")

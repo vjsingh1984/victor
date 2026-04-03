@@ -24,8 +24,18 @@ from unittest.mock import patch, MagicMock
 
 from victor.tools.file_editor_tool import edit
 
+try:
+    from victor.tools.file_editor_tool import _is_file_editor_available
+
+    _has_victor_coding = _is_file_editor_available()
+except Exception:
+    _has_victor_coding = False
+
 # Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
+]
 
 
 class TestEditBasicOperations:
@@ -513,11 +523,12 @@ class TestEditErrorHandling:
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        with patch("victor.tools.file_editor_tool.FileEditor") as mock_editor_class:
+        # Patch _create_file_editor since that's what the code uses
+        with patch("victor.tools.file_editor_tool._create_file_editor") as mock_factory:
             mock_editor = MagicMock()
             mock_editor.start_transaction.return_value = "txn123"
             mock_editor.add_modify.side_effect = Exception("Queue failed")
-            mock_editor_class.return_value = mock_editor
+            mock_factory.return_value = mock_editor
 
             result = await edit(ops=[{"type": "modify", "path": str(test_file), "content": "new"}])
 

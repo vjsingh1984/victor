@@ -1,0 +1,231 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Cross-session context linking.
+
+Provides session resume context and cross-session semantic retrieval,
+enabling intelligent session resumption with ledger, execution state,
+and compaction history restoration.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
+    from victor.agent.conversation_memory import ConversationStore
+    from victor.storage.embeddings.service import EmbeddingService
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SessionResumeContext:
+    """Context assembled when resuming a session."""
+
+    ledger: Optional[Any] = None
+    compaction_summaries: List[str] = field(default_factory=list)
+    execution_state: Optional[Any] = None
+    resume_summary: str = ""
+
+
+class SessionContextLinker:
+    """Links session state across save/load boundaries.
+
+    Builds rich resume context from persisted session data including
+    ledger, execution state, and compaction history. Optionally supports
+    cross-session semantic search via embedding service.
+    """
+
+    def __init__(
+        self,
+        session_persistence: "SQLiteSessionPersistence",
+        conversation_store: Optional["ConversationStore"] = None,
+        embedding_service: Optional["EmbeddingService"] = None,
+    ):
+        self._persistence = session_persistence
+        self._conversation_store = conversation_store
+        self._embedding_service = embedding_service
+
+    def build_resume_context(self, session_id: str) -> SessionResumeContext:
+        """Load session and build rich resume context.
+
+        Args:
+            session_id: Session to resume
+
+        Returns:
+            SessionResumeContext with restored state and summary
+        """
+        try:
+            session_data = self._persistence.load_session(session_id)
+        except Exception as e:
+            logger.warning(f"Failed to load session {session_id}: {e}")
+            return SessionResumeContext(resume_summary="[Session data unavailable]")
+
+        if session_data is None:
+            return SessionResumeContext(resume_summary="[Session not found]")
+
+        # Restore ledger
+        ledger = None
+        ledger_data = session_data.get("session_ledger")
+        if ledger_data:
+            try:
+                from victor.agent.session_ledger import SessionLedger
+
+                ledger = SessionLedger.from_dict(ledger_data)
+            except Exception as e:
+                logger.warning(f"Failed to restore ledger: {e}")
+
+        # Restore execution state
+        execution_state = None
+        exec_data = session_data.get("execution_state")
+        if exec_data:
+            try:
+                from victor.agent.session_state_manager import ExecutionState
+
+                execution_state = ExecutionState.from_dict(exec_data)
+            except Exception as e:
+                logger.warning(f"Failed to restore execution state: {e}")
+
+        # Restore compaction context from persisted hierarchy
+        compaction_summaries: List[str] = []
+        hierarchy_data = session_data.get("compaction_hierarchy")
+        if hierarchy_data:
+            try:
+                from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+
+                hm = HierarchicalCompactionManager.from_dict(hierarchy_data)
+                active_ctx = hm.get_active_context()
+                if active_ctx:
+                    compaction_summaries = [active_ctx]
+            except Exception as e:
+                logger.warning(f"Failed to restore compaction summaries: {e}")
+
+        # Build resume summary
+        summary_parts = ["[Resumed session"]
+
+        metadata = session_data.get("metadata", {})
+        if metadata.get("updated_at"):
+            summary_parts.append(f"last active: {metadata['updated_at']}")
+
+        if ledger:
+            files = ledger.get_files_read()
+            if files:
+                file_list = ", ".join(sorted(files.keys())[:5])
+                summary_parts.append(f"read: {file_list}")
+
+            decisions = [e.summary for e in ledger.entries if e.category == "decision"]
+            if decisions:
+                summary_parts.append(f"decided: {'; '.join(decisions[:3])}")
+
+            pending = [
+                e.summary
+                for e in ledger.entries
+                if e.category == "pending_action" and not e.resolved
+            ]
+            if pending:
+                summary_parts.append(f"pending: {'; '.join(pending[:3])}")
+
+        if execution_state:
+            tool_calls = getattr(execution_state, "tool_calls_used", 0)
+            if tool_calls:
+                summary_parts.append(f"{tool_calls} tool calls used")
+
+        resume_summary = ". ".join(summary_parts) + ".]"
+
+        return SessionResumeContext(
+            ledger=ledger,
+            compaction_summaries=compaction_summaries,
+            execution_state=execution_state,
+            resume_summary=resume_summary,
+        )
+
+    def find_related_sessions(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+        """Semantic search across sessions for cross-session linking.
+
+        Args:
+            query: Search query
+            limit: Maximum results
+
+        Returns:
+            List of session metadata dicts
+        """
+        if not self._conversation_store:
+            return []
+
+        try:
+            search_fn = getattr(self._conversation_store, "search", None)
+            if search_fn:
+                results = search_fn(query, limit=limit)
+                return results if isinstance(results, list) else []
+        except Exception as e:
+            logger.debug(f"Cross-session search failed: {e}")
+
+        return []
+
+    def build_cross_session_context(
+        self,
+        query: str,
+        session_ids: List[str],
+        max_chars: int = 4000,
+    ) -> str:
+        """Retrieve relevant context from related sessions.
+
+        Args:
+            query: Current query for relevance
+            session_ids: Sessions to search
+            max_chars: Maximum context size
+
+        Returns:
+            Combined relevant context string
+        """
+        if not self._conversation_store:
+            return ""
+
+        parts = []
+        chars_used = 0
+
+        for sid in session_ids:
+            try:
+                session_data = self._persistence.load_session(sid)
+                if not session_data:
+                    continue
+
+                metadata = session_data.get("metadata", {})
+                title = metadata.get("title", "Untitled")
+                entry = f"[From session '{title}' ({sid[:8]})]"
+
+                # Get ledger summary if available
+                ledger_data = session_data.get("session_ledger")
+                if ledger_data:
+                    from victor.agent.session_ledger import SessionLedger
+
+                    ledger = SessionLedger.from_dict(ledger_data)
+                    rendered = ledger.render(max_chars=500)
+                    if rendered:
+                        entry += f" {rendered}"
+
+                if chars_used + len(entry) > max_chars:
+                    break
+
+                parts.append(entry)
+                chars_used += len(entry)
+
+            except Exception as e:
+                logger.debug(f"Failed to load cross-session context from {sid}: {e}")
+
+        return " | ".join(parts) if parts else ""

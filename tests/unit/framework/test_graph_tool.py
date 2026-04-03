@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.tools.graph_tool import (
+from victor.verticals.contrib.coding.tools.graph_tool import (
     GraphAnalyzer,
     graph,
     GraphMode,
@@ -595,7 +595,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_stats_mode(self, mock_graph_store):
         """Test stats mode via the main tool function."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="stats")
@@ -607,7 +609,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_pagerank_mode(self, mock_graph_store):
         """Test pagerank mode via the main tool function."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="pagerank", top_k=5)
@@ -618,7 +622,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_neighbors_mode_requires_node(self, mock_graph_store):
         """Test that neighbors mode requires a node parameter."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="neighbors")
@@ -632,7 +638,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_find_mode_requires_query(self, mock_graph_store):
         """Test that find mode requires a query parameter."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="find")
@@ -646,7 +654,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_path_mode_requires_both_nodes(self, mock_graph_store):
         """Test that path mode requires both node and target."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="path", node="orchestrator")
@@ -657,7 +667,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_file_deps_requires_file(self, mock_graph_store):
         """Test that file_deps mode requires file parameter."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="file_deps")
@@ -671,7 +683,9 @@ class TestGraphToolFunction:
     @pytest.mark.asyncio
     async def test_graph_patterns_mode(self, mock_graph_store):
         """Test patterns mode via the main tool function."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             result = await graph(mode="patterns")
@@ -680,9 +694,85 @@ class TestGraphToolFunction:
                 assert "patterns" in result or "total_patterns_found" in result
 
     @pytest.mark.asyncio
+    async def test_graph_callers_mode_uses_provider_capability(self, mock_graph_store):
+        """callers mode should use provider-backed traversal when available."""
+        mock_index = MagicMock()
+        mock_index.find_callers = AsyncMock(
+            return_value=[
+                {
+                    "id": "function:src/main.py:main",
+                    "name": "main",
+                    "file_path": "src/main.py",
+                    "line_start": 1,
+                }
+            ]
+        )
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.verticals.contrib.coding.tools.graph_tool._get_capability_index",
+                new=AsyncMock(return_value=mock_index),
+            ):
+                result = await graph(mode="callers", node="call_provider", depth=2)
+
+        assert result["mode"] == "callers"
+        assert result["provider_backed"] is True
+        assert result["count"] == 1
+        mock_index.find_callers.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_graph_callees_mode_falls_back_to_analyzer(self, mock_graph_store):
+        """callees mode should fall back to analyzer traversal when provider support fails."""
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.verticals.contrib.coding.tools.graph_tool._get_capability_index",
+                new=AsyncMock(side_effect=NotImplementedError("unsupported")),
+            ):
+                result = await graph(mode="callees", node="orchestrator", depth=2)
+
+        assert result["mode"] == "callees"
+        assert result["provider_backed"] is False
+        assert result["count"] >= 1
+        assert any(row["name"] == "process_request" for row in result["results"])
+
+    @pytest.mark.asyncio
+    async def test_graph_trace_mode_uses_provider_capability(self, mock_graph_store):
+        """trace mode should use provider-backed execution trace when available."""
+        mock_index = MagicMock()
+        mock_index.trace_execution_path = AsyncMock(
+            return_value={
+                "entry_point": {"id": "function:src/main.py:main", "name": "main"},
+                "nodes": [{"id": "function:src/main.py:main", "name": "main"}],
+                "edges": [],
+                "edge_type": "CALLS",
+                "max_depth": 3,
+            }
+        )
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
+            mock_create.return_value = mock_graph_store
+            with patch(
+                "victor.verticals.contrib.coding.tools.graph_tool._get_capability_index",
+                new=AsyncMock(return_value=mock_index),
+            ):
+                result = await graph(mode="trace", node="call_provider", depth=3)
+
+        assert result["mode"] == "trace"
+        assert result["provider_backed"] is True
+        assert result["nodes_count"] == 1
+
+    @pytest.mark.asyncio
     async def test_graph_unknown_mode(self, mock_graph_store):
         """Test handling of unknown mode."""
-        with patch("victor.tools.graph_tool.create_graph_store") as mock_create:
+        with patch(
+            "victor.verticals.contrib.coding.tools.graph_tool.create_graph_store"
+        ) as mock_create:
             mock_create.return_value = mock_graph_store
 
             # This should not raise, but return an error

@@ -177,7 +177,7 @@ class OnboardingWizard:
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    models = result.stdout.decode().strip().split('\n')[1:]  # Skip header
+                    models = result.stdout.decode().strip().split("\n")[1:]  # Skip header
                     if models:
                         self.console.print(f"  [dim]Found {len(models)} model(s)[/]")
             except Exception:
@@ -546,6 +546,7 @@ class OnboardingWizard:
 
         try:
             from victor.ui.commands.chat import _run_default_interactive
+
             _run_default_interactive()
         except Exception as e:
             self.console.print(f"\n[yellow]Chat ended: {e}[/]")

@@ -1,0 +1,55 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for async/sync boundary helpers."""
+
+import asyncio
+
+import pytest
+
+from victor.core.async_utils import run_sync, run_sync_in_thread
+
+
+async def _sample_value() -> str:
+    return "ok"
+
+
+def test_run_sync_executes_coroutine_from_sync_context():
+    """run_sync should execute coroutines when no event loop is active."""
+    assert run_sync(_sample_value()) == "ok"
+
+
+@pytest.mark.asyncio
+async def test_run_sync_raises_from_async_context():
+    """run_sync must reject nested event-loop usage."""
+    with pytest.raises(
+        RuntimeError, match="Cannot use run_sync\\(\\) from within an async context"
+    ):
+        run_sync(_sample_value())
+
+
+def test_run_sync_in_thread_executes_coroutine():
+    """run_sync_in_thread should execute coroutines from sync contexts."""
+    assert run_sync_in_thread(_sample_value()) == "ok"
+
+
+def test_run_sync_in_thread_supports_timeouts():
+    """run_sync_in_thread should fail fast when the worker times out."""
+
+    async def _slow_value() -> str:
+        await asyncio.sleep(0.1)
+        return "slow"
+
+    with pytest.raises(TimeoutError, match="Async operation timed out"):
+        run_sync_in_thread(_slow_value(), timeout=0.01)

@@ -274,6 +274,16 @@ class DangerLevel(Enum):
         else:  # CRITICAL
             return f"{_get_icon('stop')} DANGER: This operation may cause irreversible changes!"
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel.
+
+        Returns:
+            Corresponding SeverityLevel from victor.core.severity.
+        """
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_danger_level(self)
+
 
 class SchemaLevel(str, Enum):
     """Schema verbosity level for LLM broadcasting.

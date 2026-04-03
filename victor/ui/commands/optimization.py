@@ -20,19 +20,17 @@ with the workflow optimization system.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
 from pathlib import Path
+from typing import Optional
 
 import click
 
+from victor.core.async_utils import run_sync
 from victor.optimization import (
     WorkflowOptimizer,
     OptimizationConfig,
-    WorkflowProfile,
-    OptimizationOpportunity,
 )
 from victor.experiments.tracking import ExperimentTracker
 
@@ -67,64 +65,7 @@ def profile(
     Example:
         victor opt profile my_workflow --min-executions 5
     """
-
-    async def run_profile():
-        tracker = ExperimentTracker()
-        optimizer = WorkflowOptimizer(experiment_tracker=tracker)
-
-        click.echo(f"Profiling workflow: {workflow_id}")
-
-        profile = await optimizer.analyze_workflow(
-            workflow_id=workflow_id,
-            min_executions=min_executions,
-        )
-
-        if not profile:
-            click.echo(f"Unable to profile workflow: {workflow_id}", err=True)
-            return
-
-        # Display results
-        click.echo(f"\n{'='*60}")
-        click.echo(f"Workflow Profile: {workflow_id}")
-        click.echo(f"{'='*60}")
-        click.echo(f"Total duration: {profile.total_duration:.2f}s")
-        click.echo(f"Total cost: ${profile.total_cost:.4f}")
-        click.echo(f"Total tokens: {profile.total_tokens}")
-        click.echo(f"Success rate: {profile.success_rate:.1%}")
-        click.echo(f"Executions analyzed: {profile.num_executions}")
-
-        # Display bottlenecks
-        if profile.bottlenecks:
-            click.echo(f"\nBottlenecks detected ({len(profile.bottlenecks)}):")
-            for i, bottleneck in enumerate(profile.bottlenecks, 1):
-                click.echo(f"  {i}. {bottleneck}")
-                click.echo(f"     Severity: {bottleneck.severity.value}")
-                click.echo(f"     Suggestion: {bottleneck.suggestion}")
-        else:
-            click.echo("\nNo bottlenecks detected!")
-
-        # Display opportunities
-        if profile.opportunities:
-            click.echo(f"\nOptimization opportunities ({len(profile.opportunities)}):")
-            for i, opp in enumerate(profile.opportunities[:5], 1):
-                click.echo(f"  {i}. {opp.strategy_type.value}: {opp.target}")
-                click.echo(f"     Expected improvement: {opp.expected_improvement:.1%}")
-                click.echo(f"     Risk level: {opp.risk_level.value}")
-                click.echo(f"     Confidence: {opp.confidence:.1%}")
-        else:
-            click.echo("\nNo optimization opportunities identified!")
-
-        # Save to file if requested
-        if output:
-            output_path = Path(output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(output_path, "w") as f:
-                json.dump(profile.to_dict(), f, indent=2)
-
-            click.echo(f"\nProfile saved to: {output}")
-
-    asyncio.run(run_profile())
+    run_sync(_profile_async(workflow_id, min_executions, output))
 
 
 @opt.command()
@@ -169,61 +110,16 @@ def suggest(
     Example:
         victor opt suggest my_workflow --max-suggestions 5
     """
-
-    async def run_suggest():
-        tracker = ExperimentTracker()
-        optimizer = WorkflowOptimizer(
-            experiment_tracker=tracker,
-            config=OptimizationConfig(
-                min_confidence=min_confidence,
-                min_improvement=min_improvement,
-            ),
-        )
-
-        click.echo(f"Generating optimization suggestions for: {workflow_id}")
-
-        suggestions = await optimizer.suggest_optimizations(
+    run_sync(
+        _suggest_async(
             workflow_id=workflow_id,
             min_executions=min_executions,
             max_suggestions=max_suggestions,
+            min_confidence=min_confidence,
+            min_improvement=min_improvement,
+            output=output,
         )
-
-        if not suggestions:
-            click.echo(f"No optimization suggestions found for: {workflow_id}")
-            return
-
-        click.echo(f"\nFound {len(suggestions)} optimization suggestions:\n")
-
-        for i, suggestion in enumerate(suggestions, 1):
-            click.echo(f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}")
-            click.echo(f"   Description: {suggestion.description}")
-            click.echo(f"   Expected improvement: {suggestion.expected_improvement:.1%}")
-            click.echo(f"   Risk level: {suggestion.risk_level.value}")
-            click.echo(f"   Confidence: {suggestion.confidence:.1%}")
-
-            if suggestion.estimated_cost_reduction > 0:
-                click.echo(
-                    f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}"
-                )
-
-            if suggestion.estimated_duration_reduction > 0:
-                click.echo(
-                    f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s"
-                )
-
-            click.echo()
-
-        # Save to file if requested
-        if output:
-            output_path = Path(output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(output_path, "w") as f:
-                json.dump([s.to_dict() for s in suggestions], f, indent=2)
-
-            click.echo(f"Suggestions saved to: {output}")
-
-    asyncio.run(run_suggest())
+    )
 
 
 @opt.command()
@@ -263,68 +159,16 @@ def optimize(
     Example:
         victor opt optimize my_workflow config.json --algorithm hill_climbing
     """
-
-    async def run_optimize():
-        # Load workflow config
-        with open(config_file, "r") as f:
-            workflow_config = json.load(f)
-
-        tracker = ExperimentTracker()
-        optimizer = WorkflowOptimizer(
-            experiment_tracker=tracker,
-            config=OptimizationConfig(
-                search_algorithm=algorithm,
-                max_iterations=max_iterations,
-                enable_validation=validate,
-            ),
-        )
-
-        click.echo(f"Optimizing workflow: {workflow_id}")
-        click.echo(f"Algorithm: {algorithm}")
-        click.echo(f"Max iterations: {max_iterations}")
-        click.echo(f"Validation: {'enabled' if validate else 'disabled'}")
-
-        result = await optimizer.optimize_workflow(
+    run_sync(
+        _optimize_async(
             workflow_id=workflow_id,
-            workflow_config=workflow_config,
+            config_file=config_file,
+            algorithm=algorithm,
+            max_iterations=max_iterations,
+            validate=validate,
+            output=output,
         )
-
-        if not result or not result.best_variant:
-            click.echo(f"Optimization failed for workflow: {workflow_id}", err=True)
-            return
-
-        # Display results
-        click.echo(f"\n{'='*60}")
-        click.echo(f"Optimization Results")
-        click.echo(f"{'='*60}")
-        click.echo(f"Iterations: {result.iterations}")
-        click.echo(f"Converged: {result.converged}")
-        click.echo(f"Best score: {result.best_score:.3f}")
-
-        if result.best_variant:
-            variant = result.best_variant
-            click.echo(f"\nBest variant: {variant.variant_id}")
-            click.echo(f"Changes applied: {len(variant.changes)}")
-            click.echo(f"Expected improvement: {variant.expected_improvement:.1%}")
-            click.echo(f"Risk level: {variant.risk_level}")
-
-            if variant.estimated_cost_reduction > 0:
-                click.echo(f"Estimated cost reduction: ${variant.estimated_cost_reduction:.4f}")
-
-            if variant.estimated_duration_reduction > 0:
-                click.echo(f"Estimated time saved: {variant.estimated_duration_reduction:.2f}s")
-
-        # Save to file if requested
-        if output and result.best_variant:
-            output_path = Path(output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(output_path, "w") as f:
-                json.dump(result.best_variant.to_dict(), f, indent=2)
-
-            click.echo(f"\nOptimized variant saved to: {output}")
-
-    asyncio.run(run_optimize())
+    )
 
 
 @opt.command()
@@ -345,68 +189,230 @@ def validate(
     Example:
         victor opt validate variant.json my_workflow --test-inputs tests.json
     """
+    run_sync(_validate_async(variant_file, workflow_id, test_inputs))
 
-    async def run_validate():
-        # Load variant
-        with open(variant_file, "r") as f:
-            variant_data = json.load(f)
 
-        from victor.optimization.generator import WorkflowVariant
+async def _profile_async(
+    workflow_id: str,
+    min_executions: int,
+    output: Optional[str],
+) -> None:
+    tracker = ExperimentTracker()
+    optimizer = WorkflowOptimizer(experiment_tracker=tracker)
 
-        variant = WorkflowVariant(
-            variant_id=variant_data["variant_id"],
-            base_workflow_id=variant_data["base_workflow_id"],
-            changes=[],
-            expected_improvement=variant_data.get("expected_improvement", 0.0),
-            risk_level=variant_data.get("risk_level", "medium"),
-            config=variant_data.get("config", {}),
-        )
+    click.echo(f"Profiling workflow: {workflow_id}")
+    workflow_profile = await optimizer.analyze_workflow(
+        workflow_id=workflow_id,
+        min_executions=min_executions,
+    )
 
-        # Load test inputs if provided
-        test_data = None
-        if test_inputs:
-            with open(test_inputs, "r") as f:
-                test_data = json.load(f)
+    if not workflow_profile:
+        click.echo(f"Unable to profile workflow: {workflow_id}", err=True)
+        return
 
-        tracker = ExperimentTracker()
-        optimizer = WorkflowOptimizer(experiment_tracker=tracker)
+    click.echo(f"\n{'='*60}")
+    click.echo(f"Workflow Profile: {workflow_id}")
+    click.echo(f"{'='*60}")
+    click.echo(f"Total duration: {workflow_profile.total_duration:.2f}s")
+    click.echo(f"Total cost: ${workflow_profile.total_cost:.4f}")
+    click.echo(f"Total tokens: {workflow_profile.total_tokens}")
+    click.echo(f"Success rate: {workflow_profile.success_rate:.1%}")
+    click.echo(f"Executions analyzed: {workflow_profile.num_executions}")
 
-        click.echo(f"Validating variant: {variant.variant_id}")
+    if workflow_profile.bottlenecks:
+        click.echo(f"\nBottlenecks detected ({len(workflow_profile.bottlenecks)}):")
+        for i, bottleneck in enumerate(workflow_profile.bottlenecks, 1):
+            click.echo(f"  {i}. {bottleneck}")
+            click.echo(f"     Severity: {bottleneck.severity.value}")
+            click.echo(f"     Suggestion: {bottleneck.suggestion}")
+    else:
+        click.echo("\nNo bottlenecks detected!")
 
-        # Get profile for baseline
-        profile = await optimizer.analyze_workflow(
-            workflow_id=workflow_id,
-        )
+    if workflow_profile.opportunities:
+        click.echo(f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):")
+        for i, opportunity in enumerate(workflow_profile.opportunities[:5], 1):
+            click.echo(f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}")
+            click.echo(f"     Expected improvement: {opportunity.expected_improvement:.1%}")
+            click.echo(f"     Risk level: {opportunity.risk_level.value}")
+            click.echo(f"     Confidence: {opportunity.confidence:.1%}")
+    else:
+        click.echo("\nNo optimization opportunities identified!")
 
-        if not profile:
-            click.echo(f"Cannot validate without profile for: {workflow_id}", err=True)
-            return
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(workflow_profile.to_dict(), f, indent=2)
+        click.echo(f"\nProfile saved to: {output}")
 
-        # Validate variant
-        result = await optimizer.validate_variant(
-            variant=variant,
-            profile=profile,
-            test_inputs=test_data,
-        )
 
-        # Display results
-        click.echo(f"\n{'='*60}")
-        click.echo(f"Validation Results")
-        click.echo(f"{'='*60}")
-        click.echo(f"Mode: {result.mode.value}")
-        click.echo(f"Duration score: {result.duration_score:.3f}")
-        click.echo(f"Cost score: {result.cost_score:.3f}")
-        click.echo(f"Quality score: {result.quality_score:.3f}")
-        click.echo(f"Overall score: {result.overall_score:.3f}")
-        click.echo(f"Confidence: {result.confidence:.1%}")
-        click.echo(f"Recommend: {'Yes' if result.recommendation else 'No'}")
+async def _suggest_async(
+    *,
+    workflow_id: str,
+    min_executions: int,
+    max_suggestions: int,
+    min_confidence: float,
+    min_improvement: float,
+    output: Optional[str],
+) -> None:
+    tracker = ExperimentTracker()
+    optimizer = WorkflowOptimizer(
+        experiment_tracker=tracker,
+        config=OptimizationConfig(
+            min_confidence=min_confidence,
+            min_improvement=min_improvement,
+        ),
+    )
 
-        if result.metrics:
-            click.echo(f"\nAdditional metrics:")
-            for key, value in result.metrics.items():
-                click.echo(f"  {key}: {value}")
+    click.echo(f"Generating optimization suggestions for: {workflow_id}")
+    suggestions = await optimizer.suggest_optimizations(
+        workflow_id=workflow_id,
+        min_executions=min_executions,
+        max_suggestions=max_suggestions,
+    )
 
-    asyncio.run(run_validate())
+    if not suggestions:
+        click.echo(f"No optimization suggestions found for: {workflow_id}")
+        return
+
+    click.echo(f"\nFound {len(suggestions)} optimization suggestions:\n")
+    for i, suggestion in enumerate(suggestions, 1):
+        click.echo(f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}")
+        click.echo(f"   Description: {suggestion.description}")
+        click.echo(f"   Expected improvement: {suggestion.expected_improvement:.1%}")
+        click.echo(f"   Risk level: {suggestion.risk_level.value}")
+        click.echo(f"   Confidence: {suggestion.confidence:.1%}")
+
+        if suggestion.estimated_cost_reduction > 0:
+            click.echo(f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}")
+        if suggestion.estimated_duration_reduction > 0:
+            click.echo(f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s")
+        click.echo()
+
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump([suggestion.to_dict() for suggestion in suggestions], f, indent=2)
+        click.echo(f"Suggestions saved to: {output}")
+
+
+async def _optimize_async(
+    *,
+    workflow_id: str,
+    config_file: str,
+    algorithm: str,
+    max_iterations: int,
+    validate: bool,
+    output: Optional[str],
+) -> None:
+    with open(config_file, "r") as f:
+        workflow_config = json.load(f)
+
+    tracker = ExperimentTracker()
+    optimizer = WorkflowOptimizer(
+        experiment_tracker=tracker,
+        config=OptimizationConfig(
+            search_algorithm=algorithm,
+            max_iterations=max_iterations,
+            enable_validation=validate,
+        ),
+    )
+
+    click.echo(f"Optimizing workflow: {workflow_id}")
+    click.echo(f"Algorithm: {algorithm}")
+    click.echo(f"Max iterations: {max_iterations}")
+    click.echo(f"Validation: {'enabled' if validate else 'disabled'}")
+
+    result = await optimizer.optimize_workflow(
+        workflow_id=workflow_id,
+        workflow_config=workflow_config,
+    )
+
+    if not result or not result.best_variant:
+        click.echo(f"Optimization failed for workflow: {workflow_id}", err=True)
+        return
+
+    click.echo(f"\n{'='*60}")
+    click.echo("Optimization Results")
+    click.echo(f"{'='*60}")
+    click.echo(f"Iterations: {result.iterations}")
+    click.echo(f"Converged: {result.converged}")
+    click.echo(f"Best score: {result.best_score:.3f}")
+
+    variant = result.best_variant
+    click.echo(f"\nBest variant: {variant.variant_id}")
+    click.echo(f"Changes applied: {len(variant.changes)}")
+    click.echo(f"Expected improvement: {variant.expected_improvement:.1%}")
+    click.echo(f"Risk level: {variant.risk_level}")
+
+    if variant.estimated_cost_reduction > 0:
+        click.echo(f"Estimated cost reduction: ${variant.estimated_cost_reduction:.4f}")
+    if variant.estimated_duration_reduction > 0:
+        click.echo(f"Estimated time saved: {variant.estimated_duration_reduction:.2f}s")
+
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(result.best_variant.to_dict(), f, indent=2)
+        click.echo(f"\nOptimized variant saved to: {output}")
+
+
+async def _validate_async(
+    variant_file: str,
+    workflow_id: str,
+    test_inputs: Optional[str],
+) -> None:
+    with open(variant_file, "r") as f:
+        variant_data = json.load(f)
+
+    from victor.optimization.generator import WorkflowVariant
+
+    variant = WorkflowVariant(
+        variant_id=variant_data["variant_id"],
+        base_workflow_id=variant_data["base_workflow_id"],
+        changes=[],
+        expected_improvement=variant_data.get("expected_improvement", 0.0),
+        risk_level=variant_data.get("risk_level", "medium"),
+        config=variant_data.get("config", {}),
+    )
+
+    test_data = None
+    if test_inputs:
+        with open(test_inputs, "r") as f:
+            test_data = json.load(f)
+
+    tracker = ExperimentTracker()
+    optimizer = WorkflowOptimizer(experiment_tracker=tracker)
+
+    click.echo(f"Validating variant: {variant.variant_id}")
+    workflow_profile = await optimizer.analyze_workflow(workflow_id=workflow_id)
+    if not workflow_profile:
+        click.echo(f"Cannot validate without profile for: {workflow_id}", err=True)
+        return
+
+    result = await optimizer.validate_variant(
+        variant=variant,
+        profile=workflow_profile,
+        test_inputs=test_data,
+    )
+
+    click.echo(f"\n{'='*60}")
+    click.echo("Validation Results")
+    click.echo(f"{'='*60}")
+    click.echo(f"Mode: {result.mode.value}")
+    click.echo(f"Duration score: {result.duration_score:.3f}")
+    click.echo(f"Cost score: {result.cost_score:.3f}")
+    click.echo(f"Quality score: {result.quality_score:.3f}")
+    click.echo(f"Overall score: {result.overall_score:.3f}")
+    click.echo(f"Confidence: {result.confidence:.1%}")
+    click.echo(f"Recommend: {'Yes' if result.recommendation else 'No'}")
+
+    if result.metrics:
+        click.echo("\nAdditional metrics:")
+        for key, value in result.metrics.items():
+            click.echo(f"  {key}: {value}")
 
 
 # Register commands with CLI

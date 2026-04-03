@@ -88,6 +88,12 @@ class PIISeverity(Enum):
     MEDIUM = "medium"  # Contact info, DOB
     LOW = "low"  # Demographics, preferences
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_pii_severity(self)
+
 
 @dataclass
 class PIIMatch:

@@ -33,6 +33,7 @@ Thinking Content Handling (dual-mode):
 - `suppress_thinking` option to completely hide thinking content
 """
 
+from victor.ui.rendering.buffered import BufferedRenderer
 from victor.ui.rendering.formatter_renderer import FormatterRenderer
 from victor.ui.rendering.handler import stream_response
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
@@ -49,6 +50,7 @@ __all__ = [
     # Protocol
     "StreamRenderer",
     # Renderers
+    "BufferedRenderer",
     "FormatterRenderer",
     "LiveDisplayRenderer",
     # Handler

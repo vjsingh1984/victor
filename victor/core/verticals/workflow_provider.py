@@ -27,6 +27,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
+from victor.core.verticals.import_resolver import vertical_runtime_module_candidates
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,15 +67,18 @@ class VerticalWorkflowProvider(ABC):
             Dict mapping handler name to handler instance. Empty dict if
             handlers module not found.
         """
-        # Try auto-import from victor.{vertical_name}.handlers
-        try:
-            if hasattr(cls, "name"):
-                module_path = f"victor.{cls.name}.handlers"
+        if not hasattr(cls, "name"):
+            return {}
+
+        for module_path in vertical_runtime_module_candidates(str(cls.name), "handlers"):
+            try:
                 module = __import__(module_path, fromlist=["HANDLERS"])
                 return getattr(module, "HANDLERS", {})
-        except ImportError:
-            # Handlers module not found (graceful fallback)
-            pass
+            except ImportError:
+                continue
+            except Exception as e:
+                logger.debug("Failed loading handlers from '%s': %s", module_path, e)
+                continue
         return {}
 
     @classmethod
@@ -109,12 +114,9 @@ class VerticalWorkflowProvider(ABC):
         class_name = f"{vertical_name}WorkflowProvider"
 
         # Try multiple import patterns
-        patterns = [
-            # Pattern 1: Direct module (e.g., victor.coding.workflows)
-            f"victor.{cls.name}.workflows",
-            # Pattern 2: Provider submodule (e.g., victor.coding.workflows.provider)
-            f"victor.{cls.name}.workflows.provider",
-        ]
+        patterns: List[str] = []
+        for module_suffix in ("workflows", "workflows.provider"):
+            patterns.extend(vertical_runtime_module_candidates(str(cls.name), module_suffix))
 
         for module_path in patterns:
             try:
@@ -125,6 +127,9 @@ class VerticalWorkflowProvider(ABC):
                     # with get_workflow_names() and other instance methods
                     return provider_class()
             except (ImportError, AttributeError):
+                continue
+            except Exception as e:
+                logger.debug("Failed loading workflow provider from '%s': %s", module_path, e)
                 continue
 
         return None

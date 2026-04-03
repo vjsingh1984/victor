@@ -151,6 +151,7 @@ class ToolExecutionResult:
         self.normalization_strategy = normalization_strategy
         self.correlation_id = correlation_id
         self.error_info = error_info
+        self.truncation_info: Any = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization/logging.
@@ -273,6 +274,7 @@ class ToolExecutor:
         # Execution statistics
         self._stats: Dict[str, Dict[str, Any]] = {}
         self._failed_signatures: set[Tuple[str, str]] = set()
+        self._max_failed_signatures = 1000
         self._validation_failures: int = 0  # Track validation failures for metrics
         self._errors_by_category: Dict[str, int] = {}  # Track errors by category
 
@@ -344,6 +346,77 @@ class ToolExecutor:
                 f"permission for tool '{tool_name}' (category: {category})",
             )
 
+    def _check_missing_required_args(
+        self,
+        tool: BaseTool,
+        arguments: Dict[str, Any],
+    ) -> List[str]:
+        """Check for missing required arguments before execution.
+
+        Uses the tool's JSON Schema to identify required parameters
+        that were not provided, preventing TypeError crashes.
+
+        Args:
+            tool: The tool to check arguments for
+            arguments: Arguments provided by the LLM
+
+        Returns:
+            List of missing required argument names (empty if all present)
+        """
+        schema = tool.parameters
+        if not schema:
+            return []
+
+        required = schema.get("required", [])
+        if not required:
+            return []
+
+        return [r for r in required if r not in arguments]
+
+    @staticmethod
+    def _coerce_arg_types(tool: BaseTool, arguments: Dict[str, Any]) -> None:
+        """Best-effort type coercion based on JSON Schema property types.
+
+        Prevents runtime TypeErrors when the LLM sends a value with the
+        wrong type (e.g. string "5" for an integer parameter). Modifies
+        ``arguments`` in place.
+
+        Only handles safe, lossless conversions:
+        - str → int/float (numeric strings)
+        - int → float
+        - str → bool ("true"/"false")
+        """
+        schema = tool.parameters
+        if not schema:
+            return
+
+        properties = schema.get("properties", {})
+        for key, value in list(arguments.items()):
+            prop_schema = properties.get(key)
+            if not prop_schema:
+                continue
+
+            expected = prop_schema.get("type")
+            if not expected or not isinstance(expected, str):
+                continue
+
+            try:
+                if expected == "integer" and isinstance(value, str):
+                    arguments[key] = int(value)
+                elif expected == "number" and isinstance(value, str):
+                    arguments[key] = float(value)
+                elif expected == "number" and isinstance(value, int):
+                    arguments[key] = float(value)
+                elif expected == "boolean" and isinstance(value, str):
+                    if value.lower() in ("true", "1", "yes"):
+                        arguments[key] = True
+                    elif value.lower() in ("false", "0", "no"):
+                        arguments[key] = False
+                elif expected == "string" and not isinstance(value, str):
+                    arguments[key] = str(value)
+            except (ValueError, TypeError):
+                pass  # Leave original value; tool will handle the error
+
     def _check_unknown_arguments(
         self,
         tool: BaseTool,
@@ -414,14 +487,18 @@ class ToolExecutor:
                 f"Valid parameters for '{tool.name}': {', '.join(sorted(valid_params)) or 'none'}"
             )
             self._validation_failures += 1
-            logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
             if self.validation_mode == ValidationMode.STRICT:
+                logger.error("Unknown arguments for '%s': %s", tool.name, unknown_args)
                 return False, ToolValidationResult.failure([error_msg])
             else:
                 # Strip unknown arguments so the tool function doesn't crash
                 for arg in unknown_args:
                     arguments.pop(arg, None)
-                logger.warning("Stripped unknown arguments %s (lenient mode)", sorted(unknown_args))
+                logger.debug(
+                    "Stripped unknown arguments for '%s': %s (lenient mode)",
+                    tool.name,
+                    sorted(unknown_args),
+                )
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
@@ -597,6 +674,19 @@ class ToolExecutor:
             self._complete_tool_call(call_id, False, error=result.error)
             return result
 
+        # Check for missing required arguments before schema validation
+        missing = self._check_missing_required_args(tool, normalized_args)
+        if missing:
+            error_msg = f"Error: Missing required arguments: {', '.join(missing)}"
+            result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=error_msg,
+            )
+            self._complete_tool_call(call_id, False, error=result.error)
+            return result
+
         # Pre-execution schema validation
         should_proceed, validation_result = self._validate_arguments(tool, normalized_args)
         if not should_proceed:
@@ -611,6 +701,11 @@ class ToolExecutor:
             )
             self._complete_tool_call(call_id, False, error=result.error)
             return result
+
+        # In LENIENT mode, coerce argument types to match schema to prevent
+        # runtime TypeErrors (e.g., string "5" when int expected)
+        if self.validation_mode == ValidationMode.LENIENT:
+            self._coerce_arg_types(tool, normalized_args)
 
         # Safety check for dangerous operations
         should_proceed, rejection_reason = await self.safety_checker.check_and_confirm(
@@ -668,7 +763,8 @@ class ToolExecutor:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure
             sig = (tool_name, str(sorted(normalized_args.items())))
-            self._failed_signatures.add(sig)
+            if len(self._failed_signatures) < self._max_failed_signatures:
+                self._failed_signatures.add(sig)
 
         # Emit RL event for tool execution (for learner activation)
         self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
@@ -676,7 +772,22 @@ class ToolExecutor:
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
 
-        return ToolExecutionResult(
+        # Enforce output size bounds to prevent context window blowout
+        truncation_info = None
+        if success and isinstance(result, str) and len(result) > 25600:
+            from victor.tools.output_utils import truncate_by_lines
+
+            result, truncation_info = truncate_by_lines(result)
+            if truncation_info.was_truncated:
+                logger.warning(
+                    "Tool %s output truncated: %d→%d lines (%s)",
+                    tool_name,
+                    truncation_info.total_lines,
+                    truncation_info.lines_returned,
+                    truncation_info.truncation_reason,
+                )
+
+        exec_result = ToolExecutionResult(
             tool_name=tool_name,
             success=success,
             result=result,
@@ -687,6 +798,8 @@ class ToolExecutor:
             correlation_id=correlation_id,
             error_info=error_info,
         )
+        exec_result.truncation_info = truncation_info
+        return exec_result
 
     def _run_before_hooks(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Run before hooks for a tool execution.
@@ -834,8 +947,14 @@ class ToolExecutor:
                 # Run before hooks - critical hooks can block execution
                 self._run_before_hooks(tool.name, arguments)
 
-                # Execute the tool
-                result = await tool.execute(_exec_ctx=context, **arguments)
+                # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
+                arguments.pop("_exec_ctx", None)
+                # Per-tool timeout: tools can declare timeout_seconds, default 30s
+                per_attempt_timeout = getattr(tool, "timeout_seconds", 30.0)
+                result = await asyncio.wait_for(
+                    tool.execute(_exec_ctx=context, **arguments),
+                    timeout=per_attempt_timeout,
+                )
 
                 # Run after hooks - critical hooks can raise errors
                 self._run_after_hooks(tool.name, result)

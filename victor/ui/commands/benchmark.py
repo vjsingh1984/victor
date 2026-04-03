@@ -45,6 +45,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from victor.core.async_utils import run_sync
 from victor.ui.commands.utils import setup_logging
 
 benchmark_app = typer.Typer(
@@ -137,83 +138,20 @@ def setup_benchmark(
     """
     _configure_log_level(log_level)
 
-    from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
-    from victor.evaluation.benchmarks import SWEBenchRunner
-
     # Only SWE-bench needs setup (repo cloning)
     benchmark_lower = benchmark.lower().replace("_", "-")
     if benchmark_lower not in ("swe-bench", "swe-bench-lite"):
         console.print(f"[yellow]Setup not needed for {benchmark}[/]")
         console.print("Only SWE-bench benchmarks require repo setup.")
         return
-
-    async def run_setup():
-        from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
-
-        # Create runner to load tasks
-        if benchmark_lower == "swe-bench-lite":
-            runner = SWEBenchRunner(split="lite")
-        else:
-            runner = SWEBenchRunner()
-
-        # Load tasks (model is required but not used for setup)
-        config = EvaluationConfig(
-            benchmark=BenchmarkType.SWE_BENCH,
-            model="setup-only",  # Not used for cloning/indexing
+    run_sync(
+        _setup_benchmark_async(
+            benchmark=benchmark,
+            benchmark_lower=benchmark_lower,
             max_tasks=max_tasks,
+            force_reindex=force_reindex,
         )
-
-        console.print(f"[bold]Setting up {benchmark} benchmark...[/]")
-        tasks = await runner.load_tasks(config)
-        console.print(f"Found {len(tasks)} tasks to setup")
-
-        # Setup workspace manager
-        workspace_manager = SWEBenchWorkspaceManager()
-
-        # Group tasks by repo (to avoid duplicate clones)
-        repos_seen = set()
-        unique_tasks = []
-        for task in tasks:
-            if task.repo and task.repo not in repos_seen:
-                repos_seen.add(task.repo)
-                unique_tasks.append(task)
-
-        console.print(f"Unique repositories: {len(unique_tasks)}")
-
-        # Setup each unique repo
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
-
-            for i, task in enumerate(unique_tasks):
-                repo_name = (
-                    task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
-                )
-                progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
-
-                try:
-                    # Check if already indexed
-                    if not force_reindex and workspace_manager.is_repo_indexed(task):
-                        console.print(f"  [green]✓[/] {repo_name} (cached)")
-                    else:
-                        await workspace_manager.setup_repo_with_indexes(
-                            task,
-                            force_reindex=force_reindex,
-                        )
-                        console.print(f"  [green]✓[/] {repo_name} (indexed)")
-                except Exception as e:
-                    console.print(f"  [red]✗[/] {repo_name}: {e}")
-
-                progress.advance(setup_task)
-
-        console.print("\n[bold green]Setup complete![/]")
-        console.print(f"Cached repos: {workspace_manager.cache_dir}")
-        console.print(f"\nNow run: victor benchmark run {benchmark}")
-
-    asyncio.run(run_setup())
+    )
 
 
 @benchmark_app.command("run")
@@ -305,159 +243,16 @@ def run_benchmark(
         console.print(f"Max tasks: {max_tasks}")
     console.print(f"Timeout: {timeout}s per task")
     console.print()
-
-    async def run_async():
-        from victor.evaluation.harness import EvaluationHarness
-        from victor.evaluation.agent_adapter import VictorAgentAdapter
-        from victor.evaluation.protocol import BenchmarkTask
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Loading tasks...", total=None)
-
-            # Create harness and register runner
-            harness = EvaluationHarness()
-            harness.register_runner(runner)
-
-            # Load tasks first to show count
-            tasks = await runner.load_tasks(config)
-            progress.update(task, description=f"Loaded {len(tasks)} tasks")
-
-            if not tasks:
-                console.print("[yellow]No tasks to run[/]")
-                return None
-
-            # Create agent adapter from profile
-            progress.update(task, description="Initializing agent...")
-            try:
-                adapter = VictorAgentAdapter.from_profile(
-                    profile=profile,
-                    model_override=model,  # Use explicit model if provided
-                    timeout=timeout,
-                )
-
-                # Create workspace manager for SWE-bench (uses caching)
-                from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
-
-                workspace_manager = SWEBenchWorkspaceManager()
-
-                # Create a callback that returns code AND metrics for token tracking
-                async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
-                    """Run agent on task and return generated code with metrics.
-
-                    Two-phase approach:
-                    1. Setup phase (optional, run 'victor benchmark setup' first):
-                       - Clones repo to ~/.victor/swe_bench_cache/<hash>/
-                       - Builds indexes in repo's .victor/ directory
-                    2. Execution phase (this callback):
-                       - Uses cached repo with pre-built indexes
-                       - Agent works in target repo, not victor's codebase
-
-                    Returns a dict with:
-                    - code: The generated patch or code
-                    - tokens_input: Input tokens used
-                    - tokens_output: Output tokens used
-                    - tokens_used: Total tokens used
-                    - tool_calls: Number of tool calls
-                    - turns: Number of conversation turns
-                    """
-                    import os
-
-                    # Check if repo is already setup (Phase 1 completed)
-                    cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
-                    if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
-                        # Use cached+indexed repo directly
-                        work_dir = cached_repo
-                        console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
-                    else:
-                        # Setup on-the-fly (slower, but works without explicit setup)
-                        console.print(
-                            "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
-                        )
-                        await workspace_manager.setup_repo_with_indexes(benchmark_task)
-                        work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
-
-                    # Checkout the specific base commit for this task
-                    if benchmark_task.base_commit and work_dir:
-                        checkout_proc = await asyncio.create_subprocess_exec(
-                            "git",
-                            "checkout",
-                            benchmark_task.base_commit,
-                            cwd=work_dir,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        await checkout_proc.communicate()
-
-                    # Change to target repo directory so agent uses its indexes
-                    original_cwd = os.getcwd()
-                    os.chdir(work_dir)
-                    try:
-                        trace = await adapter.execute_task(benchmark_task, work_dir)
-                    except asyncio.CancelledError:
-                        # On timeout/cancellation, store partial data for harness
-                        partial = adapter.get_partial_trace()
-                        logger.info(
-                            f"Task cancelled - partial trace: "
-                            f"tool_calls={partial['tool_calls']}, turns={partial['turns']}, "
-                            f"tokens={partial['tokens_used']}"
-                        )
-                        # Store partial data in a container the harness can access
-                        # We use a mutable dict attached to the function object
-                        agent_callback._partial_data = {
-                            "code": partial.get("code", ""),
-                            "tokens_input": partial.get("tokens_input", 0),
-                            "tokens_output": partial.get("tokens_output", 0),
-                            "tokens_used": partial.get("tokens_used", 0),
-                            "tool_calls": partial.get("tool_calls", 0),
-                            "turns": partial.get("turns", 0),
-                        }
-                        # Re-raise so wait_for properly times out
-                        raise
-                    finally:
-                        os.chdir(original_cwd)
-
-                    # Return code with metrics for harness to populate TaskResult
-                    return {
-                        "code": trace.generated_patch or trace.generated_code or "",
-                        "tokens_input": trace.token_usage.input_tokens,
-                        "tokens_output": trace.token_usage.output_tokens,
-                        "tokens_used": trace.token_usage.total_tokens,
-                        "tool_calls": len(trace.tool_calls),
-                        "turns": trace.turns,
-                    }
-
-            except Exception as e:
-                console.print(f"[red]Error initializing agent:[/] {e}")
-                import traceback
-
-                traceback.print_exc()
-                return None
-
-            # Progress callback
-            def on_progress(task_idx: int, total: int, result):
-                progress.update(
-                    task, description=f"Task {task_idx + 1}/{total}: {result.status.value}"
-                )
-
-            # Run evaluation
-            if resume:
-                progress.update(task, description="Resuming evaluation...")
-            else:
-                progress.update(task, description="Running evaluation...")
-            result = await harness.run_evaluation(
-                config=config,
-                agent_callback=agent_callback,
-                progress_callback=on_progress,
-                resume=resume,
-            )
-
-            return result
-
-    result = asyncio.run(run_async())
+    result = run_sync(
+        _run_benchmark_async(
+            runner=runner,
+            config=config,
+            profile=profile,
+            model=model,
+            timeout=timeout,
+            resume=resume,
+        )
+    )
 
     if result is None:
         raise typer.Exit(1)
@@ -500,6 +295,191 @@ def run_benchmark(
         }
         output.write_text(json.dumps(output_data, indent=2))
         console.print(f"\n[dim]Results saved to {output}[/]")
+
+
+async def _setup_benchmark_async(
+    *,
+    benchmark: str,
+    benchmark_lower: str,
+    max_tasks: Optional[int],
+    force_reindex: bool,
+) -> None:
+    from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
+    from victor.evaluation.benchmarks import SWEBenchRunner
+    from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+
+    runner = (
+        SWEBenchRunner(split="lite") if benchmark_lower == "swe-bench-lite" else SWEBenchRunner()
+    )
+    config = EvaluationConfig(
+        benchmark=BenchmarkType.SWE_BENCH,
+        model="setup-only",
+        max_tasks=max_tasks,
+    )
+
+    console.print(f"[bold]Setting up {benchmark} benchmark...[/]")
+    tasks = await runner.load_tasks(config)
+    console.print(f"Found {len(tasks)} tasks to setup")
+
+    workspace_manager = SWEBenchWorkspaceManager()
+    repos_seen = set()
+    unique_tasks = []
+    for task in tasks:
+        if task.repo and task.repo not in repos_seen:
+            repos_seen.add(task.repo)
+            unique_tasks.append(task)
+
+    console.print(f"Unique repositories: {len(unique_tasks)}")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
+
+        for i, task in enumerate(unique_tasks):
+            repo_name = task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
+            progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
+
+            try:
+                if not force_reindex and workspace_manager.is_repo_indexed(task):
+                    console.print(f"  [green]✓[/] {repo_name} (cached)")
+                else:
+                    await workspace_manager.setup_repo_with_indexes(
+                        task,
+                        force_reindex=force_reindex,
+                    )
+                    console.print(f"  [green]✓[/] {repo_name} (indexed)")
+            except Exception as e:
+                console.print(f"  [red]✗[/] {repo_name}: {e}")
+
+            progress.advance(setup_task)
+
+    console.print("\n[bold green]Setup complete![/]")
+    console.print(f"Cached repos: {workspace_manager.cache_dir}")
+    console.print(f"\nNow run: victor benchmark run {benchmark}")
+
+
+async def _run_benchmark_async(
+    *,
+    runner,
+    config,
+    profile: str,
+    model: Optional[str],
+    timeout: int,
+    resume: bool,
+):
+    from victor.evaluation.harness import EvaluationHarness
+    from victor.evaluation.agent_adapter import VictorAgentAdapter
+    from victor.evaluation.protocol import BenchmarkTask
+    from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Loading tasks...", total=None)
+
+        harness = EvaluationHarness()
+        harness.register_runner(runner)
+
+        tasks = await runner.load_tasks(config)
+        progress.update(task, description=f"Loaded {len(tasks)} tasks")
+
+        if not tasks:
+            console.print("[yellow]No tasks to run[/]")
+            return None
+
+        progress.update(task, description="Initializing agent...")
+        try:
+            adapter = VictorAgentAdapter.from_profile(
+                profile=profile,
+                model_override=model,
+                timeout=timeout,
+            )
+            workspace_manager = SWEBenchWorkspaceManager()
+
+            async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
+                """Run agent on task and return generated code with metrics."""
+                cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
+                if cached_repo and workspace_manager.is_repo_indexed(benchmark_task):
+                    work_dir = cached_repo
+                    console.print(f"  [dim]Using indexed repo: {cached_repo.name}[/]")
+                else:
+                    console.print(
+                        "  [dim]Setting up repo (run 'victor benchmark setup' for faster execution)...[/]"
+                    )
+                    await workspace_manager.setup_repo_with_indexes(benchmark_task)
+                    work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
+
+                if benchmark_task.base_commit and work_dir:
+                    checkout_proc = await asyncio.create_subprocess_exec(
+                        "git",
+                        "checkout",
+                        benchmark_task.base_commit,
+                        cwd=work_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await checkout_proc.communicate()
+
+                original_cwd = os.getcwd()
+                os.chdir(work_dir)
+                try:
+                    trace = await adapter.execute_task(benchmark_task, work_dir)
+                except asyncio.CancelledError:
+                    partial = adapter.get_partial_trace()
+                    logger.info(
+                        "Task cancelled - partial trace: tool_calls=%s, turns=%s, tokens=%s",
+                        partial["tool_calls"],
+                        partial["turns"],
+                        partial["tokens_used"],
+                    )
+                    agent_callback._partial_data = {
+                        "code": partial.get("code", ""),
+                        "tokens_input": partial.get("tokens_input", 0),
+                        "tokens_output": partial.get("tokens_output", 0),
+                        "tokens_used": partial.get("tokens_used", 0),
+                        "tool_calls": partial.get("tool_calls", 0),
+                        "turns": partial.get("turns", 0),
+                    }
+                    raise
+                finally:
+                    os.chdir(original_cwd)
+
+                return {
+                    "code": trace.generated_patch or trace.generated_code or "",
+                    "tokens_input": trace.token_usage.input_tokens,
+                    "tokens_output": trace.token_usage.output_tokens,
+                    "tokens_used": trace.token_usage.total_tokens,
+                    "tool_calls": len(trace.tool_calls),
+                    "turns": trace.turns,
+                }
+
+        except Exception as e:
+            console.print(f"[red]Error initializing agent:[/] {e}")
+            import traceback
+
+            traceback.print_exc()
+            return None
+
+        def on_progress(task_idx: int, total: int, result):
+            progress.update(
+                task,
+                description=f"Task {task_idx + 1}/{total}: {result.status.value}",
+            )
+
+        progress.update(
+            task, description="Resuming evaluation..." if resume else "Running evaluation..."
+        )
+        return await harness.run_evaluation(
+            config=config,
+            agent_callback=agent_callback,
+            progress_callback=on_progress,
+            resume=resume,
+        )
 
 
 @benchmark_app.command("compare")

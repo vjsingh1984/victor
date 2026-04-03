@@ -51,6 +51,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.core.async_utils import run_sync
+
 logger = logging.getLogger(__name__)
 
 
@@ -212,10 +214,8 @@ class BackgroundAgentManager:
             factory = OrchestratorFactory(settings, provider, model)
             manager = BackgroundAgentManager.from_factory(factory)
         """
-        import asyncio
-
         # Create orchestrator using factory (this is the unified creation path)
-        orchestrator = asyncio.run(factory.create_agent(mode="foreground"))
+        orchestrator = run_sync(factory.create_agent(mode="foreground"))
 
         # Return manager with factory stored for consistency
         return cls(
