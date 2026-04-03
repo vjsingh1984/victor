@@ -218,7 +218,9 @@ from victor.core.schema import (
     get_migration_sql,
 )
 
-from victor.core.severity import SeverityLevel
+# SeverityLevel is lazy-loaded to avoid import-time overhead.
+# Access via: from victor.core import SeverityLevel
+# or:        from victor.core.severity import SeverityLevel
 
 __all__ = [
     # Container
@@ -388,3 +390,12 @@ __all__ = [
     # Unified severity level (consolidates DangerLevel, RiskLevel, CVESeverity, etc.)
     "SeverityLevel",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for heavy or optional modules."""
+    if name == "SeverityLevel":
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -176,17 +176,32 @@ class UnifiedEntryPointRegistry:
                 all_eps = entry_points()
 
                 # Filter and group by Victor groups
+                # Handle both Python 3.9/3.10 (dict-like) and 3.12+ (flat list)
                 scan_order = 0
-                for ep in all_eps:
-                    if ep.group in ENTRY_POINT_GROUPS:
-                        if ep.group not in self._groups:
-                            self._groups[ep.group] = EntryPointGroup(
-                                group_name=ep.group, scan_order=scan_order
+                if isinstance(all_eps, dict):
+                    # Python 3.9-3.11: entry_points() returns a dict {group: [eps]}
+                    for group_name, eps in all_eps.items():
+                        if group_name not in ENTRY_POINT_GROUPS:
+                            continue
+                        if group_name not in self._groups:
+                            self._groups[group_name] = EntryPointGroup(
+                                group_name=group_name, scan_order=scan_order
                             )
                             scan_order += 1
+                        for ep in eps:
+                            self._groups[group_name].entry_points[ep.name] = (ep, False)
+                else:
+                    # Python 3.12+: entry_points() returns a flat SelectableGroups
+                    for ep in all_eps:
+                        if ep.group in ENTRY_POINT_GROUPS:
+                            if ep.group not in self._groups:
+                                self._groups[ep.group] = EntryPointGroup(
+                                    group_name=ep.group, scan_order=scan_order
+                                )
+                                scan_order += 1
 
-                        # Store entry point with loaded=False
-                        self._groups[ep.group].entry_points[ep.name] = (ep, False)
+                            # Store entry point with loaded=False
+                            self._groups[ep.group].entry_points[ep.name] = (ep, False)
 
                 self._scanned = True
 

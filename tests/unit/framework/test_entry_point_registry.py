@@ -161,8 +161,10 @@ class TestUnifiedEntryPointRegistry:
 
     def test_get_group_not_found(self):
         """Test getting non-existent group returns None."""
-        registry = UnifiedEntryPointRegistry.get_instance()
-        registry.scan_all()
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = []
+            registry = UnifiedEntryPointRegistry.get_instance()
+            registry.scan_all()
 
         group = registry.get_group("nonexistent.group")
         assert group is None
@@ -228,8 +230,10 @@ class TestUnifiedEntryPointRegistry:
 
     def test_get_entry_point_not_found(self):
         """Test getting non-existent entry point returns None."""
-        registry = UnifiedEntryPointRegistry.get_instance()
-        registry.scan_all()
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = []
+            registry = UnifiedEntryPointRegistry.get_instance()
+            registry.scan_all()
 
         result = registry.get("nonexistent.group", "nonexistent")
         assert result is None
@@ -300,11 +304,13 @@ class TestUnifiedEntryPointRegistry:
 
     def test_list_entry_points_nonexistent_group(self):
         """Test listing entry points for non-existent group."""
-        registry = UnifiedEntryPointRegistry.get_instance()
-        registry.scan_all()
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
+            mock_eps.return_value = []
+            registry = UnifiedEntryPointRegistry.get_instance()
+            registry.scan_all()
 
-        entry_points = registry.list_entry_points("nonexistent.group")
-        assert entry_points == []
+        entry_points_list = registry.list_entry_points("nonexistent.group")
+        assert entry_points_list == []
 
     def test_invalidate(self):
         """Test cache invalidation."""
