@@ -56,57 +56,53 @@ def _get_manager():
 
 @plugin_app.command("list")
 def list_plugins(
+    plugin_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Filter by type: vertical, external, plugin"
+    ),
     enabled_only: bool = typer.Option(False, "--enabled", help="Show only enabled plugins"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
-    """List all discovered plugins."""
-    manager = _get_manager()
-    plugins = manager.discover_plugins()
+    """List all plugins (verticals, external plugins, and entry-point plugins)."""
+    from victor.core.plugins.registry import PluginRegistry
 
+    # Ensure discovery has run
+    registry = PluginRegistry.get_instance()
+    if not registry.is_discovered:
+        registry.discover()
+
+    entries = registry.list_all_with_type()
+
+    if plugin_type:
+        entries = [e for e in entries if e["type"] == plugin_type]
     if enabled_only:
-        plugins = [p for p in plugins if p.enabled]
+        entries = [e for e in entries if e["enabled"]]
 
     if json_output:
-        data = [
-            {
-                "id": p.plugin_id,
-                "name": p.name,
-                "version": p.version,
-                "kind": p.kind.value,
-                "enabled": p.enabled,
-                "tools": len(p.manifest.tools),
-            }
-            for p in plugins
-        ]
-        console.print_json(json.dumps(data, indent=2))
+        console.print_json(json.dumps(entries, indent=2))
         return
 
-    if not plugins:
+    if not entries:
         console.print("[dim]No plugins found.[/]")
-        console.print("[dim]Install one with: victor plugin install <path-or-url>[/]")
+        console.print("[dim]Install with: victor plugin install <package-or-path>[/]")
         return
 
-    table = Table(title="Installed Plugins")
-    table.add_column("ID", style="cyan")
+    table = Table(title="Plugins")
+    table.add_column("Name", style="cyan")
+    table.add_column("Type")
     table.add_column("Version")
-    table.add_column("Kind")
     table.add_column("Status")
-    table.add_column("Tools", justify="right")
-    table.add_column("Description", max_width=40)
 
-    for p in sorted(plugins, key=lambda x: x.plugin_id):
-        status = "[green]enabled[/]" if p.enabled else "[dim]disabled[/]"
-        table.add_row(
-            p.plugin_id,
-            p.version,
-            p.kind.value,
-            status,
-            str(len(p.manifest.tools)),
-            p.manifest.description[:40],
-        )
+    for entry in entries:
+        status = "[green]enabled[/]" if entry["enabled"] else "[dim]disabled[/]"
+        type_style = {
+            "vertical": "[blue]vertical[/]",
+            "external": "[yellow]external[/]",
+            "plugin": "[magenta]plugin[/]",
+        }.get(entry["type"], entry["type"])
+        table.add_row(entry["name"], type_style, entry["version"], status)
 
     console.print(table)
-    console.print(f"\n[dim]{len(plugins)} plugin(s) found[/]")
+    console.print(f"\n[dim]{len(entries)} plugin(s) found[/]")
 
 
 @plugin_app.command("install")

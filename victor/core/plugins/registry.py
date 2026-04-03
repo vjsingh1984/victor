@@ -456,3 +456,45 @@ class PluginRegistry:
             if isinstance(plugin, _LegacyVerticalPluginAdapter):
                 result[plugin.name] = plugin._vertical_cls
         return result
+
+    def list_all_with_type(self) -> List[Dict[str, Any]]:
+        """Return a unified view of all plugins with type classification.
+
+        Each entry is a dict with keys: name, type, version, enabled.
+        The ``type`` field classifies the plugin as:
+        - ``"vertical"`` — VerticalBase wrapped via _LegacyVerticalPluginAdapter
+        - ``"external"`` — Subprocess plugin wrapped via _ExternalPluginAdapter
+        - ``"plugin"`` — Regular VictorPlugin (entry-point-based)
+
+        Returns:
+            Sorted list of plugin info dicts.
+        """
+        if not self._discovered:
+            return []
+
+        entries: List[Dict[str, Any]] = []
+        for name, plugin in self._plugins.items():
+            if isinstance(plugin, _LegacyVerticalPluginAdapter):
+                plugin_type = "vertical"
+                version = getattr(plugin._vertical_cls, "version", "0.0.0")
+                enabled = True
+            elif isinstance(plugin, _ExternalPluginAdapter):
+                plugin_type = "external"
+                version = getattr(plugin, "_plugin", None)
+                version = getattr(version, "version", "0.0.0") if version else "0.0.0"
+                enabled = getattr(getattr(plugin, "_plugin", None), "enabled", True)
+            else:
+                plugin_type = "plugin"
+                version = getattr(plugin, "version", "0.0.0")
+                enabled = True
+
+            entries.append(
+                {
+                    "name": name,
+                    "type": plugin_type,
+                    "version": str(version),
+                    "enabled": enabled,
+                }
+            )
+
+        return sorted(entries, key=lambda e: e["name"])

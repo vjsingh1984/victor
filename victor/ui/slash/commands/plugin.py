@@ -61,25 +61,39 @@ class PluginCommand(BaseSlashCommand):
             )
 
     def _list_plugins(self, ctx: CommandContext) -> None:
-        from victor.core.plugins.external import ExternalPluginManager
+        from victor.core.plugins.registry import PluginRegistry
 
-        manager = ExternalPluginManager()
-        plugins = manager.discover_plugins()
+        registry = PluginRegistry.get_instance()
+        if not registry.is_discovered:
+            registry.discover()
 
-        if not plugins:
-            ctx.console.print("[dim]No external plugins installed.[/]")
+        entries = registry.list_all_with_type()
+
+        if not entries:
+            ctx.console.print("[dim]No plugins found.[/]")
             ctx.console.print("[dim]Install with: victor plugin install <path>[/]")
             return
 
-        table = Table(title="External Plugins")
-        table.add_column("ID", style="cyan")
+        table = Table(title="Plugins")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type")
         table.add_column("Version")
         table.add_column("Status")
-        table.add_column("Tools", justify="right")
 
-        for p in sorted(plugins, key=lambda x: x.plugin_id):
-            status = "[green]enabled[/]" if p.enabled else "[dim]disabled[/]"
-            table.add_row(p.plugin_id, p.version, status, str(len(p.manifest.tools)))
+        type_styles = {
+            "vertical": "[blue]vertical[/]",
+            "external": "[yellow]external[/]",
+            "plugin": "[magenta]plugin[/]",
+        }
+        for entry in entries:
+            status = "[green]enabled[/]" if entry["enabled"] else "[dim]disabled[/]"
+            ctx.console.print() if False else None  # placeholder
+            table.add_row(
+                entry["name"],
+                type_styles.get(entry["type"], entry["type"]),
+                entry["version"],
+                status,
+            )
 
         ctx.console.print(table)
 
