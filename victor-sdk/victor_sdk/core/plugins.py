@@ -160,3 +160,19 @@ class VictorPlugin(Protocol):
             Dict with 'healthy' key and optional detail keys.
         """
         ...
+
+    async def on_activate_async(self) -> None:
+        """Async variant of on_activate.
+
+        When implemented, the framework calls this instead of on_activate
+        in async contexts. Useful for plugins that need I/O during setup.
+        """
+        ...
+
+    async def on_deactivate_async(self) -> None:
+        """Async variant of on_deactivate.
+
+        When implemented, the framework calls this instead of on_deactivate
+        in async contexts. Useful for plugins that need I/O during teardown.
+        """
+        ...

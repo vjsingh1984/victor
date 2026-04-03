@@ -5,6 +5,7 @@ Victor verticals without runtime dependencies.
 """
 
 from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_sdk.verticals.extensions import VerticalExtensions
 from victor_sdk.verticals.protocols import (
     # SDK-native protocols
     CapabilityProvider,
@@ -40,6 +41,7 @@ from victor_sdk.verticals.protocols import (
 
 __all__ = [
     "VerticalBase",
+    "VerticalExtensions",
     # SDK-native protocols
     "ToolProvider",
     "ToolSelectionStrategy",

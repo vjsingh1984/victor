@@ -58,6 +58,38 @@ def call_lifecycle_hook(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
     return None
 
 
+async def call_lifecycle_hook_async(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
+    """Async-aware lifecycle hook dispatch.
+
+    Prefers ``{hook}_async`` if the plugin implements it, otherwise
+    falls back to the synchronous ``{hook}`` method.
+
+    Args:
+        plugin: The plugin instance.
+        hook: Base method name (e.g., 'on_activate').
+        **kwargs: Arguments to pass to the hook.
+
+    Returns:
+        Hook return value, or None if not implemented.
+    """
+    # Try async variant first
+    async_method = getattr(plugin, f"{hook}_async", None)
+    if async_method is not None and callable(async_method):
+        try:
+            return await async_method(**kwargs)
+        except Exception as e:
+            logger.warning(
+                "Async lifecycle hook '%s_async' failed on plugin '%s': %s",
+                hook,
+                plugin.name,
+                e,
+            )
+            return None
+
+    # Fall back to sync hook
+    return call_lifecycle_hook(plugin, hook, **kwargs)
+
+
 class _LegacyVerticalPluginAdapter:
     """Wraps a VerticalBase subclass as a VictorPlugin for backward compatibility.
 
@@ -114,7 +146,8 @@ class _ExternalPluginAdapter:
         for tool_def in self._plugin.manifest.tools:
             logger.debug(
                 "External plugin %s provides tool: %s",
-                self.name, tool_def.name,
+                self.name,
+                tool_def.name,
             )
 
     def get_cli_app(self) -> None:
@@ -402,3 +435,24 @@ class PluginRegistry:
             List of plugins.
         """
         return list(self._plugins.values())
+
+    @property
+    def is_discovered(self) -> bool:
+        """Whether discovery has been run."""
+        return self._discovered
+
+    def get_vertical_classes(self) -> Dict[str, type]:
+        """Extract vertical classes from discovered plugins.
+
+        Returns classes from `_LegacyVerticalPluginAdapter` instances,
+        enabling VerticalLoader to delegate discovery to this registry
+        instead of scanning entry points independently.
+
+        Returns:
+            Dict mapping vertical names to their classes.
+        """
+        result: Dict[str, type] = {}
+        for name, plugin in self._plugins.items():
+            if isinstance(plugin, _LegacyVerticalPluginAdapter):
+                result[plugin.name] = plugin._vertical_cls
+        return result

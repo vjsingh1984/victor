@@ -78,6 +78,7 @@ from victor_sdk.verticals.protocols.capabilities import (
 
 # Extension manifest
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_sdk.verticals.extensions import VerticalExtensions
 from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
 from victor_sdk.verticals.protocols.sandbox import SandboxProvider
 from victor_sdk.verticals.protocols.hooks import HookProvider, HookConfigProvider
@@ -207,6 +208,8 @@ __all__ = [
     "get_all_canonical_names",
     "get_name_mapping",
     "is_known_capability_id",
+    # Lazy extension container
+    "VerticalExtensions",
     # Extended vertical protocols: MCP, sandbox, hooks, permissions, compaction, plugins
     "McpProvider",
     "McpToolProvider",

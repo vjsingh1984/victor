@@ -1435,45 +1435,61 @@ class VerticalExtensionLoader(ABC):
                 # Return default value
                 return [] if is_list else None
 
-        # Load each extension with error handling
-        middleware = _load_extension("middleware", cls.get_middleware, is_list=True)
-        safety = _load_extension("safety", cls.get_safety_extension)
-        prompt = _load_extension("prompt", cls.get_prompt_contributor)
-        mode_config = _load_extension("mode_config", cls.get_mode_config_provider)
-        tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
-        workflow = _load_extension("workflow", cls.get_workflow_provider)
-        service = _load_extension("service", cls.get_service_provider)
-        rl_config = _load_extension("rl_config", cls.get_rl_config_provider)
-        team_spec = _load_extension("team_spec", cls.get_team_spec_provider)
-        enrichment = _load_extension("enrichment", cls.get_enrichment_strategy)
-        tiered_tools = _load_extension("tiered_tools", cls.get_tiered_tool_config)
+        # Build lazy factories — extensions are loaded on first access,
+        # not at construction time.  This eliminates the synchronous
+        # import storm for extensions that are never used.
+        def _make_list_factory(ext_type: str, loader: callable):
+            """Create a factory for list-valued extensions."""
+            def factory():
+                result = _load_extension(ext_type, loader, is_list=True)
+                return result if result else []
+            return factory
 
-        # Check for critical failures (strict mode or required extensions)
-        critical_errors = [e for e in errors if is_strict or e.is_required]
-        if critical_errors:
-            # Raise the first critical error
-            raise critical_errors[0]
+        def _make_single_factory(ext_type: str, loader: callable):
+            """Create a factory for optional single-valued extensions."""
+            def factory():
+                return _load_extension(ext_type, loader)
+            return factory
 
-        # Log summary if there were non-critical errors
-        if errors:
-            logger.warning(
-                f"Vertical '{cls.name}' loaded with {len(errors)} extension error(s). "
-                f"Affected extensions: {', '.join(e.extension_type for e in errors)}"
-            )
+        def _make_wrapped_list_factory(ext_type: str, loader: callable):
+            """Create a factory that wraps a single result in a list."""
+            def factory():
+                result = _load_extension(ext_type, loader)
+                return [result] if result else []
+            return factory
 
-        # Build extensions object
         extensions = VerticalExtensions(
-            middleware=middleware if middleware else [],
-            safety_extensions=[safety] if safety else [],
-            prompt_contributors=[prompt] if prompt else [],
-            mode_config_provider=mode_config,
-            tool_dependency_provider=tool_deps,
-            workflow_provider=workflow,
-            service_provider=service,
-            rl_config_provider=rl_config,
-            team_spec_provider=team_spec,
-            enrichment_strategy=enrichment,
-            tiered_tool_config=tiered_tools,
+            middleware=_make_list_factory("middleware", cls.get_middleware),
+            safety_extensions=_make_wrapped_list_factory(
+                "safety", cls.get_safety_extension
+            ),
+            prompt_contributors=_make_wrapped_list_factory(
+                "prompt", cls.get_prompt_contributor
+            ),
+            mode_config_provider=_make_single_factory(
+                "mode_config", cls.get_mode_config_provider
+            ),
+            tool_dependency_provider=_make_single_factory(
+                "tool_deps", cls.get_tool_dependency_provider
+            ),
+            workflow_provider=_make_single_factory(
+                "workflow", cls.get_workflow_provider
+            ),
+            service_provider=_make_single_factory(
+                "service", cls.get_service_provider
+            ),
+            rl_config_provider=_make_single_factory(
+                "rl_config", cls.get_rl_config_provider
+            ),
+            team_spec_provider=_make_single_factory(
+                "team_spec", cls.get_team_spec_provider
+            ),
+            enrichment_strategy=_make_single_factory(
+                "enrichment", cls.get_enrichment_strategy
+            ),
+            tiered_tool_config=_make_single_factory(
+                "tiered_tools", cls.get_tiered_tool_config
+            ),
         )
 
         # Cache the extensions
