@@ -62,9 +62,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
-
-# Import from canonical location to avoid circular dependencies
-from victor.teams.types import AgentMessage
+    from victor.teams.types import AgentMessage
 
 logger = logging.getLogger(__name__)
 

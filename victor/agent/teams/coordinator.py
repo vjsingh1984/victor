@@ -51,7 +51,7 @@ from victor.observability.team_metrics import (
     record_team_spawned,
     record_team_completed,
 )
-from victor.agent.subagents.base import SubAgentConfig, SubAgentResult, SubAgentRole
+from victor.core.shared_types import SubAgentRole  # Runtime use (line 234)
 from victor.agent.subagents.orchestrator import (
     ROLE_DEFAULT_BUDGETS,
     ROLE_DEFAULT_CONTEXT,
@@ -84,6 +84,7 @@ from victor.agent.teams.communication import (
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.presentation import PresentationProtocol
+    from victor.agent.subagents.base import SubAgentConfig, SubAgentResult
 
 logger = logging.getLogger(__name__)
 
