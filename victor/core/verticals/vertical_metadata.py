@@ -72,6 +72,27 @@ class VerticalMetadata:
     is_contrib: bool
     is_external: bool
 
+    @property
+    def class_prefix(self) -> str:
+        """Return the PascalCase prefix suitable for constructing class names.
+
+        Strips ``"Assistant"`` or ``"Vertical"`` suffixes from ``qualname``
+        to recover the original casing used in class definitions.
+
+        Examples::
+
+            CodingAssistant   -> "Coding"
+            DevOpsAssistant   -> "DevOps"
+            RAGAssistant      -> "RAG"
+            DataAnalysisAssistant -> "DataAnalysis"
+        """
+        qname = self.qualname
+        if qname.endswith("Assistant"):
+            return qname[: -len("Assistant")]
+        if qname.endswith("Vertical"):
+            return qname[: -len("Vertical")]
+        return qname
+
     @classmethod
     def from_class(cls, vertical_class: type) -> "VerticalMetadata":
         """Extract metadata from a vertical class using type-safe patterns.

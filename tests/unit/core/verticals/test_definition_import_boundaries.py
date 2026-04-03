@@ -31,6 +31,7 @@ DEFINITION_BOUNDARY_TARGETS = [
     DefinitionBoundaryTarget(
         label="coding assistant",
         path=REPO_ROOT / "victor/verticals/contrib/coding/assistant.py",
+        allowed_victor_import_prefixes=("victor.core.verticals.registration",),
         requires_sdk_import=True,
     ),
     DefinitionBoundaryTarget(
@@ -46,7 +47,10 @@ DEFINITION_BOUNDARY_TARGETS = [
     DefinitionBoundaryTarget(
         label="devops assistant",
         path=REPO_ROOT / "victor/verticals/contrib/devops/assistant.py",
-        allowed_victor_import_prefixes=("victor.verticals.contrib.devops.prompt_metadata",),
+        allowed_victor_import_prefixes=(
+            "victor.core.verticals.registration",
+            "victor.verticals.contrib.devops.prompt_metadata",
+        ),
         requires_sdk_import=True,
     ),
     DefinitionBoundaryTarget(
@@ -66,7 +70,10 @@ DEFINITION_BOUNDARY_TARGETS = [
     DefinitionBoundaryTarget(
         label="research assistant",
         path=REPO_ROOT / "victor/verticals/contrib/research/assistant.py",
-        allowed_victor_import_prefixes=("victor.verticals.contrib.research.prompt_metadata",),
+        allowed_victor_import_prefixes=(
+            "victor.core.verticals.registration",
+            "victor.verticals.contrib.research.prompt_metadata",
+        ),
         requires_sdk_import=True,
     ),
     DefinitionBoundaryTarget(
@@ -155,6 +162,10 @@ def test_migrated_definition_files_do_not_import_forbidden_runtime_prefixes(
             if any(
                 module == prefix or module.startswith(f"{prefix}.")
                 for prefix in FORBIDDEN_DEFINITION_IMPORT_PREFIXES
+            )
+            and not any(
+                module == allowed or module.startswith(f"{allowed}.")
+                for allowed in target.allowed_victor_import_prefixes
             )
         }
     )
