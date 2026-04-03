@@ -103,6 +103,14 @@ class TestVerticalBehaviorConfig:
 class TestVerticalBehaviorConfigRegistry:
     """Test suite for VerticalBehaviorConfigRegistry class."""
 
+    def setup_method(self):
+        """Clear registry before each test to avoid pollution from decorator-registered verticals."""
+        VerticalBehaviorConfigRegistry.clear()
+
+    def teardown_method(self):
+        """Clear registry after each test."""
+        VerticalBehaviorConfigRegistry.clear()
+
     def test_register_and_get_config(self):
         """Test registering and retrieving configuration."""
         config = VerticalBehaviorConfig(canonicalize_tool_names=False)
@@ -272,6 +280,10 @@ class TestConvenienceFunctions:
 class TestConfigRegistryIntegration:
     """Integration tests for config registry with manifests."""
 
+    def setup_method(self):
+        """Clear registry before each test to prevent state leakage."""
+        VerticalBehaviorConfigRegistry.clear()
+
     def test_manifest_decorator_registers_config(self):
         """Test that @register_vertical decorator registers behavior config."""
         from victor.core.verticals.registration import register_vertical
@@ -299,11 +311,20 @@ class TestConfigRegistryIntegration:
             get_canonicalization_setting,
         )
 
-        # Import the verticals to trigger their @register_vertical decorators
-        # This registers their configs with VerticalBehaviorConfigRegistry
+        # Import the verticals whose @register_vertical decorators ran at
+        # first import.  If an earlier test cleared the global registry the
+        # registrations are lost, so re-register from the attached manifest.
         from victor.verticals.contrib.coding.assistant import CodingAssistant
         from victor.verticals.contrib.devops.assistant import DevOpsAssistant
         from victor.verticals.contrib.research.assistant import ResearchAssistant
+
+        for vertical_cls in (CodingAssistant, DevOpsAssistant, ResearchAssistant):
+            manifest = getattr(vertical_cls, "_victor_manifest", None)
+            if manifest is not None and not VerticalBehaviorConfigRegistry.has_config(
+                manifest.name
+            ):
+                config = VerticalBehaviorConfigRegistry.from_manifest(manifest)
+                VerticalBehaviorConfigRegistry.register(manifest.name, config)
 
         # The migrated verticals should have their configs registered
         coding_canonicalize = get_canonicalization_setting("coding")

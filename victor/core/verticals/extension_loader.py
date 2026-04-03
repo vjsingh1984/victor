@@ -908,11 +908,11 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction (replaces .replace() pattern)
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
+        vertical_prefix = metadata.class_prefix
         return cls._resolve_class_or_factory_extension(
             "mode_config_provider",
             "mode_config",
-            class_name=f"{vertical_name}ModeConfigProvider",
+            class_name=f"{vertical_prefix}ModeConfigProvider",
         )
 
     @classmethod
@@ -1083,11 +1083,11 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
+        vertical_prefix = metadata.class_prefix
         return cls._resolve_class_or_factory_extension(
             "rl_config_provider",
             "rl",
-            class_name=f"{vertical_name}RLConfig",
+            class_name=f"{vertical_prefix}RLConfig",
         )
 
     @classmethod
@@ -1099,11 +1099,11 @@ class VerticalExtensionLoader(ABC):
         """
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
+        vertical_prefix = metadata.class_prefix
         return cls._resolve_class_or_factory_extension(
             "rl_hooks",
             "rl",
-            class_name=f"{vertical_name}RLHooks",
+            class_name=f"{vertical_prefix}RLHooks",
         )
 
     @classmethod
@@ -1127,8 +1127,8 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
-        class_name = f"{vertical_name}TeamSpecProvider"
+        vertical_prefix = metadata.class_prefix
+        class_name = f"{vertical_prefix}TeamSpecProvider"
         candidate_paths = [
             path
             for path in cls._extension_module_candidates("teams")
@@ -1196,11 +1196,11 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
+        vertical_prefix = metadata.class_prefix
         return cls._resolve_class_or_factory_extension(
             "capability_provider",
             "capabilities",
-            class_name=f"{vertical_name}CapabilityProvider",
+            class_name=f"{vertical_prefix}CapabilityProvider",
         )
 
     @classmethod
@@ -1219,8 +1219,8 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
-        class_name = f"{vertical_name}ServiceProvider"
+        vertical_prefix = metadata.class_prefix
+        class_name = f"{vertical_prefix}ServiceProvider"
         candidate_paths = cls._find_available_candidates("service_provider")
         last_error: Optional[Exception] = None
 
@@ -1760,8 +1760,8 @@ class VerticalExtensionLoader(ABC):
 
         # Use VerticalMetadata for type-safe name extraction
         metadata = VerticalMetadata.from_class(cls)
-        vertical_name = metadata.canonical_name
-        class_name = f"{vertical_name}WorkflowProvider"
+        vertical_prefix = metadata.class_prefix
+        class_name = f"{vertical_prefix}WorkflowProvider"
 
         candidate_paths: List[str] = []
         for suffix in ("workflows", "workflows.provider"):

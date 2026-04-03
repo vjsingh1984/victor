@@ -74,12 +74,13 @@ class TestLoggingMiddleware:
     @pytest.mark.asyncio
     async def test_after_tool_call_logs_success(self, middleware, caplog):
         """LoggingMiddleware should log after successful tool call."""
-        # First call before to set up timing
-        await middleware.before_tool_call("test_tool", {"arg1": "value1"})
+        # Use the same arguments dict so call_id matches between before/after
+        args = {"arg1": "value1"}
+        await middleware.before_tool_call("test_tool", args)
 
-        with caplog.at_level(logging.DEBUG):
+        with caplog.at_level(logging.DEBUG, logger="victor.framework.middleware"):
             result = await middleware.after_tool_call(
-                "test_tool", {"arg1": "value1"}, "result", success=True
+                "test_tool", args, "result", success=True
             )
 
         assert result is None  # No modification
@@ -868,7 +869,6 @@ class TestMiddlewareIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    @pytest.mark.skip(reason="Requires victor_devops external package - pending migration")
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
         DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
