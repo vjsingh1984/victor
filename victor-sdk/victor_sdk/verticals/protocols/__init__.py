@@ -96,6 +96,14 @@ from victor_sdk.verticals.protocols.promoted_types import (
     ToolSelectionResult,
 )
 
+# Extended vertical protocols: MCP, sandbox, hooks, permissions, compaction, plugins
+from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
+from victor_sdk.verticals.protocols.sandbox import SandboxProvider
+from victor_sdk.verticals.protocols.hooks import HookProvider, HookConfigProvider
+from victor_sdk.verticals.protocols.permissions import PermissionProvider
+from victor_sdk.verticals.protocols.compaction import CompactionProvider
+from victor_sdk.verticals.protocols.plugins import ExternalPluginProvider
+
 __all__ = [
     # SDK-native protocols
     "ToolProvider",
@@ -153,4 +161,13 @@ __all__ = [
     "ModeConfig",
     "ToolSelectionContext",
     "ToolSelectionResult",
+    # Extended vertical protocols
+    "McpProvider",
+    "McpToolProvider",
+    "SandboxProvider",
+    "HookProvider",
+    "HookConfigProvider",
+    "PermissionProvider",
+    "CompactionProvider",
+    "ExternalPluginProvider",
 ]

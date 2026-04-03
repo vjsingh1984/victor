@@ -84,6 +84,7 @@ if TYPE_CHECKING:
     from victor.agent.signature_store import SignatureStore
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_result_cache import ToolResultCache
+    from victor.security.permissions import PermissionPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -484,6 +485,7 @@ class ToolPipeline:
         middleware_chain: Optional["MiddlewareChain"] = None,
         semantic_cache: Optional["ToolResultCache"] = None,
         search_router: Optional["SearchRouter"] = None,
+        permission_policy: Optional["PermissionPolicy"] = None,
     ):
         """Initialize tool pipeline.
 
@@ -513,6 +515,7 @@ class ToolPipeline:
         self.middleware_chain = middleware_chain
         self.semantic_cache = semantic_cache
         self.search_router = search_router
+        self._permission_policy = permission_policy
 
         # Callbacks
         self.on_tool_start = on_tool_start
@@ -1423,6 +1426,20 @@ class ToolPipeline:
                 skipped=True,
                 skip_reason=f"Unknown or disabled tool: {tool_name}",
             )
+
+        # Check permission policy (if configured)
+        if self._permission_policy is not None:
+            decision = self._permission_policy.authorize(tool_name, normalized_args)
+            if not decision.allowed and not decision.needs_prompt:
+                return ToolCallResult(
+                    tool_name=tool_name,
+                    arguments=normalized_args,
+                    success=False,
+                    skipped=True,
+                    skip_reason=f"Permission denied: {decision.reason}",
+                )
+            # needs_prompt tools are allowed through — the UI layer
+            # handles escalation prompting before reaching the pipeline.
 
         # Check budget
         if self._calls_used >= self.config.tool_budget:

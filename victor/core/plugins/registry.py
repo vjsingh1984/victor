@@ -92,10 +92,55 @@ class _LegacyVerticalPluginAdapter:
         return {"healthy": True, "adapter": "legacy_vertical"}
 
 
+class _ExternalPluginAdapter:
+    """Wraps an ExternalPluginManager RegisteredPlugin as a VictorPlugin.
+
+    This adapter allows subprocess-based external plugins (discovered via
+    plugin.json manifests) to appear in the unified PluginRegistry alongside
+    entry-point-based Python plugins.
+    """
+
+    def __init__(self, registered_plugin: Any) -> None:
+        self._plugin = registered_plugin
+
+    @property
+    def name(self) -> str:
+        return self._plugin.plugin_id
+
+    def register(self, context: Any) -> None:
+        """External plugins register tools via their tool definitions."""
+        if not hasattr(context, "register_tool"):
+            return
+        for tool_def in self._plugin.manifest.tools:
+            logger.debug(
+                "External plugin %s provides tool: %s",
+                self.name, tool_def.name,
+            )
+
+    def get_cli_app(self) -> None:
+        return None
+
+    def on_activate(self) -> None:
+        pass
+
+    def on_deactivate(self) -> None:
+        pass
+
+    def health_check(self) -> Dict[str, Any]:
+        return {
+            "healthy": self._plugin.enabled,
+            "adapter": "external_plugin",
+            "kind": self._plugin.kind.value,
+            "version": self._plugin.version,
+            "tools": len(self._plugin.manifest.tools),
+        }
+
+
 class PluginRegistry:
     """Registry for discovering and managing Victor plugins.
 
-    Discovers plugins via the 'victor.plugins' entry point group.
+    Discovers plugins via the 'victor.plugins' entry point group
+    and optionally from external manifest-based plugins.
     """
 
     _instance: Optional[PluginRegistry] = None
@@ -213,8 +258,38 @@ class PluginRegistry:
         if aot_entries is None:
             self._update_aot_manifest()
 
+        # Discover external manifest-based plugins and bridge them in.
+        self._discover_external_plugins()
+
         self._discovered = True
         return list(self._plugins.values())
+
+    def _discover_external_plugins(self) -> None:
+        """Discover external plugins via plugin.json manifests.
+
+        Wraps each discovered external plugin as a VictorPlugin adapter
+        so it appears alongside entry-point-based plugins.
+        """
+        try:
+            from victor.core.plugins.external import ExternalPluginManager
+
+            manager = ExternalPluginManager()
+            plugins = manager.discover_plugins()
+            for plugin in plugins:
+                if plugin.plugin_id in self._plugins:
+                    continue  # Entry-point plugins take precedence
+                adapter = _ExternalPluginAdapter(plugin)
+                self._plugins[adapter.name] = adapter
+                logger.info(
+                    "Discovered external plugin: %s (%s, %d tools)",
+                    plugin.plugin_id,
+                    plugin.kind.value,
+                    len(plugin.manifest.tools),
+                )
+        except ImportError:
+            logger.debug("External plugin support not available")
+        except Exception as e:
+            logger.debug("External plugin discovery failed: %s", e)
 
     def _try_aot_fast_path(self) -> Optional[Dict[str, Dict[str, str]]]:
         """Try to load entry points from AOT manifest.

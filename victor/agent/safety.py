@@ -85,6 +85,12 @@ class OperationalRiskLevel(Enum):
     HIGH = "high"  # Significant changes - deletions, overwrites
     CRITICAL = "critical"  # System-level destructive operations
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_operational_risk(self)
+
 
 class ApprovalMode(Enum):
     """Mode for write operation approval.

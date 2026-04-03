@@ -75,6 +75,12 @@ class RiskLevel(Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_risk_level(self)
+
 
 # =============================================================================
 # Pattern Definitions

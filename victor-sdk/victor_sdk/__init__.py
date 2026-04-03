@@ -78,6 +78,12 @@ from victor_sdk.verticals.protocols.capabilities import (
 
 # Extension manifest
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
+from victor_sdk.verticals.protocols.sandbox import SandboxProvider
+from victor_sdk.verticals.protocols.hooks import HookProvider, HookConfigProvider
+from victor_sdk.verticals.protocols.permissions import PermissionProvider
+from victor_sdk.verticals.protocols.compaction import CompactionProvider
+from victor_sdk.verticals.protocols.plugins import ExternalPluginProvider
 from victor_sdk.core.api_version import (
     CURRENT_API_VERSION,
     MIN_SUPPORTED_API_VERSION,
@@ -201,4 +207,13 @@ __all__ = [
     "get_all_canonical_names",
     "get_name_mapping",
     "is_known_capability_id",
+    # Extended vertical protocols: MCP, sandbox, hooks, permissions, compaction, plugins
+    "McpProvider",
+    "McpToolProvider",
+    "SandboxProvider",
+    "HookProvider",
+    "HookConfigProvider",
+    "PermissionProvider",
+    "CompactionProvider",
+    "ExternalPluginProvider",
 ]

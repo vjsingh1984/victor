@@ -57,6 +57,12 @@ ENTRY_POINT_GROUPS = frozenset(
         "victor.capabilities",
         "victor.sdk.capabilities",
         "victor.chunking_strategies",
+        # Extended provider groups: sandbox, permissions, hooks, compaction
+        "victor.sandbox.providers",
+        "victor.permission.providers",
+        "victor.hook.providers",
+        "victor.compaction.providers",
+        "victor.sdk.protocols",
     }
 )
 

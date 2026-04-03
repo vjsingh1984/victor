@@ -64,6 +64,12 @@ class CVESeverity(Enum):
         else:
             return cls.CRITICAL
 
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_cve_severity(self)
+
 
 # Backward compatibility alias
 Severity = CVESeverity

@@ -916,6 +916,83 @@ class CodeCorrectionSettings(_BaseModel):
     code_correction_max_iterations: int = 3
 
 
+class McpSettings(_BaseModel):
+    """Model Context Protocol (MCP) server configuration.
+
+    MCP enables connecting to external tool servers using the JSON-RPC 2.0
+    protocol. Servers provide tools that are namespaced as mcp__{server}__{tool}.
+
+    Config file format (mcp.yaml or settings.json mcpServers section):
+        servers:
+          server-name:
+            type: stdio|sse|http
+            command: "npx"          # for stdio
+            args: ["-y", "server"]
+            env: {KEY: value}
+            url: "https://..."      # for sse/http
+    """
+
+    mcp_enabled: bool = True
+    mcp_servers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    mcp_auto_discover: bool = True
+    mcp_tool_timeout_ms: int = 30000
+    mcp_max_retries: int = 2
+
+
+class SandboxSettings(_BaseModel):
+    """Sandbox/isolation configuration for safe tool execution.
+
+    Controls filesystem isolation, process namespace restrictions,
+    and environment variable filtering when executing tools.
+    """
+
+    sandbox_enabled: bool = False
+    sandbox_filesystem_mode: str = "workspace-only"
+    sandbox_namespace_restrictions: bool = True
+    sandbox_network_isolation: bool = False
+    sandbox_allowed_mounts: List[str] = Field(default_factory=list)
+
+
+class HooksSettings(_BaseModel):
+    """Pre/post tool use hook configuration.
+
+    Hooks are shell commands that run before and after tool execution.
+    They can allow, deny, or warn based on exit codes:
+      - Exit 0: Allow (stdout as optional message)
+      - Exit 2: Deny (stdout as denial reason)
+      - Other: Warn but allow
+    """
+
+    hooks_enabled: bool = True
+    hooks_pre_tool_use: List[str] = Field(default_factory=list)
+    hooks_post_tool_use: List[str] = Field(default_factory=list)
+
+
+class CompactionSettings(_BaseModel):
+    """Session compaction configuration for managing context window limits.
+
+    When conversation history exceeds token thresholds, older messages
+    are summarized to free context space while preserving recent history.
+    """
+
+    compaction_enabled: bool = True
+    compaction_preserve_recent: int = 4
+    compaction_max_estimated_tokens: int = 10000
+    compaction_auto_compact: bool = False
+
+
+class PermissionSettings(_BaseModel):
+    """Permission hierarchy for tool access control.
+
+    Three-tier permission model: read-only, workspace-write, danger-full-access.
+    Controls which tools agents can use based on session permission level.
+    """
+
+    permission_mode: str = "workspace-write"
+    permission_prompt_on_escalation: bool = True
+    permission_tool_overrides: Dict[str, str] = Field(default_factory=dict)
+
+
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
     "provider": ProviderSettings,
@@ -939,6 +1016,11 @@ _NESTED_GROUPS = {
     "serialization": SerializationSettings,
     "automation": AutomationSettings,
     "code_correction": CodeCorrectionSettings,
+    "mcp": McpSettings,
+    "sandbox": SandboxSettings,
+    "hooks": HooksSettings,
+    "compaction": CompactionSettings,
+    "permissions": PermissionSettings,
 }
 
 
@@ -1080,6 +1162,11 @@ class Settings(BaseSettings):
     code_correction: Optional[CodeCorrectionSettings] = Field(
         default=None, exclude=True, repr=False
     )
+    mcp: Optional[McpSettings] = Field(default=None, exclude=True, repr=False)
+    sandbox: Optional[SandboxSettings] = Field(default=None, exclude=True, repr=False)
+    hooks: Optional[HooksSettings] = Field(default=None, exclude=True, repr=False)
+    compaction: Optional[CompactionSettings] = Field(default=None, exclude=True, repr=False)
+    permissions: Optional[PermissionSettings] = Field(default=None, exclude=True, repr=False)
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"

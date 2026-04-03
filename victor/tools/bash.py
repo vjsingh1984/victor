@@ -26,24 +26,12 @@ from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priori
 from victor.tools.decorators import tool
 
 # Dangerous commands that should be blocked
-DANGEROUS_COMMANDS = {
-    "rm -rf /",
-    "dd",
-    "mkfs",
-    ":(){ :|:& };:",  # Fork bomb
-    "> /dev/sda",
-}
-
-DANGEROUS_PATTERNS = [
-    "rm -rf /",
-    "rm -rf /*",
-    "dd if=",
-    "mkfs.",
-    "> /dev/sd",
-    "wget | sh",
-    "curl | sh",
-    "curl | bash",
-]
+# Consolidated dangerous command detection — single source of truth.
+from victor.security.command_safety import (
+    DANGEROUS_COMMANDS,
+    DANGEROUS_PATTERNS,
+    is_dangerous_command as _is_dangerous_consolidated,
+)
 
 
 # Platform-specific readonly commands - safe for exploration/analysis
@@ -290,20 +278,15 @@ def get_allowed_readonly_commands() -> List[str]:
 def _is_dangerous(command: str) -> bool:
     """Check if command is potentially dangerous.
 
+    Delegates to the consolidated command safety module.
+
     Args:
         command: Command to check
 
     Returns:
         True if dangerous, False otherwise
     """
-    command_lower = command.lower().strip()
-
-    # Check exact matches
-    if command_lower in DANGEROUS_COMMANDS:
-        return True
-
-    # Check for dangerous patterns
-    return any(pattern in command_lower for pattern in DANGEROUS_PATTERNS)
+    return _is_dangerous_consolidated(command)
 
 
 @tool(

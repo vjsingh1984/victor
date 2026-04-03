@@ -218,6 +218,8 @@ from victor.core.schema import (
     get_migration_sql,
 )
 
+from victor.core.severity import SeverityLevel
+
 __all__ = [
     # Container
     "ServiceContainer",
@@ -383,4 +385,6 @@ __all__ = [
     "Schema",
     "CURRENT_SCHEMA_VERSION",
     "get_migration_sql",
+    # Unified severity level (consolidates DangerLevel, RiskLevel, CVESeverity, etc.)
+    "SeverityLevel",
 ]

@@ -1,4 +1,4 @@
-# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+# Copyright 2025 Vijaykumar Singh
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -8,9 +8,9 @@
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
 
 """Consolidated Prompt Builder for Victor Framework.
 
@@ -51,10 +51,21 @@ except ImportError:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 try:
@@ -734,10 +745,606 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
     )
 
 
+# ---------------------------------------------------------------------------
+# Dynamic prompt builder with workspace context discovery
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ContextFile:
+    """An instruction file discovered in the workspace.
+
+    Attributes:
+        path: Absolute or relative path to the file.
+        content: Raw text content of the file.
+        scope: One of "workspace", "project", or "user".
+    """
+
+    path: str
+    content: str
+    scope: str  # "workspace", "project", "user"
+
+
+@dataclass
+class ProjectContext:
+    """Snapshot of the current workspace context.
+
+    Attributes:
+        cwd: Current working directory.
+        current_date: ISO-formatted date string.
+        git_status: Short git status output, if available.
+        git_diff_summary: Condensed diff stat, if available.
+        instruction_files: Discovered instruction/context files.
+        is_git_repo: Whether the cwd is inside a git repository.
+        branch_name: Active git branch name, if available.
+    """
+
+    cwd: Path
+    current_date: str
+    git_status: Optional[str] = None
+    git_diff_summary: Optional[str] = None
+    instruction_files: List[ContextFile] = field(
+        default_factory=list
+    )
+    is_git_repo: bool = False
+    branch_name: Optional[str] = None
+
+
+@dataclass
+class PromptBudget:
+    """Character budgets for dynamic prompt sections.
+
+    Attributes:
+        max_per_file_chars: Max chars kept per instruction file.
+        max_total_instruction_chars: Aggregate cap across files.
+        max_git_status_chars: Max chars for git status output.
+        max_git_diff_chars: Max chars for git diff summary.
+    """
+
+    max_per_file_chars: int = 4000
+    max_total_instruction_chars: int = 12000
+    max_git_status_chars: int = 2000
+    max_git_diff_chars: int = 3000
+
+
+def _truncate(
+    text: str, limit: int, label: str = "content"
+) -> str:
+    """Truncate *text* to *limit* chars with a notice."""
+    if len(text) <= limit:
+        return text
+    truncated = text[:limit]
+    notice = f"\n... [{label} truncated to {limit} chars]"
+    return truncated + notice
+
+
+class WorkspaceContextBuilder:
+    """Builder for constructing system prompts with dynamic context.
+
+    Sections are assembled in a deterministic order so that the
+    most important static instructions appear first and
+    budget-managed dynamic content appears after a clearly-marked
+    boundary.
+
+    Example:
+        builder = (
+            WorkspaceContextBuilder()
+            .with_base_prompt("You are a coding assistant.")
+            .with_os_info("Darwin", "25.2.0")
+            .with_model_info("claude-opus-4-6")
+            .with_project_context(context)
+            .with_tools(["filesystem", "git"])
+        )
+        prompt = builder.build()
+    """
+
+    def __init__(
+        self, budget: Optional[PromptBudget] = None
+    ) -> None:
+        self._budget = budget or PromptBudget()
+        self._base_prompt: Optional[str] = None
+        self._output_style_name: Optional[str] = None
+        self._output_style_prompt: Optional[str] = None
+        self._os_name: Optional[str] = None
+        self._os_version: Optional[str] = None
+        self._model_name: Optional[str] = None
+        self._context: Optional[ProjectContext] = None
+        self._tool_names: List[str] = []
+        self._extra_sections: List[str] = []
+
+    # -- fluent setters ------------------------------------------------
+
+    def with_base_prompt(
+        self, prompt: str
+    ) -> "WorkspaceContextBuilder":
+        """Set the static base/vertical prompt."""
+        self._base_prompt = prompt
+        return self
+
+    def with_output_style(
+        self, name: str, prompt: str
+    ) -> "WorkspaceContextBuilder":
+        """Set an output style directive."""
+        self._output_style_name = name
+        self._output_style_prompt = prompt
+        return self
+
+    def with_os_info(
+        self, os_name: str, os_version: str
+    ) -> "WorkspaceContextBuilder":
+        """Set operating system metadata."""
+        self._os_name = os_name
+        self._os_version = os_version
+        return self
+
+    def with_model_info(
+        self, model_name: str
+    ) -> "WorkspaceContextBuilder":
+        """Set the model identifier shown in the prompt."""
+        self._model_name = model_name
+        return self
+
+    def with_project_context(
+        self, context: ProjectContext
+    ) -> "WorkspaceContextBuilder":
+        """Attach a discovered project context snapshot."""
+        self._context = context
+        return self
+
+    def with_tools(
+        self, tool_names: List[str]
+    ) -> "WorkspaceContextBuilder":
+        """Declare which tools are available to the agent."""
+        self._tool_names = list(tool_names)
+        return self
+
+    def append_section(
+        self, section: str
+    ) -> "WorkspaceContextBuilder":
+        """Append a free-form section after all standard parts."""
+        self._extra_sections.append(section)
+        return self
+
+    # -- assembly ------------------------------------------------------
+
+    def build(self) -> str:
+        """Assemble all sections into the final system prompt.
+
+        Assembly order:
+            1. Output style section (if provided)
+            2. Base prompt
+            3. System capabilities (tools available)
+            4. Environment section
+            5. Dynamic boundary marker
+            6. Instruction files (budget-truncated)
+            7. Git status context (budget-truncated)
+            8. Appended sections
+        """
+        parts: List[str] = []
+
+        # 1. Output style
+        if (
+            self._output_style_name
+            and self._output_style_prompt
+        ):
+            parts.append(
+                f"# Output Style: {self._output_style_name}\n"
+                f"{self._output_style_prompt}"
+            )
+
+        # 2. Base prompt
+        if self._base_prompt:
+            parts.append(self._base_prompt)
+
+        # 3. System capabilities
+        if self._tool_names:
+            tool_list = ", ".join(sorted(self._tool_names))
+            parts.append(
+                "# System Capabilities\n"
+                f"Tools available: {tool_list}"
+            )
+
+        # 4. Environment
+        env_lines = self._build_environment_section()
+        if env_lines:
+            parts.append(env_lines)
+
+        # 5. Dynamic boundary
+        parts.append("\n# --- DYNAMIC CONTEXT BELOW ---\n")
+
+        # 6. Instruction files
+        instr = self._build_instruction_section()
+        if instr:
+            parts.append(instr)
+
+        # 7. Git status context
+        git_section = self._build_git_context_section()
+        if git_section:
+            parts.append(git_section)
+
+        # 8. Extra appended sections
+        for section in self._extra_sections:
+            parts.append(section)
+
+        return "\n\n".join(parts)
+
+    # -- private helpers -----------------------------------------------
+
+    def _build_environment_section(self) -> str:
+        """Render the ``# Environment`` section."""
+        lines: List[str] = ["# Environment"]
+
+        if self._model_name:
+            lines.append(f"Model: {self._model_name}")
+
+        if self._context:
+            lines.append(
+                f"Working directory: {self._context.cwd}"
+            )
+            lines.append(
+                f"Current date: {self._context.current_date}"
+            )
+
+        if self._os_name and self._os_version:
+            lines.append(
+                f"Platform: {self._os_name} "
+                f"{self._os_version}"
+            )
+
+        if self._context:
+            if self._context.is_git_repo:
+                lines.append("Git repository: yes")
+            if self._context.branch_name:
+                lines.append(
+                    f"Git branch: "
+                    f"{self._context.branch_name}"
+                )
+
+        if len(lines) <= 1:
+            return ""
+        return "\n".join(lines)
+
+    def _build_instruction_section(self) -> str:
+        """Render budget-truncated instruction files."""
+        if (
+            not self._context
+            or not self._context.instruction_files
+        ):
+            return ""
+
+        budget = self._budget
+        parts: List[str] = []
+        total_chars = 0
+
+        for ctx_file in self._context.instruction_files:
+            remaining = (
+                budget.max_total_instruction_chars
+                - total_chars
+            )
+            if remaining <= 0:
+                parts.append(
+                    "... [instruction budget exhausted, "
+                    "remaining files skipped]"
+                )
+                break
+
+            per_file = min(
+                budget.max_per_file_chars, remaining
+            )
+            content = _truncate(
+                ctx_file.content, per_file, ctx_file.path
+            )
+            total_chars += len(content)
+
+            header = (
+                f"## {ctx_file.path} "
+                f"(scope: {ctx_file.scope})"
+            )
+            parts.append(f"{header}\n{content}")
+
+        if not parts:
+            return ""
+        return (
+            "# Project Instructions\n\n"
+            + "\n\n".join(parts)
+        )
+
+    def _build_git_context_section(self) -> str:
+        """Render budget-truncated git status / diff."""
+        if not self._context:
+            return ""
+
+        budget = self._budget
+        parts: List[str] = []
+
+        if self._context.git_status:
+            status = _truncate(
+                self._context.git_status,
+                budget.max_git_status_chars,
+                "git status",
+            )
+            parts.append(
+                f"## Git Status\n```\n{status}\n```"
+            )
+
+        if self._context.git_diff_summary:
+            diff = _truncate(
+                self._context.git_diff_summary,
+                budget.max_git_diff_chars,
+                "git diff",
+            )
+            parts.append(
+                f"## Git Diff Summary\n```\n{diff}\n```"
+            )
+
+        if not parts:
+            return ""
+        return (
+            "# Git Context\n\n" + "\n\n".join(parts)
+        )
+
+
+# ---------------------------------------------------------------------------
+# Project context discovery
+# ---------------------------------------------------------------------------
+
+
+def _classify_scope(
+    file_dir: Path, workspace_dir: Path
+) -> str:
+    """Determine the scope label for a discovered file.
+
+    Args:
+        file_dir: Directory the file was found in.
+        workspace_dir: The original working directory.
+
+    Returns:
+        One of "workspace", "project", or "user".
+    """
+    if file_dir == workspace_dir:
+        return "workspace"
+    if (file_dir / ".git").exists():
+        return "project"
+    return "user"
+
+
+async def _run_git(
+    cmd: List[str], cwd: Path
+) -> Optional[str]:
+    """Execute a git command asynchronously.
+
+    Args:
+        cmd: Command and arguments list.
+        cwd: Working directory for the subprocess.
+
+    Returns:
+        Stripped stdout on success, or None on any error.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return None
+        return stdout.decode("utf-8", errors="replace")
+    except (OSError, ValueError):
+        logger.debug(
+            "Git command failed: %s", " ".join(cmd)
+        )
+        return None
+
+
+class ProjectContextDiscovery:
+    """Discovers workspace context for prompt construction.
+
+    All methods are static or class-level so the class acts as
+    a namespace; no instance state is required.
+
+    Example:
+        ctx = await ProjectContextDiscovery.discover(
+            Path.cwd()
+        )
+    """
+
+    _INSTRUCTION_FILENAMES: List[str] = [
+        "CLAUDE.md",
+        "CLAUDE.local.md",
+        ".victor/init.md",
+        ".victor/instructions.md",
+        ".victor.md",
+    ]
+
+    @staticmethod
+    async def discover(
+        cwd: Path,
+        current_date: Optional[str] = None,
+    ) -> ProjectContext:
+        """Build a full ProjectContext for *cwd*.
+
+        Args:
+            cwd: Working directory to inspect.
+            current_date: Override for the current date
+                string. Defaults to today in ISO format.
+
+        Returns:
+            A populated ProjectContext dataclass.
+        """
+        from datetime import date as _date
+
+        if current_date is None:
+            current_date = _date.today().isoformat()
+
+        is_git = (cwd / ".git").exists()
+
+        if is_git:
+            branch, status, diff_summary = (
+                await asyncio.gather(
+                    ProjectContextDiscovery._get_branch_name(
+                        cwd
+                    ),
+                    ProjectContextDiscovery._get_git_status(
+                        cwd
+                    ),
+                    ProjectContextDiscovery._get_git_diff_summary(
+                        cwd
+                    ),
+                )
+            )
+        else:
+            branch = None
+            status = None
+            diff_summary = None
+
+        instruction_files = (
+            ProjectContextDiscovery
+            ._discover_instruction_files(cwd)
+        )
+
+        return ProjectContext(
+            cwd=cwd,
+            current_date=current_date,
+            git_status=status,
+            git_diff_summary=diff_summary,
+            instruction_files=instruction_files,
+            is_git_repo=is_git,
+            branch_name=branch,
+        )
+
+    @staticmethod
+    def _discover_instruction_files(
+        cwd: Path,
+    ) -> List[ContextFile]:
+        """Walk ancestor chain looking for instruction files.
+
+        Searches from *cwd* upward to the filesystem root.
+        Each discovered file is labelled with a scope:
+
+        - ``workspace`` -- lives in *cwd* itself
+        - ``project`` -- lives in a parent containing ``.git``
+        - ``user`` -- everything else (e.g. home directory)
+
+        Files with identical content are deduplicated; only the
+        first occurrence is kept.
+
+        Returns:
+            Ordered list of ContextFile instances.
+        """
+        seen_contents: set[str] = set()
+        results: List[ContextFile] = []
+
+        current = cwd.resolve()
+        root = Path(current.anchor)
+
+        while True:
+            for name in (
+                ProjectContextDiscovery
+                ._INSTRUCTION_FILENAMES
+            ):
+                candidate = current / name
+                if not candidate.is_file():
+                    continue
+
+                try:
+                    content = candidate.read_text(
+                        encoding="utf-8"
+                    )
+                except OSError:
+                    logger.debug(
+                        "Could not read instruction file %s",
+                        candidate,
+                    )
+                    continue
+
+                if content in seen_contents:
+                    continue
+                seen_contents.add(content)
+
+                scope = _classify_scope(
+                    file_dir=current,
+                    workspace_dir=cwd.resolve(),
+                )
+                results.append(
+                    ContextFile(
+                        path=str(candidate),
+                        content=content,
+                        scope=scope,
+                    )
+                )
+
+            if current == root:
+                break
+            current = current.parent
+
+        return results
+
+    @staticmethod
+    async def _get_git_status(
+        cwd: Path,
+    ) -> Optional[str]:
+        """Run ``git status --short --branch`` async.
+
+        Returns:
+            Status output string, or None on failure.
+        """
+        return await _run_git(
+            [
+                "git",
+                "--no-optional-locks",
+                "status",
+                "--short",
+                "--branch",
+            ],
+            cwd,
+        )
+
+    @staticmethod
+    async def _get_git_diff_summary(
+        cwd: Path,
+    ) -> Optional[str]:
+        """Run ``git diff --stat`` async.
+
+        Returns:
+            Diff stat output string, or None on failure.
+        """
+        return await _run_git(
+            ["git", "diff", "--stat"],
+            cwd,
+        )
+
+    @staticmethod
+    async def _get_branch_name(
+        cwd: Path,
+    ) -> Optional[str]:
+        """Get the current branch via ``git rev-parse``.
+
+        Returns:
+            Branch name string, or None on failure.
+        """
+        result = await _run_git(
+            [
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD",
+            ],
+            cwd,
+        )
+        return result.strip() if result else None
+
+
 __all__ = [
     "PromptSection",
     "ToolHint",
     "PromptBuilder",
+    "ContextFile",
+    "ProjectContext",
+    "PromptBudget",
+    "WorkspaceContextBuilder",
+    "ProjectContextDiscovery",
     "create_coding_prompt_builder",
     "create_devops_prompt_builder",
     "create_research_prompt_builder",

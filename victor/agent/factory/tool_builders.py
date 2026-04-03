@@ -213,6 +213,28 @@ class ToolBuildersMixin:
         """
         from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 
+        # Initialize permission policy from settings if available
+        permission_policy = None
+        try:
+            from victor.security.permissions import PermissionPolicy, PermissionMode
+
+            settings = getattr(self, "_settings", None)
+            perm_settings = getattr(settings, "permissions", None) if settings else None
+            if perm_settings and getattr(perm_settings, "permission_mode", None):
+                mode = PermissionMode.from_string(perm_settings.permission_mode)
+                permission_policy = PermissionPolicy(active_mode=mode)
+                # Apply per-tool overrides from config
+                for tool_name, perm_str in getattr(
+                    perm_settings, "permission_tool_overrides", {}
+                ).items():
+                    permission_policy.register_tool_permission(
+                        tool_name, PermissionMode.from_string(perm_str)
+                    )
+                # Sync from tool metadata if available
+                permission_policy.sync_from_tool_metadata()
+        except Exception:
+            pass  # Permission system is optional
+
         pipeline = ToolPipeline(
             tool_registry=tools,
             tool_executor=tool_executor,
@@ -232,6 +254,7 @@ class ToolBuildersMixin:
             middleware_chain=middleware_chain,
             semantic_cache=semantic_cache,
             search_router=search_router,
+            permission_policy=permission_policy,
         )
         logger.debug(
             "ToolPipeline created%s%s",
