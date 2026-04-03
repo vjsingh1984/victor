@@ -293,6 +293,29 @@ def test_framework_extensions_module_exports():
         "register_vertical_handlers",
         # Provider access
         "ProviderRegistry",
+        # Vertical registration and base types
+        "register_vertical",
+        "VerticalBase",
+        "StageDefinition",
+        "VerticalConfig",
+        "VerticalExtensions",
+        # Tool dependency types
+        "ToolDependencyConfig",
+        "ToolDependency",
+        "create_vertical_tool_dependency_provider",
+        # Safety pattern types
+        "SafetyExtensionProtocol",
+        "SafetyPattern",
+        # Promoted protocols
+        "PromptContributorProtocol",
+        "ModeConfigProviderProtocol",
+        "ServiceProviderProtocol",
+        "ToolDependencyProviderProtocol",
+        "WorkflowProviderProtocol",
+        "RLConfigProviderProtocol",
+        "TeamSpecProviderProtocol",
+        "EnrichmentStrategyProtocol",
+        "MiddlewareProtocol",
     }
 
     assert set(extensions.__all__) == expected_exports, (

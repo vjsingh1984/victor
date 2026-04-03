@@ -110,6 +110,29 @@ __all__ = [
     "register_vertical_handlers",  # noqa: F822
     # Provider access
     "ProviderRegistry",  # noqa: F822
+    # Vertical registration and base types (avoids direct victor.core.* imports)
+    "register_vertical",  # noqa: F822
+    "VerticalBase",  # noqa: F822
+    "StageDefinition",  # noqa: F822
+    "VerticalConfig",  # noqa: F822
+    "VerticalExtensions",  # noqa: F822
+    # Tool dependency types
+    "ToolDependencyConfig",  # noqa: F822
+    "ToolDependency",  # noqa: F822
+    "create_vertical_tool_dependency_provider",  # noqa: F822
+    # Safety pattern types
+    "SafetyExtensionProtocol",  # noqa: F822
+    "SafetyPattern",  # noqa: F822
+    # Promoted protocols (from SDK, re-exported for convenience)
+    "PromptContributorProtocol",  # noqa: F822
+    "ModeConfigProviderProtocol",  # noqa: F822
+    "ServiceProviderProtocol",  # noqa: F822
+    "ToolDependencyProviderProtocol",  # noqa: F822
+    "WorkflowProviderProtocol",  # noqa: F822
+    "RLConfigProviderProtocol",  # noqa: F822
+    "TeamSpecProviderProtocol",  # noqa: F822
+    "EnrichmentStrategyProtocol",  # noqa: F822
+    "MiddlewareProtocol",  # noqa: F822
 ]
 
 
@@ -185,6 +208,29 @@ def __getattr__(name: str):
         "register_vertical_handlers": "victor.framework.handler_registry",
         # Provider access
         "ProviderRegistry": "victor.providers.registry",
+        # Vertical registration and base types
+        "register_vertical": "victor.core.verticals.registration",
+        "VerticalBase": "victor.core.verticals.base",
+        "StageDefinition": "victor.core.verticals.base",
+        "VerticalConfig": "victor.core.verticals.base",
+        "VerticalExtensions": "victor.core.verticals.protocols",
+        # Tool dependency types
+        "ToolDependencyConfig": "victor.core.tool_dependency_base",
+        "ToolDependency": "victor.core.tool_types",
+        "create_vertical_tool_dependency_provider": "victor.core.tool_dependency_loader",
+        # Safety pattern types
+        "SafetyExtensionProtocol": "victor.core.verticals.protocols",
+        "SafetyPattern": "victor.core.verticals.protocols",
+        # Promoted protocols
+        "PromptContributorProtocol": "victor.core.verticals.protocols",
+        "ModeConfigProviderProtocol": "victor.core.verticals.protocols",
+        "ServiceProviderProtocol": "victor.core.verticals.protocols",
+        "ToolDependencyProviderProtocol": "victor.core.verticals.protocols",
+        "WorkflowProviderProtocol": "victor.core.verticals.protocols",
+        "RLConfigProviderProtocol": "victor.core.verticals.protocols",
+        "TeamSpecProviderProtocol": "victor.core.verticals.protocols",
+        "EnrichmentStrategyProtocol": "victor.core.verticals.protocols",
+        "MiddlewareProtocol": "victor.core.verticals.protocols",
     }
 
     if name in _LAZY_IMPORTS:

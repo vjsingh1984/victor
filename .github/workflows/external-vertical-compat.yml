@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Dispatch core-compat-check to ${{ matrix.name }}
         uses: peter-evans/repository-dispatch@v3
-        continue-on-error: true  # Advisory for first 2 weeks
+        continue-on-error: false
         with:
           token: ${{ secrets.EXTERNAL_VERTICAL_PAT }}
           repository: ${{ matrix.repo }}
@@ -68,7 +68,7 @@ jobs:
           echo "Dispatched \`core-compat-check\` events to external vertical repos." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Each external repo runs its test suite against this commit." >> $GITHUB_STEP_SUMMARY
-          echo "Results are **advisory** — failures do not block this workflow." >> $GITHUB_STEP_SUMMARY
+          echo "Results are **blocking** — dispatch failures indicate a PAT or repo issue." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Repo | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY

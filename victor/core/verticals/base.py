@@ -872,8 +872,6 @@ class VerticalRegistry:
         """
         import logging
 
-        from victor.framework.entry_point_registry import get_entry_point_registry
-
         logger = logging.getLogger(__name__)
         discovered: Dict[str, Type[VerticalBase]] = {}
 
@@ -881,11 +879,34 @@ class VerticalRegistry:
         if cls._external_discovered:
             return discovered
 
-        # Use UnifiedEntryPointRegistry for single-pass lazy scanning
+        # Delegate to PluginRegistry when it has already discovered,
+        # avoiding a redundant entry point scan.
+        try:
+            from victor.core.plugins.registry import PluginRegistry
+
+            plugin_registry = PluginRegistry.get_instance()
+            if plugin_registry.is_discovered:
+                for name, vertical_class in plugin_registry.get_vertical_classes().items():
+                    if name not in cls._registry:
+                        cls.register(vertical_class)
+                        discovered[name] = vertical_class
+                cls._external_discovered = True
+                if discovered:
+                    logger.info(
+                        "Discovered %d external vertical(s) via PluginRegistry: %s",
+                        len(discovered),
+                        ", ".join(discovered.keys()),
+                    )
+                return discovered
+        except Exception:
+            pass  # Fall through to direct entry point scan
+
+        # Fallback: direct entry point scan (only if PluginRegistry unavailable)
+        from victor.framework.entry_point_registry import get_entry_point_registry
+
         registry = get_entry_point_registry()
         group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
-        # Convert to list of entry points
         eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
 
         for ep, loaded in eps:
