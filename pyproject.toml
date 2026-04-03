@@ -109,6 +109,7 @@ dependencies = [
 [project.optional-dependencies]
 # Semantic embeddings: tool selection, conversation embeddings, codebase search
 embeddings = [
+    "numpy>=1.24",  # Required by victor.storage.embeddings.service
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
