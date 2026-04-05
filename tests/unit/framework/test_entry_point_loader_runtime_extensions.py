@@ -21,19 +21,36 @@ def teardown_function() -> None:
     reset_entry_point_loader_stats(clear_cache=True)
 
 
-@patch("victor.framework.entry_point_loader._cached_entry_points")
+def _mock_registry_get(group_entries):
+    """Create a mock UnifiedEntryPointRegistry that returns values from group_entries.
+
+    Args:
+        group_entries: dict mapping (group, normalized_name) -> loaded value
+    """
+    mock_registry = MagicMock()
+    mock_registry.scan_all.return_value = None
+
+    def _get(group, name):
+        return group_entries.get((group, name))
+
+    mock_registry.get.side_effect = _get
+    return mock_registry
+
+
+@patch("victor.framework.entry_point_loader.UnifiedEntryPointRegistry")
 def test_load_runtime_extension_normalizes_aliases_and_instantiates_classes(
-    mock_cached_eps,
+    mock_registry_cls,
 ) -> None:
     """Generic runtime-extension loading should normalize aliases and instantiate classes."""
 
     class PromptContributor:
         pass
 
-    ep = MagicMock()
-    ep.name = "data-analysis"
-    ep.load.return_value = PromptContributor
-    mock_cached_eps.return_value = (ep,)
+    # normalize_vertical_name("data_analysis") returns "dataanalysis"
+    mock_registry = _mock_registry_get(
+        {("victor.prompt_contributors", "dataanalysis"): PromptContributor}
+    )
+    mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_runtime_extension_from_entry_points(
         "data_analysis",
@@ -43,15 +60,15 @@ def test_load_runtime_extension_normalizes_aliases_and_instantiates_classes(
     assert isinstance(resolved, PromptContributor)
 
 
-@patch("victor.framework.entry_point_loader._cached_entry_points")
-def test_load_runtime_extension_returns_prebuilt_instances(mock_cached_eps) -> None:
+@patch("victor.framework.entry_point_loader.UnifiedEntryPointRegistry")
+def test_load_runtime_extension_returns_prebuilt_instances(mock_registry_cls) -> None:
     """Generic runtime-extension loading should preserve non-callable entry-point values."""
     contributor = object()
 
-    ep = MagicMock()
-    ep.name = "coding"
-    ep.load.return_value = contributor
-    mock_cached_eps.return_value = (ep,)
+    mock_registry = _mock_registry_get(
+        {("victor.prompt_contributors", "coding"): contributor}
+    )
+    mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_runtime_extension_from_entry_points(
         "coding",
@@ -61,18 +78,18 @@ def test_load_runtime_extension_returns_prebuilt_instances(mock_cached_eps) -> N
     assert resolved is contributor
 
 
-@patch("victor.framework.entry_point_loader._cached_entry_points")
-def test_load_rl_config_provider_returns_provider_instance(mock_cached_eps) -> None:
+@patch("victor.framework.entry_point_loader.UnifiedEntryPointRegistry")
+def test_load_rl_config_provider_returns_provider_instance(mock_registry_cls) -> None:
     """RL config provider entry-point loading should return provider instances."""
 
     class RLConfigProvider:
         def get_rl_config(self) -> dict[str, bool]:
             return {"enabled": True}
 
-    ep = MagicMock()
-    ep.name = "coding"
-    ep.load.return_value = RLConfigProvider
-    mock_cached_eps.return_value = (ep,)
+    mock_registry = _mock_registry_get(
+        {("victor.rl_configs", "coding"): RLConfigProvider}
+    )
+    mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_rl_config_provider_from_entry_points("coding")
 

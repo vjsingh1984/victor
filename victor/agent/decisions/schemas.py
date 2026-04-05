@@ -23,6 +23,9 @@ class DecisionType(str, Enum):
     LOOP_DETECTION = "loop_detection"
     ERROR_CLASSIFICATION = "error_classification"
     CONTINUATION_ACTION = "continuation_action"
+    TOOL_SELECTION = "tool_selection"
+    PROMPT_FOCUS = "prompt_focus"
+    STAGE_DETECTION = "stage_detection"
 
 
 class TaskCompletionDecision(BaseModel):
@@ -45,12 +48,25 @@ class IntentDecision(BaseModel):
 
 
 class TaskTypeDecision(BaseModel):
-    """What kind of task is this?"""
+    """What kind of task is this, and what deliverables are expected?"""
 
     task_type: Literal["analysis", "action", "generation", "search", "edit"] = Field(
         description="Classified type of the task"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+    deliverables: list[
+        Literal[
+            "file_created",
+            "file_modified",
+            "analysis_provided",
+            "answer_provided",
+            "plan_provided",
+            "code_executed",
+        ]
+    ] = Field(
+        default_factory=list,
+        description="Expected deliverable types (empty = infer from task_type)",
+    )
 
 
 class QuestionTypeDecision(BaseModel):
@@ -78,6 +94,29 @@ class ErrorClassDecision(BaseModel):
         description="Classification of the error"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
+
+
+class ToolSelectionDecision(BaseModel):
+    """Which tools are most relevant for this task?"""
+
+    tools: list[str] = Field(description="Selected tool names")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in selection")
+
+
+class PromptFocusDecision(BaseModel):
+    """Which system prompt sections to include?"""
+
+    sections: list[str] = Field(description="Selected section names")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in selection")
+
+
+class StageDetectionDecision(BaseModel):
+    """What conversation stage is this?"""
+
+    stage: Literal["initial", "planning", "reading", "analysis", "execution", "verification"] = (
+        Field(description="Detected conversation stage")
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in detection")
 
 
 class ContinuationDecision(BaseModel):

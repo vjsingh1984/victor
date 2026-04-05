@@ -14,20 +14,16 @@
 
 """Vertical management commands."""
 
-import json
-from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from victor.core.verticals.registry_manager import (
-    InstalledVertical,
+    PackageSpec,
     VerticalRegistryManager,
-    VerticalRuntimeInvalidationReason,
 )
-from victor.ui.commands.scaffold import new_vertical
 
 # Initialize components
 vertical_app = typer.Typer(
@@ -42,6 +38,8 @@ _DEPRECATION_MSG = (
     "Use 'victor plugin' instead — it shows both verticals and plugins in a unified view."
 )
 
+_VALID_SOURCES = {"all", "installed", "builtin", "available"}
+
 
 def _deprecation_notice() -> None:
     """Print deprecation notice."""
@@ -51,13 +49,17 @@ def _deprecation_notice() -> None:
 
 def _handle_error(message: str, detail: Optional[str] = None) -> None:
     """Handle and display errors."""
+    console.print(f"[red]Error:[/] {message}")
     if detail:
-        console.print(f"[red]Error:[/] {message}")
         console.print(f"[dim]{detail}[/]")
         console.print()
-    else:
-        console.print(f"[red]Error:[/] {message}")
-        raise typer.Exit(1)
+    raise typer.Exit(1)
+
+
+def _post_mutation_notice() -> None:
+    """Print post-install/uninstall notices about cache refresh and session restart."""
+    console.print("[dim]Successfully refreshed package caches.[/]")
+    console.print("[yellow]Restart other Victor sessions to pick up the change.[/]")
 
 
 @vertical_app.command("list")
@@ -108,6 +110,11 @@ def list_verticals(
         victor vertical list --tags "security,scanning"
     """
     _deprecation_notice()
+
+    if source not in _VALID_SOURCES:
+        _handle_error(f"Invalid source '{source}'. Must be one of: {', '.join(_VALID_SOURCES)}")
+        return
+
     manager = VerticalRegistryManager()
 
     with console.status("[bold blue]Loading vertical list..."):
@@ -142,7 +149,7 @@ def list_verticals(
     table.add_column("Description")
 
     if verbose:
-        table.add_column("Capabilities")
+        table.add_column("Category")
         table.add_column("Tools")
 
     for v in verticals:
@@ -154,13 +161,13 @@ def list_verticals(
         ]
 
         if verbose:
+            cat = v.metadata.category if v.metadata and v.metadata.category else "-"
             cs = v.metadata.class_spec if v.metadata else None
-            caps = ", ".join(cs.provides_capabilities) if cs and cs.provides_capabilities else "-"
             tool_list = cs.provides_tools if cs and cs.provides_tools else []
             tools = ", ".join(tool_list[:5]) if tool_list else "-"
             if len(tool_list) > 5:
                 tools += f" (+{len(tool_list) - 5} more)"
-            row.extend([caps, tools])
+            row.extend([cat, tools])
 
         table.add_row(*row)
 
@@ -199,17 +206,17 @@ def vertical_info(name: str) -> None:
                 if m.class_spec.provides_capabilities:
                     console.print("\n[bold]Capabilities:[/]")
                     for cap in m.class_spec.provides_capabilities:
-                        console.print(f"  • {cap}")
+                        console.print(f"  - {cap}")
 
                 if m.class_spec.provides_tools:
                     console.print("\n[bold]Provides Tools:[/]")
                     for tool in m.class_spec.provides_tools:
-                        console.print(f"  • {tool}")
+                        console.print(f"  - {tool}")
 
                 if m.class_spec.provides_workflows:
                     console.print("\n[bold]Provides Workflows:[/]")
                     for wf in m.class_spec.provides_workflows:
-                        console.print(f"  • {wf}")
+                        console.print(f"  - {wf}")
         else:
             console.print("\n[yellow]No detailed metadata available[/]")
 
@@ -222,38 +229,105 @@ def install_vertical(
     package: str = typer.Argument(..., help="Package name, path, or URL"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-installation"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed"),
+    no_validate: bool = typer.Option(
+        False, "--no-validate", help="Skip package validation"
+    ),
 ) -> None:
     """Install a new vertical plugin."""
-    manager = VerticalRegistryManager()
+    _deprecation_notice()
+    spec = PackageSpec.parse(package)
+    manager = VerticalRegistryManager(dry_run=dry_run)
 
-    if dry_run:
-        console.print(f"[yellow]Dry run:[/] Would install package '{package}'")
-        return
+    # Validate unless explicitly skipped
+    if not no_validate and not dry_run:
+        errors = manager._validate_package(spec)
+        if errors:
+            _handle_error("Validation failed: " + "; ".join(errors))
+            return
 
     with console.status(f"[bold blue]Installing {package}..."):
-        try:
-            result = manager.install(package, force=force)
-            if result:
-                console.print(f"[green]Successfully installed {package}[/]")
-            else:
-                _handle_error(f"Failed to install {package}")
-        except Exception as e:
-            _handle_error("Installation failed", str(detail=str(e)))
+        success, message = manager.install(spec, validate=False)
+
+    if success:
+        console.print(f"[green]{message}[/]")
+        _post_mutation_notice()
+    else:
+        console.print(f"[red]{message}[/]")
+        raise typer.Exit(1)
 
 
 @vertical_app.command("uninstall")
-def uninstall_vertical(name: str) -> None:
+def uninstall_vertical(
+    name: str = typer.Argument(..., help="Package name to uninstall"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be uninstalled"),
+) -> None:
     """Uninstall a vertical plugin."""
-    manager = VerticalRegistryManager()
+    _deprecation_notice()
+    manager = VerticalRegistryManager(dry_run=dry_run)
 
     with console.status(f"[bold blue]Uninstalling {name}..."):
-        try:
-            if manager.uninstall(name):
-                console.print(f"[green]Successfully uninstalled {name}[/]")
-            else:
-                _handle_error(f"Failed to uninstall {name}")
-        except Exception as e:
-            _handle_error("Uninstallation failed", str(e))
+        success, message = manager.uninstall(name)
+
+    if success:
+        console.print(f"[green]{message}[/]")
+        if not dry_run:
+            _post_mutation_notice()
+    else:
+        console.print(f"[red]{message}[/]")
+        raise typer.Exit(1)
+
+
+@vertical_app.command("search")
+def search_verticals(
+    query: str = typer.Argument(..., help="Search query"),
+) -> None:
+    """Search for verticals by name, description, or tags."""
+    _deprecation_notice()
+    manager = VerticalRegistryManager()
+
+    with console.status("[bold blue]Searching verticals..."):
+        results = manager.search(query)
+
+    if not results:
+        console.print(f"[yellow]No verticals found matching '{query}'[/]")
+        return
+
+    table = Table(title=f"Search Results for '{query}'")
+    table.add_column("Name", style="cyan")
+    table.add_column("Version", style="magenta")
+    table.add_column("Description")
+
+    for v in results:
+        table.add_row(
+            v.name,
+            v.version,
+            v.metadata.description if v.metadata else "[dim]No description[/]",
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]Found {len(results)} result(s)[/]")
+
+
+@vertical_app.command("create")
+def create_vertical(
+    name: str = typer.Argument(..., help="Name of the new vertical"),
+    description: str = typer.Option("A new Victor vertical", "--description", "-d"),
+    service_provider: bool = typer.Option(
+        False, "--service", help="Include service provider boilerplate"
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite if directory exists"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
+) -> None:
+    """Create (scaffold) a new vertical package."""
+    from victor.ui.commands.scaffold import new_vertical
+
+    new_vertical(
+        name=name,
+        description=description,
+        service_provider=service_provider,
+        force=force,
+        dry_run=dry_run,
+    )
 
 
 @vertical_app.command("new")
@@ -269,7 +343,6 @@ def scaffold_vertical(
     """Scaffold a new vertical package."""
     from victor.ui.commands.scaffold import new_vertical
 
-    # Call the scaffold command
     new_vertical(
         name=name,
         description=description,

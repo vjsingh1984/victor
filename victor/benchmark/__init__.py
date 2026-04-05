@@ -38,6 +38,10 @@ Usage:
     result = await bench_agent.execute_task(benchmark_task)
 """
 
+from typing import Optional
+
+from victor_sdk import PluginContext, VictorPlugin
+
 from victor.benchmark.assistant import BenchmarkVertical
 from victor.benchmark.agent import (
     BenchmarkAgent,
@@ -66,7 +70,36 @@ from victor.benchmark.prompts import (
     get_task_type_hint,
 )
 
+class BenchmarkPlugin(VictorPlugin):
+    """Victor Plugin for Benchmark vertical."""
+
+    @property
+    def name(self) -> str:
+        return "benchmark"
+
+    def register(self, context: PluginContext) -> None:
+        """Register benchmark vertical."""
+        context.register_vertical(BenchmarkVertical)
+
+    def get_cli_app(self) -> Optional["typer.Typer"]:
+        return None
+
+    def on_activate(self) -> None:
+        pass
+
+    def on_deactivate(self) -> None:
+        pass
+
+    def health_check(self) -> bool:
+        return True
+
+
+plugin = BenchmarkPlugin()
+
 __all__ = [
+    # Plugin
+    "BenchmarkPlugin",
+    "plugin",
     # Vertical
     "BenchmarkVertical",
     # Agent API

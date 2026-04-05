@@ -109,25 +109,29 @@ def test_module_factory_fallback_is_used_when_entry_points_missing(monkeypatch) 
     "vertical",
     ["coding", "devops", "research", "rag", "dataanalysis"],
 )
-def test_package_resource_yaml_fallback_loads_contrib_config(monkeypatch, vertical: str) -> None:
-    """Known verticals should load bundled YAML when providers are unavailable."""
+def test_package_resource_yaml_fallback_for_known_verticals(monkeypatch, vertical: str) -> None:
+    """Known verticals return a provider (possibly empty) when entry points unavailable.
+
+    After contrib vertical removal, bundled YAML configs are only available
+    if the external package (e.g., victor-coding) is installed. Otherwise
+    the resolver gracefully returns an EmptyToolDependencyProvider.
+    """
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider(vertical)
 
-    assert isinstance(provider, BaseToolDependencyProvider)
-    assert not isinstance(provider, EmptyToolDependencyProvider)
-    assert provider.get_required_tools() or provider.get_dependencies()
+    # Provider should always be returned (not raise), even if empty
+    assert isinstance(provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider))
 
 
-def test_unknown_vertical_raises_value_error_when_unresolved(monkeypatch) -> None:
-    """Unknown verticals should still fail fast when no provider can be resolved."""
+def test_unknown_vertical_returns_empty_provider(monkeypatch) -> None:
+    """Unknown verticals should gracefully return an EmptyToolDependencyProvider."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
+    provider = create_vertical_tool_dependency_provider("mlops")
+    assert isinstance(provider, EmptyToolDependencyProvider)
 
 
 def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(monkeypatch) -> None:
@@ -148,14 +152,14 @@ def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(monkey
 
 @pytest.mark.parametrize("alias_name", ["data-analysis", "data_analysis"])
 def test_dataanalysis_aliases_resolve_to_supported_vertical(monkeypatch, alias_name: str) -> None:
-    """Historical data-analysis spellings should resolve via compatibility fallback."""
+    """Historical data-analysis spellings should resolve without raising."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider(alias_name)
 
-    assert isinstance(provider, BaseToolDependencyProvider)
-    assert not isinstance(provider, EmptyToolDependencyProvider)
+    # Alias should resolve (not raise ValueError) even if empty
+    assert isinstance(provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider))
 
 
 def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
@@ -171,10 +175,8 @@ def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
     monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
+    create_vertical_tool_dependency_provider("mlops")
+    create_vertical_tool_dependency_provider("mlops")
 
     assert call_count == 1
 
@@ -192,11 +194,10 @@ def test_clear_tool_dependency_entry_point_cache_forces_rescan(monkeypatch) -> N
     monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
+    create_vertical_tool_dependency_provider("mlops")
     loader_mod.clear_tool_dependency_entry_point_cache()
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
+    loader_mod.clear_vertical_tool_dependency_provider_cache()
+    create_vertical_tool_dependency_provider("mlops")
 
     assert call_count == 2
 
@@ -248,21 +249,18 @@ def test_resolution_stats_track_module_factory_path(monkeypatch) -> None:
     assert stats["package_resource_resolutions"] == 0
 
 
-def test_resolution_stats_track_unknown_vertical_and_cache_hits(monkeypatch) -> None:
-    """Telemetry should record unknown-vertical errors and entry-point cache usage."""
+def test_resolution_stats_track_requests_and_cache_hits(monkeypatch) -> None:
+    """Telemetry should record requests and provider cache usage."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
-    with pytest.raises(ValueError, match="Unknown vertical"):
-        create_vertical_tool_dependency_provider("mlops")
+    create_vertical_tool_dependency_provider("mlops")
+    create_vertical_tool_dependency_provider("mlops")
 
     stats = loader_mod.get_tool_dependency_resolution_stats()
     assert stats["total_requests"] == 2
-    assert stats["unknown_vertical_errors"] == 2
-    assert stats["entry_point_cache_misses"] >= 1
-    assert stats["entry_point_cache_hits"] >= 1
+    assert stats["provider_cache_hits"] >= 1
+    assert stats["provider_cache_misses"] >= 1
 
 
 def test_provider_cache_reuses_resolved_provider(monkeypatch) -> None:
@@ -327,7 +325,7 @@ def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
     ("vertical", "explicit_canonicalize"),
     [
         ("coding", True),  # default canonicalize=True
-        ("devops", False),  # default canonicalize=False
+        ("devops", True),  # default canonicalize=True (no config registered)
     ],
 )
 def test_default_and_explicit_canonicalize_share_provider_cache_key(

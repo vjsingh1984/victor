@@ -485,6 +485,66 @@ class TaskComplexityService:
         except Exception as e:
             logger.debug(f"RL outcome recording failed: {e}")
 
+    def _classify_with_edge_model(self, message: str) -> Optional[TaskClassification]:
+        """Attempt classification using edge model for ambiguous tasks.
+
+        Handles complex prompts (e.g., SWE-bench issue text) that regex
+        patterns can't reliably classify.
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return None
+
+            from victor.agent.decisions.schemas import DecisionType
+
+            decision = service.decide_sync(
+                DecisionType.TASK_TYPE_CLASSIFICATION,
+                context={"message_excerpt": message[:300]},
+                heuristic_confidence=0.0,
+            )
+
+            if decision.source != "llm" or decision.confidence < 0.6:
+                return None
+
+            task_type = getattr(decision.result, "task_type", None)
+            if not task_type:
+                return None
+
+            # Map task_type to TaskComplexity
+            type_to_complexity = {
+                "action": TaskComplexity.ACTION,
+                "edit": TaskComplexity.ACTION,
+                "analysis": TaskComplexity.ANALYSIS,
+                "generation": TaskComplexity.GENERATION,
+                "search": TaskComplexity.SIMPLE,
+            }
+            complexity = type_to_complexity.get(task_type, TaskComplexity.MEDIUM)
+
+            result = TaskClassification(
+                complexity=complexity,
+                tool_budget=self.budgets[complexity],
+                confidence=decision.confidence,
+                matched_patterns=[f"edge:{task_type}"],
+            )
+            logger.info(
+                f"Edge complexity classification: {complexity.value} "
+                f"(task_type={task_type}, confidence={decision.confidence:.2f})"
+            )
+            return result
+
+        except Exception as e:
+            logger.debug(f"Edge complexity classification failed: {e}")
+            return None
+
     def _classify_semantic(self, message: str) -> Optional[TaskClassification]:
         """Attempt semantic classification using embeddings."""
         classifier = self._get_semantic_classifier()
@@ -557,6 +617,11 @@ class TaskComplexityService:
             semantic_result = self._classify_semantic(message)
             if semantic_result:
                 return semantic_result
+
+        # Try edge model classification (handles complex prompts like SWE-bench issues)
+        edge_result = self._classify_with_edge_model(message)
+        if edge_result:
+            return edge_result
 
         # Score all patterns
         scores: Dict[TaskComplexity, Tuple[float, List[str]]] = {}

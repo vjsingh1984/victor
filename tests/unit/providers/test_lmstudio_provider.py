@@ -37,7 +37,12 @@ from victor.providers.lmstudio_provider import LMStudioProvider
 @pytest.fixture
 def lmstudio_provider():
     """Create LMStudioProvider instance for testing."""
-    return LMStudioProvider(base_url="http://127.0.0.1:1234", _skip_discovery=True)
+    return LMStudioProvider(
+        base_url="http://127.0.0.1:1234",
+        _skip_discovery=True,
+        max_retries=0,
+        use_circuit_breaker=False,
+    )
 
 
 @pytest.mark.asyncio

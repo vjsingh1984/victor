@@ -137,6 +137,9 @@ dev = [
     "mypy>=1.10",
     "black==26.1.0",
 
+    # Code complexity analysis
+    "radon>=6.0",
+
     # Type stubs
     "types-pyyaml",
     "types-aiofiles",
@@ -440,23 +443,13 @@ victor-examples = "examples.playground.cli:app"
 # All contrib verticals are now bundled with the main victor package.
 # =============================================================================
 [project.entry-points."victor.verticals"]
-# Legacy group — new entries should use victor.plugins instead
-# Existing entries here are auto-wrapped via _LegacyVerticalPluginAdapter
-benchmark = "victor.benchmark:BenchmarkVertical"
-
-# Contrib verticals (migrated from external packages)
-# coding = "victor.verticals.contrib.coding:CodingAssistant"  <-- Registered via plugin now
-# rag = "victor.verticals.contrib.rag:RAGAssistant"
-# devops = "victor.verticals.contrib.devops:DevOpsAssistant"
-# dataanalysis = "victor.verticals.contrib.dataanalysis:DataAnalysisAssistant"
-# research = "victor.verticals.contrib.research:ResearchAssistant"
+# Legacy group — kept for backward compatibility with external packages.
+# New entries should use victor.plugins instead.
+# Entries here are auto-wrapped via _LegacyVerticalPluginAdapter.
 
 [project.entry-points."victor.plugins"]
-coding = "victor.verticals.contrib.coding:plugin"
-rag = "victor.verticals.contrib.rag:plugin"
-devops = "victor.verticals.contrib.devops:plugin"
-dataanalysis = "victor.verticals.contrib.dataanalysis:plugin"
-research = "victor.verticals.contrib.research:plugin"
+# Built-in verticals (canonical registration)
+benchmark = "victor.benchmark:plugin"
 
 # =============================================================================
 # External Vertical Registration (for third-party packages)
@@ -528,6 +521,7 @@ addopts = [
     "--strict-config",
     "--cov=victor",
     "--cov-report=",
+    "--timeout=120",
 ]
 asyncio_mode = "auto"
 markers = [

@@ -682,7 +682,7 @@ _AUTO_DETECT_SPECS: list[dict[str, Any]] = [
     },
     {
         "protocol_attr": "EditorProtocol",
-        "import_path": "victor_coding.editing.file_editor:FileEditor",
+        "import_path": "victor_coding.editing.editor:FileEditor",
         "label": "FileEditor",
     },
 ]

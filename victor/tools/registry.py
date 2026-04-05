@@ -15,7 +15,8 @@
 """Tool registry for managing available tools."""
 
 import threading
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
@@ -103,6 +104,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
         }
         self._schema_cache_version: int = 0
         self._schema_cache_lock = threading.RLock()
+        self._batch_mode: bool = False
+        self._batch_dirty: bool = False
 
         # Strategy pattern support (when flag enabled)
         # Initialize strategy registry if flag is enabled
@@ -137,7 +140,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Called when tools are registered, unregistered, enabled, or disabled.
         Thread-safe using the schema cache lock. Uses O(1) version counter
         instead of rebuilding tool name tuples for validation.
+
+        If batch_update() is active, defers invalidation until the batch ends.
         """
+        if self._batch_mode:
+            self._batch_dirty = True
+            return
         with self._schema_cache_lock:
             self._schema_cache_version += 1
 
@@ -448,6 +456,34 @@ class ToolRegistry(BaseRegistry[str, Any]):
             Dictionary mapping tool names to enabled state
         """
         return self._tool_enabled.copy()
+
+    @contextmanager
+    def batch_update(self) -> Generator[None, None, None]:
+        """Batch multiple tool mutations with a single cache invalidation.
+
+        Use when registering, enabling, or disabling many tools at once
+        (e.g., during startup or vertical activation) to avoid repeated
+        schema cache rebuilds.
+
+        Example::
+
+            with registry.batch_update():
+                registry.register(tool_a)
+                registry.register(tool_b)
+                registry.enable_tool("tool_a")
+                registry.enable_tool("tool_b")
+            # Cache invalidated once here
+        """
+        self._batch_mode = True
+        self._batch_dirty = False
+        try:
+            yield
+        finally:
+            self._batch_mode = False
+            if self._batch_dirty:
+                self._batch_dirty = False
+                with self._schema_cache_lock:
+                    self._schema_cache_version += 1
 
     def get(self, name: str) -> Optional[Any]:
         """Get a tool by name.

@@ -292,7 +292,17 @@ class ProviderLogger:
 
         # Tier 3: String fallback (for third-party exceptions)
         error_str = str(error).lower()
-        return any(p in error_str for p in ("timeout", "rate limit", "connection reset"))
+        return any(
+            p in error_str
+            for p in (
+                "timeout",
+                "rate limit",
+                "connection reset",
+                "connection refused",
+                "service unavailable",
+                "too many requests",
+            )
+        )
 
     def _sanitize_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """

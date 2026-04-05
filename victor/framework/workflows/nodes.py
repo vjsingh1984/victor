@@ -223,8 +223,8 @@ class TeamNode:
             # Create team coordinator
             coordinator = create_coordinator(
                 orchestrator=orchestrator,
-                with_observability=False,  # Disable to avoid double-events
-                with_rl=False,
+                enable_observability=False,  # Disable to avoid double-events
+                enable_rl=False,
             )
 
             # Create team config

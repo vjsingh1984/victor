@@ -347,6 +347,50 @@ class VictorAgentAdapter:
         # encapsulation of project context updates.
         self.orchestrator.set_workspace(workspace_dir)
 
+        # Also chdir so tools that resolve path='.' against cwd work correctly.
+        # Tools like code_search._literal_search use os.walk(path) where path='.'
+        # resolves to cwd, not the framework's project root. This is a pragmatic
+        # fix; the proper solution is for tools to use get_project_paths().
+        import os
+
+        os.chdir(workspace_dir)
+
+        # Force EXECUTION stage so tool selector doesn't gate edit/write behind
+        # READING stage. The stage detector will try to override this based on
+        # tool history, but for benchmarks we want edit available from turn 1.
+        try:
+            from victor.core.shared_types import ConversationStage
+
+            state_mgr = getattr(
+                self.orchestrator, '_conversation_state',
+                getattr(self.orchestrator, 'conversation_state', None),
+            )
+            if state_mgr and hasattr(state_mgr, '_transition_to'):
+                state_mgr._transition_to(ConversationStage.EXECUTION, confidence=1.0)
+                # Prevent stage regression — don't let the detector push back
+                # to READING/ANALYSIS after grep/read tool calls.
+                state_mgr.MIN_TOOLS_FOR_TRANSITION = 999
+        except Exception:
+            pass
+
+        # Restrict tools to a focused set for benchmark tasks.
+        # The default semantic selector broadcasts 15+ tools which causes model
+        # decision fatigue — models default to text responses instead of tool use.
+        # A minimal set forces decisive tool use at each stage.
+        BENCHMARK_TOOLS = {"read", "edit", "write", "grep", "ls", "shell"}
+        try:
+            if hasattr(self.orchestrator, 'tools'):
+                all_tools = set(self.orchestrator.tools.list_tools())
+                disable = all_tools - BENCHMARK_TOOLS
+                for tool_name in disable:
+                    self.orchestrator.tools.disable_tool(tool_name)
+                logger.info(
+                    f"Benchmark tool restriction: {len(BENCHMARK_TOOLS)} tools enabled "
+                    f"({', '.join(sorted(BENCHMARK_TOOLS))})"
+                )
+        except Exception as e:
+            logger.debug(f"Could not restrict tools for benchmark: {e}")
+
         trace = AgenticExecutionTrace(
             task_id=task.task_id,
             start_time=time.time(),
@@ -360,6 +404,37 @@ class VictorAgentAdapter:
         task_description = task.issue_text or task.prompt
         self._completion_detector.analyze_intent(task_description)
 
+        # Configure the orchestrator's detector to not prematurely stop.
+        # The adapter's outer loop controls completion, not the orchestrator.
+        orch_detector = getattr(self.orchestrator, '_task_completion_detector', None)
+        if orch_detector:
+            # Inject the edge decision service if available
+            try:
+                from victor.core import get_container
+                from victor.agent.services.protocols.decision_service import (
+                    LLMDecisionServiceProtocol,
+                )
+
+                edge_service = get_container().get(LLMDecisionServiceProtocol)
+                if edge_service:
+                    orch_detector._decision_service = edge_service
+            except Exception:
+                pass
+
+            orch_detector.analyze_intent(task_description)
+
+            # If regex couldn't classify (common for complex SWE-bench issues),
+            # default to requiring file modifications before completion.
+            if not orch_detector._state.expected_deliverables:
+                from victor.agent.task_completion import DeliverableType
+
+                orch_detector._state.expected_deliverables = [
+                    DeliverableType.FILE_MODIFIED
+                ]
+
+            # High continuation budget — adapter controls stopping
+            orch_detector._state.max_continuation_requests = 999
+
         # Determine task complexity with fallback chain:
         # 1. Explicit override from task (highest priority)
         # 2. Inference from task description
@@ -367,8 +442,14 @@ class VictorAgentAdapter:
         complexity_value = self._determine_complexity(task, task_description)
         self._completion_detector.configure_for_complexity(complexity_value)
 
-        # Use task's issue_text or prompt directly - let framework handle enrichment
-        prompt = task_description
+        # Wrap task description with explicit instructions for benchmark tasks.
+        # Raw issue text alone causes models to analyze instead of fix.
+        prompt = (
+            "Fix the following issue by editing the source code in this repository. "
+            "Use the read tool to find the relevant files, then use the edit tool "
+            "to apply your fix. Do not just describe the fix — apply it.\n\n"
+            f"ISSUE:\n{task_description}"
+        )
 
         try:
             # Execute agent loop
@@ -376,26 +457,96 @@ class VictorAgentAdapter:
             while not complete and self._turns < self.config.max_turns:
                 self._turns += 1
 
-                # Add user message
-                current_message = prompt if self._turns == 1 else "Continue."
+                # Add user message — on continuation turns, direct the model
+                # toward file edits since benchmark tasks require code changes.
+                if self._turns == 1:
+                    current_message = prompt
+                elif not self._completion_detector._has_file_modifications():
+                    current_message = (
+                        "You have not edited any files yet. "
+                        "Use the edit or write tool to fix the issue in the source code. "
+                        "Do not just describe the fix — apply it."
+                    )
+                else:
+                    current_message = "Continue."
                 self._messages.append({"role": "user", "content": current_message})
 
                 # Get agent response
+                logger.info(
+                    "[AgentAdapter] Turn %d started (tool_calls=%d, files_modified=%s)",
+                    self._turns,
+                    len(self._tool_calls),
+                    self._completion_detector._has_file_modifications(),
+                )
                 try:
                     response = await asyncio.wait_for(
                         self.orchestrator.chat(current_message),
                         timeout=self.config.timeout_per_turn,
                     )
                 except asyncio.TimeoutError:
-                    logger.warning(f"Turn {self._turns} timed out")
+                    logger.warning(f"[AgentAdapter] Turn {self._turns} timed out")
+                    break
+                except Exception as e:
+                    logger.error(
+                        "[AgentAdapter] Turn %d provider error: %s", self._turns, e
+                    )
+                    # Provider error (disconnect, SSL, etc.) — don't retry,
+                    # record what we have and move on
                     break
 
                 assistant_content = response.content if response else ""
-                self._messages.append({"role": "assistant", "content": assistant_content})
+
+                # Capture and display reasoning/thinking if present
+                reasoning = None
+                if response and response.metadata:
+                    reasoning = response.metadata.get("reasoning_content")
+                if reasoning:
+                    logger.info(
+                        "[AgentAdapter] Model reasoning (%d chars):\n%s",
+                        len(reasoning),
+                        reasoning[:500] + ("..." if len(reasoning) > 500 else ""),
+                    )
+
+                # Log the actual response content for debugging
+                logger.info(
+                    "[AgentAdapter] Turn %d response (%d chars, %d tool calls):\n%s",
+                    self._turns,
+                    len(assistant_content),
+                    len(response.tool_calls) if response and response.tool_calls else 0,
+                    assistant_content[:300] + ("..." if len(assistant_content) > 300 else ""),
+                )
+
+                self._messages.append({
+                    "role": "assistant",
+                    "content": assistant_content,
+                    "reasoning": reasoning,
+                })
 
                 # Use framework's completion detection (not gaming code)
                 self._completion_detector.analyze_response(assistant_content)
+
+                # For benchmark tasks, ignore premature active signals (e.g. "summary:")
+                # unless the agent has actually modified files. Without this guard,
+                # models that include "Summary:" headers in their first response
+                # trigger immediate termination before any work is done.
+                if (
+                    self._completion_detector._state.active_signal_detected
+                    and not self._completion_detector._has_file_modifications()
+                ):
+                    self._completion_detector._state.active_signal_detected = False
+                    self._completion_detector._state.completion_signals.clear()
+
                 complete = self._completion_detector.should_stop()
+                logger.info(
+                    "[AgentAdapter] Turn %d complete=%s (deliverables=%d, signals=%d, "
+                    "active_signal=%s, file_mods=%s)",
+                    self._turns,
+                    complete,
+                    len(self._completion_detector._state.completed_deliverables),
+                    len(self._completion_detector._state.completion_signals),
+                    self._completion_detector._state.active_signal_detected,
+                    self._completion_detector._has_file_modifications(),
+                )
 
                 # Check tool budget
                 if len(self._tool_calls) >= self.config.tool_budget:

@@ -146,54 +146,290 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             result.error_message = "No valid patch found in output"
             return result
 
-        # Set up environment
-        env = TaskEnvironment(
-            task=task,
-            workspace_dir=config.workspace_dir,
-            use_docker=config.use_docker,
-            docker_image=config.docker_image,
-        )
-
+        # Use cached repo for fast local test execution instead of
+        # cloning from GitHub. Apply patch to a clean checkout and run tests.
         try:
-            await env.setup()
+            from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
 
-            # Apply patch
-            if not await env.apply_patch(patch):
-                result.status = TaskStatus.FAILED
-                result.error_message = "Failed to apply patch"
-                return result
+            workspace_manager = SWEBenchWorkspaceManager()
+            cached_repo = workspace_manager.get_cached_repo_path(task)
 
-            # Apply test patch if available
-            if task.test_code:
-                await env.apply_patch(task.test_code)
-
-            # Run tests
-            passed, total, stdout, stderr = await env.run_tests(timeout=config.timeout_per_task)
-
-            result.tests_passed = passed
-            result.tests_total = total
-            result.tests_failed = total - passed
-            result.stdout = stdout
-            result.stderr = stderr
-
-            # Determine status
-            if total > 0 and passed == total:
-                result.status = TaskStatus.PASSED
-            elif passed > 0:
-                result.status = TaskStatus.FAILED
-                result.error_message = f"Partial pass: {passed}/{total}"
+            if cached_repo and cached_repo.exists():
+                result = await self._run_tests_in_cached_repo(
+                    task, result, patch, cached_repo, config
+                )
             else:
-                result.status = TaskStatus.FAILED
-                result.error_message = "All tests failed"
+                # Fallback to TaskEnvironment with remote clone
+                env = TaskEnvironment(
+                    task=task,
+                    workspace_dir=config.workspace_dir,
+                    use_docker=config.use_docker,
+                    docker_image=config.docker_image,
+                )
+                try:
+                    await env.setup()
+                    if not await env.apply_patch(patch):
+                        result.status = TaskStatus.FAILED
+                        result.error_message = "Failed to apply patch"
+                        return result
+                    if task.test_code:
+                        await env.apply_patch(task.test_code)
+                    passed, total, stdout, stderr = await env.run_tests(
+                        timeout=config.timeout_per_task
+                    )
+                    result.tests_passed = passed
+                    result.tests_total = total
+                    result.tests_failed = total - passed
+                    result.stdout = stdout
+                    result.stderr = stderr
+                    if total > 0 and passed == total:
+                        result.status = TaskStatus.PASSED
+                    elif passed > 0:
+                        result.status = TaskStatus.FAILED
+                        result.error_message = f"Partial pass: {passed}/{total}"
+                    else:
+                        result.status = TaskStatus.FAILED
+                        result.error_message = "All tests failed"
+                except Exception as e:
+                    result.status = TaskStatus.ERROR
+                    result.error_message = str(e)
+                finally:
+                    await env.cleanup()
 
         except Exception as e:
             result.status = TaskStatus.ERROR
             result.error_message = str(e)
 
+        return result
+
+    async def _run_tests_in_cached_repo(
+        self,
+        task: BenchmarkTask,
+        result: TaskResult,
+        patch: str,
+        cached_repo: Path,
+        config: EvaluationConfig,
+    ) -> TaskResult:
+        """Run tests using the cached repo for fast local execution.
+
+        Resets repo to base_commit, applies agent's patch, runs tests,
+        then resets again to leave repo clean.
+        """
+        import asyncio
+        import sys
+        import tempfile
+
+        try:
+            # Reset to base commit (fetch first — may be outside shallow depth)
+            if task.base_commit:
+                for cmd in [
+                    ["git", "fetch", "--depth", "1", "origin", task.base_commit],
+                    ["git", "checkout", "--force", task.base_commit],
+                    ["git", "clean", "-fd"],
+                ]:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        cwd=cached_repo,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await proc.communicate()
+
+            # Apply the agent's patch
+            patch_file = cached_repo / ".agent_patch.diff"
+            patch_file.write_text(patch)
+            apply_proc = await asyncio.create_subprocess_exec(
+                "git", "apply", "--allow-empty", str(patch_file),
+                cwd=cached_repo,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            apply_stdout, apply_stderr = await apply_proc.communicate()
+
+            if apply_proc.returncode != 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = (
+                    f"Failed to apply patch: {apply_stderr.decode()[:200]}"
+                )
+                logger.warning("Patch apply failed: %s", apply_stderr.decode()[:200])
+                return result
+
+            logger.info("Patch applied successfully to cached repo")
+
+            # Apply test patch if available (SWE-bench provides test code)
+            if task.test_code:
+                test_patch_file = cached_repo / ".test_patch.diff"
+                test_patch_file.write_text(task.test_code)
+                test_proc = await asyncio.create_subprocess_exec(
+                    "git", "apply", "--allow-empty", str(test_patch_file),
+                    cwd=cached_repo,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await test_proc.communicate()
+
+            # Try to apply patch to the installed package in site-packages.
+            # Source checkouts of projects like astropy need compiled C extensions
+            # which aren't available from the raw git checkout. If the project is
+            # pip-installed, we can patch site-packages and run tests against it.
+            import os
+
+            site_pkg_dir = None
+            if task.repo:
+                # Extract project name from repo URL (e.g., "astropy" from "astropy/astropy")
+                repo_name = task.repo.rstrip("/").split("/")[-1].replace(".git", "")
+                try:
+                    spec = __import__(repo_name)
+                    site_pkg_dir = Path(spec.__file__).parent
+                    # Apply patch to site-packages
+                    site_patch_file = cached_repo / ".site_patch.diff"
+                    site_patch_file.write_text(patch)
+                    apply_site = await asyncio.create_subprocess_exec(
+                        "git", "apply", "--allow-empty", "--directory",
+                        str(site_pkg_dir.parent), str(site_patch_file),
+                        cwd=cached_repo,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    site_out, site_err = await apply_site.communicate()
+                    if apply_site.returncode == 0:
+                        logger.info("Patch also applied to installed package at %s", site_pkg_dir)
+                    site_patch_file.unlink(missing_ok=True)
+                except Exception as e:
+                    logger.debug("Could not patch installed package: %s", e)
+
+            # Run tests — prefer running from a temp dir to avoid conftest conflicts
+            test_cmd = self._build_test_command(task, cached_repo)
+            test_cmd.insert(test_cmd.index("-m") + 2, "--noconftest")
+            logger.info("Running tests: %s", " ".join(test_cmd))
+
+            # Use installed package path as test root if available
+            test_cwd = str(site_pkg_dir.parent) if site_pkg_dir else str(cached_repo)
+
+            clean_env = os.environ.copy()
+            clean_env["PYTHONDONTWRITEBYTECODE"] = "1"
+
+            test_proc = await asyncio.create_subprocess_exec(
+                *test_cmd,
+                cwd=test_cwd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=clean_env,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    test_proc.communicate(),
+                    timeout=min(config.timeout_per_task, 300),
+                )
+            except asyncio.TimeoutError:
+                test_proc.kill()
+                result.status = TaskStatus.FAILED
+                result.error_message = "Test execution timed out"
+                return result
+
+            stdout_str = stdout.decode("utf-8", errors="replace")
+            stderr_str = stderr.decode("utf-8", errors="replace")
+            result.stdout = stdout_str[-2000:]  # Last 2KB for diagnostics
+            result.stderr = stderr_str[-2000:]
+
+            logger.info("Test stdout (last 500): %s", stdout_str[-500:])
+            logger.info("Test stderr (last 500): %s", stderr_str[-500:])
+
+            # Parse test results
+            passed, total = self._parse_test_output(stdout_str + stderr_str)
+            result.tests_passed = passed
+            result.tests_total = total
+            result.tests_failed = total - passed
+
+            if total > 0 and passed == total:
+                result.status = TaskStatus.PASSED
+                logger.info("Tests PASSED: %d/%d", passed, total)
+            elif total > 0 and passed > 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = f"Partial pass: {passed}/{total}"
+                logger.info("Tests partial: %d/%d", passed, total)
+            elif total > 0:
+                result.status = TaskStatus.FAILED
+                result.error_message = f"All tests failed ({total} total)"
+                logger.info("Tests FAILED: %d/%d", passed, total)
+            else:
+                # Tests couldn't run (0 collected) — likely missing project deps.
+                # Report as PATCH_APPLIED to distinguish from "no patch generated".
+                result.status = TaskStatus.FAILED
+                result.error_message = (
+                    "Patch applied successfully but tests could not run "
+                    "(0 collected). Install project deps or use Docker."
+                )
+                logger.warning(
+                    "Tests not collected (0/0). Project may need "
+                    "`pip install -e .` or Docker for test execution."
+                )
+
+        except Exception as e:
+            result.status = TaskStatus.ERROR
+            result.error_message = str(e)
+            logger.error("Test execution error: %s", e)
+
         finally:
-            await env.cleanup()
+            # Clean up patch files and reset repo
+            for f in [".agent_patch.diff", ".test_patch.diff"]:
+                (cached_repo / f).unlink(missing_ok=True)
+            if task.base_commit:
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "checkout", "--force", task.base_commit,
+                    cwd=cached_repo,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await proc.communicate()
 
         return result
+
+    def _build_test_command(self, task: BenchmarkTask, repo_dir: Path) -> list:
+        """Build the test command for a SWE-bench task."""
+        import re
+        import sys
+
+        # Use the current interpreter (venv python) not system python
+        python = sys.executable
+
+        # Use FAIL_TO_PASS test list if available (from SWE-bench metadata)
+        if hasattr(task, "fail_to_pass") and task.fail_to_pass:
+            test_ids = task.fail_to_pass
+            return [python, "-m", "pytest", "-xvs"] + test_ids
+
+        # Extract test file paths from test_code patch (SWE-bench provides test diffs)
+        if task.test_code:
+            test_files = re.findall(r"diff --git a/(\S+)", task.test_code)
+            test_files = [f for f in test_files if "test" in f.lower()]
+            if test_files:
+                return [python, "-m", "pytest", "-xvs"] + test_files
+
+        # Fallback: run tests related to the modified module
+        return [python, "-m", "pytest", "-x", "--tb=short", "-q"]
+
+    def _parse_test_output(self, output: str) -> tuple:
+        """Parse pytest output to extract pass/fail counts."""
+        import re
+
+        # Try pytest format: "5 passed, 2 failed"
+        match = re.search(r"(\d+) passed", output)
+        passed = int(match.group(1)) if match else 0
+
+        match = re.search(r"(\d+) failed", output)
+        failed = int(match.group(1)) if match else 0
+
+        total = passed + failed
+
+        # Try "Ran N tests" (unittest format)
+        if total == 0:
+            match = re.search(r"Ran (\d+) test", output)
+            if match:
+                total = int(match.group(1))
+                if "OK" in output:
+                    passed = total
+
+        return passed, total
 
     def _extract_patch(self, output: str) -> str:
         """Extract diff patch from agent output."""

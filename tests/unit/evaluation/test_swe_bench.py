@@ -283,6 +283,9 @@ class TestRunTaskErrorHandling:
         task.task_id = "test-1"
         task.description = "Test task"
         task.test_code = "assert True"
+        # Set repo to None so SWEBenchWorkspaceManager returns None for
+        # cached_repo, forcing the TaskEnvironment fallback path.
+        task.repo = None
 
         agent_output = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"
         config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", use_docker=False)

@@ -238,11 +238,12 @@ class TestRuntimeLazyInitialization:
             await agent.close()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="Lazy initialization behavior changed - metrics_collector is now initialized during orchestrator setup"
-    )
-    async def test_metrics_runtime_components_are_lazy(self):
-        """Test that metrics runtime components are NOT initialized during Agent.create()."""
+    async def test_metrics_runtime_components_initialized_during_setup(self):
+        """Test that metrics_collector is initialized during orchestrator setup.
+
+        The metrics_collector is eagerly initialized because create_lifecycle_manager()
+        accesses metrics_coordinator.metrics_collector during Agent.create().
+        """
         agent = await Agent.create(
             provider="ollama",
             model="qwen3-coder:30b",
@@ -256,14 +257,13 @@ class TestRuntimeLazyInitialization:
             metrics_runtime = getattr(orchestrator, "_metrics_runtime", None)
             assert metrics_runtime is not None, "metrics_runtime should exist"
 
-            # Check that components are NOT initialized (lazy)
+            # metrics_collector is initialized during orchestrator setup
             metrics_collector = getattr(metrics_runtime, "metrics_collector", None)
-
             assert metrics_collector is not None, "metrics_collector should exist"
             initialized = getattr(metrics_collector, "initialized", False)
             assert (
-                not initialized
-            ), "metrics_collector should NOT be initialized after Agent.create()"
+                initialized
+            ), "metrics_collector should be initialized after Agent.create()"
 
         finally:
             await agent.close()

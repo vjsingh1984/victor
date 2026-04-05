@@ -301,5 +301,143 @@ def profile_current(
         console.print(f"\n[dim]Current profile: {profile_name}[/] (custom configuration)")
 
 
+@profiles_app.command("create")
+def profile_create(
+    name: str = typer.Argument(..., help="Profile name to create"),
+    provider: str = typer.Option("ollama", "--provider", "-p", help="LLM provider"),
+    model: str = typer.Option("llama2", "--model", "-m", help="Model name"),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+) -> None:
+    """Create a new custom profile."""
+    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    profiles_file = config_path / "profiles.yaml"
+
+    data = _load_profiles_yaml(profiles_file)
+    profiles = data.get("profiles", {})
+
+    if name in profiles:
+        console.print(f"[red]✗[/] Profile '{name}' already exists")
+        console.print("Use [bold]victor profile edit[/] to modify it.")
+        return
+
+    profile_data: Dict[str, Any] = {"provider": provider, "model": model}
+    if temperature is not None:
+        profile_data["temperature"] = temperature
+    if max_tokens is not None:
+        profile_data["max_tokens"] = max_tokens
+    if description is not None:
+        profile_data["description"] = description
+
+    profiles[name] = profile_data
+    data["profiles"] = profiles
+    _save_profiles_yaml(profiles_file, data)
+
+    console.print(f"[green]✓[/] Created profile '{name}'")
+
+
+@profiles_app.command("edit")
+def profile_edit(
+    name: str = typer.Argument(..., help="Profile name to edit"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="LLM provider"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Model name"),
+    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+) -> None:
+    """Edit an existing custom profile."""
+    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    profiles_file = config_path / "profiles.yaml"
+
+    data = _load_profiles_yaml(profiles_file)
+    profiles = data.get("profiles", {})
+
+    if name not in profiles:
+        console.print(f"[red]✗[/] Profile '{name}' not found")
+        return
+
+    updates: Dict[str, Any] = {}
+    if provider is not None:
+        updates["provider"] = provider
+    if model is not None:
+        updates["model"] = model
+    if temperature is not None:
+        updates["temperature"] = temperature
+    if max_tokens is not None:
+        updates["max_tokens"] = max_tokens
+    if description is not None:
+        updates["description"] = description
+
+    if not updates:
+        console.print("[yellow]No changes specified[/]")
+        return
+
+    profiles[name].update(updates)
+    data["profiles"] = profiles
+    _save_profiles_yaml(profiles_file, data)
+
+    console.print(f"[green]✓[/] Updated profile '{name}'")
+
+
+@profiles_app.command("delete")
+def profile_delete(
+    name: str = typer.Argument(..., help="Profile name to delete"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+) -> None:
+    """Delete a custom profile."""
+    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    profiles_file = config_path / "profiles.yaml"
+
+    data = _load_profiles_yaml(profiles_file)
+    profiles = data.get("profiles", {})
+
+    if name not in profiles:
+        console.print(f"[red]✗[/] Profile '{name}' not found")
+        return
+
+    if not force:
+        confirm = typer.confirm(f"Delete profile '{name}'?")
+        if not confirm:
+            console.print("[yellow]Cancelled[/]")
+            return
+
+    del profiles[name]
+    data["profiles"] = profiles
+    _save_profiles_yaml(profiles_file, data)
+
+    console.print(f"[green]✓[/] Deleted profile '{name}'")
+
+
+@profiles_app.command("set-default")
+def profile_set_default(
+    name: str = typer.Argument(..., help="Profile name to set as default"),
+    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+) -> None:
+    """Set a profile as the default."""
+    config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
+    profiles_file = config_path / "profiles.yaml"
+
+    data = _load_profiles_yaml(profiles_file)
+    profiles = data.get("profiles", {})
+
+    if name not in profiles:
+        console.print(f"[red]✗[/] Profile '{name}' not found")
+        return
+
+    current_default = data.get("default_profile")
+    if current_default == name:
+        console.print(f"[yellow]'{name}' is already the default[/]")
+        return
+
+    data["default_profile"] = name
+    _save_profiles_yaml(profiles_file, data)
+
+    console.print(f"[green]✓[/] Set '{name}' as the default profile")
+
+
 # Add profiles_app to the main CLI
 # This is imported by cli.py

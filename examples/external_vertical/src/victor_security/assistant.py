@@ -30,6 +30,7 @@ class SecurityAssistant(VerticalBase):
     name = "security"
     description = "Security auditing, vulnerability analysis, and compliance review"
     version = "0.2.0"
+    VERTICAL_API_VERSION = 1
 
     @classmethod
     def get_name(cls) -> str:

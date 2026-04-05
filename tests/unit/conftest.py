@@ -127,3 +127,215 @@ def reset_service_container():
             reset_container()
         except ImportError:
             pass  # Module not loaded, nothing to reset
+
+
+@pytest.fixture(autouse=True)
+def reset_plugin_registry():
+    """Reset PluginRegistry between tests to prevent plugin state leakage.
+
+    The PluginRegistry is a singleton that caches discovered plugins.
+    Without reset, the first test triggering discovery pollutes the
+    registry for all subsequent tests in the same xdist worker.
+    """
+    yield
+    import sys
+
+    if "victor.core.plugins.registry" in sys.modules:
+        try:
+            from victor.core.plugins.registry import PluginRegistry
+
+            PluginRegistry._instance = None
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_feature_flags():
+    """Reset FeatureFlagManager singleton between tests."""
+    yield
+    import sys
+
+    if "victor.core.feature_flags" in sys.modules:
+        try:
+            from victor.core.feature_flags import get_feature_flag_manager
+
+            mgr = get_feature_flag_manager()
+            if hasattr(mgr, "_instance"):
+                type(mgr)._instance = None
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_extension_cache():
+    """Reset VerticalExtensionLoader caches between tests."""
+    yield
+    import sys
+
+    if "victor.core.verticals.extension_loader" in sys.modules:
+        try:
+            from victor.core.verticals.extension_loader import VerticalExtensionLoader
+
+            VerticalExtensionLoader._cache_manager.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_change_tracker():
+    """Reset FileChangeHistory singleton between tests."""
+    yield
+    import sys
+
+    if "victor.agent.change_tracker" in sys.modules:
+        try:
+            from victor.agent.change_tracker import reset_change_tracker
+
+            reset_change_tracker()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_mode_controller():
+    """Reset AgentModeController singleton between tests."""
+    yield
+    import sys
+
+    if "victor.agent.mode_controller" in sys.modules:
+        try:
+            from victor.agent.mode_controller import reset_mode_controller
+
+            reset_mode_controller()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_rl_coordinator():
+    """Reset RLCoordinator singleton between tests."""
+    yield
+    import sys
+
+    if "victor.framework.rl.coordinator" in sys.modules:
+        try:
+            from victor.framework.rl.coordinator import reset_rl_coordinator
+
+            reset_rl_coordinator()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_snapshot_store():
+    """Reset FileSnapshotStore singleton between tests."""
+    yield
+    import sys
+
+    if "victor.agent.snapshot_store" in sys.modules:
+        try:
+            from victor.agent.snapshot_store import reset_snapshot_store
+
+            reset_snapshot_store()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_tool_cache_manager():
+    """Reset ToolCacheManager singleton between tests."""
+    yield
+    import sys
+
+    if "victor.tools.cache_manager" in sys.modules:
+        try:
+            from victor.tools.cache_manager import reset_tool_cache_manager
+
+            reset_tool_cache_manager()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_tool_result_cache():
+    """Reset ToolResultCache singleton between tests."""
+    yield
+    import sys
+
+    if "victor.agent.tool_result_cache" in sys.modules:
+        try:
+            from victor.agent.tool_result_cache import reset_tool_cache
+
+            reset_tool_cache()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_task_analyzer():
+    """Reset TaskAnalyzer singleton between tests."""
+    yield
+    import sys
+
+    if "victor.agent.task_analyzer" in sys.modules:
+        try:
+            from victor.agent.task_analyzer import reset_task_analyzer
+
+            reset_task_analyzer()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_compiled_graph_cache():
+    """Reset CompiledGraphCache singleton between tests."""
+    yield
+    import sys
+
+    if "victor.framework.graph_cache" in sys.modules:
+        try:
+            from victor.framework.graph_cache import reset_compiled_graph_cache
+
+            reset_compiled_graph_cache()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_tool_metadata_registry():
+    """Reset ToolMetadataRegistry singleton between tests."""
+    yield
+    import sys
+
+    if "victor.tools.metadata_registry" in sys.modules:
+        try:
+            from victor.tools.metadata_registry import reset_global_registry
+
+            reset_global_registry()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def cleanup_dangling_asyncio_tasks():
+    """Cancel leftover asyncio tasks after each test to prevent xdist hangs.
+
+    Tests that create InMemoryEventBackend instances with connect() spawn
+    background dispatch tasks. If not properly disconnected, these tasks
+    keep the event loop alive, hanging xdist worker shutdown.
+    """
+    yield
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return  # Can't cancel tasks from inside a running loop
+        if loop.is_closed():
+            return
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            if not task.done():
+                task.cancel()
+    except RuntimeError:
+        pass  # No event loop

@@ -159,21 +159,32 @@ def bootstrap_new_services(
         )
         logger.info("Bootstrapped SessionService")
 
-    # Bootstrap LLMDecisionService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+    # Bootstrap LLMDecisionService — prefer edge model if available
+    decision_service = None
+
+    if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
+        decision_service = _create_edge_decision_service()
+        if decision_service is not None:
+            logger.info("Bootstrapped LLMDecisionService with edge model")
+
+    if decision_service is None and feature_flags.is_enabled(
+        FeatureFlag.USE_LLM_DECISION_SERVICE
+    ):
         decision_service = _create_llm_decision_service(container)
         if decision_service is not None:
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
+            logger.info("Bootstrapped LLMDecisionService with cloud provider")
 
-            services_created["llm_decision"] = decision_service
-            container.register(
-                LLMDecisionServiceProtocol,
-                lambda c: decision_service,
-                ServiceLifetime.SINGLETON,
-            )
-            logger.info("Bootstrapped LLMDecisionService")
+    if decision_service is not None:
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
+
+        services_created["llm_decision"] = decision_service
+        container.register(
+            LLMDecisionServiceProtocol,
+            lambda c: decision_service,
+            ServiceLifetime.SINGLETON,
+        )
 
     # Bootstrap ChatService if enabled (depends on other services)
     if feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
@@ -357,6 +368,22 @@ def _create_chat_service(
         conversation_controller=conversation_controller,
         streaming_coordinator=streaming_coordinator,
     )
+
+
+def _create_edge_decision_service() -> Optional[Any]:
+    """Create LLMDecisionService backed by a local edge model (Ollama).
+
+    Uses a small model (qwen2.5-coder:1.5b) for zero-cost micro-decisions.
+    Returns None if Ollama is unavailable.
+    """
+    try:
+        from victor.agent.edge_model import EdgeModelConfig, create_edge_decision_service
+
+        config = EdgeModelConfig()
+        return create_edge_decision_service(config)
+    except Exception as e:
+        logger.debug("Edge decision service unavailable: %s", e)
+        return None
 
 
 def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:

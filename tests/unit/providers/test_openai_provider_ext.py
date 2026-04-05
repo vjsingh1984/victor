@@ -36,7 +36,8 @@ def openai_provider():
         organization="test-org",
         base_url="https://api.openai.com/v1",
         timeout=30,
-        max_retries=2,
+        max_retries=0,
+        use_circuit_breaker=False,
     )
 
 

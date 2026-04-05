@@ -135,8 +135,10 @@ else:
     TeamCoordinatorProtocol = None  # type: ignore
     TeamMemberProtocol = None  # type: ignore
 
-# Coordinator
-from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+# Coordinator: lazy import to break circular dependency with
+# victor.coordination.formations.base → victor.teams.types
+# UnifiedTeamCoordinator is accessed via create_coordinator() or
+# direct import from victor.teams.unified_coordinator.
 
 # Framework coordinator (for testing/lightweight usage)
 # Note: Imported in create_coordinator() to avoid circular dependency
@@ -196,9 +198,14 @@ def create_coordinator(
     from victor.framework import AgentTeam
 
     if lightweight:
-        # For testing, use framework's AgentTeam (lightweight coordinator)
-        # This doesn't require an orchestrator
-        return AgentTeam()  # type: ignore
+        # For testing, use UnifiedTeamCoordinator in lightweight mode
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
+        return UnifiedTeamCoordinator(
+            orchestrator=None,
+            enable_observability=False,
+            enable_rl=False,
+        )
     else:
         # Production coordinator
         if orchestrator is None:
@@ -208,6 +215,8 @@ def create_coordinator(
             )
 
         # Create UnifiedTeamCoordinator with requested features
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
         return UnifiedTeamCoordinator(
             orchestrator=orchestrator,
             enable_observability=enable_observability,
@@ -222,6 +231,11 @@ def __getattr__(name: str) -> Any:
     It lazily imports the protocols from victor.protocols.team only when
     they are actually accessed, breaking the circular import cycle.
     """
+    if name == "UnifiedTeamCoordinator":
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
+        globals()["UnifiedTeamCoordinator"] = UnifiedTeamCoordinator
+        return UnifiedTeamCoordinator
     if name in {
         "IAgent",
         "IEnhancedTeamCoordinator",

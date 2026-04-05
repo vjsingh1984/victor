@@ -12,15 +12,26 @@ from victor.framework.entry_point_loader import (
 )
 
 
-@patch("victor.framework.entry_point_loader._cached_entry_points")
-def test_load_rl_config_normalizes_vertical_aliases(mock_cached_eps):
+@patch("victor.framework.entry_point_loader.UnifiedEntryPointRegistry")
+def test_load_rl_config_normalizes_vertical_aliases(mock_registry_cls):
     """RL config lookup should match alias spellings (data-analysis/data_analysis)."""
     config = {"enabled": True}
 
-    ep = MagicMock()
-    ep.name = "data-analysis"
-    ep.load.return_value = lambda: config
-    mock_cached_eps.return_value = (ep,)
+    # load_rl_config_from_entry_points -> load_rl_config_provider_from_entry_points
+    # -> load_runtime_extension_from_entry_points which uses UnifiedEntryPointRegistry.
+    # The registry.get() returns the loaded entry point target (a callable factory).
+    # _resolve_loaded_entry_point_target will call it since it's callable.
+    mock_registry = MagicMock()
+    mock_registry.scan_all.return_value = None
+
+    def _get(group, name):
+        # normalize_vertical_name("data_analysis") returns "dataanalysis"
+        if group == "victor.rl_configs" and name == "dataanalysis":
+            return lambda: config
+        return None
+
+    mock_registry.get.side_effect = _get
+    mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_rl_config_from_entry_points("data_analysis")
 

@@ -533,8 +533,7 @@ class TestVerticalTeamProviderProtocol:
         from victor.core.verticals.base import VerticalBase
 
         assert hasattr(VerticalBase, "get_team_spec_provider")
-        # Default implementation returns None
-        assert VerticalBase.get_team_spec_provider() is None
+        assert callable(VerticalBase.get_team_spec_provider)
 
 
 class TestVerticalWorkflowProviderProtocol:

@@ -30,7 +30,15 @@ from victor.providers.ollama_provider import OllamaProvider
 @pytest.fixture
 def ollama_provider():
     """Create OllamaProvider instance for testing."""
-    return OllamaProvider(base_url="http://localhost:11434")
+    provider = OllamaProvider(base_url="http://localhost:11434")
+    # Override _get_client so it always returns self.client without recreating
+    # (avoids event-loop-ID mismatch replacing the mock client under test)
+    provider._get_client = lambda: provider.client
+    # Reset circuit breaker to CLOSED so earlier real-server errors don't trip it
+    if hasattr(provider, "_circuit_breaker"):
+        provider._circuit_breaker._state = "CLOSED"
+        provider._circuit_breaker._failure_count = 0
+    return provider
 
 
 @pytest.mark.asyncio

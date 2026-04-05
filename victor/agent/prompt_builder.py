@@ -557,30 +557,87 @@ class SystemPromptBuilder:
             # Fall back to provider-specific prompt
             base_prompt = self._build_for_provider()
 
-        # Prepend concise mode guidance if enabled
-        if self.concise_mode:
+        # Determine which prompt sections to include.
+        # Edge model can select only task-relevant sections to save tokens.
+        sections_to_include = self._get_active_sections()
+
+        if "concise_mode" in sections_to_include and self.concise_mode:
             base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
 
-        # Append task-specific guidance if classification provided
-        task_guidance = self._get_task_guidance_section()
-        if task_guidance:
-            base_prompt = f"{base_prompt}\n\n{task_guidance}"
+        if "task_guidance" in sections_to_include:
+            task_guidance = self._get_task_guidance_section()
+            if task_guidance:
+                base_prompt = f"{base_prompt}\n\n{task_guidance}"
 
-        # Append tool constraint section
-        tool_constraint = self._get_tool_constraint_section()
-        if tool_constraint:
-            base_prompt = f"{base_prompt}\n\n{tool_constraint}"
+        if "tool_constraint" in sections_to_include:
+            tool_constraint = self._get_tool_constraint_section()
+            if tool_constraint:
+                base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
-        # Append completion guidance (always included for deterministic task completion)
-        base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
+        if "completion" in sections_to_include:
+            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
 
-        # Append provider-specific tool guidance if available (GAP-5)
-        tool_guidance = self.get_provider_tool_guidance()
-        if tool_guidance:
-            return f"{base_prompt}\n\n{tool_guidance}"
+        if "tool_guidance" in sections_to_include:
+            tool_guidance = self.get_provider_tool_guidance()
+            if tool_guidance:
+                base_prompt = f"{base_prompt}\n\n{tool_guidance}"
 
         return base_prompt
+
+    def _get_active_sections(self) -> set:
+        """Determine which prompt sections to include.
+
+        Uses edge model to select relevant sections when available,
+        reducing system prompt token count for focused tasks.
+        Falls back to all sections if edge model unavailable.
+        """
+        all_sections = {
+            "concise_mode",
+            "task_guidance",
+            "tool_constraint",
+            "completion",
+            "tool_guidance",
+        }
+
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return all_sections
+
+            from victor.agent.edge_model import select_prompt_sections_with_edge_model
+
+            # Use cached task type from classification if available
+            task_type = getattr(self, "_task_type", "action")
+            user_msg = getattr(self, "_user_message", "")
+
+            selected = select_prompt_sections_with_edge_model(
+                service=service,
+                user_message=user_msg[:200] if user_msg else "",
+                task_type=task_type,
+                available_sections=list(all_sections),
+            )
+
+            if selected:
+                # Always include completion guidance (required for detection)
+                result = set(selected) | {"completion"}
+                logger.debug(
+                    f"Edge prompt focus: {len(result)}/{len(all_sections)} sections"
+                )
+                return result
+
+        except Exception:
+            pass
+
+        return all_sections
 
     def _build_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.

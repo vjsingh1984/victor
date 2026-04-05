@@ -1156,6 +1156,12 @@ def get_rl_coordinator() -> RLCoordinator:
     return _rl_coordinator
 
 
+def reset_rl_coordinator() -> None:
+    """Reset the global RL coordinator singleton."""
+    global _rl_coordinator
+    _rl_coordinator = None
+
+
 async def get_rl_coordinator_async() -> RLCoordinator:
     """Get global RL coordinator with async-safe initialization.
 

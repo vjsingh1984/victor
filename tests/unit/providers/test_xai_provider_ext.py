@@ -35,7 +35,8 @@ def xai_provider():
         api_key="test-api-key",
         base_url="https://api.x.ai/v1",
         timeout=30,
-        max_retries=2,
+        max_retries=0,
+        use_circuit_breaker=False,
     )
 
 

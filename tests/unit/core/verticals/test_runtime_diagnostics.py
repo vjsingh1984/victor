@@ -14,7 +14,7 @@ def test_runtime_diagnostics_includes_all_telemetry_sections(monkeypatch) -> Non
         get_discovery_stats=lambda: {"vertical": {"calls": 1}},
     )
     monkeypatch.setattr(
-        "victor.core.verticals.runtime_diagnostics.get_tool_dependency_resolution_stats",
+        "victor.core.tool_dependency_loader.get_tool_dependency_resolution_stats",
         lambda: {"total_requests": 3},
     )
     monkeypatch.setattr(
@@ -40,7 +40,7 @@ def test_runtime_diagnostics_is_resilient_to_loader_failure(monkeypatch) -> None
             raise RuntimeError("loader unavailable")
 
     monkeypatch.setattr(
-        "victor.core.verticals.runtime_diagnostics.get_tool_dependency_resolution_stats",
+        "victor.core.tool_dependency_loader.get_tool_dependency_resolution_stats",
         lambda: {"total_requests": 1},
     )
     monkeypatch.setattr(
@@ -70,7 +70,7 @@ def test_runtime_diagnostics_is_resilient_to_component_stat_failures(monkeypatch
         raise RuntimeError("framework stats unavailable")
 
     monkeypatch.setattr(
-        "victor.core.verticals.runtime_diagnostics.get_tool_dependency_resolution_stats",
+        "victor.core.tool_dependency_loader.get_tool_dependency_resolution_stats",
         _fail_tool_stats,
     )
     monkeypatch.setattr(

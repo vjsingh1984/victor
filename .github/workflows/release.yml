@@ -73,9 +73,7 @@ jobs:
 
       - name: Run tests
         run: |
-          echo "Skipping tests for v0.6.0 release - will fix in follow-up PR"
-          # Tests temporarily disabled to unblock release
-          # pytest tests/unit -v --tb=short -n auto --dist loadscope
+          pytest tests/unit -v --tb=short -n auto --dist loadscope
 
       - name: Run linting
         run: |
@@ -150,8 +148,6 @@ jobs:
   build-native:
     name: Build Native (${{ matrix.os }})
     needs: test
-    # Temporarily disabled - victor-sdk 0.6.0 must be published first
-    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -215,8 +211,6 @@ jobs:
   build-binary:
     name: Build Binary (${{ matrix.os }})
     needs: test
-    # Temporarily disabled - victor-sdk 0.6.0 must be published first
-    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -278,8 +272,6 @@ jobs:
   build-docker:
     name: Build Docker Image
     needs: test
-    # Temporarily disabled - victor-sdk 0.6.0 must be published first
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -402,8 +394,6 @@ jobs:
   build-vscode:
     name: Build VS Code Extension
     needs: test
-    # Temporarily disabled - requires victor-sdk 0.6.0 on PyPI first
-    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -541,8 +531,6 @@ jobs:
   publish-docker:
     name: Publish Docker Image
     needs: [build-python, generate-checksums, create-release]
-    # Temporarily disabled - Docker image requires victor-sdk 0.6.0 on PyPI first
-    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -576,8 +564,6 @@ jobs:
   generate-sbom:
     name: Generate SBOM
     needs: [build-python]
-    # Temporarily disabled - requires victor-sdk 0.6.0 on PyPI first
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

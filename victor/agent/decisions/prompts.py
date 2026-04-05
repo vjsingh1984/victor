@@ -17,9 +17,12 @@ from victor.agent.decisions.schemas import (
     ErrorClassDecision,
     IntentDecision,
     LoopDetection,
+    PromptFocusDecision,
     QuestionTypeDecision,
+    StageDetectionDecision,
     TaskCompletionDecision,
     TaskTypeDecision,
+    ToolSelectionDecision,
 )
 
 
@@ -68,17 +71,22 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     ),
     DecisionType.TASK_TYPE_CLASSIFICATION: DecisionPrompt(
         system=(
-            "You are a task type classifier. " "Respond ONLY with a JSON object, no other text."
+            "You classify user requests for an AI coding assistant. "
+            "Respond ONLY with a JSON object, no other text."
         ),
         user_template=(
-            "Classify this task message:\n\n"
+            "Classify this user request:\n\n"
             "{message_excerpt}\n\n"
-            'Respond with JSON: {{"task_type": '
-            '"analysis"|"action"|"generation"|"search"|"edit", '
-            '"confidence": 0.0-1.0}}'
+            "Task types: analysis (review/investigate), action (fix/modify), "
+            "generation (create new), search (find/locate), edit (refactor/update)\n\n"
+            "Deliverables (pick all that apply): "
+            "file_modified, file_created, analysis_provided, "
+            "answer_provided, plan_provided, code_executed\n\n"
+            'Respond with JSON: {{"task_type": "...", "confidence": 0.0-1.0, '
+            '"deliverables": ["..."]}}'
         ),
         schema=TaskTypeDecision,
-        max_tokens=20,
+        max_tokens=50,
     ),
     DecisionType.QUESTION_CLASSIFICATION: DecisionPrompt(
         system=(
@@ -137,5 +145,40 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         ),
         schema=ContinuationDecision,
         max_tokens=40,
+    ),
+    DecisionType.TOOL_SELECTION: DecisionPrompt(
+        system="You select tools for a coding assistant. Respond ONLY with JSON.",
+        user_template=(
+            "Pick the most relevant tools for this request.\n\n"
+            "Request: {message_excerpt}\n"
+            "Stage: {stage}\n"
+            "Available: {available_tools}\n\n"
+            'JSON: {{"tools": ["tool1", "tool2", ...], "confidence": 0.0-1.0}}'
+        ),
+        schema=ToolSelectionDecision,
+        max_tokens=60,
+    ),
+    DecisionType.PROMPT_FOCUS: DecisionPrompt(
+        system="You optimize system prompts. Respond ONLY with JSON.",
+        user_template=(
+            "Select prompt sections needed for this task.\n\n"
+            "Task type: {task_type}\n"
+            "Request: {message_excerpt}\n"
+            "Available: {available_sections}\n\n"
+            'JSON: {{"sections": ["section1", ...], "confidence": 0.0-1.0}}'
+        ),
+        schema=PromptFocusDecision,
+        max_tokens=40,
+    ),
+    DecisionType.STAGE_DETECTION: DecisionPrompt(
+        system="You classify conversation stages. Respond ONLY with JSON.",
+        user_template=(
+            "What stage is this request in?\n\n"
+            "Request: {message_excerpt}\n\n"
+            "Stages: initial, planning, reading, analysis, execution, verification\n\n"
+            'JSON: {{"stage": "...", "confidence": 0.0-1.0}}'
+        ),
+        schema=StageDetectionDecision,
+        max_tokens=25,
     ),
 }

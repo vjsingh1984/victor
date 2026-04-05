@@ -52,19 +52,22 @@ install-dev:
 	pre-commit install || true
 
 test:
+	pytest tests/unit -v --tb=short -n 2 --dist loadscope
+
+test-parallel:
 	pytest tests/unit -v --tb=short -n auto --dist loadscope
 
 test-definition-boundaries:
 	pytest tests/unit/core/verticals/test_definition_import_boundaries.py -q
 
 test-all:
-	pytest -v --tb=short -n auto --dist loadscope
+	pytest -v --tb=short
 
 test-cov:
-	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing -n auto --dist loadscope
+	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
 
 test-quick:
-	pytest tests/unit -v --tb=short -m "not slow" -n auto --dist loadscope
+	pytest tests/unit -v --tb=short -m "not slow"
 
 test-split:
 	pytest tests/unit --splits=4 --group=1 -v --tb=short

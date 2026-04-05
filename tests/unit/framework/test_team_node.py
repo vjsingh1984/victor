@@ -260,51 +260,63 @@ class TestTeamNode:
             await asyncio.sleep(2)  # Longer than timeout
             return MagicMock()
 
-        with patch.object(
-            sample_team_node,
-            "_execute_team",
-            side_effect=timeout_execute,
+        with patch(
+            "victor.teams.create_coordinator",
+            return_value=MagicMock(),
         ):
-            # Set short timeout
-            sample_team_node.config.timeout_seconds = 0.1
+            with patch.object(
+                sample_team_node,
+                "_execute_team",
+                side_effect=timeout_execute,
+            ):
+                # Set short timeout
+                sample_team_node.config.timeout_seconds = 0.1
 
-            graph_state = {"user_task": "Test task"}
-            result = await sample_team_node.execute_async(None, graph_state)
+                graph_state = {"user_task": "Test task"}
+                result = await sample_team_node.execute_async(None, graph_state)
 
-            # Should have error but continue (continue_on_error=True)
-            assert "_error" in result
-            assert "_timeout" in result
-            assert "timed out" in result["_error"].lower()
+                # Should have error but continue (continue_on_error=True)
+                assert "_error" in result
+                assert "_timeout" in result
+                assert "timed out" in result["_error"].lower()
 
     @pytest.mark.asyncio
     async def test_execute_async_exception_continue(self, sample_team_node):
         """Test team execution with exception and continue_on_error."""
-        with patch.object(
-            sample_team_node,
-            "_execute_team",
-            side_effect=Exception("Team execution failed"),
+        with patch(
+            "victor.teams.create_coordinator",
+            return_value=MagicMock(),
         ):
-            sample_team_node.config.continue_on_error = True
-            graph_state = {"user_task": "Test task"}
-            result = await sample_team_node.execute_async(None, graph_state)
+            with patch.object(
+                sample_team_node,
+                "_execute_team",
+                side_effect=Exception("Team execution failed"),
+            ):
+                sample_team_node.config.continue_on_error = True
+                graph_state = {"user_task": "Test task"}
+                result = await sample_team_node.execute_async(None, graph_state)
 
-            # Should have error but continue
-            assert "_error" in result
-            assert "Team execution failed" in result["_error"]
+                # Should have error but continue
+                assert "_error" in result
+                assert "Team execution failed" in result["_error"]
 
     @pytest.mark.asyncio
     async def test_execute_async_exception_raise(self, sample_team_node):
         """Test team execution with exception and continue_on_error=False."""
-        with patch.object(
-            sample_team_node,
-            "_execute_team",
-            side_effect=Exception("Team execution failed"),
+        with patch(
+            "victor.teams.create_coordinator",
+            return_value=MagicMock(),
         ):
-            sample_team_node.config.continue_on_error = False
-            graph_state = {"user_task": "Test task"}
+            with patch.object(
+                sample_team_node,
+                "_execute_team",
+                side_effect=Exception("Team execution failed"),
+            ):
+                sample_team_node.config.continue_on_error = False
+                graph_state = {"user_task": "Test task"}
 
-            with pytest.raises(Exception, match="Team execution failed"):
-                await sample_team_node.execute_async(None, graph_state)
+                with pytest.raises(Exception, match="Team execution failed"):
+                    await sample_team_node.execute_async(None, graph_state)
 
     def test_merge_team_result_team_wins(self, sample_team_node):
         """Test merging team result with team_wins mode."""

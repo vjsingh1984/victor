@@ -69,6 +69,12 @@ class _FullPlugin:
     def on_deactivate(self):
         self.deactivated = True
 
+    async def on_activate_async(self):
+        self.activated = True
+
+    async def on_deactivate_async(self):
+        self.deactivated = True
+
     def health_check(self):
         return {"healthy": True, "detail": "ok"}
 
@@ -520,61 +526,6 @@ class TestEntryPointCacheWiring:
 
         mock_importlib.import_module.assert_called_once_with("my.module")
         assert result.name == "loaded"
-
-
-# ===========================================================================
-# P1-3: Lazy Extension Loading (Deprecation Warning Deferred)
-# ===========================================================================
-
-
-class TestLazyExtensionLoading:
-    """Verify contrib warnings fire during register(), not during import."""
-
-    def test_coding_plugin_no_warning_on_import(self):
-        """Importing CodingPlugin class should NOT trigger deprecation."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            from victor.verticals.contrib.coding import CodingPlugin
-
-            # Filter for our specific deprecation
-            depr = [
-                x
-                for x in w
-                if issubclass(x.category, DeprecationWarning)
-                and "victor.verticals.contrib.coding" in str(x.message)
-            ]
-            # The module import still triggers the old-style warning (git-tracked
-            # version has module-level imports), but the plugin-style __init__.py
-            # defers it to register(). Check that CodingPlugin is importable.
-            assert CodingPlugin is not None
-
-    def test_rag_plugin_no_warning_on_import(self):
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            from victor.verticals.contrib.rag import RAGPlugin
-
-            assert RAGPlugin is not None
-
-    def test_devops_plugin_no_warning_on_import(self):
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            from victor.verticals.contrib.devops import DevOpsPlugin
-
-            assert DevOpsPlugin is not None
-
-    def test_dataanalysis_plugin_no_warning_on_import(self):
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            from victor.verticals.contrib.dataanalysis import DataAnalysisPlugin
-
-            assert DataAnalysisPlugin is not None
-
-    def test_research_plugin_no_warning_on_import(self):
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            from victor.verticals.contrib.research import ResearchPlugin
-
-            assert ResearchPlugin is not None
 
 
 # ===========================================================================

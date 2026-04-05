@@ -1748,6 +1748,11 @@ class ToolSelector(ModeAwareMixin):
             tools = self._get_fallback_tools(user_message)
             is_fallback = True
 
+        # Edge model tool filter — runs BEFORE the cap so it can reduce
+        # 15+ tools down to 5-6 targeted tools, saving token broadcast cost.
+        if len(tools) > 8:
+            tools = self._apply_edge_model_filter(tools, user_message, stage)
+
         # Cap to fallback_max_tools to avoid broadcasting too many tools
         if len(tools) > self.fallback_max_tools:
             logger.debug(f"Capping tools from {len(tools)} to {self.fallback_max_tools}")
@@ -1905,6 +1910,60 @@ class ToolSelector(ModeAwareMixin):
         if _record:
             self._record_selection("keyword", len(selected_tools))
         return selected_tools
+
+    def _apply_edge_model_filter(
+        self,
+        tools: List["ToolDefinition"],
+        user_message: str,
+        stage: Optional["ConversationStage"],
+    ) -> List["ToolDefinition"]:
+        """Use edge model to rank and filter tools.
+
+        Reduces 15+ tools to the most relevant 5-6, saving ~3000 tokens
+        per cloud LLM request.
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return tools
+
+            from victor.agent.edge_model import select_tools_with_edge_model
+
+            tool_names = [t.name for t in tools]
+            stage_name = stage.value if stage else "initial"
+
+            selected_names = select_tools_with_edge_model(
+                service=service,
+                user_message=user_message,
+                available_tools=tool_names,
+                stage=stage_name,
+                recent_tools=None,  # Not tracking recent tools in filter
+                max_tools=6,
+            )
+
+            if selected_names:
+                # Always keep critical tools (read, ls, grep)
+                critical = self._get_core_tools_cached()
+                keep_names = set(selected_names) | critical
+                filtered = [t for t in tools if t.name in keep_names]
+                if len(filtered) >= 3:
+                    logger.info(
+                        f"Edge model filtered tools: {len(tools)} -> {len(filtered)}"
+                    )
+                    return filtered
+
+        except Exception as e:
+            logger.debug(f"Edge tool filter unavailable: {e}")
+
+        return tools
 
     def prioritize_by_stage(
         self,

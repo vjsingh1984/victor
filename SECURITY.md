@@ -88,12 +88,16 @@ If you prefer email, contact the maintainer directly at: `singhvjd@gmail.com`
 
 Current repository policy uses tiered enforcement:
 
+**Blocking today**
+
 - **Blocking (merge-gating)**:
   - Secret scanning via `gitleaks` — any verified secret hit fails CI
   - Trivy filesystem scan — `CRITICAL` findings only (`ignore-unfixed: true`)
   - Dependency audit via `pip-audit` — known vulnerabilities fail CI
   - Bandit SAST — `HIGH` severity + `HIGH` confidence findings fail CI
   - Standard CI/test/lint gates
+**Advisory today**
+
 - **Advisory (reported, not blocking)**:
   - Bandit full report — all severity levels captured as artifact
   - `semgrep` — repo-specific exclusions still being baselined

@@ -42,7 +42,7 @@ def test_external_vertical_example_metadata_matches_security_assistant(
 
     assert project["name"] == "victor-security"
     assert project["version"] == SecurityAssistant.version
-    assert "victor-sdk>=1.0.0" in project["dependencies"]
+    assert "victor-sdk>=0.6.0" in project["dependencies"]
     assert "victor-ai>=0.3.0" in project["optional-dependencies"]["runtime"]
     assert entry_points["security"] == "victor_security:SecurityAssistant"
 

@@ -47,6 +47,61 @@ class DeliverableType(Enum):
     ERROR_REPORTED = "error_reported"
 
 
+# ---------------------------------------------------------------------------
+# Deliverable inference helpers
+# ---------------------------------------------------------------------------
+
+# Map task_type → default deliverables when LLM omits them
+_TASK_TYPE_DELIVERABLE_MAP: Dict[str, List[DeliverableType]] = {
+    "action": [DeliverableType.FILE_MODIFIED],
+    "edit": [DeliverableType.FILE_MODIFIED],
+    "generation": [DeliverableType.FILE_CREATED],
+    "analysis": [DeliverableType.ANALYSIS_PROVIDED],
+    "search": [DeliverableType.ANSWER_PROVIDED],
+}
+
+# Map deliverable string → DeliverableType enum
+_DELIVERABLE_STRING_MAP: Dict[str, DeliverableType] = {
+    "file_created": DeliverableType.FILE_CREATED,
+    "file_modified": DeliverableType.FILE_MODIFIED,
+    "analysis_provided": DeliverableType.ANALYSIS_PROVIDED,
+    "answer_provided": DeliverableType.ANSWER_PROVIDED,
+    "plan_provided": DeliverableType.PLAN_PROVIDED,
+    "code_executed": DeliverableType.CODE_EXECUTED,
+}
+
+
+def _infer_deliverables_from_task_type(task_type: str) -> List[DeliverableType]:
+    """Infer expected deliverables from a task_type classification.
+
+    Used when the LLM returns a task_type but no explicit deliverables.
+
+    Args:
+        task_type: One of "action", "edit", "generation", "analysis", "search"
+
+    Returns:
+        List of inferred DeliverableType values
+    """
+    return list(_TASK_TYPE_DELIVERABLE_MAP.get(task_type, []))
+
+
+def _parse_deliverables(deliverable_strings: List[str]) -> List[DeliverableType]:
+    """Convert deliverable strings from LLM response to DeliverableType enums.
+
+    Args:
+        deliverable_strings: List of string deliverable names from LLM
+
+    Returns:
+        List of matching DeliverableType values (unrecognized strings are skipped)
+    """
+    result = []
+    for s in deliverable_strings:
+        dt = _DELIVERABLE_STRING_MAP.get(s)
+        if dt is not None:
+            result.append(dt)
+    return result
+
+
 class ResponsePhase(Enum):
     """Phases of agent response for completion detection."""
 
@@ -375,17 +430,68 @@ class TaskCompletionDetector:
     def analyze_intent(self, user_message: str) -> List[DeliverableType]:
         """Infer expected deliverables from user request.
 
+        Uses a priority chain:
+        1. LLM classification (via decision_service) — understands complex prompts
+        2. Regex keyword fallback — fast, no API cost
+
         Args:
             user_message: The user's request message
 
         Returns:
             List of expected deliverable types
         """
+        # Priority 1: LLM classification via decision service
+        if self._decision_service is not None:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                decision = self._decision_service.decide_sync(
+                    DecisionType.TASK_TYPE_CLASSIFICATION,
+                    context={"message_excerpt": user_message[:500]},
+                    heuristic_confidence=0.0,
+                )
+                if (
+                    decision.source == "llm"
+                    and decision.confidence >= 0.6
+                    and hasattr(decision.result, "deliverables")
+                ):
+                    deliverables = _parse_deliverables(decision.result.deliverables)
+                    # If LLM returned task_type but no deliverables, infer them
+                    if not deliverables and hasattr(decision.result, "task_type"):
+                        deliverables = _infer_deliverables_from_task_type(
+                            decision.result.task_type
+                        )
+                    if deliverables:
+                        self._state.expected_deliverables = list(deliverables)
+                        logger.info(
+                            f"LLM intent classification: task_type={decision.result.task_type}, "
+                            f"deliverables={self._state.expected_deliverables}, "
+                            f"confidence={decision.confidence:.2f}"
+                        )
+                        return self._state.expected_deliverables
+            except Exception as e:
+                logger.debug(f"LLM intent classification failed, using regex fallback: {e}")
+
+        # Priority 2: Regex keyword fallback
+        deliverables = self._regex_classify_intent(user_message)
+        self._state.expected_deliverables = list(deliverables)
+        logger.debug(f"Regex intent classification: {self._state.expected_deliverables}")
+        return self._state.expected_deliverables
+
+    def _regex_classify_intent(self, user_message: str) -> Set[DeliverableType]:
+        """Regex-based intent classification (fallback).
+
+        Args:
+            user_message: The user's request message
+
+        Returns:
+            Set of expected deliverable types
+        """
         message_lower = user_message.lower()
         deliverables: Set[DeliverableType] = set()
 
         # Check for file extension mentions (strong signal for file creation)
-        if re.search(r"\.\w{2,4}\b", user_message):  # .py, .js, .yaml, etc.
+        if re.search(r"\.\w{2,4}\b", user_message):
             deliverables.add(DeliverableType.FILE_CREATED)
 
         # Check for intent keywords
@@ -393,11 +499,7 @@ class TaskCompletionDetector:
             if keyword in message_lower:
                 deliverables.update(types)
 
-        # Store expected deliverables
-        self._state.expected_deliverables = list(deliverables)
-
-        logger.debug(f"Analyzed intent, expecting: {self._state.expected_deliverables}")
-        return self._state.expected_deliverables
+        return deliverables
 
     def record_tool_result(self, tool_name: str, result: Dict[str, Any]) -> None:
         """Record deliverables from tool execution.

@@ -311,30 +311,20 @@ class TestConfigRegistryIntegration:
             get_canonicalization_setting,
         )
 
-        # Import the verticals whose @register_vertical decorators ran at
-        # first import.  If an earlier test cleared the global registry the
-        # registrations are lost, so re-register from the attached manifest.
-        from victor.verticals.contrib.coding.assistant import CodingAssistant
-        from victor.verticals.contrib.devops.assistant import DevOpsAssistant
-        from victor.verticals.contrib.research.assistant import ResearchAssistant
+        # Register synthetic verticals with different configurations
+        config_a = VerticalBehaviorConfig(
+            canonicalize_tool_names=True,
+            tool_dependency_strategy="auto",
+        )
+        config_b = VerticalBehaviorConfig(
+            canonicalize_tool_names=False,
+            tool_dependency_strategy="entry_point",
+        )
+        VerticalBehaviorConfigRegistry.register("vertical_a", config_a)
+        VerticalBehaviorConfigRegistry.register("vertical_b", config_b)
 
-        for vertical_cls in (CodingAssistant, DevOpsAssistant, ResearchAssistant):
-            manifest = getattr(vertical_cls, "_victor_manifest", None)
-            if manifest is not None and not VerticalBehaviorConfigRegistry.has_config(
-                manifest.name
-            ):
-                config = VerticalBehaviorConfigRegistry.from_manifest(manifest)
-                VerticalBehaviorConfigRegistry.register(manifest.name, config)
-
-        # The migrated verticals should have their configs registered
-        coding_canonicalize = get_canonicalization_setting("coding")
-        devops_canonicalize = get_canonicalization_setting("devops")
-        research_canonicalize = get_canonicalization_setting("research")
-
-        # Verify the expected values
-        assert coding_canonicalize is True  # Set in decorator
-        assert devops_canonicalize is False  # Set in decorator
-        assert research_canonicalize is False  # Set in decorator
+        assert get_canonicalization_setting("vertical_a") is True
+        assert get_canonicalization_setting("vertical_b") is False
 
 
 class TestConfigRegistryCleanup:

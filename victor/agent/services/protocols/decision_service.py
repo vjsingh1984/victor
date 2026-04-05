@@ -93,6 +93,30 @@ class LLMDecisionServiceProtocol(Protocol):
         """
         ...
 
+    async def decide_async(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Async alias for decide() — use from async context.
+
+        Avoids the thread-spawning overhead of decide_sync().
+        Delegates directly to decide().
+
+        Args:
+            decision_type: Type of decision to make.
+            context: Context dict with template placeholders.
+            heuristic_result: Pre-computed heuristic result.
+            heuristic_confidence: Confidence of the heuristic result.
+
+        Returns:
+            DecisionResult with the decision and metadata.
+        """
+        ...
+
     def decide_sync(
         self,
         decision_type: DecisionType,

@@ -109,6 +109,9 @@ class FeatureFlag(Enum):
     # Phase 7 - LLM Decision Service
     USE_LLM_DECISION_SERVICE = "use_llm_decision_service"
 
+    # Phase 8 - Edge Model for micro-decisions
+    USE_EDGE_MODEL = "use_edge_model"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

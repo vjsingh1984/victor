@@ -596,13 +596,10 @@ class TestListVerticalsFunction:
         names = list_verticals()
         assert "test_vertical" in names
 
-    @pytest.mark.skip(
-        reason="Requires external vertical packages (victor_coding) - pending migration"
-    )
     def test_list_verticals_includes_builtins(self):
         """Test that list_verticals includes built-in verticals."""
         names = list_verticals()
-        # Built-in verticals registered in victor/verticals/__init__.py
+        # Contrib verticals are registered via victor.plugins entry points
         assert "coding" in names
 
 

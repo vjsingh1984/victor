@@ -96,6 +96,9 @@ from victor_sdk.verticals.protocols.promoted_types import (
     ToolSelectionResult,
 )
 
+# Conversation management protocol
+from victor_sdk.verticals.protocols.conversation import ConversationManagerProtocol
+
 # Extended vertical protocols: MCP, sandbox, hooks, permissions, compaction, plugins
 from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
 from victor_sdk.verticals.protocols.sandbox import SandboxProvider
@@ -161,6 +164,8 @@ __all__ = [
     "ModeConfig",
     "ToolSelectionContext",
     "ToolSelectionResult",
+    # Conversation management
+    "ConversationManagerProtocol",
     # Extended vertical protocols
     "McpProvider",
     "McpToolProvider",

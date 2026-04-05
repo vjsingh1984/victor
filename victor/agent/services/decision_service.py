@@ -217,25 +217,52 @@ class LLMDecisionService:
                 confidence=heuristic_confidence,
             )
 
+        # Use run_sync_in_thread to handle both cases:
+        # 1. No running loop — runs in a thread with its own loop
+        # 2. Inside async context — also runs in a thread (avoids blocking)
+        # This ensures the edge model's Ollama provider gets a fresh event loop
+        # each time, avoiding the "Event loop is closed" httpx bug.
         try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return run_sync(
+            from victor.core.async_utils import run_sync_in_thread
+
+            return run_sync_in_thread(
                 self.decide(
                     decision_type,
                     context,
                     heuristic_result=heuristic_result,
                     heuristic_confidence=heuristic_confidence,
-                )
+                ),
+                timeout=self._config.timeout_ms / 1000.0,
             )
-
-        # Can't block a running loop; return heuristic fallback
-        self._metrics.total_calls += 1
-        return DecisionResult(
-            decision_type=decision_type,
-            result=heuristic_result,
-            source="heuristic",
+        except (TimeoutError, Exception) as e:
+            logger.debug("decide_sync thread execution failed: %s", e)
+            self._metrics.total_calls += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="heuristic",
             confidence=heuristic_confidence,
+        )
+
+    async def decide_async(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Async version of decide() — explicit alias for async callers.
+
+        Use this from async context to avoid the thread-spawning overhead
+        of decide_sync(). Delegates directly to decide() without wrapping
+        in a thread.
+        """
+        return await self.decide(
+            decision_type,
+            context,
+            heuristic_result=heuristic_result,
+            heuristic_confidence=heuristic_confidence,
         )
 
     @property

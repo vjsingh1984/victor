@@ -283,15 +283,28 @@ class TestBootstrapServices:
             tool_service = container.get(ToolServiceProtocol)
             assert tool_service is not None
 
-    @pytest.mark.skip(
-        reason="ImportError testing requires module reload which interferes with other tests"
-    )
     def test_bootstrap_returns_early_without_feature_flags_module(self):
         """Test that bootstrap returns early when feature flags module is not available."""
-        # This test is skipped because it requires modifying sys.modules
-        # which can interfere with other tests in the suite
-        # The behavior is tested implicitly by other tests
-        pass
+        import builtins
+
+        container = ServiceContainer()
+        conversation_controller = MagicMock()
+        streaming_coordinator = MagicMock()
+
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "victor.core.feature_flags":
+                raise ImportError("feature flags not available")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            # Should handle ImportError gracefully and return early
+            bootstrap_new_services(
+                container,
+                conversation_controller,
+                streaming_coordinator,
+            )
 
     def test_chat_service_receives_dependencies(self):
         """Test that ChatService receives its dependencies correctly."""

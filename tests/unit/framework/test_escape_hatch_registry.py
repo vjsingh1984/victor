@@ -429,12 +429,11 @@ class TestEscapeHatchRegistry:
 
     # --- Discover Tests ---
 
-    @pytest.mark.skip(reason="Requires victor_coding external package - pending migration")
     def test_discover_from_vertical_imports_and_registers(self):
         """Test discover_from_vertical imports and registers escape hatches."""
         registry = EscapeHatchRegistry()
 
-        # Use coding vertical which we know exists
+        # Use coding vertical which is bundled in contrib
         cond_count, trans_count = registry.discover_from_vertical("coding")
 
         # coding/escape_hatches.py has conditions and transforms

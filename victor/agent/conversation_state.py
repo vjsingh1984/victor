@@ -421,7 +421,9 @@ class ConversationStateMachine:
         }
 
     def _detect_stage_from_content(self, content: str) -> Optional[ConversationStage]:
-        """Detect stage from message content using keyword matching.
+        """Detect stage from message content.
+
+        Uses keyword matching first, then edge model for ambiguous cases.
 
         Args:
             content: Message content to analyze
@@ -440,12 +442,83 @@ class ConversationStateMachine:
                 scores[stage] = score
 
         if scores:
-            # Return stage with highest score
             best_stage = max(scores, key=scores.get)  # type: ignore
-            if scores[best_stage] >= 2:  # Require at least 2 keyword matches
+            if scores[best_stage] >= 2:  # High confidence — use keyword result
                 return best_stage
 
+        # Low confidence or no keyword match — try edge model
+        edge_stage = self._detect_stage_with_edge_model(content)
+        if edge_stage is not None:
+            return edge_stage
+
+        # Fall through to best keyword match even with score < 2
+        if scores:
+            return max(scores, key=scores.get)  # type: ignore
+
         return None
+
+    def _detect_stage_with_edge_model(self, content: str) -> Optional[ConversationStage]:
+        """Use edge model for stage detection when keywords are ambiguous.
+
+        Args:
+            content: Message content to analyze
+
+        Returns:
+            Detected ConversationStage or None
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return None
+
+            from victor.agent.decisions.schemas import DecisionType
+
+            decision = service.decide_sync(
+                DecisionType.STAGE_DETECTION,
+                context={"message_excerpt": content[:200]},
+                heuristic_confidence=0.0,
+            )
+
+            if decision.source in ("heuristic", "budget_exhausted", "timeout_fallback"):
+                return None
+
+            if not hasattr(decision.result, "stage"):
+                return None
+
+            stage_name = decision.result.stage
+            confidence = decision.confidence
+
+            if confidence < 0.6:
+                return None
+
+            # Map string to ConversationStage enum
+            stage_map = {
+                "initial": ConversationStage.INITIAL,
+                "planning": ConversationStage.PLANNING,
+                "reading": ConversationStage.READING,
+                "analysis": ConversationStage.ANALYSIS,
+                "execution": ConversationStage.EXECUTION,
+                "verification": ConversationStage.VERIFICATION,
+                "completion": ConversationStage.COMPLETION,
+            }
+            result = stage_map.get(stage_name)
+            if result:
+                logger.info(
+                    f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
+                )
+            return result
+
+        except Exception as e:
+            logger.debug(f"Edge stage detection unavailable: {e}")
+            return None
 
     def _detect_stage_from_tools(self) -> Optional[ConversationStage]:
         """Detect stage from recent tool execution patterns.

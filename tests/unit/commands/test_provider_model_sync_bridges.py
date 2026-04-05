@@ -447,6 +447,7 @@ class TestBenchmarkSyncBridge:
                 max_turns=4,
                 parallel=1,
                 resume=False,
+                provider=None,
                 log_level=None,
             )
 
@@ -456,7 +457,9 @@ class TestBenchmarkSyncBridge:
             profile="default",
             model="model-x",
             timeout=30,
+            max_turns=4,
             resume=False,
+            provider_override=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 

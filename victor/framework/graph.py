@@ -226,20 +226,24 @@ class CopyOnWriteState(Generic[StateType]):
             The mutable copy of the state
 
         Raises:
-            RuntimeError: In debug mode, if accessed from a different thread
-                or asyncio task than the one that created this wrapper.
+            RuntimeError: If accessed from a different thread than the one
+                that created this wrapper. In debug mode, also checks
+                asyncio task identity.
         """
-        import asyncio
         import threading
 
+        # Thread check is always-on (O(1) integer comparison)
         current = threading.current_thread().ident or 0
-        if current != self._owner_thread and __debug__:
+        if current != self._owner_thread:
             raise RuntimeError(
                 f"CopyOnWriteState thread violation: created on thread "
                 f"{self._owner_thread}, mutated from thread {current}. "
                 f"Each thread must use its own CopyOnWriteState wrapper."
             )
+        # Asyncio task check is debug-only (heavier, needs try/except)
         if self._owner_task is not None and __debug__:
+            import asyncio
+
             try:
                 current_task_id = id(asyncio.current_task())
             except RuntimeError:

@@ -14,6 +14,7 @@
 
 """Ollama provider implementation for local model inference."""
 
+import asyncio
 import json
 import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
@@ -106,10 +107,34 @@ class OllamaProvider(BaseProvider):
         self._raw_base_urls = base_url
         self._models_without_tools: set = set()  # Cache models that don't support tools
         self._context_window_cache: Dict[str, int] = {}  # Cache model context windows
-        self.client = httpx.AsyncClient(
-            base_url=chosen_base,
-            timeout=httpx.Timeout(timeout),
+        self._base_url_for_client = chosen_base
+        self._timeout_for_client = timeout
+        self._client_loop_id: int | None = None
+        self.client = self._make_client()
+
+    def _make_client(self) -> httpx.AsyncClient:
+        """Create a fresh httpx AsyncClient."""
+        return httpx.AsyncClient(
+            base_url=self._base_url_for_client,
+            timeout=httpx.Timeout(self._timeout_for_client),
         )
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Get httpx client, recreating if the event loop has changed.
+
+        Handles run_sync_in_thread creating new event loops — the old client's
+        connection pool references the dead loop and must be replaced.
+        """
+        try:
+            loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:
+            return self.client
+
+        if self._client_loop_id != loop_id:
+            self.client = self._make_client()
+            self._client_loop_id = loop_id
+
+        return self.client
 
     @classmethod
     async def create(
@@ -168,7 +193,7 @@ class OllamaProvider(BaseProvider):
         raw_response: Optional[Dict[str, Any]] = None
 
         try:
-            resp = await self.client.post("/api/show", json={"name": model})
+            resp = await self._get_client().post("/api/show", json={"name": model})
             resp.raise_for_status()
             raw_response = resp.json()
 
@@ -399,7 +424,7 @@ class OllamaProvider(BaseProvider):
 
                 # Make API call with circuit breaker protection
                 response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/api/chat", json=payload
+                    self._get_client().post, "/api/chat", json=payload
                 )
                 response.raise_for_status()
 
@@ -441,7 +466,7 @@ class OllamaProvider(BaseProvider):
                                 **kwargs,
                             )
                             response = await self._execute_with_circuit_breaker(
-                                self.client.post, "/api/chat", json=payload
+                                self._get_client().post, "/api/chat", json=payload
                             )
                             response.raise_for_status()
                             result = response.json()
@@ -578,7 +603,7 @@ class OllamaProvider(BaseProvider):
             endpoint_url = f"{self.base_url}/api/chat"
             self._provider_logger.logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
 
-            async with self.client.stream("POST", "/api/chat", json=payload) as response:
+            async with self._get_client().stream("POST", "/api/chat", json=payload) as response:
                 # Check for HTTP 400 "does not support tools" error
                 if response.status_code == 400 and tools and retry_without_tools:
                     error_body = await response.aread()
@@ -712,7 +737,13 @@ class OllamaProvider(BaseProvider):
         """
         payload: Dict[str, Any] = {
             "model": model,
-            "messages": [{"role": msg.role, "content": msg.content} for msg in messages],
+            "messages": [
+                {
+                    "role": msg["role"] if isinstance(msg, dict) else msg.role,
+                    "content": msg["content"] if isinstance(msg, dict) else msg.content,
+                }
+                for msg in messages
+            ],
             "stream": stream,
             "options": {
                 "temperature": temperature,
@@ -915,7 +946,7 @@ class OllamaProvider(BaseProvider):
             ProviderError: If request fails
         """
         try:
-            response = await self.client.get("/api/tags")
+            response = await self._get_client().get("/api/tags")
             response.raise_for_status()
             result = response.json()
             return result.get("models", [])
@@ -941,7 +972,7 @@ class OllamaProvider(BaseProvider):
         try:
             payload = {"name": model, "stream": True}
 
-            async with self.client.stream("POST", "/api/pull", json=payload) as response:
+            async with self._get_client().stream("POST", "/api/pull", json=payload) as response:
                 response.raise_for_status()
 
                 async for line in response.aiter_lines():

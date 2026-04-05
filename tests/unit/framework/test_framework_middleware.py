@@ -871,7 +871,10 @@ class TestMiddlewareIntegration:
     @pytest.mark.integration
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
-        DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
+        try:
+            DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
+        except ImportError:
+            pytest.skip("DevOps vertical not installed (contrib removed, external package required)")
 
         middleware_list = DevOpsAssistant.get_middleware()
 

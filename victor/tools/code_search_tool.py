@@ -476,7 +476,11 @@ async def _literal_search(
     k: int = 5,
     exts: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Internal literal/keyword search implementation.
+    """Literal/keyword search using ripgrep (rg) or grep subprocess.
+
+    Uses native search tools instead of Python file-by-file scanning for
+    speed and correctness — no file count limits, handles binary detection,
+    and searches the full directory tree efficiently.
 
     Args:
         query: Search terms
@@ -484,22 +488,80 @@ async def _literal_search(
         k: Max results
         exts: File extensions ([".py", ".js"])
     """
-    try:
-        files = _gather_files(path, exts, 200)
-        scores: List[Dict[str, Any]] = []
-        for file_path in files:
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read(50000)
-                score = _keyword_score(text, query)
-                if score > 0:
-                    scores.append({"path": file_path, "score": score, "snippet": text[:800]})
-            except Exception:
-                continue
+    import shutil
+    import subprocess
 
-        scores.sort(key=lambda x: x["score"], reverse=True)
-        top = scores[: max(1, min(k, len(scores)))]
-        return {"success": True, "results": top, "count": len(top), "mode": "literal"}
+    try:
+        # Resolve '.' to the framework's project root
+        search_path = path
+        if search_path == ".":
+            try:
+                from victor.config.settings import get_project_paths
+
+                search_path = str(get_project_paths().project_root)
+            except Exception:
+                pass
+
+        logger.info(
+            f"Literal search: query={query!r}, path={path!r}, "
+            f"resolved={search_path!r}, exts={exts}"
+        )
+
+        # Build command: prefer ripgrep, fall back to grep
+        use_rg = shutil.which("rg") is not None
+        if use_rg:
+            cmd = [
+                "rg", "--no-heading", "--line-number", "--color=never",
+                "--max-count=5",  # max matches per file
+                "--max-columns=200",
+            ]
+            if exts:
+                for ext in exts:
+                    cmd.extend(["--glob", f"*{ext}"])
+            else:
+                # Default: code files only
+                cmd.extend(["--type=py", "--type=js", "--type=ts",
+                            "--type=go", "--type=java", "--type=c", "--type=cpp",
+                            "--type=rust", "--type=yaml"])
+            cmd.extend(["--", query, search_path])
+        else:
+            cmd = ["grep", "-rn", "--include=*.py", "--", query, search_path]
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30,
+        )
+
+        # Parse results: group by file, take top k files
+        file_matches: Dict[str, List[str]] = {}
+        for line in result.stdout.splitlines():
+            # Format: path:line_number:content
+            parts = line.split(":", 2)
+            if len(parts) >= 3:
+                fpath = parts[0]
+                if fpath not in file_matches:
+                    file_matches[fpath] = []
+                file_matches[fpath].append(line)
+
+        # Sort by number of matches (most matches = most relevant)
+        ranked = sorted(file_matches.items(), key=lambda x: len(x[1]), reverse=True)
+        top = ranked[:k]
+
+        results = []
+        for fpath, matches in top:
+            snippet = "\n".join(matches[:5])  # first 5 matching lines
+            results.append({
+                "path": fpath,
+                "score": len(matches),
+                "snippet": snippet,
+            })
+
+        logger.info(
+            f"Literal search: found {len(file_matches)} files matching "
+            f"{query!r} in {search_path} ({'rg' if use_rg else 'grep'})"
+        )
+        return {"success": True, "results": results, "count": len(results), "mode": "literal"}
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Search timed out after 30s"}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 

@@ -478,151 +478,73 @@ class TestVerticalSafetyIntegration:
     # - victor-dataanalysis: tests/test_safety.py (PII, export rules)
     # - victor-coding: tests/safety/test_safety_integration.py (all coding rules)
 
-    @pytest.mark.skip(
-        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
-    )
     def test_benchmark_safety_repository_rules(self):
-        """Benchmark repository safety rules should block operations outside workspace."""
-        from victor.benchmark.safety import create_benchmark_repository_safety_rules
+        """BenchmarkSafetyExtension should block operations on production paths."""
+        from victor.benchmark.safety import BenchmarkSafetyExtension
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_benchmark_repository_safety_rules(
-            enforcer,
-            block_outside_workspace=True,
-            protected_repositories=["/production", "release"],  # Use simpler paths
-            block_git_operations_outside_workspace=True,
-        )
+        ext = BenchmarkSafetyExtension()
 
-        # Test blocking operations on protected repositories
-        allowed, reason = enforcer.check_operation("write file to /production directory")
-        assert allowed is False
-        assert (
-            "workspace" in reason.lower()
-            or "protected" in reason.lower()
-            or "blocked" in reason.lower()
-        )
+        # Test blocking operations on production paths (benchmark_production_modify rule)
+        is_safe = ext.check_operation("shell", ["/production/deploy"])
+        assert not is_safe
 
-        # Test blocking git operations on protected repositories
-        allowed, reason = enforcer.check_operation("git push to release branch")
-        assert allowed is False
-        assert "git" in reason.lower() or "blocked" in reason.lower()
+        # Test blocking git force push (benchmark_git_force_push rule, tool_names=["git"])
+        is_safe = ext.check_operation("git", ["push", "--force", "origin", "main"])
+        assert not is_safe
 
-    @pytest.mark.skip(
-        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
-    )
     def test_benchmark_safety_resource_rules(self):
-        """Benchmark resource safety rules should block excessive resource usage."""
-        from victor.benchmark.safety import create_benchmark_resource_safety_rules
+        """BenchmarkSafetyExtension should block dangerous system commands."""
+        from victor.benchmark.safety import BenchmarkSafetyExtension
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_benchmark_resource_safety_rules(
-            enforcer,
-            block_excessive_timeouts=True,
-            max_timeout_seconds=600,
-            block_unlimited_budgets=True,
-        )
+        ext = BenchmarkSafetyExtension()
 
-        # Test unlimited budget blocking
-        allowed, reason = enforcer.check_operation("tool_budget=-1 unlimited budget")
-        assert allowed is False
-        assert "budget" in reason.lower() or "blocked" in reason.lower()
+        # Test blocking dangerous commands (benchmark_dangerous_commands rule)
+        is_safe = ext.check_operation("shell", ["rm -rf /"])
+        assert not is_safe
 
-    @pytest.mark.skip(
-        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
-    )
+        # Test blocking format commands
+        is_safe = ext.check_operation("execute_bash", ["format C:"])
+        assert not is_safe
+
     def test_benchmark_safety_test_rules(self):
-        """Benchmark test safety rules should block production test runs."""
-        from victor.benchmark.safety import create_benchmark_test_safety_rules
+        """BenchmarkSafetyExtension should block production modifications."""
+        from victor.benchmark.safety import BenchmarkSafetyExtension
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_benchmark_test_safety_rules(
-            enforcer,
-            block_production_test_runs=True,
-            block_destructive_tests=True,
-            protected_environments=["production", "staging", "prod"],
-        )
+        ext = BenchmarkSafetyExtension()
 
-        # Test blocking tests on production environments
-        allowed, reason = enforcer.check_operation("run tests on production environment")
-        assert allowed is False
-        assert (
-            "production" in reason.lower()
-            or "test" in reason.lower()
-            or "blocked" in reason.lower()
-        )
+        # Test blocking production path operations
+        is_safe = ext.check_operation("shell", ["deploy to /prod/server"])
+        assert not is_safe
 
-        # Test blocking destructive tests
-        allowed, reason = enforcer.check_operation("drop table test")
-        assert allowed is False
-        assert "destructive" in reason.lower() or "blocked" in reason.lower()
+        # Test blocking release branch operations
+        is_safe = ext.check_operation("shell", ["push to release"])
+        assert not is_safe
 
-    @pytest.mark.skip(
-        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
-    )
     def test_benchmark_safety_data_rules(self):
-        """Benchmark data safety rules should block external data uploads."""
-        from victor.benchmark.safety import create_benchmark_data_safety_rules
+        """BenchmarkSafetyExtension should block database/data file deletion."""
+        from victor.benchmark.safety import BenchmarkSafetyExtension
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_benchmark_data_safety_rules(
-            enforcer,
-            block_external_uploads=True,
-            block_task_data_leaks=True,
-            block_solution_sharing=True,
-        )
+        ext = BenchmarkSafetyExtension()
 
-        # Test blocking external uploads
-        allowed, reason = enforcer.check_operation("upload benchmark data to s3")
-        assert allowed is False
-        assert (
-            "external" in reason.lower()
-            or "upload" in reason.lower()
-            or "blocked" in reason.lower()
-        )
+        # Test blocking database file deletion (benchmark_file_deletion rule)
+        is_safe = ext.check_operation("file_delete", ["benchmark.db"])
+        assert not is_safe
 
-        # Test blocking task data leaks
-        allowed, reason = enforcer.check_operation("export benchmark task description")
-        assert allowed is False
-        assert "task" in reason.lower() or "leak" in reason.lower() or "blocked" in reason.lower()
+        # Test blocking data file deletion
+        is_safe = ext.check_operation("file_delete", ["important_database"])
+        assert not is_safe
 
-        # Test blocking solution sharing
-        allowed, reason = enforcer.check_operation("share humaneval solution on api")
-        assert allowed is False
-        assert (
-            "solution" in reason.lower()
-            or "benchmark" in reason.lower()
-            or "blocked" in reason.lower()
-        )
+    def test_benchmark_safety_extension_has_rules(self):
+        """BenchmarkSafetyExtension should register safety rules on creation."""
+        from victor.benchmark.safety import BenchmarkSafetyExtension
 
-    @pytest.mark.skip(
-        reason="Pending migration: create_benchmark_*_safety_rules functions removed in favor of BenchmarkSafetyExtension class"
-    )
-    def test_create_all_benchmark_safety_rules(self):
-        """create_all_benchmark_safety_rules should register all benchmark rules."""
-        from victor.benchmark.safety import create_all_benchmark_safety_rules
+        ext = BenchmarkSafetyExtension()
 
-        enforcer = SafetyEnforcer(config=SafetyConfig(level=SafetyLevel.HIGH))
-        create_all_benchmark_safety_rules(
-            enforcer,
-            protected_repositories=["/production"],
-            max_timeout_seconds=300,
-        )
+        # Should have rules registered
+        coordinator = ext.get_coordinator()
+        rules = coordinator.list_rules()
+        assert len(rules) > 0
 
-        # Should have rules from all categories
-        assert len(enforcer.rules) > 0
-
-        # Verify repository protection
-        allowed, _ = enforcer.check_operation("write file to /production")
-        assert allowed is False
-
-        # Verify unlimited budget blocking
-        allowed, _ = enforcer.check_operation("tool_budget=-1")
-        assert allowed is False
-
-        # Verify production test blocking
-        allowed, _ = enforcer.check_operation("run tests on production")
-        assert allowed is False
-
-        # Verify external upload blocking
-        allowed, _ = enforcer.check_operation("upload to s3")
-        assert allowed is False
+        # Should have stats tracking
+        stats = ext.get_safety_stats()
+        assert isinstance(stats, dict)

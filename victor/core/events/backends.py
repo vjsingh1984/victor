@@ -355,6 +355,11 @@ class InMemoryEventBackend:
         self._exact_topic_index: Dict[str, List[str]] = {}
         self._wildcard_subscriptions: List[str] = []
         self._compiled_patterns: Dict[str, Callable[[str], bool]] = {}
+        # Cache: topic -> list of matching wildcard subscription IDs.
+        # Invalidated on subscribe/unsubscribe to keep consistent.
+        self._wildcard_match_cache: Dict[str, List[str]] = {}
+        # Cache: topic -> (policy, timeout_ms) for overflow policy resolution.
+        self._overflow_policy_cache: Dict[str, tuple[str, float]] = {}
         self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(
             maxsize=self._queue_maxsize
         )
@@ -385,11 +390,20 @@ class InMemoryEventBackend:
         """Check if backend is connected and ready."""
         return self._is_connected
 
+    def _invalidate_dispatch_caches(self) -> None:
+        """Invalidate wildcard match and overflow policy caches.
+
+        Called when subscriptions change to ensure cache consistency.
+        """
+        self._wildcard_match_cache.clear()
+        self._overflow_policy_cache.clear()
+
     def _index_subscription(self, subscription: "_Subscription") -> None:
         """Add subscription to the appropriate index."""
         if "*" in subscription.pattern:
             self._wildcard_subscriptions.append(subscription.id)
             self._compiled_patterns[subscription.id] = self._compile_pattern(subscription.pattern)
+            self._invalidate_dispatch_caches()
         else:
             # Exact topic match - O(1) lookup
             if subscription.pattern not in self._exact_topic_index:
@@ -403,6 +417,7 @@ class InMemoryEventBackend:
             if sid in self._wildcard_subscriptions:
                 self._wildcard_subscriptions.remove(sid)
             self._compiled_patterns.pop(sid, None)
+            self._invalidate_dispatch_caches()
         else:
             subs = self._exact_topic_index.get(subscription.pattern, [])
             if sid in subs:
@@ -520,15 +535,26 @@ class InMemoryEventBackend:
             logger.debug("Durable sink write failed: %s", e)
 
     def _resolve_overflow_policy_for_topic(self, topic: str) -> tuple[str, float]:
-        """Resolve effective overflow policy + timeout for a topic."""
+        """Resolve effective overflow policy + timeout for a topic.
+
+        Results are cached per topic and invalidated when subscriptions change.
+        """
+        cached = self._overflow_policy_cache.get(topic)
+        if cached is not None:
+            return cached
+
         for pattern, policy in self._queue_overflow_topic_policy_items:
             if fnmatchcase(topic, pattern):
                 timeout_ms = self._queue_overflow_topic_block_timeout_ms.get(
                     pattern,
                     self._queue_overflow_block_timeout_ms,
                 )
-                return policy, timeout_ms
-        return self._queue_overflow_policy, self._queue_overflow_block_timeout_ms
+                result = (policy, timeout_ms)
+                self._overflow_policy_cache[topic] = result
+                return result
+        result = (self._queue_overflow_policy, self._queue_overflow_block_timeout_ms)
+        self._overflow_policy_cache[topic] = result
+        return result
 
     async def publish(self, event: MessagingEvent) -> bool:
         """Publish an event to all matching subscribers.
@@ -708,11 +734,18 @@ class InMemoryEventBackend:
                     # O(1) exact topic match
                     exact_ids = self._exact_topic_index.get(event.topic, [])
                     matched_ids.extend(exact_ids)
-                    # O(w) wildcard scan where w << total subscriptions
-                    for sid in self._wildcard_subscriptions:
-                        matcher = self._compiled_patterns.get(sid)
-                        if matcher and matcher(event.topic):
-                            matched_ids.append(sid)
+                    # Wildcard matching with cache (O(1) on cache hit)
+                    cached_wildcards = self._wildcard_match_cache.get(event.topic)
+                    if cached_wildcards is not None:
+                        matched_ids.extend(cached_wildcards)
+                    else:
+                        wildcard_matches = [
+                            sid
+                            for sid in self._wildcard_subscriptions
+                            if self._compiled_patterns.get(sid, lambda t: False)(event.topic)
+                        ]
+                        self._wildcard_match_cache[event.topic] = wildcard_matches
+                        matched_ids.extend(wildcard_matches)
                     subscriptions = [
                         self._subscriptions[sid]
                         for sid in matched_ids

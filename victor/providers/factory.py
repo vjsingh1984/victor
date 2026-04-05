@@ -334,6 +334,26 @@ class ManagedProvider:
 
         logger.info(f"ManagedProvider for {self.name} shutdown complete")
 
+    def is_healthy(self) -> bool:
+        """Check if the provider is still operational.
+
+        Verifies that the underlying provider and resilience layer
+        are in a usable state. Used by ProviderPool to avoid
+        returning stale providers.
+        """
+        # Check circuit breaker state if resilient provider is active
+        if self._resilient_provider is not None:
+            cb = getattr(self._resilient_provider, "_circuit_breaker", None)
+            if cb is not None and hasattr(cb, "state"):
+                if cb.state == "open":
+                    return False
+        # Check if base provider client is still alive
+        client = getattr(self._base_provider, "_client", None)
+        if client is not None and hasattr(client, "is_closed"):
+            if client.is_closed:
+                return False
+        return True
+
 
 class ProviderPool:
     """Connection pool for ManagedProvider instances.
@@ -378,14 +398,24 @@ class ProviderPool:
         return provider
 
     async def release(self, provider_name: str, model: str, provider: "ManagedProvider") -> None:
-        """Return a provider to the pool."""
+        """Return a provider to the pool.
+
+        Checks provider health before re-pooling. Unhealthy providers
+        are shut down instead of being returned to the pool.
+        """
         key = (provider_name, model)
         async with self._lock:
             self._in_use[key] = max(0, self._in_use.get(key, 0) - 1)
             pool = self._pools.setdefault(key, [])
-            if len(pool) < self._max_size:
+            if len(pool) < self._max_size and provider.is_healthy():
                 pool.append(provider)
             else:
+                if not provider.is_healthy():
+                    logger.debug(
+                        "Discarding unhealthy provider for %s/%s",
+                        provider_name,
+                        model,
+                    )
                 await provider.shutdown()
 
     async def shutdown(self) -> None:

@@ -12,19 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# =============================================================================
-# Victor Security Vertical - Example External Plugin Package
-# =============================================================================
-#
-# This pyproject.toml demonstrates how to create an external Victor vertical
-# that can be installed via pip and automatically discovered by Victor.
-#
-# Key concepts:
-# 1. Entry Points: Victor discovers verticals via "victor.verticals" entry points
-# 2. Package Structure: src/ layout for clean imports
-# 3. Dependencies: victor-sdk for authoring, victor-ai as an optional runtime
-# =============================================================================
-
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -32,82 +19,43 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "victor-security"
 version = "0.2.0"
-description = "SDK-only security auditing and vulnerability analysis vertical for Victor"
+description = "Security auditing vertical for Victor ecosystem"
 readme = "README.md"
-license = {text = "Apache-2.0"}
-authors = [
-    {name = "Victor Community", email = "community@victor.dev"}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Security",
-    "Topic :: Software Development :: Quality Assurance",
-]
+authors = [{ name = "Victor Community", email = "community@victor.dev" }]
+license = { text = "Apache-2.0" }
 keywords = ["victor", "ai", "security", "vulnerability", "audit"]
 requires-python = ">=3.10"
 
 # Dependencies - external authoring depends on victor-sdk only
 dependencies = [
-    "victor-sdk>=1.0.0",
+    "victor-sdk>=0.6.0",
 ]
 
 [project.optional-dependencies]
 runtime = [
     "victor-ai>=0.3.0",
 ]
-dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0",
-]
 
-[project.urls]
-Homepage = "https://github.com/your-org/victor-security"
-Documentation = "https://victor.dev/verticals/security"
-Repository = "https://github.com/your-org/victor-security"
-Issues = "https://github.com/your-org/victor-security/issues"
-
-# =============================================================================
-# Entry Points - This is how Victor discovers your vertical!
-# =============================================================================
-#
-# Victor uses Python entry points to discover external verticals.
-# The "victor.verticals" group is scanned at startup.
-#
-# Format: <vertical_name> = "<module_path>:<class_name>"
-#
-# After installing this package with `pip install .`, Victor will
-# automatically find and register the SecurityAssistant vertical.
-# =============================================================================
 [project.entry-points."victor.verticals"]
 security = "victor_security:SecurityAssistant"
 
-# This example intentionally avoids runtime-owned tool or protocol entry points.
-
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-# =============================================================================
-# Development Tool Configuration
-# =============================================================================
+[tool.setuptools.package-data]
+"*" = ["victor-vertical.toml"]
 
 [tool.black]
-line-length = 100
-target-version = ["py310", "py311", "py312"]
+line-length = 88
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 88
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 

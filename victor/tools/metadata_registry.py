@@ -583,12 +583,27 @@ class ToolMetadataRegistry:
 
         core_readonly: List[str] = list(default_readonly)
 
-        # Simple env override (comma-separated) to avoid pydantic parsing errors
+        # Env override: supports JSON list format (["a", "b"]) or comma-separated
         import os
+        import json as _json
 
         env_raw = os.getenv("CORE_READONLY_TOOLS")
         if env_raw:
-            core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
+            env_raw_stripped = env_raw.strip()
+            if env_raw_stripped.startswith("["):
+                try:
+                    parsed = _json.loads(env_raw_stripped)
+                    if isinstance(parsed, list):
+                        core_readonly.extend(str(item).strip() for item in parsed if item)
+                except (ValueError, TypeError):
+                    # Fallback to comma-separated if JSON parse fails
+                    core_readonly.extend(
+                        [item.strip() for item in env_raw.split(",") if item.strip()]
+                    )
+            else:
+                core_readonly.extend(
+                    [item.strip() for item in env_raw.split(",") if item.strip()]
+                )
 
         # Runtime override/extension via settings (env: CORE_READONLY_TOOLS)
         try:
@@ -1521,6 +1536,12 @@ def get_global_registry() -> ToolMetadataRegistry:
     if _global_registry is None:
         _global_registry = ToolMetadataRegistry()
     return _global_registry
+
+
+def reset_global_registry() -> None:
+    """Reset the global metadata registry singleton."""
+    global _global_registry
+    _global_registry = None
 
 
 def register_tool_metadata(tool: BaseTool) -> None:

@@ -1249,6 +1249,8 @@ class TestEntryPointCache:
 
     def test_scan_entry_points_with_mock_entry_points(self, entry_point_cache):
         """Test _scan_entry_points processes entry points correctly."""
+        from victor.framework.entry_point_registry import EntryPointGroup
+
         # Create mock entry points
         mock_ep1 = MagicMock()
         mock_ep1.name = "plugin1"
@@ -1258,16 +1260,23 @@ class TestEntryPointCache:
         mock_ep2.name = "plugin2"
         mock_ep2.value = "another.module:function"
 
-        mock_eps = [mock_ep1, mock_ep2]
+        # Build a mock registry returning a group with these entry points
+        mock_group = EntryPointGroup(group_name="test.group")
+        mock_group.entry_points = {
+            "plugin1": (mock_ep1, False),
+            "plugin2": (mock_ep2, False),
+        }
 
-        with patch("victor.framework.module_loader.sys.version_info", (3, 10)):
-            with patch(
-                "importlib.metadata.entry_points",
-                return_value=mock_eps,
-            ):
-                result = entry_point_cache._scan_entry_points("test.group")
-                assert result["plugin1"] == "mypackage.module:MyClass"
-                assert result["plugin2"] == "another.module:function"
+        mock_registry = MagicMock()
+        mock_registry.get_group.return_value = mock_group
+
+        with patch(
+            "victor.framework.entry_point_registry.get_entry_point_registry",
+            return_value=mock_registry,
+        ):
+            result = entry_point_cache._scan_entry_points("test.group")
+            assert result["plugin1"] == "mypackage.module:MyClass"
+            assert result["plugin2"] == "another.module:function"
 
     @pytest.mark.asyncio
     async def test_get_entry_points_async(self, entry_point_cache):

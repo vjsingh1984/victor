@@ -572,3 +572,9 @@ def set_snapshot_store(store: FileSnapshotStore) -> None:
     """Set the default snapshot store instance."""
     global _default_store
     _default_store = store
+
+
+def reset_snapshot_store() -> None:
+    """Reset the default snapshot store singleton."""
+    global _default_store
+    _default_store = None

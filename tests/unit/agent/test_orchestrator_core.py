@@ -1485,7 +1485,7 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback to provider limits
         )
 
         mock_limits = MagicMock()
@@ -1505,7 +1505,7 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback path
         )
         mock_get_limits.side_effect = RuntimeError("Config error")
         # Should not raise, falls back to defaults (128000 * 3.5 * 0.8 = 358400)
@@ -1520,7 +1520,7 @@ class TestContextLimitCalculation:
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback path
             use_mcp_tools=False,
         )
         mock_limits = MagicMock()

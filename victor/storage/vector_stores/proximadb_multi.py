@@ -50,11 +50,16 @@ from victor.storage.vector_stores.models import (
     EmbeddingModelConfig,
     create_embedding_model,
 )
-from victor.verticals.contrib.coding.languages.base import TreeSitterQueries
-from victor.verticals.contrib.coding.languages.registry import (
-    LanguageRegistry,
-    get_language_registry,
-)
+try:
+    from victor_coding.languages.base import TreeSitterQueries
+    from victor_coding.languages.registry import (
+        LanguageRegistry,
+        get_language_registry,
+    )
+except ImportError:
+    TreeSitterQueries = None  # type: ignore[misc, assignment]
+    LanguageRegistry = None  # type: ignore[misc, assignment]
+    get_language_registry = None  # type: ignore[assignment]
 
 try:
     from tree_sitter import Query, QueryCursor

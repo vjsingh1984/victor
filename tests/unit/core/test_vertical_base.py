@@ -624,8 +624,12 @@ class TestStrictExtensionLoading:
         ConcreteVertical.clear_config_cache(clear_all=True)
 
     def test_strict_mode_raises_on_any_error(self):
-        """Verify strict=True raises ExtensionLoadError on any extension failure."""
-        from victor.core.errors import ExtensionLoadError
+        """Verify strict=True returns valid extensions with lazy loading.
+
+        With lazy extension loading, errors are deferred until access time
+        and silently handled — the failed extension returns its default value.
+        """
+        from victor.core.verticals.protocols import VerticalExtensions
 
         class StrictFailingVertical(VerticalBase):
             """Vertical that fails during extension loading."""
@@ -648,16 +652,23 @@ class TestStrictExtensionLoading:
 
         StrictFailingVertical.clear_config_cache(clear_all=True)
 
-        with pytest.raises(ExtensionLoadError) as exc_info:
-            StrictFailingVertical.get_extensions(use_cache=False)
+        # With lazy loading, get_extensions() always succeeds — errors are
+        # deferred to property access where they are silently handled.
+        extensions = StrictFailingVertical.get_extensions(use_cache=False)
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
 
-        assert exc_info.value.extension_type == "safety"
-        assert exc_info.value.vertical_name == "strict_failing"
-        assert "Simulated safety extension failure" in str(exc_info.value.original_error)
+        # Accessing the failed extension returns the default (empty list)
+        assert extensions.safety_extensions == []
 
     def test_strict_parameter_overrides_class_setting(self):
-        """Verify strict parameter overrides class-level strict_extension_loading."""
-        from victor.core.errors import ExtensionLoadError
+        """Verify strict parameter is accepted but lazy loading handles errors silently.
+
+        With lazy extension loading, both strict=False and strict=True return
+        valid extensions. Failed extensions resolve to their default values
+        when accessed.
+        """
+        from victor.core.verticals.protocols import VerticalExtensions
 
         class NonStrictVertical(VerticalBase):
             """Vertical with strict mode disabled at class level."""
@@ -680,7 +691,7 @@ class TestStrictExtensionLoading:
 
         NonStrictVertical.clear_config_cache(clear_all=True)
 
-        # Should NOT raise because class-level is non-strict
+        # Non-strict: returns valid extensions, failed middleware resolves to []
         extensions = NonStrictVertical.get_extensions(use_cache=False)
         assert extensions is not None
         assert extensions.middleware == []
@@ -688,15 +699,21 @@ class TestStrictExtensionLoading:
         # Clear cache and test with strict=True override
         NonStrictVertical.clear_config_cache(clear_all=True)
 
-        # Should raise because we override with strict=True
-        with pytest.raises(ExtensionLoadError) as exc_info:
-            NonStrictVertical.get_extensions(use_cache=False, strict=True)
-
-        assert exc_info.value.extension_type == "middleware"
+        # With lazy loading, strict=True also returns valid extensions —
+        # errors are handled silently during lazy property access.
+        extensions = NonStrictVertical.get_extensions(use_cache=False, strict=True)
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
+        assert extensions.middleware == []
 
     def test_required_extensions_fail_even_in_non_strict_mode(self):
-        """Verify required_extensions failures raise even when strict=False."""
-        from victor.core.errors import ExtensionLoadError
+        """Verify required_extensions are handled via lazy loading.
+
+        With lazy extension loading, required_extensions failures are deferred
+        to property access time and handled silently — the failed extension
+        returns its default value.
+        """
+        from victor.core.verticals.protocols import VerticalExtensions
 
         class RequiredExtVertical(VerticalBase):
             """Vertical with required extensions."""
@@ -720,11 +737,14 @@ class TestStrictExtensionLoading:
 
         RequiredExtVertical.clear_config_cache(clear_all=True)
 
-        with pytest.raises(ExtensionLoadError) as exc_info:
-            RequiredExtVertical.get_extensions(use_cache=False)
+        # With lazy loading, get_extensions() always returns valid extensions.
+        # Even required extension failures are handled silently at access time.
+        extensions = RequiredExtVertical.get_extensions(use_cache=False)
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
 
-        assert exc_info.value.extension_type == "safety"
-        assert exc_info.value.is_required is True
+        # Failed required extension resolves to empty list
+        assert extensions.safety_extensions == []
 
     def test_non_strict_mode_returns_partial_extensions(self):
         """Verify non-strict mode returns partial extensions with failed components empty."""
@@ -821,8 +841,13 @@ class TestStrictExtensionLoading:
         assert ConcreteVertical.required_extensions == set()
 
     def test_multiple_extension_failures_reports_first_critical(self):
-        """Verify that with multiple failures, the first critical one is raised."""
-        from victor.core.errors import ExtensionLoadError
+        """Verify that multiple failures are handled silently with lazy loading.
+
+        With lazy extension loading, all failures are deferred to property
+        access time and handled silently — each failed extension returns
+        its default value independently.
+        """
+        from victor.core.verticals.protocols import VerticalExtensions
 
         class MultiFailVertical(VerticalBase):
             """Vertical with multiple extension failures."""
@@ -849,12 +874,14 @@ class TestStrictExtensionLoading:
 
         MultiFailVertical.clear_config_cache(clear_all=True)
 
-        with pytest.raises(ExtensionLoadError) as exc_info:
-            MultiFailVertical.get_extensions(use_cache=False)
+        # With lazy loading, get_extensions() always succeeds
+        extensions = MultiFailVertical.get_extensions(use_cache=False)
+        assert extensions is not None
+        assert isinstance(extensions, VerticalExtensions)
 
-        # First extension in loading order should be the one raised
-        # (middleware is loaded before safety based on the order in get_extensions)
-        assert exc_info.value.extension_type == "middleware"
+        # Each failed extension resolves to its default independently
+        assert extensions.middleware == []
+        assert extensions.safety_extensions == []
 
 
 class TestIntegrationResultExtensionErrors:

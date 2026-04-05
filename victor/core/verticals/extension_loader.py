@@ -446,6 +446,7 @@ class VerticalExtensionLoader(ABC):
     # Shared async extension loading infrastructure (P3)
     _extension_executor_max_workers: ClassVar[int] = 8
     _extension_executor_queue_limit: ClassVar[int] = 32
+    _extension_load_timeout: ClassVar[float] = 10.0
     _extension_executor: ClassVar[Optional[concurrent.futures.ThreadPoolExecutor]] = None
     _extension_executor_lock: ClassVar[threading.RLock] = threading.RLock()
     _extension_executor_semaphores: ClassVar[Dict[int, asyncio.Semaphore]] = {}
@@ -1558,11 +1559,13 @@ class VerticalExtensionLoader(ABC):
                     executor,
                     lambda: load_fn(extension_type, loader, is_list),
                 )
-                return await asyncio.wait_for(future, timeout=30.0)
+                timeout = cls._extension_load_timeout
+                return await asyncio.wait_for(future, timeout=timeout)
             except asyncio.TimeoutError:
                 logger.error(
-                    "Extension '%s' timed out after 30s for vertical '%s'",
+                    "Extension '%s' timed out after %.0fs for vertical '%s'",
                     extension_type,
+                    cls._extension_load_timeout,
                     cls.name,
                 )
                 cls._increment_loader_metric("failed")

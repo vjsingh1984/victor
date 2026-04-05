@@ -304,7 +304,10 @@ class TestConversationManagerSession:
 
     def test_get_session_stats_without_store(self):
         """Test get_session_stats without store."""
-        config = ConversationManagerConfig(enable_persistence=False)
+        config = ConversationManagerConfig(
+            enable_persistence=False,
+            enable_stage_tracking=False,
+        )
         manager = ConversationManager(config=config)
         manager.add_user_message("Test")
 

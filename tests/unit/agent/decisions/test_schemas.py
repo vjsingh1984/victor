@@ -27,8 +27,8 @@ class TestDecisionType:
         assert DecisionType.ERROR_CLASSIFICATION.value == "error_classification"
         assert DecisionType.CONTINUATION_ACTION.value == "continuation_action"
 
-    def test_seven_decision_types(self):
-        assert len(DecisionType) == 7
+    def test_decision_type_count(self):
+        assert len(DecisionType) == 10
 
 
 class TestTaskCompletionDecision:

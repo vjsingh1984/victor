@@ -173,6 +173,9 @@ def run_benchmark(
     resume: bool = typer.Option(
         False, "--resume", "-r", help="Resume from checkpoint if previous run was interrupted"
     ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Override provider (e.g., deepseek, openai, xai)"
+    ),
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
@@ -250,7 +253,9 @@ def run_benchmark(
             profile=profile,
             model=model,
             timeout=timeout,
+            max_turns=max_turns,
             resume=resume,
+            provider_override=provider,
         )
     )
 
@@ -368,7 +373,9 @@ async def _run_benchmark_async(
     profile: str,
     model: Optional[str],
     timeout: int,
+    max_turns: int = 10,
     resume: bool,
+    provider_override: Optional[str] = None,
 ):
     from victor.evaluation.harness import EvaluationHarness
     from victor.evaluation.agent_adapter import VictorAgentAdapter
@@ -394,11 +401,69 @@ async def _run_benchmark_async(
 
         progress.update(task, description="Initializing agent...")
         try:
-            adapter = VictorAgentAdapter.from_profile(
-                profile=profile,
-                model_override=model,
-                timeout=timeout,
+            from victor.evaluation.agent_adapter import AdapterConfig
+
+            adapter_config = AdapterConfig(
+                total_timeout=timeout,
+                max_turns=max_turns,
+                min_turn_timeout=max(240, timeout // max(max_turns, 1)),
             )
+            # Bootstrap edge model decision service into the container
+            # so tool selection, prompt focus, and stage detection can use it.
+            try:
+                from victor.agent.edge_model import (
+                    EdgeModelConfig,
+                    create_edge_decision_service,
+                )
+                from victor.core import get_container
+                from victor.agent.services.protocols.decision_service import (
+                    LLMDecisionServiceProtocol,
+                )
+                from victor.core.container import ServiceLifetime
+
+                edge_service = create_edge_decision_service(EdgeModelConfig())
+                if edge_service:
+                    container = get_container()
+                    container.register(
+                        LLMDecisionServiceProtocol,
+                        lambda c: edge_service,
+                        ServiceLifetime.SINGLETON,
+                    )
+                    console.print("[dim]Edge model enabled for micro-decisions[/]")
+            except Exception as e:
+                console.print(f"[dim]Edge model unavailable: {e}[/]")
+
+            if provider_override:
+                # Direct provider creation bypassing profile's provider
+                from victor.config.settings import load_settings
+                from victor.config.api_keys import get_api_key
+                from victor.providers.registry import ProviderRegistry
+                from victor.agent.orchestrator import AgentOrchestrator
+
+                settings = load_settings()
+                profiles = settings.load_profiles()
+                profile_config = profiles.get(profile, profiles.get("default"))
+                effective_model = model or (profile_config.model if profile_config else "deepseek-chat")
+
+                api_key = get_api_key(provider_override)
+                provider = ProviderRegistry.create(
+                    provider_override, api_key=api_key, settings=settings, timeout=timeout
+                )
+                orchestrator = AgentOrchestrator(
+                    settings=settings,
+                    provider=provider,
+                    model=effective_model,
+                    provider_name=provider_override,
+                    thinking=True,
+                )
+                adapter = VictorAgentAdapter(orchestrator, adapter_config)
+            else:
+                adapter = VictorAgentAdapter.from_profile(
+                    profile=profile,
+                    model_override=model,
+                    timeout=timeout,
+                    config=adapter_config,
+                )
             workspace_manager = SWEBenchWorkspaceManager()
 
             async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
@@ -415,15 +480,20 @@ async def _run_benchmark_async(
                     work_dir = workspace_manager.get_cached_repo_path(benchmark_task)
 
                 if benchmark_task.base_commit and work_dir:
-                    checkout_proc = await asyncio.create_subprocess_exec(
-                        "git",
-                        "checkout",
-                        benchmark_task.base_commit,
-                        cwd=work_dir,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    await checkout_proc.communicate()
+                    # Reset workspace to base_commit with clean working tree.
+                    # Fetch the specific commit first (may be outside shallow depth).
+                    for git_cmd in [
+                        ["git", "fetch", "--depth", "1", "origin", benchmark_task.base_commit],
+                        ["git", "checkout", "--force", benchmark_task.base_commit],
+                        ["git", "clean", "-fd"],
+                    ]:
+                        proc = await asyncio.create_subprocess_exec(
+                            *git_cmd,
+                            cwd=work_dir,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        await proc.communicate()
 
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
@@ -449,8 +519,31 @@ async def _run_benchmark_async(
                 finally:
                     os.chdir(original_cwd)
 
+                # Capture actual file changes as a git diff patch.
+                # The agent edits files via the edit tool (modifies on disk),
+                # but the evaluation harness needs a patch string to apply
+                # on a fresh repo clone and run tests.
+                patch = trace.generated_patch or trace.generated_code or ""
+                if not patch and work_dir:
+                    try:
+                        diff_proc = await asyncio.create_subprocess_exec(
+                            "git", "diff",
+                            cwd=work_dir,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        diff_out, _ = await diff_proc.communicate()
+                        if diff_out:
+                            patch = diff_out.decode("utf-8", errors="replace")
+                            logger.info(
+                                "Captured git diff patch: %d bytes from workspace",
+                                len(patch),
+                            )
+                    except Exception as e:
+                        logger.debug("Failed to capture git diff: %s", e)
+
                 return {
-                    "code": trace.generated_patch or trace.generated_code or "",
+                    "code": patch,
                     "tokens_input": trace.token_usage.input_tokens,
                     "tokens_output": trace.token_usage.output_tokens,
                     "tokens_used": trace.token_usage.total_tokens,
