@@ -98,10 +98,10 @@ jobs:
         run: python scripts/check_version_sync.py
 
   # ==========================================================================
-  # Build Python packages (SDK + AI)
+  # Build Python package (victor-ai only; SDK is released independently)
   # ==========================================================================
   build-python:
-    name: Build Python Packages
+    name: Build Python Package
     needs: version-check
     runs-on: ubuntu-latest
     steps:
@@ -115,21 +115,6 @@ jobs:
       - name: Install build tools
         run: |
           pip install build twine
-
-      - name: Build victor-sdk
-        working-directory: victor-sdk
-        run: |
-          python -m build
-
-      - name: Check victor-sdk package
-        run: |
-          twine check victor-sdk/dist/*
-
-      - name: Upload SDK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdk-package
-          path: victor-sdk/dist/
 
       - name: Build victor-ai
         run: |
@@ -442,7 +427,7 @@ jobs:
   # ==========================================================================
 
   # ==========================================================================
-  # Publish to TestPyPI (for pre-releases or manual testing) - runs first
+  # Publish to TestPyPI (for pre-releases or manual testing)
   # ==========================================================================
   publish-testpypi:
     name: Publish to TestPyPI
@@ -456,19 +441,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Download SDK artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: sdk-package
-          path: sdk-dist/
-
-      - name: Publish victor-sdk to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          packages-dir: sdk-dist/
-          skip-existing: true
-
       - name: Download victor-ai artifacts
         uses: actions/download-artifact@v4
         with:
@@ -484,32 +456,11 @@ jobs:
 
   # ==========================================================================
   # Publish to PyPI (Trusted Publishing - no API token needed)
-  # IMPORTANT: SDK must be published BEFORE victor-ai (dependency order)
+  # SDK is published independently via release-sdk.yml
   # ==========================================================================
-  publish-sdk-pypi:
-    name: Publish victor-sdk to PyPI
-    needs: [build-python, generate-checksums, create-release]
-    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-
-    steps:
-      - name: Download SDK artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: sdk-package
-          path: dist/
-
-      - name: Publish victor-sdk to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          verbose: true
-          skip-existing: true
-
   publish-pypi:
     name: Publish victor-ai to PyPI
-    needs: [publish-sdk-pypi]
+    needs: [build-python, generate-checksums, create-release]
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')"
     runs-on: ubuntu-latest
     permissions:
@@ -697,7 +648,6 @@ jobs:
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           files: |
             artifacts/python-package/*
-            artifacts/sdk-package/*
             artifacts/binary-*/*
             artifacts/checksums/checksums.txt
         env:
