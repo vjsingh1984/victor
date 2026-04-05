@@ -38,7 +38,10 @@ Usage:
     result = await bench_agent.execute_task(benchmark_task)
 """
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    import typer
 
 from victor_sdk import PluginContext, VictorPlugin
 

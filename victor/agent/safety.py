@@ -34,6 +34,7 @@ from victor.tools.metadata_registry import get_write_tools as registry_get_write
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
+    from victor.core.severity import SeverityLevel
 
 logger = logging.getLogger(__name__)
 

@@ -15,6 +15,10 @@
 """Enumerations for tool framework."""
 
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.severity import SeverityLevel
 
 # Lazy-loaded presentation adapter for icons
 _presentation = None

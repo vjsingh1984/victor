@@ -22,7 +22,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from victor.core.severity import SeverityLevel
 
 
 class CVESeverity(Enum):
