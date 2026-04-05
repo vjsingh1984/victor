@@ -69,8 +69,8 @@ docs/
 | **Orchestrator** | AgentOrchestrator, Controllers | `victor/agent/` |
 | **Framework** | StateGraph, Workflows, Teams | `victor/framework/` |
 | **Verticals** | 9 built-in + custom | `victor/{vertical}/` |
-| **Providers** | 22 LLM providers | `victor/providers/` |
-| **Tools** | 33 tool modules | `victor/tools/` |
+| **Providers** | 24 LLM providers | `victor/providers/` |
+| **Tools** | 34 tool modules | `victor/tools/` |
 
 ### Verticals
 

@@ -31,6 +31,7 @@ from victor.agent.provider_tool_guidance import (
 from victor.agent.prompt_normalizer import get_prompt_normalizer
 
 if TYPE_CHECKING:
+    from victor.agent.query_classifier import QueryClassification
     from victor.framework.enrichment import (
         PromptEnrichmentService,
         EnrichmentContext,
@@ -74,29 +75,34 @@ OUTPUT STYLE: CONCISE
 
 # Active completion signaling - deterministic detection
 # This guidance is always included to ensure predictable task completion detection
-# Uses underscore-prefixed signals to distinguish from natural language
+# Uses bold-wrapped markers with colon suffix for markdown-safe rendering:
+#   **DONE**: description  → rendered as bold "DONE:" → stripped to "DONE:"
+#   __DONE__: description  → rendered as italic "DONE:" → stripped to "DONE:"
+# The detector strips markdown formatting (**, __, *, _) and matches "KEYWORD:"
 COMPLETION_GUIDANCE = """
 TASK COMPLETION (MANDATORY):
-When you complete a task, you MUST signal completion using these EXACT markers:
+When you complete a task, you MUST signal completion using these EXACT markers.
+Use the bold format with a colon suffix exactly as shown:
 
 1. For FILE OPERATIONS (create/edit/write):
-   Say: "_DONE_ Created/Modified <filename>"
+   **DONE**: Created/Modified <filename>
 
 2. For BUG FIXES / ISSUE RESOLUTION:
-   Say: "_TASK_DONE_ <what was fixed>"
+   **TASK_DONE**: <what was fixed>
 
 3. For ANALYSIS / QUESTIONS / RESEARCH:
-   End with: "_SUMMARY_ <key findings>"
+   **SUMMARY**: <key findings>
 
 4. For FAILED / BLOCKED TASKS:
-   Say: "_BLOCKED_ <reason>" or "_CANNOT_COMPLETE_ <reason>"
+   **BLOCKED**: <reason>
 
 IMPORTANT:
-- These signals are REQUIRED for the system to detect task completion
-- Use the EXACT markers with underscores (e.g., _DONE_, _TASK_DONE_, _SUMMARY_)
+- These markers are REQUIRED for the system to detect task completion
+- Always use the bold format with colon: **DONE**: or **SUMMARY**: or **TASK_DONE**:
 - After signaling completion, STOP - do NOT ask follow-up questions
 - Do NOT say "would you like me to continue?" after completing the task
 - Do NOT re-read files you have already read
+- Signal completion ONCE - do not repeat the marker multiple times
 """.strip()
 
 # Extended grounding rules for local models that need more explicit guidance
@@ -133,36 +139,15 @@ DO NOT re-read the full file without parameters - you will get the same truncate
 DO NOT assume content is missing - use offset/search to access additional sections.
 """.strip()
 
-# DEPRECATED: Task-type-specific prompt hints
-# These hints are now maintained in vertical prompt contributors:
-# - victor/coding/prompts.py (CodingPromptContributor)
-# - victor/devops/prompts.py (DevOpsPromptContributor)
-# - victor/research/prompts.py (ResearchPromptContributor)
-# - victor/dataanalysis/prompts.py (DataAnalysisPromptContributor)
-#
-# This dict is kept for backward compatibility only. New code should use
-# prompt contributors via the vertical's PromptContributorProtocol.
-#
-# Each hint includes a completion signal instruction for deterministic task
-# completion detection. Uses underscore-prefixed markers (e.g., _DONE_)
-# to distinguish from natural language.
-#
-# Migration: Use get_task_type_hint(task_type, prompt_contributors=[...])
-# with the appropriate vertical contributor for full task hint support.
-_DEPRECATED_TASK_TYPE_HINTS = {
-    # Framework-level defaults (not vertical-specific)
-    # These are minimal fallbacks when no vertical contributor is available
-}
+# Task-type hints are now in vertical prompt contributors (E5 M3).
+# Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
 
 def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
     """Get prompt hint for a specific task type.
 
-    This function supports vertical prompt contributors. It gets hints from:
-    1. Vertical prompt contributors (if provided) - canonical source
-    2. _DEPRECATED_TASK_TYPE_HINTS (fallback, deprecated)
-
-    For new code, always pass prompt_contributors from the vertical.
+    Hints come from vertical prompt contributors (the canonical source).
+    Pass prompt_contributors from the vertical for full task hint support.
 
     Args:
         task_type: The detected task type (e.g., "create_simple", "edit")
@@ -171,7 +156,6 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = Non
     Returns:
         Task-specific prompt hint or empty string if not found
     """
-    # Try vertical contributors first (canonical source)
     if prompt_contributors:
         for contributor in sorted(prompt_contributors, key=lambda c: c.get_priority()):
             hints = contributor.get_task_type_hints()
@@ -182,7 +166,6 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = Non
                     hint_text = task_hint.hint
                 else:
                     hint_text = str(task_hint)
-                # Log when vertical hint is applied
                 contributor_name = type(contributor).__name__
                 logger.info(
                     "Applied vertical task hint: task_type=%s, contributor=%s",
@@ -191,36 +174,7 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = Non
                 )
                 return hint_text
 
-    # Fallback to deprecated hints (should be empty, but kept for safety)
-    hint = _DEPRECATED_TASK_TYPE_HINTS.get(task_type.lower(), "")
-    if hint:
-        import warnings
-
-        warnings.warn(
-            f"Using deprecated TASK_TYPE_HINTS for '{task_type}'. "
-            "Pass prompt_contributors for vertical-specific hints.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        logger.debug("Applied deprecated task hint for task_type=%s", task_type)
-    return hint
-
-
-# Backward compatibility alias - deprecated
-def __getattr__(name: str):
-    """Provide backward compatibility for TASK_TYPE_HINTS access."""
-    if name == "TASK_TYPE_HINTS":
-        import warnings
-
-        warnings.warn(
-            "TASK_TYPE_HINTS is deprecated. Task hints are now in vertical prompt "
-            "contributors (e.g., CodingPromptContributor, DevOpsPromptContributor). "
-            "Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DEPRECATED_TASK_TYPE_HINTS
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return ""
 
 
 # Models with known good native tool calling support
@@ -273,6 +227,7 @@ class SystemPromptBuilder:
         enrichment_service: Optional["PromptEnrichmentService"] = None,
         vertical: Optional[str] = None,
         concise_mode: bool = False,
+        query_classification: Optional["QueryClassification"] = None,
     ):
         """Initialize the prompt builder.
 
@@ -289,7 +244,16 @@ class SystemPromptBuilder:
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
         """
-        self.provider_name = (provider_name or "").lower()
+        # Handle both string and ProviderSettings object for provider_name
+        # (backward compatibility with settings refactor)
+        if provider_name and hasattr(provider_name, "default_provider"):
+            # provider_name is a ProviderSettings object
+            actual_provider_name = provider_name.default_provider
+        else:
+            # provider_name is a string or None
+            actual_provider_name = provider_name
+
+        self.provider_name = (actual_provider_name or "").lower()
         self.model = model or ""
         self.model_lower = self.model.lower()
         self.tool_adapter = tool_adapter
@@ -300,6 +264,7 @@ class SystemPromptBuilder:
         self.enrichment_service = enrichment_service
         self.vertical = vertical or "coding"
         self.concise_mode = concise_mode
+        self.query_classification = query_classification
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -332,7 +297,7 @@ class SystemPromptBuilder:
         if self._merged_task_hints is not None:
             return self._merged_task_hints
 
-        merged = _DEPRECATED_TASK_TYPE_HINTS.copy()  # Start with deprecated fallback hints
+        merged: dict = {}  # Populated by vertical contributors below
 
         # Override with vertical contributors (sorted by priority)
         for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
@@ -526,6 +491,47 @@ class SystemPromptBuilder:
                 enriched_prompt=prompt,
             )
 
+    def _get_task_guidance_section(self) -> str:
+        """Get task-specific guidance based on query classification."""
+        if not self.query_classification:
+            return ""
+
+        from victor.agent.query_classifier import QueryType
+
+        guidance_map = {
+            QueryType.EXPLORATION: (
+                "TASK GUIDANCE: Explore systematically. List directories before reading files. "
+                "Map structure first. Build a mental model of the codebase before diving deep."
+            ),
+            QueryType.IMPLEMENTATION: (
+                "TASK GUIDANCE: Plan before coding. Break into discrete steps. "
+                "Test incrementally. Verify each step before proceeding."
+            ),
+            QueryType.DEBUGGING: (
+                "TASK GUIDANCE: Focus on error messages and stack traces. "
+                "Check recent changes first. Reproduce the issue before fixing."
+            ),
+            QueryType.REVIEW: (
+                "TASK GUIDANCE: Examine for correctness, style, and security. "
+                "Reference specific line numbers. Be thorough but constructive."
+            ),
+            QueryType.QUICK_QUESTION: (
+                "TASK GUIDANCE: Answer directly and concisely. "
+                "Only use tools if the answer requires checking the codebase."
+            ),
+        }
+        return guidance_map.get(self.query_classification.query_type, "")
+
+    def _get_tool_constraint_section(self) -> str:
+        """Get tool constraint section listing available tools."""
+        if not self.available_tools:
+            return ""
+        tool_list = ", ".join(sorted(self.available_tools))
+        return (
+            f"IMPORTANT: Only use tools from this list: {tool_list}. "
+            "Do not attempt to call unlisted tools."
+        )
+
     def build(self) -> str:
         """Build the system prompt.
 
@@ -536,8 +542,10 @@ class SystemPromptBuilder:
         The prompt is built in this order:
         1. Concise mode guidance (if enabled)
         2. Base prompt (provider-specific)
-        3. Completion guidance (always included for deterministic task completion)
-        4. Provider-specific tool guidance (GAP-5)
+        3. Task-specific guidance (based on query classification)
+        4. Tool constraint section (available tools list)
+        5. Completion guidance (always included for deterministic task completion)
+        6. Provider-specific tool guidance (GAP-5)
 
         Returns:
             System prompt string tailored to the provider/model
@@ -549,20 +557,85 @@ class SystemPromptBuilder:
             # Fall back to provider-specific prompt
             base_prompt = self._build_for_provider()
 
-        # Prepend concise mode guidance if enabled
-        if self.concise_mode:
+        # Determine which prompt sections to include.
+        # Edge model can select only task-relevant sections to save tokens.
+        sections_to_include = self._get_active_sections()
+
+        if "concise_mode" in sections_to_include and self.concise_mode:
             base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
 
-        # Append completion guidance (always included for deterministic task completion)
-        base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
+        if "task_guidance" in sections_to_include:
+            task_guidance = self._get_task_guidance_section()
+            if task_guidance:
+                base_prompt = f"{base_prompt}\n\n{task_guidance}"
 
-        # Append provider-specific tool guidance if available (GAP-5)
-        tool_guidance = self.get_provider_tool_guidance()
-        if tool_guidance:
-            return f"{base_prompt}\n\n{tool_guidance}"
+        if "tool_constraint" in sections_to_include:
+            tool_constraint = self._get_tool_constraint_section()
+            if tool_constraint:
+                base_prompt = f"{base_prompt}\n\n{tool_constraint}"
+
+        if "completion" in sections_to_include:
+            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
+
+        if "tool_guidance" in sections_to_include:
+            tool_guidance = self.get_provider_tool_guidance()
+            if tool_guidance:
+                base_prompt = f"{base_prompt}\n\n{tool_guidance}"
 
         return base_prompt
+
+    def _get_active_sections(self) -> set:
+        """Determine which prompt sections to include.
+
+        Uses edge model to select relevant sections when available,
+        reducing system prompt token count for focused tasks.
+        Falls back to all sections if edge model unavailable.
+        """
+        all_sections = {
+            "concise_mode",
+            "task_guidance",
+            "tool_constraint",
+            "completion",
+            "tool_guidance",
+        }
+
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return all_sections
+
+            from victor.agent.edge_model import select_prompt_sections_with_edge_model
+
+            # Use cached task type from classification if available
+            task_type = getattr(self, "_task_type", "action")
+            user_msg = getattr(self, "_user_message", "")
+
+            selected = select_prompt_sections_with_edge_model(
+                service=service,
+                user_message=user_msg[:200] if user_msg else "",
+                task_type=task_type,
+                available_sections=list(all_sections),
+            )
+
+            if selected:
+                # Always include completion guidance (required for detection)
+                result = set(selected) | {"completion"}
+                logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
+                return result
+
+        except Exception:
+            pass
+
+        return all_sections
 
     def _build_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
@@ -643,9 +716,10 @@ class SystemPromptBuilder:
             "and modifying code. Use them effectively:\n\n"
             "1. Use list_directory and read_file to examine code before conclusions.\n"
             "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
-            "3. Provide clear, actionable responses based on actual file contents.\n"
-            "4. Always cite specific file paths and line numbers when referencing code.\n"
-            "5. You may call multiple tools in parallel when they are independent.\n\n"
+            "3. For call-graph questions, prefer graph(mode='callers'|'callees'|'trace').\n"
+            "4. Provide clear, actionable responses based on actual file contents.\n"
+            "5. Always cite specific file paths and line numbers when referencing code.\n"
+            "6. You may call multiple tools in parallel when they are independent.\n\n"
             f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
         )
@@ -669,6 +743,7 @@ class SystemPromptBuilder:
             "• Generation: Write code directly, minimal tool use\n"
             "• Exploration: Use tools systematically, then summarize\n"
             "• Modification: Read → understand → edit\n"
+            "• For call-graph questions, use graph(mode='callers'|'callees'|'trace')\n"
             "• Actions: Execute fully, report results\n\n"
             f"{PARALLEL_READ_GUIDANCE}\n\n"
             f"{GROUNDING_RULES}"
@@ -707,6 +782,7 @@ class SystemPromptBuilder:
             "• read_file ONCE per file, remember contents\n"
             "• For large files, use search/offset parameters (see above)\n"
             "• Use semantic_code_search for specific symbols\n"
+            "• Use graph(mode='callers'|'callees'|'trace') for call-graph questions\n"
             "• Stop tool calls when you have enough info (usually 3-5 calls)\n\n"
             "TASK EXECUTION:\n"
             "• Generation: Write code directly without excessive exploration\n"
@@ -729,6 +805,7 @@ class SystemPromptBuilder:
             "• Use list_directory to understand project structure first\n"
             "• Use read_file to examine specific files (one read per file)\n"
             "• Use semantic_code_search for finding specific code patterns\n"
+            "• Use graph(mode='callers'|'callees'|'trace') for call-graph questions\n"
             "• Parallel tool calls are allowed for independent operations\n\n"
             "TASK APPROACH:\n"
             "• For analysis tasks: Read relevant files, then provide structured findings\n"

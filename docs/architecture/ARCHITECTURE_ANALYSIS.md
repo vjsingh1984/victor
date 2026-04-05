@@ -28,8 +28,8 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                 ORCHESTRATION LAYER                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  AgentOrchestrator (4,277 LOC) - Facade Pattern                │
-│  ├── Coordinators (8 focused, ~9K LOC total)                   │
+│  AgentOrchestrator (3,940 LOC) - Facade Pattern                │
+│  ├── Coordinators (21 focused, ~9K LOC total)                  │
 │  │   ├── ChatCoordinator (2,038 LOC)                           │
 │  │   ├── ToolCoordinator (1,412 LOC)                           │
 │  │   ├── MetricsCoordinator (708 LOC)                          │
@@ -37,7 +37,11 @@
 │  │   ├── SafetyCoordinator (596 LOC)                          │
 │  │   ├── SessionCoordinator (806 LOC)                          │
 │  │   ├── ProviderCoordinator (556 LOC)                         │
-│  │   └── PlanningCoordinator (570 LOC)                         │
+│  │   ├── PlanningCoordinator (570 LOC)                          │
+│  │   ├── CallbackCoordinator                                   │
+│  │   ├── OrchestratorPropertyFacade                            │
+│  │   └── InitializationPhaseManager                            │
+│  ├── Runtime Boundaries (8)                                    │
 │  └── Delegated Services (DI container)                         │
 │      ├── ToolPipeline, ToolSelector, ToolRegistrar              │
 │      ├── ConversationController, StreamingController           │
@@ -100,7 +104,7 @@
 │  ├── SourceVerificationCapability                              │
 │  └── BaseCapabilityProvider (registry)                         │
 │                                                                  │
-│  Tools (33 tool modules, 11 categories)                         │
+│  Tools (34 tool modules, 11 categories)                         │
 │  ├── ToolSet, ToolCategory, ToolCategoryRegistry               │
 │  └── Preset: default/minimal/full/airgapped                    │
 │                                                                  │
@@ -186,7 +190,7 @@ Any component → emit_event(event_type, data)
 
 ### 1.3 Extension Loading
 
-**Lazy Vertical Loading** (victor/core/verticals/extension_loader.py, 1,951 LOC):
+**Lazy Vertical Loading** (victor/core/verticals/extension_loader.py, 1,897 LOC):
 ```
 VerticalExtensionLoader
   ├── load_extensions(vertical_name) → VerticalExtensions
@@ -196,6 +200,9 @@ VerticalExtensionLoader
   │   ├── Prompt extensions (contributors, task hints)
   │   ├── Config extensions (mode config, workflows)
   │   └── Framework extensions (RL, teams, chains)
+  ├── ExtensionModuleResolver (module resolution)
+  ├── ExtensionCacheManager (cache lifecycle)
+  ├── CapabilityNegotiator (protocol negotiation)
   └── Caching: WeakValueCache for loaded extensions
 ```
 
@@ -266,7 +273,7 @@ Created `scripts/migrate_vertical_to_contrib.py` (640 LOC):
 
 | Module | LOC | Responsibility | SRP Compliant? |
 |--------|-----|---------------|----------------|
-| AgentOrchestrator | 4,277 | Facade coordination | ✅ Extracted 9 coordinators |
+| AgentOrchestrator | 3,940 | Facade coordination | ✅ Extracted 21 coordinators + 8 runtime boundaries |
 | ChatCoordinator | 2,038 | Chat flow management | ✅ Single domain |
 | ToolCoordinator | 1,412 | Tool execution | ✅ Focused |
 | VerticalIntegrationPipeline | 95K | Setup orchestration | ✅ Step handlers |
@@ -275,8 +282,9 @@ Created `scripts/migrate_vertical_to_contrib.py` (640 LOC):
 | ObservabilityManager | 801 | Metrics aggregation | ✅ Focused |
 
 **Violations Fixed**:
-- ❌ AgentOrchestrator: Was 6,000+ LOC, now 4,277 (28% reduction)
+- ❌ AgentOrchestrator: Was 6,000+ LOC, now 3,940 (34% reduction)
 - ✅ Extracted: Conversation, Metrics, Safety, Provider coordinators
+- ✅ Extracted: CallbackCoordinator, OrchestratorPropertyFacade, InitializationPhaseManager
 - ✅ Delegated: ToolRegistrar, ProviderManager, LifecycleManager
 
 **Remaining Concerns**:
@@ -389,7 +397,7 @@ metrics = container.get(MetricsServiceProtocol)
 
 | Principle | Score | Evidence |
 |-----------|-------|----------|
-| SRP | 8/10 | Orchestrator reduced 28%, coordinators extracted |
+| SRP | 8/10 | Orchestrator reduced 34%, 21 coordinators + 8 runtime boundaries extracted |
 | OCP | 9/10 | YAML categories, step handlers, entry points |
 | LSP | 8/10 | Stage contracts enforced, needs formal testing |
 | ISP | 10/10 | 13 focused protocols, no fat interfaces |
@@ -405,7 +413,7 @@ metrics = container.get(MetricsServiceProtocol)
 **Path 1: Agent Creation** (one-time)
 ```
 VerticalIntegrationPipeline.apply()
-  └── Extension loading: 1,951 LOC, could be slow
+  └── Extension loading: 1,897 LOC, could be slow
   └── 13 protocol checks: Could batch load
   └── Validation: Parallelize stage/extension validation
 ```
@@ -532,7 +540,7 @@ emit_event()
 | Dashboard | CLI dashboard + JSON | No | No | No | Yes (debug) | No |
 | **Multi-Agent** | | | | | | |
 | Teams | 4 formations (Sequential, Parallel, Hierarchy, Pipeline) | LangGraph Team | Crew (sequential) | No | Agents (query) | Group chat |
-| Coordination | Coordinators (9 focused) | Graph-based | Task-based | Chain-based | Router-based | Conversation-based |
+| Coordination | Coordinators (21 focused) | Graph-based | Task-based | Chain-based | Router-based | Conversation-based |
 | Orchestration | Facade + coordinators | State machine | Delegation | Sequential | Router | Round-robin |
 | **Developer Experience** | | | | | | |
 | CLI | 22 subcommands (Typer) | No | No | No (Python only) | No | No (Python only) |
@@ -556,7 +564,7 @@ emit_event()
 | Production Readiness | **8** | 5 | 3 | 4 | 5 | 4 |
 
 **Rationale**:
-- **Victor**: Strong architecture (coordinators, protocols), extensibility (verticals, capabilities), observability (unified metrics), CLI, CI/CD
+- **Victor**: Strong architecture (21 coordinators, protocols), extensibility (verticals, capabilities), observability (unified metrics), CLI, CI/CD
 - **LangGraph**: Excellent multi-agent (LangGraph Team), weak extensibility (no verticals), basic observability
 - **CrewAI**: Simple multi-agent (crews), poor architecture (monolithic), no observability
 - **LangChain**: Poor architecture (chains mixed), no multi-agent, basic observability

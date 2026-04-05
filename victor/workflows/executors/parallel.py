@@ -24,7 +24,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from victor.workflows.definition import ParallelNode, WorkflowState
+    from victor.workflows.definition import ParallelNode
+    from victor.workflows.runtime_types import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class ParallelNodeExecutor:
             This node serves as a join point and applies the join strategy.
         """
         import time
-        from victor.framework.graph import GraphNodeResult
+        from victor.workflows.runtime_types import GraphNodeResult
 
         logger.info(f"Executing parallel node: {node.id}")
         start_time = time.time()
@@ -119,16 +120,13 @@ class ParallelNodeExecutor:
 
             state["_node_results"][node.id] = GraphNodeResult(
                 node_id=node.id,
-                status="completed" if "_error" not in state else "failed",
-                result={
+                success="_error" not in state,
+                output={
                     "parallel_nodes": getattr(node, "parallel_nodes", []),
                     "join_strategy": join_strategy,
                     "results_count": len(parallel_results),
                 },
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                    "join_strategy": join_strategy,
-                },
+                duration_seconds=time.time() - start_time,
             )
 
             logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
@@ -143,11 +141,9 @@ class ParallelNodeExecutor:
 
             state["_node_results"][node.id] = GraphNodeResult(
                 node_id=node.id,
-                status="failed",
+                success=False,
                 error=str(e),
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                },
+                duration_seconds=time.time() - start_time,
             )
 
             raise

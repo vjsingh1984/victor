@@ -11,6 +11,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as cp from 'child_process';
 
 export interface ContextItem {
     type: 'file' | 'symbol' | 'folder' | 'selection' | 'diagnostics' | 'git';
@@ -301,7 +302,6 @@ export class ContextProvider {
 
     private async _executeGitCommand(command: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const cp = require('child_process');
             cp.exec(
                 `git ${command}`,
                 { cwd: this._workspaceRoot, maxBuffer: 1024 * 1024 },
@@ -378,7 +378,7 @@ export class MentionCompletionProvider implements vscode.CompletionItemProvider 
     async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-        token: vscode.CancellationToken
+        _token: vscode.CancellationToken
     ): Promise<vscode.CompletionItem[]> {
         const lineText = document.lineAt(position).text;
         const linePrefix = lineText.substring(0, position.character);

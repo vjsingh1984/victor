@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
 
+from victor.core.async_utils import run_sync
 from victor.ui.slash.protocol import CommandContext, CommandMetadata
 from victor.ui.slash.registry import CommandRegistry, get_command_registry
 
@@ -175,7 +176,7 @@ class SlashCommandHandler:
 
         For use in contexts where async is not available.
         """
-        return asyncio.get_event_loop().run_until_complete(self.execute(text))
+        return run_sync(self.execute(text))
 
     def get_help(self, command_name: Optional[str] = None) -> str:
         """Get help text for a command or all commands.
@@ -198,6 +199,12 @@ class SlashCommandHandler:
                     f"[dim]Aliases:[/] {aliases}\n"
                     f"[dim]Category:[/] {meta.category}"
                 )
+            from victor.ui.slash.commands.system import get_builtin_tool_help
+
+            tool_help = get_builtin_tool_help(command_name)
+            if tool_help:
+                _, content = tool_help
+                return content
             return f"Unknown command: /{command_name}"
 
         # Build table of all commands
@@ -234,6 +241,13 @@ class SlashCommandHandler:
                     )
                 )
             else:
+                from victor.ui.slash.commands.system import get_builtin_tool_help
+
+                tool_help = get_builtin_tool_help(command_name)
+                if tool_help:
+                    title, content = tool_help
+                    self.console.print(Panel(content, title=f"Help: {title}", border_style="blue"))
+                    return
                 self.console.print(f"[yellow]Unknown command:[/] /{command_name}")
             return
 

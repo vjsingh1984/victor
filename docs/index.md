@@ -2,7 +2,7 @@
 
 # Victor Documentation
 
-**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 22 providers.**
+**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 24 providers.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -15,7 +15,7 @@
 
 ## Welcome! 👋
 
-Victor is an open-source agentic AI framework supporting **22 LLM providers** with **33 tool modules** across **9 domain verticals**. Whether you need local development with Ollama, cloud capabilities with Claude/GPT, or enterprise deployments with Azure/AWS, Victor provides a unified interface with powerful features like multi-agent teams, stateful workflows, event sourcing, semantic codebase search, and air-gapped mode support.
+Victor is an open-source agentic AI framework supporting **24 LLM providers** with **34 tool modules** across **9 domain verticals**. Whether you need local development with Ollama, cloud capabilities with Claude/GPT, or enterprise deployments with Azure/AWS, Victor provides a unified interface with powerful features like multi-agent teams, stateful workflows, event sourcing, semantic codebase search, and air-gapped mode support.
 
 ## What is Victor?
 
@@ -23,7 +23,7 @@ Victor is an **agentic AI framework** that gives you the freedom to choose betwe
 
 ### Key Highlights
 
-- 🌐 **22 LLM Providers** - Switch between Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex, Ollama, LM Studio, vLLM, and more
+- 🌐 **24 LLM Providers** - Switch between Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex, Ollama, LM Studio, vLLM, and more
 - 🛠️ **33 Tool Modules** - Across 9 domain verticals (Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark)
 - 🔄 **YAML-First Workflows** - Define multi-step automation with StateGraph DSL and checkpointing
 - 🔒 **Air-Gapped Mode** - Full functionality with local models for secure, offline environments
@@ -158,7 +158,7 @@ docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
 
 ### Key Concepts
 
-- **Provider Agnosticism** - Switch between 22 LLM providers seamlessly
+- **Provider Agnosticism** - Switch between 24 LLM providers seamlessly
 - **Vertical Architecture** - Self-contained domains with specialized tools
 - **YAML Workflows** - Declarative workflow definitions with Python escape hatches
 - **StateGraph DSL** - LangGraph-compatible workflow API for complex automation

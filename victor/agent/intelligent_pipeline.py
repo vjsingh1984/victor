@@ -652,10 +652,11 @@ class IntelligentAgentPipeline:
                 # Max retries exceeded - force finalize with best-effort response
                 should_finalize = True
                 finalize_reason = "grounding failure limit exceeded"
-                logger.warning(
-                    f"[IntelligentPipeline] Grounding failure count ({self._grounding_failure_count}) "
-                    f"exceeded max retries ({self._max_grounding_retries}). "
-                    f"Forcing best-effort finalize."
+                logger.debug(
+                    "[IntelligentPipeline] Grounding failure count (%d) "
+                    "exceeded max retries (%d). Forcing best-effort finalize.",
+                    self._grounding_failure_count,
+                    self._max_grounding_retries,
                 )
             else:
                 # Can still retry - generate actionable feedback prompt

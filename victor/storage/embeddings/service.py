@@ -121,6 +121,9 @@ class EmbeddingService:
         # Shutdown flag to prevent new operations after shutdown initiated
         self._shutdown = False
 
+        # Fast hash for cache keys (xxhash if available, else SHA-256)
+        self._hash_fn = self._init_hash_fn()
+
     @classmethod
     def get_instance(
         cls,
@@ -242,8 +245,23 @@ class EmbeddingService:
         return self._model is not None
 
     def _get_cache_key(self, text: str) -> str:
-        """Generate cache key for text."""
-        return hashlib.sha256(text.encode()).hexdigest()[:16]
+        """Generate cache key for text.
+
+        Uses xxhash (C-backed, ~10x faster than SHA-256) for cache keys
+        where cryptographic strength is unnecessary.
+        Includes model name so cache is invalidated on model switch.
+        """
+        return self._hash_fn(f"{self.model_name}:{text}".encode()).hexdigest()
+
+    @staticmethod
+    def _init_hash_fn():
+        """Select fastest available hash function for cache keys."""
+        try:
+            import xxhash
+
+            return xxhash.xxh64
+        except ImportError:
+            return lambda data: hashlib.sha256(data)
 
     def _estimate_embedding_memory(self, embedding: np.ndarray) -> int:
         """Estimate memory usage of an embedding in bytes.
@@ -482,10 +500,7 @@ class EmbeddingService:
             )
             return np.zeros(self.dimension, dtype=np.float32)
 
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, lambda: self.embed_text_sync(text, use_cache=use_cache)
-        )
+        return await asyncio.to_thread(self.embed_text_sync, text, use_cache=use_cache)
 
     async def embed_batch(self, texts: List[str]) -> np.ndarray:
         """Generate embeddings for multiple texts (async version).
@@ -503,8 +518,7 @@ class EmbeddingService:
             )
             return np.zeros((len(texts), self.dimension), dtype=np.float32)
 
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.embed_batch_sync, texts)
+        return await asyncio.to_thread(self.embed_batch_sync, texts)
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -552,6 +566,16 @@ class EmbeddingService:
         if corpus.size == 0:
             return np.array([])
 
+        # Ensure corpus is at least 2D for axis operations
+        # Handle edge case where corpus might be 1D (malformed embeddings)
+        if corpus.ndim == 1:
+            # If corpus is 1D, it's a single vector - reshape to 2D
+            corpus = corpus.reshape(1, -1)
+        elif corpus.ndim != 2:
+            # Unexpected dimensionality - return empty
+            logger.warning(f"Unexpected corpus shape: {corpus.shape}, returning empty similarities")
+            return np.array([])
+
         # NumPy with BLAS is faster than Rust for vectorized operations
         query_norm = query / (np.linalg.norm(query) + 1e-9)
         corpus_norms = corpus / (np.linalg.norm(corpus, axis=1, keepdims=True) + 1e-9)
@@ -559,3 +583,38 @@ class EmbeddingService:
         # Dot product
         similarities = np.dot(corpus_norms, query_norm)
         return np.asarray(similarities)
+
+
+def get_embedding_service(
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+    device: Optional[str] = None,
+) -> "EmbeddingService":
+    """Get the EmbeddingService, preferring DI container over singleton.
+
+    Resolution order:
+    1. DI container (if bootstrapped and service registered)
+    2. Singleton via EmbeddingService.get_instance()
+
+    This function provides a migration path away from the singleton pattern.
+    New code should inject EmbeddingService via constructor parameters or
+    the DI container directly.
+
+    Args:
+        model_name: Model name (only used if creating a new instance).
+        device: Device (only used if creating a new instance).
+
+    Returns:
+        EmbeddingService instance.
+    """
+    try:
+        from victor.core.container import get_container
+
+        container = get_container()
+        if container is not None:
+            service = container.get_optional(EmbeddingService)
+            if service is not None:
+                return service
+    except Exception:
+        pass
+
+    return EmbeddingService.get_instance(model_name=model_name, device=device)

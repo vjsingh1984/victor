@@ -73,15 +73,38 @@ def keys(
     list_services: bool = typer.Option(
         False, "--services", help="List configured services (finnhub, fred, etc.)"
     ),
+    set_oauth_client_id: Optional[str] = typer.Option(
+        None, "--set-oauth-client-id", help="Set OAuth client_id for a provider (openai, qwen)"
+    ),
+    delete_oauth_client_id: Optional[str] = typer.Option(
+        None, "--delete-oauth-client-id", help="Delete OAuth client_id from keyring"
+    ),
 ):
-    """Manage API keys for cloud providers and external services."""
+    """Manage API keys for cloud providers and external services.
+
+    [yellow]Deprecated:[/] Use 'victor auth' instead for a more unified experience.
+    This command continues to work for backward compatibility.
+    """
     if ctx.invoked_subcommand is None:
+        # Show deprecation notice
+        console.print("[yellow]Note:[/] 'victor keys' is deprecated. Use 'victor auth' instead.")
+        console.print("[dim]New command features:[/]")
+        console.print("  • victor auth setup - Interactive setup wizard")
+        console.print("  • victor auth add - Quick add provider account")
+        console.print("  • victor auth list - List configured accounts")
+        console.print("  • victor auth test - Test provider connection")
+        console.print("[dim]Run: victor auth --help[/]")
+        console.print()
         if setup:
             _setup()
         elif delete_keyring:
             _delete_keyring(delete_keyring)
         elif delete_service_keyring:
             _delete_service_keyring(delete_service_keyring)
+        elif set_oauth_client_id:
+            _set_oauth_client_id(set_oauth_client_id)
+        elif delete_oauth_client_id:
+            _delete_oauth_client_id(delete_oauth_client_id)
         elif migrate:
             _migrate()
         elif provider:
@@ -408,3 +431,75 @@ def _list_services():
         console.print(
             "  [cyan]victor keys --set-service fred --keyring[/]     Store FRED key in keyring"
         )
+
+
+def _set_oauth_client_id(provider: str):
+    """Set OAuth client_id for a provider."""
+    provider = provider.lower()
+
+    # Validate provider
+    oauth_providers = {"openai", "qwen"}
+    if provider not in oauth_providers:
+        console.print(f"[red]Provider '{provider}' does not support OAuth.[/]")
+        console.print(f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}")
+        raise typer.Exit(1)
+
+    # Check keyring availability
+    if not is_keyring_available():
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Setting OAuth client_id for {provider}[/]")
+    console.print("[dim]Paste your OAuth client_id (input hidden):[/]")
+
+    client_id = getpass.getpass("")
+
+    if not client_id.strip():
+        console.print("[red]No client_id provided. Cancelled.[/]")
+        raise typer.Exit(1)
+
+    # Import the OAuth manager function
+    try:
+        from victor.providers.oauth_manager import _set_oauth_client_id_in_keyring
+
+        if _set_oauth_client_id_in_keyring(provider, client_id.strip()):
+            console.print(f"[green]✓[/] OAuth client_id for [cyan]{provider}[/] saved to keyring")
+            console.print()
+            console.print("[yellow]Important:[/]")
+            console.print(f"  This client_id must be registered with {provider.upper()}")
+            console.print(
+                f'  You can now use: victor chat --provider {provider} --auth-mode oauth "Your message"'
+            )
+        else:
+            console.print("[red]Failed to save OAuth client_id")
+            raise typer.Exit(1)
+    except ImportError as e:
+        console.print(f"[red]Failed to import OAuth manager: {e}[/]")
+        raise typer.Exit(1)
+
+
+def _delete_oauth_client_id(provider: str):
+    """Delete OAuth client_id from keyring."""
+    provider = provider.lower()
+
+    # Validate provider
+    oauth_providers = {"openai", "qwen"}
+    if provider not in oauth_providers:
+        console.print(f"[red]Provider '{provider}' does not support OAuth.[/]")
+        console.print(f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}")
+        raise typer.Exit(1)
+
+    # Check keyring availability
+    if not is_keyring_available():
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
+        raise typer.Exit(1)
+
+    try:
+        import keyring
+
+        # Delete the OAuth client_id from keyring
+        keyring.delete_password("victor", f"oauth_client_id_{provider}")
+        console.print(f"[green]✓[/] Deleted OAuth client_id for [cyan]{provider}[/] from keyring")
+    except Exception as e:
+        console.print(f"[yellow]Failed to delete OAuth client_id: {e}[/]")
+        console.print("[dim]The client_id may not be stored in the keyring.[/]")

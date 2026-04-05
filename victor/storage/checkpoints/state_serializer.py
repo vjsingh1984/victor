@@ -21,8 +21,9 @@ checksums.
 
 import gzip
 import hashlib
-import json
 import logging
+
+from victor.core.json_utils import json_dumps, json_loads
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Union
@@ -89,7 +90,7 @@ class StateSerializer:
         json_safe = self._to_json_safe(state)
 
         # Serialize to JSON string
-        json_str = json.dumps(json_safe, sort_keys=True, ensure_ascii=False)
+        json_str = json_dumps(json_safe, sort_keys=True, ensure_ascii=False)
         json_bytes = json_str.encode("utf-8")
 
         # Calculate checksum of uncompressed data
@@ -141,7 +142,7 @@ class StateSerializer:
                     f"Checksum mismatch: expected {serialized.checksum}, got {checksum}"
                 )
 
-            json_safe = json.loads(json_str)
+            json_safe = json_loads(json_str)
         else:
             if isinstance(serialized.data, bytes):
                 json_bytes = serialized.data
@@ -154,12 +155,12 @@ class StateSerializer:
                         f"Checksum mismatch: expected {serialized.checksum}, got {checksum}"
                     )
 
-                json_safe = json.loads(json_str)
+                json_safe = json_loads(json_str)
             else:
                 json_safe = serialized.data
 
                 # Verify checksum
-                json_str = json.dumps(json_safe, sort_keys=True, ensure_ascii=False)
+                json_str = json_dumps(json_safe, sort_keys=True, ensure_ascii=False)
                 checksum = hashlib.sha256(json_str.encode("utf-8")).hexdigest()
                 if checksum != serialized.checksum:
                     raise ValueError(

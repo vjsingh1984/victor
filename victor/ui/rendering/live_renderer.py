@@ -102,6 +102,7 @@ class LiveDisplayRenderer:
         elapsed: float,
         arguments: dict[str, Any],
         error: str | None = None,
+        follow_up_suggestions: list[dict[str, Any]] | None = None,
     ) -> None:
         """Handle tool execution result - print consolidated single line.
 
@@ -119,6 +120,14 @@ class LiveDisplayRenderer:
         color = "green" if success else "red"
         # Single consolidated line: icon + name + args + time
         self.console.print(f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]")
+        if success and follow_up_suggestions:
+            for suggestion in follow_up_suggestions[:2]:
+                if not isinstance(suggestion, dict):
+                    continue
+                command = suggestion.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    continue
+                self.console.print(f"[dim]  next: {command}[/]")
         self._pending_tool = None
         self.resume()
 

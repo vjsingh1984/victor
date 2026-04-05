@@ -81,6 +81,11 @@ class OpenAIProvider(BaseProvider):
         self._oauth_manager: Optional[OAuthTokenManager] = None
 
         if auth_mode == "oauth":
+            # OAuth mode uses ChatGPT subscription via Codex API.
+            # The /v1/chat/completions path is bridged to the Responses API.
+            if base_url is None:
+                base_url = "https://chatgpt.com/backend-api/codex/v1"
+
             self._oauth_manager = OAuthTokenManager("openai")
             # Use pre-obtained tokens or load cached (sync-safe)
             if oauth_tokens is not None:
@@ -146,12 +151,26 @@ class OpenAIProvider(BaseProvider):
             max_retries=max_retries,
             **kwargs,
         )
+
+        # Build extra headers for OAuth / Codex backend
+        default_headers = None
+        if auth_mode == "oauth":
+            import platform
+
+            from victor import __version__
+
+            default_headers = {
+                "originator": "victor",
+                "User-Agent": f"victor/{__version__} ({platform.system()})",
+            }
+
         self.client = AsyncOpenAI(
             api_key=self._api_key,
             organization=organization,
             base_url=base_url,
             timeout=timeout,
             max_retries=max_retries,
+            default_headers=default_headers,
         )
 
     async def _ensure_valid_token(self) -> None:
@@ -231,7 +250,7 @@ class OpenAIProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 # Convert messages to OpenAI format
                 openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
@@ -270,13 +289,7 @@ class OpenAIProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(request_params)}",
-                    endpoint="/chat/completions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -287,7 +300,17 @@ class OpenAIProvider(BaseProvider):
                     raise
 
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key", "invalid api", "api_key", "401"]):
+                if any(
+                    term in error_str
+                    for term in [
+                        "auth",
+                        "unauthorized",
+                        "invalid key",
+                        "invalid api",
+                        "api_key",
+                        "401",
+                    ]
+                ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,

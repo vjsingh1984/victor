@@ -15,11 +15,13 @@ from victor.agent.protocols import (
     IBudgetManager,
     ChunkGeneratorProtocol,
     CodeExecutionManagerProtocol,
+    CompactionSummarizerProtocol,
     ComplexityClassifierProtocol,
     ConversationEmbeddingStoreProtocol,
     ContextCompactorProtocol,
     ConversationStateMachineProtocol,
     DebugLoggerProtocol,
+    HierarchicalCompactionProtocol,
     IntentClassifierProtocol,
     IToolAccessController,
     MCPBridgeProtocol,
@@ -36,6 +38,7 @@ from victor.agent.protocols import (
     SafetyCheckerProtocol,
     SearchRouterProtocol,
     SemanticToolSelectorProtocol,
+    SessionContextLinkerProtocol,
     StateCoordinatorProtocol,
     StreamingHandlerProtocol,
     StreamingMetricsCollectorProtocol,
@@ -83,6 +86,9 @@ class ServiceSpec:
     factory_attr: str
     lifetime: ServiceLifetime = ServiceLifetime.SINGLETON
     pass_container: bool = False
+    depends_on: tuple = ()
+    phase: str = "orchestrator"
+    critical: bool = True
 
 
 AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
@@ -139,6 +145,9 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(ChunkGeneratorProtocol, "_create_chunk_generator"),
     ServiceSpec(ToolPlannerProtocol, "_create_tool_planner"),
     ServiceSpec(TaskCoordinatorProtocol, "_create_task_coordinator"),
+    ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
+    ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
+    ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
     ServiceSpec(
         ToolCoordinatorProtocol,
         "_create_tool_coordinator",
@@ -162,7 +171,7 @@ VERTICAL_EXTENSION_SPECS: List[ServiceSpec] = []
 WORKFLOW_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(NodeExecutorFactoryProtocol, "_create_node_executor_factory"),
     ServiceSpec(WorkflowValidator, "_create_workflow_validator"),
-    ServiceSpec(OrchestratorPool, "_create_orchestrator_pool"),
+    ServiceSpec(OrchestratorPool, "_create_orchestrator_pool", pass_container=True),
 ]
 
 WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
@@ -170,13 +179,12 @@ WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
         ExecutionContextProtocol,
         "_create_execution_context",
         ServiceLifetime.SCOPED,
+        pass_container=True,
     ),
 ]
 
 WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
-    ServiceSpec(
-        WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
-    ),
+    ServiceSpec(WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
     ServiceSpec(
         WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
     ),

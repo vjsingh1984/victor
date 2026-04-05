@@ -729,13 +729,21 @@ class UnifiedTaskTracker(ModeAwareMixin):
         - Plan mode: 2.5x multiplier (more exploration needed for planning)
         - Explore mode: 3.0x multiplier (exploration is the primary goal)
         - Model multiplier: varies by model capability
+
+        Capped proportionally to the tool budget to prevent runaway exploration.
         """
         # Handle case where task_config hasn't been set yet
         if self._task_config is None:
             return 8  # Default fallback
         base = self._task_config.max_exploration_iterations
         combined_multiplier = self._exploration_multiplier * self._mode_exploration_multiplier
-        return int(base * combined_multiplier)
+        raw = int(base * combined_multiplier)
+        # Cap at 3x the current tool budget to prevent runaway exploration
+        tool_budget = self._progress.tool_budget
+        if tool_budget and tool_budget > 0:
+            cap = max(tool_budget * 3, 30)  # At least 30
+            return min(raw, cap)
+        return min(raw, 100)  # Hard ceiling
 
     def set_mode_exploration_multiplier(self, multiplier: float) -> None:
         """Set the agent mode exploration multiplier.

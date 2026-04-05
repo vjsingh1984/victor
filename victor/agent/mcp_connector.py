@@ -59,6 +59,28 @@ class MCPConnectorConfig:
     auto_discover: bool = True
     connection_timeout: float = 30.0
 
+    @classmethod
+    def from_settings(cls, settings: Any) -> "MCPConnectorConfig":
+        """Create config from Victor Settings object.
+
+        Reads from settings.mcp (McpSettings) if available,
+        falls back to defaults otherwise.
+
+        Args:
+            settings: Victor Settings instance.
+
+        Returns:
+            Populated MCPConnectorConfig.
+        """
+        mcp = getattr(settings, "mcp", None)
+        if mcp is None:
+            return cls()
+        return cls(
+            enabled=getattr(mcp, "mcp_enabled", False),
+            auto_discover=getattr(mcp, "mcp_auto_discover", True),
+            connection_timeout=getattr(mcp, "mcp_tool_timeout_ms", 30000) / 1000.0,
+        )
+
 
 @dataclass
 class MCPConnectResult:

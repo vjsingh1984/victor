@@ -287,6 +287,7 @@ export class TeamsViewProvider implements vscode.TreeDataProvider<TeamTreeItem>,
     private _refreshInterval: NodeJS.Timeout | null = null;
     private _isLoading: boolean = false;
     private _lastFetchTime: number = 0;
+    private _capabilityAvailable: boolean | null = null;
     private _statusBarItem: vscode.StatusBarItem;
 
     constructor(
@@ -428,6 +429,17 @@ export class TeamsViewProvider implements vscode.TreeDataProvider<TeamTreeItem>,
         this._isLoading = true;
 
         try {
+            const teamsAvailable = await this._client.supportsCapability('teams');
+            this._capabilityAvailable = teamsAvailable;
+            if (!teamsAvailable) {
+                this._teams.clear();
+                this._messages.clear();
+                this.refresh();
+                this._updateStatusBar();
+                this._log('Teams capability unavailable on current server');
+                return;
+            }
+
             const teams = await this._client.listTeams();
 
             this._teams.clear();
@@ -557,6 +569,10 @@ export class TeamsViewProvider implements vscode.TreeDataProvider<TeamTreeItem>,
     }
 
     private _getTeamItems(): TeamTreeItem[] {
+        if (this._capabilityAvailable === false) {
+            return [new TeamInfoItem('Teams unavailable', 'This Victor server does not expose team APIs', 'circle-slash')];
+        }
+
         if (this._teams.size === 0) {
             return [new TeamInfoItem('No teams', 'Create a team to get started', 'info')];
         }

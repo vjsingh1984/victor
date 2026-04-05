@@ -45,9 +45,10 @@ Usage:
     await provider.shutdown()
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional
 
 from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk
 from victor.providers.registry import ProviderRegistry
@@ -333,6 +334,116 @@ class ManagedProvider:
 
         logger.info(f"ManagedProvider for {self.name} shutdown complete")
 
+    def is_healthy(self) -> bool:
+        """Check if the provider is still operational.
+
+        Verifies that the underlying provider and resilience layer
+        are in a usable state. Used by ProviderPool to avoid
+        returning stale providers.
+        """
+        # Check circuit breaker state if resilient provider is active
+        if self._resilient_provider is not None:
+            cb = getattr(self._resilient_provider, "_circuit_breaker", None)
+            if cb is not None and hasattr(cb, "state"):
+                if cb.state == "open":
+                    return False
+        # Check if base provider client is still alive
+        client = getattr(self._base_provider, "_client", None)
+        if client is not None and hasattr(client, "is_closed"):
+            if client.is_closed:
+                return False
+        return True
+
+
+class ProviderPool:
+    """Connection pool for ManagedProvider instances.
+
+    Reuses provider instances keyed by (provider_name, model) to avoid
+    repeated initialization overhead. Thread-safe via asyncio.Lock.
+
+    Usage:
+        pool = ProviderPool(max_size_per_key=3)
+        provider = await pool.acquire("anthropic", "claude-3-5-haiku", factory_fn)
+        # ... use provider ...
+        await pool.release("anthropic", "claude-3-5-haiku", provider)
+    """
+
+    def __init__(self, max_size_per_key: int = 3) -> None:
+        self._max_size = max_size_per_key
+        self._pools: Dict[tuple, List[ManagedProvider]] = {}
+        self._in_use: Dict[tuple, int] = {}
+        self._lock = asyncio.Lock()
+
+    async def acquire(
+        self,
+        provider_name: str,
+        model: str,
+        factory: Callable[[], Awaitable["ManagedProvider"]],
+    ) -> "ManagedProvider":
+        """Get a provider from pool or create a new one."""
+        key = (provider_name, model)
+        async with self._lock:
+            pool = self._pools.setdefault(key, [])
+            if pool:
+                provider = pool.pop()
+                self._in_use[key] = self._in_use.get(key, 0) + 1
+                logger.debug("Reusing pooled provider for %s/%s", provider_name, model)
+                return provider
+
+        # Create outside lock to avoid blocking other acquires
+        provider = await factory()
+        async with self._lock:
+            self._in_use[key] = self._in_use.get(key, 0) + 1
+        logger.debug("Created new provider for %s/%s", provider_name, model)
+        return provider
+
+    async def release(self, provider_name: str, model: str, provider: "ManagedProvider") -> None:
+        """Return a provider to the pool.
+
+        Checks provider health before re-pooling. Unhealthy providers
+        are shut down instead of being returned to the pool.
+        """
+        key = (provider_name, model)
+        async with self._lock:
+            self._in_use[key] = max(0, self._in_use.get(key, 0) - 1)
+            pool = self._pools.setdefault(key, [])
+            if len(pool) < self._max_size and provider.is_healthy():
+                pool.append(provider)
+            else:
+                if not provider.is_healthy():
+                    logger.debug(
+                        "Discarding unhealthy provider for %s/%s",
+                        provider_name,
+                        model,
+                    )
+                await provider.shutdown()
+
+    async def shutdown(self) -> None:
+        """Shutdown all pooled providers."""
+        async with self._lock:
+            for key, pool in self._pools.items():
+                for provider in pool:
+                    try:
+                        await provider.shutdown()
+                    except Exception as e:
+                        logger.warning("Error shutting down pooled provider %s: %s", key, e)
+            self._pools.clear()
+            self._in_use.clear()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get pool statistics."""
+        return {
+            "pools": {
+                f"{k[0]}/{k[1]}": {
+                    "available": len(v),
+                    "in_use": self._in_use.get(k, 0),
+                }
+                for k, v in self._pools.items()
+            },
+            "total_available": sum(len(v) for v in self._pools.values()),
+            "total_in_use": sum(self._in_use.values()),
+        }
+
 
 class ManagedProviderFactory:
     """
@@ -343,27 +454,72 @@ class ManagedProviderFactory:
     - Rate limiting with priority queues
     - Streaming metrics collection
     - Fallback provider chains
+    - Connection pooling via ProviderPool
 
     Usage:
-        # Simple creation
+        # Simple creation (no pooling)
         provider = await ManagedProviderFactory.create(
             provider_name="anthropic",
             model="claude-3-5-haiku-20241022",
             api_key=api_key,
         )
 
-        # With custom configuration
-        config = ProviderConfig(
+        # With pooling (reuses providers)
+        provider = await ManagedProviderFactory.acquire(
             provider_name="anthropic",
             model="claude-3-5-haiku-20241022",
             api_key=api_key,
-            enable_resilience=True,
-            fallback_providers=[
-                ProviderConfig(provider_name="openai", model="gpt-4", api_key=openai_key),
-            ],
         )
-        provider = await ManagedProviderFactory.create_from_config(config)
+        # ... use provider ...
+        await ManagedProviderFactory.release(provider)
     """
+
+    _default_pool: Optional[ProviderPool] = None
+
+    _default_pool: Optional["ProviderPool"] = None
+
+    @classmethod
+    def get_pool(cls, max_size_per_key: int = 3) -> "ProviderPool":
+        """Get or create the default provider pool."""
+        if cls._default_pool is None:
+            cls._default_pool = ProviderPool(max_size_per_key=max_size_per_key)
+        return cls._default_pool
+
+    @classmethod
+    async def acquire(
+        cls,
+        provider_name: str,
+        model: str,
+        api_key: Optional[str] = None,
+        **kwargs: Any,
+    ) -> ManagedProvider:
+        """Acquire a provider from the pool (or create new)."""
+        pool = cls.get_pool()
+
+        async def _factory():
+            return await cls.create(
+                provider_name=provider_name,
+                model=model,
+                api_key=api_key,
+                **kwargs,
+            )
+
+        return await pool.acquire(provider_name, model, _factory)
+
+    @classmethod
+    async def release(cls, provider: ManagedProvider) -> None:
+        """Release a provider back to the pool."""
+        if cls._default_pool is not None:
+            name = provider.name
+            model = provider.model
+            await cls._default_pool.release(name, model, provider)
+
+    @classmethod
+    async def shutdown_pool(cls) -> None:
+        """Shutdown the default provider pool."""
+        if cls._default_pool is not None:
+            await cls._default_pool.shutdown()
+            cls._default_pool = None
 
     @classmethod
     async def create(

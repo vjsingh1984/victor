@@ -14,15 +14,36 @@
 
 """Tool framework - backward compatible re-exports.
 
+.. deprecated::
+    Importing from ``victor.tools`` directly is deprecated for specific classes.
+    Import from the specific submodule instead. This module will continue to
+    re-export for backward compatibility until Victor 2.0.
+
 This module provides backward compatibility by re-exporting all classes
-from their new locations. Existing code can still import from victor.tools.base
-or from victor.tools directly without any changes.
+from their new locations. Existing code can still import from victor.tools
+directly without any changes, but new code should use the specific imports.
+
+Migration Path:
+    **OLD (deprecated but still works):**
+        from victor.tools import BaseTool, ToolResult, ToolRegistry
+
+    **NEW (recommended):**
+        from victor.tools.base import BaseTool, ToolResult
+        from victor.tools.registry import ToolRegistry
+
+    **Or be more explicit:**
+        from victor.tools.base import BaseTool
+        from victor.tools.enums import CostTier, Priority
+        from victor.tools.metadata import ToolMetadata
+        from victor.tools.registry import ToolRegistry
 
 New structure:
 - victor/tools/base.py - BaseTool, ToolResult, and supporting classes
 - victor/tools/enums.py - All enum classes
 - victor/tools/metadata.py - ToolMetadata and ToolMetadataRegistry
 - victor/tools/registry.py - ToolRegistry, Hook, HookError
+
+For migration examples, see: ``docs/MIGRATION_GUIDE.md``
 """
 
 # Re-export everything from base.py for backward compatibility

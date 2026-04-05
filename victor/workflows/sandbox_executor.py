@@ -283,9 +283,9 @@ class SandboxedExecutor:
 
             # Communicate with process
             stdout, stderr = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: process.communicate(input_data.encode() if input_data else None),
+                asyncio.to_thread(
+                    process.communicate,
+                    input_data.encode() if input_data else None,
                 ),
                 timeout=limits.timeout_seconds,
             )

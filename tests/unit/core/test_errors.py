@@ -14,6 +14,8 @@
 
 """Tests for centralized error handling module."""
 
+import threading
+
 import pytest
 from datetime import datetime, timezone
 
@@ -511,6 +513,33 @@ class TestErrorHandler:
 
         assert len(recent) == 2
         assert recent[-1].message == "Error 3"
+
+
+# =============================================================================
+# ERROR HANDLER THREAD SAFETY TESTS
+# =============================================================================
+
+
+class TestErrorHandlerThreadSafety:
+    """Tests for ErrorHandler thread safety."""
+
+    def test_concurrent_error_handling(self):
+        """Test that concurrent error handling does not corrupt history."""
+        handler = ErrorHandler()
+        barrier = threading.Barrier(10)
+
+        def worker():
+            barrier.wait()
+            for _ in range(100):
+                handler.handle(Exception("test error"))
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(handler.get_recent_errors(100)) <= 100
 
 
 # =============================================================================

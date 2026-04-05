@@ -34,6 +34,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
@@ -42,6 +43,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from victor.core.verticals.import_resolver import module_import_candidates
 
 if TYPE_CHECKING:
     from victor.framework.protocols import LanguageRegistryProtocol, LSPPoolProtocol
@@ -116,8 +119,12 @@ class WriteResult:
             "error": self.error,
             "summary": {
                 "total_diagnostics": len(self.diagnostics),
-                "errors": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.ERROR),
-                "warnings": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.WARNING),
+                "errors": sum(
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.ERROR
+                ),
+                "warnings": sum(
+                    1 for d in self.diagnostics if d.severity == DiagnosticSeverity.WARNING
+                ),
                 "info": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.INFO),
                 "hints": sum(1 for d in self.diagnostics if d.severity == DiagnosticSeverity.HINT),
             },
@@ -150,15 +157,16 @@ class LSPWriteEnhancer:
         Uses injected pool if available, otherwise falls back to coding vertical.
         """
         if self._lsp_pool is None:
-            try:
-                from victor.verticals.contrib.coding.lsp.manager import LSPConnectionPool
-
-                self._lsp_pool = LSPConnectionPool(self._workspace_root)
-            except ImportError:
+            lsp_pool_cls = self._load_optional_symbol(
+                "victor.coding.lsp.manager",
+                "LSPConnectionPool",
+            )
+            if lsp_pool_cls is None:
                 raise ImportError(
-                    "LSP support requires the coding vertical. "
-                    "Install it or inject an LSPPoolProtocol instance."
+                    "LSP support requires the coding vertical package. "
+                    "Install 'victor-coding' or inject an LSPPoolProtocol instance."
                 )
+            self._lsp_pool = lsp_pool_cls(self._workspace_root)
         return self._lsp_pool
 
     def _get_language_registry(self) -> "LanguageRegistryProtocol":
@@ -167,18 +175,27 @@ class LSPWriteEnhancer:
         Uses injected registry if available, otherwise falls back to coding vertical.
         """
         if self._language_registry is None:
-            try:
-                from victor.verticals.contrib.coding.languages.registry import (
-                    get_language_registry,
-                )
-
-                self._language_registry = get_language_registry()
-            except ImportError:
+            get_registry = self._load_optional_symbol(
+                "victor.coding.languages.registry",
+                "get_language_registry",
+            )
+            if get_registry is None:
                 raise ImportError(
-                    "Language registry requires the coding vertical. "
-                    "Install it or inject a LanguageRegistryProtocol instance."
+                    "Language registry requires the coding vertical package. "
+                    "Install 'victor-coding' or inject a LanguageRegistryProtocol instance."
                 )
+            self._language_registry = get_registry()
         return self._language_registry
+
+    def _load_optional_symbol(self, module_path: str, symbol_name: str) -> Optional[Any]:
+        """Load symbol from the first importable compatibility module path."""
+        for candidate in module_import_candidates(module_path):
+            try:
+                module = importlib.import_module(candidate)
+                return getattr(module, symbol_name)
+            except Exception:
+                continue
+        return None
 
     async def validate_with_lsp(self, path: str, content: str) -> List[Diagnostic]:
         """Validate code content using LSP.
@@ -251,9 +268,7 @@ class LSPWriteEnhancer:
         # Write content to temp file for formatting
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=file_path.suffix, delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=file_path.suffix, delete=False) as tmp:
             tmp_path = tmp.name
             tmp.write(content)
 

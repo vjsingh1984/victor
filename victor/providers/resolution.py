@@ -55,7 +55,6 @@ from victor.config.api_keys import (
     is_keyring_available,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -129,13 +128,10 @@ class APIKeyNotFoundError(Exception):
                     f"  • Set {env_var} environment variable "
                     "(recommended for servers/containers/CI)"
                 )
-            lines.append(
-                "  • Pass api_key parameter to provider constructor"
-            )
+            lines.append("  • Pass api_key parameter to provider constructor")
         else:
             lines.append(
-                f"  • Run: victor keys set {self.provider} --keyring "
-                "(for interactive CLI use)"
+                f"  • Run: victor keys set {self.provider} --keyring " "(for interactive CLI use)"
             )
             env_var = _get_provider_env_var(self.provider)
             if env_var:
@@ -207,8 +203,7 @@ class UnifiedApiKeyResolver:
             non_interactive: Force non-interactive mode (None = auto-detect)
         """
         self.non_interactive = (
-            non_interactive if non_interactive is not None
-            else self._detect_non_interactive()
+            non_interactive if non_interactive is not None else self._detect_non_interactive()
         )
         self._cache: Dict[str, APIKeyResult] = {}
 
@@ -281,28 +276,35 @@ class UnifiedApiKeyResolver:
 
         # Priority 1: Explicit parameter
         if explicit_key is not None:
-            sources.append(KeySource(
+            sources.append(
+                KeySource(
+                    source="explicit",
+                    description="Explicit api_key parameter",
+                    found=True,
+                    value_preview=self._preview_key(explicit_key),
+                    interactive_required=False,
+                )
+            )
+            return self._cache_result(
+                provider,
+                APIKeyResult(
+                    key=explicit_key,
+                    source="explicit",
+                    source_detail="Explicit api_key parameter",
+                    sources_attempted=sources,
+                    non_interactive=self.non_interactive,
+                    confidence="high",
+                ),
+            )
+
+        sources.append(
+            KeySource(
                 source="explicit",
                 description="Explicit api_key parameter",
-                found=True,
-                value_preview=self._preview_key(explicit_key),
+                found=False,
                 interactive_required=False,
-            ))
-            return self._cache_result(provider, APIKeyResult(
-                key=explicit_key,
-                source="explicit",
-                source_detail="Explicit api_key parameter",
-                sources_attempted=sources,
-                non_interactive=self.non_interactive,
-                confidence="high",
-            ))
-
-        sources.append(KeySource(
-            source="explicit",
-            description="Explicit api_key parameter",
-            found=False,
-            interactive_required=False,
-        ))
+            )
+        )
 
         # Priority 2: Environment variable
         env_var = _get_provider_env_var(provider)
@@ -310,13 +312,15 @@ class UnifiedApiKeyResolver:
         if env_var:
             env_key = os.environ.get(env_var)
             if env_key:
-                sources.append(KeySource(
-                    source="environment",
-                    description=f"{env_var} environment variable",
-                    found=True,
-                    value_preview=self._preview_key(env_key),
-                    interactive_required=False,
-                ))
+                sources.append(
+                    KeySource(
+                        source="environment",
+                        description=f"{env_var} environment variable",
+                        found=True,
+                        value_preview=self._preview_key(env_key),
+                        interactive_required=False,
+                    )
+                )
                 result = APIKeyResult(
                     key=env_key,
                     source="environment",
@@ -327,31 +331,32 @@ class UnifiedApiKeyResolver:
                 )
                 return self._cache_result(provider, result)
             else:
-                sources.append(KeySource(
-                    source="environment",
-                    description=f"{env_var} environment variable",
-                    found=False,
-                    interactive_required=False,
-                ))
+                sources.append(
+                    KeySource(
+                        source="environment",
+                        description=f"{env_var} environment variable",
+                        found=False,
+                        interactive_required=False,
+                    )
+                )
 
         # Priority 3: Keyring (skip in non-interactive mode)
-        check_keyring = (
-            check_keyring if check_keyring is not None
-            else not self.non_interactive
-        )
+        check_keyring = check_keyring if check_keyring is not None else not self.non_interactive
 
         if check_keyring and is_keyring_available():
             from victor.config.api_keys import KEYRING_SERVICE
 
             keyring_key = _get_key_from_keyring(provider)
             if keyring_key:
-                sources.append(KeySource(
-                    source="keyring",
-                    description=f"System keyring ({KEYRING_SERVICE})",
-                    found=True,
-                    value_preview=self._preview_key(keyring_key),
-                    interactive_required=False,
-                ))
+                sources.append(
+                    KeySource(
+                        source="keyring",
+                        description=f"System keyring ({KEYRING_SERVICE})",
+                        found=True,
+                        value_preview=self._preview_key(keyring_key),
+                        interactive_required=False,
+                    )
+                )
                 result = APIKeyResult(
                     key=keyring_key,
                     source="keyring",
@@ -362,19 +367,23 @@ class UnifiedApiKeyResolver:
                 )
                 return self._cache_result(provider, result)
             else:
-                sources.append(KeySource(
-                    source="keyring",
-                    description=f"System keyring ({KEYRING_SERVICE})",
-                    found=False,
-                    interactive_required=True,  # May need user to unlock
-                ))
+                sources.append(
+                    KeySource(
+                        source="keyring",
+                        description=f"System keyring ({KEYRING_SERVICE})",
+                        found=False,
+                        interactive_required=True,  # May need user to unlock
+                    )
+                )
         elif self.non_interactive:
-            sources.append(KeySource(
-                source="keyring",
-                description="System keyring (skipped in non-interactive mode)",
-                found=False,
-                interactive_required=False,
-            ))
+            sources.append(
+                KeySource(
+                    source="keyring",
+                    description="System keyring (skipped in non-interactive mode)",
+                    found=False,
+                    interactive_required=False,
+                )
+            )
 
         # Priority 4: Config file
         try:
@@ -385,13 +394,15 @@ class UnifiedApiKeyResolver:
                 manager = APIKeyManager(keys_file=keys_file)
                 file_key = manager._load_key_from_file(provider)
                 if file_key:
-                    sources.append(KeySource(
-                        source="file",
-                        description=f"Config file ({keys_file})",
-                        found=True,
-                        value_preview=self._preview_key(file_key),
-                        interactive_required=False,
-                    ))
+                    sources.append(
+                        KeySource(
+                            source="file",
+                            description=f"Config file ({keys_file})",
+                            found=True,
+                            value_preview=self._preview_key(file_key),
+                            interactive_required=False,
+                        )
+                    )
                     result = APIKeyResult(
                         key=file_key,
                         source="file",
@@ -402,12 +413,14 @@ class UnifiedApiKeyResolver:
                     )
                     return self._cache_result(provider, result)
                 else:
-                    sources.append(KeySource(
-                        source="file",
-                        description=f"Config file ({keys_file})",
-                        found=False,
-                        interactive_required=False,
-                    ))
+                    sources.append(
+                        KeySource(
+                            source="file",
+                            description=f"Config file ({keys_file})",
+                            found=False,
+                            interactive_required=False,
+                        )
+                    )
         except Exception as e:
             logger.debug(f"Config file check failed: {e}")
 

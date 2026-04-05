@@ -153,10 +153,7 @@ class TestProfileYAMLGeneration:
     def test_apply_configuration(self, mock_install):
         """Applying configuration calls install_profile."""
         wizard = OnboardingWizard()
-        wizard.state["selected_profile"] = MagicMock(
-            name="test",
-            display_name="Test Profile"
-        )
+        wizard.state["selected_profile"] = MagicMock(name="test", display_name="Test Profile")
         wizard.state["provider"] = "ollama"
         wizard.state["model"] = "qwen2.5-coder:7b"
 
@@ -200,9 +197,18 @@ class TestWizardFlow:
     @patch("victor.ui.commands.onboarding.OnboardingWizard._show_welcome")
     @patch("victor.ui.commands.onboarding.OnboardingWizard._confirm_start")
     @patch("victor.ui.commands.onboarding.Confirm.ask")
-    def test_full_run_success(self, mock_confirm, mock_confirm_start, mock_welcome,
-                            mock_detect, mock_select, mock_configure, mock_apply,
-                            mock_validate, mock_complete):
+    def test_full_run_success(
+        self,
+        mock_confirm,
+        mock_confirm_start,
+        mock_welcome,
+        mock_detect,
+        mock_select,
+        mock_configure,
+        mock_apply,
+        mock_validate,
+        mock_complete,
+    ):
         """Test full wizard run with all steps."""
         wizard = OnboardingWizard()
 
@@ -247,7 +253,9 @@ class TestRunOnboarding:
         assert exit_code == 0
         mock_run.assert_called_once()
 
-    @patch("victor.ui.commands.onboarding.OnboardingWizard.run", side_effect=Exception("Test error"))
+    @patch(
+        "victor.ui.commands.onboarding.OnboardingWizard.run", side_effect=Exception("Test error")
+    )
     def test_run_onboarding_handles_exception(self, mock_run):
         """run_onboarding handles exceptions."""
         from victor.ui.commands.onboarding import run_onboarding

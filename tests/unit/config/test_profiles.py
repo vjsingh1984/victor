@@ -149,17 +149,13 @@ class TestProfileGeneration:
 
     def test_generate_with_provider_override(self):
         """Provider override works in YAML generation."""
-        yaml_content = generate_profile_yaml(
-            BASIC_PROFILE,
-            provider_override="anthropic"
-        )
+        yaml_content = generate_profile_yaml(BASIC_PROFILE, provider_override="anthropic")
         assert "provider: anthropic" in yaml_content
 
     def test_generate_with_model_override(self):
         """Model override works in YAML generation."""
         yaml_content = generate_profile_yaml(
-            BASIC_PROFILE,
-            model_override="claude-sonnet-4-5-20250514"
+            BASIC_PROFILE, model_override="claude-sonnet-4-5-20250514"
         )
         assert "model: claude-sonnet-4-5-20250514" in yaml_content
 

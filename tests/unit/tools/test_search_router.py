@@ -234,6 +234,20 @@ class TestConvenienceFunctions:
         tool = suggest_search_tool("how does the caching mechanism work")
         assert tool == "semantic_code_search"
 
+    def test_suggest_search_tool_bug_similarity(self):
+        """Bug/regression queries should keep using code_search with bug mode."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("find similar crashes in the auth flow")
+        assert tool == "code_search"
+
+    def test_suggest_search_tool_graph_callers(self):
+        """Call-graph questions should recommend the graph tool."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("who calls parse_json")
+        assert tool == "graph"
+
     def test_is_keyword_query(self):
         """Test is_keyword_query function."""
         from victor.agent.search_router import is_keyword_query
@@ -304,6 +318,51 @@ class TestRealWorldQueries:
         result = router.route("how is error handling implemented across providers")
 
         assert result.search_type == SearchType.SEMANTIC
+
+    def test_bug_similarity_query_sets_tool_arguments(self):
+        """Bug-style queries should route to code_search with mode='bugs'."""
+        from victor.agent.search_router import SearchRouter, SearchType
+
+        router = SearchRouter()
+        result = router.route("json parsing crash on empty payload")
+
+        assert result.search_type == SearchType.SEMANTIC
+        assert result.tool_name == "code_search"
+        assert result.tool_arguments == {"mode": "bugs"}
+        assert "crash" in result.matched_patterns
+
+    def test_callers_query_routes_to_graph_tool(self):
+        """Caller questions should route to graph(mode='callers')."""
+        from victor.agent.search_router import SearchRouter, SearchType
+
+        router = SearchRouter()
+        result = router.route("who calls parse_json?")
+
+        assert result.search_type == SearchType.SEMANTIC
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {"mode": "callers", "node": "parse_json", "depth": 2}
+        assert result.transformed_query == "parse_json"
+        assert "who_calls" in result.matched_patterns
+
+    def test_callees_query_routes_to_graph_tool(self):
+        """Forward call questions should route to graph(mode='callees')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("what does main call")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {"mode": "callees", "node": "main", "depth": 2}
+
+    def test_trace_query_routes_to_graph_tool(self):
+        """Execution-path questions should route to graph(mode='trace')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route('trace execution from "main"')
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {"mode": "trace", "node": "main", "depth": 3}
 
     def test_import_exact_match(self):
         """Test exact import routes to KEYWORD."""

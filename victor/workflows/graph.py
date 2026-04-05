@@ -564,7 +564,8 @@ def __getattr__(name: str):
         _warnings.warn(
             "WorkflowGraph from victor.workflows.graph is deprecated. "
             "Use BasicWorkflowGraph instead, or for typed workflows use "
-            "victor.workflows.graph_dsl.WorkflowGraph.",
+            "victor.workflows.graph_dsl.WorkflowGraph. "
+            "Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )

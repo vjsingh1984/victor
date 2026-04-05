@@ -81,6 +81,7 @@ class TestFormatterRenderer:
             tool_name="write",
             success=True,
             error=None,
+            follow_up_suggestions=None,
         )
         mock_formatter.start_streaming.assert_called_once()
 
@@ -98,6 +99,31 @@ class TestFormatterRenderer:
             tool_name="bash",
             success=False,
             error="Permission denied",
+            follow_up_suggestions=None,
+        )
+
+    def test_on_tool_result_forwards_follow_up_suggestions(self, renderer, mock_formatter):
+        """Test on_tool_result() forwards follow-up suggestions to formatter."""
+        follow_ups = [
+            {
+                "command": 'graph(mode="trace", node="main", depth=3)',
+                "description": "Trace execution starting from main.",
+            }
+        ]
+
+        renderer.on_tool_result(
+            name="code_search",
+            success=True,
+            elapsed=0.4,
+            arguments={"query": "main entry point"},
+            follow_up_suggestions=follow_ups,
+        )
+
+        mock_formatter.tool_result.assert_called_once_with(
+            tool_name="code_search",
+            success=True,
+            error=None,
+            follow_up_suggestions=follow_ups,
         )
 
     def test_on_status(self, renderer, mock_formatter):
@@ -322,6 +348,34 @@ class TestLiveDisplayRenderer:
         assert "✗" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_tool_result_prints_follow_up_suggestions(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """Test on_tool_result() prints visible next-step suggestions."""
+        mock_live = MagicMock()
+        mock_live_class.return_value = mock_live
+
+        renderer.start()
+        renderer.on_tool_result(
+            name="code_search",
+            success=True,
+            elapsed=0.3,
+            arguments={"query": "main entry point"},
+            follow_up_suggestions=[
+                {
+                    "command": 'graph(mode="trace", node="main", depth=3)',
+                    "description": "Trace execution starting from main.",
+                }
+            ],
+        )
+
+        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
+        assert any("next:" in call_str for call_str in printed_calls)
+        assert any(
+            'graph(mode="trace", node="main", depth=3)' in call_str for call_str in printed_calls
+        )
+
+    @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_status_prints_dim(self, mock_live_class, renderer, mock_console):
         """Test on_status() prints message with dim styling."""
         mock_live = MagicMock()
@@ -511,6 +565,48 @@ class TestStreamResponse:
             elapsed=0.5,
             arguments={"path": "/out.py"},
             error=None,
+            follow_up_suggestions=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_processes_tool_result_event_with_follow_ups(self, mock_agent, mock_renderer):
+        """Test stream_response forwards tool follow-up suggestions."""
+
+        async def mock_stream():
+            yield StreamChunk(
+                content="",
+                metadata={
+                    "tool_result": {
+                        "name": "code_search",
+                        "success": True,
+                        "elapsed": 0.2,
+                        "arguments": {"query": "main entry point"},
+                        "follow_up_suggestions": [
+                            {
+                                "command": 'graph(mode="trace", node="main", depth=3)',
+                                "description": "Trace execution starting from main.",
+                            }
+                        ],
+                    }
+                },
+            )
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(mock_agent, "test message", mock_renderer)
+
+        mock_renderer.on_tool_result.assert_called_once_with(
+            name="code_search",
+            success=True,
+            elapsed=0.2,
+            arguments={"query": "main entry point"},
+            error=None,
+            follow_up_suggestions=[
+                {
+                    "command": 'graph(mode="trace", node="main", depth=3)',
+                    "description": "Trace execution starting from main.",
+                }
+            ],
         )
 
     @pytest.mark.asyncio
@@ -541,6 +637,7 @@ class TestStreamResponse:
             elapsed=1.0,
             arguments={"cmd": "rm -rf /"},
             error="Permission denied",
+            follow_up_suggestions=None,
         )
 
     @pytest.mark.asyncio

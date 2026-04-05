@@ -91,6 +91,7 @@ from victor.framework.state_merging import (
     StateMergeError,
     create_merge_strategy,
 )
+from victor.core.async_utils import run_sync
 from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 
 if TYPE_CHECKING:
@@ -172,26 +173,21 @@ class TeamNode:
         Returns:
             Updated graph state with team result merged in
         """
-        # Import here to avoid circular dependency
-        import asyncio
-
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # We're in an async context, need to create task
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run, self.execute_async(orchestrator, graph_state)
-                    )
-                    return future.result()
-            else:
-                # No running loop, just run
-                return asyncio.run(self.execute_async(orchestrator, graph_state))
+            asyncio.get_running_loop()
         except RuntimeError:
-            # No event loop, create new one
-            return asyncio.run(self.execute_async(orchestrator, graph_state))
+            return run_sync(self.execute_async(orchestrator, graph_state))
+
+        # Preserve the sync API inside async callers by hopping to a worker
+        # thread, where run_sync() can safely own the event loop.
+        import concurrent.futures
+
+        def _execute_in_worker_thread() -> Dict[str, Any]:
+            return run_sync(self.execute_async(orchestrator, graph_state))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_execute_in_worker_thread)
+            return future.result()
 
     async def execute_async(
         self,
@@ -227,8 +223,8 @@ class TeamNode:
             # Create team coordinator
             coordinator = create_coordinator(
                 orchestrator=orchestrator,
-                with_observability=False,  # Disable to avoid double-events
-                with_rl=False,
+                enable_observability=False,  # Disable to avoid double-events
+                enable_rl=False,
             )
 
             # Create team config
@@ -504,7 +500,7 @@ class TeamNode:
         Returns:
             TeamNode instance
         """
-        from victor.agent.subagents import SubAgentRole
+        from victor.core.shared_types import SubAgentRole
 
         # Deserialize members
         members = []

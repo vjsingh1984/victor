@@ -44,10 +44,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthError,
     ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -301,7 +298,7 @@ class BedrockProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 client = await self._get_client()
 
@@ -325,47 +322,12 @@ class BedrockProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = response.usage.get("total_tokens") if response.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(messages)}",
-                    endpoint=f"bedrock.{self._region}.amazonaws.com",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return response
 
             except Exception as e:
-                # Convert to specific provider error types based on error
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                auth_terms = ["auth", "unauthorized", "access denied", "401", "403"]
-                rate_limit_terms = ["rate limit", "429", "throttling", "too many requests"]
-
-                if any(term in error_str for term in auth_terms):
-                    raise ProviderAuthError(
-                        message=f"AWS Bedrock authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in rate_limit_terms):
-                    raise ProviderRateLimitError(
-                        message=f"AWS Bedrock rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                elif "timeout" in error_str:
-                    raise ProviderTimeoutError(
-                        message=f"Bedrock request timed out after {self.timeout}s",
-                        provider=self.name,
-                    ) from e
-                else:
-                    raise ProviderError(
-                        message=f"Bedrock error: {e}",
-                        provider=self.name,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def _chat_converse(
         self, client, messages, model, temperature, max_tokens, tools, **kwargs
@@ -630,36 +592,7 @@ class BedrockProvider(BaseProvider):
                     )
 
         except Exception as e:
-            # Convert to specific provider error types based on error
-            # Skip if already a ProviderError to avoid double-wrapping
-            if isinstance(e, ProviderError):
-                raise
-
-            error_str = str(e).lower()
-            auth_terms = ["auth", "unauthorized", "access denied", "401", "403"]
-            rate_limit_terms = ["rate limit", "429", "throttling", "too many requests"]
-
-            if any(term in error_str for term in auth_terms):
-                raise ProviderAuthError(
-                    message=f"AWS Bedrock authentication failed: {str(e)}",
-                    provider=self.name,
-                ) from e
-            elif any(term in error_str for term in rate_limit_terms):
-                raise ProviderRateLimitError(
-                    message=f"AWS Bedrock rate limit exceeded: {str(e)}",
-                    provider=self.name,
-                    status_code=429,
-                ) from e
-            elif "timeout" in error_str:
-                raise ProviderTimeoutError(
-                    message="Bedrock stream timed out",
-                    provider=self.name,
-                ) from e
-            else:
-                raise ProviderError(
-                    message=f"Bedrock streaming error: {e}",
-                    provider=self.name,
-                ) from e
+            raise self.classify_error(e) from e
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Bedrock foundation models."""

@@ -94,6 +94,7 @@ Example - Operator chaining (>>):
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 from abc import ABC
@@ -116,6 +117,7 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.async_utils import run_sync, run_sync_in_thread
 from victor.workflows.definition import (
     AgentNode,
     ConditionNode,
@@ -855,9 +857,11 @@ class WorkflowGraph(Generic[S]):
                 result = f(state)
                 # Handle both sync and async functions
                 if inspect.iscoroutine(result):
-                    import asyncio
-
-                    result = asyncio.get_event_loop().run_until_complete(result)
+                    try:
+                        asyncio.get_running_loop()
+                        result = run_sync_in_thread(result)
+                    except RuntimeError:
+                        result = run_sync(result)
                 return result.to_dict() if hasattr(result, "to_dict") else ctx
 
             return TransformNode(

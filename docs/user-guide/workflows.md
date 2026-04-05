@@ -608,7 +608,7 @@ workflows:
 Each vertical provides a workflow provider for easy execution:
 
 ```python
-from victor.coding.workflows import CodingWorkflowProvider
+from victor_coding.workflows import CodingWorkflowProvider
 
 # Create provider
 provider = CodingWorkflowProvider()

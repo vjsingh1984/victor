@@ -29,6 +29,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Load a vertical attribute using external-first resolution."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None or not hasattr(module, attr_name):
+        raise ImportError(f"Unable to resolve {module_path}:{attr_name}")
+    return getattr(module, attr_name)
+
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -45,7 +56,7 @@ class ConcreteYAMLWorkflowProvider:
         # Create a concrete subclass dynamically
         class TestProvider(BaseYAMLWorkflowProvider):
             def _get_escape_hatches_module(self) -> str:
-                return "victor.research.escape_hatches"
+                return "victor_research.escape_hatches"
 
             def _get_workflows_directory(self_inner) -> Path:
                 if workflows_dir:
@@ -292,7 +303,10 @@ class TestVerticalProviderIntegration:
     def test_research_provider_has_get_compiler(self):
         """Test that ResearchWorkflowProvider has get_compiler method."""
         try:
-            from victor.research.workflows import ResearchWorkflowProvider
+            ResearchWorkflowProvider = _load_vertical_attr(
+                "victor.research.workflows",
+                "ResearchWorkflowProvider",
+            )
 
             provider = ResearchWorkflowProvider()
             assert hasattr(provider, "get_compiler")
@@ -303,7 +317,10 @@ class TestVerticalProviderIntegration:
     def test_coding_provider_has_get_compiler(self):
         """Test that CodingWorkflowProvider has get_compiler method."""
         try:
-            from victor.coding.workflows.provider import CodingWorkflowProvider
+            CodingWorkflowProvider = _load_vertical_attr(
+                "victor.coding.workflows.provider",
+                "CodingWorkflowProvider",
+            )
 
             provider = CodingWorkflowProvider()
             assert hasattr(provider, "get_compiler")
@@ -314,7 +331,10 @@ class TestVerticalProviderIntegration:
     def test_devops_provider_has_compile_workflow(self):
         """Test that DevOpsWorkflowProvider has compile_workflow method."""
         try:
-            from victor.devops.workflows import DevOpsWorkflowProvider
+            DevOpsWorkflowProvider = _load_vertical_attr(
+                "victor.devops.workflows",
+                "DevOpsWorkflowProvider",
+            )
 
             provider = DevOpsWorkflowProvider()
             assert hasattr(provider, "compile_workflow")
@@ -325,7 +345,10 @@ class TestVerticalProviderIntegration:
     def test_dataanalysis_provider_has_run_compiled_workflow(self):
         """Test that DataAnalysisWorkflowProvider has run_compiled_workflow method."""
         try:
-            from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+            DataAnalysisWorkflowProvider = _load_vertical_attr(
+                "victor.dataanalysis.workflows",
+                "DataAnalysisWorkflowProvider",
+            )
 
             provider = DataAnalysisWorkflowProvider()
             assert hasattr(provider, "run_compiled_workflow")

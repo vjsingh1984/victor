@@ -104,19 +104,41 @@ from victor.teams.types import (
     TeamResult,
 )
 
-# Protocols
-from victor.teams.protocols import (
-    IEnhancedTeamCoordinator,
-    IMessageBusProvider,
-    IObservableCoordinator,
-    IRLCoordinator,
-    ISharedMemoryProvider,
-    ITeamCoordinator,
-    ITeamMember,
-)
+# Protocols (import from canonical location to avoid circular import)
+# Note: victor.teams.protocols is a re-export shim - import from victor.protocols.team directly
+# Deferred import to avoid circular dependency with victor.protocols.team
+if TYPE_CHECKING:
+    from victor.protocols.team import (
+        IAgent,
+        IEnhancedTeamCoordinator,
+        IMessageBusProvider,
+        IObservableCoordinator,
+        IRLCoordinator,
+        ISharedMemoryProvider,
+        ITeamCoordinator,
+        ITeamMember,
+        TeamCoordinatorProtocol,
+        TeamMemberProtocol,
+    )
+else:
+    # Lazy load protocols at runtime to break circular import
+    # victor.protocols.team imports from victor.teams.types, which creates a cycle
+    # if victor.teams.__init__ imports from victor.protocols.team at module level
+    IAgent = None  # type: ignore
+    IEnhancedTeamCoordinator = None  # type: ignore
+    IMessageBusProvider = None  # type: ignore
+    IObservableCoordinator = None  # type: ignore
+    IRLCoordinator = None  # type: ignore
+    ISharedMemoryProvider = None  # type: ignore
+    ITeamCoordinator = None  # type: ignore
+    ITeamMember = None  # type: ignore
+    TeamCoordinatorProtocol = None  # type: ignore
+    TeamMemberProtocol = None  # type: ignore
 
-# Coordinator
-from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+# Coordinator: lazy import to break circular dependency with
+# victor.coordination.formations.base → victor.teams.types
+# UnifiedTeamCoordinator is accessed via create_coordinator() or
+# direct import from victor.teams.unified_coordinator.
 
 # Framework coordinator (for testing/lightweight usage)
 # Note: Imported in create_coordinator() to avoid circular dependency
@@ -136,83 +158,110 @@ if TYPE_CHECKING:
 
 def create_coordinator(
     orchestrator: Optional["AgentOrchestrator"] = None,
-    *,
     lightweight: bool = False,
-    with_observability: bool = True,
-    with_rl: bool = True,
+    enable_observability: bool = False,
+    enable_rl: bool = False,
 ) -> ITeamCoordinator:
-    """Factory function for creating team coordinators.
+    """Create a team coordinator instance.
 
-    This is the recommended way to create coordinators as it handles
-    the appropriate configuration based on requirements.
+    This is a factory function that creates the appropriate coordinator
+    based on the provided parameters. Use this instead of directly
+    instantiating coordinator classes.
 
     Args:
-        orchestrator: Agent orchestrator (optional, for SubAgent spawning)
-        lightweight: Use lightweight mode (disables mixins, for testing)
-        with_observability: Enable EventBus integration (default: True)
-        with_rl: Enable RL integration (default: True)
+        orchestrator: The agent orchestrator for coordination context.
+            Required for production coordinators.
+        lightweight: If True, create a lightweight coordinator for testing.
+            Lightweight coordinators have minimal dependencies and are
+            suitable for unit tests.
+        enable_observability: If True, enable observability features
+            (metrics, traces, events).
+        enable_rl: If True, enable reinforcement learning features.
 
     Returns:
-        ITeamCoordinator implementation (UnifiedTeamCoordinator)
+        A coordinator instance implementing ITeamCoordinator.
 
-    Examples:
-        # Lightweight for testing (replaces FrameworkTeamCoordinator)
-        coordinator = create_coordinator(lightweight=True)
+    Example:
+        from victor.teams import create_coordinator
 
-        # Production coordinator with all features
-        coordinator = create_coordinator(orchestrator)
-
-        # Without RL
-        coordinator = create_coordinator(orchestrator, with_rl=False)
-
-        # Without observability (minimal dependencies)
+        # Production coordinator with full features
         coordinator = create_coordinator(
-            orchestrator,
-            with_observability=False,
-            with_rl=False,
+            orchestrator=my_orchestrator,
+            enable_observability=True,
+            enable_rl=True,
         )
 
-    See Also:
-        MIGRATION_GUIDE.md: Complete migration instructions
-        UnifiedTeamCoordinator: Direct coordinator class
+        # Lightweight coordinator for testing
+        coordinator = create_coordinator(lightweight=True)
     """
-    # Always use UnifiedTeamCoordinator with appropriate mode
-    # This effectively merges FrameworkTeamCoordinator into UnifiedTeamCoordinator
-    return UnifiedTeamCoordinator(
-        orchestrator,
-        enable_observability=with_observability if not lightweight else False,
-        enable_rl=with_rl if not lightweight else False,
-        lightweight_mode=lightweight,
-    )
+    # Import here to avoid circular dependency
+    from victor.framework import AgentTeam
+
+    if lightweight:
+        # For testing, use UnifiedTeamCoordinator in lightweight mode
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
+        return UnifiedTeamCoordinator(
+            orchestrator=None,
+            enable_observability=False,
+            enable_rl=False,
+        )
+    else:
+        # Production coordinator
+        if orchestrator is None:
+            raise ValueError(
+                "orchestrator is required for production coordinators. "
+                "Use lightweight=True for testing without an orchestrator."
+            )
+
+        # Create UnifiedTeamCoordinator with requested features
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
+        return UnifiedTeamCoordinator(
+            orchestrator=orchestrator,
+            enable_observability=enable_observability,
+            enable_rl=enable_rl,
+        )
 
 
-__all__ = [
-    # Types
-    "TeamFormation",
-    "MessageType",
-    "MessagePriority",
-    "AgentMessage",
-    "MemberResult",
-    "TeamResult",
-    # Protocols
-    "ITeamCoordinator",
-    "ITeamMember",
-    "IObservableCoordinator",
-    "IRLCoordinator",
-    "IMessageBusProvider",
-    "ISharedMemoryProvider",
-    "IEnhancedTeamCoordinator",
-    # Coordinators
-    "UnifiedTeamCoordinator",
-    # Communication
-    "TeamMessageBus",
-    "TeamSharedMemory",
-    # Team configuration
-    "TeamConfig",
-    "TeamMember",
-    # Mixins
-    "ObservabilityMixin",
-    "RLMixin",
-    # Factory
-    "create_coordinator",
-]
+def __getattr__(name: str) -> Any:
+    """Lazy load protocols to avoid circular import.
+
+    This function is called when an attribute is not found in the module.
+    It lazily imports the protocols from victor.protocols.team only when
+    they are actually accessed, breaking the circular import cycle.
+    """
+    if name == "UnifiedTeamCoordinator":
+        from victor.teams.unified_coordinator import UnifiedTeamCoordinator
+
+        globals()["UnifiedTeamCoordinator"] = UnifiedTeamCoordinator
+        return UnifiedTeamCoordinator
+    if name in {
+        "IAgent",
+        "IEnhancedTeamCoordinator",
+        "IMessageBusProvider",
+        "IObservableCoordinator",
+        "IRLCoordinator",
+        "ISharedMemoryProvider",
+        "ITeamCoordinator",
+        "ITeamMember",
+        "TeamCoordinatorProtocol",
+        "TeamMemberProtocol",
+    }:
+        from victor.protocols.team import (
+            IAgent,
+            IEnhancedTeamCoordinator,
+            IMessageBusProvider,
+            IObservableCoordinator,
+            IRLCoordinator,
+            ISharedMemoryProvider,
+            ITeamCoordinator,
+            ITeamMember,
+            TeamCoordinatorProtocol,
+            TeamMemberProtocol,
+        )
+
+        # Store in module globals for future access
+        globals()[name] = locals()[name]
+        return locals()[name]
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

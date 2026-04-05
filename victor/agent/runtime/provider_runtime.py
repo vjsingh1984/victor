@@ -74,6 +74,7 @@ class ProviderRuntimeComponents:
 
     provider_coordinator: LazyRuntimeProxy[Any]
     provider_switch_coordinator: LazyRuntimeProxy[Any]
+    pool: Optional[Any] = None
 
 
 def create_provider_runtime_components(
@@ -81,6 +82,7 @@ def create_provider_runtime_components(
     factory: Any,
     settings: Any,
     provider_manager: Any,
+    pool: Optional[Any] = None,
 ) -> ProviderRuntimeComponents:
     """Create lazy provider runtime components for orchestrator wiring."""
 
@@ -104,6 +106,21 @@ def create_provider_runtime_components(
             health_monitor=provider_manager._health_monitor,
         )
 
+    # Feature-flagged provider pooling
+    resolved_pool = pool
+    if resolved_pool is None:
+        use_pooling = getattr(
+            getattr(settings, "feature_flags", None), "use_provider_pooling", False
+        )
+        if use_pooling:
+            try:
+                from victor.providers.factory import ProviderPool
+
+                resolved_pool = ProviderPool()
+                logger.info("ProviderPool enabled via feature flag")
+            except ImportError:
+                logger.debug("ProviderPool not available")
+
     return ProviderRuntimeComponents(
         provider_coordinator=LazyRuntimeProxy(
             factory=_build_provider_coordinator,
@@ -113,4 +130,5 @@ def create_provider_runtime_components(
             factory=_build_provider_switch_coordinator,
             name="provider_switch_coordinator",
         ),
+        pool=resolved_pool,
     )

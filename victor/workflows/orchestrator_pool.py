@@ -64,5 +64,13 @@ class OrchestratorPool:
         logger.debug(f"OrchestratorPool.get_orchestrator({profile}) - stub implementation")
         return None
 
+    def get_default_orchestrator(self) -> Any:
+        """Get the default orchestrator.
+
+        The current stub pool has no provider-specific distinction yet, so the
+        default path is the same as requesting an unqualified orchestrator.
+        """
+        return self.get_orchestrator(None)
+
 
 __all__ = ["OrchestratorPool"]

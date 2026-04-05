@@ -39,6 +39,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable
 
+from victor.core.async_utils import run_sync, run_sync_in_thread
 from victor.core.events.protocols import (
     EventHandler,
     MessagingEvent,
@@ -59,7 +60,7 @@ class SyncEventWrapper:
     """Synchronous wrapper around IEventBackend.
 
     This wrapper allows synchronous code to use the async event backend
-    by running async operations in an event loop via asyncio.run().
+    by delegating to the shared async/sync bridge helpers.
 
     This is intended for gradual migration from sync to async APIs.
     New code should use async/await directly.
@@ -81,9 +82,9 @@ class SyncEventWrapper:
         True
 
     Thread Safety:
-        - Each call creates a new event loop via asyncio.run()
-        - Not safe to share SyncEventWrapper across threads
-        - For thread safety, use backend directly with proper async/await
+        - Sync callers use the canonical `run_sync()` helper
+        - Async-context callers hop to a worker thread via `run_sync_in_thread()`
+        - For thread safety and best performance, use backend directly with async/await
     """
 
     def __init__(self, backend: IEventBackend) -> None:
@@ -99,8 +100,8 @@ class SyncEventWrapper:
         """Run an async coroutine in a synchronous context.
 
         This method handles both cases:
-        1. Called from sync context - uses asyncio.run()
-        2. Called from async context - runs in a separate thread with its own event loop
+        1. Called from sync context - uses the shared `run_sync()` helper
+        2. Called from async context - uses `run_sync_in_thread()` to avoid nested loops
 
         Args:
             coro: Awaitable coroutine to execute
@@ -115,36 +116,13 @@ class SyncEventWrapper:
         try:
             # Check if we're already in an async context
             asyncio.get_running_loop()
-            # If we get here, we're in an async context
-            # This shouldn't happen for a sync wrapper - warn and run in thread pool
             logger.warning(
                 "[SyncEventWrapper] Method called from async context. "
                 "This indicates incorrect usage. Use async backend directly."
             )
-            # Run in a new thread with its own event loop to avoid blocking
-            import threading
-
-            result = [None]
-            exception = [None]
-
-            def run_in_thread():
-                try:
-                    result[0] = asyncio.run(coro)
-                except Exception as e:
-                    exception[0] = e
-
-            thread = threading.Thread(target=run_in_thread)
-            thread.start()
-            thread.join(timeout=5.0)  # 5 second timeout
-
-            if exception[0]:
-                raise exception[0]
-            if thread.is_alive():
-                raise TimeoutError("Async operation timed out")
-            return result[0]
+            return run_sync_in_thread(coro, timeout=5.0)
         except RuntimeError:
-            # No running loop, safe to use asyncio.run()
-            return asyncio.run(coro)
+            return run_sync(coro)
 
     def publish(self, event: MessagingEvent) -> bool:
         """Publish an event synchronously.

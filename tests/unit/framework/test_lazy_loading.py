@@ -45,7 +45,7 @@ class TestLazyLoading:
         import victor.framework
 
         with pytest.raises(AttributeError, match="no attribute"):
-            getattr(victor.framework, "ThisDoesNotExist12345")
+            victor.framework.ThisDoesNotExist12345
 
     def test_dir_contains_core_names(self):
         """__dir__ should include core names."""
@@ -101,7 +101,6 @@ class TestLazyLoading:
         """Importing victor.framework should NOT load optional modules."""
         # Remove cached modules to test fresh import behavior
         mods_to_check = [
-            "victor.framework.cqrs_bridge",
             "victor.framework.health",
             "victor.framework.metrics",
             "victor.framework.resilience",

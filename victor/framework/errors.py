@@ -241,3 +241,15 @@ class StateTransitionError(AgentError):
 
     def __str__(self) -> str:
         return f"{self.message} ({self.from_state} -> {self.to_state})"
+
+
+class EdgeResolutionError(AgentError):
+    """No conditional edge matched the current state.
+
+    Raised when ``strict_edges=True`` is set on a compiled graph and a
+    conditional routing function returns a value that doesn't match any
+    registered edge target.
+    """
+
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(message, recoverable=False, **kwargs)

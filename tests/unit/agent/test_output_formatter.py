@@ -192,6 +192,24 @@ class TestOutputFormatterToolTracking:
         formatter.tool_result("test_tool", True, result=long_result)
         assert len(formatter._tool_calls[0]["result"]) == 500
 
+    def test_tool_result_records_follow_up_suggestions(self):
+        """Test tool results record follow-up suggestion commands."""
+        config = OutputConfig(mode=OutputMode.JSON)
+        formatter = OutputFormatter(config)
+        formatter.tool_result(
+            "code_search",
+            True,
+            follow_up_suggestions=[
+                {
+                    "command": 'graph(mode="trace", node="main", depth=3)',
+                    "description": "Trace execution starting from main.",
+                }
+            ],
+        )
+        assert formatter._tool_calls[0]["follow_up_suggestions"] == [
+            'graph(mode="trace", node="main", depth=3)'
+        ]
+
 
 class TestOutputFormatterStreaming:
     """Tests for streaming output."""
@@ -506,6 +524,25 @@ class TestOutputFormatterRichMode:
         # New compact format: "# ✗ tool_name(args) (duration) - error"
         assert "test_tool" in output
         assert "✗" in output
+
+    def test_tool_result_plain_mode_shows_follow_up_suggestions(self):
+        """Test tool_result prints visible next-step suggestions in Plain mode."""
+        stderr = io.StringIO()
+        config = OutputConfig(mode=OutputMode.PLAIN, stderr=stderr)
+        formatter = OutputFormatter(config)
+        formatter.tool_result(
+            "code_search",
+            True,
+            follow_up_suggestions=[
+                {
+                    "command": 'graph(mode="trace", node="main", depth=3)',
+                    "description": "Trace execution starting from main.",
+                }
+            ],
+        )
+        output = stderr.getvalue()
+        assert "next:" in output
+        assert 'graph(mode="trace", node="main", depth=3)' in output
 
 
 class TestOutputFormatterStreamingRich:

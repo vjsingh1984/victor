@@ -453,7 +453,7 @@ class TestCheckCodebaseIndex:
         from victor.ui.commands.utils import check_codebase_index
 
         # Patch the import inside the function
-        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": None}):
+        with patch.dict("sys.modules", {"victor_coding.codebase.indexer": None}):
             # Should not raise
             await check_codebase_index("/tmp", mock_console)
 
@@ -465,7 +465,7 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.side_effect = Exception("Test error")
 
-        with patch.dict("sys.modules", {"victor.coding.codebase.indexer": MagicMock()}):
+        with patch.dict("sys.modules", {"victor_coding.codebase.indexer": MagicMock()}):
             with patch(
                 "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
             ):
@@ -480,12 +480,21 @@ class TestCheckCodebaseIndex:
         mock_index = MagicMock()
         mock_index.check_staleness_by_mtime.return_value = (False, [], [])
 
-        try:
-            with patch("victor_coding.codebase.indexer.CodebaseIndex", return_value=mock_index):
-                await check_codebase_index("/tmp", mock_console, silent=True)
-                # No output expected when not stale and silent
-        except ImportError:
-            pytest.skip("victor-coding package not installed")
+        mock_factory = MagicMock()
+        mock_factory.create.return_value = mock_index
+
+        mock_container = MagicMock()
+        mock_container.get_optional.return_value = mock_factory
+
+        with (
+            patch(
+                "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
+                new=MagicMock(),
+            ),
+            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
+        ):
+            await check_codebase_index("/tmp", mock_console, silent=True)
+            # No output expected when not stale and silent
 
 
 # =============================================================================

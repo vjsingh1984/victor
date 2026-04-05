@@ -62,6 +62,8 @@ if TYPE_CHECKING:
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
     from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
+    from victor.agent.streaming.pipeline import StreamingChatPipeline
+    from victor.agent.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -80,19 +82,32 @@ class ChatCoordinator:
         orchestrator: Any object satisfying ChatOrchestratorProtocol
     """
 
-    def __init__(self, orchestrator: "ChatOrchestratorProtocol") -> None:
+    def __init__(
+        self,
+        orchestrator: "ChatOrchestratorProtocol",
+        token_tracker: Optional["TokenTracker"] = None,
+    ) -> None:
         """Initialize the ChatCoordinator.
 
         Args:
             orchestrator: Object satisfying ChatOrchestratorProtocol
+            token_tracker: Optional centralized token tracker. When provided,
+                streaming token usage is accumulated through the tracker
+                instead of direct dict mutation on the orchestrator.
         """
         self._orchestrator = orchestrator
+        self._token_tracker = token_tracker
 
         # Lazy-initialized handlers
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
         self._planning_coordinator: Optional["PlanningCoordinator"] = None
+        self._streaming_pipeline: Optional["StreamingChatPipeline"] = None
+
+    def set_streaming_pipeline(self, pipeline: "StreamingChatPipeline") -> None:
+        """Inject a pre-built streaming pipeline (used by orchestrator factory)."""
+        self._streaming_pipeline = pipeline
 
         # NEW: Execution coordinator for agentic loop (Phase 1)
         self._execution_coordinator: Optional[Any] = None
@@ -122,6 +137,7 @@ class ChatCoordinator:
                 tool_context=adapter,
                 provider_context=adapter,
                 execution_provider=adapter,
+                token_tracker=self._token_tracker,
             )
         return self._execution_coordinator
 
@@ -176,6 +192,7 @@ class ChatCoordinator:
             return False
 
         # Simple heuristic: multi-step keywords
+        # Includes analysis/document-oriented terms alongside code-oriented ones
         multi_step_indicators = [
             "analyze",
             "architecture",
@@ -190,6 +207,15 @@ class ChatCoordinator:
             "phase",
             "stage",
             "deliverable",
+            # Document analysis / review tasks
+            "review",
+            "criteria",
+            "milestone",
+            "assessment",
+            "audit",
+            "comprehensive",
+            "document",
+            "provide",
         ]
         message_lower = user_message.lower()
         keyword_count = sum(1 for kw in multi_step_indicators if kw in message_lower)
@@ -244,187 +270,12 @@ class ChatCoordinator:
 
         return response
 
-    # NOTE: Legacy implementation retained temporarily as migration fallback.
-    # Primary path uses ExecutionCoordinator via `chat()`.
-
-    async def _chat_with_agentic_loop_legacy(self, user_message: str) -> CompletionResponse:
-        """Legacy agentic loop implementation used as fallback during migration.
-
-        This method implements a proper agentic loop that:
-        1. Gets model response
-        2. Executes any tool calls
-        3. Continues until model provides a final response (no tool calls)
-        4. Ensures non-empty response on tool failures
-
-        Args:
-            user_message: User's message
-
-        Returns:
-            CompletionResponse from the model with complete response
-        """
-        orch = self._orchestrator
-
-        # Ensure system prompt is included once at start of conversation
-        orch.conversation.ensure_system_prompt()
-        orch._system_added = True
-        # Add user message to history
-        orch.add_message("user", user_message)
-
-        # Initialize tracking for this conversation turn
-        orch.tool_calls_used = 0
-        failure_context = ToolFailureContext()
-        max_iterations = getattr(orch.settings, "chat_max_iterations", 10)
-        iteration = 0
-
-        # Classify task complexity for appropriate budgeting
-        task_classification = orch.task_classifier.classify(user_message)
-        iteration_budget = min(
-            task_classification.tool_budget * 2, max_iterations  # Allow 2x budget for iterations
-        )
-
-        # Agentic loop: continue until no tool calls or budget exhausted
-        final_response: Optional[CompletionResponse] = None
-
-        while iteration < iteration_budget:
-            iteration += 1
-
-            # Get tool definitions if provider supports them
-            tools = None
-            if orch.provider.supports_tools() and orch.tool_calls_used < orch.tool_budget:
-                conversation_depth = orch.conversation.message_count()
-                conversation_history = (
-                    [msg.model_dump() for msg in orch.messages] if orch.messages else None
-                )
-                tools = await orch.tool_selector.select_tools(
-                    user_message,
-                    use_semantic=orch.use_semantic_selection,
-                    conversation_history=conversation_history,
-                    conversation_depth=conversation_depth,
-                )
-                tools = orch.tool_selector.prioritize_by_stage(user_message, tools)
-
-            # Prepare optional thinking parameter
-            provider_kwargs = {}
-            if orch.thinking:
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-            # Check context and compact before API call to prevent overflow
-            if orch._context_compactor:
-                compaction_action = orch._context_compactor.check_and_compact(
-                    current_query=user_message,
-                    force=False,
-                    tool_call_count=orch.tool_calls_used,
-                    task_complexity=task_classification.complexity.value,
-                )
-                if compaction_action.action_taken:
-                    logger.info(
-                        f"Compacted context before API call: {compaction_action.messages_removed} messages removed, "
-                        f"{compaction_action.tokens_freed} tokens freed"
-                    )
-
-            # Get response from provider
-            response = await orch.provider.chat(
-                messages=orch.messages,
-                model=orch.model,
-                temperature=orch.temperature,
-                max_tokens=orch.max_tokens,
-                tools=tools,
-                **provider_kwargs,
-            )
-
-            # Accumulate token usage for evaluation tracking (P1: Token Tracking Fix)
-            if response.usage:
-                orch._cumulative_token_usage["prompt_tokens"] += response.usage.get(
-                    "prompt_tokens", 0
-                )
-                orch._cumulative_token_usage["completion_tokens"] += response.usage.get(
-                    "completion_tokens", 0
-                )
-                orch._cumulative_token_usage["total_tokens"] += response.usage.get(
-                    "total_tokens", 0
-                )
-
-            # Add assistant response to history if has content
-            if response.content:
-                orch.add_message("assistant", response.content)
-
-                # Check compaction after adding assistant response
-                if orch._context_compactor:
-                    compaction_action = orch._context_compactor.check_and_compact(
-                        current_query=user_message,
-                        force=False,
-                        tool_call_count=orch.tool_calls_used,
-                        task_complexity=task_classification.complexity.value,
-                    )
-                    if compaction_action.action_taken:
-                        logger.info(
-                            f"Compacted context after response: {compaction_action.messages_removed} messages removed, "
-                            f"{compaction_action.tokens_freed} tokens freed"
-                        )
-
-            # Check if model wants to use tools
-            if response.tool_calls:
-                # Handle tool calls and track results
-                tool_results = await orch._handle_tool_calls(response.tool_calls)
-
-                # Update failure context
-                for result in tool_results:
-                    if result.get("success"):
-                        failure_context.successful_tools.append(result)
-                    else:
-                        failure_context.failed_tools.append(result)
-                        failure_context.last_error = result.get("error")
-
-                # Continue loop to get follow-up response
-                continue
-
-            # No tool calls - this is the final response
-            final_response = response
-            break
-
-        # Ensure we have a complete response
-        if final_response is None or not final_response.content:
-            # Use response completer to generate a response
-            completion_result = await orch.response_completer.ensure_response(
-                messages=orch.messages,
-                model=orch.model,
-                temperature=orch.temperature,
-                max_tokens=orch.max_tokens,
-                failure_context=failure_context if failure_context.failed_tools else None,
-            )
-
-            if completion_result.content:
-                orch.add_message("assistant", completion_result.content)
-                # Create a synthetic response
-                final_response = CompletionResponse(
-                    content=completion_result.content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-            else:
-                # Last resort fallback
-                fallback_content = (
-                    "I was unable to generate a complete response. "
-                    "Please try rephrasing your request."
-                )
-                if failure_context.failed_tools:
-                    fallback_content = orch.response_completer.format_tool_failure_message(
-                        failure_context
-                    )
-                # Add fallback to history and return synthetic response
-                orch.add_message("assistant", fallback_content)
-                final_response = CompletionResponse(
-                    content=fallback_content,
-                    role="assistant",
-                    tool_calls=None,
-                )
-
-        return final_response
-
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
-        This method wraps the implementation to make phased refactors safer.
+        Delegates to the canonical StreamingChatPipeline that coordinates the
+        streaming lifecycle (context prep, provider streaming, tool execution,
+        continuation handling).
 
         Args:
             user_message: User's input message
@@ -433,8 +284,14 @@ class ChatCoordinator:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
         orch = self._orchestrator
+        if self._streaming_pipeline is None:
+            from victor.agent.streaming import create_streaming_chat_pipeline
+
+            self._streaming_pipeline = create_streaming_chat_pipeline(self)
+
+        pipeline = self._streaming_pipeline
         try:
-            async for chunk in self._stream_chat_impl(user_message):
+            async for chunk in pipeline.run(user_message):
                 yield chunk
         finally:
             # Update cumulative token usage after stream completes
@@ -442,486 +299,18 @@ class ChatCoordinator:
             if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
                 ctx = orch._current_stream_context
                 if hasattr(ctx, "cumulative_usage"):
-                    for key in orch._cumulative_token_usage:
-                        if key in ctx.cumulative_usage:
-                            orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
-                    # Calculate total if not tracked by provider
-                    if orch._cumulative_token_usage["total_tokens"] == 0:
-                        orch._cumulative_token_usage["total_tokens"] = (
-                            orch._cumulative_token_usage["prompt_tokens"]
-                            + orch._cumulative_token_usage["completion_tokens"]
-                        )
-
-    # =====================================================================
-    # Streaming Implementation
-    # =====================================================================
-
-    async def _stream_chat_impl(self, user_message: str) -> AsyncIterator[StreamChunk]:
-        """Implementation for streaming chat.
-
-        Args:
-            user_message: User's message
-
-        Yields:
-            StreamChunk objects with incremental response
-
-        Note:
-            Stream metrics (TTFT, throughput) are available via get_last_stream_metrics()
-            after the stream completes.
-
-            The stream can be cancelled by calling request_cancellation(). When cancelled,
-            the stream will yield a final chunk indicating cancellation and stop.
-
-            This method uses StreamingChatContext to centralize state management.
-        """
-        orch = self._orchestrator
-
-        # Initialize and prepare using StreamingChatContext
-        stream_ctx = await self._create_stream_context(user_message)
-
-        # Store context reference for handler delegation methods
-        orch._current_stream_context = stream_ctx
-
-        # Extract required files and outputs from user prompt for task completion tracking
-        orch._required_files = self._extract_required_files_from_prompt(user_message)
-        orch._required_outputs = self._extract_required_outputs_from_prompt(user_message)
-        orch._read_files_session.clear()
-        orch._all_files_read_nudge_sent = False
-        logger.debug(
-            f"Task requirements extracted - files: {orch._required_files}, "
-            f"outputs: {orch._required_outputs}"
-        )
-
-        # Emit task requirements extracted event
-        if orch._required_files or orch._required_outputs:
-            from victor.core.events import get_observability_bus
-
-            event_bus = get_observability_bus()
-            await event_bus.emit(
-                topic="state.task.requirements_extracted",
-                data={
-                    "required_files": orch._required_files,
-                    "required_outputs": orch._required_outputs,
-                    "file_count": len(orch._required_files),
-                    "output_count": len(orch._required_outputs),
-                    "category": "state",
-                },
-            )
-
-        # Iteration limits - kept as read-only local references for readability
-        max_total_iterations = stream_ctx.max_total_iterations
-        max_exploration_iterations = stream_ctx.max_exploration_iterations
-
-        # Detect intent and inject prompt guard for non-write tasks
-        self._apply_intent_guard(user_message)
-
-        # For compound analysis+edit tasks, unified_tracker handles exploration limits
-        if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in ("edit", "create"):
-            logger.info(
-                f"Compound task detected (analysis+{stream_ctx.unified_task_type.value}): "
-                f"unified_tracker will use appropriate exploration limits"
-            )
-
-        logger.info(
-            f"Task type classification: coarse={stream_ctx.coarse_task_type}, "
-            f"unified={stream_ctx.unified_task_type.value}, is_analysis={stream_ctx.is_analysis_task}, "
-            f"is_action={stream_ctx.is_action_task}"
-        )
-
-        # Apply guidance for analysis/action tasks
-        self._apply_task_guidance(
-            user_message,
-            stream_ctx.unified_task_type,
-            stream_ctx.is_analysis_task,
-            stream_ctx.is_action_task,
-            stream_ctx.needs_execution,
-            max_exploration_iterations,
-        )
-
-        # Add guidance for action-oriented tasks
-        if stream_ctx.is_action_task:
-            logger.info(
-                f"Detected action-oriented task - allowing up to {max_exploration_iterations} exploration iterations"
-            )
-
-            if stream_ctx.needs_execution:
-                orch.add_message(
-                    "system",
-                    "This is an action-oriented task requiring execution. "
-                    "Follow this workflow: "
-                    "1. CREATE the file/script with write_file or edit_files "
-                    "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
-                    "3. SHOW the output to the user. "
-                    "Minimize exploration and proceed directly to create->execute->show results.",
-                )
-            else:
-                orch.add_message(
-                    "system",
-                    "This is an action-oriented task (create/write/build). "
-                    "Minimize exploration and proceed directly to creating what was requested. "
-                    "Only explore if absolutely necessary to complete the task.",
-                )
-
-        goals = orch._tool_planner.infer_goals_from_message(user_message)
-
-        # Log all limits for debugging
-        logger.info(
-            f"Stream chat limits: "
-            f"tool_budget={orch.tool_budget}, "
-            f"max_total_iterations={max_total_iterations}, "
-            f"max_exploration_iterations={max_exploration_iterations}, "
-            f"is_analysis_task={stream_ctx.is_analysis_task}, "
-            f"is_action_task={stream_ctx.is_action_task}"
-        )
-
-        # Reset debug logger for new conversation turn
-        orch.debug_logger.reset()
-
-        while True:
-            # === PRE-ITERATION CHECKS (via coordinator helper) ===
-            cancelled = False
-            async for pre_chunk in self._run_iteration_pre_checks(stream_ctx, user_message):
-                yield pre_chunk
-                if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
-                    cancelled = True
-            if cancelled:
-                return
-
-            # Log iteration debug info
-            self._log_iteration_debug(stream_ctx, max_total_iterations)
-
-            # === CONTEXT AND ITERATION LIMIT CHECKS ===
-            max_context = self._get_max_context_chars()
-            handled, iter_chunk = await self._handle_context_and_iteration_limits(
-                user_message,
-                max_total_iterations,
-                max_context,
-                stream_ctx.total_iterations,
-                stream_ctx.last_quality_score,
-            )
-            if iter_chunk:
-                yield iter_chunk
-            if handled:
-                break
-
-            tools = await self._select_tools_for_turn(stream_ctx.context_msg, goals)
-
-            # Prepare optional thinking parameter for providers that support it
-            provider_kwargs = {}
-            if orch.thinking:
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-
-            full_content, tool_calls, _, garbage_detected = await self._stream_provider_response(
-                tools=tools,
-                provider_kwargs=provider_kwargs,
-                stream_ctx=stream_ctx,
-            )
-
-            # Debug: Log response details
-            content_preview = full_content[:200] if full_content else "(empty)"
-            logger.debug(
-                f"_stream_provider_response returned: content_len={len(full_content) if full_content else 0}, "
-                f"native_tool_calls={len(tool_calls) if tool_calls else 0}, tokens={stream_ctx.total_tokens}, "
-                f"garbage={garbage_detected}, content_preview={content_preview!r}"
-            )
-
-            # If garbage was detected, force completion on next iteration
-            if garbage_detected and not tool_calls:
-                stream_ctx.force_completion = True
-                logger.info("Setting force_completion due to garbage detection")
-
-            # Parse, validate, and normalize tool calls
-            tool_calls, full_content = self._parse_and_validate_tool_calls(tool_calls, full_content)
-
-            # Task Completion Detection Enhancement
-            if orch._task_completion_detector and full_content:
-                from victor.agent.task_completion import CompletionConfidence
-
-                orch._task_completion_detector.analyze_response(full_content)
-                confidence = orch._task_completion_detector.get_completion_confidence()
-
-                if confidence == CompletionConfidence.HIGH:
-                    logger.info(
-                        "Task completion: HIGH confidence detected (active signal), "
-                        "forcing completion after this response"
-                    )
-                    stream_ctx.force_completion = True
-                elif confidence == CompletionConfidence.MEDIUM:
-                    logger.info(
-                        "Task completion: MEDIUM confidence detected (file mods + passive signal)"
-                    )
-
-            # Initialize mentioned_tools_detected for later use in continuation action
-            mentioned_tools_detected: List[str] = []
-
-            # Check for mentioned tools early for recovery integration
-            from victor.agent.continuation_strategy import ContinuationStrategy
-            from victor.tools.tool_names import get_all_canonical_names, TOOL_ALIASES
-
-            if full_content and not tool_calls:
-                all_tool_names = get_all_canonical_names() | set(TOOL_ALIASES.keys())
-                mentioned_tools_detected = ContinuationStrategy.detect_mentioned_tools(
-                    full_content, list(all_tool_names), TOOL_ALIASES
-                )
-
-            # Use recovery integration to detect and handle failures
-            recovery_action = await self._handle_recovery_with_integration(
-                stream_ctx=stream_ctx,
-                full_content=full_content,
-                tool_calls=tool_calls,
-                mentioned_tools=mentioned_tools_detected or None,
-            )
-
-            # Apply recovery action if not just "continue"
-            if recovery_action.action != "continue":
-                recovery_chunk = self._apply_recovery_action(recovery_action, stream_ctx)
-                if recovery_chunk:
-                    yield recovery_chunk
-                    if recovery_chunk.is_final:
-                        orch._recovery_integration.record_outcome(success=False)
-                        return
-                if recovery_action.action in ("retry", "force_summary"):
-                    continue
-
-            if full_content:
-                # Sanitize response to remove malformed patterns from local models
-                sanitized = orch.sanitizer.sanitize(full_content)
-                if sanitized:
-                    orch.add_message("assistant", sanitized)
-                else:
-                    plain_text = orch.sanitizer.strip_markup(full_content)
-                    if plain_text:
-                        orch.add_message("assistant", plain_text)
-
-                # Log if model mentioned tools but didn't execute them
-                if mentioned_tools_detected:
-                    tools_str = ", ".join(mentioned_tools_detected)
-                    logger.info(
-                        f"Model mentioned tool(s) [{tools_str}] in text without executing. "
-                        "Common with local models - tool syntax detected in response content."
-                    )
-            elif not tool_calls:
-                # No content and no tool calls - check for natural completion
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                final_chunk = orch._recovery_coordinator.check_natural_completion(
-                    recovery_ctx, has_tool_calls=False, content_length=0
-                )
-                if final_chunk:
-                    yield final_chunk
-                    return
-
-                # No substantial content yet - attempt aggressive recovery
-                logger.warning("Model returned empty response - attempting aggressive recovery")
-
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
-                    recovery_ctx
-                )
-                if recovery_chunk:
-                    yield recovery_chunk
-                    continue
-
-                # Delegate empty response recovery to helper method
-                recovery_success, recovered_tool_calls, final_chunk = (
-                    await self._handle_empty_response_recovery(stream_ctx, tools)
-                )
-
-                if recovery_success:
-                    if final_chunk:
-                        yield final_chunk
-                        return
-                    elif recovered_tool_calls:
-                        tool_calls = recovered_tool_calls
-                        logger.info(
-                            f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
-                        )
-                else:
-                    recovery_ctx = self._create_recovery_context(stream_ctx)
-                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
-                        recovery_ctx
-                    )
-                    orch._record_intelligent_outcome(
-                        success=False,
-                        quality_score=0.3,
-                        user_satisfied=False,
-                        completed=False,
-                    )
-                    yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
-                    return
-
-            # Record tool calls in progress tracker for loop detection
-            for tc in tool_calls or []:
-                tool_name = tc.get("name", "")
-                tool_args = tc.get("arguments", {})
-                orch.unified_tracker.record_tool_call(tool_name, tool_args)
-
-            content_length = len(full_content.strip())
-
-            # Record iteration in unified tracker
-            orch.unified_tracker.record_iteration(content_length)
-
-            # Intelligent pipeline post-iteration hook: validate response quality
-            if full_content and len(full_content.strip()) > 50:
-                quality_result = await self._validate_intelligent_response(
-                    response=full_content,
-                    query=user_message,
-                    tool_calls=orch.tool_calls_used,
-                    task_type=stream_ctx.unified_task_type.value,
-                )
-                if quality_result and not quality_result.get("is_grounded", True):
-                    issues = quality_result.get("grounding_issues", [])
-                    if issues:
-                        logger.warning(
-                            f"IntelligentPipeline detected grounding issues: {issues[:3]}"
-                        )
-                    if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback", "")
-                        if grounding_feedback:
-                            logger.info(
-                                f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
+                    if self._token_tracker is not None:
+                        self._token_tracker.accumulate(ctx.cumulative_usage)
+                    else:
+                        for key in orch._cumulative_token_usage:
+                            if key in ctx.cumulative_usage:
+                                orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
+                        # Calculate total if not tracked by provider
+                        if orch._cumulative_token_usage["total_tokens"] == 0:
+                            orch._cumulative_token_usage["total_tokens"] = (
+                                orch._cumulative_token_usage["prompt_tokens"]
+                                + orch._cumulative_token_usage["completion_tokens"]
                             )
-                            stream_ctx.pending_grounding_feedback = grounding_feedback
-
-                if quality_result:
-                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
-                    stream_ctx.update_quality_score(new_score)
-
-                if quality_result and quality_result.get("should_finalize"):
-                    finalize_reason = quality_result.get(
-                        "finalize_reason", "grounding limit exceeded"
-                    )
-                    logger.warning(
-                        f"Force finalize triggered: {finalize_reason}. "
-                        "Stopping continuation to prevent infinite loop."
-                    )
-                    orch._force_finalize = True
-
-            # Check for loop warning via streaming handler
-            unified_loop_warning = orch.unified_tracker.check_loop_warning()
-            loop_warning_chunk = orch._streaming_handler.handle_loop_warning(
-                stream_ctx, unified_loop_warning
-            )
-            if loop_warning_chunk:
-                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
-                yield loop_warning_chunk
-            else:
-                # Check UnifiedTaskTracker for stop decision via recovery coordinator
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)
-                if was_triggered:
-                    logger.info(
-                        f"UnifiedTaskTracker forcing action: {hint}, "
-                        f"metrics={orch.unified_tracker.get_metrics()}"
-                    )
-
-                logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
-
-                if not tool_calls:
-                    # === INTENT CLASSIFICATION (P0 SRP refactor) ===
-                    if not self._intent_classification_handler:
-                        from victor.agent.streaming import create_intent_classification_handler
-
-                        self._intent_classification_handler = create_intent_classification_handler(
-                            orch
-                        )
-
-                    # Ensure tracking variables are initialized
-                    if not hasattr(orch, "_continuation_prompts"):
-                        orch._continuation_prompts = 0
-                    if not hasattr(orch, "_asking_input_prompts"):
-                        orch._asking_input_prompts = 0
-                    if not hasattr(orch, "_consecutive_blocked_attempts"):
-                        orch._consecutive_blocked_attempts = 0
-                    if not hasattr(orch, "_cumulative_prompt_interventions"):
-                        orch._cumulative_prompt_interventions = 0
-
-                    from victor.agent.streaming import create_tracking_state
-
-                    tracking_state = create_tracking_state(orch)
-
-                    intent_result = (
-                        self._intent_classification_handler.classify_and_determine_action(
-                            stream_ctx=stream_ctx,
-                            full_content=full_content,
-                            content_length=content_length,
-                            mentioned_tools=mentioned_tools_detected,
-                            tracking_state=tracking_state,
-                        )
-                    )
-
-                    for chunk in intent_result.chunks:
-                        yield chunk
-
-                    if intent_result.content_cleared:
-                        full_content = ""
-
-                    force_finalize_used = (
-                        tracking_state.force_finalize and intent_result.action == "finish"
-                    )
-                    from victor.agent.streaming import apply_tracking_state_updates
-
-                    apply_tracking_state_updates(
-                        orch, intent_result.state_updates, force_finalize_used
-                    )
-
-                    action_result = intent_result.action_result
-                    action = intent_result.action
-
-                    logger.info(
-                        f"Continuation action: {action} - {action_result.get('reason', 'unknown')}"
-                    )
-
-                    # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
-                    if not self._continuation_handler:
-                        from victor.agent.streaming import create_continuation_handler
-
-                        self._continuation_handler = create_continuation_handler(orch)
-
-                    action_result["action"] = action
-
-                    continuation_result = await self._continuation_handler.handle_action(
-                        action_result=action_result,
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
-                    )
-
-                    for chunk in continuation_result.chunks:
-                        yield chunk
-
-                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
-                        orch._cumulative_prompt_interventions = continuation_result.state_updates[
-                            "cumulative_prompt_interventions"
-                        ]
-
-                    if continuation_result.should_return:
-                        return
-
-                # === TOOL EXECUTION PHASE (P0 SRP refactor) ===
-                if not self._tool_execution_handler:
-                    from victor.agent.streaming import create_tool_execution_handler
-
-                    self._tool_execution_handler = create_tool_execution_handler(orch)
-
-                self._tool_execution_handler.update_observed_files(
-                    set(orch.observed_files) if orch.observed_files else set()
-                )
-
-                tool_exec_result = await self._tool_execution_handler.execute_tools(
-                    stream_ctx=stream_ctx,
-                    tool_calls=tool_calls,
-                    user_message=user_message,
-                    full_content=full_content,
-                    tool_calls_used=orch.tool_calls_used,
-                    tool_budget=orch.tool_budget,
-                )
-
-                for chunk in tool_exec_result.chunks:
-                    yield chunk
-
-                orch.tool_calls_used += tool_exec_result.tool_calls_executed
-
-                if tool_exec_result.should_return:
-                    return
 
     # =====================================================================
     # Stream Preparation and Context
@@ -1282,6 +671,28 @@ class ChatCoordinator:
         current_intent = getattr(orch, "_current_intent", None)
         tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
         return tools
+
+    def _get_decision_service(self) -> Optional[Any]:
+        """Get the LLM decision service from the container if available.
+
+        Returns:
+            LLMDecisionService instance or None if not configured.
+        """
+        try:
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+                return None
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            container = getattr(self._orchestrator, "_container", None)
+            if container is not None:
+                return container.get(LLMDecisionServiceProtocol)
+        except Exception as e:
+            logger.debug("Failed to resolve LLM decision service: %s", e)
+        return None
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
         """Extract required file paths from the user message.
@@ -1784,15 +1195,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator for consistency (includes model, temperature,
         unified_task_type, is_analysis_task, is_action_task fields).
-
-        Args:
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamingRecoveryContext with all necessary state
         """
-        orch = self._orchestrator
-        return orch._create_recovery_context(stream_ctx)
+        return self._orchestrator._create_recovery_context(stream_ctx)
 
     async def _handle_recovery_with_integration(
         self,
@@ -1805,18 +1209,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator which uses _recovery_coordinator for
         consistent recovery handling.
-
-        Args:
-            stream_ctx: The streaming context
-            full_content: The full content from the response
-            tool_calls: Tool calls from the response
-            mentioned_tools: Tools mentioned in the content
-
-        Returns:
-            RecoveryAction with the action to take
         """
-        orch = self._orchestrator
-        return await orch._handle_recovery_with_integration(
+        return await self._orchestrator._handle_recovery_with_integration(
             stream_ctx=stream_ctx,
             full_content=full_content,
             tool_calls=tool_calls,
@@ -1830,16 +1224,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator which uses _recovery_coordinator for
         consistent recovery action application.
-
-        Args:
-            recovery_action: The recovery action to apply
-            stream_ctx: The streaming context
-
-        Returns:
-            StreamChunk to yield, or None
         """
-        orch = self._orchestrator
-        return orch._apply_recovery_action(recovery_action, stream_ctx)
+        return self._orchestrator._apply_recovery_action(recovery_action, stream_ctx)
 
     async def _handle_empty_response_recovery(
         self,
@@ -1933,18 +1319,8 @@ class ChatCoordinator:
 
         Delegates to orchestrator's implementation which uses the correct
         intelligent_integration property.
-
-        Args:
-            response: The response to validate
-            query: The original query
-            tool_calls: Number of tool calls used
-            task_type: The task type
-
-        Returns:
-            Validation result dict or None
         """
-        orch = self._orchestrator
-        return await orch._validate_intelligent_response(
+        return await self._orchestrator._validate_intelligent_response(
             response=response,
             query=query,
             tool_calls=tool_calls,
@@ -1975,13 +1351,8 @@ class ChatCoordinator:
     ) -> CompletionResponse:
         """Chat with automatic planning for complex multi-step tasks.
 
-        This method extends the regular chat flow by:
-        1. Analyzing if the task is complex enough to benefit from planning
-        2. If complex, generating a structured plan using ReadableTaskPlan
-        3. Executing the plan step-by-step with context-aware tools
-        4. Providing a summary of results
-
-        For simple tasks, it falls back to regular direct chat.
+        Delegates to _chat_with_planning when planning is enabled or auto-detected.
+        For simple tasks or when planning is disabled, uses regular chat.
 
         Args:
             user_message: User's message
@@ -2002,65 +1373,13 @@ class ChatCoordinator:
                 use_planning=True
             )
         """
-
         # If planning is explicitly disabled, use regular chat
         if use_planning is False:
             return await self.chat(user_message)
 
-        # If planning is explicitly enabled, use planning coordinator
-        if use_planning is True:
-            planning_coordinator = self._get_planning_coordinator()
-            return await planning_coordinator.chat_with_planning(user_message)
+        # If planning is explicitly enabled or auto-detected, delegate
+        if use_planning is True or self._should_use_planning(user_message):
+            return await self._chat_with_planning(user_message)
 
-        # Auto-detect: analyze if planning would be beneficial
-        task_analysis = self._analyze_task_for_planning(user_message)
-
-        # Get planning coordinator and let it decide
-        planning_coordinator = self._get_planning_coordinator()
-
-        # Check if planning should be used
-        should_plan = planning_coordinator._should_use_planning(user_message, task_analysis)
-
-        if should_plan:
-            logger.info("Using planning-based chat execution")
-            return await planning_coordinator.chat_with_planning(user_message, task_analysis)
-        else:
-            logger.info("Using direct chat (no planning needed)")
-            return await self.chat(user_message)
-
-    def _analyze_task_for_planning(self, user_message: str) -> Optional["TaskAnalysis"]:
-        """Analyze task to determine if planning would be beneficial.
-
-        Args:
-            user_message: User's message
-
-        Returns:
-            TaskAnalysis if available, None otherwise
-        """
-        orch = self._orchestrator
-
-        # Try to get task analysis from task_analyzer if available
-        if hasattr(orch, "task_analyzer"):
-            try:
-                return orch.task_analyzer.analyze(user_message)
-            except Exception as e:
-                logger.warning(f"Task analysis failed: {e}")
-
-        # Fall back to task_classifier
-        if hasattr(orch, "task_classifier"):
-            try:
-                classification = orch.task_classifier.classify(user_message)
-                # Convert TaskClassification to TaskAnalysis-like structure
-                from victor.agent.task_analyzer import TaskAnalysis
-                from victor.agent.unified_classifier import UnifiedTaskType
-
-                return TaskAnalysis(
-                    complexity=classification.complexity,
-                    tool_budget=classification.tool_budget,
-                    complexity_confidence=0.8,  # Default confidence
-                    unified_task_type=UnifiedTaskType.DEFAULT,
-                )
-            except Exception as e:
-                logger.warning(f"Task classification failed: {e}")
-
-        return None
+        # Default to regular chat for simple tasks
+        return await self.chat(user_message)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -447,8 +449,19 @@ class ToolMetadataRegistry:
         Priority.LOW: 0.05,
     }
 
-    def __init__(self) -> None:
-        """Initialize empty registry."""
+    def __init__(
+        self,
+        category_resolver: Optional[ToolCategoryResolver] = None,
+        keyword_matcher: Optional[KeywordMatcher] = None,
+        schema_cache: Optional[ToolSchemaCache] = None,
+    ) -> None:
+        """Initialize the registry.
+
+        Args:
+            category_resolver: Resolver for tool categories. Creates default if None.
+            keyword_matcher: Matcher for keyword-based tool selection. Creates default if None.
+            schema_cache: Cache for tool schemas. Creates default if None.
+        """
         self._entries: Dict[str, ToolMetadataEntry] = {}
         self._by_priority: Dict[Priority, Set[str]] = {p: set() for p in Priority}
         self._by_access_mode: Dict[AccessMode, Set[str]] = {a: set() for a in AccessMode}
@@ -465,10 +478,10 @@ class ToolMetadataRegistry:
             ec: set() for ec in ExecutionCategory
         }
 
-        # Composed extracted classes
-        self._category_resolver = ToolCategoryResolver()
-        self._keyword_matcher = KeywordMatcher()
-        self._schema_cache = ToolSchemaCache()
+        # Composed extracted classes (injectable for testing)
+        self._category_resolver = category_resolver or ToolCategoryResolver()
+        self._keyword_matcher = keyword_matcher or KeywordMatcher()
+        self._schema_cache = schema_cache or ToolSchemaCache()
 
     def register(self, tool: BaseTool) -> None:
         """Register a tool in the metadata registry.
@@ -527,7 +540,9 @@ class ToolMetadataRegistry:
             self._keyword_matcher.index_tool(
                 name=entry.name,
                 keywords=list(entry.keywords),
-                mandatory_keywords=list(entry.mandatory_keywords) if entry.mandatory_keywords else None,
+                mandatory_keywords=(
+                    list(entry.mandatory_keywords) if entry.mandatory_keywords else None
+                ),
             )
         schema = getattr(tool, "parameters", None)
         if schema:
@@ -568,12 +583,25 @@ class ToolMetadataRegistry:
 
         core_readonly: List[str] = list(default_readonly)
 
-        # Simple env override (comma-separated) to avoid pydantic parsing errors
+        # Env override: supports JSON list format (["a", "b"]) or comma-separated
         import os
+        import json as _json
 
         env_raw = os.getenv("CORE_READONLY_TOOLS")
         if env_raw:
-            core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
+            env_raw_stripped = env_raw.strip()
+            if env_raw_stripped.startswith("["):
+                try:
+                    parsed = _json.loads(env_raw_stripped)
+                    if isinstance(parsed, list):
+                        core_readonly.extend(str(item).strip() for item in parsed if item)
+                except (ValueError, TypeError):
+                    # Fallback to comma-separated if JSON parse fails
+                    core_readonly.extend(
+                        [item.strip() for item in env_raw.split(",") if item.strip()]
+                    )
+            else:
+                core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
 
         # Runtime override/extension via settings (env: CORE_READONLY_TOOLS)
         try:
@@ -1506,6 +1534,12 @@ def get_global_registry() -> ToolMetadataRegistry:
     if _global_registry is None:
         _global_registry = ToolMetadataRegistry()
     return _global_registry
+
+
+def reset_global_registry() -> None:
+    """Reset the global metadata registry singleton."""
+    global _global_registry
+    _global_registry = None
 
 
 def register_tool_metadata(tool: BaseTool) -> None:

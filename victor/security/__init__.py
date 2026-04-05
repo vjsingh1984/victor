@@ -30,8 +30,8 @@ Example usage:
     from victor.security.auth import RBACManager, Permission
     from victor.security.safety import detect_secrets, CodePatternScanner
     from victor.security.audit import AuditManager
+    from victor.core.async_utils import run_sync
     from pathlib import Path
-    import asyncio
 
     async def scan_project():
         # Vulnerability scanning
@@ -67,7 +67,7 @@ Example usage:
         audit = AuditManager.get_instance()
         await audit.log_file_operation("read", "/path/to/file")
 
-    asyncio.run(scan_project())
+    run_sync(scan_project())
 """
 
 # CVE/Vulnerability scanning (existing functionality)
@@ -145,6 +145,14 @@ __all__ = [
     "SecurityManager",
     "get_security_manager",
     "reset_security_manager",
+    # Permission hierarchy (three-tier: ReadOnly, WorkspaceWrite, DangerFullAccess)
+    "PermissionMode",
+    "PermissionPolicy",
+    "AuthorizationDecision",
+    # Command safety (consolidated)
+    "is_dangerous_command",
+    # Environment filtering (consolidated)
+    "get_filtered_env",
 ]
 
 
@@ -162,4 +170,17 @@ def __getattr__(name: str):
         from victor.security import audit
 
         return audit
+    # New consolidated modules (lazy to avoid import-time overhead)
+    elif name in ("PermissionMode", "PermissionPolicy", "AuthorizationDecision"):
+        from victor.security import permissions
+
+        return getattr(permissions, name)
+    elif name == "is_dangerous_command":
+        from victor.security.command_safety import is_dangerous_command
+
+        return is_dangerous_command
+    elif name == "get_filtered_env":
+        from victor.security.env_filtering import get_filtered_env
+
+        return get_filtered_env
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -262,7 +262,10 @@ class TestToolRegistry:
         """Test registering invalid type raises error."""
         registry = ToolRegistry()
 
-        with pytest.raises(TypeError, match="Can only register BaseTool instances"):
+        with pytest.raises(
+            TypeError,
+            match="Can only register BaseTool|No registration strategy found",
+        ):
             registry.register("not a tool")
 
     def test_unregister_tool(self):

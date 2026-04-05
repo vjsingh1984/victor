@@ -203,14 +203,18 @@ class ReplicateProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=False,  # Replicate doesn't support tools
-        ):
+        ) as log_success:
             try:
                 # Convert messages to prompt format for Replicate
                 prompt = self._messages_to_prompt(messages)
 
                 # Create prediction
                 prediction = await self._create_prediction(
-                    model=model, prompt=prompt, temperature=temperature, max_tokens=max_tokens, **kwargs
+                    model=model,
+                    prompt=prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
                 )
 
                 # Wait for completion
@@ -235,13 +239,7 @@ class ReplicateProvider(BaseProvider):
                 )
 
                 # Log success
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(prompt)}",
-                    endpoint="/predictions",
-                    model=model,
-                    start_time=0,  # Set by context manager
-                    tokens=None,  # Replicate doesn't provide token counts
-                )
+                log_success(tokens=None)
 
                 return response
 
@@ -273,29 +271,7 @@ class ReplicateProvider(BaseProvider):
                         status_code=e.response.status_code,
                     ) from e
             except Exception as e:
-                # Convert to specific provider error types based on error message
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid token", "401"]):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                else:
-                    # Wrap generic errors in ProviderError
-                    raise ProviderError(
-                        message=f"Replicate API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,

@@ -45,6 +45,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -77,6 +78,7 @@ class GlobalStateManager:
         """Initialize the global state manager."""
         self._managers: Dict[StateScope, IStateManager] = {}
         self._tracer: Optional[Any] = None
+        self._lock = asyncio.Lock()
 
         logger.info("GlobalStateManager initialized")
 
@@ -153,17 +155,17 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        old_value = await manager.get(key)
-        await manager.set(key, value)
+        async with self._lock:
+            old_value = await manager.get(key)
+            await manager.set(key, value)
 
-        # Trace transition
-        if self._tracer:
-            self._tracer.record_transition(
-                scope=scope.value,
-                key=key,
-                old_value=old_value,
-                new_value=value,
-            )
+            if self._tracer:
+                self._tracer.record_transition(
+                    scope=scope.value,
+                    key=key,
+                    old_value=old_value,
+                    new_value=value,
+                )
 
     async def delete(
         self,
@@ -183,17 +185,17 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        old_value = await manager.get(key)
-        await manager.delete(key)
+        async with self._lock:
+            old_value = await manager.get(key)
+            await manager.delete(key)
 
-        # Trace transition
-        if self._tracer:
-            self._tracer.record_transition(
-                scope=scope.value,
-                key=key,
-                old_value=old_value,
-                new_value=None,
-            )
+            if self._tracer:
+                self._tracer.record_transition(
+                    scope=scope.value,
+                    key=key,
+                    old_value=old_value,
+                    new_value=None,
+                )
 
     async def exists(
         self,
@@ -277,18 +279,18 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        # Trace each update
-        if self._tracer:
-            for key, value in updates.items():
-                old_value = await manager.get(key)
-                self._tracer.record_transition(
-                    scope=scope.value,
-                    key=key,
-                    old_value=old_value,
-                    new_value=value,
-                )
+        async with self._lock:
+            if self._tracer:
+                for key, value in updates.items():
+                    old_value = await manager.get(key)
+                    self._tracer.record_transition(
+                        scope=scope.value,
+                        key=key,
+                        old_value=old_value,
+                        new_value=value,
+                    )
 
-        await manager.update(updates)
+            await manager.update(updates)
 
     async def clear(self, scope: StateScope = StateScope.GLOBAL) -> None:
         """Clear all state from specified scope.
@@ -303,7 +305,8 @@ class GlobalStateManager:
         if not manager:
             raise ValueError(f"No manager registered for scope: {scope.value}")
 
-        await manager.clear()
+        async with self._lock:
+            await manager.clear()
         logger.info(f"Cleared all state from scope: {scope.value}")
 
     async def create_checkpoint(self) -> Dict[str, Any]:
@@ -326,13 +329,14 @@ class GlobalStateManager:
         """
         checkpoint: Dict[str, Any] = {}
 
-        for scope, manager in self._managers.items():
-            try:
-                snapshot = await manager.snapshot()
-                checkpoint[scope.value] = snapshot
-            except Exception as e:
-                logger.error(f"Failed to create snapshot for scope {scope.value}: {e}")
-                raise
+        async with self._lock:
+            for scope, manager in self._managers.items():
+                try:
+                    snapshot = await manager.snapshot()
+                    checkpoint[scope.value] = snapshot
+                except Exception as e:
+                    logger.error(f"Failed to create snapshot for scope {scope.value}: {e}")
+                    raise
 
         logger.info(f"Created checkpoint across {len(checkpoint)} scopes")
         return checkpoint
@@ -352,22 +356,23 @@ class GlobalStateManager:
         Example:
             >>> await state.restore_checkpoint(checkpoint)
         """
-        for scope_value, snapshot in checkpoint.items():
-            try:
-                scope = StateScope(scope_value)
-            except ValueError:
-                logger.warning(f"Invalid scope in checkpoint: {scope_value}")
-                continue
+        async with self._lock:
+            for scope_value, snapshot in checkpoint.items():
+                try:
+                    scope = StateScope(scope_value)
+                except ValueError:
+                    logger.warning(f"Invalid scope in checkpoint: {scope_value}")
+                    continue
 
-            manager = self._managers.get(scope)
-            if not manager:
-                raise ValueError(f"Cannot restore scope {scope.value}: " f"no manager registered")
+                manager = self._managers.get(scope)
+                if not manager:
+                    raise ValueError(f"Cannot restore scope {scope.value}: no manager registered")
 
-            try:
-                await manager.restore(snapshot)
-            except Exception as e:
-                logger.error(f"Failed to restore snapshot for scope {scope.value}: {e}")
-                raise
+                try:
+                    await manager.restore(snapshot)
+                except Exception as e:
+                    logger.error(f"Failed to restore snapshot for scope {scope.value}: {e}")
+                    raise
 
         logger.info(f"Restored checkpoint across {len(checkpoint)} scopes")
 

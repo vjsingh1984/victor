@@ -43,10 +43,10 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from victor.core.events import ObservabilityBus, get_observability_bus
 from victor.core.events.emit_helper import emit_event_sync
 from victor.observability.hooks import StateHookManager, TransitionHistory
+from victor.observability.request_correlation import get_request_correlation_id
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.observability.cqrs_adapter import CQRSEventAdapter, UnifiedEventBridge
 
 logger = logging.getLogger(__name__)
 
@@ -75,39 +75,23 @@ class ObservabilityIntegration:
         self,
         event_bus: Optional["ObservabilityBus"] = None,
         session_id: Optional[str] = None,
-        enable_cqrs_bridge: bool = False,
     ) -> None:
         """Initialize the integration.
 
         Args:
             event_bus: ObservabilityBus to use (default: singleton).
             session_id: Optional session ID for correlation.
-            enable_cqrs_bridge: Whether to enable CQRS event bridging.
-                When enabled, events are automatically forwarded between
-                the observability ObservabilityBus and CQRS EventDispatcher.
         """
         self._bus = event_bus or get_observability_bus()
         self._session_id = session_id
         self._wired_components: List[str] = []
         self._tool_start_times: Dict[str, float] = {}
-        self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
-
-        # Note: session_id is stored in self._session_id for use in event emissions
-        # The new ObservabilityBus doesn't have set_session_id() method
-
-        if enable_cqrs_bridge:
-            self._setup_cqrs_bridge()
 
     @property
     def event_bus(self) -> "ObservabilityBus":
         """Get the event bus."""
         return self._bus
-
-    @property
-    def cqrs_bridge(self) -> Optional["UnifiedEventBridge"]:
-        """Get the CQRS bridge if enabled."""
-        return self._cqrs_bridge
 
     @property
     def state_hook_manager(self) -> Optional[StateHookManager]:
@@ -117,6 +101,33 @@ class ObservabilityIntegration:
             StateHookManager instance or None.
         """
         return self._state_hook_manager
+
+    def _schedule_emit(
+        self,
+        *,
+        topic: str,
+        data: Dict[str, Any],
+        correlation_id: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Schedule an async observability emit on the active event loop."""
+        event_name = description or topic
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            logger.debug("No event loop, skipping %s event emission", event_name)
+            return
+
+        try:
+            loop.create_task(
+                self._bus.emit(
+                    topic=topic,
+                    data=data,
+                    correlation_id=correlation_id,
+                )
+            )
+        except Exception as e:
+            logger.debug("Failed to emit %s event: %s", event_name, e)
 
     @property
     def state_transition_history(self) -> Optional[TransitionHistory]:
@@ -179,51 +190,6 @@ class ObservabilityIntegration:
                 stage: history.get_stage_visit_count(stage) for stage in unique_stages
             },
         }
-
-    def _setup_cqrs_bridge(self) -> None:
-        """Set up the CQRS event bridge.
-
-        Creates a UnifiedEventBridge that connects the observability
-        EventBus to the CQRS EventDispatcher for bidirectional event flow.
-        """
-        from victor.observability.cqrs_adapter import create_unified_bridge
-
-        self._cqrs_bridge = create_unified_bridge(
-            event_bus=self._bus,
-            auto_start=True,
-        )
-        self._wired_components.append("cqrs_bridge")
-        logger.debug("CQRS event bridge enabled")
-
-    def enable_cqrs_bridge(self) -> "UnifiedEventBridge":
-        """Enable CQRS event bridging.
-
-        Creates and starts a UnifiedEventBridge if not already enabled.
-
-        Returns:
-            The UnifiedEventBridge instance.
-
-        Example:
-            integration = ObservabilityIntegration()
-            bridge = integration.enable_cqrs_bridge()
-
-            # Events now flow between EventBus and CQRS EventDispatcher
-        """
-        if self._cqrs_bridge is None:
-            self._setup_cqrs_bridge()
-        return self._cqrs_bridge
-
-    def disable_cqrs_bridge(self) -> None:
-        """Disable CQRS event bridging.
-
-        Stops the bridge if it was enabled.
-        """
-        if self._cqrs_bridge is not None:
-            self._cqrs_bridge.stop()
-            self._cqrs_bridge = None
-            if "cqrs_bridge" in self._wired_components:
-                self._wired_components.remove("cqrs_bridge")
-            logger.debug("CQRS event bridge disabled")
 
     def set_session_id(self, session_id: str) -> None:
         """Set the session ID for event correlation.
@@ -309,49 +275,33 @@ class ObservabilityIntegration:
                 enhanced_context["stage_duration_ms"] = last_records[0].duration_ms
 
             # Emit state transition event
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(
-                    self._bus.emit(
-                        topic="state.stage_changed",
-                        data={
-                            "old_stage": old_stage,
-                            "new_stage": new_stage,
-                            "confidence": context.get("confidence", 1.0),
-                            **enhanced_context,
-                        },
-                    )
-                )
-            except RuntimeError:
-                # No event loop running
-                logger.debug("No event loop, skipping state.stage_changed event emission")
-            except Exception as e:
-                logger.debug(f"Failed to emit state transition event: {e}")
+            self._schedule_emit(
+                topic="state.stage_changed",
+                data={
+                    "old_stage": old_stage,
+                    "new_stage": new_stage,
+                    "confidence": context.get("confidence", 1.0),
+                    **enhanced_context,
+                },
+                description="state.stage_changed",
+            )
 
             # Emit warning event if cycle detected (potential infinite loop)
             if history.has_cycle():
                 cycle_count = history.get_stage_visit_count(new_stage)
                 if cycle_count >= 3:
                     # Emit cycle warning event
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(
-                            self._bus.emit(
-                                topic="error.cycle_warning",
-                                data={
-                                    "stage": new_stage,
-                                    "visit_count": cycle_count,
-                                    "sequence": history.get_stage_sequence()[-5:],
-                                    "severity": "warning",
-                                    "category": "error",
-                                },
-                            )
-                        )
-                    except RuntimeError:
-                        # No event loop running
-                        logger.debug("No event loop, skipping cycle_warning event emission")
-                    except Exception as e:
-                        logger.debug(f"Failed to emit cycle warning event: {e}")
+                    self._schedule_emit(
+                        topic="error.cycle_warning",
+                        data={
+                            "stage": new_stage,
+                            "visit_count": cycle_count,
+                            "sequence": history.get_stage_sequence()[-5:],
+                            "severity": "warning",
+                            "category": "error",
+                        },
+                        description="error.cycle_warning",
+                    )
 
         if hasattr(state_machine, "set_hooks"):
             state_machine.set_hooks(hook_manager)
@@ -378,24 +328,18 @@ class ObservabilityIntegration:
             tool_id: Optional tool call ID.
         """
         self._tool_start_times[tool_id or tool_name] = time.time()
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="tool.start",
-                    data={
-                        "tool_name": tool_name,
-                        "arguments": arguments,
-                        "tool_id": tool_id,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping tool.start event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit tool start event: {e}")
+        correlation_id = get_request_correlation_id() or self._session_id
+        self._schedule_emit(
+            topic="tool.start",
+            data={
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "tool_id": tool_id,
+                "category": "tool",
+            },
+            correlation_id=correlation_id,
+            description="tool.start",
+        )
 
     def on_tool_end(
         self,
@@ -417,49 +361,35 @@ class ObservabilityIntegration:
         key = tool_id or tool_name
         start_time = self._tool_start_times.pop(key, None)
         duration_ms = (time.time() - start_time) * 1000 if start_time else None
+        correlation_id = get_request_correlation_id() or self._session_id
 
         # Emit tool complete/end event
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="tool.end",
-                    data={
-                        "tool_name": tool_name,
-                        "result": result,
-                        "success": success,
-                        "tool_id": tool_id,
-                        "duration_ms": duration_ms,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping tool.end event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit tool end event: {e}")
+        self._schedule_emit(
+            topic="tool.end",
+            data={
+                "tool_name": tool_name,
+                "result": result,
+                "success": success,
+                "tool_id": tool_id,
+                "duration_ms": duration_ms,
+                "category": "tool",
+            },
+            correlation_id=correlation_id,
+            description="tool.end",
+        )
 
         if not success and error:
             # Emit tool error event
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(
-                    self._bus.emit(
-                        topic=f"error.{tool_name}",
-                        data={
-                            "tool_name": tool_name,
-                            "error": error,
-                            "tool_id": tool_id,
-                            "category": "error",
-                        },
-                    )
-                )
-            except RuntimeError:
-                # No event loop running
-                logger.debug("No event loop, skipping tool error event emission")
-            except Exception as e:
-                logger.debug(f"Failed to emit tool error event: {e}")
+            self._schedule_emit(
+                topic=f"error.{tool_name}",
+                data={
+                    "tool_name": tool_name,
+                    "error": error,
+                    "tool_id": tool_id,
+                    "category": "error",
+                },
+                description=f"error.{tool_name}",
+            )
 
     # =========================================================================
     # Model Events
@@ -481,25 +411,17 @@ class ObservabilityIntegration:
             tool_count: Number of tools available.
         """
         # Emit model request event
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="model.request",
-                    data={
-                        "provider": provider,
-                        "model": model,
-                        "message_count": message_count,
-                        "tool_count": tool_count,
-                        "category": "model",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping model.request event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit model request event: {e}")
+        self._schedule_emit(
+            topic="model.request",
+            data={
+                "provider": provider,
+                "model": model,
+                "message_count": message_count,
+                "tool_count": tool_count,
+                "category": "model",
+            },
+            description="model.request",
+        )
 
     def on_model_response(
         self,
@@ -519,26 +441,18 @@ class ObservabilityIntegration:
             latency_ms: Optional latency in milliseconds.
         """
         # Emit model response event
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                self._bus.emit(
-                    topic="model.response",
-                    data={
-                        "provider": provider,
-                        "model": model,
-                        "tokens_used": tokens_used,
-                        "tool_calls": tool_calls,
-                        "latency_ms": latency_ms,
-                        "category": "model",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            logger.debug("No event loop, skipping model.response event emission")
-        except Exception as e:
-            logger.debug(f"Failed to emit model response event: {e}")
+        self._schedule_emit(
+            topic="model.response",
+            data={
+                "provider": provider,
+                "model": model,
+                "tokens_used": tokens_used,
+                "tool_calls": tool_calls,
+                "latency_ms": latency_ms,
+                "category": "model",
+            },
+            description="model.response",
+        )
 
     # =========================================================================
     # Lifecycle Events
@@ -608,36 +522,21 @@ class ObservabilityIntegration:
 def setup_observability(
     orchestrator: "AgentOrchestrator",
     session_id: Optional[str] = None,
-    enable_cqrs_bridge: bool = False,
 ) -> ObservabilityIntegration:
     """Convenience function to set up observability for an orchestrator.
 
     Args:
         orchestrator: Orchestrator to wire.
         session_id: Optional session ID.
-        enable_cqrs_bridge: Whether to enable CQRS event bridging.
-            When enabled, events are automatically forwarded between
-            the observability EventBus and CQRS EventDispatcher.
 
     Returns:
         Configured ObservabilityIntegration instance.
 
     Example:
-        # Basic usage
         integration = setup_observability(orchestrator)
-
-        # With CQRS bridge for event sourcing integration
-        integration = setup_observability(orchestrator, enable_cqrs_bridge=True)
-
-        # Subscribe to CQRS events
-        if integration.cqrs_bridge:
-            from victor.core import EventDispatcher
-            dispatcher = integration.cqrs_bridge.adapter.event_dispatcher
-            dispatcher.subscribe_all(lambda e: print(f"CQRS event: {e}"))
     """
     integration = ObservabilityIntegration(
         session_id=session_id,
-        enable_cqrs_bridge=enable_cqrs_bridge,
     )
     integration.wire_orchestrator(orchestrator)
     return integration

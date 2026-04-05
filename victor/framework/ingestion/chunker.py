@@ -359,7 +359,7 @@ class BaseChunker:
             return self._chunk_text(content)
 
         chunks = []
-        soup = BeautifulSoup(content, "html.parser")
+        soup = BeautifulSoup(content, "lxml")
 
         # Remove non-content elements
         for tag in soup(["script", "style", "nav", "footer", "header"]):

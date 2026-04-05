@@ -68,7 +68,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         if not content or not content.strip():
             return []
 
-        soup = BeautifulSoup(content, "html.parser")
+        soup = BeautifulSoup(content, "lxml")
 
         # Remove non-content elements
         for tag in soup(["script", "style", "nav", "footer", "header", "meta", "link"]):

@@ -319,7 +319,7 @@ class TestAgentCreationFactory:
             mode="plan",
             tool_budget=100,
             max_iterations=50,
-            vertical="research",
+            vertical="benchmark",  # Use benchmark which is a built-in vertical
             enable_observability=False,
             session_id="test-123",
             custom_key="custom_value",
@@ -333,7 +333,7 @@ class TestAgentCreationFactory:
         assert context.mode == "plan"
         assert context.tool_budget == 100
         assert context.max_iterations == 50
-        assert context.vertical is not None
+        assert context.vertical is not None  # benchmark is a built-in vertical
         assert context.enable_observability is False
         assert context.session_id == "test-123"
         assert context.metadata == {"custom_key": "custom_value"}

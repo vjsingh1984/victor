@@ -716,15 +716,19 @@ class TestFromSettings:
         mock_provider.supports_tools.return_value = True
         mock_provider.get_context_window.return_value = 100000
 
-        with patch("victor.agent.orchestrator.ProviderRegistry") as mock_registry:
-            mock_registry.create.return_value = mock_provider
-            with patch("victor.agent.orchestrator.UsageLogger"):
-                orch = await AgentOrchestrator.from_settings(
-                    settings=orchestrator_settings, profile_name="default"
-                )
+        with (
+            patch("victor.providers.registry.ProviderRegistry.create") as mock_create,
+            patch("victor.agent.tool_calling.capabilities.ModelCapabilityLoader") as mock_caps,
+            patch("victor.agent.orchestrator.UsageLogger"),
+        ):
+            mock_create.return_value = mock_provider
+            mock_caps.return_value.get_capabilities.return_value = None
+            orch = await AgentOrchestrator.from_settings(
+                settings=orchestrator_settings, profile_name="default"
+            )
 
-                assert orch is not None
-                assert orch.model == "test-model"
+            assert orch is not None
+            assert orch.model == "test-model"
 
 
 class TestToolPlanning:
@@ -1442,7 +1446,7 @@ class TestCallbacks:
         # Should not raise
 
     def test_send_rl_reward_signal(self, orchestrator):
-        """_send_rl_reward_signal handles reward signal gracefully."""
+        """RL reward signal via callback coordinator handles reward gracefully."""
         from victor.agent.streaming_controller import StreamingSession
         import time
 
@@ -1454,7 +1458,7 @@ class TestCallbacks:
         )
         session.end_time = time.time()
         # Should not raise, even if RL module not available
-        orchestrator._send_rl_reward_signal(session)
+        orchestrator._callback_coordinator._send_rl_reward_signal(session)
 
 
 class TestContextLimitCalculation:
@@ -1481,7 +1485,7 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback to provider limits
         )
 
         mock_limits = MagicMock()
@@ -1501,7 +1505,7 @@ class TestContextLimitCalculation:
             analytics_enabled=False,
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback path
         )
         mock_get_limits.side_effect = RuntimeError("Config error")
         # Should not raise, falls back to defaults (128000 * 3.5 * 0.8 = 358400)
@@ -1516,7 +1520,7 @@ class TestContextLimitCalculation:
         settings = Settings(
             analytics_enabled=False,
             use_semantic_tool_selection=False,
-            max_context_chars=0,  # Disable settings override to test fallback
+            max_context_chars=None,  # No settings override, test fallback path
             use_mcp_tools=False,
         )
         mock_limits = MagicMock()
@@ -1976,13 +1980,17 @@ class TestSwitchModel:
 
     def test_switch_model_returns_bool(self, orchestrator):
         """switch_model returns boolean."""
-        result = orchestrator.switch_model("different-model")
+        import asyncio
+
+        result = asyncio.run(orchestrator.switch_model("different-model"))
         assert isinstance(result, bool)
 
     def test_switch_model_updates_model(self, orchestrator):
         """Successful model switch updates model attribute."""
+        import asyncio
+
         old_model = orchestrator.model
-        result = orchestrator.switch_model("new-test-model")
+        result = asyncio.run(orchestrator.switch_model("new-test-model"))
         if result:
             assert orchestrator.model == "new-test-model"
         else:
@@ -3336,6 +3344,23 @@ class TestCreateBackgroundTask:
         # Should have added a task
         assert len(orchestrator._background_tasks) >= initial_count
 
+    def test_create_background_task_without_loop_returns_none(self, orchestrator):
+        """Test _create_background_task closes bare coroutines without a running loop."""
+
+        async def dummy_coro():
+            return None
+
+        coro = dummy_coro()
+
+        with patch(
+            "victor.agent.orchestrator.asyncio.get_running_loop",
+            side_effect=RuntimeError,
+        ):
+            result = orchestrator._create_background_task(coro, name="test_task")
+
+        assert result is None
+        assert coro.cr_frame is None
+
 
 class TestSwitchModel:
     """Tests for switch_model method."""
@@ -4441,7 +4466,7 @@ class TestStreamingHandlerProperty:
 
 
 class TestCheckProgressWithHandler:
-    """Tests for progress checking (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for progress checking (now owned by StreamingChatPipeline).
 
     The _check_progress_with_handler method was removed from the orchestrator.
     Progress checking is now handled via the recovery coordinator directly.
@@ -4471,7 +4496,7 @@ class TestCheckProgressWithHandler:
 
 
 class TestHandleForceCompletionWithHandler:
-    """Tests for force completion (now inline in ChatCoordinator._stream_chat_impl).
+    """Tests for force completion (now driven by StreamingChatPipeline).
 
     The _handle_force_completion_with_handler method was removed from the orchestrator.
     Force completion is now handled via the unified_tracker and streaming context.

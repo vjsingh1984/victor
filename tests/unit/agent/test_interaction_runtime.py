@@ -20,6 +20,9 @@ def test_create_interaction_runtime_components_lazy_materialization():
     memory_manager = MagicMock()
     checkpoint_manager = MagicMock()
     cost_tracker = MagicMock()
+    factory = MagicMock()
+    pipeline = MagicMock()
+    factory.create_streaming_chat_pipeline.return_value = pipeline
 
     with patch("victor.agent.coordinators.chat_coordinator.ChatCoordinator") as chat_cls:
         with patch("victor.agent.coordinators.tool_coordinator.ToolCoordinator") as tool_cls:
@@ -33,8 +36,11 @@ def test_create_interaction_runtime_components_lazy_materialization():
                 tool_cls.return_value = tool_coordinator
                 session_factory.return_value = session_coordinator
 
+                chat_coordinator.set_streaming_pipeline = MagicMock()
+
                 runtime = create_interaction_runtime_components(
                     orchestrator=orchestrator,
+                    factory=factory,
                     tool_pipeline=tool_pipeline,
                     tool_registry=tool_registry,
                     tool_selector=tool_selector,
@@ -56,6 +62,8 @@ def test_create_interaction_runtime_components_lazy_materialization():
                 assert runtime.session_coordinator.get_instance() is session_coordinator
 
     chat_cls.assert_called_once_with(orchestrator)
+    factory.create_streaming_chat_pipeline.assert_called_once_with(chat_coordinator)
+    chat_coordinator.set_streaming_pipeline.assert_called_once_with(pipeline)
     tool_cls.assert_called_once_with(
         tool_pipeline=tool_pipeline,
         tool_registry=tool_registry,

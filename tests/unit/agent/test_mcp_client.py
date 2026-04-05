@@ -434,6 +434,50 @@ class TestMCPClientDisconnect:
         mock_task.cancel.assert_called_once()
         assert client._health_task is None
 
+    def test_disconnect_uses_shared_sync_bridge_for_sandboxed_process(self):
+        """Test disconnect bridges sandbox cleanup with run_sync outside event loops."""
+        client = MCPClient()
+        sandboxed_process = MagicMock()
+        coro = object()
+        sandboxed_process.terminate.return_value = coro
+        client._sandboxed_process = sandboxed_process
+
+        with (
+            patch(
+                "victor.integrations.mcp.client.asyncio.get_running_loop",
+                side_effect=RuntimeError,
+            ),
+            patch("victor.integrations.mcp.client.run_sync", return_value=None) as mock_run_sync,
+        ):
+            client.disconnect()
+
+        sandboxed_process.terminate.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+        assert client._sandboxed_process is None
+
+    def test_cleanup_process_uses_shared_sync_bridge_for_sandboxed_process(self):
+        """Test _cleanup_process bridges sandbox cleanup with run_sync outside loops."""
+        client = MCPClient()
+        sandboxed_process = MagicMock()
+        coro = object()
+        sandboxed_process.terminate.return_value = coro
+        client._sandboxed_process = sandboxed_process
+
+        with (
+            patch(
+                "victor.integrations.mcp.client.asyncio.get_running_loop",
+                side_effect=RuntimeError,
+            ),
+            patch.object(client, "_cleanup_process_sync") as mock_cleanup_sync,
+            patch("victor.integrations.mcp.client.run_sync", return_value=None) as mock_run_sync,
+        ):
+            client._cleanup_process()
+
+        sandboxed_process.terminate.assert_called_once_with()
+        mock_run_sync.assert_called_once_with(coro)
+        mock_cleanup_sync.assert_called_once_with()
+        assert client._sandboxed_process is None
+
 
 class TestMCPClientPing:
     """Tests for ping/health checking."""

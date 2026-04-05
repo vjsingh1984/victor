@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from victor.storage.embeddings.service import EmbeddingService
+from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class StaticEmbeddingCollection:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Use shared embedding service
-        self.embedding_service = embedding_service or EmbeddingService.get_instance()
+        self.embedding_service = embedding_service or get_embedding_service()
 
         # Cache file path
         self.cache_file = self.cache_dir / f"{name}_collection.pkl"

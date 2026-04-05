@@ -52,73 +52,12 @@ from typing import Any, Callable, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-class ResponseQualityDimension(Enum):
-    """Dimensions of LLM response quality.
-
-    This is the CANONICAL ResponseQualityDimension for response quality scoring.
-
-    Renamed from QualityDimension to be semantically distinct:
-    - ResponseQualityDimension (here): LLM response quality (7 dimensions)
-    - ProtocolQualityDimension (victor.protocols.quality): Protocol-level quality (7 different dimensions)
-    """
-
-    RELEVANCE = "relevance"  # Addresses the query
-    COMPLETENESS = "completeness"  # Covers all aspects
-    ACCURACY = "accuracy"  # Factually correct
-    CONCISENESS = "conciseness"  # Not verbose
-    ACTIONABILITY = "actionability"  # Clear next steps
-    COHERENCE = "coherence"  # Logical structure
-    CODE_QUALITY = "code_quality"  # Code correctness
-
-
-@dataclass
-class DimensionScore:
-    """Score for a single quality dimension.
-
-    Attributes:
-        dimension: Quality dimension
-        score: Score from 0.0 to 1.0
-        weight: Importance weight for overall score
-        feedback: Specific feedback for improvement
-        evidence: Evidence supporting the score
-    """
-
-    dimension: ResponseQualityDimension
-    score: float
-    weight: float = 1.0
-    feedback: str = ""
-    evidence: List[str] = field(default_factory=list)
-
-
-@dataclass
-class QualityResult:
-    """Result of quality scoring.
-
-    Attributes:
-        overall_score: Weighted average score (0.0 to 1.0)
-        dimension_scores: Scores for each dimension
-        passes_threshold: Whether score meets minimum threshold
-        improvement_suggestions: Prioritized improvements
-        metadata: Additional scoring metadata
-    """
-
-    overall_score: float
-    dimension_scores: List[DimensionScore]
-    passes_threshold: bool
-    improvement_suggestions: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def get_dimension_score(self, dimension: ResponseQualityDimension) -> Optional[float]:
-        """Get score for a specific dimension."""
-        for ds in self.dimension_scores:
-            if ds.dimension == dimension:
-                return ds.score
-        return None
-
-    def get_weakest_dimensions(self, n: int = 3) -> List[DimensionScore]:
-        """Get the n weakest scoring dimensions."""
-        sorted_dims = sorted(self.dimension_scores, key=lambda x: x.score)
-        return sorted_dims[:n]
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import (  # noqa: F401
+    DimensionScore,
+    QualityResult,
+    ResponseQualityDimension,
+)
 
 
 @dataclass

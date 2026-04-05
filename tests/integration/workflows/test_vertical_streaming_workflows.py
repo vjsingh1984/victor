@@ -32,13 +32,29 @@ import pytest
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
+from victor.core.verticals.import_resolver import import_module_with_fallback
+
+
+def _load_vertical_attr(module_path: str, attr_name: str):
+    """Resolve a vertical attribute using external-first import fallbacks."""
+    module, _resolved = import_module_with_fallback(module_path)
+    if module is None:
+        pytest.skip(f"Vertical module not available: {module_path}")
+    if not hasattr(module, attr_name):
+        pytest.skip(f"Missing attribute '{attr_name}' in module '{module_path}'")
+    return getattr(module, attr_name)
+
+
 # ============ Test Fixtures ============
 
 
 @pytest.fixture
 def coding_provider():
     """Fixture providing CodingWorkflowProvider."""
-    from victor.coding.workflows.provider import CodingWorkflowProvider
+    CodingWorkflowProvider = _load_vertical_attr(
+        "victor.coding.workflows.provider",
+        "CodingWorkflowProvider",
+    )
 
     return CodingWorkflowProvider()
 
@@ -46,7 +62,10 @@ def coding_provider():
 @pytest.fixture
 def devops_provider():
     """Fixture providing DevOpsWorkflowProvider."""
-    from victor.devops.workflows import DevOpsWorkflowProvider
+    DevOpsWorkflowProvider = _load_vertical_attr(
+        "victor.devops.workflows",
+        "DevOpsWorkflowProvider",
+    )
 
     return DevOpsWorkflowProvider()
 
@@ -54,7 +73,10 @@ def devops_provider():
 @pytest.fixture
 def research_provider():
     """Fixture providing ResearchWorkflowProvider."""
-    from victor.research.workflows import ResearchWorkflowProvider
+    ResearchWorkflowProvider = _load_vertical_attr(
+        "victor.research.workflows",
+        "ResearchWorkflowProvider",
+    )
 
     return ResearchWorkflowProvider()
 
@@ -62,7 +84,10 @@ def research_provider():
 @pytest.fixture
 def dataanalysis_provider():
     """Fixture providing DataAnalysisWorkflowProvider."""
-    from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
+    DataAnalysisWorkflowProvider = _load_vertical_attr(
+        "victor.dataanalysis.workflows",
+        "DataAnalysisWorkflowProvider",
+    )
 
     return DataAnalysisWorkflowProvider()
 
@@ -204,15 +229,27 @@ class TestCanonicalWorkflowAPI:
     def test_compile_workflow_returns_compiled_graph(self, all_providers):
         """Test compile_workflow returns a CompiledGraph instance."""
         for name, provider in all_providers:
-            workflows = provider.get_workflow_names()
-            if workflows:
-                workflow_name = workflows[0]
-                compiled = provider.compile_workflow(workflow_name)
-                # CompiledGraph should have invoke and stream methods
-                assert hasattr(compiled, "invoke"), f"{name} compiled graph missing invoke"
-                assert hasattr(compiled, "stream"), f"{name} compiled graph missing stream"
-                assert callable(compiled.invoke), f"{name} invoke not callable"
-                assert callable(compiled.stream), f"{name} stream not callable"
+            workflow_names = provider.get_workflow_names()
+            if not workflow_names:
+                pytest.skip(f"{name} provider has no workflows")
+
+            compiled = None
+            for workflow_name in workflow_names:
+                try:
+                    compiled = provider.compile_workflow(workflow_name)
+                    break
+                except FileNotFoundError:
+                    # Some manifests may include optional workflows not present in this env.
+                    continue
+
+            if compiled is None:
+                pytest.skip(f"{name} provider has no compileable workflows in this environment")
+
+            # CompiledGraph should have invoke and stream methods
+            assert hasattr(compiled, "invoke"), f"{name} compiled graph missing invoke"
+            assert hasattr(compiled, "stream"), f"{name} compiled graph missing stream"
+            assert callable(compiled.invoke), f"{name} invoke not callable"
+            assert callable(compiled.stream), f"{name} stream not callable"
 
     @pytest.mark.asyncio
     async def test_run_compiled_workflow_raises_for_unknown_workflow(self, all_providers):

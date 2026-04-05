@@ -63,7 +63,17 @@ Brief description of this release (2-3 sentences).
 - **[Feature/API]**: Description
   - Deprecated in: [Version]
   - To be removed in: [Version]
+  - Target removal date: YYYY-MM-DD
+  - Replacement: [API/path]
   - Migration path: Link to documentation
+  - Compatibility shim status: [still supported until X / removed in this release]
+
+Required for every deprecation or removal carried in the release:
+
+- Include the target removal version and removal date.
+- State whether a compatibility shim still exists.
+- Link to the migration guide or include a minimal migration snippet.
+- If the deprecated surface is removed in this release, repeat it under `Breaking Changes`.
 
 ### Documentation
 
@@ -172,11 +182,20 @@ See [CHANGELOG.md](CHANGELOG.md) for details on previous releases.
 - Provide migration code examples
 - Link to migration guide
 
+### Extracted Verticals
+- If a release changes first-party vertical packaging, add a short subsection
+  naming the authoritative external package for each affected vertical.
+- State whether a bundled shim still exists in `victor-ai`.
+- State the earliest removal version/date for that shim.
+- Include the install or upgrade command users should run.
+
 ### Version Numbering
 - Follow semantic versioning: MAJOR.MINOR.PATCH
 - MAJOR: Breaking changes
 - MINOR: New features (backward compatible)
 - PATCH: Bug fixes (backward compatible)
+- First-party extracted vertical packages should use the same suite version as
+  `victor-ai` and `victor-sdk` for the release that publishes them.
 
 ### Contributors Section
 - Use GitHub usernames

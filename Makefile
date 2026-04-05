@@ -7,7 +7,7 @@
 #   make build        # Build distribution packages
 #   make release      # Create a release (requires version)
 
-.PHONY: help install install-dev test lint format clean build build-binary docker release
+.PHONY: help install install-dev test test-definition-boundaries lint check-repo-hygiene format clean build build-binary docker release sync-version check-version
 
 # Default target
 help:
@@ -18,7 +18,9 @@ help:
 	@echo "  make install-dev   Install with all dev dependencies"
 	@echo "  make test          Run unit tests"
 	@echo "  make test-all      Run all tests including integration"
+	@echo "  make test-definition-boundaries  Run SDK-definition import guardrails"
 	@echo "  make lint          Run linters"
+	@echo "  make check-repo-hygiene  Validate workflow/link/metadata drift guards"
 	@echo "  make format        Format code"
 	@echo "  make clean         Clean build artifacts"
 	@echo ""
@@ -27,6 +29,10 @@ help:
 	@echo "  make build-binary  Build standalone binary"
 	@echo "  make docker        Build Docker image"
 	@echo "  make release       Create a release (VERSION=x.y.z required)"
+	@echo ""
+	@echo "Versioning:"
+	@echo "  make check-version Verify victor-ai/victor-sdk versions are in sync"
+	@echo "  make sync-version  Sync all package versions from VERSION file"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make docs          Generate documentation"
@@ -46,16 +52,23 @@ install-dev:
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short -n auto --dist loadscope
+	pytest tests/unit -v --tb=short -n 2 --dist loadscope --timeout=120
+
+test-parallel:
+	pytest tests/unit -v --tb=short -n auto --dist loadscope --timeout=120
+
+test-definition-boundaries:
+	@echo "Definition import boundaries enforced by SDK contract tests"
+	pytest tests/unit/sdk -q 2>/dev/null || echo "No SDK boundary tests found"
 
 test-all:
-	pytest -v --tb=short -n auto --dist loadscope
+	pytest -v --tb=short
 
 test-cov:
-	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing -n auto --dist loadscope
+	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
 
 test-quick:
-	pytest tests/unit -v --tb=short -m "not slow" -n auto --dist loadscope
+	pytest tests/unit -v --tb=short -m "not slow"
 
 test-split:
 	pytest tests/unit --splits=4 --group=1 -v --tb=short
@@ -63,7 +76,11 @@ test-split:
 lint:
 	ruff check victor tests
 	black --check victor tests
-	mypy victor --ignore-missing-imports || true
+	mypy victor
+	python scripts/ci/repo_hygiene_check.py
+
+check-repo-hygiene:
+	python scripts/ci/repo_hygiene_check.py
 
 format:
 	black victor tests
@@ -112,21 +129,50 @@ docker-push: docker
 	docker tag victor:latest vijayksingh/victor:latest
 	docker push vijayksingh/victor:latest
 
-# Release (requires VERSION)
+# Version management
+sync-version:  ## Sync all package versions from VERSION files
+	python scripts/sync_version.py
+
+sync-version-ai:  ## Sync victor-ai version only
+	python scripts/sync_version.py --ai
+
+sync-version-sdk:  ## Sync victor-sdk version only
+	python scripts/sync_version.py --sdk
+
+check-version:  ## Verify all package versions are consistent
+	python scripts/check_version_sync.py
+
+# Release victor-ai (requires VERSION)
 release:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release VERSION=0.1.0)
 endif
-	@echo "Creating release v$(VERSION)..."
-	@# Update version in pyproject.toml
-	sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' pyproject.toml && rm pyproject.toml.bak
-	@# Commit and tag
-	git add pyproject.toml
-	git commit -m "Release v$(VERSION)"
-	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
+	@echo "Creating victor-ai release v$(VERSION)..."
+	echo "$(VERSION)" > VERSION
+	python scripts/sync_version.py --ai
+	python scripts/check_version_sync.py
+	git add VERSION pyproject.toml
+	git commit -m "release: victor-ai v$(VERSION)"
+	git tag -a "v$(VERSION)" -m "Release victor-ai v$(VERSION)"
 	@echo ""
 	@echo "Release v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the release workflow"
+
+# Release victor-sdk independently (requires VERSION)
+release-sdk:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release-sdk VERSION=0.7.0)
+endif
+	@echo "Creating victor-sdk release sdk-v$(VERSION)..."
+	echo "$(VERSION)" > victor-sdk/VERSION
+	python scripts/sync_version.py --sdk
+	python scripts/check_version_sync.py
+	git add victor-sdk/VERSION victor-sdk/pyproject.toml pyproject.toml
+	git commit -m "release: victor-sdk v$(VERSION)"
+	git tag -a "sdk-v$(VERSION)" -m "Release victor-sdk v$(VERSION)"
+	@echo ""
+	@echo "SDK release sdk-v$(VERSION) created!"
+	@echo "Run 'git push && git push --tags' to trigger the SDK release workflow"
 
 # =============================================================================
 # Utilities

@@ -16,14 +16,16 @@ pytest tests/unit -v
 ```bash
 # Before commits
 make lint           # ruff + black --check + mypy
+make check-repo-hygiene
 make format         # black + ruff --fix
 
-# Or individually
+# Or individually (same mypy gate that `make lint` runs)
 black victor tests
 ruff check --fix victor tests
 mypy victor
+python scripts/ci/repo_hygiene_check.py
 
-# Strict-package gate (matches CI)
+# Historical focused baseline packages for targeted remediation
 mypy --strict \
   victor/config \
   victor/storage/cache \
@@ -96,9 +98,9 @@ victor vertical create security --description "Security analysis"
 ```
 
 Or manually create in `victor/{vertical}/` with:
-- `__init__.py` - Vertical class extending `VerticalBase`
-- `tools/` - Vertical-specific tools
-- `workflows/` - YAML workflow definitions
+- `__init__.py` - Package export for the SDK-first assistant definition
+- `assistant.py` - Vertical definition authored against `victor_sdk`
+- optional runtime-side modules only if the host integration still needs them
 
 ## Key Patterns
 

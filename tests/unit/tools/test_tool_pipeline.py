@@ -14,9 +14,12 @@
 
 """Tests for ToolPipeline."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
 
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from victor.agent.search_router import SearchRouter
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
@@ -498,6 +501,47 @@ class TestToolPipelineNormalization:
         args, strategy = pipeline._normalize_arguments("test_tool", {"x": 1})
         assert "x" in args
 
+    def test_normalize_tool_call_adds_bug_mode_to_code_search(self, pipeline):
+        """Bug-style code_search queries should get mode='bugs' automatically."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "code_search",
+            {"query": "json parsing crash on empty payload"},
+        )
+
+        assert tool_name == "code_search"
+        assert args["mode"] == "bugs"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_semantic_bug_search(self, pipeline):
+        """Bug-style semantic_code_search queries should route to code_search."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "find similar regressions in auth"},
+        )
+
+        assert tool_name == "code_search"
+        assert args["mode"] == "bugs"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_call_graph_query_to_graph(self, pipeline):
+        """Call-graph semantic queries should route to graph with traversal args."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "who calls parse_json"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "callers"
+        assert args["node"] == "parse_json"
+        assert args["depth"] == 2
+        assert strategy is not None
+
     def test_get_call_signature_json(self, pipeline):
         """Test generating call signature."""
         sig = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
@@ -735,6 +779,87 @@ class TestToolPipelineCallbacks:
 
         assert result.successful_calls == 1
 
+
+class TestToolPipelineSearchRouting:
+    """Tests for search router integration in tool execution."""
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_semantic_bug_query(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """semantic_code_search bug queries should execute as code_search(mode='bugs')."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="code_search",
+                success=True,
+                result={"matches": ["src/parser.py"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "semantic_code_search",
+                    "arguments": {"query": "json parsing crash on empty payload"},
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "code_search"
+        assert executed_kwargs["arguments"]["query"] == "json parsing crash on empty payload"
+        assert executed_kwargs["arguments"]["mode"] == "bugs"
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_search_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Call-graph search queries should execute as graph tool calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["main", "worker"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "who calls parse_json",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "callers"
+        assert executed_kwargs["arguments"]["node"] == "parse_json"
+        assert executed_kwargs["arguments"]["depth"] == 2
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
     @pytest.mark.asyncio
     async def test_on_tool_complete_exception_handled(self, pipeline, mock_tool_executor):
         """Test that exceptions in on_tool_complete are handled."""
@@ -768,3 +893,155 @@ class TestPipelineExecutionResult:
         assert result.budget_exhausted is False
         assert result.parallel_execution_used is False
         assert result.parallel_speedup == 1.0
+
+
+class TestFallbackOnToolFailure:
+    """Tests for error recovery fallback in tool pipeline."""
+
+    @pytest.fixture
+    def fallback_pipeline(self, mock_tool_registry):
+        """Create a pipeline with a failing executor that falls back."""
+        executor = MagicMock()
+
+        # First call fails (semantic_code_search), second succeeds (code_search)
+        fail_result = ToolExecutionResult(
+            tool_name="semantic_code_search",
+            success=False,
+            result=None,
+            error="Tool 'semantic_code_search': dependencies missing for victor-coding",
+        )
+        success_result = ToolExecutionResult(
+            tool_name="code_search",
+            success=True,
+            result={"matches": ["file.py:10: class MyClass"]},
+            error=None,
+        )
+        executor.execute = AsyncMock(side_effect=[fail_result, success_result])
+
+        return ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(tool_budget=10),
+        )
+
+    async def test_fallback_on_tool_failure(self, fallback_pipeline):
+        """Test that failed tool call triggers fallback to alternative tool."""
+        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "MyClass"}}]
+        result = await fallback_pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+        assert result.results[0].success is True
+        assert result.results[0].tool_name == "code_search"
+
+    async def test_no_fallback_when_tool_succeeds(self, mock_tool_registry, mock_tool_executor):
+        """Test that successful tools don't trigger fallback."""
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            config=ToolPipelineConfig(tool_budget=10),
+        )
+
+        tool_calls = [{"name": "test_tool", "arguments": {}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+        # Executor should only be called once (no fallback)
+        assert mock_tool_executor.execute.call_count == 1
+
+    async def test_fallback_not_triggered_when_disabled(self, mock_tool_registry):
+        """Test that fallback doesn't trigger when fallback tool is not enabled."""
+        executor = MagicMock()
+        fail_result = ToolExecutionResult(
+            tool_name="semantic_code_search",
+            success=False,
+            result=None,
+            error="dependencies missing for victor-coding",
+        )
+        executor.execute = AsyncMock(return_value=fail_result)
+
+        registry = MagicMock()
+        # semantic_code_search is enabled, but code_search (fallback) is not
+        registry.is_tool_enabled = MagicMock(
+            side_effect=lambda name: name == "semantic_code_search"
+        )
+
+        pipeline = ToolPipeline(
+            tool_registry=registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(tool_budget=10),
+        )
+
+        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "test"}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.failed_calls == 1
+        # Only one execute call (no fallback attempted)
+        assert executor.execute.call_count == 1
+
+
+class TestPerToolTimeout:
+    """Tests for per-tool-call timeout in serial execution path."""
+
+    async def test_tool_timeout_fires(self, mock_tool_registry):
+        """Test that slow tool execution triggers timeout."""
+        executor = MagicMock()
+
+        async def slow_execute(**kwargs):
+            await asyncio.sleep(10)  # Simulate slow tool
+            return ToolExecutionResult(
+                tool_name="slow_tool", success=True, result="done", error=None
+            )
+
+        executor.execute = slow_execute
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                tool_budget=10,
+                per_tool_timeout_seconds=0.1,  # 100ms timeout
+            ),
+        )
+
+        tool_calls = [{"name": "slow_tool", "arguments": {}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.failed_calls == 1
+        assert result.results[0].success is False
+        assert "timed out" in result.results[0].error
+
+    async def test_fast_tool_not_affected_by_timeout(self, mock_tool_registry):
+        """Test that fast tools complete normally within timeout."""
+        executor = MagicMock()
+
+        async def fast_execute(**kwargs):
+            return ToolExecutionResult(
+                tool_name="fast_tool", success=True, result="quick", error=None
+            )
+
+        executor.execute = fast_execute
+
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=executor,
+            config=ToolPipelineConfig(
+                tool_budget=10,
+                per_tool_timeout_seconds=5.0,
+            ),
+        )
+
+        tool_calls = [{"name": "fast_tool", "arguments": {}}]
+        result = await pipeline.execute_tool_calls(tool_calls, {})
+
+        assert result.successful_calls == 1
+        assert result.results[0].success is True
+
+    def test_config_default_timeout(self):
+        """Test that default per_tool_timeout_seconds is 30."""
+        config = ToolPipelineConfig()
+        assert config.per_tool_timeout_seconds == 30.0
+
+    def test_config_custom_timeout(self):
+        """Test custom per_tool_timeout_seconds."""
+        config = ToolPipelineConfig(per_tool_timeout_seconds=15.0)
+        assert config.per_tool_timeout_seconds == 15.0

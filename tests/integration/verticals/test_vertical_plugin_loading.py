@@ -28,6 +28,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from victor.core.verticals import VerticalBase, VerticalRegistry
+from victor_sdk import VerticalBase as SdkVerticalBase
 
 # =============================================================================
 # Test Fixtures and Helper Classes
@@ -126,6 +127,30 @@ class ConflictingNameVertical(VerticalBase):
         return "Conflicting"
 
 
+class SdkOnlyExternalVertical(SdkVerticalBase):
+    """A valid SDK-only external vertical for testing."""
+
+    name = "sdk_external"
+    description = "SDK-only external vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_tools(cls) -> List[str]:
+        return ["read", "write"]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
+        return "You are an SDK-only test assistant."
+
+
 def create_mock_entry_point(name: str, load_result):
     """Create a mock entry point object."""
     ep = MagicMock()
@@ -195,6 +220,21 @@ class TestExternalVerticalDiscovery:
             assert len(discovered) == 2
             assert "external_test" in discovered
             assert "another_external" in discovered
+
+    def test_discover_sdk_only_external_vertical(self):
+        """SDK-only external verticals should pass discovery validation."""
+        mock_ep = create_mock_entry_point("sdk_external", SdkOnlyExternalVertical)
+
+        VerticalRegistry.reset_discovery()
+
+        with patch("importlib.metadata.entry_points") as mock_entry_points:
+            mock_entry_points.return_value = [mock_ep]
+
+            discovered = VerticalRegistry.discover_external_verticals()
+
+            assert "sdk_external" in discovered
+            assert discovered["sdk_external"] is SdkOnlyExternalVertical
+            assert VerticalRegistry.get("sdk_external") is SdkOnlyExternalVertical
 
     def test_discover_with_no_entry_points(self):
         """Discovery handles case with no external entry points."""

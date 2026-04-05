@@ -1,0 +1,186 @@
+# Victor Configuration Example
+# This file demonstrates the unified configuration format for Victor
+# Copy this to ~/.victor/config.yaml and customize for your needs
+
+# =============================================================================
+# Accounts
+# =============================================================================
+# Each account represents a provider + model combination with authentication
+# and optional settings like temperature and max_tokens.
+
+accounts:
+  # -------------------------------------------------------------------------
+  # Default Account - Anthropic Claude
+  # -------------------------------------------------------------------------
+  # This is the default account used when no --account flag is specified
+  default:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    auth:
+      method: api_key
+      source: keyring  # Options: keyring, env, file
+    tags: [chat, coding]
+    temperature: 0.7
+    max_tokens: 4096
+
+  # -------------------------------------------------------------------------
+  # Coding Account - OpenAI GPT-4
+  # -------------------------------------------------------------------------
+  # Optimized for coding tasks with lower temperature for more focused output
+  coding:
+    provider: openai
+    model: gpt-4o
+    auth:
+      method: api_key
+      source: keyring
+    tags: [coding, premium]
+    temperature: 0.3
+    max_tokens: 8192
+
+  # -------------------------------------------------------------------------
+  # GLM Coding Plan - ZhipuAI with Coding Endpoint
+  # -------------------------------------------------------------------------
+  # Uses model suffix ":coding" to select the coding-optimized endpoint
+  glm-coding:
+    provider: zai
+    model: glm-4.6:coding  # Model suffix selects coding endpoint
+    auth:
+      method: api_key
+      source: keyring
+    tags: [coding, glm, premium]
+    temperature: 0.3
+    max_tokens: 8192
+
+  # -------------------------------------------------------------------------
+  # OAuth Account - OpenAI with OAuth
+  # -------------------------------------------------------------------------
+  # Uses browser-based OAuth authentication (ChatGPT subscription)
+  openai-oauth:
+    provider: openai
+    model: gpt-4o
+    auth:
+      method: oauth
+      source: keyring
+    tags: [oauth, chat, premium]
+    temperature: 0.7
+    max_tokens: 4096
+
+  # -------------------------------------------------------------------------
+  # Local Provider - Ollama
+  # -------------------------------------------------------------------------
+  # Local inference with no API key required
+  local:
+    provider: ollama
+    model: llama3
+    auth:
+      method: none
+    tags: [local, free]
+    temperature: 0.8
+    max_tokens: 4096
+
+  # -------------------------------------------------------------------------
+  # Google Gemini
+  # -------------------------------------------------------------------------
+  gemini:
+    provider: google
+    model: gemini-2.5-pro
+    auth:
+      method: api_key
+      source: keyring
+    tags: [google, gemini, chat]
+    temperature: 0.7
+    max_tokens: 8192
+
+  # -------------------------------------------------------------------------
+  # Fast Inference - GroqCloud
+  # -------------------------------------------------------------------------
+  # Ultra-fast inference with LPU acceleration
+  fast:
+    provider: groqcloud
+    model: llama-3.3-70b-versatile
+    auth:
+      method: api_key
+      source: keyring
+    tags: [fast, free, inference]
+    temperature: 0.7
+    max_tokens: 4096
+
+  # -------------------------------------------------------------------------
+  # Creative Writing - Higher Temperature
+  # -------------------------------------------------------------------------
+  creative:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    auth:
+      method: api_key
+      source: keyring
+    tags: [creative, writing]
+    temperature: 0.9  # More creative
+    max_tokens: 4096
+
+  # -------------------------------------------------------------------------
+  # Precise Tasks - Lower Temperature
+  # -------------------------------------------------------------------------
+  precise:
+    provider: anthropic
+    model: claude-opus-4-6
+    auth:
+      method: api_key
+      source: keyring
+    tags: [precise, analytical]
+    temperature: 0.1  # More focused
+    max_tokens: 2048
+
+# =============================================================================
+# Defaults
+# =============================================================================
+# Global defaults that apply when no account-specific value is set
+
+defaults:
+  account: default  # Default account to use
+  temperature: 0.7  # Default temperature
+  max_tokens: 4096  # Default max tokens
+
+# =============================================================================
+# Notes
+# =============================================================================
+#
+# Authentication Methods:
+#   - api_key: Traditional API key authentication
+#   - oauth: Browser-based OAuth (OpenAI, Qwen)
+#   - none: No authentication (local providers)
+#
+# Storage Options for auth.source:
+#   - keyring: System keyring (recommended, most secure)
+#   - env: Environment variable (for CI/CD)
+#   - file: Stored in config file (not recommended for API keys)
+#
+# Model Suffixes:
+#   For ZhipuAI (zai), you can use model suffixes to select endpoints:
+#     - glm-4.6:coding  - Coding-optimized endpoint
+#     - glm-4.6:standard - Standard endpoint
+#     - glm-4.6:china   - China endpoint
+#     - glm-4.6:anthropic - Anthropic-compatible endpoint
+#
+# Environment Variables:
+#   If auth.source is "env", Victor checks these environment variables:
+#     - ANTHROPIC_API_KEY
+#     - OPENAI_API_KEY
+#     - GOOGLE_API_KEY
+#     - ZAI_API_KEY
+#     - And more...
+#
+# Getting Started:
+#   1. Run: victor auth setup
+#   2. Follow the interactive wizard
+#   3. Test: victor auth test
+#   4. Chat: victor chat
+#
+# Commands:
+#   victor auth setup     - Interactive setup wizard
+#   victor auth add       - Quick add an account
+#   victor auth list      - List all accounts
+#   victor auth test      - Test provider connection
+#   victor auth remove    - Remove an account
+#   victor auth migrate   - Migrate from old config format
+#

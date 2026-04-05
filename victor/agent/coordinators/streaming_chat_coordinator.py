@@ -143,9 +143,7 @@ class StreamingChatCoordinator:
         ):
             # Emit event if event emitter is available
             if self._event_emitter:
-                await self._event_emitter.emit_async(
-                    "stream_chunk", {"chunk": chunk}
-                )
+                await self._event_emitter.emit_async("stream_chunk", {"chunk": chunk})
 
             yield chunk
 
@@ -180,9 +178,7 @@ class StreamingChatCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 
@@ -231,31 +227,39 @@ class StreamingChatCoordinator:
             return
 
         # Stream from provider
-        content_parts = []
+        content_parts: list[str] = []
         tool_calls = None
 
-        async for chunk in provider.stream(
-            messages=self._chat_context.messages,
-            model=self._provider_context.model,
-            temperature=self._provider_context.temperature,
-            max_tokens=self._provider_context.max_tokens,
-            tools=tools,
-            **kwargs,
-        ):
-            # Check for cancellation
-            if self._provider_context._check_cancellation():
-                logger.debug("Stream cancelled during provider streaming")
-                break
+        try:
+            async for chunk in provider.stream(
+                messages=self._chat_context.messages,
+                model=self._provider_context.model,
+                temperature=self._provider_context.temperature,
+                max_tokens=self._provider_context.max_tokens,
+                tools=tools,
+                **kwargs,
+            ):
+                # Check for cancellation
+                if self._provider_context._check_cancellation():
+                    logger.debug("Stream cancelled during provider streaming")
+                    break
 
-            # Accumulate content
-            if chunk.content:
-                content_parts.append(chunk.content)
+                # Accumulate content
+                if chunk.content:
+                    content_parts.append(chunk.content)
 
-            # Track tool calls
-            if chunk.tool_calls:
-                tool_calls = chunk.tool_calls
+                # Track tool calls
+                if chunk.tool_calls:
+                    tool_calls = chunk.tool_calls
 
-            yield chunk
+                yield chunk
+        except Exception as e:
+            logger.error("Stream failed after %d chunks: %s", len(content_parts), e)
+            if content_parts:
+                partial = "".join(content_parts)
+                # Add partial content to conversation so it's not lost
+                self._chat_context.add_message("assistant", partial + "\n\n[Stream interrupted]")
+            raise
 
         # Add complete assistant response to history
         if content_parts:

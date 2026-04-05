@@ -238,7 +238,7 @@ class ToolOutputFormatter:
             return self._format_list_directory(args, output_str)
 
         if tool_name in ("code_search", "semantic_code_search"):
-            return self._format_code_search(tool_name, args, output_str)
+            return self._format_code_search(tool_name, args, output_str, output)
 
         if tool_name == "execute_bash":
             return self._format_bash(args, output_str)
@@ -352,16 +352,50 @@ ACTION REQUIRED: This file is too large to display fully.
 
 Use only the files/directories listed above. Do not invent files that are not shown."""
 
-    def _format_code_search(self, tool_name: str, args: Dict[str, Any], output_str: str) -> str:
+    def _format_code_search(
+        self, tool_name: str, args: Dict[str, Any], output_str: str, output: Any
+    ) -> str:
         """Format code_search / semantic_code_search tool output."""
         query = args.get("query", args.get("pattern", ""))
+        follow_up_block = self._format_code_search_follow_ups(output)
         return f"""<TOOL_OUTPUT tool="{tool_name}" query="{query}">
 ═══ SEARCH RESULTS ═══
 {output_str}
+{follow_up_block}
 ═══ END OF SEARCH RESULTS ═══
 </TOOL_OUTPUT>
 
 These are the actual search results. Reference only the files and matches shown above."""
+
+    def _format_code_search_follow_ups(self, output: Any) -> str:
+        """Extract and format suggested next tools from code_search output."""
+        if not isinstance(output, dict):
+            return ""
+
+        metadata = output.get("metadata")
+        if not isinstance(metadata, dict):
+            return ""
+
+        suggestions = metadata.get("follow_up_suggestions")
+        if not isinstance(suggestions, list) or not suggestions:
+            return ""
+
+        lines = ["", "═══ SUGGESTED NEXT TOOLS ═══"]
+        for suggestion in suggestions[:3]:
+            if not isinstance(suggestion, dict):
+                continue
+            command = suggestion.get("command")
+            reason = suggestion.get("reason")
+            if not isinstance(command, str) or not command.strip():
+                continue
+            if isinstance(reason, str) and reason.strip():
+                lines.append(f"- {command}  ({reason.strip()})")
+            else:
+                lines.append(f"- {command}")
+
+        if len(lines) == 2:
+            return ""
+        return "\n".join(lines)
 
     def _format_bash(self, args: Dict[str, Any], output_str: str) -> str:
         """Format execute_bash tool output."""

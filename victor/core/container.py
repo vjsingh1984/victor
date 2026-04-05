@@ -185,6 +185,12 @@ class ServiceNotFoundError(Exception):
         super().__init__(f"Service not registered: {name}")
 
 
+class ServiceResolutionError(Exception):
+    """Raised when a service cannot be resolved (e.g., circular dependency)."""
+
+    pass
+
+
 class ServiceAlreadyRegisteredError(Exception):
     """Raised when trying to register a service that already exists."""
 
@@ -228,6 +234,7 @@ class ServiceContainer:
         self._descriptors: Dict[Type, ServiceDescriptor] = {}
         self._lock = threading.RLock()
         self._disposed = False
+        self._resolving: set = set()  # Circular dependency detection
 
     def register(
         self,
@@ -334,16 +341,32 @@ class ServiceContainer:
 
         Raises:
             ServiceNotFoundError: If service is not registered
+            ServiceResolutionError: If circular dependency detected
         """
         descriptor = self._get_descriptor(service_type)
 
+        # Circular dependency detection
+        if service_type in self._resolving:
+            chain = " -> ".join(t.__name__ for t in self._resolving)
+            raise ServiceResolutionError(
+                f"Circular dependency detected: {chain} -> {service_type.__name__}"
+            )
+
         if descriptor.lifetime == ServiceLifetime.TRANSIENT:
-            return descriptor.create_instance(self)
+            self._resolving.add(service_type)
+            try:
+                return descriptor.create_instance(self)
+            finally:
+                self._resolving.discard(service_type)
 
         # Singleton or Scoped (scoped in root container acts as singleton)
         with self._lock:
             if descriptor.instance is None:
-                descriptor.instance = descriptor.create_instance(self)
+                self._resolving.add(service_type)
+                try:
+                    descriptor.instance = descriptor.create_instance(self)
+                finally:
+                    self._resolving.discard(service_type)
             return descriptor.instance
 
     def get_optional(self, service_type: Type[T]) -> Optional[T]:
@@ -405,6 +428,127 @@ class ServiceContainer:
             List of registered types
         """
         return list(self._descriptors.keys())
+
+    def service(
+        self,
+        service_type: Type[T],
+        lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
+    ):
+        """Decorator for registering services.
+
+        Provides a decorator-based alternative to register() for cleaner
+        service registration syntax. The decorated class is automatically
+        registered with the container.
+
+        Example:
+            container = ServiceContainer()
+
+            @container.service(IService, ServiceLifetime.SINGLETON)
+            class MyService(IService):
+                def __init__(self):
+                    self.value = 42
+
+                def get_value(self):
+                    return self.value
+
+            # Service is now registered and can be resolved
+            service = container.get(IService)
+
+        Args:
+            service_type: Type/interface to register the service as
+            lifetime: How long the service instance lives (default: SINGLETON)
+
+        Returns:
+            Decorator function that registers the class
+
+        Raises:
+            ServiceAlreadyRegisteredError: If service type already registered
+        """
+
+        def decorator(cls: Type[T]) -> Type[T]:
+            with self._lock:
+                if service_type in self._descriptors:
+                    raise ServiceAlreadyRegisteredError(service_type)
+
+                def factory(c: ServiceContainer) -> T:
+                    return cls()  # type: ignore[call-arg]
+
+                self._descriptors[service_type] = ServiceDescriptor(
+                    service_type=service_type,
+                    factory=factory,
+                    lifetime=lifetime,
+                )
+                logger.debug(
+                    f"Registered {cls.__name__} as {service_type.__name__} "
+                    f"with {lifetime.value} lifetime (via decorator)"
+                )
+
+            return cls
+
+        return decorator
+
+    def check_health(self, service_type: Type) -> bool:
+        """Check if a service is healthy.
+
+        A service is considered healthy if:
+        1. It is registered in the container
+        2. It can be instantiated (or already has an instance)
+        3. If it has an is_healthy() method, that method returns True
+
+        This is useful for health checks and monitoring in production systems.
+
+        Args:
+            service_type: Type of service to check
+
+        Returns:
+            True if the service is healthy, False otherwise
+
+        Example:
+            container = ServiceContainer()
+            container.register(IMetrics, MetricsService)
+
+            if container.check_health(IMetrics):
+                logger.info("Metrics service is healthy")
+            else:
+                logger.error("Metrics service is unhealthy")
+        """
+        try:
+            instance = self.get(service_type)
+
+            # Check for is_healthy method if defined
+            if hasattr(instance, "is_healthy") and callable(instance.is_healthy):
+                try:
+                    return bool(instance.is_healthy())
+                except Exception as e:
+                    logger.warning(f"Health check for {service_type.__name__} failed: {e}")
+                    return False
+
+            # No is_healthy method, consider service healthy if it exists
+            return True
+
+        except Exception as e:
+            logger.debug(f"Health check for {service_type.__name__} failed: {e}")
+            return False
+
+    def check_all_health(self) -> Dict[Type, bool]:
+        """Check health of all registered services.
+
+        Returns:
+            Dictionary mapping service types to their health status
+
+        Example:
+            container = ServiceContainer()
+            # ... register services ...
+
+            health_status = container.check_all_health()
+            for service_type, is_healthy in health_status.items():
+                status = "✓" if is_healthy else "✗"
+                print(f"{status} {service_type.__name__}")
+        """
+        return {
+            service_type: self.check_health(service_type)
+            for service_type in self.get_registered_types()
+        }
 
     def dispose(self) -> None:
         """Dispose all singleton services and clear registrations."""

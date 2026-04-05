@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
+from victor_sdk.core.types import VerticalDefinition
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -84,6 +86,18 @@ def mock_vertical():
     """Create a mock vertical class for testing."""
     vertical = MagicMock()
     vertical.name = "test_vertical"
+    vertical.description = "Test vertical"
+    vertical.version = "1.0.0"
+    vertical.get_definition = MagicMock(
+        return_value=VerticalDefinition(
+            name="test_vertical",
+            description="Test vertical",
+            version="1.0.0",
+            tools=["tool1", "tool2"],
+            system_prompt="Test system prompt",
+            workflow_metadata={"provider_hints": {"preferred_providers": ["anthropic"]}},
+        )
+    )
     vertical.get_config = MagicMock(
         return_value=MagicMock(
             tools=["tool1", "tool2"],
@@ -131,9 +145,6 @@ class TestAgentInit:
         assert agent._vertical_config is None
         assert agent._state is not None
         assert agent._state_observers == []
-        assert agent._cqrs_bridge is None
-        assert agent._cqrs_session_id is None
-        assert agent._cqrs_adapter is None
 
     def test_init_with_vertical(self, mock_orchestrator, mock_vertical):
         """Agent should store vertical and vertical_config when provided."""
@@ -395,26 +406,6 @@ class TestAgentStream:
         # Observer should have been called at least once for stage change
         # (depends on mock timing, but we test the mechanism)
         assert agent._state_observers == [observer]
-
-    @pytest.mark.asyncio
-    async def test_stream_forwards_to_cqrs(self, mock_orchestrator):
-        """stream should forward events to CQRS when enabled."""
-        from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
-
-        mock_adapter = MagicMock()
-
-        async def mock_stream_with_events(orchestrator, prompt):
-            yield AgentExecutionEvent(type=EventType.CONTENT, content="Test")
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_adapter = mock_adapter
-
-        with patch("victor.framework._internal.stream_with_events", mock_stream_with_events):
-            async for _ in agent.stream("test"):
-                pass
-
-        mock_adapter.forward.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stream_observer_exception_does_not_break_streaming(self, mock_orchestrator):
@@ -914,179 +905,6 @@ class TestAgentObservability:
 
 
 # =============================================================================
-# CQRS Tests (lines 741-755, 764, 773, 786-789, 805-808, 824-827, 837-838)
-# =============================================================================
-
-
-class TestAgentCQRS:
-    """Tests for Agent CQRS integration methods."""
-
-    @pytest.mark.asyncio
-    async def test_enable_cqrs(self, mock_orchestrator):
-        """enable_cqrs should create and connect CQRS bridge."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.connect_agent = MagicMock(return_value="session-123")
-
-        agent = Agent(mock_orchestrator)
-
-        with patch(
-            "victor.framework.cqrs_bridge.CQRSBridge.create",
-            new=AsyncMock(return_value=mock_bridge),
-        ):
-            bridge = await agent.enable_cqrs(session_id="my-session")
-
-        assert bridge is mock_bridge
-        assert agent._cqrs_bridge is mock_bridge
-        assert agent._cqrs_session_id == "session-123"
-
-    @pytest.mark.asyncio
-    async def test_enable_cqrs_reuses_existing_bridge(self, mock_orchestrator):
-        """enable_cqrs should reuse existing bridge."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.connect_agent = MagicMock(return_value="session-456")
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-
-        bridge = await agent.enable_cqrs()
-
-        assert bridge is mock_bridge
-        mock_bridge.connect_agent.assert_called_once()
-
-    def test_cqrs_bridge_property(self, mock_orchestrator):
-        """cqrs_bridge property should return stored bridge."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-
-        assert agent.cqrs_bridge is mock_bridge
-
-    def test_cqrs_session_id_property(self, mock_orchestrator):
-        """cqrs_session_id property should return stored session ID."""
-        from victor.framework.agent import Agent
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_session_id = "test-session"
-
-        assert agent.cqrs_session_id == "test-session"
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_session(self, mock_orchestrator):
-        """cqrs_get_session should query session via bridge."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.get_session = AsyncMock(return_value={"session": "data"})
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-        agent._cqrs_session_id = "session-123"
-
-        result = await agent.cqrs_get_session()
-
-        assert result == {"session": "data"}
-        mock_bridge.get_session.assert_called_once_with("session-123")
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_session_not_enabled(self, mock_orchestrator):
-        """cqrs_get_session should raise AgentError when CQRS not enabled."""
-        from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
-
-        agent = Agent(mock_orchestrator)
-
-        with pytest.raises(AgentError, match="CQRS not enabled"):
-            await agent.cqrs_get_session()
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_history(self, mock_orchestrator):
-        """cqrs_get_history should query conversation history."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.get_conversation_history = AsyncMock(return_value={"messages": []})
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-        agent._cqrs_session_id = "session-123"
-
-        result = await agent.cqrs_get_history(limit=50)
-
-        assert result == {"messages": []}
-        mock_bridge.get_conversation_history.assert_called_once_with("session-123", limit=50)
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_history_not_enabled(self, mock_orchestrator):
-        """cqrs_get_history should raise AgentError when CQRS not enabled."""
-        from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
-
-        agent = Agent(mock_orchestrator)
-
-        with pytest.raises(AgentError, match="CQRS not enabled"):
-            await agent.cqrs_get_history()
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_metrics(self, mock_orchestrator):
-        """cqrs_get_metrics should query session metrics."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.get_metrics = AsyncMock(return_value={"tool_calls": 10})
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-        agent._cqrs_session_id = "session-123"
-
-        result = await agent.cqrs_get_metrics()
-
-        assert result == {"tool_calls": 10}
-        mock_bridge.get_metrics.assert_called_once_with("session-123")
-
-    @pytest.mark.asyncio
-    async def test_cqrs_get_metrics_not_enabled(self, mock_orchestrator):
-        """cqrs_get_metrics should raise AgentError when CQRS not enabled."""
-        from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
-
-        agent = Agent(mock_orchestrator)
-
-        with pytest.raises(AgentError, match="CQRS not enabled"):
-            await agent.cqrs_get_metrics()
-
-    def test_forward_event_to_cqrs(self, mock_orchestrator):
-        """_forward_event_to_cqrs should forward to adapter when set."""
-        from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
-
-        mock_adapter = MagicMock()
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_adapter = mock_adapter
-
-        event = AgentExecutionEvent(type=EventType.CONTENT, content="test")
-        agent._forward_event_to_cqrs(event)
-
-        mock_adapter.forward.assert_called_once_with(event)
-
-    def test_forward_event_to_cqrs_no_adapter(self, mock_orchestrator):
-        """_forward_event_to_cqrs should do nothing when no adapter."""
-        from victor.framework.agent import Agent
-        from victor.framework.events import AgentExecutionEvent, EventType
-
-        agent = Agent(mock_orchestrator)
-        event = AgentExecutionEvent(type=EventType.CONTENT, content="test")
-
-        # Should not raise
-        agent._forward_event_to_cqrs(event)
-
-
-# =============================================================================
 # Workflow and Team Execution Tests (lines 882-905, 947-987, 1009, 1028, 1032, 1036)
 # =============================================================================
 
@@ -1399,28 +1217,6 @@ class TestAgentLifecycle:
         mock_orchestrator.reset_conversation.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_close_with_cqrs(self, mock_orchestrator):
-        """close should cleanup CQRS bridge when enabled."""
-        from victor.framework.agent import Agent
-
-        mock_bridge = MagicMock()
-        mock_bridge.disconnect_agent = MagicMock()
-        mock_bridge.close = MagicMock()
-
-        agent = Agent(mock_orchestrator)
-        agent._cqrs_bridge = mock_bridge
-        agent._cqrs_session_id = "session-123"
-        agent._cqrs_adapter = MagicMock()
-
-        await agent.close()
-
-        mock_bridge.disconnect_agent.assert_called_once_with("session-123")
-        mock_bridge.close.assert_called_once()
-        assert agent._cqrs_bridge is None
-        assert agent._cqrs_session_id is None
-        assert agent._cqrs_adapter is None
-
-    @pytest.mark.asyncio
     async def test_close_with_orchestrator_close(self, mock_orchestrator):
         """close should call orchestrator.close when available."""
         from victor.framework.agent import Agent
@@ -1541,12 +1337,16 @@ class TestAgentCreate:
 
         mock_orchestrator = MagicMock()
 
-        # Set up vertical config with provider hints preferring openai
-        mock_config = MagicMock()
-        mock_config.tools = []
-        mock_config.system_prompt = "Test prompt"
-        mock_config.provider_hints = {"preferred_providers": ["openai", "google"]}
-        mock_vertical.get_config = MagicMock(return_value=mock_config)
+        mock_vertical.get_definition = MagicMock(
+            return_value=VerticalDefinition(
+                name="test_vertical",
+                description="Test vertical",
+                version="1.0.0",
+                tools=[],
+                system_prompt="Test prompt",
+                workflow_metadata={"provider_hints": {"preferred_providers": ["openai", "google"]}},
+            )
+        )
 
         with patch(
             "victor.framework._internal.create_orchestrator_from_options",
@@ -1560,6 +1360,39 @@ class TestAgentCreate:
 
         # Agent should still use anthropic (hints are just hints)
         assert agent._provider == "anthropic"
+
+    @pytest.mark.asyncio
+    async def test_create_with_vertical_uses_get_config(self):
+        """create should call vertical.get_config() directly."""
+        from victor.core.verticals.base import VerticalBase
+        from victor.framework.agent import Agent
+
+        class DirectConfigVertical(VerticalBase):
+            name = "direct_config"
+            description = "Direct config vertical"
+
+            @classmethod
+            def get_tools(cls):
+                return ["read", "write"]
+
+            @classmethod
+            def get_system_prompt(cls):
+                return "Use direct config path."
+
+        mock_orchestrator = MagicMock()
+
+        with patch(
+            "victor.framework._internal.create_orchestrator_from_options",
+            new=AsyncMock(return_value=mock_orchestrator),
+        ):
+            agent = await Agent.create(
+                provider="anthropic",
+                vertical=DirectConfigVertical,
+            )
+
+        assert agent._vertical is DirectConfigVertical
+        assert agent._vertical_config.system_prompt == "Use direct config path."
+        assert agent._vertical_config.tools.tools == {"read", "write"}
 
     @pytest.mark.asyncio
     async def test_create_provider_error(self):

@@ -19,6 +19,7 @@ Tests for model metadata parsing, known model lookups, and message serialization
 
 import pytest
 from datetime import datetime
+from unittest.mock import AsyncMock
 from victor.agent.conversation_memory import (
     MessageRole,
     MessagePriority,
@@ -30,6 +31,7 @@ from victor.agent.conversation_memory import (
     get_known_model_context,
     get_known_model_params,
     ConversationMessage,
+    ConversationStore,
 )
 
 # =============================================================================
@@ -237,6 +239,56 @@ class TestParseModelMetadataQwen:
         assert metadata.model_family == ModelFamily.QWEN
         assert metadata.model_params_b == 32.0
         assert metadata.model_size == ModelSize.LARGE  # 32B is >= 32
+
+
+class TestSemanticRetrievalBoundaries:
+    """Tests for sync/async semantic retrieval boundaries."""
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        return ConversationStore(db_path=tmp_path / "conversation.db")
+
+    @pytest.mark.asyncio
+    async def test_async_semantic_retrieval_uses_embedding_store(self, store):
+        """Async callers should use the async embedding-store path directly."""
+        session = store.create_session(session_id="session-1")
+        message = store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Authentication failure in the session middleware path.",
+        )
+
+        hit = type("SearchHit", (), {"message_id": message.id, "similarity": 0.93})()
+        embedding_store = AsyncMock()
+        embedding_store.search_similar = AsyncMock(return_value=[hit])
+        store.set_embedding_store(embedding_store)
+
+        results = await store.aget_semantically_relevant_messages(
+            session.session_id,
+            "auth middleware failure",
+            limit=5,
+        )
+
+        assert len(results) == 1
+        assert results[0][0].id == message.id
+        assert results[0][1] == 0.93
+        embedding_store.search_similar.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_sync_semantic_retrieval_rejects_async_context(self, store):
+        """Sync semantic retrieval should fail fast inside async runtime code."""
+        session = store.create_session(session_id="session-2")
+        store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Authentication failure in the session middleware path.",
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match="Use await aget_semantically_relevant_messages",
+        ):
+            store.get_semantically_relevant_messages(session.session_id, "auth failure")
 
     def test_parse_qwen_3(self):
         """Parse qwen3 model."""

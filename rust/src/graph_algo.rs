@@ -6,6 +6,7 @@
 use ahash::AHashMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 
 /// PageRank via power iteration.
@@ -16,7 +17,7 @@ pub fn pagerank(
     damping: f64,
     iterations: usize,
     tolerance: f64,
-) -> PyResult<AHashMap<String, f64>> {
+) -> PyResult<HashMap<String, f64>> {
     // Parse adjacency dict: Dict[str, List[str]]
     let mut adj: AHashMap<String, Vec<String>> = AHashMap::new();
     let mut all_nodes: Vec<String> = Vec::new();
@@ -30,7 +31,7 @@ pub fn pagerank(
 
     let n = all_nodes.len();
     if n == 0 {
-        return Ok(AHashMap::new());
+        return Ok(HashMap::new());
     }
 
     let inv_n = 1.0 / n as f64;
@@ -75,7 +76,7 @@ pub fn pagerank(
         }
     }
 
-    Ok(scores)
+    Ok(scores.into_iter().collect())
 }
 
 /// Weighted PageRank where adjacency is Dict[str, Dict[str, int]].
@@ -85,7 +86,7 @@ pub fn weighted_pagerank(
     adjacency: &Bound<'_, PyDict>,
     damping: f64,
     iterations: usize,
-) -> PyResult<AHashMap<String, f64>> {
+) -> PyResult<HashMap<String, f64>> {
     let mut adj: AHashMap<String, Vec<(String, f64)>> = AHashMap::new();
     let mut all_nodes: Vec<String> = Vec::new();
 
@@ -104,7 +105,7 @@ pub fn weighted_pagerank(
 
     let n = all_nodes.len();
     if n == 0 {
-        return Ok(AHashMap::new());
+        return Ok(HashMap::new());
     }
 
     let inv_n = 1.0 / n as f64;
@@ -137,7 +138,7 @@ pub fn weighted_pagerank(
         scores = new_scores;
     }
 
-    Ok(scores)
+    Ok(scores.into_iter().collect())
 }
 
 /// Betweenness centrality using Brandes algorithm.
@@ -146,7 +147,7 @@ pub fn weighted_pagerank(
 pub fn betweenness_centrality(
     adjacency: &Bound<'_, PyDict>,
     normalized: bool,
-) -> PyResult<AHashMap<String, f64>> {
+) -> PyResult<HashMap<String, f64>> {
     let mut adj: AHashMap<String, Vec<String>> = AHashMap::new();
     let mut all_nodes: Vec<String> = Vec::new();
 
@@ -219,7 +220,7 @@ pub fn betweenness_centrality(
         }
     }
 
-    Ok(cb)
+    Ok(cb.into_iter().collect())
 }
 
 /// Find connected components using union-find.

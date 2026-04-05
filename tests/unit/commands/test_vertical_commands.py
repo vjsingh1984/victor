@@ -29,6 +29,7 @@ from victor.core.verticals.registry_manager import (
     PackageSourceType,
     VerticalRegistryManager,
 )
+from victor.core.verticals.cache_invalidation import VerticalRuntimeInvalidationReason
 from victor.core.verticals.package_schema import (
     VerticalPackageMetadata,
     VerticalClassSpec,
@@ -310,11 +311,23 @@ class TestVerticalRegistryManager:
             stderr="",
         )
 
-        success, message = manager.install(spec)
+        with patch(
+            "victor.core.verticals.registry_manager.invalidate_vertical_runtime_state",
+        ) as mock_invalidate:
+            with patch.object(
+                manager,
+                "_detect_install_invalidation_reason",
+                return_value=VerticalRuntimeInvalidationReason.INSTALL,
+            ):
+                success, message = manager.install(spec)
 
         assert success is True
         assert "Successfully installed" in message
         mock_run.assert_called_once()
+        mock_invalidate.assert_called_once_with(
+            VerticalRuntimeInvalidationReason.INSTALL,
+            package_name="victor-security",
+        )
 
     @patch("subprocess.run")
     def test_install_failure(self, mock_run):
@@ -324,10 +337,48 @@ class TestVerticalRegistryManager:
 
         mock_run.side_effect = subprocess.CalledProcessError(1, "pip", stderr="Installation failed")
 
-        success, message = manager.install(spec)
+        with patch(
+            "victor.core.verticals.registry_manager.invalidate_vertical_runtime_state",
+        ) as mock_invalidate:
+            with patch.object(
+                manager,
+                "_detect_install_invalidation_reason",
+                return_value=VerticalRuntimeInvalidationReason.INSTALL,
+            ):
+                success, message = manager.install(spec)
 
         assert success is False
         assert "Installation failed" in message
+        mock_invalidate.assert_not_called()
+
+    @patch("subprocess.run")
+    def test_install_existing_package_triggers_upgrade_invalidation(self, mock_run):
+        """Successful reinstall/upgrade should invalidate with the upgrade reason."""
+        manager = VerticalRegistryManager(dry_run=False)
+        spec = PackageSpec(name="victor-security", version=">=1.1.0")
+
+        mock_run.return_value = Mock(
+            returncode=0,
+            stdout="Upgrading...",
+            stderr="",
+        )
+
+        with patch(
+            "victor.core.verticals.registry_manager.invalidate_vertical_runtime_state",
+        ) as mock_invalidate:
+            with patch.object(
+                manager,
+                "_detect_install_invalidation_reason",
+                return_value=VerticalRuntimeInvalidationReason.UPGRADE,
+            ):
+                success, message = manager.install(spec)
+
+        assert success is True
+        assert "Successfully installed" in message
+        mock_invalidate.assert_called_once_with(
+            VerticalRuntimeInvalidationReason.UPGRADE,
+            package_name="victor-security",
+        )
 
     def test_uninstall_builtin(self):
         """Test uninstalling built-in vertical (should fail)."""
@@ -358,10 +409,17 @@ class TestVerticalRegistryManager:
             stderr="",
         )
 
-        success, message = manager.uninstall("victor-security")
+        with patch(
+            "victor.core.verticals.registry_manager.invalidate_vertical_runtime_state",
+        ) as mock_invalidate:
+            success, message = manager.uninstall("victor-security")
 
         assert success is True
         assert "Successfully uninstalled" in message
+        mock_invalidate.assert_called_once_with(
+            VerticalRuntimeInvalidationReason.UNINSTALL,
+            package_name="victor-security",
+        )
 
     def test_validate_package_builtin_name(self):
         """Test validation fails for built-in name."""
@@ -416,6 +474,8 @@ class TestVerticalCommands:
 
         assert result.exit_code == 0
         assert "Successfully installed" in result.stdout
+        assert "refreshed package caches" in result.stdout
+        assert "Restart other Victor sessions" in result.stdout
 
     @patch("victor.core.verticals.registry_manager.VerticalRegistryManager.install")
     def test_install_command_failure(self, mock_install):
@@ -790,6 +850,8 @@ class TestVerticalUninstallation:
 
         assert result.exit_code == 0
         assert "Successfully uninstalled" in result.stdout or "Success" in result.stdout
+        assert "refreshed package caches" in result.stdout
+        assert "Restart other Victor sessions" in result.stdout
 
     @patch("subprocess.run")
     def test_uninstall_dry_run(self, mock_run):

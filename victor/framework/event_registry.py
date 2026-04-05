@@ -248,6 +248,7 @@ class ContentEventConverter(BaseEventConverter):
         return {
             EventTarget.CQRS: ["content_generated", "ContentGeneratedEvent"],
             EventTarget.OBSERVABILITY: ["content"],
+            EventTarget.STREAM_CHUNK: ["content", "text"],
         }
 
     def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
@@ -292,6 +293,7 @@ class ThinkingEventConverter(BaseEventConverter):
         return {
             EventTarget.CQRS: ["thinking_generated", "ThinkingGeneratedEvent"],
             EventTarget.OBSERVABILITY: ["thinking"],
+            EventTarget.STREAM_CHUNK: ["reasoning_content", "thinking"],
         }
 
     def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
@@ -336,6 +338,7 @@ class ToolCallEventConverter(BaseEventConverter):
         return {
             EventTarget.CQRS: ["tool_called", "ToolCalledEvent"],
             EventTarget.OBSERVABILITY: ["tool.start"],
+            EventTarget.STREAM_CHUNK: ["tool_start", "tool_call"],
         }
 
     def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:
@@ -389,6 +392,7 @@ class ToolResultEventConverter(BaseEventConverter):
         return {
             EventTarget.CQRS: ["tool_result", "ToolResultEvent"],
             EventTarget.OBSERVABILITY: ["tool.end"],
+            EventTarget.STREAM_CHUNK: ["tool_result"],
         }
 
     def to_external(self, event: AgentExecutionEvent, target: EventTarget) -> Dict[str, Any]:

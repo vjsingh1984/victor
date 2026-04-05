@@ -65,13 +65,21 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 import httpx
 
-from victor.core.verticals.package_schema import VerticalPackageMetadata
+from victor.core.verticals.package_schema import (
+    VerticalPackageMetadata,
+    is_victor_version_compatible,
+)
+from victor.core.verticals.cache_invalidation import (
+    VerticalRuntimeInvalidationReason,
+    invalidate_vertical_runtime_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -333,15 +341,18 @@ class VerticalRegistryManager:
                 # Check for victor.verticals entry point
                 entry_points = list(dist.entry_points.select(group="victor.verticals"))
                 if entry_points:
+                    # Resolve source root once per distribution
+                    location = self._resolve_source_root(dist)
+
                     for ep in entry_points:
                         # Try to load metadata from package
-                        metadata = self._load_metadata_from_dist(ep, dist)
+                        metadata = self._load_metadata_from_dist(ep, dist, location)
 
                         verticals.append(
                             InstalledVertical(
                                 name=ep.name,
                                 version=dist.version,
-                                location=Path(dist.locate_file("")),
+                                location=location,
                                 metadata=metadata,
                                 is_builtin=False,
                             )
@@ -351,27 +362,70 @@ class VerticalRegistryManager:
 
         return verticals
 
+    def _resolve_source_root(self, dist: Any) -> Path:
+        """Resolve the source root directory for a distribution.
+
+        For editable installs (PEP 660), reads direct_url.json to find the
+        actual source directory. For regular installs, falls back to
+        dist.locate_file("").
+        """
+        try:
+            direct_url_text = dist.read_text("direct_url.json")
+            if direct_url_text:
+                direct_url = json.loads(direct_url_text)
+                if direct_url.get("dir_info", {}).get("editable", False):
+                    url = direct_url.get("url", "")
+                    if url.startswith("file://"):
+                        source_root = Path(url[7:])
+                        if source_root.is_dir():
+                            return source_root
+        except Exception:
+            pass
+        return Path(dist.locate_file(""))
+
     def _load_metadata_from_dist(
         self,
         entry_point: Any,
         dist: Any,
+        source_root: Optional[Path] = None,
     ) -> Optional[VerticalPackageMetadata]:
         """Load metadata from an installed distribution.
 
         Args:
             entry_point: Entry point object
             dist: Distribution object
+            source_root: Pre-resolved source root (from _resolve_source_root)
 
         Returns:
             VerticalPackageMetadata if found, None otherwise
         """
         try:
-            # Check for victor-vertical.toml in package
-            package_dir = Path(dist.locate_file(""))
-            metadata_file = package_dir / "victor-vertical.toml"
+            if source_root is None:
+                source_root = self._resolve_source_root(dist)
 
+            # 1. Check dist.files for victor-vertical.toml (wheel installs)
+            if dist.files:
+                for file_path in dist.files:
+                    if str(file_path).endswith("victor-vertical.toml"):
+                        full_path = Path(dist.locate_file(str(file_path)))
+                        if full_path.exists():
+                            return VerticalPackageMetadata.from_toml(full_path)
+
+            # 2. Check source root directly
+            metadata_file = source_root / "victor-vertical.toml"
             if metadata_file.exists():
                 return VerticalPackageMetadata.from_toml(metadata_file)
+
+            # 3. Check inside package directory (src layout or flat layout)
+            if hasattr(entry_point, "value"):
+                module_path = entry_point.value.split(":")[0]
+                package_name = module_path.split(".")[0]
+                for candidate in [
+                    source_root / "src" / package_name / "victor-vertical.toml",
+                    source_root / package_name / "victor-vertical.toml",
+                ]:
+                    if candidate.exists():
+                        return VerticalPackageMetadata.from_toml(candidate)
 
         except Exception as e:
             logger.debug(f"Failed to load metadata for {entry_point.name}: {e}")
@@ -594,6 +648,8 @@ class VerticalRegistryManager:
         if self.dry_run:
             return True, f"Would install: {' '.join(cmd)}"
 
+        invalidation_reason = self._detect_install_invalidation_reason(package_spec)
+
         # Execute installation
         try:
             subprocess.run(
@@ -603,6 +659,10 @@ class VerticalRegistryManager:
                 check=True,
             )
 
+            invalidate_vertical_runtime_state(
+                invalidation_reason,
+                package_name=package_spec.name,
+            )
             # Success
             return True, f"Successfully installed {package_spec.name}"
 
@@ -642,6 +702,10 @@ class VerticalRegistryManager:
                 check=True,
             )
 
+            invalidate_vertical_runtime_state(
+                VerticalRuntimeInvalidationReason.UNINSTALL,
+                package_name=name,
+            )
             # Success
             return True, f"Successfully uninstalled {name}"
 
@@ -735,15 +799,7 @@ class VerticalRegistryManager:
         Returns:
             True if compatible, False otherwise
         """
-        try:
-            from packaging.requirements import Requirement
-            from packaging.version import Version
-
-            req = Requirement(f"victor-ai{required}")
-            return Version(current) in req.specifier
-        except Exception:
-            # Assume compatible if we can't check
-            return True
+        return is_victor_version_compatible(current, required)
 
     def clear_cache(self) -> None:
         """Clear the metadata cache."""
@@ -754,3 +810,27 @@ class VerticalRegistryManager:
             self._metadata_cache.clear()
         except Exception as e:
             logger.warning(f"Failed to clear cache: {e}")
+
+    def _detect_install_invalidation_reason(
+        self,
+        package_spec: PackageSpec,
+    ) -> VerticalRuntimeInvalidationReason:
+        """Classify a successful install as fresh install vs upgrade.
+
+        The current runtime uses the same invalidation mechanics for both, but the
+        reason is tracked separately so tests, logs, and future refresh behavior
+        can distinguish them.
+        """
+
+        try:
+            distribution(package_spec.name)
+        except PackageNotFoundError:
+            return VerticalRuntimeInvalidationReason.INSTALL
+        except Exception as e:
+            logger.debug(
+                "Failed to determine pre-install package state for %s: %s",
+                package_spec.name,
+                e,
+            )
+            return VerticalRuntimeInvalidationReason.INSTALL
+        return VerticalRuntimeInvalidationReason.UPGRADE

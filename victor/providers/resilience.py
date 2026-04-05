@@ -567,7 +567,10 @@ class ResilientProvider:
             circuit_config: Circuit breaker configuration
             retry_config: Retry strategy configuration
             fallback_providers: List of fallback providers
-            request_timeout: Request timeout in seconds
+            request_timeout: Request timeout in seconds. This is the single
+                source of truth for timeouts. Set this lower than SDK-level
+                timeouts (typically 60s for cloud, 300s for local) so that
+                asyncio.wait_for fires first with a clean TimeoutError.
         """
         self.provider = provider
         self.fallback_providers = fallback_providers or []
@@ -724,6 +727,7 @@ class ResilientProvider:
             Stream chunks
         """
         self._stats["total_requests"] += 1
+        partial_content: list = []
 
         # For streaming, we only retry the initial connection
         async def _start_stream():
@@ -736,17 +740,34 @@ class ResilientProvider:
             )
 
             async for chunk in stream:
+                partial_content.append(chunk)
                 yield chunk
 
             self._stats["primary_successes"] += 1
 
-        except CircuitOpenError:
+        except (CircuitOpenError, Exception) as primary_err:
+            # Build augmented messages for fallback with partial content
+            fallback_messages = list(messages)
+            if partial_content:
+                collected = "".join(getattr(c, "content", "") or "" for c in partial_content)
+                if collected.strip():
+                    fallback_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": collected,
+                        }
+                    )
+                    logger.info(
+                        "Passing %d chars of partial content to fallback",
+                        len(collected),
+                    )
+
             # Try fallbacks for streaming
             for fallback in self.fallback_providers:
                 fb_name = getattr(fallback, "name", "unknown")
                 try:
                     logger.info(f"Trying fallback stream: {fb_name}")
-                    stream = fallback.stream(messages, model=model, **kwargs)
+                    stream = fallback.stream(fallback_messages, model=model, **kwargs)
                     async for chunk in stream:
                         yield chunk
                     self._stats["fallback_successes"] += 1
@@ -756,7 +777,7 @@ class ResilientProvider:
                     continue
 
             self._stats["total_failures"] += 1
-            raise
+            raise primary_err
 
     def get_stats(self) -> Dict[str, Any]:
         """Get resilience statistics."""

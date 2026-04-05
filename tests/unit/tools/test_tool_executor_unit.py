@@ -1714,3 +1714,34 @@ class TestToolExecutorTimeoutHandling:
 
         assert result.success is True
         assert call_count[0] == 2  # First timeout, then success
+
+
+class TestExecCtxDoublePassing:
+    """Tests that _exec_ctx is stripped from LLM-provided arguments."""
+
+    def setup_method(self):
+        """Reset safety checker before each test."""
+        import victor.agent.safety as safety_module
+
+        safety_module._default_checker = None
+
+    @pytest.mark.asyncio
+    async def test_exec_ctx_stripped_from_arguments(self):
+        """If LLM hallucinates _exec_ctx in arguments, it should be stripped before execute."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "test_strip"
+        mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
+        mock_tool.parameters = {"type": "object", "properties": {"query": {"type": "string"}}}
+
+        registry = ToolRegistry()
+        registry.register(mock_tool)
+
+        executor = ToolExecutor(tool_registry=registry)
+        # Simulate LLM including _exec_ctx in arguments
+        result = await executor.execute("test_strip", {"query": "hello", "_exec_ctx": {}})
+
+        assert result.success is True
+        # Verify _exec_ctx was passed by framework (via _exec_ctx kwarg), not from arguments
+        call_kwargs = mock_tool.execute.call_args.kwargs
+        assert "_exec_ctx" in call_kwargs  # Framework passes it
+        assert call_kwargs.get("query") == "hello"

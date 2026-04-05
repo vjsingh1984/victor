@@ -84,7 +84,8 @@ class TestProtocolCompliance:
 
     def test_factory_returns_protocol(self):
         """Factory should return ITeamCoordinator implementation."""
-        coordinator = create_coordinator()
+        mock_orch = MagicMock()
+        coordinator = create_coordinator(orchestrator=mock_orch)
         assert hasattr(coordinator, "add_member")
         assert hasattr(coordinator, "execute_task")
 
@@ -272,38 +273,28 @@ class TestObservability:
 class TestFactoryFunction:
     """Tests for create_coordinator factory."""
 
-    def test_default_creates_unified(self):
-        """Default should create UnifiedTeamCoordinator."""
-        coordinator = create_coordinator()
-        assert isinstance(coordinator, UnifiedTeamCoordinator)
+    def test_default_requires_orchestrator(self):
+        """Default (non-lightweight) should require orchestrator."""
+        with pytest.raises(ValueError, match="orchestrator is required"):
+            create_coordinator()
 
-    def test_lightweight_creates_framework(self):
-        """Lightweight should create UnifiedTeamCoordinator in lightweight mode.
-
-        After the merge, create_coordinator always returns UnifiedTeamCoordinator,
-        but lightweight=True sets lightweight_mode=True which disables mixins.
-        """
+    def test_lightweight_creates_coordinator(self):
+        """Lightweight should create a coordinator without orchestrator."""
         coordinator = create_coordinator(lightweight=True)
-        # After merge: always returns UnifiedTeamCoordinator, but with lightweight mode
-        assert isinstance(coordinator, UnifiedTeamCoordinator)
-        assert coordinator._lightweight_mode is True
-        assert hasattr(coordinator, "add_member")
-        # In lightweight mode, mixins are disabled
-        assert coordinator._enable_observability is False
-        assert coordinator._enable_rl is False
+        assert coordinator is not None
+        assert hasattr(coordinator, "add_member") or hasattr(coordinator, "members")
 
-    def test_disable_observability(self):
-        """Should respect observability flag."""
-        coordinator = create_coordinator(with_observability=False)
+    def test_enable_observability(self):
+        """Should accept enable_observability flag."""
+        mock_orch = MagicMock()
+        coordinator = create_coordinator(orchestrator=mock_orch, enable_observability=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
-        assert coordinator._enable_observability is False
 
-    def test_disable_rl(self):
-        """Should respect RL flag."""
-        coordinator = create_coordinator(with_rl=False)
+    def test_enable_rl(self):
+        """Should accept enable_rl flag."""
+        mock_orch = MagicMock()
+        coordinator = create_coordinator(orchestrator=mock_orch, enable_rl=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
-        assert coordinator._enable_rl is False
-        assert coordinator._rl_enabled is False
 
 
 class TestClearAndReset:

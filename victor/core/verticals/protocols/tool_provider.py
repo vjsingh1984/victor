@@ -276,16 +276,7 @@ class VerticalTieredToolProviderProtocol(Protocol):
         """
         ...
 
-    @classmethod
-    def get_tiered_tools(cls) -> Optional[Any]:
-        """Legacy method for backward compatibility.
-
-        DEPRECATED: Use get_tiered_tool_config() instead.
-
-        Returns:
-            TieredToolConfig instance or None
-        """
-        ...
+    # get_tiered_tools() removed (E5 M3) — use get_tiered_tool_config() instead
 
 
 __all__ = [

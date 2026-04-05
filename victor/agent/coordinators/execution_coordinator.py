@@ -51,6 +51,7 @@ if TYPE_CHECKING:
         ToolContextProtocol,
         ProviderContextProtocol,
     )
+    from victor.agent.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class ExecutionCoordinator:
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
         execution_provider: Any,  # ExecutionProvider protocol
+        token_tracker: Optional["TokenTracker"] = None,
     ) -> None:
         """Initialize the ExecutionCoordinator.
 
@@ -89,11 +91,15 @@ class ExecutionCoordinator:
             tool_context: Tool context protocol implementation
             provider_context: Provider context protocol implementation
             execution_provider: Execution provider protocol implementation
+            token_tracker: Optional centralized token tracker. When provided,
+                token usage is accumulated through the tracker instead of
+                direct dict mutation on chat_context.
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._execution_provider = execution_provider
+        self._token_tracker = token_tracker
 
     # =====================================================================
     # Public API
@@ -126,15 +132,11 @@ class ExecutionCoordinator:
         # Initialize tracking for this conversation turn
         self._tool_context.tool_calls_used = 0
         failure_context = ToolFailureContext()
-        max_iterations_setting = getattr(
-            self._chat_context.settings, "chat_max_iterations", 10
-        )
+        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
         iteration = 0
 
         # Classify task complexity for appropriate budgeting
-        task_classification = self._provider_context.task_classifier.classify(
-            user_message
-        )
+        task_classification = self._provider_context.task_classifier.classify(user_message)
         # Ensure at least 1 iteration is always allowed
         task_iteration_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(
@@ -153,8 +155,7 @@ class ExecutionCoordinator:
             tools = None
             if (
                 self._provider_context.provider.supports_tools()
-                and self._tool_context.tool_calls_used
-                < self._tool_context.tool_budget
+                and self._tool_context.tool_calls_used < self._tool_context.tool_budget
             ):
                 tools = await self._select_tools_for_turn(user_message)
 
@@ -185,9 +186,7 @@ class ExecutionCoordinator:
             # Check if model wants to use tools
             if response.tool_calls:
                 # Handle tool calls and track results
-                tool_results = await self._tool_context._handle_tool_calls(
-                    response.tool_calls
-                )
+                tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
 
                 # Update failure context
                 for result in tool_results:
@@ -205,9 +204,7 @@ class ExecutionCoordinator:
             break
 
         # Ensure we have a complete response
-        final_response = await self._ensure_complete_response(
-            final_response, failure_context
-        )
+        final_response = await self._ensure_complete_response(final_response, failure_context)
 
         return final_response
 
@@ -268,9 +265,7 @@ class ExecutionCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 
@@ -300,19 +295,26 @@ class ExecutionCoordinator:
     def _accumulate_token_usage(self, response: CompletionResponse) -> None:
         """Accumulate token usage for evaluation tracking.
 
+        When a TokenTracker is configured, usage is accumulated through
+        the tracker (single source of truth). Otherwise falls back to
+        direct dict mutation on chat_context for backward compatibility.
+
         Args:
             response: Response from model
         """
         if response.usage:
-            self._chat_context._cumulative_token_usage["prompt_tokens"] += (
-                response.usage.get("prompt_tokens", 0)
-            )
-            self._chat_context._cumulative_token_usage["completion_tokens"] += (
-                response.usage.get("completion_tokens", 0)
-            )
-            self._chat_context._cumulative_token_usage["total_tokens"] += (
-                response.usage.get("total_tokens", 0)
-            )
+            if self._token_tracker is not None:
+                self._token_tracker.accumulate(response.usage)
+            else:
+                self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
+                self._chat_context._cumulative_token_usage[
+                    "completion_tokens"
+                ] += response.usage.get("completion_tokens", 0)
+                self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
 
     async def _check_context_compaction(
         self,
@@ -377,8 +379,7 @@ class ExecutionCoordinator:
 
         # Last resort fallback
         fallback_content = (
-            "I was unable to generate a complete response. "
-            "Please try rephrasing your request."
+            "I was unable to generate a complete response. " "Please try rephrasing your request."
         )
         if failure_context.failed_tools:
             fallback_content = (

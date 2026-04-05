@@ -85,7 +85,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Dangerous system operation",
                 severity=10,
             ),
-
             # Example: Use helper for file deletion pattern
             self.create_file_deletion_rule(
                 rule_id="benchmark_file_deletion",
@@ -93,7 +92,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Database/data file deletion",
                 severity=9,
             ),
-
             # Example: Use helper for completely blocked operation
             self.create_blocked_operation_rule(
                 rule_id="benchmark_production_modify",
@@ -101,7 +99,6 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
                 description="Cannot modify production systems",
                 category=SafetyCategory.SHELL,
             ),
-
             # Example: Use helper for git operations
             self.create_git_force_push_rule(
                 rule_id="benchmark_git_force_push",
@@ -142,13 +139,10 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
         Returns:
             Tuple of (is_safe, warning_message)
         """
-        # Use coordinator's safety checking
         ctx = context or {}
-        return self._coordinator.is_operation_safe(
-            tool_name=tool_name,
-            arguments=arguments,
-            context=ctx,
-        )
+        result = self._coordinator.check_safety(tool_name, arguments, ctx)
+        msg = result.block_reason if not result.is_safe else None
+        return result.is_safe, msg
 
     def check_operation(self, tool_name: str, arguments: List[str]) -> bool:
         """Check if operation should be allowed.
@@ -163,13 +157,20 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
         is_safe, _ = self.is_operation_safe(tool_name, arguments)
         return is_safe
 
+    def get_coordinator(self):
+        """Get the underlying SafetyCoordinator instance."""
+        return self._coordinator
+
     def get_safety_stats(self) -> dict:
         """Get safety statistics.
 
         Returns:
             Dictionary with safety statistics
         """
-        return self._coordinator.get_stats()
+        stats = self._coordinator.get_stats()
+        if hasattr(stats, "to_dict"):
+            return stats.to_dict()
+        return stats if isinstance(stats, dict) else {}
 
 
 __all__ = [

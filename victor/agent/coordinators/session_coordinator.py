@@ -64,6 +64,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from victor.core.async_utils import run_sync
+
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
     from victor.agent.lifecycle_manager import LifecycleManager
@@ -683,14 +685,14 @@ class SessionCoordinator:
         pending_semantic_cache = None
 
         try:
-            from victor.storage.embeddings.service import EmbeddingService
+            from victor.storage.embeddings.service import get_embedding_service
             from victor.agent.conversation_embedding_store import (
                 ConversationEmbeddingStore,
             )
             import victor.agent.conversation_embedding_store as ces_module
 
             # Get the shared embedding service
-            embedding_service = EmbeddingService.get_instance()
+            embedding_service = get_embedding_service()
 
             # Use singleton pattern - check if already exists
             if ces_module._embedding_store is not None:
@@ -716,16 +718,17 @@ class SessionCoordinator:
             if not conversation_embedding_store.is_initialized:
                 try:
                     loop = asyncio.get_running_loop()
-                    loop.create_task(conversation_embedding_store.initialize())
                 except RuntimeError:
                     try:
-                        asyncio.run(conversation_embedding_store.initialize())
+                        run_sync(conversation_embedding_store.initialize())
                     except Exception as e:
                         logger.debug(
                             "Failed to run ConversationEmbeddingStore.initialize() "
                             "synchronously: %s",
                             e,
                         )
+                else:
+                    loop.create_task(conversation_embedding_store.initialize())
 
             logger.info(
                 "ConversationEmbeddingStore configured. " "Message embeddings will sync to LanceDB."

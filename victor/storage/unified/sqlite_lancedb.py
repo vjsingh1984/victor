@@ -113,28 +113,27 @@ class SqliteLanceDBStore:
         self._graph_store = SqliteGraphStore(str(graph_db_path))
         await self._graph_store.initialize()
 
-        # Initialize embedding model
-        # Note: Embedding model from victor-coding is optional
-        # If not available, we'll use a default implementation
-        try:
-            from victor_coding.codebase.embeddings.models import (
-                EmbeddingModelConfig,
-                create_embedding_model,
-            )
+        # Initialize embedding model via capability registry or fallback
+        from victor.core.capability_registry import CapabilityRegistry
+        from victor.framework.vertical_protocols import EmbeddingModelFactoryProtocol
 
-            model_config = EmbeddingModelConfig(
-                model_type=self.embedding_model_type,
-                model_name=self.embedding_model_name,
+        factory = CapabilityRegistry.get_instance().get(EmbeddingModelFactoryProtocol)
+        if factory is not None:
+            try:
+                self._embedding_model = factory.create_model(
+                    self.embedding_model_type, self.embedding_model_name
+                )
+                await self._embedding_model.initialize()
+            except Exception as e:
+                logger.warning(f"Enhanced embedding model failed: {e}, falling back")
+                factory = None
+
+        if factory is None:
+            # Fallback to SentenceTransformer
+            logger.info(
+                "Using default SentenceTransformer embedding model. "
+                "Install victor-coding for enhanced models."
             )
-            self._embedding_model = create_embedding_model(model_config)
-            await self._embedding_model.initialize()
-        except ImportError:
-            # victor-coding not installed, use default embedding model
-            logger.warning(
-                "victor-coding not installed, using default embedding model. "
-                "Install with: pip install victor-coding"
-            )
-            # Use a simple default model
             from sentence_transformers import SentenceTransformer
 
             self._embedding_model = SentenceTransformer(self.embedding_model_name)
@@ -160,7 +159,9 @@ class SqliteLanceDBStore:
             self._vector_table = None
 
             # Check if table exists
-            if "symbols" in self._vector_store.list_tables().tables:
+            from victor.storage.vector_stores._lancedb_compat import get_table_names
+
+            if "symbols" in get_table_names(self._vector_store):
                 self._vector_table = self._vector_store.open_table("symbols")
         except ImportError:
             logger.warning("LanceDB not available. Semantic search disabled.")
@@ -763,7 +764,9 @@ class SqliteLanceDBStore:
 
         await self._graph_store.delete_by_repo()
 
-        if self._vector_store and "symbols" in self._vector_store.list_tables().tables:
+        from victor.storage.vector_stores._lancedb_compat import get_table_names
+
+        if self._vector_store and "symbols" in get_table_names(self._vector_store):
             self._vector_store.drop_table("symbols")
             self._vector_table = None
 

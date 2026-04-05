@@ -31,6 +31,7 @@ This module defines the abstract base for all formation strategies,
 following the Open/Closed Principle (OCP) and Strategy pattern.
 """
 
+import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -82,18 +83,23 @@ class TeamContext:
         self._lsp = lsp_capability  # Language Server Protocol capability
         self.metadata = metadata
         self._state_manager = state_manager
+        self._lock = threading.Lock()
 
         # Initialize manager with existing shared_state
         if self._state_manager and self.shared_state:
             self._sync_to_manager()
 
     def _sync_to_manager(self) -> None:
-        """Sync shared_state to the canonical state manager."""
+        """Sync shared_state to the canonical state manager.
+
+        Called once during __init__. Uses direct _state access since
+        the async manager API is unavailable in a sync constructor.
+        This is safe because no concurrent access exists at construction time.
+        """
         if not self._state_manager:
             return
 
         try:
-            # Sync shared_state to manager
             for key, value in self.shared_state.items():
                 self._state_manager._state[key] = value
         except Exception as e:
@@ -114,15 +120,13 @@ class TeamContext:
         Returns:
             Value associated with key, or default
         """
-        # Try manager first
-        if self._state_manager:
-            try:
-                return self._state_manager._state.get(key, default)
-            except Exception:
-                pass
-
-        # Fall back to shared_state dict
-        return self.shared_state.get(key, default)
+        with self._lock:
+            if self._state_manager:
+                try:
+                    return self._state_manager._state.get(key, default)
+                except Exception:
+                    pass
+            return self.shared_state.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
         """Set a value in shared state.
@@ -133,14 +137,13 @@ class TeamContext:
             key: Key to set
             value: Value to store
         """
-        # Update both manager and shared_state
-        if self._state_manager:
-            try:
-                self._state_manager._state[key] = value
-            except Exception:
-                pass
-
-        self.shared_state[key] = value
+        with self._lock:
+            if self._state_manager:
+                try:
+                    self._state_manager._state[key] = value
+                except Exception:
+                    pass
+            self.shared_state[key] = value
 
     def update(self, updates: Dict[str, Any]) -> None:
         """Update multiple values in shared state.
@@ -150,14 +153,13 @@ class TeamContext:
         Args:
             updates: Dictionary of key-value pairs to update
         """
-        # Update both manager and shared_state
-        if self._state_manager:
-            try:
-                self._state_manager._state.update(updates)
-            except Exception:
-                pass
-
-        self.shared_state.update(updates)
+        with self._lock:
+            if self._state_manager:
+                try:
+                    self._state_manager._state.update(updates)
+                except Exception:
+                    pass
+            self.shared_state.update(updates)
 
     @property
     def lsp(self) -> Optional[Any]:

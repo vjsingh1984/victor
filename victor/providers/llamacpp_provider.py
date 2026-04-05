@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -454,7 +456,7 @@ class LlamaCppProvider(BaseProvider):
             operation="chat",
             num_messages=len(messages),
             has_tools=tools is not None,
-        ):
+        ) as log_success:
             try:
                 response = await self.client.post(
                     f"{self.base_url}/v1/chat/completions",
@@ -468,13 +470,7 @@ class LlamaCppProvider(BaseProvider):
 
                 # Log success with usage info
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                self._provider_logger._log_api_call_success(
-                    call_id=f"chat_{model}_{id(payload)}",
-                    endpoint="/chat/completions",
-                    model=model,
-                    start_time=0,  # Will be set by context manager
-                    tokens=tokens,
-                )
+                log_success(tokens=tokens)
 
                 return parsed
 
@@ -492,7 +488,11 @@ class LlamaCppProvider(BaseProvider):
                 except Exception:
                     pass
 
-                error_msg = error_data.get("error", {}).get("message") if isinstance(error_data, dict) else str(error_data)
+                error_msg = (
+                    error_data.get("error", {}).get("message")
+                    if isinstance(error_data, dict)
+                    else str(error_data)
+                )
                 if not error_msg:
                     error_msg = e.response.text[:500] if e.response.text else "Unknown error"
 
@@ -736,7 +736,9 @@ class LlamaCppProvider(BaseProvider):
                                 )
 
                         except json.JSONDecodeError:
-                            self._provider_logger.logger.debug(f"Failed to parse streaming chunk: {line}")
+                            self._provider_logger.logger.debug(
+                                f"Failed to parse streaming chunk: {line}"
+                            )
                             continue
 
         except httpx.TimeoutException as e:

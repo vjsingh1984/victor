@@ -188,6 +188,43 @@ class TestStateGraphExecutor:
         assert result.get("done") is True
 
     @pytest.mark.asyncio
+    async def test_execute_uses_shared_initial_state_shape(self):
+        """Execute should seed the compiled graph with the canonical workflow state."""
+        executor = StateGraphExecutor()
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
+        captured = {}
+
+        class FakeCompiledGraph:
+            async def invoke(self, state, thread_id=None):
+                captured["state"] = state
+                captured["thread_id"] = thread_id
+                return MagicMock(
+                    success=True,
+                    state=state,
+                    error=None,
+                    node_history=["step"],
+                    iterations=1,
+                )
+
+        fake_compiler = MagicMock()
+        fake_compiler.compile.return_value = FakeCompiledGraph()
+        executor._compiler = fake_compiler
+
+        result = await executor.execute(
+            workflow,
+            {"input": "data"},
+            thread_id="session-123",
+        )
+
+        assert result.success is True
+        assert captured["thread_id"] == "session-123"
+        assert captured["state"]["_workflow_id"] == "session-123"
+        assert captured["state"]["_current_node"] == "step"
+        assert captured["state"]["_node_results"] == {}
+        assert captured["state"]["_parallel_results"] == {}
+        assert captured["state"]["input"] == "data"
+
+    @pytest.mark.asyncio
     async def test_execute_handles_errors(self):
         """Test that execution handles errors gracefully.
 

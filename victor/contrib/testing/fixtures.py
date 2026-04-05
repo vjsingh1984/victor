@@ -166,7 +166,7 @@ class TestAssistantMixin:
             override this method to create their specific assistant type.
         """
         if provider is None:
-            if hasattr(self, 'create_mock_provider'):
+            if hasattr(self, "create_mock_provider"):
                 provider = self.create_mock_provider()
             else:
                 provider = mock.MagicMock()

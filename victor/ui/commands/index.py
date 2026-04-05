@@ -1,15 +1,20 @@
 import typer
-import asyncio
 import os
 import time
 
 from rich.console import Console
 
+from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.ui.commands.utils import preload_semantic_index
 
 index_app = typer.Typer(name="index", help="Build semantic code search index for the codebase.")
 console = Console()
+
+
+async def _build_index_async(cwd: str, settings, force: bool) -> bool:
+    """Build the semantic index asynchronously."""
+    return await preload_semantic_index(cwd, settings, console, force=force)
 
 
 @index_app.callback(invoke_without_command=True)
@@ -39,11 +44,8 @@ def index(
 
         console.print(f"[dim]Indexing codebase at: {cwd}[/dim]")
 
-        async def _build_index() -> bool:
-            return await preload_semantic_index(cwd, settings, console, force=force)
-
         start_time = time.time()
-        success = asyncio.run(_build_index())
+        success = run_sync(_build_index_async(cwd, settings, force))
         elapsed = time.time() - start_time
 
         if success:

@@ -47,7 +47,6 @@ from victor.framework.tools import ToolSet, ToolsInput
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.core.container import ServiceContainer
-    from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
     from victor.framework.service_provider import (
         EventRegistryService,
         ToolConfiguratorService,
@@ -125,13 +124,11 @@ class BuilderPreset(str, Enum):
 
         # For coding tasks:
         pip install victor-coding
-        from victor_coding import CodingAssistant
-        agent = await Agent.create(vertical=CodingAssistant)
+        agent = await Agent.create(vertical="coding")
 
         # For research tasks:
         pip install victor-research
-        from victor_research import ResearchAssistant
-        agent = await Agent.create(vertical=ResearchAssistant)
+        agent = await Agent.create(vertical="research")
     """
 
     DEFAULT = "default"  # Balanced configuration
@@ -157,8 +154,6 @@ class AgentBuildOptions:
     vertical: Optional[Type["VerticalBase"]] = None
     enable_observability: bool = True
     session_id: Optional[str] = None
-    enable_cqrs: bool = False
-    cqrs_event_sourcing: bool = True
     custom_system_prompt: Optional[str] = None
     state_hooks: Optional[Dict[str, Callable]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -196,7 +191,6 @@ class AgentBuilder:
             .model("gpt-4-turbo")
             .tools(["filesystem", "git"])
             .thinking(True)
-            .with_cqrs()
             .build()
         )
 
@@ -564,7 +558,7 @@ class AgentBuilder:
         """Use a domain-specific vertical.
 
         Args:
-            vertical_class: Vertical class (CodingAssistant, ResearchAssistant, etc.)
+            vertical_class: Vertical class or name string
 
         Returns:
             Self for chaining
@@ -610,20 +604,6 @@ class AgentBuilder:
             Self for chaining
         """
         self._options.session_id = session_id
-        return self
-
-    def with_cqrs(self, enabled: bool = True, event_sourcing: bool = True) -> "AgentBuilder":
-        """Enable CQRS integration.
-
-        Args:
-            enabled: Whether to enable CQRS
-            event_sourcing: Whether to enable event sourcing
-
-        Returns:
-            Self for chaining
-        """
-        self._options.enable_cqrs = enabled
-        self._options.cqrs_event_sourcing = event_sourcing
         return self
 
     # -------------------------------------------------------------------------
@@ -713,8 +693,6 @@ class AgentBuilder:
             vertical=self._options.vertical,
             enable_observability=self._options.enable_observability,
             session_id=self._options.session_id,
-            enable_cqrs=self._options.enable_cqrs,
-            cqrs_event_sourcing=self._options.cqrs_event_sourcing,
             custom_system_prompt=self._options.custom_system_prompt,
             state_hooks=self._options.state_hooks,
             metadata=dict(self._options.metadata),
@@ -766,13 +744,6 @@ class AgentBuilder:
         # Apply tool filters via container-managed ToolConfigurator (Phase 8.2)
         if self._tool_filters:
             await self._apply_tool_filters(agent)
-
-        # Enable CQRS if requested
-        if self._options.enable_cqrs:
-            await agent.enable_cqrs(
-                session_id=self._options.session_id,
-                enable_event_sourcing=self._options.cqrs_event_sourcing,
-            )
 
         # Store metadata and container reference
         agent._builder_metadata = self._options.metadata
@@ -1397,18 +1368,15 @@ class AgentSession:
 class BridgeConfiguration:
     """Configuration for AgentBridge."""
 
-    enable_cqrs: bool = True
-    enable_event_sourcing: bool = True
     enable_observability: bool = True
     enable_metrics: bool = True
     auto_forward_events: bool = True
 
 
 class AgentBridge:
-    """Bridge between Agent and external systems (CQRS, Observability).
+    """Bridge between Agent and external systems (Observability).
 
     The AgentBridge provides a clean integration layer that:
-    - Connects agents to CQRS subsystem
     - Forwards events to observability infrastructure
     - Manages session correlation
     - Handles cleanup on disconnect
@@ -1417,14 +1385,6 @@ class AgentBridge:
         # Create and connect
         bridge = AgentBridge(agent, BridgeConfiguration())
         await bridge.connect()
-
-        # Events are now automatically forwarded
-        async for event in agent.stream("Analyze code"):
-            print(event.content)
-
-        # Query through bridge
-        session = await bridge.get_session_info()
-        metrics = await bridge.get_metrics()
 
         # Disconnect when done
         await bridge.disconnect()
@@ -1449,8 +1409,6 @@ class AgentBridge:
         self._config = config or BridgeConfiguration()
         self._connected = False
         self._session_id: Optional[str] = None
-        self._cqrs_bridge: Optional["CQRSBridge"] = None
-        self._event_adapter: Optional["FrameworkEventAdapter"] = None
 
     @property
     def connected(self) -> bool:
@@ -1461,11 +1419,6 @@ class AgentBridge:
     def session_id(self) -> Optional[str]:
         """Get session ID."""
         return self._session_id
-
-    @property
-    def cqrs_bridge(self) -> Optional["CQRSBridge"]:
-        """Get CQRS bridge if enabled."""
-        return self._cqrs_bridge
 
     @property
     def agent(self) -> "Agent":
@@ -1492,29 +1445,6 @@ class AgentBridge:
             raise AgentError("Bridge already connected")
 
         self._session_id = session_id or str(uuid.uuid4())
-
-        # Enable CQRS if configured
-        if self._config.enable_cqrs:
-            from victor.framework.cqrs_bridge import CQRSBridge, FrameworkEventAdapter
-
-            self._cqrs_bridge = await CQRSBridge.create(
-                enable_event_sourcing=self._config.enable_event_sourcing,
-                enable_observability=self._config.enable_observability,
-            )
-
-            # Connect agent
-            self._cqrs_bridge.connect_agent(
-                self._agent,
-                session_id=self._session_id,
-            )
-
-            # Set up event adapter for auto-forwarding
-            if self._config.auto_forward_events:
-                self._event_adapter = FrameworkEventAdapter(
-                    event_bus=self._agent.event_bus,
-                )
-                self._agent._cqrs_adapter = self._event_adapter
-
         self._connected = True
         return self._session_id
 
@@ -1523,80 +1453,8 @@ class AgentBridge:
         if not self._connected:
             return
 
-        if self._cqrs_bridge and self._session_id:
-            self._cqrs_bridge.disconnect_agent(self._session_id)
-            self._cqrs_bridge.close()
-
-        self._agent._cqrs_adapter = None
-        self._cqrs_bridge = None
-        self._event_adapter = None
         self._session_id = None
         self._connected = False
-
-    # -------------------------------------------------------------------------
-    # CQRS Operations
-    # -------------------------------------------------------------------------
-
-    async def get_session_info(self) -> Dict[str, Any]:
-        """Get session information.
-
-        Returns:
-            Session details
-
-        Raises:
-            AgentError: If not connected
-        """
-        if not self._connected or not self._cqrs_bridge:
-            raise AgentError("Bridge not connected")
-
-        return await self._cqrs_bridge.get_session(self._session_id)
-
-    async def get_conversation_history(self, limit: int = 100) -> Dict[str, Any]:
-        """Get conversation history.
-
-        Args:
-            limit: Maximum messages
-
-        Returns:
-            Conversation history
-
-        Raises:
-            AgentError: If not connected
-        """
-        if not self._connected or not self._cqrs_bridge:
-            raise AgentError("Bridge not connected")
-
-        return await self._cqrs_bridge.get_conversation_history(
-            self._session_id,
-            limit=limit,
-        )
-
-    async def get_metrics(self) -> Dict[str, Any]:
-        """Get session metrics.
-
-        Returns:
-            Metrics data
-
-        Raises:
-            AgentError: If not connected
-        """
-        if not self._connected or not self._cqrs_bridge:
-            raise AgentError("Bridge not connected")
-
-        return await self._cqrs_bridge.get_metrics(self._session_id)
-
-    # -------------------------------------------------------------------------
-    # Event Forwarding
-    # -------------------------------------------------------------------------
-
-    def forward_event(self, event: AgentExecutionEvent) -> None:
-        """Manually forward an event to CQRS.
-
-        Args:
-            event: AgentExecutionEvent to forward
-        """
-        if self._event_adapter:
-            self._event_adapter.forward(event)
 
     # -------------------------------------------------------------------------
     # Context Manager

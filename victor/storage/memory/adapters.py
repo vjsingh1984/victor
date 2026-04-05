@@ -209,7 +209,7 @@ class EntityMemoryAdapter:
 
     def is_available(self) -> bool:
         """Check if entity memory is available."""
-        return self._available and self._memory._initialized
+        return self._available and getattr(self._memory, "_initialized", False)
 
     def _entity_to_dict(self, entity: Any) -> Dict[str, Any]:
         """Convert entity to dictionary for serialization."""
@@ -292,12 +292,20 @@ class ConversationMemoryAdapter:
             results = []
 
             # Try semantic search first
-            semantic_results = self._store.get_semantically_relevant_messages(
-                session_id=session_id,
-                query=query.query,
-                limit=query.limit,
-                min_similarity=query.min_relevance or 0.3,
-            )
+            if hasattr(self._store, "aget_semantically_relevant_messages"):
+                semantic_results = await self._store.aget_semantically_relevant_messages(
+                    session_id=session_id,
+                    query=query.query,
+                    limit=query.limit,
+                    min_similarity=query.min_relevance or 0.3,
+                )
+            else:
+                semantic_results = self._store.get_semantically_relevant_messages(
+                    session_id=session_id,
+                    query=query.query,
+                    limit=query.limit,
+                    min_similarity=query.min_relevance or 0.3,
+                )
 
             for message, similarity in semantic_results:
                 results.append(
@@ -555,7 +563,7 @@ class GraphMemoryAdapter:
 
     def is_available(self) -> bool:
         """Check if graph memory is available."""
-        return self._available and self._memory._initialized
+        return self._available and getattr(self._memory, "_initialized", False)
 
 
 # =============================================================================

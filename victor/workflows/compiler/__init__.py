@@ -20,8 +20,22 @@ that can be registered in the DI container.
 
 from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+from victor.workflows.compiler.boundary import (
+    LegacyWorkflowGraphCompiler,
+    NativeWorkflowGraphCompiler,
+    ParsedWorkflowDefinition,
+    WorkflowCompilationRequest,
+    WorkflowDefinitionValidator,
+    WorkflowParser,
+)
 
 __all__ = [
+    "LegacyWorkflowGraphCompiler",
+    "NativeWorkflowGraphCompiler",
+    "ParsedWorkflowDefinition",
     "WorkflowCompiler",
     "WorkflowCompilerImpl",
+    "WorkflowCompilationRequest",
+    "WorkflowDefinitionValidator",
+    "WorkflowParser",
 ]

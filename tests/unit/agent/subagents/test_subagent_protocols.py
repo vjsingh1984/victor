@@ -56,6 +56,10 @@ class TestSubAgentContextProtocol:
             def temperature(self) -> float:
                 return 0.7
 
+            @property
+            def vertical_context(self) -> Any:
+                return None
+
         context = MinimalContext()
         assert isinstance(context, SubAgentContext)
 
@@ -418,6 +422,10 @@ class TestProtocolIntegration:
             @property
             def temperature(self) -> float:
                 return 0.7
+
+            @property
+            def vertical_context(self) -> Any:
+                return None
 
         class ExecutorImpl:
             def execute(

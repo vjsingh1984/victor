@@ -207,6 +207,7 @@ class DynamicModuleLoader:
 
         # Module tracking
         self._loaded_modules: Dict[str, Any] = {}
+        self._modules_lock = threading.Lock()
         self._module_paths: Dict[str, Path] = {}  # module -> file path
 
     @property
@@ -240,21 +241,23 @@ class DynamicModuleLoader:
         # Remove from internal tracking
         self._loaded_modules.pop(module_name, None)
 
-        # Remove main module
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-            invalidated += 1
-            logger.debug(f"Invalidated module: {module_name}")
+        # Lock protects sys.modules from concurrent invalidation
+        with self._modules_lock:
+            # Remove main module
+            if module_name in sys.modules:
+                del sys.modules[module_name]
+                invalidated += 1
+                logger.debug(f"Invalidated module: {module_name}")
 
-        # Remove submodules
-        prefix = f"{module_name}."
-        to_remove = [name for name in sys.modules if name.startswith(prefix)]
-        for name in to_remove:
-            del sys.modules[name]
-            invalidated += 1
-            logger.debug(f"Invalidated submodule: {name}")
+            # Remove submodules
+            prefix = f"{module_name}."
+            to_remove = [name for name in sys.modules if name.startswith(prefix)]
+            for name in to_remove:
+                del sys.modules[name]
+                invalidated += 1
+                logger.debug(f"Invalidated submodule: {name}")
 
-        # Clear import caches
+        # Clear import caches (thread-safe per CPython)
         importlib.invalidate_caches()
 
         return invalidated
@@ -279,31 +282,33 @@ class DynamicModuleLoader:
         invalidated = 0
         path_str = str(directory_path.resolve())
 
-        # Remove the main module
-        if base_module_name in sys.modules:
-            del sys.modules[base_module_name]
-            invalidated += 1
-            logger.debug(f"Invalidated module: {base_module_name}")
+        # Lock protects sys.modules from concurrent invalidation
+        with self._modules_lock:
+            # Remove the main module
+            if base_module_name in sys.modules:
+                del sys.modules[base_module_name]
+                invalidated += 1
+                logger.debug(f"Invalidated module: {base_module_name}")
 
-        # Remove any modules that came from this directory
-        modules_to_remove = []
-        for mod_name, mod in list(sys.modules.items()):
-            if mod is None:
-                continue
+            # Remove any modules that came from this directory
+            modules_to_remove = []
+            for mod_name, mod in list(sys.modules.items()):
+                if mod is None:
+                    continue
 
-            try:
-                mod_file = getattr(mod, "__file__", None)
-                if mod_file and path_str in str(Path(mod_file).resolve()):
-                    modules_to_remove.append(mod_name)
-            except Exception:
-                continue
+                try:
+                    mod_file = getattr(mod, "__file__", None)
+                    if mod_file and path_str in str(Path(mod_file).resolve()):
+                        modules_to_remove.append(mod_name)
+                except Exception:
+                    continue
 
-        for mod_name in modules_to_remove:
-            del sys.modules[mod_name]
-            invalidated += 1
-            logger.debug(f"Invalidated module from path: {mod_name}")
+            for mod_name in modules_to_remove:
+                del sys.modules[mod_name]
+                invalidated += 1
+                logger.debug(f"Invalidated module from path: {mod_name}")
 
-        # Clear import caches
+        # Clear import caches (thread-safe per CPython)
         importlib.invalidate_caches()
 
         return invalidated
@@ -787,6 +792,41 @@ class EntryPointCache:
 
             return f"time_{int(time.time())}"
 
+    def _compute_installation_fingerprint(self) -> str:
+        """Compute lightweight installation fingerprint for warm-start checks.
+
+        This avoids full package enumeration by hashing a small set of
+        interpreter and site-package directory mtimes.
+        """
+        import hashlib
+        import site
+        import sys
+
+        components = [
+            f"exe:{sys.executable}",
+            f"py:{sys.version_info.major}.{sys.version_info.minor}",
+        ]
+        candidate_paths = []
+        try:
+            candidate_paths.extend(site.getsitepackages())
+        except Exception:
+            pass
+
+        user_site = site.getusersitepackages()
+        if isinstance(user_site, str):
+            candidate_paths.append(user_site)
+
+        for raw_path in sorted({p for p in candidate_paths if p}):
+            try:
+                resolved = Path(raw_path).resolve()
+                stat = resolved.stat()
+                components.append(f"path:{resolved}:{stat.st_mtime_ns}:{stat.st_size}")
+            except Exception:
+                components.append(f"path:{raw_path}:missing")
+
+        payload = "|".join(components)
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
     def _get_env_hash(self) -> str:
         """Get cached or compute environment hash.
 
@@ -808,11 +848,34 @@ class EntryPointCache:
             with open(self._cache_file, "r") as f:
                 data = json.load(f)
 
-            # Current env hash for validation
-            current_hash = self._get_env_hash()
+            if not isinstance(data, dict):
+                logger.warning("Entry point cache file has invalid top-level format")
+                return
+
+            # Warm-start fast path: if installation fingerprint matches, reuse persisted env hash
+            # and avoid the expensive full package-distribution scan.
+            current_hash: Optional[str] = None
+            meta = data.get("_meta")
+            if isinstance(meta, dict):
+                cached_env_hash = meta.get("env_hash")
+                cached_fingerprint = meta.get("install_fingerprint")
+                if isinstance(cached_env_hash, str) and isinstance(cached_fingerprint, str):
+                    current_fingerprint = self._compute_installation_fingerprint()
+                    if current_fingerprint == cached_fingerprint:
+                        self._env_hash = cached_env_hash
+                        current_hash = cached_env_hash
+                        logger.debug(
+                            "Reused cached env hash via installation fingerprint fast path"
+                        )
+
+            # Fallback for legacy cache files or fingerprint mismatch.
+            if current_hash is None:
+                current_hash = self._get_env_hash()
 
             with self._cache_lock:
                 for group, entry_data in data.items():
+                    if group == "_meta":
+                        continue
                     try:
                         cached = CachedEntryPoints.from_dict(entry_data)
                         # Only load if env hash matches and not expired
@@ -832,12 +895,20 @@ class EntryPointCache:
         """Save cache to disk."""
         try:
             import json
+            import time
 
             # Ensure cache directory exists
             self._cache_dir.mkdir(parents=True, exist_ok=True)
 
             with self._cache_lock:
                 data = {group: cached.to_dict() for group, cached in self._memory_cache.items()}
+                if self._env_hash is not None:
+                    data["_meta"] = {
+                        "schema_version": 1,
+                        "env_hash": self._env_hash,
+                        "install_fingerprint": self._compute_installation_fingerprint(),
+                        "saved_at": time.time(),
+                    }
 
             with open(self._cache_file, "w") as f:
                 json.dump(data, f, indent=2)
@@ -907,14 +978,16 @@ class EntryPointCache:
         entries = {}
 
         try:
-            # Load entry points (Python 3.10+)
-            from importlib.metadata import entry_points
+            # Use UnifiedEntryPointRegistry for single-pass lazy scanning
+            from victor.framework.entry_point_registry import get_entry_point_registry
 
-            eps = entry_points(group=group)
+            registry = get_entry_point_registry()
+            group_obj = registry.get_group(group)
 
-            for ep in eps:
-                # Store as "module:attr" format
-                entries[ep.name] = f"{ep.value}"
+            if group_obj:
+                for ep_name, (ep, _loaded) in group_obj.entry_points.items():
+                    # Store as "module:attr" format
+                    entries[ep_name] = f"{ep.value}"
 
         except Exception as e:
             logger.warning(f"Failed to scan entry points for '{group}': {e}")

@@ -101,6 +101,9 @@ CORE_DIRS = {
     "api",
 }
 
+GRAPH_FOLLOW_UP_SYMBOL_TYPES = {"function", "method"}
+ENTRYPOINT_SYMBOL_NAMES = {"main", "run", "start", "serve", "cli", "bootstrap"}
+
 
 def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
     """Calculate importance score for a search result.
@@ -193,6 +196,178 @@ def _keyword_score(text: str, query: str) -> int:
     return sum(t.count(word) for word in q)
 
 
+def _normalize_result_dict(result: Any) -> Dict[str, Any]:
+    """Normalize search results from models or dict-like providers."""
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+    if isinstance(result, dict):
+        return dict(result)
+    return dict(result)
+
+
+def _prepare_ranked_results(
+    results: List[Any],
+    search_mode: str,
+    max_content_chars: int = 500,
+) -> List[Dict[str, Any]]:
+    """Normalize, truncate, and importance-rank search results."""
+    ranked_results: List[Dict[str, Any]] = []
+    for result in results:
+        result_dict = _normalize_result_dict(result)
+        result_dict.setdefault("search_mode", search_mode)
+
+        content = result_dict.get("content", "")
+        if isinstance(content, str) and len(content) > max_content_chars:
+            result_dict["content"] = (
+                content[:max_content_chars] + f"... [truncated, {len(content)} chars total]"
+            )
+            result_dict["content_truncated"] = True
+
+        file_path = result_dict.get("file_path", result_dict.get("path", ""))
+        symbol_type = result_dict.get("symbol_type")
+        importance = _calculate_importance_score(file_path, symbol_type)
+        result_dict["importance_score"] = round(importance, 2)
+
+        raw_score = result_dict.get("score", result_dict.get("similarity"))
+        if raw_score is None:
+            raw_score = result_dict.get("combined_score", 0.5)
+        try:
+            numeric_score = float(raw_score)
+        except (TypeError, ValueError):
+            numeric_score = 0.5
+        result_dict["combined_score"] = round(numeric_score * importance, 3)
+
+        ranked_results.append(result_dict)
+
+    ranked_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
+    return ranked_results
+
+
+def _extract_graph_follow_up_symbol(result: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Extract a symbol candidate suitable for graph follow-up suggestions."""
+    metadata = result.get("metadata")
+    metadata_dict = metadata if isinstance(metadata, dict) else {}
+
+    symbol_type = (
+        result.get("symbol_type")
+        or result.get("type")
+        or metadata_dict.get("symbol_type")
+        or metadata_dict.get("type")
+    )
+    symbol_name = (
+        result.get("name")
+        or result.get("symbol_name")
+        or metadata_dict.get("name")
+        or metadata_dict.get("symbol_name")
+    )
+
+    if not isinstance(symbol_type, str) or not isinstance(symbol_name, str):
+        return None
+
+    normalized_type = symbol_type.strip().lower()
+    normalized_name = symbol_name.strip()
+    if normalized_type not in GRAPH_FOLLOW_UP_SYMBOL_TYPES or not normalized_name:
+        return None
+
+    return {"name": normalized_name, "symbol_type": normalized_type}
+
+
+def _build_graph_follow_up_suggestions(
+    results: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Build graph-tool follow-up suggestions from ranked search results."""
+    for result in results:
+        symbol = _extract_graph_follow_up_symbol(result)
+        if symbol is None:
+            continue
+
+        symbol_name = symbol["name"]
+        symbol_name_lower = symbol_name.lower()
+        suggestions: List[Dict[str, Any]] = []
+
+        if symbol_name_lower in ENTRYPOINT_SYMBOL_NAMES:
+            trace_args = {"mode": "trace", "node": symbol_name, "depth": 3}
+            suggestions.append(
+                {
+                    "tool": "graph",
+                    "command": f'graph(mode="trace", node="{symbol_name}", depth=3)',
+                    "arguments": trace_args,
+                    "reason": f"Trace execution starting from {symbol_name}.",
+                }
+            )
+
+        for mode, reason in (
+            ("callers", f"Find who calls {symbol_name}."),
+            ("callees", f"Find what {symbol_name} calls."),
+        ):
+            depth = 2
+            suggestions.append(
+                {
+                    "tool": "graph",
+                    "command": f'graph(mode="{mode}", node="{symbol_name}", depth={depth})',
+                    "arguments": {"mode": mode, "node": symbol_name, "depth": depth},
+                    "reason": reason,
+                }
+            )
+
+        return suggestions
+
+    return []
+
+
+def _build_search_response(
+    *,
+    results: List[Dict[str, Any]],
+    mode: str,
+    rebuilt: bool,
+    root_path: Path,
+    exec_ctx: Optional[Dict[str, Any]],
+    filters_applied: List[str],
+    ranking_note: str,
+    extra_metadata: Optional[Dict[str, Any]] = None,
+    follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Build a consistent search tool response envelope."""
+    cache_entry = _get_index_cache(exec_ctx).get(str(root_path), {})
+    hint = (
+        "Use read_file with offset/limit based on line_number/end_line for precise reads. "
+        "Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)"
+    )
+    if follow_up_suggestions:
+        hint += f" Graph follow-up: {follow_up_suggestions[0]['command']}"
+
+    metadata = {
+        "rebuilt": rebuilt,
+        "root": str(root_path),
+        "indexed_at": cache_entry.get("indexed_at"),
+        "filters_applied": filters_applied if filters_applied else None,
+        "chunking_strategy": "BODY_AWARE",
+        "importance_weighted": True,
+        "available_filters": [
+            "file_path",
+            "symbol_type",
+            "visibility",
+            "language",
+            "is_test_file",
+            "has_docstring",
+        ],
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    if follow_up_suggestions:
+        metadata["follow_up_suggestions"] = follow_up_suggestions
+
+    return {
+        "success": True,
+        "results": results,
+        "count": len(results),
+        "mode": mode,
+        "hint": hint,
+        "ranking_note": ranking_note,
+        "metadata": metadata,
+    }
+
+
 async def _get_or_build_index(
     root: Path,
     settings: Any,
@@ -212,10 +387,13 @@ async def _get_or_build_index(
         force_reindex: Force full re-index
         exec_ctx: Execution context for DI-based cache access
     """
-    try:
-        from victor_coding.codebase.indexer import CodebaseIndex
-    except ImportError:
-        # External vertical package may not be installed
+    from victor.core.capability_registry import CapabilityRegistry
+    from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+    _index_factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+    if _index_factory is None or not CapabilityRegistry.get_instance().is_enhanced(
+        CodebaseIndexFactoryProtocol
+    ):
         raise ImportError(
             "Codebase indexing requires victor-coding package. "
             "Install with: pip install victor-coding"
@@ -265,7 +443,7 @@ async def _get_or_build_index(
     graph_path = getattr(settings, "codebase_graph_path", None)
 
     # Create new index - it will load from disk if available
-    index = CodebaseIndex(
+    index = _index_factory.create(
         root_path=str(root),
         use_embeddings=True,
         embedding_config=embedding_config,
@@ -298,7 +476,11 @@ async def _literal_search(
     k: int = 5,
     exts: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Internal literal/keyword search implementation.
+    """Literal/keyword search using ripgrep (rg) or grep subprocess.
+
+    Uses native search tools instead of Python file-by-file scanning for
+    speed and correctness — no file count limits, handles binary detection,
+    and searches the full directory tree efficiently.
 
     Args:
         query: Search terms
@@ -306,22 +488,98 @@ async def _literal_search(
         k: Max results
         exts: File extensions ([".py", ".js"])
     """
-    try:
-        files = _gather_files(path, exts, 200)
-        scores: List[Dict[str, Any]] = []
-        for file_path in files:
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read(50000)
-                score = _keyword_score(text, query)
-                if score > 0:
-                    scores.append({"path": file_path, "score": score, "snippet": text[:800]})
-            except Exception:
-                continue
+    import shutil
+    import subprocess
 
-        scores.sort(key=lambda x: x["score"], reverse=True)
-        top = scores[: max(1, min(k, len(scores)))]
-        return {"success": True, "results": top, "count": len(top), "mode": "literal"}
+    try:
+        # Resolve '.' to the framework's project root
+        search_path = path
+        if search_path == ".":
+            try:
+                from victor.config.settings import get_project_paths
+
+                search_path = str(get_project_paths().project_root)
+            except Exception:
+                pass
+
+        logger.info(
+            f"Literal search: query={query!r}, path={path!r}, "
+            f"resolved={search_path!r}, exts={exts}"
+        )
+
+        # Build command: prefer ripgrep, fall back to grep
+        use_rg = shutil.which("rg") is not None
+        if use_rg:
+            cmd = [
+                "rg",
+                "--no-heading",
+                "--line-number",
+                "--color=never",
+                "--max-count=5",  # max matches per file
+                "--max-columns=200",
+            ]
+            if exts:
+                for ext in exts:
+                    cmd.extend(["--glob", f"*{ext}"])
+            else:
+                # Default: code files only
+                cmd.extend(
+                    [
+                        "--type=py",
+                        "--type=js",
+                        "--type=ts",
+                        "--type=go",
+                        "--type=java",
+                        "--type=c",
+                        "--type=cpp",
+                        "--type=rust",
+                        "--type=yaml",
+                    ]
+                )
+            cmd.extend(["--", query, search_path])
+        else:
+            cmd = ["grep", "-rn", "--include=*.py", "--", query, search_path]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        # Parse results: group by file, take top k files
+        file_matches: Dict[str, List[str]] = {}
+        for line in result.stdout.splitlines():
+            # Format: path:line_number:content
+            parts = line.split(":", 2)
+            if len(parts) >= 3:
+                fpath = parts[0]
+                if fpath not in file_matches:
+                    file_matches[fpath] = []
+                file_matches[fpath].append(line)
+
+        # Sort by number of matches (most matches = most relevant)
+        ranked = sorted(file_matches.items(), key=lambda x: len(x[1]), reverse=True)
+        top = ranked[:k]
+
+        results = []
+        for fpath, matches in top:
+            snippet = "\n".join(matches[:5])  # first 5 matching lines
+            results.append(
+                {
+                    "path": fpath,
+                    "score": len(matches),
+                    "snippet": snippet,
+                }
+            )
+
+        logger.info(
+            f"Literal search: found {len(file_matches)} files matching "
+            f"{query!r} in {search_path} ({'rg' if use_rg else 'grep'})"
+        )
+        return {"success": True, "results": results, "count": len(results), "mode": "literal"}
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Search timed out after 30s"}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 
@@ -343,6 +601,11 @@ async def _literal_search(
         "concept",
         "pattern",
         "similar",
+        "bug",
+        "bugs",
+        "regression",
+        "crash",
+        "failure",
         "find",
         "grep",
         "literal",
@@ -390,16 +653,17 @@ async def code_search(
     Modes:
     - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
     - "literal": Keyword matching (like grep). Best for exact text/identifiers.
+    - "bugs": Similar bug search with graph context when supported by the provider.
 
     Args:
         query: Search query (semantic concepts or literal text)
         path: Directory to search
         k: Max results
-        mode: Search mode - "semantic" (default) or "literal"
+        mode: Search mode - "semantic" (default), "literal", or "bugs"
         reindex: Force re-index (semantic mode only)
         file: Filter by file path (semantic mode only)
         symbol: Filter by type (class/function/method) (semantic mode only)
-        lang: Filter by language (python/rust/js) (semantic mode only)
+        lang: Filter by language (python/rust/js) (semantic and bugs modes)
         test: Filter test files (true/false) (semantic mode only)
         exts: File extensions for literal mode (e.g., [".py", ".js"])
         _exec_ctx: Framework execution context (contains settings, etc.)
@@ -407,6 +671,7 @@ async def code_search(
     Example:
         search(query="error handling in providers")  # Semantic: find related concepts
         search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
+        search(query="json parsing crash on empty payload", mode="bugs")
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
@@ -463,6 +728,57 @@ async def code_search(
         index, rebuilt = await _get_or_build_index(
             root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
         )
+
+        if mode == "bugs":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                bug_results = await index.find_similar_bugs(
+                    bug_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    bug_results,
+                    search_mode="bug_similarity",
+                )
+                extra_metadata = {
+                    "provider_capability": "find_similar_bugs",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="bugs",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (bug_similarity × importance). Graph context included when available.",
+                    extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Bug similarity mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "bugs",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
+            else:
+                fallback_metadata = {}
+        else:
+            fallback_metadata = {}
 
         # Get semantic search configuration from settings
         # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
@@ -592,58 +908,20 @@ async def code_search(
                 logger.warning(f"Hybrid search failed, falling back to semantic: {e}")
                 # Fall back to semantic-only results (already have them)
 
-        # Truncate content in results to prevent context overflow
-        # Keep enough for context but not entire function bodies
-        MAX_CONTENT_CHARS = 500
-        truncated_results = []
-        for result in results:
-            # Convert to dict for serialization
-            result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
-            content = result_dict.get("content", "")
-            if len(content) > MAX_CONTENT_CHARS:
-                result_dict["content"] = (
-                    content[:MAX_CONTENT_CHARS] + f"... [truncated, {len(content)} chars total]"
-                )
-                result_dict["content_truncated"] = True
+        ranked_results = _prepare_ranked_results(results, search_mode="semantic")
+        follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
 
-            # Calculate importance score for ranking
-            file_path = result_dict.get("file_path", "")
-            symbol_type = result_dict.get("symbol_type")
-            importance = _calculate_importance_score(file_path, symbol_type)
-            result_dict["importance_score"] = round(importance, 2)
-
-            # Combine semantic similarity with importance for final ranking
-            semantic_score = result_dict.get("score", result_dict.get("similarity", 0.5))
-            result_dict["combined_score"] = round(semantic_score * importance, 3)
-
-            truncated_results.append(result_dict)
-
-        # Re-sort by combined score (importance-weighted semantic relevance)
-        truncated_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
-
-        return {
-            "success": True,
-            "results": truncated_results,
-            "count": len(truncated_results),
-            "hint": "Use read_file with offset/limit based on line_number/end_line for precise reads. Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)",
-            "ranking_note": "Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
-            "metadata": {
-                "rebuilt": rebuilt,
-                "root": str(root_path),
-                "indexed_at": _get_index_cache(_exec_ctx)[str(root_path)]["indexed_at"],
-                "filters_applied": filters_applied if filters_applied else None,
-                "chunking_strategy": "BODY_AWARE",
-                "importance_weighted": True,
-                "available_filters": [
-                    "file_path",
-                    "symbol_type",
-                    "visibility",
-                    "language",
-                    "is_test_file",
-                    "has_docstring",
-                ],
-            },
-        }
+        return _build_search_response(
+            results=ranked_results,
+            mode="semantic",
+            rebuilt=rebuilt,
+            root_path=root_path,
+            exec_ctx=_exec_ctx,
+            filters_applied=filters_applied,
+            ranking_note="Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
+            extra_metadata=fallback_metadata,
+            follow_up_suggestions=follow_up_suggestions,
+        )
     except ImportError as exc:
         return {
             "success": False,

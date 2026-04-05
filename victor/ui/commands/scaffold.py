@@ -187,13 +187,13 @@ def new_vertical(
 ) -> None:
     """Generate a new vertical structure from templates.
 
-    Creates a complete vertical directory with all necessary files:
-    - __init__.py - Package initialization and exports
-    - assistant.py - Main vertical class inheriting from VerticalBase
-    - safety.py - Safety patterns for dangerous operations
-    - prompts.py - Task type hints and system prompt sections
-    - mode_config.py - Mode configurations and tool budgets
-    - service_provider.py - DI container registration (optional)
+    Creates a vertical directory with an SDK-first definition layer:
+    - __init__.py - Package initialization and assistant export
+    - assistant.py - Main vertical definition authored against victor-sdk
+    - safety.py - Optional runtime-side safety notes placeholder
+    - prompts.py - Optional serializable prompt metadata helper
+    - mode_config.py - Optional runtime-side mode metadata placeholder
+    - service_provider.py - DI container registration (optional runtime integration)
 
     Examples:
         victor vertical create security --description "Security analysis assistant"
@@ -313,10 +313,15 @@ def new_vertical(
         console.print()
         console.print("[bold]Next steps:[/]")
         console.print(f"  1. Review and customize the files in victor/{name}/")
-        console.print(f"  2. Add {name}-specific tools to get_tools() in assistant.py")
-        console.print(f"  3. Define safety patterns in safety.py")
-        console.print(f"  4. Customize task type hints in prompts.py")
-        console.print(f"  5. Add mode configurations in mode_config.py")
+        console.print(f"  2. Update tool and capability requirements in assistant.py")
+        console.print(
+            f"  3. Verify {to_class_name(name)}Assistant.get_definition() works without runtime imports"
+        )
+        console.print(
+            f"  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
+        )
+        if service_provider:
+            console.print(f"  5. Wire any runtime-only integrations through service_provider.py")
         console.print()
         console.print("[dim]To use your new vertical:[/]")
         console.print(f"    from victor.{name} import {to_class_name(name)}Assistant")

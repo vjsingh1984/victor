@@ -1,0 +1,47 @@
+{
+  "framework": "victor",
+  "provider": "ollama",
+  "model": "qwen3-coder-tools:30b",
+  "timestamp": "2026-03-11T15:54:50.248320Z",
+  "tasks_total": 2,
+  "tasks_successful": 1,
+  "tasks_failed": 1,
+  "success_rate": 50.0,
+  "avg_duration_ms": 181330.66,
+  "results": [
+    {
+      "task_id": "R4",
+      "task_name": "Debug investigation",
+      "category": "Multi-Step Reasoning",
+      "complexity": "Medium",
+      "framework": "victor",
+      "provider": "ollama",
+      "model": "qwen3-coder-tools:30b",
+      "run": 1,
+      "timestamp": "2026-03-11T15:53:19.903765Z",
+      "success": true,
+      "duration_ms": 181330.66,
+      "output_length": 325,
+      "output_preview": "I encountered an issue: - grep: Semantic search dependencies missing: Codebase indexing requires victor-coding package. Install with: pip install victor-coding. Install lancedb/chromadb + sentence-transformers.\n\nBased on what I found before the error:\nSuccessfully executed: ls, grep, read, grep, grep, grep, read, grep, grep",
+      "memory_mb": 111.48,
+      "error": null
+    },
+    {
+      "task_id": "T1",
+      "task_name": "File operations",
+      "category": "Tool Usage",
+      "complexity": "Simple",
+      "framework": "victor",
+      "provider": "ollama",
+      "model": "qwen3-coder-tools:30b",
+      "run": 1,
+      "timestamp": "2026-03-11T15:54:50.248272Z",
+      "success": false,
+      "duration_ms": 90344.03,
+      "output_length": 0,
+      "output_preview": "",
+      "memory_mb": 34.5,
+      "error": "Timeout"
+    }
+  ]
+}

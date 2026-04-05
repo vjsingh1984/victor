@@ -24,8 +24,18 @@ from pathlib import Path
 
 from victor.tools.file_editor_tool import edit
 
+try:
+    from victor.tools.file_editor_tool import _is_file_editor_available
+
+    _has_victor_coding = _is_file_editor_available()
+except Exception:
+    _has_victor_coding = False
+
 # Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
+]
 
 
 class TestEditFiles:

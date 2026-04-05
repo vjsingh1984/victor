@@ -53,42 +53,56 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Protocol, Union
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
-
-# Import from canonical location to avoid circular dependencies
-from victor.protocols.team import IAgent
-from victor.teams.types import AgentMessage
-
-if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
+    from victor.teams.types import AgentMessage
 
 logger = logging.getLogger(__name__)
 
 
-class SubAgentRole(Enum):
-    """Role specialization for sub-agents.
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import SubAgentRole  # noqa: F401
 
-    Each role has specific capabilities and constraints:
 
-    - RESEARCHER: Read-only exploration (read, search, code_search, web_search)
-    - PLANNER: Task breakdown and planning (read, ls, search, plan_files)
-    - EXECUTOR: Code changes and execution (read, write, edit, shell, test, git)
-    - REVIEWER: Quality checks and testing (read, search, test, git_diff, shell)
-    - TESTER: Test writing and running (read, write to tests/, test, shell)
+# Local IAgent protocol to avoid circular import at runtime
+# The canonical IAgent is in victor.protocols.team but we can't import it
+# at module level due to circular dependencies
+class _IAgentProtocol(Protocol):
+    """Local IAgent protocol for type checking.
+
+    This protocol is used instead of importing IAgent from victor.protocols.team
+    to avoid circular import issues at module initialization time.
     """
 
-    RESEARCHER = "researcher"
-    PLANNER = "planner"
-    EXECUTOR = "executor"
-    REVIEWER = "reviewer"
-    TESTER = "tester"
+    @property
+    def id(self) -> str:
+        """Unique identifier for this agent."""
+        ...
+
+    @property
+    def role(self) -> Any:
+        """Role of this agent."""
+        ...
+
+    @property
+    def persona(self) -> Optional[Any]:
+        """Persona of this agent."""
+        ...
+
+    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+        """Execute a task using this agent."""
+        ...
+
+    async def receive_message(self, message: Any) -> Optional[Any]:
+        """Receive a message from another agent."""
+        ...
 
 
 @dataclass
@@ -162,7 +176,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent(IAgent):
+class SubAgent(_IAgentProtocol):  # type: ignore[misc]
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
@@ -317,6 +331,14 @@ class SubAgent(IAgent):
             # Note: We'll share the parent's DI container for now
             # In production, we might want isolated scoped containers
         )
+
+        # Inherit parent's vertical context via flyweight pattern
+        parent_vc = self._context.vertical_context
+        if parent_vc is not None and hasattr(parent_vc, "create_child_context"):
+            child_vc = parent_vc.create_child_context(
+                enabled_tools=set(self.config.allowed_tools),
+            )
+            orchestrator._vertical_context = child_vc
 
         # Set disable_embeddings flag for workflow service mode
         if self.config.disable_embeddings:
@@ -534,8 +556,8 @@ class SubAgent(IAgent):
                 tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute sub-agent context size: %s", e)
 
             return SubAgentResult(
                 success=False,
@@ -632,8 +654,8 @@ class SubAgent(IAgent):
                 tool_calls_used = getattr(self.orchestrator, "tool_calls_used", 0)
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

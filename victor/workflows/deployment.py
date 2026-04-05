@@ -894,20 +894,17 @@ class DockerDeploymentHandler(DeploymentHandler):
                 pass
 
         # Run container in background
-        loop = asyncio.get_event_loop()
-        container = await loop.run_in_executor(
-            None,
-            lambda: client.containers.run(
-                self.config.image,
-                detach=True,
-                environment=environment,
-                volumes=volumes if volumes else None,
-                network_mode=self.config.network,
-                mem_limit=mem_limit,
-                cpu_quota=cpu_quota,
-                # Keep container running for node execution
-                command="sleep infinity",
-            ),
+        container = await asyncio.to_thread(
+            client.containers.run,
+            self.config.image,
+            detach=True,
+            environment=environment,
+            volumes=volumes if volumes else None,
+            network_mode=self.config.network,
+            mem_limit=mem_limit,
+            cpu_quota=cpu_quota,
+            # Keep container running for node execution
+            command="sleep infinity",
         )
 
         self.container_id = container.id
@@ -941,11 +938,7 @@ class DockerDeploymentHandler(DeploymentHandler):
             f"print(json.dumps({{'node_id': '{node_id}', 'state': state}}))",
         ]
 
-        loop = asyncio.get_event_loop()
-        exit_code, output = await loop.run_in_executor(
-            None,
-            lambda: container.exec_run(exec_cmd),
-        )
+        exit_code, output = await asyncio.to_thread(container.exec_run, exec_cmd)
 
         if exit_code != 0:
             logger.error(f"Node execution failed with exit code {exit_code}")
@@ -965,9 +958,8 @@ class DockerDeploymentHandler(DeploymentHandler):
             try:
                 client = self._get_client()
                 container = client.containers.get(self.container_id)
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, container.stop)
-                await loop.run_in_executor(None, container.remove)
+                await asyncio.to_thread(container.stop)
+                await asyncio.to_thread(container.remove)
             except Exception as e:
                 logger.warning(f"Error cleaning up container: {e}")
             finally:
@@ -1057,10 +1049,10 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         )
 
         # Create pod
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: api.create_namespaced_pod(namespace=self._namespace, body=pod),
+        await asyncio.to_thread(
+            api.create_namespaced_pod,
+            namespace=self._namespace,
+            body=pod,
         )
 
         # Wait for pod to be running
@@ -1075,10 +1067,10 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            loop = asyncio.get_event_loop()
-            pod = await loop.run_in_executor(
-                None,
-                lambda: api.read_namespaced_pod(name=self.pod_name, namespace=self._namespace),
+            pod = await asyncio.to_thread(
+                api.read_namespaced_pod,
+                name=self.pod_name,
+                namespace=self._namespace,
             )
 
             if pod.status.phase == "Running":
@@ -1118,20 +1110,17 @@ class KubernetesDeploymentHandler(DeploymentHandler):
             f"print(json.dumps({{'node_id': '{node_id}', 'state': state}}))",
         ]
 
-        loop = asyncio.get_event_loop()
-        resp = await loop.run_in_executor(
-            None,
-            lambda: stream(
-                api.connect_get_namespaced_pod_exec,
-                self.pod_name,
-                self._namespace,
-                command=exec_command,
-                container="workflow-runner",
-                stderr=True,
-                stdin=False,
-                stdout=True,
-                tty=False,
-            ),
+        resp = await asyncio.to_thread(
+            stream,
+            api.connect_get_namespaced_pod_exec,
+            self.pod_name,
+            self._namespace,
+            command=exec_command,
+            container="workflow-runner",
+            stderr=True,
+            stdin=False,
+            stdout=True,
+            tty=False,
         )
 
         # Parse output if JSON
@@ -1148,13 +1137,10 @@ class KubernetesDeploymentHandler(DeploymentHandler):
             logger.info(f"Deleting K8s pod: {self.pod_name}")
             try:
                 api = self._get_api()
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: api.delete_namespaced_pod(
-                        name=self.pod_name,
-                        namespace=self._namespace,
-                    ),
+                await asyncio.to_thread(
+                    api.delete_namespaced_pod,
+                    name=self.pod_name,
+                    namespace=self._namespace,
                 )
             except Exception as e:
                 logger.warning(f"Error cleaning up pod: {e}")
@@ -1208,7 +1194,6 @@ class ECSDeploymentHandler(DeploymentHandler):
             }
 
         # Run ECS task
-        loop = asyncio.get_event_loop()
         run_params = {
             "cluster": self.config.cluster,
             "taskDefinition": self.config.task_definition,
@@ -1219,10 +1204,7 @@ class ECSDeploymentHandler(DeploymentHandler):
         if network_config:
             run_params["networkConfiguration"] = network_config
 
-        response = await loop.run_in_executor(
-            None,
-            lambda: client.run_task(**run_params),
-        )
+        response = await asyncio.to_thread(client.run_task, **run_params)
 
         if not response.get("tasks"):
             failures = response.get("failures", [])
@@ -1243,13 +1225,10 @@ class ECSDeploymentHandler(DeploymentHandler):
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: client.describe_tasks(
-                    cluster=self.config.cluster,
-                    tasks=[self.task_arn],
-                ),
+            response = await asyncio.to_thread(
+                client.describe_tasks,
+                cluster=self.config.cluster,
+                tasks=[self.task_arn],
             )
 
             if not response.get("tasks"):
@@ -1301,17 +1280,13 @@ class ECSDeploymentHandler(DeploymentHandler):
             f"print(json.dumps({{'node_id': '{node_id}', 'state': state}}))\""
         )
 
-        loop = asyncio.get_event_loop()
-
         try:
-            response = await loop.run_in_executor(
-                None,
-                lambda: client.execute_command(
-                    cluster=self.config.cluster,
-                    task=self.task_arn,
-                    interactive=False,
-                    command=exec_command,
-                ),
+            response = await asyncio.to_thread(
+                client.execute_command,
+                cluster=self.config.cluster,
+                task=self.task_arn,
+                interactive=False,
+                command=exec_command,
             )
 
             # ECS Exec returns a session - would need SSM to get output
@@ -1329,14 +1304,11 @@ class ECSDeploymentHandler(DeploymentHandler):
             logger.info(f"Stopping ECS task: {self.task_arn}")
             try:
                 client = self._get_client()
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: client.stop_task(
-                        cluster=self.config.cluster,
-                        task=self.task_arn,
-                        reason="Workflow execution completed",
-                    ),
+                await asyncio.to_thread(
+                    client.stop_task,
+                    cluster=self.config.cluster,
+                    task=self.task_arn,
+                    reason="Workflow execution completed",
                 )
             except Exception as e:
                 logger.warning(f"Error stopping ECS task: {e}")

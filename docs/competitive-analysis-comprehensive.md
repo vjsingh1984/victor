@@ -70,7 +70,7 @@
 | Dimension | Victor | LangGraph | CrewAI | LangChain | LlamaIndex | AutoGen |
 |-----------|--------|-----------|--------|-----------|------------|---------|
 | **16. Provider Support** | **10** | 9 | 7 | **10** | 8 | 6 |
-| *LLM breadth (22+ providers)* | 22 providers: OpenAI, Anthropic, Azure, Bedrock, Google, HuggingFace, Ollama, local models, etc. | Major providers via LangChain | OpenAI-focused, some Azure | **Broadest**: 50+ integrations | Major providers | OpenAI-focused |
+| *LLM breadth (24+ providers)* | 24 providers: OpenAI, Anthropic, Azure, Bedrock, Google, HuggingFace, Ollama, local models, etc. | Major providers via LangChain | OpenAI-focused, some Azure | **Broadest**: 50+ integrations | Major providers | OpenAI-focused |
 | **17. Production Readiness** | **7** | 9 | 6 | 9 | 8 | 5 |
 | *CI, security, monitoring, stability* | CI/testing, security scans, circuit breakers, health checks, but young framework | Google-backed, mature, deployed at scale | Growing, but early | **Most mature**: enterprise adoption | Mature for RAG | Research-oriented |
 | **18. Security (Guardrails)** | **9** | 6 | 5 | 7 | 6 | 4 |

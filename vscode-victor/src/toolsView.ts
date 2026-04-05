@@ -18,12 +18,6 @@ export interface ToolInfo {
     requires_approval: boolean;
 }
 
-interface ToolsResponse {
-    tools: ToolInfo[];
-    total: number;
-    categories: string[];
-}
-
 // Default tools to show when server is unavailable
 const DEFAULT_TOOLS: ToolInfo[] = [
     { name: 'read', description: 'Read file contents', category: 'Filesystem', cost_tier: 'free', parameters: {}, is_dangerous: false, requires_approval: false },

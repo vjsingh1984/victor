@@ -826,22 +826,13 @@
       "properties": {
         "victor.serverUrl": {
           "type": "string",
-          "default": "http://127.0.0.1:8000",
-          "description": "URL of the Victor server (deprecated, use serverPort instead)"
+          "default": "http://127.0.0.1:8765",
+          "description": "Full Victor server URL for remote or shared deployments. Overrides serverPort when set."
         },
         "victor.serverPort": {
           "type": "number",
           "default": 8765,
           "description": "Primary port for the Victor server"
-        },
-        "victor.serverBackend": {
-          "type": "string",
-          "enum": [
-            "aiohttp",
-            "fastapi"
-          ],
-          "default": "aiohttp",
-          "description": "Server backend: 'aiohttp' (legacy) or 'fastapi' (modern with OpenAPI docs at /docs)"
         },
         "victor.fallbackPorts": {
           "type": "array",

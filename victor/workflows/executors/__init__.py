@@ -23,10 +23,25 @@ Executors:
 - TransformNodeExecutor: Handles transform nodes (state transformations)
 - ParallelNodeExecutor: Handles parallel nodes (concurrent execution)
 - ConditionNodeExecutor: Handles condition nodes (branching logic)
+- TeamNodeExecutor: Handles team nodes (ad-hoc multi-agent teams)
+- HITLNodeExecutor: Handles HITL nodes (resume-time metadata + result recording)
+- Registry helpers: Support plugin/application registration of custom node types
 """
 
 from victor.workflows.executors.factory import NodeExecutorFactory
+from victor.workflows.executors.registry import (
+    WorkflowNodeExecutorRegistration,
+    WorkflowNodeExecutorRegistry,
+    clear_registered_workflow_node_executors,
+    get_workflow_node_executor_registry,
+    register_workflow_node_executor,
+)
 
 __all__ = [
     "NodeExecutorFactory",
+    "WorkflowNodeExecutorRegistration",
+    "WorkflowNodeExecutorRegistry",
+    "clear_registered_workflow_node_executors",
+    "get_workflow_node_executor_registry",
+    "register_workflow_node_executor",
 ]

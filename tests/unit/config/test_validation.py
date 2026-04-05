@@ -67,10 +67,13 @@ class TestValidationResult:
 
     def test_invalid_result(self):
         """Invalid result has errors."""
-        result = ValidationResult(is_valid=False, errors=[
-            ValidationError("Error 1"),
-            ValidationError("Error 2"),
-        ])
+        result = ValidationResult(
+            is_valid=False,
+            errors=[
+                ValidationError("Error 1"),
+                ValidationError("Error 2"),
+            ],
+        )
         assert not result.is_valid
         assert result.error_count == 2
 
@@ -111,11 +114,11 @@ class TestValidateEnvironment:
         # Clear API keys
         for key in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
             monkeypatch.delenv(key, raising=False)
-        
+
         # This test is context-dependent - skip if keys are set
         if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
             pytest.skip("API keys already set")
-        
+
         result = validate_environment()
         # Should have a warning about no API keys for cloud providers
         # (but this depends on settings, which we can't easily mock)
@@ -127,7 +130,7 @@ class TestValidatePaths:
     def test_missing_config_dir(self):
         """Missing config directory is an error."""
         from victor.config.settings import Settings
-        
+
         # Create settings with non-existent config dir
         settings = Settings()
         # We can't easily mock get_config_dir, so we'll just call the function
@@ -143,10 +146,10 @@ class TestValidateToolSettings:
     def test_negative_max_tools(self):
         """Negative fallback_max_tools is an error."""
         from victor.config.settings import Settings
-        
+
         settings = Settings()
         settings.fallback_max_tools = -1
-        
+
         result = validate_tool_settings(settings)
         has_invalid_error = any(
             "fallback_max_tools" in error.message or "budget" in error.message.lower()
@@ -157,14 +160,13 @@ class TestValidateToolSettings:
     def test_high_max_tools_warning(self):
         """Very high fallback_max_tools is a warning."""
         from victor.config.settings import Settings
-        
+
         settings = Settings()
         settings.fallback_max_tools = 100
-        
+
         result = validate_tool_settings(settings)
         has_high_warning = any(
-            "fallback_max_tools" in (error.field or "")
-            for error in result.errors
+            "fallback_max_tools" in (error.field or "") for error in result.errors
         )
         # Should have a warning about high tool budget
 
@@ -175,16 +177,13 @@ class TestValidatePerformanceSettings:
     def test_disabled_preloading_warning(self):
         """Disabled preloading generates warning."""
         from victor.config.settings import Settings
-        
+
         settings = Settings()
-        if hasattr(settings, 'framework_preload_enabled'):
+        if hasattr(settings, "framework_preload_enabled"):
             settings.framework_preload_enabled = False
-            
+
             result = validate_performance_settings(settings)
-            has_warning = any(
-                error.error_code == "PRELOAD_DISABLED"
-                for error in result.errors
-            )
+            has_warning = any(error.error_code == "PRELOAD_DISABLED" for error in result.errors)
             assert has_warning
 
 
@@ -200,10 +199,10 @@ class TestValidateConfiguration:
     def test_comprehensive_validation(self):
         """Comprehensive validation checks all categories."""
         from victor.config.settings import Settings
-        
+
         settings = Settings()
         result = validate_configuration(settings)
-        
+
         # Should have some result
         assert isinstance(result, ValidationResult)
         assert isinstance(result.errors, list)
@@ -220,9 +219,12 @@ class TestFormatValidationResult:
 
     def test_format_invalid_result(self):
         """Formatting invalid result shows errors."""
-        result = ValidationResult(is_valid=False, errors=[
-            ValidationError("Error 1", field="field1", suggestion="Fix it"),
-        ])
+        result = ValidationResult(
+            is_valid=False,
+            errors=[
+                ValidationError("Error 1", field="field1", suggestion="Fix it"),
+            ],
+        )
         formatted = format_validation_result(result)
         assert "Error 1" in formatted
         assert "field1" in formatted
@@ -230,8 +232,11 @@ class TestFormatValidationResult:
 
     def test_format_with_error_code(self):
         """Formatting with error code includes code."""
-        result = ValidationResult(is_valid=False, errors=[
-            ValidationError("Error", error_code="TEST_ERR"),
-        ])
+        result = ValidationResult(
+            is_valid=False,
+            errors=[
+                ValidationError("Error", error_code="TEST_ERR"),
+            ],
+        )
         formatted = format_validation_result(result)
         assert "TEST_ERR" in formatted

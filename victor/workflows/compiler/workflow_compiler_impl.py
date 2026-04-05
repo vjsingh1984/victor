@@ -12,131 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Concrete workflow compiler implementation.
-
-This module provides concrete implementations that can be registered
-in the DI container, bridging the gap between protocols and
-the legacy implementation.
-"""
+"""Backward-compatible concrete compiler facade for DI registration."""
 
 from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import Any
 
-if TYPE_CHECKING:
-    from victor.workflows.compiler_protocols import CompiledGraphProtocol
-
-logger = logging.getLogger(__name__)
+from victor.workflows.compiler.unified_compiler import WorkflowCompiler
 
 
-class WorkflowCompilerImpl:
-    """Concrete implementation of workflow compiler.
-
-    This class wraps the legacy YAMLToStateGraphCompiler and provides
-    a protocol-compliant interface that can be registered in the DI
-    container.
-
-    During migration, this delegates to the legacy implementation.
-    In Phase 8, this will be replaced with pure SOLID implementation.
-
-    Attributes:
-        _yaml_loader: Loads and parses YAML workflow definitions
-        _validator: Validates workflow structure
-        _node_factory: Creates executor functions for nodes
-
-    Example:
-        compiler = WorkflowCompilerImpl(yaml_loader, validator, node_factory)
-        compiled = compiler.compile("workflow.yaml")
-        result = await compiled.invoke({"input": "data"})
-    """
+class WorkflowCompilerImpl(WorkflowCompiler):
+    """Concrete compatibility wrapper around the shared compiler facade."""
 
     def __init__(
         self,
         yaml_loader: Any,
         validator: Any,
         node_factory: Any,
-    ):
-        """Initialize the compiler.
+    ) -> None:
+        """Initialize the backward-compatible compiler wrapper.
 
         Args:
             yaml_loader: YAMLWorkflowLoader instance
             validator: WorkflowValidator instance
             node_factory: NodeExecutorFactoryProtocol instance
         """
-        self._yaml_loader = yaml_loader
-        self._validator = validator
-        self._node_factory = node_factory
-
-    def compile(
-        self,
-        source: str,
-        *,
-        workflow_name: Optional[str] = None,
-        validate: bool = True,
-    ) -> "CompiledGraphProtocol":
-        """Compile a workflow from YAML source.
-
-        Args:
-            source: YAML file path or YAML string content
-            workflow_name: Name of workflow to compile (for multi-workflow files)
-            validate: Whether to validate workflow definition before compilation
-
-        Returns:
-            CompiledGraphProtocol: Executable compiled graph
-
-        Raises:
-            ValueError: If source is invalid or validation fails
-            FileNotFoundError: If YAML file doesn't exist
-
-        Example:
-            compiler = WorkflowCompilerImpl(...)
-            compiled = compiler.compile("workflow.yaml")
-            result = await compiled.invoke({"input": "data"})
-        """
-        logger.info(f"Compiling workflow: {source[:100]}...")
-
-        # For now, delegate to legacy implementation
-        return self._compile_legacy(source, workflow_name=workflow_name, validate=validate)
-
-    def _compile_legacy(
-        self,
-        source: str,
-        *,
-        workflow_name: Optional[str] = None,
-        validate: bool = True,
-    ) -> "CompiledGraphProtocol":
-        """Delegate to legacy implementation (temporary).
-
-        This will be replaced with pure SOLID implementation in Phase 8.
-        """
-        from victor.workflows.yaml_to_graph_compiler import YAMLToStateGraphCompiler
-
-        # Create legacy compiler
-        legacy_compiler = YAMLToStateGraphCompiler(
-            orchestrator=None,  # Will be set by execution context
-            orchestrators=None,  # Will be set by execution context
+        super().__init__(
+            yaml_loader=yaml_loader,
+            validator=validator,
+            node_executor_factory=node_factory,
         )
-
-        # Load YAML (pass workflow_name to select specific workflow if needed)
-        yaml_def = self._yaml_loader.load(source, workflow_name=workflow_name)
-
-        # If we got a dict of workflows (no workflow_name specified), use the first one
-        if isinstance(yaml_def, dict) and not hasattr(yaml_def, "nodes"):
-            if len(yaml_def) == 1:
-                yaml_def = next(iter(yaml_def.values()))
-            else:
-                raise ValueError(
-                    f"Multiple workflows found. Please specify workflow_name. "
-                    f"Available: {list(yaml_def.keys())}"
-                )
-
-        # Validate if requested
-        if validate and self._validator:
-            self._validator.validate(yaml_def)
-
-        # Compile using legacy implementation
-        return legacy_compiler.compile(yaml_def)
 
 
 __all__ = [

@@ -23,12 +23,13 @@ Usage:
     victor dashboard --no-live          # Disable live event streaming
 """
 
-import asyncio
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
+
+from victor.core.async_utils import run_sync
 
 dashboard_app = typer.Typer(
     name="dashboard",
@@ -93,7 +94,7 @@ def dashboard(
 
         setup_logging(command="dashboard", cli_log_level=log_level)
 
-        asyncio.run(
+        run_sync(
             run_dashboard(
                 log_file=log_file,
                 live=live,

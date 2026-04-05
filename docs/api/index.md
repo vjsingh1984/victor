@@ -10,7 +10,7 @@ Victor provides a comprehensive Python API for building agentic AI applications:
 - **StateGraph API**: Stateful workflow engine with conditional logic
 - **Tools API**: Tool registry and execution framework
 - **Configuration API**: Settings, profiles, and environment management
-- **Provider API**: 22 LLM provider adapters with unified interface
+- **Provider API**: 24 LLM provider adapters with unified interface
 - **Core APIs**: Events, State, Workflows, Multi-agent teams
 
 ## Quick Start

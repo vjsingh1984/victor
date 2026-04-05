@@ -94,55 +94,12 @@ class CommandResult:
 
 
 # Commands that should never be executed
-DANGEROUS_COMMANDS = frozenset(
-    {
-        "rm -rf /",
-        "rm -rf /*",
-        "dd",
-        "mkfs",
-        ":(){ :|:& };:",  # Fork bomb
-        "> /dev/sda",
-    }
+# Consolidated dangerous command detection — single source of truth.
+from victor.security.command_safety import (  # noqa: E402
+    DANGEROUS_COMMANDS,
+    DANGEROUS_PATTERNS,
+    is_dangerous_command,
 )
-
-# Patterns that indicate dangerous commands
-DANGEROUS_PATTERNS = (
-    "rm -rf /",
-    "rm -rf /*",
-    "rm -rf $HOME",
-    "rm -rf ~",
-    "dd if=/dev/",
-    "dd of=/dev/",
-    "mkfs.",
-    "> /dev/sd",
-    "wget | sh",
-    "wget | bash",
-    "curl | sh",
-    "curl | bash",
-    ":(){",  # Fork bomb variant
-    "chmod 777 /",
-    "chown root /",
-)
-
-
-def is_dangerous_command(command: str) -> bool:
-    """Check if a command is potentially dangerous.
-
-    Args:
-        command: Command string to check.
-
-    Returns:
-        True if the command is dangerous, False otherwise.
-    """
-    command_lower = command.lower().strip()
-
-    # Check exact matches
-    if command_lower in DANGEROUS_COMMANDS:
-        return True
-
-    # Check for dangerous patterns
-    return any(pattern in command_lower for pattern in DANGEROUS_PATTERNS)
-
 
 # =============================================================================
 # Tool Availability Checking
@@ -412,6 +369,7 @@ async def run_command_async(
             )
 
     try:
+        logger.debug("Executing command via shell: %.200s", command)
         process = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,

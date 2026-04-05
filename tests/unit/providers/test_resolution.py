@@ -164,10 +164,7 @@ class TestUnifiedApiKeyResolver:
                 result = resolver.get_api_key("deepseek")
 
                 # Check that keyring source shows "skipped"
-                keyring_sources = [
-                    s for s in result.sources_attempted
-                    if s.source == "keyring"
-                ]
+                keyring_sources = [s for s in result.sources_attempted if s.source == "keyring"]
                 assert len(keyring_sources) > 0
                 assert "skipped" in keyring_sources[0].description
 

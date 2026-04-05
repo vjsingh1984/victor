@@ -25,12 +25,68 @@ from victor.framework.vertical_service import (
     clear_vertical_integration_pipeline_cache,
     get_vertical_integration_pipeline,
 )
+from victor_sdk.constants import CapabilityIds
 
 
 class DummyVertical:
     """Minimal vertical type for service-level tests."""
 
     name = "dummy"
+
+
+class DefinitionOnlyVertical(VerticalBase):
+    """Vertical that supports the definition-layer contract."""
+
+    name = "definition_only"
+    description = "Definition only test vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_tools(cls):
+        return ["read", "write"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "Definition-only prompt"
+
+
+class CapabilityRequirementVertical(VerticalBase):
+    """Vertical that declares SDK capability requirements."""
+
+    name = "capability_requirements"
+    description = "Capability requirement test vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_tools(cls):
+        return ["read", "write", "edit", "grep"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "Capability requirement prompt"
+
+    @classmethod
+    def get_capability_requirements(cls):
+        return [
+            CapabilityIds.FILE_OPS,
+            {"capability_id": "not_registered_capability"},
+        ]
+
+
+class LegacyConfigOnlyVertical(VerticalBase):
+    """Vertical using standard VerticalBase protocol."""
+
+    name = "legacy_config_only"
+    description = "Legacy config only vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_tools(cls):
+        return ["read", "write"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "Legacy config only prompt"
 
 
 class VerticalWithServiceProvider(VerticalBase):
@@ -120,6 +176,62 @@ class TestVerticalService:
 
         assert result is expected
         pipeline.apply.assert_called_once_with(orchestrator, DummyVertical)
+
+    def test_apply_vertical_configuration_supports_definition_only_verticals(self):
+        """Shared application should create context through the direct vertical protocol."""
+        orchestrator = StubOrchestrator()
+        get_vertical_integration_pipeline(reset=True)
+
+        result = apply_vertical_configuration(
+            orchestrator,
+            DefinitionOnlyVertical,
+            source="sdk",
+        )
+
+        assert result.success is True
+        assert result.context is not None
+        assert result.context.config is not None
+        assert result.context.config.system_prompt == "Definition-only prompt"
+        assert result.context.config.tools.tools == {"read", "write"}
+
+    def test_apply_vertical_configuration_records_capability_requirement_diagnostics(self):
+        """Capability requirements should be resolved and surfaced during application."""
+        orchestrator = StubOrchestrator()
+        get_vertical_integration_pipeline(reset=True)
+
+        result = apply_vertical_configuration(
+            orchestrator,
+            CapabilityRequirementVertical,
+            source="sdk",
+        )
+
+        assert result.success is True
+        assert result.context is not None
+        resolutions = result.context.get_capability_config("sdk_capability_resolutions")
+        assert resolutions is not None
+        assert resolutions[0]["capability_id"] == CapabilityIds.FILE_OPS
+        assert resolutions[0]["available"] is True
+        assert resolutions[1]["capability_id"] == "not_registered_capability"
+        assert resolutions[1]["available"] is False
+        assert any("not_registered_capability" in warning for warning in result.warnings)
+
+    def test_apply_vertical_configuration_supports_legacy_config_only_verticals(self):
+        """VerticalBase verticals should work with the direct protocol path."""
+        orchestrator = StubOrchestrator()
+        get_vertical_integration_pipeline(reset=True)
+
+        result = apply_vertical_configuration(
+            orchestrator,
+            LegacyConfigOnlyVertical,
+            source="sdk",
+        )
+
+        assert result.success is True
+        assert result.vertical_name == "legacy_config_only"
+        assert result.context is not None
+        assert result.context.config is not None
+        assert result.context.config.system_prompt == "Legacy config only prompt"
+        assert result.context.config.tools.tools == {"read", "write"}
 
     def test_clear_vertical_integration_pipeline_cache_delegates_to_pipeline(self):
         """Cache clear helper should delegate to shared pipeline clear_cache()."""

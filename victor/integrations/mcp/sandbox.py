@@ -132,21 +132,10 @@ def _setup_sandbox_env(config: SandboxConfig) -> Dict[str, str]:
     """
     env = os.environ.copy()
 
-    # Clear sensitive environment variables
-    sensitive_vars = [
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
-        "ANTHROPIC_API_KEY",
-        "OPENAI_API_KEY",
-        "GOOGLE_API_KEY",
-        "DEEPSEEK_API_KEY",
-        "MOONSHOT_API_KEY",
-        "XAI_API_KEY",
-        "DATABASE_URL",
-        "REDIS_URL",
-    ]
+    # Clear sensitive environment variables — uses consolidated list.
+    from victor.security.env_filtering import SENSITIVE_ENV_VARS
 
-    for var in sensitive_vars:
+    for var in SENSITIVE_ENV_VARS:
         env.pop(var, None)
 
     # Set custom temp directory if specified

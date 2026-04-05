@@ -35,23 +35,26 @@
 │ ~82K LOC         │ │ verticals/ ~4K   │ │ ~19K LOC               │
 │                  │ │ + 9 verticals    │ │                        │
 │ Orchestrator     │ │ ~15K LOC         │ │ EventSourcing (1076)   │
-│  (4053 lines)    │ │                  │ │ CQRS (914)             │
+│  (3940 lines)    │ │                  │ │ CQRS (914)             │
 │ ├─ChatCoord      │ │ VerticalBase     │ │ Middleware (905)        │
 │ ├─ToolCoord      │◄┤ ├─get_tools()   │ │ Container (539)        │
 │ ├─SessionCoord   │ │ ├─get_prompt()  │ │ Bootstrap (662)        │
 │ ├─MetricsCoord   │ │ └─get_extensions│ │ Protocols (505)        │
-│ └─ProviderCoord  │ │   ├─middleware  │ │                        │
-│                  │ │   ├─safety      │ │ Events/                │
-│ ToolPipeline     │ │   ├─rl_config   │ │ ├─taxonomy.py (626)    │
-│ ToolExecutor     │ │   ├─team_spec   │ │ ├─backends.py (1173)   │
-│ ToolSelector     │ │   └─11 types    │ │ └─protocols.py (492)   │
+│ ├─CallbackCoord  │ │   ├─middleware  │ │                        │
+│ ├─PropertyFacade │ │   ├─safety      │ │ Events/                │
+│ ├─InitPhaseMgr   │ │   ├─rl_config   │ │ ├─taxonomy.py (626)    │
+│ └─ProviderCoord  │ │   ├─team_spec   │ │ ├─backends.py (1173)   │
+│                  │ │   └─11 types    │ │ └─protocols.py (492)   │
+│ ToolPipeline     │ │                  │ │                        │
+│ ToolExecutor     │ │                  │ │                        │
+│ ToolSelector     │ │                  │ │                        │
 └────────┬─────────┘ └────────┬────────┘ └────────────────────────┘
          │                    │
          ▼                    ▼
 ┌──────────────────┐ ┌──────────────────┐
 │ TOOLS            │ │ PROVIDERS        │
 │ victor/tools/    │ │ victor/providers/│
-│ 33 modules       │ │ 22 adapters      │
+│ 34 modules       │ │ 24 adapters      │
 │ ~68 files        │ │                  │
 └──────────────────┘ └──────────────────┘
 ```
@@ -85,7 +88,7 @@
 
 | Location | Issue | Fix |
 |----------|-------|-----|
-| `orchestrator.py` (4,053 LOC) | Still coordinates too many concerns despite Phase 0-3 | Continue extraction; Phase 4 should split `_handle_tool_calls` (187 lines) into ExecutionCoordinator |
+| `orchestrator.py` (3,940 LOC) | Thin facade after Phase 3B/3C extraction of 37 properties + callbacks + session state. 21 coordinators + 8 runtime boundaries. | Further extraction possible but diminishing returns; current LOC is acceptable |
 | `ChatCoordinator` (~1,800 LOC) | Manages both streaming and non-streaming chat plus recovery | Split into `StreamingChatCoordinator` and `SyncChatCoordinator` |
 | `VerticalBase.get_config()` (template method) | Assembles tools + prompt + stages + hints + modes in one method | Already mitigated by composition with 3 providers; acceptable |
 
@@ -124,7 +127,7 @@ The 13 protocol modules in `victor/core/verticals/protocols/` (SafetyExtensionPr
 | Path | Risk | Mitigation |
 |------|------|------------|
 | **Tool selection per turn** (`ToolSelector.select_tools()`) | Semantic selection calls embedding service on every turn | Already cached via `ToolResultCache` with FAISS; monitor cache hit rate |
-| **VerticalExtensionLoader** | 11 extension types loaded lazily, but `get_extensions()` called on every agent creation | Per-class caching with composite keys is effective; verify no cache invalidation storms |
+| **VerticalExtensionLoader** (1,897 LOC, decomposed into ExtensionModuleResolver + ExtensionCacheManager + CapabilityNegotiator) | 11 extension types loaded lazily, but `get_extensions()` called on every agent creation | Per-class caching with composite keys is effective; verify no cache invalidation storms |
 | **ConversationEmbeddingStore.initialize()** | LanceDB init is fire-and-forget async; if slow, first queries block | Already uses singleton + async init; add timeout guard |
 | **Middleware pipeline per tool call** | Each tool call traverses full middleware chain | Chain is short (2-4 middlewares typically); acceptable unless middleware does I/O |
 
@@ -158,7 +161,7 @@ The 13 protocol modules in `victor/core/verticals/protocols/` (SafetyExtensionPr
 | **Workflow/Graph Engine** (15%) | **8** | 10 | 5 | 6 | 4 | 6 |
 | *Rationale* | StateGraph + YAML DSL + HITL + checkpoints | Best-in-class graph engine | Sequential/hierarchical only | LCEL chains, no graph | No native workflow engine | Basic conversation flows |
 | **Tool System** (15%) | **9** | 6 | 7 | 8 | 6 | 5 |
-| *Rationale* | 33 built-in, semantic selection, RL optimization, tiered | Define-your-own only | Task-based tools, decent | Large tool ecosystem | Tool abstractions exist | Function calling only |
+| *Rationale* | 34 built-in, semantic selection, RL optimization, tiered | Define-your-own only | Task-based tools, decent | Large tool ecosystem | Tool abstractions exist | Function calling only |
 | **Multi-Agent** (15%) | **8** | 7 | 9 | 4 | 3 | 8 |
 | *Rationale* | 5 formations, team specs, message bus, personas | Supervisor pattern | Best multi-agent UX | No native multi-agent | No multi-agent | Native multi-agent conversation |
 | **Extensibility** (15%) | **9** | 7 | 6 | 8 | 7 | 5 |
@@ -219,4 +222,4 @@ Victor leads on breadth (agent + tools + observability + extensibility). LangGra
 
 ---
 
-*Analysis performed on codebase at commit `cbc4c33b1` (2026-02-17). Orchestrator at 4,053 LOC after Phase 0-3 decomposition (42.4% reduction from 7,032 peak).*
+*Analysis performed on codebase at commit `cbc4c33b1` (2026-02-17). Orchestrator at 4,053 LOC after Phase 0-3 decomposition (42.4% reduction from 7,032 peak). Updated 2026-03-15: Orchestrator further reduced to 3,940 LOC (44.0% reduction from peak) via OrchestratorPropertyFacade (37 properties), CallbackCoordinator, and session state extraction.*

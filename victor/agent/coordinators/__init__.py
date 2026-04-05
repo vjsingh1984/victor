@@ -48,6 +48,8 @@ from victor.agent.coordinators.tool_coordinator import (
     IToolCoordinator,
     create_tool_coordinator,
 )
+from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+from victor.agent.coordinators.tool_retry import ToolRetryExecutor
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.agent.coordinators.chat_protocols import (
     ChatContextProtocol,
@@ -95,6 +97,7 @@ from victor.agent.coordinators.safety_coordinator import (
     SafetyCategory,
 )
 from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 
 __all__ = [
     "ChatCoordinator",
@@ -135,4 +138,9 @@ __all__ = [
     "SafetyAction",
     "SafetyCategory",
     "MetricsCoordinator",
+    # E1 M3: Extracted from ToolCoordinator
+    "ToolObservabilityHandler",
+    "ToolRetryExecutor",
+    # Phase 6: System prompt business logic extraction
+    "SystemPromptCoordinator",
 ]

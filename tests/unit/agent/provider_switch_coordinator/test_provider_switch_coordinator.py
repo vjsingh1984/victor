@@ -20,6 +20,7 @@ from typing import Any, Dict, Optional
 
 from victor.agent.provider.switcher import ProviderSwitcher, ProviderSwitcherState
 from victor.agent.provider.health_monitor import ProviderHealthMonitor
+from victor.core.async_utils import run_sync as real_run_sync
 from victor.core.events.protocols import MessagingEvent
 
 
@@ -300,6 +301,53 @@ class TestProviderSwitchCoordinator:
         # Verify hook was called
         assert len(hooks_called) == 1
         assert "post_switch" in hooks_called
+
+    def test_execute_post_switch_hooks_bridges_sync_context(self, coordinator):
+        """Legacy hook execution should use the shared sync bridge."""
+        coordinator._current_provider = "anthropic"
+        coordinator._current_model = "claude-sonnet"
+        coordinator._execute_hooks = AsyncMock(return_value=None)
+
+        from unittest.mock import patch
+
+        with patch(
+            "victor.agent.provider_switch_coordinator.run_sync",
+            wraps=real_run_sync,
+        ) as run_sync_mock:
+            coordinator._execute_post_switch_hooks()
+
+        run_sync_mock.assert_called_once()
+        coordinator._execute_hooks.assert_awaited_once()
+
+    def test_execute_post_switch_hooks_schedules_on_running_loop(self, coordinator):
+        """Legacy hook execution should schedule onto an active event loop."""
+        coordinator._current_provider = "anthropic"
+        coordinator._current_model = "claude-sonnet"
+        coordinator._execute_hooks = AsyncMock(return_value=None)
+        scheduled = []
+        loop = MagicMock()
+
+        def capture_task(coro):
+            scheduled.append(coro)
+            coro.close()
+            return MagicMock()
+
+        loop.create_task.side_effect = capture_task
+
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "victor.agent.provider_switch_coordinator.asyncio.get_running_loop",
+                return_value=loop,
+            ),
+            patch("victor.agent.provider_switch_coordinator.run_sync") as run_sync_mock,
+        ):
+            coordinator._execute_post_switch_hooks()
+
+        assert len(scheduled) == 1
+        run_sync_mock.assert_not_called()
+        coordinator._execute_hooks.assert_called_once()
 
 
 class TestProviderSwitchCoordinatorIntegration:

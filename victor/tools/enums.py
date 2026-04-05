@@ -15,6 +15,10 @@
 """Enumerations for tool framework."""
 
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.severity import SeverityLevel
 
 # Lazy-loaded presentation adapter for icons
 _presentation = None
@@ -273,6 +277,16 @@ class DangerLevel(Enum):
             return f"{_get_icon('warning')} WARNING: This is a potentially destructive operation."
         else:  # CRITICAL
             return f"{_get_icon('stop')} DANGER: This operation may cause irreversible changes!"
+
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel.
+
+        Returns:
+            Corresponding SeverityLevel from victor.core.severity.
+        """
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_danger_level(self)
 
 
 class SchemaLevel(str, Enum):

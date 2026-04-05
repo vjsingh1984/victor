@@ -14,6 +14,7 @@
 
 """Tests for the modular slash command system (victor.ui.slash)."""
 
+from datetime import datetime
 import io
 import pytest
 from unittest.mock import MagicMock, AsyncMock
@@ -289,6 +290,29 @@ class TestSlashCommandHandlerExecute:
         result = await handler.execute("/?")  # Alias for help
         assert result is True
 
+    def test_execute_sync_runs_async_execute(self):
+        """execute_sync bridges async execution from sync contexts."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+        handler.execute = AsyncMock(return_value=True)
+
+        result = handler.execute_sync("/help")
+
+        assert result is True
+        handler.execute.assert_awaited_once_with("/help")
+
+    @pytest.mark.asyncio
+    async def test_execute_sync_rejects_async_context(self):
+        """execute_sync rejects nested event-loop usage."""
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+        handler.execute = AsyncMock(return_value=True)
+
+        with pytest.raises(RuntimeError, match="Cannot use run_sync\\(\\)"):
+            handler.execute_sync("/help")
+
 
 class TestSlashCommandHandlerHelp:
     """Tests for help command."""
@@ -319,6 +343,21 @@ class TestSlashCommandHandlerHelp:
 
         # Should show model command info
         assert "model" in output.lower()
+
+    @pytest.mark.asyncio
+    async def test_help_graph_tool_modes(self):
+        """Test help can describe graph tool call modes."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        await handler.execute("/help graph")
+        output = stdout.getvalue().lower()
+
+        assert "callers" in output
+        assert "callees" in output
+        assert "trace" in output
 
 
 class TestSlashCommandHandlerClear:
@@ -745,6 +784,19 @@ class TestSystemCommands:
         assert "?" in meta.aliases
         assert meta.category == "system"
 
+    def test_handler_get_help_supports_graph_tool(self):
+        """Test programmatic help includes embedded graph tool guidance."""
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        handler = SlashCommandHandler(console=console, settings=settings)
+
+        output = handler.get_help("graph").lower()
+
+        assert "callers" in output
+        assert "callees" in output
+        assert "trace" in output
+
     def test_config_command_metadata(self):
         """Test ConfigCommand metadata."""
         from victor.ui.slash.commands.system import ConfigCommand
@@ -884,6 +936,104 @@ class TestModelCommands:
 
         assert meta.name == "provider"
         assert meta.category in ["model", "system", "general"]
+
+    @pytest.mark.asyncio
+    async def test_model_command_awaits_switch_model(self):
+        """ModelCommand uses the async model-switch API."""
+        from victor.ui.slash.commands.model import ModelCommand
+
+        console = Console(file=io.StringIO())
+        settings = MagicMock()
+        agent = MagicMock()
+        agent.switch_model = AsyncMock(return_value=True)
+        agent.get_current_provider_info.return_value = {
+            "native_tool_calls": True,
+            "thinking_mode": False,
+        }
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["claude-3.7-sonnet"],
+        )
+
+        await ModelCommand().execute(ctx)
+
+        agent.switch_model.assert_awaited_once_with("claude-3.7-sonnet")
+
+
+class TestCheckpointCommands:
+    """Tests for checkpoint slash commands."""
+
+    def test_checkpoint_command_metadata(self):
+        """CheckpointCommand is registered as an async command."""
+        from victor.ui.slash.commands.checkpoint import CheckpointCommand
+
+        cmd = CheckpointCommand()
+        meta = cmd.metadata
+
+        assert meta.name == "checkpoint"
+        assert meta.is_async is True
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_save_awaits_agent_api(self):
+        """Checkpoint save uses the async agent API directly."""
+        from victor.ui.slash.commands.checkpoint import CheckpointCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        agent = MagicMock()
+        agent.checkpoint_manager = MagicMock()
+        agent.save_checkpoint = AsyncMock(return_value="ckpt_1234567890")
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["save", "before", "refactor"],
+        )
+
+        await CheckpointCommand().execute(ctx)
+
+        agent.save_checkpoint.assert_awaited_once_with(description="before refactor")
+        assert "Checkpoint saved successfully" in stdout.getvalue()
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_list_awaits_manager_api(self):
+        """Checkpoint list uses the async checkpoint-manager API directly."""
+        from victor.ui.slash.commands.checkpoint import CheckpointCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        checkpoint = MagicMock()
+        checkpoint.checkpoint_id = "ckpt_1234567890abcdef"
+        checkpoint.timestamp = datetime(2026, 3, 27, 12, 34)
+        checkpoint.stage = "ACTIVE"
+        checkpoint.tool_count = 3
+        checkpoint.message_count = 7
+        checkpoint.description = "snapshot"
+
+        checkpoint_manager = MagicMock()
+        checkpoint_manager.list_checkpoints = AsyncMock(return_value=[checkpoint])
+
+        agent = MagicMock()
+        agent.checkpoint_manager = checkpoint_manager
+        agent._memory_session_id = "session-123"
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["list", "5"],
+        )
+
+        await CheckpointCommand().execute(ctx)
+
+        checkpoint_manager.list_checkpoints.assert_awaited_once_with("session-123", limit=5)
+        assert "Checkpoints" in stdout.getvalue()
 
 
 # =============================================================================

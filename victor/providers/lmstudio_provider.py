@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -249,7 +251,9 @@ class LMStudioProvider(BaseProvider):
         self._model_tool_support_cache[model] = supports
 
         if not supports:
-            self._provider_logger.logger.debug(f"LMStudio: Model {model} does not support native tool calling")
+            self._provider_logger.logger.debug(
+                f"LMStudio: Model {model} does not support native tool calling"
+            )
 
         return supports
 
@@ -352,7 +356,9 @@ class LMStudioProvider(BaseProvider):
                 context_window = self._extract_context_window(match)
 
         except Exception as exc:
-            self._provider_logger.logger.warning(f"Failed to discover capabilities for {model} on {self.base_url}: {exc}")
+            self._provider_logger.logger.warning(
+                f"Failed to discover capabilities for {model} on {self.base_url}: {exc}"
+            )
 
         from victor.config.config_loaders import get_provider_limits
 
@@ -447,14 +453,16 @@ class LMStudioProvider(BaseProvider):
                         self._models_available = False
                     return url
             except Exception as exc:
-                self._provider_logger.logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
+                self._provider_logger.logger.warning(
+                    f"LMStudio endpoint {url} not reachable ({exc}); trying next."
+                )
 
         fallback = (
             base_url
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        self._provider_logger.logger.error(
+        logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback
@@ -512,26 +520,26 @@ class LMStudioProvider(BaseProvider):
                     models = data.get("data", [])
                     if models:
                         model_names = [m.get("id", "unknown") for m in models[:3]]
-                        self._provider_logger.logger.info(
+                        logger.info(
                             f"LMStudio base URL selected (async): {url} "
                             f"(models: {', '.join(model_names)}{'...' if len(models) > 3 else ''})"
                         )
                         return url, True
                     else:
-                        self._provider_logger.logger.warning(
+                        logger.warning(
                             f"LMStudio server at {url} has NO MODELS LOADED. "
                             "Please load a model in LMStudio before using this provider."
                         )
                         return url, False
             except Exception as exc:
-                self._provider_logger.logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
+                logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
 
         fallback = (
             base_url
             if isinstance(base_url, str)
             else str(base_url[0]) if base_url else "http://127.0.0.1:1234"
         )
-        self._provider_logger.logger.error(
+        logger.error(
             f"No LMStudio endpoints reachable from: {candidates}. Falling back to {fallback}"
         )
         return fallback, None
@@ -652,9 +660,9 @@ class LMStudioProvider(BaseProvider):
                 elif status_code == 429:
                     raise ProviderRateLimitError(
                         message=(
-                            f"LMStudio rate limit exceeded (429). "
-                            f"The server is receiving too many requests. "
-                            f"Try again later."
+                            "LMStudio rate limit exceeded (429). "
+                            "The server is receiving too many requests. "
+                            "Try again later."
                         ),
                         provider=self.name,
                         status_code=429,
@@ -800,7 +808,9 @@ class LMStudioProvider(BaseProvider):
                                         f"LMStudio: Extracted {len(thinking)} chars of thinking"
                                     )
 
-                            self._provider_logger.logger.debug(f"LMStudio stream complete after {line_count} lines")
+                            self._provider_logger.logger.debug(
+                                f"LMStudio stream complete after {line_count} lines"
+                            )
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(
@@ -822,7 +832,9 @@ class LMStudioProvider(BaseProvider):
                             yield chunk
 
                         except json.JSONDecodeError:
-                            self._provider_logger.logger.warning(f"LMStudio JSON decode error on line: {line[:100]}")
+                            self._provider_logger.logger.warning(
+                                f"LMStudio JSON decode error on line: {line[:100]}"
+                            )
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -856,9 +868,9 @@ class LMStudioProvider(BaseProvider):
             elif status_code == 429:
                 raise ProviderRateLimitError(
                     message=(
-                        f"LMStudio rate limit exceeded (429) during streaming. "
-                        f"The server is receiving too many requests. "
-                        f"Try again later."
+                        "LMStudio rate limit exceeded (429) during streaming. "
+                        "The server is receiving too many requests. "
+                        "Try again later."
                     ),
                     provider=self.name,
                     status_code=429,
@@ -1115,7 +1127,9 @@ class LMStudioProvider(BaseProvider):
             if thinking:
                 metadata = {"reasoning_content": thinking}
                 content = main_content
-                self._provider_logger.logger.debug(f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}")
+                self._provider_logger.logger.debug(
+                    f"LMStudio: Extracted {len(thinking)} chars of thinking from {model}"
+                )
 
         # Fallback: Check if content contains JSON tool call
         if not tool_calls and content:

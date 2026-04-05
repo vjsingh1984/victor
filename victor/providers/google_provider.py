@@ -20,9 +20,12 @@ Note: This module uses the new google-genai SDK (google.genai) instead of
 the deprecated google-generativeai package.
 """
 
+import logging
 import os
 import warnings
 from typing import Any, AsyncIterator, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Suppress Google SDK warning about non-text parts (we handle it correctly)
 warnings.filterwarnings(
@@ -144,7 +147,7 @@ class GoogleProvider(BaseProvider):
 
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
-                "google-genai package not installed. Install with: pip install google-genai"
+                "google-genai package not installed. Install with: pip install victor[google]"
             )
 
         # Log provider initialization

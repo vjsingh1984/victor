@@ -39,7 +39,10 @@ Example usage:
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Pattern, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Pattern, Tuple
+
+if TYPE_CHECKING:
+    from victor.core.severity import SeverityLevel
 
 # Rust-accelerated secret scanning (with Python fallback)
 _RUST_SECRETS_AVAILABLE = False
@@ -62,6 +65,12 @@ class SecretSeverity(Enum):
     HIGH = "high"  # API tokens, passwords
     MEDIUM = "medium"  # Generic secrets
     LOW = "low"  # Potentially sensitive
+
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_secret_severity(self)
 
 
 @dataclass

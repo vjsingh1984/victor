@@ -50,7 +50,7 @@ class ModelCommand(BaseSlashCommand):
         if ctx.args:
             # Switch model
             model_name = ctx.args[0]
-            if ctx.agent.switch_model(model_name):
+            if await ctx.agent.switch_model(model_name):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(f"[green]Switched to model:[/] [cyan]{model_name}[/]")
                 ctx.console.print(

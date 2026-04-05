@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import logging
 import time
-import uuid
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -57,13 +56,14 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
+    from victor.framework.graph import CheckpointerProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.yaml_to_graph_compiler import (
-        CompilerConfig,
-        YAMLToStateGraphCompiler,
-    )
-    from victor.framework.graph import CheckpointerProtocol
+from victor.workflows.yaml_to_graph_compiler import (
+    CompilerConfig,
+    YAMLToStateGraphCompiler,
+)
+from victor.workflows.runtime_types import WorkflowState, create_initial_workflow_state
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +255,6 @@ class StateGraphExecutor:
         logger.info(f"Executing workflow '{workflow.name}'")
 
         try:
-            from victor.workflows.yaml_to_graph_compiler import WorkflowState
-
             compiler = self._get_compiler()
 
             # Override checkpointer if provided
@@ -273,21 +271,11 @@ class StateGraphExecutor:
             # Compile workflow to StateGraph
             compiled = compiler.compile(workflow)
 
-            # Prepare initial state
-            state: WorkflowState = {
-                "_workflow_id": thread_id or uuid.uuid4().hex,
-                "_current_node": workflow.start_node or "",
-                "_node_results": {},
-                "_error": None,
-                "_iteration": 0,
-                "_parallel_results": {},
-                "_hitl_pending": False,
-                "_hitl_response": None,
-            }
-
-            # Merge user context
-            for key, value in (initial_context or {}).items():
-                state[key] = value
+            state = create_initial_workflow_state(
+                workflow_id=thread_id,
+                current_node=workflow.start_node or "",
+                initial_state=initial_context,
+            )
 
             # Execute
             result = await compiled.invoke(state, thread_id=thread_id)
@@ -330,25 +318,14 @@ class StateGraphExecutor:
         Yields:
             Tuple of (node_id, current_state) after each node execution
         """
-        from victor.workflows.yaml_to_graph_compiler import WorkflowState
-
         compiler = self._get_compiler()
         compiled = compiler.compile(workflow)
 
-        # Prepare initial state
-        state: WorkflowState = {
-            "_workflow_id": thread_id or uuid.uuid4().hex,
-            "_current_node": workflow.start_node or "",
-            "_node_results": {},
-            "_error": None,
-            "_iteration": 0,
-            "_parallel_results": {},
-            "_hitl_pending": False,
-            "_hitl_response": None,
-        }
-
-        for key, value in (initial_context or {}).items():
-            state[key] = value
+        state = create_initial_workflow_state(
+            workflow_id=thread_id,
+            current_node=workflow.start_node or "",
+            initial_state=initial_context,
+        )
 
         # Stream execution
         async for node_id, current_state in compiled.stream(state, thread_id=thread_id):

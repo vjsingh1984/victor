@@ -27,8 +27,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Union
 
-# Import canonical ConversationStage from conversation_state.py (single source of truth)
-from victor.agent.conversation_state import ConversationStage
+# Import canonical ConversationStage from shared_types (single source of truth)
+from victor.core.shared_types import ConversationStage
 
 if TYPE_CHECKING:
     from victor.framework.protocols import OrchestratorProtocol

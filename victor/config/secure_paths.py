@@ -33,6 +33,8 @@ Usage:
     safe_path = safe_resolve_path(user_path, expected_parent=victor_dir)
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import platform

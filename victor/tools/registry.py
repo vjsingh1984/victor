@@ -15,10 +15,15 @@
 """Tool registry for managing available tools."""
 
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
+
+if TYPE_CHECKING:
+    from victor.tools.registration.strategies import ToolRegistrationStrategy
+    from victor.tools.registration.registry import ToolRegistrationStrategyRegistry
 
 
 class HookError(Exception):
@@ -89,15 +94,35 @@ class ToolRegistry(BaseRegistry[str, Any]):
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
         self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
-        self._after_hooks: List[Union[Hook, Callable]] = []
+        self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
-        # Schema cache: (enabled_tool_names_tuple, schemas_list) for both enabled/all modes
-        # Key is (only_enabled: bool), value is (tool_names_tuple, schemas_list)
-        self._schema_cache: Dict[bool, Optional[Tuple[Tuple[str, ...], List[Dict[str, Any]]]]] = {
+        # Schema cache: version-counter based invalidation for O(1) cache checks.
+        # Key is (only_enabled: bool), value is (version_at_cache_time, schemas_list)
+        self._schema_cache: Dict[bool, Optional[Tuple[int, List[Dict[str, Any]]]]] = {
             True: None,  # Cache for only_enabled=True
             False: None,  # Cache for only_enabled=False
         }
+        self._schema_cache_version: int = 0
         self._schema_cache_lock = threading.RLock()
+        self._batch_mode: bool = False
+        self._batch_dirty: bool = False
+
+        # Strategy pattern support (when flag enabled)
+        # Initialize strategy registry if flag is enabled
+        self._strategy_registry: Optional["ToolRegistrationStrategyRegistry"] = None
+        try:
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+            if get_feature_flag_manager().is_enabled(
+                FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
+            ):
+                from victor.tools.registration.registry import (
+                    get_tool_registration_strategy_registry,
+                )
+
+                self._strategy_registry = get_tool_registration_strategy_registry()
+        except ImportError:
+            pass  # Feature flags not available
 
     @property
     def _tools(self) -> Dict[str, Any]:
@@ -110,14 +135,19 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._items = value
 
     def _invalidate_schema_cache(self) -> None:
-        """Invalidate the schema cache.
+        """Invalidate the schema cache by bumping the version counter.
 
         Called when tools are registered, unregistered, enabled, or disabled.
-        Thread-safe using the schema cache lock.
+        Thread-safe using the schema cache lock. Uses O(1) version counter
+        instead of rebuilding tool name tuples for validation.
+
+        If batch_update() is active, defers invalidation until the batch ends.
         """
+        if self._batch_mode:
+            self._batch_dirty = True
+            return
         with self._schema_cache_lock:
-            self._schema_cache[True] = None
-            self._schema_cache[False] = None
+            self._schema_cache_version += 1
 
     def _wrap_hook(
         self, hook: Union[Hook, Callable], critical: bool = False, name: str = ""
@@ -172,6 +202,10 @@ class ToolRegistry(BaseRegistry[str, Any]):
         The first form is preferred for tool registration; the second allows
         ToolRegistry to be used where BaseRegistry is expected.
 
+        When feature flag USE_STRATEGY_BASED_TOOL_REGISTRATION is enabled,
+        this method uses the strategy pattern to automatically determine the
+        appropriate registration strategy based on the tool type.
+
         Args:
             *args: Either (tool,) or (key, value)
             enabled: Whether the tool is enabled by default (default: True)
@@ -184,6 +218,19 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if len(args) == 1:
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
+
+            # Check feature flag for strategy-based registration
+            try:
+                from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+                if get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
+                ):
+                    return self._register_with_strategy(tool, enabled)
+            except ImportError:
+                pass  # Feature flags not available
+
+            # Use existing implementation
             if hasattr(tool, "Tool"):  # It's a decorated function
                 tool_instance = tool.Tool
                 super().register(tool_instance.name, tool_instance)
@@ -207,6 +254,75 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         # Invalidate schema cache after registration
         self._invalidate_schema_cache()
+
+    def _register_with_strategy(self, tool: Any, enabled: bool) -> None:
+        """Register using strategy pattern.
+
+        Args:
+            tool: Tool to register
+            enabled: Whether tool is enabled
+        """
+        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+
+        if self._strategy_registry is None:
+            self._strategy_registry = get_tool_registration_strategy_registry()
+
+        strategy = self._strategy_registry.get_strategy_for(tool)
+        if strategy is None:
+            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
+
+        strategy.register(self, tool, enabled)
+        self._invalidate_schema_cache()
+
+    def _register_direct(self, name: str, tool: Any, enabled: bool = True) -> None:
+        """Directly register a tool by name (used by strategies).
+
+        This method is called by registration strategies to perform
+        the actual registration with the BaseRegistry.
+
+        Args:
+            name: Tool name
+            tool: Tool instance
+            enabled: Whether tool is enabled
+        """
+        super().register(name, tool)
+        self._tool_enabled[name] = enabled
+        self._invalidate_schema_cache()
+
+    def add_custom_strategy(self, strategy: "ToolRegistrationStrategy") -> None:
+        """Add a custom registration strategy.
+
+        Allows extending tool registration without modifying core code.
+
+        Example:
+            class PydanticModelStrategy:
+                def can_handle(self, tool):
+                    try:
+                        from pydantic import BaseModel
+                        return isinstance(tool, BaseModel)
+                    except ImportError:
+                        return False
+
+                def register(self, registry, tool, enabled=True):
+                    wrapper = self._create_wrapper(tool)
+                    registry._register_direct(wrapper.name, wrapper, enabled)
+
+                @property
+                def priority(self):
+                    return 75
+
+            registry = ToolRegistry()
+            registry.add_custom_strategy(PydanticModelStrategy())
+
+        Args:
+            strategy: Strategy to add
+        """
+        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+
+        if self._strategy_registry is None:
+            self._strategy_registry = get_tool_registration_strategy_registry()
+
+        self._strategy_registry.register_strategy(strategy)
 
     # Alias for backwards compatibility with code using register_tool()
     def register_tool(self, tool: Any, enabled: bool = True) -> None:
@@ -341,6 +457,34 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         return self._tool_enabled.copy()
 
+    @contextmanager
+    def batch_update(self) -> Generator[None, None, None]:
+        """Batch multiple tool mutations with a single cache invalidation.
+
+        Use when registering, enabling, or disabling many tools at once
+        (e.g., during startup or vertical activation) to avoid repeated
+        schema cache rebuilds.
+
+        Example::
+
+            with registry.batch_update():
+                registry.register(tool_a)
+                registry.register(tool_b)
+                registry.enable_tool("tool_a")
+                registry.enable_tool("tool_b")
+            # Cache invalidated once here
+        """
+        self._batch_mode = True
+        self._batch_dirty = False
+        try:
+            yield
+        finally:
+            self._batch_mode = False
+            if self._batch_dirty:
+                self._batch_dirty = False
+                with self._schema_cache_lock:
+                    self._schema_cache_version += 1
+
     def get(self, name: str) -> Optional[Any]:
         """Get a tool by name.
 
@@ -370,9 +514,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
     def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
         """Get JSON schemas for all tools with caching.
 
-        Uses a cache to avoid regenerating schemas when the tool set hasn't changed.
-        The cache is invalidated automatically when tools are registered, unregistered,
-        enabled, or disabled.
+        Uses O(1) version-counter invalidation. The cache is bumped automatically
+        when tools are registered, unregistered, enabled, or disabled.
 
         Args:
             only_enabled: If True, only return schemas for enabled tools (default: True)
@@ -381,22 +524,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
             List of tool JSON schemas
         """
         with self._schema_cache_lock:
-            # Build the current tool names set for cache validation
-            if only_enabled:
-                current_tool_names = tuple(
-                    sorted(
-                        name for name in self._tools.keys() if self._tool_enabled.get(name, False)
-                    )
-                )
-            else:
-                current_tool_names = tuple(sorted(self._tools.keys()))
+            current_version = self._schema_cache_version
 
-            # Check cache
+            # O(1) cache check via version counter
             cache_entry = self._schema_cache.get(only_enabled)
             if cache_entry is not None:
-                cached_names, cached_schemas = cache_entry
-                if cached_names == current_tool_names:
-                    # Cache hit - return cached schemas
+                cached_version, cached_schemas = cache_entry
+                if cached_version == current_version:
                     return cached_schemas
 
             # Cache miss - generate schemas
@@ -409,8 +543,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
             else:
                 schemas = [tool.to_json_schema() for tool in self._tools.values()]
 
-            # Update cache
-            self._schema_cache[only_enabled] = (current_tool_names, schemas)
+            # Update cache with current version
+            self._schema_cache[only_enabled] = (current_version, schemas)
 
             return schemas
 

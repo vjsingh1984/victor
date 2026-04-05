@@ -120,43 +120,8 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-@runtime_checkable
-class VerticalContextProtocol(Protocol):
-    """Protocol for accessing vertical context.
-
-    This protocol defines the read-only interface for accessing
-    vertical configuration from orchestrator components.
-    """
-
-    @property
-    def vertical_name(self) -> Optional[str]:
-        """Get the vertical name."""
-        ...
-
-    @property
-    def has_vertical(self) -> bool:
-        """Check if a vertical is configured."""
-        ...
-
-    @property
-    def middleware(self) -> List["MiddlewareProtocol"]:
-        """Get middleware list."""
-        ...
-
-    @property
-    def safety_patterns(self) -> List["SafetyPattern"]:
-        """Get safety patterns."""
-        ...
-
-    @property
-    def task_hints(self) -> Dict[str, "TaskTypeHint"]:
-        """Get task type hints."""
-        ...
-
-    @property
-    def mode_configs(self) -> Dict[str, "ModeConfig"]:
-        """Get mode configurations."""
-        ...
+# Re-export from canonical location for backward compatibility
+from victor.core.shared_types import VerticalContextProtocol  # noqa: F401
 
 
 @runtime_checkable
@@ -296,6 +261,9 @@ class VerticalContext:
 
     # Tool filter
     enabled_tools: Set[str] = field(default_factory=set)
+
+    # Capability negotiation results (Phase 4)
+    capability_negotiation_results: Optional[Dict[str, Any]] = None
 
     # New framework integrations (workflows, RL, teams)
     workflows: Dict[str, Any] = field(default_factory=dict)
@@ -746,6 +714,61 @@ class VerticalContext:
             Empty VerticalContext instance
         """
         return cls()
+
+    def create_child_context(
+        self,
+        enabled_tools: Optional[Set[str]] = None,
+    ) -> "VerticalContext":
+        """Create a child context that inherits shared config from this parent.
+
+        Copies immutable vertical config (name, config, system_prompt, stages,
+        middleware, safety_patterns, rl_config, tiered_config, etc.) to the
+        child. The child gets its own mutable state (enabled_tools,
+        capability_configs, prompt_sections).
+
+        This is the flyweight pattern: shared immutable config, per-agent
+        mutable state. Used by multi-agent teams to avoid redundant copies.
+
+        Args:
+            enabled_tools: Optional tool set override for the child agent.
+                If None, inherits parent's enabled_tools.
+
+        Returns:
+            New VerticalContext with inherited config.
+        """
+        child = VerticalContext()
+
+        # Immutable identity (shared by reference)
+        child.name = self.name
+        child.config = self.config
+
+        # Config set once at integration time (shared by reference)
+        child.system_prompt = self.system_prompt
+        child.default_mode = self.default_mode
+        child.default_budget = self.default_budget
+        child.rl_config = self.rl_config
+        child.rl_hooks = self.rl_hooks
+        child.tiered_config = self.tiered_config
+        child.enrichment_strategy = self.enrichment_strategy
+        child.tool_selection_strategy = self.tool_selection_strategy
+
+        # Copy collections (shallow copy — child gets own list/dict/set)
+        child.stages = dict(self.stages)
+        child.middleware = list(self.middleware)
+        child.safety_patterns = list(self.safety_patterns)
+        child.task_hints = dict(self.task_hints)
+        child.mode_configs = dict(self.mode_configs)
+        child.tool_dependencies = list(self.tool_dependencies)
+        child.tool_sequences = [list(s) for s in self.tool_sequences]
+        child.workflows = dict(self.workflows)
+        child.team_specs = dict(self.team_specs)
+
+        # Per-agent mutable state (fresh or overridden)
+        child.enabled_tools = set(enabled_tools) if enabled_tools else set(self.enabled_tools)
+        child.prompt_sections = []  # Fresh — child builds its own
+        child.capability_configs = {}  # Fresh — child gets own capabilities
+
+        return child
 
 
 # =============================================================================

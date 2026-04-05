@@ -20,13 +20,13 @@ jobs:
   test:
     name: Test (Py${{ matrix.python-version }}, Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: []  # No dependencies - run in parallel with ci-fast
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +41,7 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/pipenv
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
@@ -59,6 +59,8 @@ jobs:
           python -m pip install --upgrade pip
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Install victor-sdk from local repository first (includes constants module)
+          pip install -e ./victor-sdk
           # Install with dev dependencies for testing
           pip install -e ".[dev,api]"
           # Install pytest-xdist for parallel execution
@@ -71,7 +73,7 @@ jobs:
             --dist loadscope \
             -n auto \
             --splitting-algorithm=least_duration \
-            --splits=4 \
+            --splits=6 \
             --group=${{ matrix.shard }} \
             -v \
             --tb=short \
@@ -127,7 +129,10 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e .
+          # Install victor-sdk from local repository first (includes constants module)
+          pip install -e ./victor-sdk
+          # Then install victor-ai with embeddings extra (needed for CLI import chain)
+          pip install -e ".[embeddings]"
 
       - name: Test CLI commands
         run: |

@@ -72,11 +72,41 @@ _TOOL_MENTION_TEMPLATES = [
     r"\bthe\s+{tool}\s+tool\b",  # "the read tool"
 ]
 
+# Tool names that are also common English words - require stricter matching
+# to avoid false positives (e.g., "implementation plan" triggering "plan" tool detection)
+# These tools are only detected via parenthesis pattern: tool_name(
+_AMBIGUOUS_TOOL_NAMES: frozenset = frozenset(
+    {
+        "plan",
+        "search",
+        "read",
+        "write",
+        "edit",
+        "create",
+        "run",
+        "test",
+        "check",
+        "list",
+        "view",
+        "find",
+        "review",
+        "analyze",
+    }
+)
+
+# Stricter templates for ambiguous tool names - only match with parenthesis or "tool" suffix
+_AMBIGUOUS_TOOL_MENTION_TEMPLATES = [
+    r"\b{tool}\s*\(",  # tool_name( - strongest signal
+    r"\bthe\s+{tool}\s+tool\b",  # "the plan tool" - explicit tool reference
+]
+
 
 def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
     """Get or create compiled patterns for detecting tool mentions.
 
     Caches compiled patterns per tool name to avoid recompilation.
+    Uses stricter patterns for ambiguous tool names (common English words)
+    to prevent false positives like "implementation plan" triggering "plan" tool.
 
     Args:
         tool_name: Name of the tool
@@ -86,9 +116,14 @@ def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
     """
     if tool_name not in _TOOL_MENTION_PATTERN_CACHE:
         escaped_name = re.escape(tool_name)
+        # Use stricter templates for ambiguous tool names (common English words)
+        templates = (
+            _AMBIGUOUS_TOOL_MENTION_TEMPLATES
+            if tool_name.lower() in _AMBIGUOUS_TOOL_NAMES
+            else _TOOL_MENTION_TEMPLATES
+        )
         _TOOL_MENTION_PATTERN_CACHE[tool_name] = [
-            re.compile(template.format(tool=escaped_name), re.IGNORECASE)
-            for template in _TOOL_MENTION_TEMPLATES
+            re.compile(template.format(tool=escaped_name), re.IGNORECASE) for template in templates
         ]
     return _TOOL_MENTION_PATTERN_CACHE[tool_name]
 
@@ -112,13 +147,19 @@ class ContinuationStrategy:
     Extracted from CRITICAL-001 Phase 2E.
     """
 
-    def __init__(self, event_bus: Optional[ObservabilityBus] = None):
+    def __init__(
+        self,
+        event_bus: Optional[ObservabilityBus] = None,
+        decision_service: Optional[Any] = None,
+    ):
         """Initialize continuation strategy.
 
         Args:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
+            decision_service: Optional LLMDecisionService for ambiguous continuation decisions
         """
         self._event_bus = event_bus or self._get_default_bus()
+        self._decision_service = decision_service
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -271,6 +312,9 @@ class ContinuationStrategy:
         tool_budget: int,
         unified_tracker_config: Dict[str, Any],
         task_completion_signals: Optional[Dict[str, Any]] = None,
+        # Dynamic budget parameters
+        query_classification: Any = None,  # Optional[QueryClassification]
+        plan_step_count: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
@@ -529,6 +573,20 @@ class ContinuationStrategy:
         max_cont_analysis = getattr(settings, "max_continuation_prompts_analysis", 6)
         max_cont_action = getattr(settings, "max_continuation_prompts_action", 5)
         max_cont_default = getattr(settings, "max_continuation_prompts_default", 3)
+
+        # Apply dynamic budget hints from query classification (before RL/manual overrides)
+        if query_classification and hasattr(query_classification, "continuation_budget_hint"):
+            budget_hint = query_classification.continuation_budget_hint
+            max_cont_default = max(max_cont_default, budget_hint)
+            max_cont_analysis = max(max_cont_analysis, budget_hint)
+            max_cont_action = max(max_cont_action, budget_hint)
+
+        # Increase budget based on plan step count
+        if plan_step_count is not None and plan_step_count > 0:
+            plan_budget = plan_step_count * 2
+            max_cont_default = max(max_cont_default, plan_budget)
+            max_cont_analysis = max(max_cont_analysis, plan_budget)
+            max_cont_action = max(max_cont_action, plan_budget)
 
         # Check for provider/model-specific overrides (RL-learned or manually configured)
         provider_model_key = f"{provider_name}:{model}"
@@ -856,6 +914,53 @@ class ContinuationStrategy:
                 "reason": "Max continuation prompts reached",
                 "updates": updates,
             }
+
+        # LLM augmentation: before defaulting to finish, consult LLM if task has been
+        # running for 3+ turns without clear resolution
+        if self._decision_service is not None and continuation_prompts >= 3:
+            try:
+                from victor.agent.decisions.schemas import DecisionType
+
+                response_excerpt = (full_content or "")[-500:]
+                decision = self._decision_service.decide_sync(
+                    DecisionType.CONTINUATION_ACTION,
+                    context={
+                        "response_excerpt": response_excerpt,
+                        "continuation_prompts": str(continuation_prompts),
+                        "task_type": (
+                            "analysis"
+                            if is_analysis_task
+                            else ("action" if is_action_task else "default")
+                        ),
+                    },
+                    heuristic_confidence=0.5,
+                )
+                if decision.source == "llm" and hasattr(decision.result, "action"):
+                    llm_action = decision.result.action
+                    llm_reason = getattr(decision.result, "reason", "LLM decision")
+                    if llm_action != "finish":
+                        logger.info(
+                            "LLM continuation action: %s (reason: %s)",
+                            llm_action,
+                            llm_reason,
+                        )
+                        message = None
+                        if llm_action == "prompt_tool_call":
+                            message = "Continue. Use appropriate tools if needed."
+                            updates["continuation_prompts"] = continuation_prompts + 1
+                        elif llm_action == "request_summary":
+                            message = (
+                                "Please provide a summary of your findings/work so far. "
+                                "Conclude your response."
+                            )
+                        return {
+                            "action": llm_action,
+                            "message": message,
+                            "reason": f"LLM: {llm_reason}",
+                            "updates": updates,
+                        }
+            except Exception:
+                logger.debug("LLM continuation decision failed", exc_info=True)
 
         # Default: finish
         logger.info("No continuation needed - finishing")

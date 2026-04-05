@@ -27,8 +27,6 @@ Usage:
 
 from __future__ import annotations
 
-from victor.ui.emoji import get_icon, is_emoji_enabled
-
 
 class EmojiPresentationAdapter:
     """Presentation adapter that delegates to victor.ui.emoji module.
@@ -60,6 +58,8 @@ class EmojiPresentationAdapter:
         Returns:
             True if emojis should be displayed, False for text alternatives.
         """
+        from victor.ui.emoji import is_emoji_enabled
+
         return is_emoji_enabled()
 
     def icon(
@@ -87,6 +87,8 @@ class EmojiPresentationAdapter:
         Raises:
             KeyError: If icon name is not found.
         """
+        from victor.ui.emoji import get_icon
+
         return get_icon(
             name,
             force_emoji=force_emoji,

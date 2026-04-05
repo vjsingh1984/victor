@@ -47,7 +47,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
+
+if TYPE_CHECKING:
+    from victor.core.severity import SeverityLevel
 
 from victor.security.safety.types import SafetyPattern
 
@@ -74,6 +77,12 @@ class RiskLevel(Enum):
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
+
+    def to_severity(self) -> "SeverityLevel":
+        """Convert to unified SeverityLevel."""
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel.from_risk_level(self)
 
 
 # =============================================================================

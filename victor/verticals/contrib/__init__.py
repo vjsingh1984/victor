@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contributed Verticals - Migrated from external packages.
+"""Contributed Verticals — REMOVED in v0.7.0.
 
-These verticals were previously distributed as separate PyPI packages:
-- victor-coding → victor.verticals.contrib.coding
-- victor-rag → victor.verticals.contrib.rag
-- victor-devops → victor.verticals.contrib.devops
-- victor-dataanalysis → victor.verticals.contrib.dataanalysis
-- victor-research → victor.verticals.contrib.research
+The following verticals have been extracted to separate PyPI packages:
 
-Migration Date: 2026-03-01
+- victor-coding   (pip install victor-coding)
+- victor-rag      (pip install victor-rag)
+- victor-devops   (pip install victor-devops)
+- victor-dataanalysis (pip install victor-dataanalysis)
+- victor-research (pip install victor-research)
+
+Install the external packages directly instead of relying on bundled contrib.
 """
 
 from __future__ import annotations
 
-__all__ = []
+__all__: list[str] = []

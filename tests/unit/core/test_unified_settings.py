@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import SecretStr
 
 from victor.config.unified_settings import VictorSettings
 
@@ -128,6 +129,19 @@ class TestVictorSettingsBasic:
         with pytest.raises(ValueError):
             VictorSettings(default_max_tokens=0)
 
+    def test_prompt_policy_defaults(self):
+        """Prompt policy fields should have sensible defaults."""
+        settings = VictorSettings()
+
+        assert settings.prompt_policy_enforce_identity is True
+        assert settings.prompt_policy_enforce_guidelines is True
+        assert settings.prompt_policy_max_section_chars == 18000
+        assert settings.prompt_policy_protected_sections == [
+            "identity",
+            "guidelines",
+            "operating_mode",
+        ]
+
 
 class TestVictorSettingsPrecedence:
     """Test settings precedence (CLI > env > .env > settings.yaml > profiles.yaml > defaults)."""
@@ -164,6 +178,27 @@ class TestVictorSettingsPrecedence:
         assert settings.default_provider == "anthropic"
         assert settings.default_model == "claude-opus-4"
         assert settings.default_temperature == 0.5
+
+    def test_prompt_policy_profile_override(self, tmp_path):
+        """Profiles.yaml should configure prompt policy fields."""
+        profiles_yaml = tmp_path / "profiles.yaml"
+        profiles_data = {
+            "profiles": {
+                "secure": {
+                    "prompt_policy_identity": "Secure Victor",
+                    "prompt_policy_max_section_chars": 9000,
+                    "prompt_policy_protected_sections": ["identity", "runbook"],
+                }
+            }
+        }
+        with open(profiles_yaml, "w") as f:
+            yaml.dump(profiles_data, f)
+
+        settings = VictorSettings.from_sources(profile_name="secure", config_dir=tmp_path)
+
+        assert settings.prompt_policy_identity == "Secure Victor"
+        assert settings.prompt_policy_max_section_chars == 9000
+        assert settings.prompt_policy_protected_sections == ["identity", "runbook"]
 
     def test_from_sources_with_settings_yaml(self, tmp_path):
         """Test from_sources with settings.yaml."""
@@ -245,11 +280,15 @@ class TestVictorSettingsPrecedence:
         # Set environment variables
         monkeypatch.setenv("VICTOR_DEFAULT_PROVIDER", "lmstudio")
         monkeypatch.setenv("VICTOR_TOOL_CACHE_TTL", "450")
+        monkeypatch.setenv("VICTOR_PROMPT_POLICY_ENFORCE_IDENTITY", "false")
+        monkeypatch.setenv("VICTOR_PROMPT_POLICY_MAX_SECTION_CHARS", "3210")
 
         settings = VictorSettings.from_sources(config_dir=tmp_path)
 
         assert settings.default_provider == "lmstudio"
         assert settings.tool_cache_ttl == 450
+        assert settings.prompt_policy_enforce_identity is False
+        assert settings.prompt_policy_max_section_chars == 3210
 
     def test_from_sources_cli_overrides_env(self, tmp_path, monkeypatch):
         """Test that CLI args override environment variables."""
@@ -305,6 +344,18 @@ class TestVictorSettingsTypeSafety:
         assert settings.openai_api_key is None
         assert settings.log_file is None
         assert settings.codebase_persist_directory is None
+
+    def test_server_secrets_are_redacted_types(self):
+        """Server-facing secrets should use SecretStr for safe repr/logging."""
+        settings = VictorSettings(
+            server_api_key="server-token",
+            server_session_secret="session-secret",
+        )
+
+        assert isinstance(settings.server_api_key, SecretStr)
+        assert settings.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server_session_secret, SecretStr)
+        assert settings.server_session_secret.get_secret_value() == "session-secret"
 
     def test_field_types_validated(self):
         """Test that field types are validated."""

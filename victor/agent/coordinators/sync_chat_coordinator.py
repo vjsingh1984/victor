@@ -36,7 +36,7 @@ Phase 2: Split Sync/Streaming Paths
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.task import TaskComplexity
 from victor.providers.base import CompletionResponse
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
         ProviderContextProtocol,
     )
     from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+    from victor.agent.query_classifier import QueryClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ class SyncChatCoordinator:
         provider_context: "ProviderContextProtocol",
         execution_coordinator: "ExecutionCoordinator",
         orchestrator: Any = None,
+        query_classifier: Optional["QueryClassifier"] = None,
     ) -> None:
         """Initialize the SyncChatCoordinator.
 
@@ -87,12 +89,14 @@ class SyncChatCoordinator:
             provider_context: Provider context protocol implementation
             execution_coordinator: Execution coordinator for agentic loop
             orchestrator: Optional orchestrator (required for planning path)
+            query_classifier: Optional query classifier for auto-planning detection
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._execution_coordinator = execution_coordinator
         self._orchestrator = orchestrator
+        self._query_classifier = query_classifier
 
     # =====================================================================
     # Public API
@@ -101,7 +105,7 @@ class SyncChatCoordinator:
     async def chat(
         self,
         user_message: str,
-        use_planning: bool = False,
+        use_planning: Optional[bool] = False,
     ) -> CompletionResponse:
         """Execute chat without streaming.
 
@@ -113,13 +117,30 @@ class SyncChatCoordinator:
 
         Args:
             user_message: User's message
-            use_planning: Whether to use structured planning for complex tasks
+            use_planning: Whether to use structured planning for complex tasks.
+                None = auto-detect via QueryClassifier.
+                True = always use planning (if should_use_planning passes).
+                False = never use planning.
 
         Returns:
             CompletionResponse with complete response
         """
-        # Check if we should use planning for this task
-        if use_planning and self._should_use_planning(user_message):
+        # Auto-detect planning via QueryClassifier when use_planning is None
+        if use_planning is None:
+            if self._query_classifier:
+                classification = self._query_classifier.classify(user_message)
+                # Update system prompt with task-aware guidance
+                if self._orchestrator and hasattr(
+                    self._orchestrator, "update_system_prompt_for_query"
+                ):
+                    self._orchestrator.update_system_prompt_for_query(classification)
+                if classification.should_plan:
+                    return await self._chat_with_planning(user_message)
+            else:
+                # Fallback to keyword heuristic
+                if self._should_use_planning(user_message):
+                    return await self._chat_with_planning(user_message)
+        elif use_planning and self._should_use_planning(user_message):
             return await self._chat_with_planning(user_message)
 
         # Use execution coordinator for agentic loop
@@ -172,9 +193,7 @@ class SyncChatCoordinator:
             return True
 
         # Check task complexity
-        task_classification = self._provider_context.task_classifier.classify(
-            user_message
-        )
+        task_classification = self._provider_context.task_classifier.classify(user_message)
         return task_classification.complexity in (
             TaskComplexity.MEDIUM,
             TaskComplexity.COMPLEX,

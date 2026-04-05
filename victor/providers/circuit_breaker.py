@@ -40,6 +40,7 @@ Related module:
 import asyncio
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional, TypeVar, Awaitable
@@ -86,10 +87,17 @@ class CircuitBreakerConfig:
 class CircuitBreakerError(Exception):
     """Raised when circuit is open and request is rejected."""
 
-    def __init__(self, message: str, state: CircuitState, retry_after: float):
+    def __init__(
+        self,
+        message: str,
+        state: CircuitState,
+        retry_after: float,
+        last_error: Optional[Exception] = None,
+    ):
         super().__init__(message)
         self.state = state
         self.retry_after = retry_after
+        self.last_error = last_error
 
 
 class CircuitBreaker:
@@ -167,6 +175,7 @@ class CircuitBreaker:
         self._failure_count = 0
         self._success_count = 0
         self._last_failure_time: Optional[float] = None
+        self._last_exception: Optional[Exception] = None
         self._half_open_calls = 0
         self._lock = asyncio.Lock()
 
@@ -174,7 +183,7 @@ class CircuitBreaker:
         self._total_calls = 0
         self._total_failures = 0
         self._total_rejected = 0
-        self._state_changes: list[tuple[float, CircuitState, CircuitState]] = []
+        self._state_changes: deque[tuple[float, CircuitState, CircuitState]] = deque(maxlen=100)
 
     @property
     def state(self) -> CircuitState:
@@ -226,13 +235,13 @@ class CircuitBreaker:
         """
         self._record_success()
 
-    def record_failure(self) -> None:
+    def record_failure(self, exception: Optional[Exception] = None) -> None:
         """Record a failed execution.
 
         Call this after a failed operation to potentially
         transition to OPEN state.
         """
-        self._record_failure()
+        self._record_failure(exception)
 
     def _should_attempt_recovery(self) -> bool:
         """Check if enough time has passed to attempt recovery."""
@@ -277,10 +286,11 @@ class CircuitBreaker:
             # Reset failure count on success
             self._failure_count = 0
 
-    def _record_failure(self) -> None:
+    def _record_failure(self, exception: Optional[Exception] = None) -> None:
         """Record a failed call."""
         self._total_failures += 1
         self._last_failure_time = time.time()
+        self._last_exception = exception
 
         if self._state == CircuitState.HALF_OPEN:
             # Any failure in half-open immediately opens circuit
@@ -313,6 +323,7 @@ class CircuitBreaker:
                 f"Circuit breaker '{self.name}' is OPEN. " f"Retry after {retry_after:.1f}s",
                 state=state,
                 retry_after=retry_after,
+                last_error=self._last_exception,
             )
 
         if state == CircuitState.HALF_OPEN:
@@ -322,6 +333,7 @@ class CircuitBreaker:
                         f"Circuit breaker '{self.name}' is HALF_OPEN with max calls reached",
                         state=state,
                         retry_after=1.0,
+                        last_error=self._last_exception,
                     )
                 self._half_open_calls += 1
 
@@ -355,8 +367,8 @@ class CircuitBreaker:
         except self.excluded_exceptions:
             # These exceptions don't count as failures
             raise
-        except Exception:
-            self._record_failure()
+        except Exception as exc:
+            self._record_failure(exc)
             raise
 
     def __call__(
@@ -386,7 +398,7 @@ class CircuitBreaker:
         if exc_type is None:
             self._record_success()
         elif not isinstance(exc_val, self.excluded_exceptions):
-            self._record_failure()
+            self._record_failure(exc_val)
 
     def reset(self) -> None:
         """Manually reset the circuit breaker to closed state."""
@@ -394,6 +406,7 @@ class CircuitBreaker:
         self._failure_count = 0
         self._success_count = 0
         self._last_failure_time = None
+        self._last_exception = None
         self._half_open_calls = 0
         logger.info(f"Circuit breaker '{self.name}' manually reset")
 

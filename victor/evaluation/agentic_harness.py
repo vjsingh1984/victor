@@ -660,9 +660,9 @@ class SemanticMatchValidator(AgenticValidator):
         """Lazily load embedding service."""
         if self._embedding_service is None:
             try:
-                from victor.storage.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import get_embedding_service
 
-                self._embedding_service = EmbeddingService.get_instance()
+                self._embedding_service = get_embedding_service()
             except ImportError:
                 logger.warning("EmbeddingService not available, semantic match disabled")
         return self._embedding_service

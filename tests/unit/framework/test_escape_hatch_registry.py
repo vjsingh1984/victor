@@ -433,7 +433,7 @@ class TestEscapeHatchRegistry:
         """Test discover_from_vertical imports and registers escape hatches."""
         registry = EscapeHatchRegistry()
 
-        # Use coding vertical which we know exists
+        # Use coding vertical which is bundled in contrib
         cond_count, trans_count = registry.discover_from_vertical("coding")
 
         # coding/escape_hatches.py has conditions and transforms

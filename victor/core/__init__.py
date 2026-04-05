@@ -97,12 +97,15 @@ from victor.core.middleware import (
     CachingMiddleware,
     ContextKey,
     ErrorHandlingMiddleware,
+    ErrorMiddleware,
     LoggingMiddleware,
     MetricsMiddleware,
     Middleware,
     MiddlewareContext,
     MiddlewarePipeline,
     PipelineBuilder,
+    RequestMiddleware,
+    ResponseMiddleware,
     RetryMiddleware,
     TimeoutMiddleware,
     TimingMiddleware,
@@ -162,78 +165,6 @@ from victor.core.unit_of_work import (
     transactional,
 )
 
-from victor.core.cqrs import (
-    # Base types
-    Command,
-    Query,
-    CommandResult,
-    QueryResult,
-    # Handlers
-    CommandHandler,
-    QueryHandler,
-    command_handler,
-    query_handler,
-    get_registered_command_handlers,
-    get_registered_query_handlers,
-    clear_handlers,
-    # Middleware
-    CommandMiddleware,
-    QueryMiddleware,
-    LoggingCommandMiddleware,
-    LoggingQueryMiddleware,
-    ValidationCommandMiddleware,
-    RetryCommandMiddleware,
-    CachingQueryMiddleware,
-    # Buses
-    CommandBus,
-    QueryBus,
-    # Mediator
-    Mediator,
-    # Read Models
-    ReadModel,
-    InMemoryReadModel,
-    # Exceptions
-    CQRSError,
-    CommandError,
-    QueryError,
-    CommandValidationError as CQRSValidationError,
-    # Factories
-    create_command_bus,
-    create_query_bus,
-    create_mediator,
-)
-
-from victor.core.agent_commands import (
-    # Commands
-    ChatCommand,
-    ExecuteToolCommand,
-    CancelOperationCommand,
-    SwitchProviderCommand,
-    UpdateConfigCommand,
-    StartSessionCommand,
-    EndSessionCommand,
-    # Queries
-    GetSessionQuery,
-    GetConversationHistoryQuery,
-    GetToolsQuery,
-    GetProvidersQuery,
-    GetSessionMetricsQuery,
-    SearchCodeQuery,
-    # Events
-    SessionStartedEvent,
-    ChatMessageSentEvent,
-    ChatResponseReceivedEvent,
-    ToolExecutedEvent,
-    ProviderSwitchedEvent,
-    SessionEndedEvent,
-    ErrorOccurredEvent,
-    # Projection
-    SessionProjection,
-    # Bus
-    AgentCommandBus,
-    create_agent_command_bus,
-)
-
 from victor.core.mode_config import (
     ModeLevel,
     ModeDefinition,
@@ -286,6 +217,10 @@ from victor.core.schema import (
     CURRENT_SCHEMA_VERSION,
     get_migration_sql,
 )
+
+# SeverityLevel is lazy-loaded to avoid import-time overhead.
+# Access via: from victor.core import SeverityLevel
+# or:        from victor.core.severity import SeverityLevel
 
 __all__ = [
     # Container
@@ -411,61 +346,6 @@ __all__ = [
     "UnitOfWorkProtocol",
     "create_unit_of_work",
     "transactional",
-    # CQRS
-    "Command",
-    "Query",
-    "CommandResult",
-    "QueryResult",
-    "CommandHandler",
-    "QueryHandler",
-    "command_handler",
-    "query_handler",
-    "get_registered_command_handlers",
-    "get_registered_query_handlers",
-    "clear_handlers",
-    "CommandMiddleware",
-    "QueryMiddleware",
-    "LoggingCommandMiddleware",
-    "LoggingQueryMiddleware",
-    "ValidationCommandMiddleware",
-    "RetryCommandMiddleware",
-    "CachingQueryMiddleware",
-    "CommandBus",
-    "QueryBus",
-    "Mediator",
-    "ReadModel",
-    "InMemoryReadModel",
-    "CQRSError",
-    "CommandError",
-    "QueryError",
-    "CQRSValidationError",
-    "create_command_bus",
-    "create_query_bus",
-    "create_mediator",
-    # Agent Commands (CQRS integration)
-    "ChatCommand",
-    "ExecuteToolCommand",
-    "CancelOperationCommand",
-    "SwitchProviderCommand",
-    "UpdateConfigCommand",
-    "StartSessionCommand",
-    "EndSessionCommand",
-    "GetSessionQuery",
-    "GetConversationHistoryQuery",
-    "GetToolsQuery",
-    "GetProvidersQuery",
-    "GetSessionMetricsQuery",
-    "SearchCodeQuery",
-    "SessionStartedEvent",
-    "ChatMessageSentEvent",
-    "ChatResponseReceivedEvent",
-    "ToolExecutedEvent",
-    "ProviderSwitchedEvent",
-    "SessionEndedEvent",
-    "ErrorOccurredEvent",
-    "SessionProjection",
-    "AgentCommandBus",
-    "create_agent_command_bus",
     # Mode Configuration
     "ModeLevel",
     "ModeDefinition",
@@ -507,4 +387,15 @@ __all__ = [
     "Schema",
     "CURRENT_SCHEMA_VERSION",
     "get_migration_sql",
+    # Unified severity level (consolidates DangerLevel, RiskLevel, CVESeverity, etc.)
+    "SeverityLevel",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for heavy or optional modules."""
+    if name == "SeverityLevel":
+        from victor.core.severity import SeverityLevel
+
+        return SeverityLevel
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

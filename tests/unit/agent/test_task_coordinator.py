@@ -61,6 +61,7 @@ def mock_unified_tracker():
     tracker = MagicMock()
     tracker.config = {"max_total_iterations": 50}
     tracker.set_tool_budget = Mock()
+    tracker._sticky_user_budget = False
     return tracker
 
 

@@ -584,9 +584,9 @@ class ConversationManager:
 
             # Get or create embedding service
             if self._embedding_service is None:
-                from victor.storage.embeddings.service import EmbeddingService
+                from victor.storage.embeddings.service import get_embedding_service
 
-                self._embedding_service = EmbeddingService.get_instance()
+                self._embedding_service = get_embedding_service()
 
             # Get SQLite DB path from store if available
             sqlite_path = None

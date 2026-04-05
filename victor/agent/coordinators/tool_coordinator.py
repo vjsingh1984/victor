@@ -50,7 +50,6 @@ Usage:
 from __future__ import annotations
 
 import ast
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -68,6 +67,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+from victor.agent.coordinators.tool_retry import ToolRetryExecutor
 from victor.tools.budget_controller import BudgetController
 from victor.tools.tool_call_parser import ToolCallParser
 from victor.tools.tool_call_validator import ToolCallValidator
@@ -262,10 +263,15 @@ class ToolCoordinator:
         # Composed extracted classes
         self._tool_call_parser = ToolCallParser()
         self._tool_call_validator = ToolCallValidator()
+        self._observability = ToolObservabilityHandler(self)
+        self._retry_executor = ToolRetryExecutor(self._config, self._pipeline, self._cache)
 
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
+
+        # Known tool names for hallucination pre-filtering
+        self._known_tool_names: Optional[Set[str]] = None
 
         logger.debug(
             f"ToolCoordinator initialized with budget={self._total_budget}, "
@@ -434,26 +440,8 @@ class ToolCoordinator:
             return []
 
     def get_selection_stats(self) -> Dict[str, Any]:
-        """Get tool selection statistics.
-
-        Returns:
-            Dict with selection method distribution and counts
-        """
-        method_counts: Dict[str, int] = {}
-        total_selected = 0
-
-        for method, count in self._selection_history:
-            method_counts[method] = method_counts.get(method, 0) + 1
-            total_selected += count
-
-        return {
-            "total_selections": len(self._selection_history),
-            "total_tools_selected": total_selected,
-            "method_distribution": method_counts,
-            "avg_tools_per_selection": (
-                total_selected / len(self._selection_history) if self._selection_history else 0
-            ),
-        }
+        """Get tool selection statistics."""
+        return self._observability.get_selection_stats()
 
     # =====================================================================
     # Tool Access Control
@@ -468,7 +456,14 @@ class ToolCoordinator:
         # Use ToolAccessController if available
         if self._tool_access_controller:
             context = self._build_tool_access_context()
-            return self._tool_access_controller.get_allowed_tools(context)
+            allowed = self._tool_access_controller.get_allowed_tools(context)
+
+            # Keep selector + orchestrator tools in sync with controller decisions
+            if allowed != self._enabled_tools:
+                self._enabled_tools = allowed
+                if self._selector and hasattr(self._selector, "set_enabled_tools"):
+                    self._selector.set_enabled_tools(allowed)
+            return allowed
 
         # Check mode controller for BUILD mode (allows all tools)
         if self._mode_controller:
@@ -572,47 +567,100 @@ class ToolCoordinator:
         Returns:
             Canonical tool name
         """
+        from victor.tools.tool_names import get_canonical_name
+
+        canonical = get_canonical_name(tool_name)
+
         # Resolve shell aliases to appropriate enabled variant
         shell_aliases = {
+            ToolNames.SHELL,
+            ToolNames.SHELL_READONLY,
             "run",
             "bash",
             "execute",
             "cmd",
             "execute_bash",
-            "shell_readonly",
-            "shell",
         }
 
-        if tool_name not in shell_aliases:
-            return tool_name
+        if canonical not in shell_aliases and tool_name not in shell_aliases:
+            if canonical != tool_name:
+                logger.debug(f"Resolved '{tool_name}' to canonical '{canonical}'")
+            return canonical
 
         # Check mode controller for BUILD mode (allows all tools including shell)
         if self._mode_controller:
             config = self._mode_controller.config
-            if config.allow_all_tools and "shell" not in config.disallowed_tools:
-                logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
+            if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
+                logger.debug(
+                    f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)"
+                )
                 return ToolNames.SHELL
 
         # Check if full shell is enabled first
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (shell enabled)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to 'shell_readonly' (readonly mode)")
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
             return ToolNames.SHELL_READONLY
 
         # Neither enabled - return canonical name (will fail validation)
-        from victor.tools.tool_names import get_canonical_name
-
-        canonical = get_canonical_name(tool_name)
         logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
     # =====================================================================
     # Tool Execution
     # =====================================================================
+
+    def _get_known_tool_names(self) -> Set[str]:
+        """Get the set of known/valid tool names from the registry."""
+        if self._known_tool_names is not None:
+            return self._known_tool_names
+        try:
+            if hasattr(self._registry, "get_tool_names"):
+                self._known_tool_names = set(self._registry.get_tool_names())
+            elif hasattr(self._registry, "list_tools"):
+                self._known_tool_names = {t.name for t in self._registry.list_tools()}
+            else:
+                self._known_tool_names = set()
+        except Exception:
+            self._known_tool_names = set()
+        return self._known_tool_names
+
+    def _pre_filter_tool_calls(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Pre-filter tool calls, removing hallucinated tool names.
+
+        Args:
+            tool_calls: Raw tool calls from the model
+
+        Returns:
+            Tuple of (valid_calls, filtered_names)
+        """
+        known = self._get_known_tool_names()
+        if not known:
+            return tool_calls, []
+
+        valid = []
+        filtered_names = []
+        for call in tool_calls:
+            name = call.get("name", "")
+            if name in known:
+                valid.append(call)
+            else:
+                filtered_names.append(name)
+
+        if filtered_names:
+            logger.warning(
+                "Filtered %d hallucinated tool call(s): %s",
+                len(filtered_names),
+                ", ".join(filtered_names),
+            )
+
+        return valid, filtered_names
 
     async def execute_tool_calls(
         self,
@@ -622,7 +670,7 @@ class ToolCoordinator:
         """Execute tool calls through the pipeline.
 
         Delegates to ToolPipeline for actual execution, handling budget
-        tracking and caching coordination.
+        tracking and caching coordination. Pre-filters hallucinated tool names.
 
         Args:
             tool_calls: List of tool calls to execute
@@ -631,6 +679,20 @@ class ToolCoordinator:
         Returns:
             PipelineExecutionResult with execution details
         """
+        # Pre-filter hallucinated tool names
+        tool_calls, filtered = self._pre_filter_tool_calls(tool_calls)
+
+        if not tool_calls:
+            # All calls were hallucinated — return empty result
+            from victor.agent.tool_pipeline import PipelineExecutionResult
+
+            return PipelineExecutionResult(
+                results=[],
+                successful_calls=0,
+                failed_calls=len(filtered),
+                total_duration_ms=0,
+            )
+
         # Check budget before execution
         remaining = self.get_remaining_budget()
         call_count = len(tool_calls)
@@ -676,151 +738,16 @@ class ToolCoordinator:
         on_success: Optional[Callable[[str, Dict[str, Any], Any], None]] = None,
         retry_config: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Optional[Any], bool, Optional[str]]:
-        """Execute a tool with retry logic and exponential backoff.
-
-        Args:
-            tool_name: Name of the tool to execute
-            tool_args: Arguments for the tool
-            context: Execution context
-            tool_executor: Optional custom executor callable. If provided, called as
-                ``await tool_executor(tool_name, tool_args, context)``.
-                Defaults to ``self._pipeline._execute_single_tool``.
-            cache: Optional cache override. Defaults to ``self._cache``.
-            on_success: Optional callback invoked on success as
-                ``on_success(tool_name, tool_args, result)``.
-            retry_config: Optional dict with keys ``retry_enabled``, ``max_attempts``,
-                ``base_delay``, ``max_delay`` to override coordinator config.
-
-        Returns:
-            Tuple of (result, success, error_message or None)
-        """
-        effective_cache = cache if cache is not None else self._cache
-
-        # Try cache first for allowlisted tools
-        if effective_cache:
-            cached = effective_cache.get(tool_name, tool_args)
-            if cached is not None:
-                logger.debug(f"Cache hit for tool '{tool_name}'")
-                return cached, True, None
-
-        if retry_config:
-            retry_enabled = retry_config.get("retry_enabled", self._config.retry_enabled)
-            max_attempts = (
-                retry_config.get("max_attempts", self._config.max_retry_attempts)
-                if retry_enabled
-                else 1
-            )
-            base_delay = retry_config.get("base_delay", self._config.retry_base_delay)
-            max_delay = retry_config.get("max_delay", self._config.retry_max_delay)
-        else:
-            retry_enabled = self._config.retry_enabled
-            max_attempts = self._config.max_retry_attempts if retry_enabled else 1
-            base_delay = self._config.retry_base_delay
-            max_delay = self._config.retry_max_delay
-
-        last_error = None
-        for attempt in range(max_attempts):
-            try:
-                if tool_executor:
-                    result = await tool_executor(tool_name, tool_args, context)
-                else:
-                    result = await self._pipeline._execute_single_tool(
-                        tool_name, tool_args, context
-                    )
-
-                if result.success:
-                    # Cache successful result
-                    if effective_cache:
-                        effective_cache.set(tool_name, tool_args, result)
-                        # Invalidate related cache entries
-                        invalidating_tools = {
-                            "write_file",
-                            "edit_files",
-                            "execute_bash",
-                            "git",
-                            "docker",
-                        }
-                        if tool_name in invalidating_tools:
-                            touched_paths = []
-                            if "path" in tool_args:
-                                touched_paths.append(tool_args["path"])
-                            if "paths" in tool_args and isinstance(tool_args["paths"], list):
-                                touched_paths.extend(tool_args["paths"])
-                            if touched_paths:
-                                effective_cache.invalidate_paths(touched_paths)
-                            else:
-                                namespaces_to_clear = [
-                                    "code_search",
-                                    "semantic_code_search",
-                                    "list_directory",
-                                ]
-                                effective_cache.clear_namespaces(namespaces_to_clear)
-
-                    if attempt > 0:
-                        logger.info(
-                            f"Tool '{tool_name}' succeeded on retry attempt {attempt + 1}/{max_attempts}"
-                        )
-
-                    # Invoke success callback if provided
-                    if on_success:
-                        on_success(tool_name, tool_args, result)
-
-                    return result, True, None
-                else:
-                    # Tool returned failure - check if retryable
-                    error_msg = result.error or "Unknown error"
-
-                    # Don't retry validation errors or permanent failures
-                    non_retryable_errors = [
-                        "Invalid",
-                        "Missing required",
-                        "Not found",
-                        "disabled",
-                    ]
-                    if any(err in error_msg for err in non_retryable_errors):
-                        logger.debug(
-                            f"Tool '{tool_name}' failed with non-retryable error: {error_msg}"
-                        )
-                        return result, False, error_msg
-
-                    last_error = error_msg
-                    if attempt < max_attempts - 1:
-                        # Calculate exponential backoff delay
-                        delay = min(base_delay * (2**attempt), max_delay)
-                        logger.warning(
-                            f"Tool '{tool_name}' failed (attempt {attempt + 1}/{max_attempts}): {error_msg}. "
-                            f"Retrying in {delay:.1f}s..."
-                        )
-                        await asyncio.sleep(delay)
-                    else:
-                        logger.error(
-                            f"Tool '{tool_name}' failed after {max_attempts} attempts: {error_msg}"
-                        )
-                        return result, False, error_msg
-
-            except Exception as e:
-                # Check for non-retryable errors
-                from victor.core.errors import ToolNotFoundError, ToolValidationError
-
-                if isinstance(e, (ToolNotFoundError, ToolValidationError, PermissionError)):
-                    logger.error(f"Tool '{tool_name}' permanent failure: {e}")
-                    return None, False, str(e)
-
-                # Retryable transient errors
-                last_error = str(e)
-                if attempt < max_attempts - 1:
-                    delay = min(base_delay * (2**attempt), max_delay)
-                    logger.warning(
-                        f"Tool '{tool_name}' transient error (attempt {attempt + 1}/{max_attempts}): {e}. "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
-                    return None, False, last_error
-
-        # Should not reach here, but handle it anyway
-        return None, False, last_error or "Unknown error"
+        """Execute a tool with retry logic and exponential backoff."""
+        return await self._retry_executor.execute_tool_with_retry(
+            tool_name=tool_name,
+            tool_args=tool_args,
+            context=context,
+            tool_executor=tool_executor,
+            cache=cache,
+            on_success=on_success,
+            retry_config=retry_config,
+        )
 
     # =====================================================================
     # Tool Call Parsing
@@ -1004,154 +931,38 @@ class ToolCoordinator:
         observability: Optional[Any] = None,
         pipeline_calls_used: int = 0,
     ) -> None:
-        """Handle tool execution completion with event emission and file tracking.
-
-        Args:
-            result: ToolCallResult from execution
-            metrics_collector: MetricsCollector to record completion
-            read_files_session: Mutable set of read file paths for tracking
-            required_files: List of files required for the task
-            required_outputs: List of required output descriptions
-            nudge_sent_flag: Single-element list used as mutable bool flag for nudge tracking
-            add_message: Callback to inject messages into conversation
-            observability: Optional observability handler
-            pipeline_calls_used: Current pipeline call count for observability
-        """
-        metrics_collector.on_tool_complete(result)
-
-        # Emit tool complete event
-        from victor.core.events import get_observability_bus
-
-        bus = get_observability_bus()
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                bus.emit(
-                    topic="tool.complete",
-                    data={
-                        "tool_name": result.tool_name,
-                        "success": result.success,
-                        "result_length": len(str(result.result or "")) if result.result else 0,
-                        "error": str(result.error) if result.error else None,
-                        "category": "tool",
-                    },
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            pass
-        except Exception:
-            # Ignore errors during event emission
-            pass
-
-        # Track read files for task completion detection
-        if (
-            result.success
-            and result.tool_name in ("read", "Read", "read_file")
-            and read_files_session is not None
-        ):
-            if result.arguments:
-                file_path = result.arguments.get("path") or result.arguments.get("file_path")
-                if file_path:
-                    read_files_session.add(file_path)
-                    logger.debug(f"Tracked read file: {file_path}")
-
-                    # Check if all required files have been read - nudge to produce output
-                    if (
-                        required_files
-                        and read_files_session.issuperset(set(required_files))
-                        and nudge_sent_flag is not None
-                        and not nudge_sent_flag[0]
-                    ):
-                        nudge_sent_flag[0] = True
-                        logger.info(
-                            f"All {len(required_files)} required files have been read. "
-                            "Agent should now produce the required output."
-                        )
-
-                        # Emit nudge event
-                        event_bus = get_observability_bus()
-                        event_bus.emit(
-                            topic="state.task.all_files_read_nudge",
-                            data={
-                                "required_files": list(required_files),
-                                "read_files": list(read_files_session),
-                                "required_outputs": required_outputs,
-                                "action": "nudge_output_production",
-                                "category": "state",
-                            },
-                        )
-
-                        # Inject nudge message to encourage output production
-                        if required_outputs and add_message:
-                            outputs_str = ", ".join(required_outputs)
-                            add_message(
-                                "system",
-                                f"[REMINDER] All required files have been read. "
-                                f"Please now produce the required output: {outputs_str}. "
-                                f"Avoid further exploration - focus on synthesizing findings.",
-                            )
-
-        # Emit observability event for tool completion
-        if observability:
-            tool_id = f"tool-{pipeline_calls_used}"
-            observability.on_tool_end(
-                tool_name=result.tool_name,
-                result=result.result,
-                success=result.success,
-                tool_id=tool_id,
-                error=result.error,
-            )
+        """Handle tool execution completion with event emission and file tracking."""
+        return self._observability.on_tool_complete(
+            result=result,
+            metrics_collector=metrics_collector,
+            read_files_session=read_files_session,
+            required_files=required_files,
+            required_outputs=required_outputs,
+            nudge_sent_flag=nudge_sent_flag,
+            add_message=add_message,
+            observability=observability,
+            pipeline_calls_used=pipeline_calls_used,
+        )
 
     # =====================================================================
     # Statistics and Tracking
     # =====================================================================
 
     def get_execution_stats(self) -> Dict[str, Any]:
-        """Get tool execution statistics.
-
-        Returns:
-            Dict with execution counts and budget usage
-        """
-        return {
-            "total_executions": self._execution_count,
-            "budget_used": self._budget_used,
-            "budget_total": self._total_budget,
-            "budget_remaining": self.get_remaining_budget(),
-            "budget_utilization": (
-                self._budget_used / self._total_budget if self._total_budget > 0 else 0
-            ),
-            "executed_tools": list(self._executed_tools),
-            "failed_signatures_count": len(self._failed_tool_signatures),
-        }
+        """Get tool execution statistics."""
+        return self._observability.get_execution_stats()
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
-        """Get comprehensive tool usage statistics.
-
-        Returns:
-            Dictionary with usage analytics including:
-            - Selection stats (semantic/keyword/fallback counts)
-            - Per-tool execution stats (calls, success rate, timing)
-            - Cost tracking (by tier and total)
-            - Overall metrics
-        """
-        return {
-            "selection": self.get_selection_stats(),
-            "execution": self.get_execution_stats(),
-            "budget": {
-                "total": self._total_budget,
-                "used": self._budget_used,
-                "remaining": self.get_remaining_budget(),
-            },
-        }
+        """Get comprehensive tool usage statistics."""
+        return self._observability.get_tool_usage_stats()
 
     def clear_selection_history(self) -> None:
         """Clear the selection history."""
-        self._selection_history.clear()
+        self._observability.clear_selection_history()
 
     def clear_failed_signatures(self) -> None:
         """Clear the failed tool signatures cache."""
-        self._failed_tool_signatures.clear()
+        self._observability.clear_failed_signatures()
 
     # =====================================================================
     # Dependency Injection
@@ -1284,9 +1095,7 @@ class ToolCoordinator:
                 canonical, tool_call.get("arguments", {})
             )
             if not schema_result.valid:
-                logger.warning(
-                    f"Schema validation: {canonical}: {schema_result.errors}"
-                )
+                logger.warning(f"Schema validation: {canonical}: {schema_result.errors}")
 
         return ToolCallValidation(
             valid=True,
@@ -1439,4 +1248,6 @@ __all__ = [
     "ToolExecutionResult",
     "IToolCoordinator",
     "create_tool_coordinator",
+    "ToolObservabilityHandler",
+    "ToolRetryExecutor",
 ]

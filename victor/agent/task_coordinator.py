@@ -294,13 +294,17 @@ class TaskCoordinator:
                 "After examining 3-4 modules, provide your summary. Keep responses concise.",
             )
 
-            # Increase tool budget for comprehensive analysis
-            original_budget = self._tool_budget
-            self._tool_budget = max(self._tool_budget, 200)
-            if self._tool_budget != original_budget:
-                logger.info(
-                    f"Analysis task: increased tool_budget from {original_budget} to {self._tool_budget}"
-                )
+            # Increase tool budget for comprehensive analysis,
+            # but only if the user didn't explicitly set it via --tool-budget
+            if not self.unified_tracker._sticky_user_budget:
+                original_budget = self._tool_budget
+                self._tool_budget = max(self._tool_budget, 200)
+                if self._tool_budget != original_budget:
+                    logger.info(
+                        f"Analysis task: increased tool_budget from {original_budget} to {self._tool_budget}"
+                    )
+            else:
+                logger.info(f"Analysis task: respecting user-set tool_budget={self._tool_budget}")
 
             conversation_controller.add_message(
                 "system",

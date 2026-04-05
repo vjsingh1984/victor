@@ -21,8 +21,11 @@ This tool provides:
 4. Conflict detection and resolution help
 """
 
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
@@ -673,8 +676,8 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                         conflict_details.append(
                             f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to read merge conflict details for %s: %s", file, e)
 
             if conflict_details:
                 prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.

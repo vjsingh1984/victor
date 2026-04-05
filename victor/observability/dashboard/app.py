@@ -1395,7 +1395,7 @@ class ObservabilityDashboard(App):
         logger = logging.getLogger(__name__)
 
         settings = get_settings()
-        backend = getattr(settings, "eventbus_backend", "memory")
+        backend = getattr(settings, "event_backend_type", "in_memory")
 
         logger.info(f"[Dashboard] Setting up event source for backend: {backend}")
 

@@ -69,9 +69,9 @@ class TUIConsoleAdapter:
             for line in output.split("\n"):
                 line = line.strip()
                 if line:
+                    self._log.add_system_message(line)
                     if self._on_line:
                         self._on_line(line)
-                    self._log.add_system_message(line)
 
     def __getattr__(self, name):
         """Delegate other console methods to the internal console."""
@@ -325,6 +325,29 @@ class VictorTUI(App):
         color: $warning;
     }
 
+    StatusBar .follow-indicator {
+        width: auto;
+        margin-left: 1;
+        color: $text-muted;
+        text-style: bold;
+    }
+
+    StatusBar .follow-indicator.paused {
+        color: $warning;
+    }
+
+    StatusBar .unread-indicator {
+        width: auto;
+        margin-left: 1;
+        color: $primary;
+        text-style: bold;
+        display: none;
+    }
+
+    StatusBar .unread-indicator.visible {
+        display: block;
+    }
+
     StatusBar .provider-info .victor-name {
         color: $primary;
     }
@@ -554,6 +577,11 @@ class VictorTUI(App):
         Binding("ctrl+down", "scroll_down", "Scroll Down", show=False),
         Binding("ctrl+home", "scroll_top", "Scroll Top", show=False),
         Binding("ctrl+end", "scroll_bottom", "Scroll Bottom", show=False),
+        Binding("ctrl+f", "toggle_follow_mode", "Toggle Follow", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
+        Binding("ctrl+n", "jump_unread", "Jump Unread", show=False),
+        Binding("ctrl+u", "toggle_unread_marker", "Toggle Unread Marker", show=False),
     ]
 
     def __init__(
@@ -595,6 +623,12 @@ class VictorTUI(App):
         self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
         self._session_messages: list[Message] = []
+        self._session_restore_task: asyncio.Task | None = None
+        self._jump_button_visible: Optional[bool] = None  # None = unknown initial state
+
+    # Async replay thresholds
+    _ASYNC_REPLAY_THRESHOLD = 100
+    _ASYNC_REPLAY_CHUNK_SIZE = 25
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -649,11 +683,20 @@ class VictorTUI(App):
         if not message:
             return
 
+        # Reject submission while busy
+        if self._is_processing:
+            self._set_status("Working", "busy")
+            return
+
         # Add to history before clearing
         self._input_widget.add_to_history(message)
 
         # Clear input
         self._input_widget.clear()
+
+        # Resume follow if paused
+        if self._conversation_log and self._conversation_log.follow_paused:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
 
         # Handle commands
         if message.startswith("/"):
@@ -681,10 +724,7 @@ class VictorTUI(App):
 
         # Handle /clear in TUI to also clear the visual log
         if cmd in ("/clear", "/reset"):
-            self._conversation_log.clear()
-            if self.agent:
-                self.agent.reset_conversation()
-            self._conversation_log.add_system_message("Conversation cleared")
+            self.action_clear()
             self._input_widget.focus_input()
             return
 
@@ -713,6 +753,8 @@ class VictorTUI(App):
 
         self._is_processing = True
         self._set_status("Working", "busy")
+        if self._input_widget:
+            self._input_widget.set_busy(True)
 
         try:
             if self.agent:
@@ -735,7 +777,7 @@ class VictorTUI(App):
             self._is_processing = False
             self._set_status("Idle", "idle")
             if self._input_widget:
-                # Call directly without _call_ui since we're in the UI thread
+                self._input_widget.set_busy(False)
                 try:
                     self._input_widget.focus_input()
                 except Exception as e:
@@ -819,6 +861,37 @@ class VictorTUI(App):
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
 
+                elif isinstance(getattr(chunk, "metadata", None), dict):
+                    metadata = chunk.metadata or {}
+
+                    if "tool_start" in metadata:
+                        tool_data = metadata["tool_start"]
+                        try:
+                            self._show_tool_call(
+                                tool_data.get("name", "unknown"),
+                                tool_data.get("arguments", {}),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to show tool call: {e}")
+
+                    elif "tool_result" in metadata:
+                        tool_data = metadata["tool_result"]
+                        try:
+                            self._finish_tool_call(
+                                success=tool_data.get("success", True),
+                                elapsed=tool_data.get("elapsed"),
+                                follow_up_suggestions=tool_data.get("follow_up_suggestions"),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to finish tool call: {e}")
+
+                    elif "reasoning_content" in metadata:
+                        try:
+                            self._show_thinking()
+                            self._update_thinking(metadata["reasoning_content"] or "")
+                        except Exception as e:
+                            logger.warning(f"Failed to update thinking content: {e}")
+
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
                     content_buffer += chunk.content
@@ -882,21 +955,29 @@ class VictorTUI(App):
         self,
         success: bool = True,
         elapsed: float | None = None,
+        follow_up_suggestions: list[dict] | None = None,
     ) -> None:
         """Finish current tool call."""
         if self._current_tool_widget:
             status = "success" if success else "error"
             finished_widget = self._current_tool_widget
-            finished_widget.update_status(status, elapsed)
+            finished_widget.update_status(
+                status,
+                elapsed,
+                follow_up_suggestions=follow_up_suggestions,
+            )
             self._current_tool_widget = None
-            self._schedule_tool_widget_cleanup(finished_widget)
+            self._schedule_tool_widget_cleanup(
+                finished_widget,
+                timeout=20.0 if follow_up_suggestions else 6.0,
+            )
             self._prune_tool_widgets()
 
-    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget) -> None:
+    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget, timeout: float = 6.0) -> None:
         def _remove() -> None:
             self._remove_tool_widget(widget)
 
-        self.set_timer(6.0, _remove)
+        self.set_timer(timeout, _remove)
 
     def _remove_tool_widget(self, widget: ToolCallWidget) -> None:
         if widget in self._tool_widgets:
@@ -984,7 +1065,14 @@ class VictorTUI(App):
             self._add_system_message("Details panels shown")
 
     def action_cancel_stream(self) -> None:
-        """Request cancellation of the current stream if active."""
+        """Request cancellation of the current stream or session restore."""
+        # Cancel active session restore first
+        if self._session_restore_task and not self._session_restore_task.done():
+            self._session_restore_task.cancel()
+            self._add_system_message("Session restore canceled")
+            self._set_status("Idle", "idle")
+            return
+
         if not self.agent:
             self._add_system_message("No active agent to cancel")
             return
@@ -1125,23 +1213,16 @@ class VictorTUI(App):
             return
 
         message_count = len(session.messages)
-        if message_count > 50:
-            self._add_system_message(f"Loading {message_count} messages...")
-
-        if self._conversation_log:
-            self._conversation_log.clear()
+        self._set_status(f"Loading session ({message_count} messages)...", "busy")
 
         self._session_messages = list(session.messages)
-        for i, msg in enumerate(session.messages):
-            self._render_message(msg.role, msg.content)
-            # Show progress for large sessions
-            if message_count > 50 and (i + 1) % 25 == 0:
-                self._add_system_message(f"Loading... {i + 1}/{message_count}")
+        self._replay_transcript([(msg.role, msg.content) for msg in session.messages])
 
         self._restore_agent_conversation(session.messages)
         self._add_system_message(
             f"Session loaded: {session.name or session.id[:8]} ({message_count} messages)"
         )
+        self._set_status("Idle", "idle")
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""
@@ -1202,8 +1283,11 @@ class VictorTUI(App):
         title = metadata.get("title") or session_id[:8]
         self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
 
-    def _render_message(self, role: str, content: str) -> None:
+    def _render_message(self, role: str, content: str, replay: bool = False) -> None:
         if not self._conversation_log:
+            return
+        if replay:
+            self._conversation_log.add_history_message(role, content)
             return
         if role == "user":
             self._conversation_log.add_user_message(content)
@@ -1238,6 +1322,104 @@ class VictorTUI(App):
             self.agent.conversation = history
         except Exception as exc:
             self._add_error_message(f"Failed to restore agent context: {exc}")
+
+    def _replay_transcript(self, messages: list[tuple[str, str]]) -> None:
+        """Replay a list of (role, content) tuples into the conversation log.
+
+        Uses ``add_history_message`` to avoid scroll/unread side effects,
+        then jumps to bottom once.
+        """
+        with self.batch_update():
+            self._conversation_log.clear()
+            for role, content in messages:
+                self._conversation_log.add_history_message(role, content)
+        self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+
+    async def _replay_transcript_async(
+        self,
+        messages: list[tuple[str, str]],
+        status_label: str = "Loading session",
+    ) -> None:
+        """Replay a transcript with async chunking for large histories."""
+        if len(messages) <= self._ASYNC_REPLAY_THRESHOLD:
+            self._replay_transcript(messages)
+            return
+
+        self._conversation_log.clear()
+        total = len(messages)
+        idx = 0
+        while idx < total:
+            chunk_end = min(idx + self._ASYNC_REPLAY_CHUNK_SIZE, total)
+            with self.batch_update():
+                for role, content in messages[idx:chunk_end]:
+                    self._conversation_log.add_history_message(role, content)
+            idx = chunk_end
+            self._set_status(f"{status_label} ({idx}/{total})")
+            await asyncio.sleep(0)
+
+        self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+
+    def _start_session_restore(
+        self,
+        coro,
+        fallback: Optional[Callable] = None,
+    ) -> None:
+        """Schedule a session-restore coroutine on the running event loop.
+
+        Falls back to ``fallback()`` when no event loop is active.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            self._session_restore_task = loop.create_task(coro)
+        except RuntimeError:
+            # No running loop — clean up the coroutine and use fallback
+            coro.close()
+            if fallback:
+                fallback()
+
+    async def _load_session_async(self, session_id: str) -> None:
+        """Async session loader using chunked replay."""
+        from victor.ui.tui.session import SessionManager
+
+        manager = SessionManager()
+        session = await asyncio.to_thread(manager.load, session_id)
+        if not session:
+            self._add_error_message(f"Session not found: {session_id}")
+            return
+
+        messages = [(msg.role, msg.content) for msg in session.messages]
+        await self._replay_transcript_async(messages, status_label="Loading session")
+        self._restore_agent_conversation(session.messages)
+        self._add_system_message(
+            f"Session loaded: {session.name or session.id[:8]} ({len(session.messages)} messages)"
+        )
+
+    async def _load_project_session_async(self, session_id: str) -> None:
+        """Async project session loader using chunked replay."""
+        from victor.agent.message_history import MessageHistory
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+
+        persistence = get_sqlite_session_persistence()
+        session = await asyncio.to_thread(persistence.load_session, session_id)
+        if not session:
+            self._add_error_message(f"Project session not found: {session_id}")
+            return
+
+        conversation = session.get("conversation", {})
+        history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
+        messages = [(msg.role, msg.content) for msg in history.messages]
+        await self._replay_transcript_async(messages, status_label="Loading project session")
+
+        metadata = session.get("metadata", {})
+        title = metadata.get("title") or session_id[:8]
+        self._add_system_message(f"Project session loaded: {title} ({len(messages)} messages)")
+
+    def _handle_console_line(self, line: str) -> None:
+        """Handle a single console output line for recording and UI refresh."""
+        if not line:
+            return
+        self._record_message("system", line)
+        self._update_jump_to_bottom()
 
     def action_save_session(self) -> None:
         """Save the current session."""
@@ -1347,19 +1529,101 @@ Slash Commands:
         """Scroll to bottom of conversation."""
         if not self._conversation_log:
             return
-        self._conversation_log.scroll_to_bottom(animate=False)
+        if self._conversation_log.follow_paused:
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+        else:
+            self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
 
-    def on_scroll(self, event) -> None:
-        if event.sender is self._conversation_log:
-            self._update_jump_to_bottom()
+    def action_page_up(self) -> None:
+        """Page up the conversation log."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.disable_auto_scroll()
+        self._conversation_log.scroll_page_up(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
+
+    def action_page_down(self) -> None:
+        """Page down the conversation log."""
+        if not self._conversation_log:
+            return
+        self._conversation_log.scroll_page_down(animate=False)
+        self._conversation_log.update_auto_scroll_state()
+        self._update_jump_to_bottom()
+
+    def action_toggle_follow_mode(self) -> None:
+        """Toggle sticky follow-pause mode (Ctrl+F)."""
+        if not self._conversation_log:
+            return
+        if self._conversation_log.follow_paused or self._conversation_log.auto_scroll_enabled:
+            # Currently following or paused — toggle
+            if self._conversation_log.follow_paused:
+                self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            else:
+                self._conversation_log.set_follow_paused(True, jump_to_bottom=False)
+        else:
+            # User scrolled away (not paused, not at bottom) — resume
+            self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+        self._update_jump_to_bottom()
+
+    def action_toggle_unread_marker(self) -> None:
+        """Toggle unread separator marker visibility."""
+        if not self._conversation_log:
+            return
+        new_state = not self._conversation_log.unread_separator_enabled
+        self._conversation_log.set_unread_separator_enabled(new_state)
+        label = "Unread marker shown" if new_state else "Unread marker hidden"
+        self._add_system_message(label)
+        self._update_jump_to_bottom()
+
+    def action_jump_unread(self) -> None:
+        """Jump to unread separator or bottom."""
+        if not self._conversation_log:
+            return
+        jumped = self._conversation_log.jump_to_unread_separator()
+        if jumped:
+            self._conversation_log.disable_auto_scroll()
+            self._conversation_log.update_auto_scroll_state()
+        else:
+            if self._conversation_log.follow_paused:
+                self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            else:
+                self._conversation_log.scroll_to_bottom(animate=False)
+        self._update_jump_to_bottom()
+
+    def on_update_scroll(self, event) -> None:
+        """Refresh jump button when conversation log scrolls."""
+        from textual.messages import UpdateScroll
+
+        if not isinstance(event, UpdateScroll):
+            return
+        if getattr(event, "_sender", None) is not self._conversation_log:
+            return
+        self._update_jump_to_bottom()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "jump-to-bottom":
             return
         if self._conversation_log:
-            self._conversation_log.scroll_to_bottom(animate=False)
+            if self._conversation_log.follow_paused:
+                self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
+            else:
+                self._conversation_log.scroll_to_bottom(animate=False)
         self._update_jump_to_bottom()
+
+    def on_tool_call_widget_follow_up_selected(
+        self, event: ToolCallWidget.FollowUpSelected
+    ) -> None:
+        """Prefill the input with a selected tool follow-up command."""
+        command = event.command.strip()
+        if not command or not self._input_widget:
+            return
+        self._input_widget.set_value(command)
+        if not self._is_processing:
+            self._input_widget.focus_input()
+        preview = command if len(command) <= 80 else command[:77] + "..."
+        self._add_system_message(f"Prepared follow-up: {preview}")
 
     def add_message(self, content: str, role: str = "assistant") -> None:
         """Add a message to the conversation log.
@@ -1396,10 +1660,32 @@ Slash Commands:
     def _update_jump_to_bottom(self) -> None:
         if not self._jump_button or not self._conversation_log:
             return
-        if self._conversation_log.auto_scroll_enabled:
-            self._jump_button.remove_class("visible")
+        log = self._conversation_log
+        should_show = not log.auto_scroll_enabled or log.follow_paused
+        unread = log.unread_count
+        paused = log.follow_paused or not log.auto_scroll_enabled
+
+        if should_show:
+            if self._jump_button_visible is not True:
+                self._jump_button.add_class("visible")
+                self._jump_button_visible = True
+            if log.follow_paused:
+                label = "Resume follow"
+            else:
+                label = "Jump to bottom"
+            if unread > 0:
+                label += f" ({unread} new)"
+            self._jump_button.label = label
         else:
-            self._jump_button.add_class("visible")
+            if self._jump_button_visible is not False:
+                self._jump_button.remove_class("visible")
+                self._jump_button_visible = False
+            self._jump_button.label = "Jump to bottom"
+
+        # Update status bar indicators if available
+        if self._status_bar:
+            self._status_bar.update_follow(paused)
+            self._status_bar.update_unread(unread)
 
     async def _start_streaming_ui(self) -> None:
         if not self._conversation_log:

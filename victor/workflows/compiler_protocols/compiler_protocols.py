@@ -45,7 +45,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Opti
 
 if TYPE_CHECKING:
     from victor.framework.graph import StateGraph
-    from victor.workflows.definition import WorkflowDefinition, WorkflowNode, WorkflowState
+    from victor.workflows.definition import WorkflowDefinition, WorkflowNode
+    from victor.workflows.runtime_types import WorkflowState
 
 
 class WorkflowCompilerProtocol(Protocol):

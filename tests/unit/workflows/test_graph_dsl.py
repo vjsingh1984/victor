@@ -14,10 +14,14 @@
 
 """Tests for the WorkflowGraph DSL module."""
 
+from __future__ import annotations
+
 import pytest
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from unittest.mock import patch
 
+from victor.core.async_utils import run_sync as shared_run_sync, run_sync_in_thread
 from victor.workflows.graph_dsl import (
     State,
     WorkflowGraph,
@@ -415,6 +419,43 @@ class TestCompilation:
         workflow = graph.compile()
 
         assert isinstance(workflow.nodes["process"], TransformNode)
+
+    def test_compile_with_async_transform_node_uses_shared_sync_bridge(self):
+        """Async function nodes should use the shared sync bridge when compiled."""
+        graph = WorkflowGraph(SimpleState)
+        graph.add_node("process", async_increment)
+        graph.set_entry_point("process")
+        graph.set_finish_point("process")
+
+        workflow = graph.compile()
+
+        with patch(
+            "victor.workflows.graph_dsl.run_sync",
+            side_effect=lambda coro: shared_run_sync(coro),
+        ) as mock_run_sync:
+            result = workflow.nodes["process"].transform({"value": 1})
+
+        assert result["value"] == 2
+        mock_run_sync.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_compile_with_async_transform_node_uses_thread_bridge_in_async_context(self):
+        """Compiled async function nodes should avoid nested loops in async contexts."""
+        graph = WorkflowGraph(SimpleState)
+        graph.add_node("process", async_increment)
+        graph.set_entry_point("process")
+        graph.set_finish_point("process")
+
+        workflow = graph.compile()
+
+        with patch(
+            "victor.workflows.graph_dsl.run_sync_in_thread",
+            side_effect=lambda coro: run_sync_in_thread(coro),
+        ) as mock_run_sync_in_thread:
+            result = workflow.nodes["process"].transform({"value": 2})
+
+        assert result["value"] == 3
+        mock_run_sync_in_thread.assert_called_once()
 
     def test_compile_preserves_edges(self):
         """Test that edges are preserved in compilation."""

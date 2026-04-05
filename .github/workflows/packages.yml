@@ -3,8 +3,6 @@ name: Packages CI
 on:
   push:
     branches: [main, develop]
-    tags:
-      - 'v*'  # Trigger on version tags for PyPI publishing
   pull_request:
     branches: [main, develop]
 
@@ -13,9 +11,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Verify versions are in sync before anything else
+  version-check:
+    name: Version Sync Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check version consistency
+        run: python scripts/check_version_sync.py
+
+  # Build and test victor-sdk first (victor-ai depends on it)
+  build-sdk:
+    name: Build victor-sdk
+    runs-on: ubuntu-latest
+    needs: version-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install build tools
+        run: pip install build wheel
+
+      - name: Build victor-sdk
+        working-directory: victor-sdk
+        run: python -m build
+
+      - name: Upload SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: victor-sdk-dist
+          path: victor-sdk/dist/
+
   # Test package in isolation
   test-packages:
     name: Test victor-ai (Python ${{ matrix.python-version }})
+    needs: [version-check, build-sdk]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -32,6 +70,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+
+      - name: Download and install victor-sdk wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: victor-sdk-dist
+          path: sdk-dist/
+
+      - name: Install victor-sdk from local wheel
+        run: |
+          pip install sdk-dist/*.whl
+          python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
 
       - name: Install package dependencies
         run: |
@@ -118,48 +167,28 @@ jobs:
         run: victor --help
         continue-on-error: true  # May fail during migration
 
-  # Publish to TestPyPI on develop branch
+  # Publish to TestPyPI on develop branch (preview builds)
+  # Production PyPI publishing is handled by release.yml (v* tags)
+  # SDK publishing is handled by release-sdk.yml (sdk-v* tags)
   publish-testpypi:
     name: Publish to TestPyPI
     runs-on: ubuntu-latest
-    needs: [build-packages, integration-test]
+    needs: [build-sdk, build-packages, integration-test]
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment: testpypi
     permissions:
       id-token: write
     steps:
-      - name: Download artifact
+      - name: Download victor-ai artifact
         uses: actions/download-artifact@v4
         with:
           name: victor-ai-dist
           path: dist/
 
-      - name: Publish to TestPyPI
+      - name: Publish victor-ai to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/
           skip-existing: true
-        continue-on-error: true  # May fail if version already exists
-
-  # Publish to PyPI on version tags
-  publish-pypi:
-    name: Publish victor-ai to PyPI
-    runs-on: ubuntu-latest
-    needs: [build-packages, integration-test]
-    if: startsWith(github.ref, 'refs/tags/v')
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: victor-ai-dist
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
-          skip-existing: true
+        continue-on-error: true

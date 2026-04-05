@@ -201,31 +201,28 @@ class DockerServiceProvider(BaseServiceProvider):
 
         handle = ServiceHandle.create(config)
 
-        # Run in thread pool (Docker SDK is sync)
-        loop = asyncio.get_event_loop()
-
         try:
             # Pull image if needed
             try:
-                await loop.run_in_executor(None, self.client.images.get, config.image)
+                await asyncio.to_thread(self.client.images.get, config.image)
             except ImageNotFound:
                 logger.info(f"Pulling image: {config.image}")
-                await loop.run_in_executor(None, self.client.images.pull, config.image)
+                await asyncio.to_thread(self.client.images.pull, config.image)
 
             # Build container config
-            container_config = self._build_container_config(config, handle)
+            container_config = await asyncio.to_thread(self._build_container_config, config, handle)
 
             # Create and start container
-            container: Container = await loop.run_in_executor(
-                None,
-                lambda: self.client.containers.run(**container_config),
+            container: Container = await asyncio.to_thread(
+                self.client.containers.run,
+                **container_config,
             )
 
             handle.container_id = container.id
             handle.state = ServiceState.STARTING
 
             # Get actual port mappings
-            await loop.run_in_executor(None, container.reload)
+            await asyncio.to_thread(container.reload)
 
             ports = container.attrs.get("NetworkSettings", {}).get("Ports", {})
             for pm in config.ports:
@@ -253,11 +250,8 @@ class DockerServiceProvider(BaseServiceProvider):
         if not handle.container_id:
             return
 
-        loop = asyncio.get_event_loop()
-
         try:
-            container = await loop.run_in_executor(
-                None,
+            container = await asyncio.to_thread(
                 self.client.containers.get,
                 handle.container_id,
             )
@@ -266,12 +260,8 @@ class DockerServiceProvider(BaseServiceProvider):
                 f"Stopping container {handle.container_id[:12]} " f"(grace={grace_period}s)"
             )
 
-            await loop.run_in_executor(
-                None,
-                lambda: container.stop(timeout=int(grace_period)),
-            )
-
-            await loop.run_in_executor(None, container.remove)
+            await asyncio.to_thread(container.stop, timeout=int(grace_period))
+            await asyncio.to_thread(container.remove)
 
             logger.info(f"Stopped and removed container {handle.container_id[:12]}")
 
@@ -286,19 +276,13 @@ class DockerServiceProvider(BaseServiceProvider):
         if not handle.container_id:
             return
 
-        loop = asyncio.get_event_loop()
-
         try:
-            container = await loop.run_in_executor(
-                None,
+            container = await asyncio.to_thread(
                 self.client.containers.get,
                 handle.container_id,
             )
 
-            await loop.run_in_executor(
-                None,
-                lambda: container.remove(force=True),
-            )
+            await asyncio.to_thread(container.remove, force=True)
 
             logger.info(f"Force removed container {handle.container_id[:12]}")
 
@@ -312,19 +296,13 @@ class DockerServiceProvider(BaseServiceProvider):
         if not handle.container_id:
             return ""
 
-        loop = asyncio.get_event_loop()
-
         try:
-            container = await loop.run_in_executor(
-                None,
+            container = await asyncio.to_thread(
                 self.client.containers.get,
                 handle.container_id,
             )
 
-            logs = await loop.run_in_executor(
-                None,
-                lambda: container.logs(tail=tail, timestamps=True),
-            )
+            logs = await asyncio.to_thread(container.logs, tail=tail, timestamps=True)
 
             return logs.decode("utf-8", errors="replace")
 
@@ -342,19 +320,13 @@ class DockerServiceProvider(BaseServiceProvider):
         if not handle.container_id:
             raise RuntimeError("No container ID")
 
-        loop = asyncio.get_event_loop()
-
         try:
-            container = await loop.run_in_executor(
-                None,
+            container = await asyncio.to_thread(
                 self.client.containers.get,
                 handle.container_id,
             )
 
-            result = await loop.run_in_executor(
-                None,
-                lambda: container.exec_run(command, demux=True),
-            )
+            result = await asyncio.to_thread(container.exec_run, command, demux=True)
 
             exit_code = result.exit_code
             stdout = result.output[0] or b""
@@ -376,25 +348,21 @@ class DockerServiceProvider(BaseServiceProvider):
         Returns:
             Number of containers removed
         """
-        loop = asyncio.get_event_loop()
-
         filters = {"label": f"{self._label_prefix}.managed=true"}
         if label_filter:
             filters["label"] = [filters["label"], label_filter]
 
         try:
-            containers = await loop.run_in_executor(
-                None,
-                lambda: self.client.containers.list(filters=filters, all=True),
+            containers = await asyncio.to_thread(
+                self.client.containers.list,
+                filters=filters,
+                all=True,
             )
 
             count = 0
             for container in containers:
                 try:
-                    await loop.run_in_executor(
-                        None,
-                        lambda c=container: c.remove(force=True),
-                    )
+                    await asyncio.to_thread(container.remove, force=True)
                     count += 1
                 except Exception as e:
                     logger.warning(f"Failed to remove container {container.id}: {e}")

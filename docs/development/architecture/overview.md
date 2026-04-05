@@ -110,8 +110,8 @@ flowchart TB
 |-------|------------|---------|
 | **Clients** | CLI, HTTP API, MCP Server, VS Code | User interaction |
 | **Orchestrator** | AgentOrchestrator, Controllers | Coordinate execution |
-| **Providers** | 22 LLM providers | Model abstraction |
-| **Tools** | 33 tool modules | Capability execution |
+| **Providers** | 24 LLM providers | Model abstraction |
+| **Tools** | 34 tool modules | Capability execution |
 | **Workflows** | StateGraph, YAML DSL | Multi-step processes |
 | **Teams** | 4 formations (seq/par/hier/pipe) | Multi-agent coordination |
 | **State** | 4 scopes (workflow/conv/team/global) | Unified state management |

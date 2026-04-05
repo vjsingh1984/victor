@@ -34,6 +34,7 @@ import uuid
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from victor.config.timeouts import McpTimeouts
+from victor.core.async_utils import run_sync
 
 if TYPE_CHECKING:
     from victor.integrations.mcp.sandbox import SandboxConfig, SandboxedProcess
@@ -246,23 +247,26 @@ class MCPClient:
             self.process = None
             self.initialized = False
 
+    def _cleanup_sandboxed_process_sync(self) -> None:
+        """Clean up sandboxed process from sync code paths."""
+        if self._sandboxed_process is None:
+            return
+
+        sandboxed_process = self._sandboxed_process
+        self._sandboxed_process = None
+
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(sandboxed_process.terminate())
+        except RuntimeError:
+            try:
+                run_sync(sandboxed_process.terminate())
+            except Exception as e:
+                logger.debug(f"Error terminating sandboxed process: {e}")
+
     def _cleanup_process(self) -> None:
         """Clean up subprocess and its resources (sync wrapper for backwards compatibility)."""
-        # Handle sandboxed process cleanup synchronously if possible
-        if self._sandboxed_process is not None:
-            try:
-                # Try to get running loop and schedule cleanup
-                _loop = asyncio.get_running_loop()  # noqa: F841
-                # If we're in an async context, schedule the cleanup
-                asyncio.create_task(self._sandboxed_process.terminate())
-            except RuntimeError:
-                # No running loop, we're in sync context
-                try:
-                    asyncio.run(self._sandboxed_process.terminate())
-                except Exception as e:
-                    logger.debug(f"Error terminating sandboxed process: {e}")
-            self._sandboxed_process = None
-
+        self._cleanup_sandboxed_process_sync()
         self._cleanup_process_sync()
 
     async def initialize(self) -> bool:
@@ -431,7 +435,7 @@ class MCPClient:
             (request_json + "\n").encode()
 
             # Write asynchronously using run_in_executor to avoid blocking
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(
                 None,
                 lambda: (self.process.stdin.write(request_json + "\n"), self.process.stdin.flush()),
@@ -497,19 +501,7 @@ class MCPClient:
             self._health_task.cancel()
             self._health_task = None
 
-        # Clean up sandboxed process if used
-        if self._sandboxed_process is not None:
-            try:
-                # Try to get running loop and schedule cleanup
-                _loop = asyncio.get_running_loop()  # noqa: F841
-                asyncio.create_task(self._sandboxed_process.terminate())
-            except RuntimeError:
-                # No running loop, we're in sync context
-                try:
-                    asyncio.run(self._sandboxed_process.terminate())
-                except Exception as e:
-                    logger.debug(f"Error terminating sandboxed process: {e}")
-            self._sandboxed_process = None
+        self._cleanup_sandboxed_process_sync()
 
         if self.process:
             # Close file handles to prevent resource leaks
@@ -625,7 +617,7 @@ class MCPClient:
             try:
                 self.process.terminate()
                 # Use asyncio to wait non-blocking
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 try:
                     await asyncio.wait_for(
                         loop.run_in_executor(None, self.process.wait),

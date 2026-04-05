@@ -244,13 +244,13 @@ export class ViewRefreshManager {
 
     private _setupChangeHandler(): void {
         this._disposables.push(
-            this._fileWatcher.onFileChange((event) => {
-                this._handleFileChange(event);
+            this._fileWatcher.onFileChange(() => {
+                this._handleFileChange();
             })
         );
     }
 
-    private _handleFileChange(event: FileChangeEvent): void {
+    private _handleFileChange(): void {
         const now = Date.now();
 
         // Refresh all registered views with throttling

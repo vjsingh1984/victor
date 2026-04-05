@@ -183,7 +183,7 @@ def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
     Returns:
         List of result dictionaries
     """
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
     results = []
 
     # Find result divs
@@ -244,7 +244,7 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     Returns:
         Extracted text content
     """
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, "lxml")
 
     # Remove script and style elements
     for script in soup(["script", "style", "nav", "footer", "header"]):
@@ -310,7 +310,7 @@ async def web_search(
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
-    context: Optional[Dict[str, Any]] = None,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Search the web using DuckDuckGo. Optionally summarize with AI.
 
@@ -329,7 +329,7 @@ async def web_search(
         fetch_top: Number of URLs to fetch for deeper summary (only with ai_summarize=True).
         fetch_pool: Pool of URLs to try fetching from (only with ai_summarize=True).
         max_content_length: Max content length to extract per URL (only with ai_summarize=True).
-        context: Tool execution context containing ToolConfig for provider/model access.
+        _exec_ctx: Tool execution context containing ToolConfig for provider/model access.
 
     Returns:
         Dictionary containing:
@@ -349,12 +349,12 @@ async def web_search(
             fetch_top,
             fetch_pool,
             max_content_length,
-            context=context,
+            context=_exec_ctx,
         )
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
 
-    config = _get_web_config(context)
+    config = _get_web_config(_exec_ctx)
 
     # Map safe search to DuckDuckGo values
     safe_map = {"on": "1", "moderate": "-1", "off": "-2"}
@@ -438,7 +438,7 @@ async def web_search(
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
 )
-async def web_fetch(url: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -447,7 +447,7 @@ async def web_fetch(url: str, context: Optional[Dict[str, Any]] = None) -> Dict[
     if not url:
         return {"success": False, "error": "Missing required parameter: url"}
 
-    config = _get_web_config(context)
+    config = _get_web_config(_exec_ctx)
     cache: Optional[GenericResultCache] = None
     cache_params = {
         "max_content_length": int(config.get("max_content_length", _DEFAULT_MAX_CONTENT_LENGTH))

@@ -350,6 +350,16 @@ class InMemoryEventBackend:
         self._overflow_durable_sink = extra.get("overflow_durable_sink")
 
         self._subscriptions: Dict[str, _Subscription] = {}
+        # Topic index: exact topic -> list of subscription IDs for O(1) exact dispatch.
+        # Wildcard subscriptions (containing "*") are stored separately for linear scan.
+        self._exact_topic_index: Dict[str, List[str]] = {}
+        self._wildcard_subscriptions: List[str] = []
+        self._compiled_patterns: Dict[str, Callable[[str], bool]] = {}
+        # Cache: topic -> list of matching wildcard subscription IDs.
+        # Invalidated on subscribe/unsubscribe to keep consistent.
+        self._wildcard_match_cache: Dict[str, List[str]] = {}
+        # Cache: topic -> (policy, timeout_ms) for overflow policy resolution.
+        self._overflow_policy_cache: Dict[str, tuple[str, float]] = {}
         self._event_queue: asyncio.Queue[MessagingEvent] = asyncio.Queue(
             maxsize=self._queue_maxsize
         )
@@ -379,6 +389,68 @@ class InMemoryEventBackend:
     def is_connected(self) -> bool:
         """Check if backend is connected and ready."""
         return self._is_connected
+
+    def _invalidate_dispatch_caches(self) -> None:
+        """Invalidate wildcard match and overflow policy caches.
+
+        Called when subscriptions change to ensure cache consistency.
+        """
+        self._wildcard_match_cache.clear()
+        self._overflow_policy_cache.clear()
+
+    def _index_subscription(self, subscription: "_Subscription") -> None:
+        """Add subscription to the appropriate index."""
+        if "*" in subscription.pattern:
+            self._wildcard_subscriptions.append(subscription.id)
+            self._compiled_patterns[subscription.id] = self._compile_pattern(subscription.pattern)
+            self._invalidate_dispatch_caches()
+        else:
+            # Exact topic match - O(1) lookup
+            if subscription.pattern not in self._exact_topic_index:
+                self._exact_topic_index[subscription.pattern] = []
+            self._exact_topic_index[subscription.pattern].append(subscription.id)
+
+    def _deindex_subscription(self, subscription: "_Subscription") -> None:
+        """Remove subscription from the index."""
+        sid = subscription.id
+        if "*" in subscription.pattern:
+            if sid in self._wildcard_subscriptions:
+                self._wildcard_subscriptions.remove(sid)
+            self._compiled_patterns.pop(sid, None)
+            self._invalidate_dispatch_caches()
+        else:
+            subs = self._exact_topic_index.get(subscription.pattern, [])
+            if sid in subs:
+                subs.remove(sid)
+                if not subs:
+                    del self._exact_topic_index[subscription.pattern]
+
+    @staticmethod
+    def _compile_pattern(pattern: str) -> Callable[[str], bool]:
+        """Compile a topic pattern into an efficient matcher function.
+
+        Avoids repeated string splitting on every event dispatch.
+        """
+        if pattern == "*":
+            return lambda topic: True
+
+        pattern_parts = pattern.split(".")
+        has_trailing_wildcard = pattern_parts[-1] == "*"
+
+        def matcher(topic: str) -> bool:
+            topic_parts = topic.split(".")
+            if has_trailing_wildcard:
+                if len(topic_parts) < len(pattern_parts) - 1:
+                    return False
+                return all(
+                    p == "*" or p == t
+                    for p, t in zip(pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1])
+                )
+            if len(pattern_parts) != len(topic_parts):
+                return False
+            return all(p == "*" or p == t for p, t in zip(pattern_parts, topic_parts))
+
+        return matcher
 
     async def connect(self) -> None:
         """Connect and start the event dispatcher.
@@ -463,15 +535,26 @@ class InMemoryEventBackend:
             logger.debug("Durable sink write failed: %s", e)
 
     def _resolve_overflow_policy_for_topic(self, topic: str) -> tuple[str, float]:
-        """Resolve effective overflow policy + timeout for a topic."""
+        """Resolve effective overflow policy + timeout for a topic.
+
+        Results are cached per topic and invalidated when subscriptions change.
+        """
+        cached = self._overflow_policy_cache.get(topic)
+        if cached is not None:
+            return cached
+
         for pattern, policy in self._queue_overflow_topic_policy_items:
             if fnmatchcase(topic, pattern):
                 timeout_ms = self._queue_overflow_topic_block_timeout_ms.get(
                     pattern,
                     self._queue_overflow_block_timeout_ms,
                 )
-                return policy, timeout_ms
-        return self._queue_overflow_policy, self._queue_overflow_block_timeout_ms
+                result = (policy, timeout_ms)
+                self._overflow_policy_cache[topic] = result
+                return result
+        result = (self._queue_overflow_policy, self._queue_overflow_block_timeout_ms)
+        self._overflow_policy_cache[topic] = result
+        return result
 
     async def publish(self, event: MessagingEvent) -> bool:
         """Publish an event to all matching subscribers.
@@ -593,6 +676,7 @@ class InMemoryEventBackend:
 
         with self._lock:
             self._subscriptions[subscription_id] = subscription
+            self._index_subscription(subscription)
 
         # Create handle with unsubscribe capability
         handle = SubscriptionHandle(
@@ -624,6 +708,7 @@ class InMemoryEventBackend:
             subscription = self._subscriptions.get(handle.subscription_id)
             if subscription:
                 subscription.is_active = False
+                self._deindex_subscription(subscription)
                 del self._subscriptions[handle.subscription_id]
                 handle.is_active = False
                 logger.debug(f"Unsubscribed from pattern '{handle.pattern}'")
@@ -643,12 +728,28 @@ class InMemoryEventBackend:
                 except asyncio.TimeoutError:
                     continue
 
-                # Get matching subscriptions
+                # Get matching subscriptions via indexed lookup
                 with self._lock:
+                    matched_ids: List[str] = []
+                    # O(1) exact topic match
+                    exact_ids = self._exact_topic_index.get(event.topic, [])
+                    matched_ids.extend(exact_ids)
+                    # Wildcard matching with cache (O(1) on cache hit)
+                    cached_wildcards = self._wildcard_match_cache.get(event.topic)
+                    if cached_wildcards is not None:
+                        matched_ids.extend(cached_wildcards)
+                    else:
+                        wildcard_matches = [
+                            sid
+                            for sid in self._wildcard_subscriptions
+                            if self._compiled_patterns.get(sid, lambda t: False)(event.topic)
+                        ]
+                        self._wildcard_match_cache[event.topic] = wildcard_matches
+                        matched_ids.extend(wildcard_matches)
                     subscriptions = [
-                        s
-                        for s in self._subscriptions.values()
-                        if s.is_active and event.matches_pattern(s.pattern)
+                        self._subscriptions[sid]
+                        for sid in matched_ids
+                        if sid in self._subscriptions and self._subscriptions[sid].is_active
                     ]
 
                 # Dispatch to handlers concurrently
@@ -660,14 +761,18 @@ class InMemoryEventBackend:
                         self._pending_tasks.add(task)
                         task.add_done_callback(self._pending_tasks.discard)
                     except Exception:
-                        # Silently skip all errors - event loop issues, closed loops, etc.
-                        pass
+                        logger.warning(
+                            "Failed to dispatch event handler",
+                            exc_info=True,
+                        )
 
             except asyncio.CancelledError:
                 break
             except Exception:
-                # Silently suppress all dispatch loop errors
-                pass
+                logger.warning(
+                    "Unexpected error in event dispatch loop",
+                    exc_info=True,
+                )
 
     async def _safe_call_handler(self, handler: EventHandler, event: MessagingEvent) -> None:
         """Safely call a handler, catching exceptions."""
@@ -830,6 +935,7 @@ def create_event_backend(
     *,
     backend_type: Optional[BackendType] = None,
     lazy_init: bool = False,
+    enable_batching: bool = False,
 ) -> IEventBackend:
     """Factory function to create event backends.
 
@@ -841,23 +947,10 @@ def create_event_backend(
         backend_type: Override backend type (uses config.backend_type if not set)
         lazy_init: If True, defer backend object construction until first operation.
             Recommended for heavyweight distributed backends.
+        enable_batching: If True, wrap the backend in a BatchingEventBackend decorator.
 
     Returns:
         IEventBackend implementation
-
-    Example:
-        # Default in-memory backend
-        backend = create_event_backend()
-
-        # With config
-        config = BackendConfig(
-            backend_type=BackendType.KAFKA,
-            extra={"bootstrap_servers": "localhost:9092"}
-        )
-        backend = create_event_backend(config)
-
-        # Override type
-        backend = create_event_backend(backend_type=BackendType.REDIS)
     """
     config = config or BackendConfig()
     selected_type = backend_type or config.backend_type
@@ -879,13 +972,21 @@ def create_event_backend(
 
     # In-memory backend is lightweight; instantiate directly.
     if selected_type == BackendType.IN_MEMORY or not lazy_init:
-        return factory(config)
+        backend = factory(config)
+    else:
+        backend = LazyInitEventBackend(
+            config=config,
+            backend_type=selected_type,
+            factory=factory,
+        )
 
-    return LazyInitEventBackend(
-        config=config,
-        backend_type=selected_type,
-        factory=factory,
-    )
+    # Wrap in batching decorator if requested
+    if enable_batching:
+        from victor.core.events.batching_backend import BatchingEventBackend
+
+        return BatchingEventBackend(backend, config)
+
+    return backend
 
 
 # Register built-in backend
@@ -1379,8 +1480,13 @@ def get_observability_bus() -> ObservabilityBus:
             # Read settings to determine backend
             settings = get_settings()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
+            enable_batching = bool(getattr(settings, "event_batching_enabled", False))
             backend_config = build_backend_config_from_settings(settings)
-            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
+            backend = create_event_backend(
+                config=backend_config,
+                lazy_init=lazy_init,
+                enable_batching=enable_batching,
+            )
 
             return ObservabilityBus(backend=backend)
 
@@ -1446,8 +1552,15 @@ def get_agent_message_bus() -> AgentMessageBus:
             # Read settings to determine backend
             settings = get_settings()
             lazy_init = bool(getattr(settings, "event_backend_lazy_init", True))
+            enable_batching = bool(
+                getattr(settings, "event_agent_messaging_batching_enabled", False)
+            )
             backend_config = build_backend_config_from_settings(settings)
-            backend = create_event_backend(config=backend_config, lazy_init=lazy_init)
+            backend = create_event_backend(
+                config=backend_config,
+                lazy_init=lazy_init,
+                enable_batching=enable_batching,
+            )
 
             return AgentMessageBus(backend=backend)
 

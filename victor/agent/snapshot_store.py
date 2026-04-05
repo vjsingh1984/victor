@@ -199,8 +199,8 @@ class FileSnapshotStore:
             )
             if result.returncode == 0:
                 return result.stdout.strip()[:12]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to resolve git HEAD for snapshot: %s", e)
         return None
 
     def _read_file_safe(self, path: Path) -> Optional[str]:
@@ -572,3 +572,9 @@ def set_snapshot_store(store: FileSnapshotStore) -> None:
     """Set the default snapshot store instance."""
     global _default_store
     _default_store = store
+
+
+def reset_snapshot_store() -> None:
+    """Reset the default snapshot store singleton."""
+    global _default_store
+    _default_store = None
