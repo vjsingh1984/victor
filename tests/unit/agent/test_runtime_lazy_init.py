@@ -261,9 +261,7 @@ class TestRuntimeLazyInitialization:
             metrics_collector = getattr(metrics_runtime, "metrics_collector", None)
             assert metrics_collector is not None, "metrics_collector should exist"
             initialized = getattr(metrics_collector, "initialized", False)
-            assert (
-                initialized
-            ), "metrics_collector should be initialized after Agent.create()"
+            assert initialized, "metrics_collector should be initialized after Agent.create()"
 
         finally:
             await agent.close()

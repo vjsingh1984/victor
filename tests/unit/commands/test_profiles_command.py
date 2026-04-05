@@ -280,9 +280,7 @@ class TestEditProfile:
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
-        result = runner.invoke(
-            profiles_app, ["edit", "no_change", "--config-dir", str(tmp_path)]
-        )
+        result = runner.invoke(profiles_app, ["edit", "no_change", "--config-dir", str(tmp_path)])
 
         assert "No changes specified" in result.stdout
 
@@ -509,7 +507,16 @@ class TestProfilesAppIntegration:
         # Create
         result = runner.invoke(
             profiles_app,
-            ["create", "workflow_test", "--provider", "ollama", "--model", "test", "--config-dir", cd],
+            [
+                "create",
+                "workflow_test",
+                "--provider",
+                "ollama",
+                "--model",
+                "test",
+                "--config-dir",
+                cd,
+            ],
         )
         assert "Created" in result.stdout
 

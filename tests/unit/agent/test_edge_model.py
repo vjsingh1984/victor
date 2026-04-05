@@ -98,12 +98,21 @@ class TestToolSelection:
     def test_selects_relevant_tools(self):
         service = self._make_mock_service(["read", "edit", "grep", "ls", "shell"])
         available = [
-            "read", "write", "edit", "grep", "ls", "shell", "git",
-            "overview", "find", "symbol", "refs", "jira", "scan",
+            "read",
+            "write",
+            "edit",
+            "grep",
+            "ls",
+            "shell",
+            "git",
+            "overview",
+            "find",
+            "symbol",
+            "refs",
+            "jira",
+            "scan",
         ]
-        result = select_tools_with_edge_model(
-            service, "Fix the auth bug", available, "execution"
-        )
+        result = select_tools_with_edge_model(service, "Fix the auth bug", available, "execution")
         assert result is not None
         assert "read" in result
         assert "edit" in result
@@ -161,8 +170,11 @@ class TestPromptSectionSelection:
     def test_selects_sections_for_fix_task(self):
         service = self._make_mock_service(["completion", "tool_guidance"])
         available = [
-            "concise_mode", "task_guidance", "tool_constraint",
-            "completion", "tool_guidance",
+            "concise_mode",
+            "task_guidance",
+            "tool_constraint",
+            "completion",
+            "tool_guidance",
         ]
         result = select_prompt_sections_with_edge_model(
             service, "Fix the auth bug", "action", available
@@ -173,8 +185,11 @@ class TestPromptSectionSelection:
     def test_selects_sections_for_analysis(self):
         service = self._make_mock_service(["concise_mode", "completion"])
         available = [
-            "concise_mode", "task_guidance", "tool_constraint",
-            "completion", "tool_guidance",
+            "concise_mode",
+            "task_guidance",
+            "tool_constraint",
+            "completion",
+            "tool_guidance",
         ]
         result = select_prompt_sections_with_edge_model(
             service, "Analyze the codebase", "analysis", available
@@ -185,9 +200,7 @@ class TestPromptSectionSelection:
     def test_returns_none_on_error(self):
         service = MagicMock()
         service.decide_sync.side_effect = Exception("timeout")
-        result = select_prompt_sections_with_edge_model(
-            service, "test", "action", ["completion"]
-        )
+        result = select_prompt_sections_with_edge_model(service, "test", "action", ["completion"])
         assert result is None
 
 
@@ -272,9 +285,7 @@ class TestEdgeFallbackBehavior:
     """Test that everything works when edge model is unavailable."""
 
     def test_tool_selection_returns_none_without_service(self):
-        result = select_tools_with_edge_model(
-            None, "test", ["read", "edit"]  # type: ignore
-        )
+        result = select_tools_with_edge_model(None, "test", ["read", "edit"])  # type: ignore
         assert result is None
 
     def test_prompt_selection_returns_none_without_service(self):

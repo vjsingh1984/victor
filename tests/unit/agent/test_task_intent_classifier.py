@@ -18,7 +18,6 @@ import pytest
 from victor.agent.decisions.schemas import DecisionType, TaskTypeDecision
 from victor.agent.task_completion import DeliverableType, TaskCompletionDetector
 
-
 # ---------------------------------------------------------------------------
 # Schema tests
 # ---------------------------------------------------------------------------
@@ -64,8 +63,12 @@ class TestTaskTypeDecisionSchema:
 
     def test_all_deliverable_types(self):
         for dt in [
-            "file_created", "file_modified", "analysis_provided",
-            "answer_provided", "plan_provided", "code_executed",
+            "file_created",
+            "file_modified",
+            "analysis_provided",
+            "answer_provided",
+            "plan_provided",
+            "code_executed",
         ]:
             d = TaskTypeDecision(task_type="action", confidence=0.8, deliverables=[dt])
             assert dt in d.deliverables
@@ -155,9 +158,7 @@ class TestLLMIntentClassification:
 
     def test_generation_sets_file_created(self):
         service = _mock_decision_service(
-            TaskTypeDecision(
-                task_type="generation", confidence=0.8, deliverables=["file_created"]
-            )
+            TaskTypeDecision(task_type="generation", confidence=0.8, deliverables=["file_created"])
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Create a new cache manager")
@@ -165,9 +166,7 @@ class TestLLMIntentClassification:
 
     def test_search_sets_answer_provided(self):
         service = _mock_decision_service(
-            TaskTypeDecision(
-                task_type="search", confidence=0.85, deliverables=["answer_provided"]
-            )
+            TaskTypeDecision(task_type="search", confidence=0.85, deliverables=["answer_provided"])
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Find where auth tokens are stored")
@@ -278,9 +277,7 @@ class TestCompletionWithClassification:
     def test_fix_stops_after_file_edit(self):
         detector = TaskCompletionDetector()
         detector._state.expected_deliverables = [DeliverableType.FILE_MODIFIED]
-        detector._state.completed_deliverables.append(
-            MagicMock(type=DeliverableType.FILE_MODIFIED)
-        )
+        detector._state.completed_deliverables.append(MagicMock(type=DeliverableType.FILE_MODIFIED))
         assert detector.should_stop() is True
 
     def test_explain_stops_on_answer(self):

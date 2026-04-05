@@ -287,9 +287,7 @@ class TestFactoryFunction:
     def test_enable_observability(self):
         """Should accept enable_observability flag."""
         mock_orch = MagicMock()
-        coordinator = create_coordinator(
-            orchestrator=mock_orch, enable_observability=True
-        )
+        coordinator = create_coordinator(orchestrator=mock_orch, enable_observability=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
     def test_enable_rl(self):

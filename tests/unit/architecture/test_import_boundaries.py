@@ -146,7 +146,9 @@ class TestVictorSDKNoDependencies:
                     continue
 
                 # Check for actual import statements from victor
-                if (line.startswith("from victor.") or line.startswith("import victor.")) and not line.startswith("from victor_sdk."):
+                if (
+                    line.startswith("from victor.") or line.startswith("import victor.")
+                ) and not line.startswith("from victor_sdk."):
                     errors.append(
                         f"{py_file.relative_to(sdk_path)}:{i} "
                         f"imports from victor-ai, but victor-sdk "
@@ -173,9 +175,7 @@ class TestVictorSDKNoDependencies:
         allowed_deps = ["typing-extensions"]
         for dep in dependencies:
             dep_name = dep.split(">=")[0].split("==")[0].strip()
-            assert (
-                dep_name in allowed_deps
-            ), f"victor-sdk has unexpected dependency: {dep}"
+            assert dep_name in allowed_deps, f"victor-sdk has unexpected dependency: {dep}"
 
 
 class TestCanonicalProtocolImports:
@@ -224,9 +224,8 @@ class TestCanonicalProtocolImports:
                 # Allow it in comments
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
-                    if (
-                        "from victor.teams.protocols import" in line
-                        and not line.strip().startswith("#")
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
                     ):
                         errors.append(
                             f"{py_file.relative_to(victor_path)}:{i} "

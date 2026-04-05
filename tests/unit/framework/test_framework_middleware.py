@@ -79,9 +79,7 @@ class TestLoggingMiddleware:
         await middleware.before_tool_call("test_tool", args)
 
         with caplog.at_level(logging.DEBUG, logger="victor.framework.middleware"):
-            result = await middleware.after_tool_call(
-                "test_tool", args, "result", success=True
-            )
+            result = await middleware.after_tool_call("test_tool", args, "result", success=True)
 
         assert result is None  # No modification
         assert "Tool success: test_tool" in caplog.text
@@ -874,7 +872,9 @@ class TestMiddlewareIntegration:
         try:
             DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
         except ImportError:
-            pytest.skip("DevOps vertical not installed (contrib removed, external package required)")
+            pytest.skip(
+                "DevOps vertical not installed (contrib removed, external package required)"
+            )
 
         middleware_list = DevOpsAssistant.get_middleware()
 
