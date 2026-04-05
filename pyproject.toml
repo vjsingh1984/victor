@@ -56,7 +56,7 @@ Repository = "https://github.com/vjsingh1984/victor-dataanalysis"
 Documentation = "https://docs.victor.dev/verticals/dataanalysis"
 Issues = "https://github.com/vjsingh1984/victor-dataanalysis/issues"
 
-[project.entry-points."victor.verticals"]
+[project.entry-points."victor.plugins"]
 dataanalysis = "victor_dataanalysis.assistant:DataAnalysisAssistant"
 
 [project.entry-points."victor.tool_dependencies"]
