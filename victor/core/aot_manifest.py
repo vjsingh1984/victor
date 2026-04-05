@@ -25,11 +25,11 @@ Usage:
     manifest = manager.load_manifest()
     if manifest is None:
         # Build and cache new manifest
-        manifest = manager.build_manifest(["victor.verticals", "victor.providers"])
+        manifest = manager.build_manifest(["victor.plugins", "victor.providers"])
         manager.save_manifest(manifest)
 
     # Use cached entries
-    for entry in manifest.entries.get("victor.verticals", []):
+    for entry in manifest.entries.get("victor.plugins", []):
         module = importlib.import_module(entry.module)
         attr = getattr(module, entry.attr)
 """
@@ -54,7 +54,7 @@ class EntryPointEntry:
         name: The entry point name (e.g., "security" for a vertical).
         module: The module path to import (e.g., "victor_security.vertical").
         attr: The attribute to get from the module (e.g., "SecurityAssistant").
-        group: The entry point group (e.g., "victor.verticals").
+        group: The entry point group (e.g., "victor.plugins").
     """
 
     name: str
@@ -214,7 +214,7 @@ class AOTManifestManager:
 
         Args:
             groups: List of entry point group names to scan
-                   (e.g., ["victor.verticals", "victor.providers"]).
+                   (e.g., ["victor.plugins", "victor.providers"]).
 
         Returns:
             New AOTManifest with current environment hash and entries.

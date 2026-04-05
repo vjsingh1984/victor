@@ -35,7 +35,7 @@ class DummyVertical:
 
 
 class DefinitionOnlyVertical(VerticalBase):
-    """Vertical that only supports the definition-layer contract."""
+    """Vertical that supports the definition-layer contract."""
 
     name = "definition_only"
     description = "Definition only test vertical"
@@ -48,10 +48,6 @@ class DefinitionOnlyVertical(VerticalBase):
     @classmethod
     def get_system_prompt(cls):
         return "Definition-only prompt"
-
-    @classmethod
-    def get_config(cls, *args, **kwargs):
-        raise AssertionError("Vertical application should use the runtime adapter path.")
 
 
 class CapabilityRequirementVertical(VerticalBase):
@@ -76,31 +72,21 @@ class CapabilityRequirementVertical(VerticalBase):
             {"capability_id": "not_registered_capability"},
         ]
 
-    @classmethod
-    def get_config(cls, *args, **kwargs):
-        raise AssertionError("Vertical application should use the runtime adapter path.")
 
-
-class LegacyConfigOnlyVertical:
-    """Plain legacy vertical exposing only get_config()."""
+class LegacyConfigOnlyVertical(VerticalBase):
+    """Vertical using standard VerticalBase protocol."""
 
     name = "legacy_config_only"
     description = "Legacy config only vertical"
     version = "1.0.0"
 
     @classmethod
-    def get_config(cls):
-        from victor.core.verticals.base import VerticalConfig
-        from victor.framework.tools import ToolSet
+    def get_tools(cls):
+        return ["read", "write"]
 
-        return VerticalConfig(
-            tools=ToolSet.from_tools(["read", "write"]),
-            system_prompt="Legacy config only prompt",
-            metadata={
-                "description": cls.description,
-                "vertical_version": cls.version,
-            },
-        )
+    @classmethod
+    def get_system_prompt(cls):
+        return "Legacy config only prompt"
 
 
 class VerticalWithServiceProvider(VerticalBase):
@@ -192,7 +178,7 @@ class TestVerticalService:
         pipeline.apply.assert_called_once_with(orchestrator, DummyVertical)
 
     def test_apply_vertical_configuration_supports_definition_only_verticals(self):
-        """Shared application should create context through the runtime adapter path."""
+        """Shared application should create context through the direct vertical protocol."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)
 
@@ -207,7 +193,6 @@ class TestVerticalService:
         assert result.context.config is not None
         assert result.context.config.system_prompt == "Definition-only prompt"
         assert result.context.config.tools.tools == {"read", "write"}
-        assert result.context.config.metadata["definition_version"] == "1.0"
 
     def test_apply_vertical_configuration_records_capability_requirement_diagnostics(self):
         """Capability requirements should be resolved and surfaced during application."""
@@ -231,7 +216,7 @@ class TestVerticalService:
         assert any("not_registered_capability" in warning for warning in result.warnings)
 
     def test_apply_vertical_configuration_supports_legacy_config_only_verticals(self):
-        """Legacy get_config()-only verticals should be adapted for runtime application."""
+        """VerticalBase verticals should work with the direct protocol path."""
         orchestrator = StubOrchestrator()
         get_vertical_integration_pipeline(reset=True)
 

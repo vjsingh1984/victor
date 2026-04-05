@@ -60,23 +60,6 @@ class TestListAllWithType:
             assert "version" in entry
             assert "enabled" in entry
 
-    def test_verticals_have_type_vertical(self):
-        """Plugins wrapping VerticalBase should have type='vertical'."""
-        from victor.core.plugins.registry import PluginRegistry, _LegacyVerticalPluginAdapter
-
-        registry = PluginRegistry()
-
-        # Create a mock vertical class
-        mock_vertical_cls = type("MockCoding", (), {"name": "coding", "version": "1.0"})
-        adapter = _LegacyVerticalPluginAdapter("coding", mock_vertical_cls)
-        registry._plugins["coding"] = adapter
-        registry._discovered = True
-
-        result = registry.list_all_with_type()
-        coding_entry = next((e for e in result if e["name"] == "coding"), None)
-        assert coding_entry is not None
-        assert coding_entry["type"] == "vertical"
-
     def test_external_plugins_have_type_external(self):
         """External manifest plugins should have type='external'."""
         from victor.core.plugins.registry import PluginRegistry, _ExternalPluginAdapter
@@ -117,13 +100,13 @@ class TestListAllWithType:
 
     def test_no_duplicates(self):
         """Each plugin should appear exactly once."""
-        from victor.core.plugins.registry import PluginRegistry, _LegacyVerticalPluginAdapter
+        from victor.core.plugins.registry import PluginRegistry
 
         registry = PluginRegistry()
 
-        mock_cls = type("MockV", (), {"name": "coding", "version": "1.0"})
-        adapter = _LegacyVerticalPluginAdapter("coding", mock_cls)
-        registry._plugins["coding"] = adapter
+        mock_plugin = MagicMock()
+        mock_plugin.name = "coding"
+        registry._plugins["coding"] = mock_plugin
         registry._discovered = True
 
         result = registry.list_all_with_type()

@@ -948,10 +948,6 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
-        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-
-        vertical_class = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_class)
-
         result.vertical_name = vertical_class.name
 
         cache_key: Optional[str] = None
@@ -1736,10 +1732,6 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
-        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-
-        vertical_cls = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical_cls)
-
         cache_key: Optional[str] = None
         cache_hit = False
 
@@ -2299,17 +2291,17 @@ class VerticalIntegrationPipeline:
             from victor.framework.sdk_capability_registry import (
                 resolve_capability_requirements,
             )
-            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
-            binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
+            config = vertical.get_config()
+            definition = vertical.get_definition()
             context = create_vertical_context(
                 name=vertical.name,
-                config=binding.runtime_config,
+                config=config,
             )
             capability_resolutions = resolve_capability_requirements(
-                binding.definition.capability_requirements,
+                definition.capability_requirements,
                 orchestrator=orchestrator,
-                available_tools=binding.definition.get_tool_names(),
+                available_tools=definition.get_tool_names(),
             )
             if capability_resolutions:
                 context.apply_capability_configs(

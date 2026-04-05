@@ -1362,14 +1362,14 @@ class TestAgentCreate:
         assert agent._provider == "anthropic"
 
     @pytest.mark.asyncio
-    async def test_create_with_vertical_uses_definition_runtime_adapter(self):
-        """create should translate verticals through the runtime adapter, not get_config()."""
+    async def test_create_with_vertical_uses_get_config(self):
+        """create should call vertical.get_config() directly."""
         from victor.core.verticals.base import VerticalBase
         from victor.framework.agent import Agent
 
-        class DefinitionOnlyVertical(VerticalBase):
-            name = "definition_only"
-            description = "Definition-only vertical"
+        class DirectConfigVertical(VerticalBase):
+            name = "direct_config"
+            description = "Direct config vertical"
 
             @classmethod
             def get_tools(cls):
@@ -1377,11 +1377,7 @@ class TestAgentCreate:
 
             @classmethod
             def get_system_prompt(cls):
-                return "Use definition path."
-
-            @classmethod
-            def get_config(cls, *args, **kwargs):
-                raise AssertionError("Agent.create should not call legacy get_config().")
+                return "Use direct config path."
 
         mock_orchestrator = MagicMock()
 
@@ -1391,11 +1387,11 @@ class TestAgentCreate:
         ):
             agent = await Agent.create(
                 provider="anthropic",
-                vertical=DefinitionOnlyVertical,
+                vertical=DirectConfigVertical,
             )
 
-        assert agent._vertical is DefinitionOnlyVertical
-        assert agent._vertical_config.system_prompt == "Use definition path."
+        assert agent._vertical is DirectConfigVertical
+        assert agent._vertical_config.system_prompt == "Use direct config path."
         assert agent._vertical_config.tools.tools == {"read", "write"}
 
     @pytest.mark.asyncio

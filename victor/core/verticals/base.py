@@ -670,20 +670,9 @@ class VerticalBase(
         Returns:
             Configured Agent instance.
         """
-        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-
-        warnings.warn(
-            "VerticalBase.create_agent() is deprecated and will be removed in v0.8.0. "
-            "Use victor.framework.Agent.create(vertical=YourVertical, ...) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        return await VerticalRuntimeAdapter.create_agent(
-            cls,
-            provider=provider,
-            model=model,
-            **kwargs,
+        raise NotImplementedError(
+            "VerticalBase.create_agent() has been removed. "
+            "Use Agent.create(vertical=YourVertical) instead."
         )
 
 
@@ -879,29 +868,7 @@ class VerticalRegistry:
         if cls._external_discovered:
             return discovered
 
-        # Delegate to PluginRegistry when it has already discovered,
-        # avoiding a redundant entry point scan.
-        try:
-            from victor.core.plugins.registry import PluginRegistry
-
-            plugin_registry = PluginRegistry.get_instance()
-            if plugin_registry.is_discovered:
-                for name, vertical_class in plugin_registry.get_vertical_classes().items():
-                    if name not in cls._registry:
-                        cls.register(vertical_class)
-                        discovered[name] = vertical_class
-                cls._external_discovered = True
-                if discovered:
-                    logger.info(
-                        "Discovered %d external vertical(s) via PluginRegistry: %s",
-                        len(discovered),
-                        ", ".join(discovered.keys()),
-                    )
-                return discovered
-        except Exception:
-            pass  # Fall through to direct entry point scan
-
-        # Fallback: direct entry point scan (only if PluginRegistry unavailable)
+        # Direct entry point scan
         from victor.framework.entry_point_registry import get_entry_point_registry
 
         registry = get_entry_point_registry()

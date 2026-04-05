@@ -430,23 +430,6 @@ victor = "victor.ui.cli:app"
 vic = "victor.ui.cli:app"
 victor-examples = "examples.playground.cli:app"
 
-# =============================================================================
-# Contrib Vertical Entry Points (migrated from external packages 2026-03-01)
-# =============================================================================
-# These verticals were previously distributed as separate packages:
-# - victor-coding → victor.verticals.contrib.coding
-# - victor-rag → victor.verticals.contrib.rag
-# - victor-devops → victor.verticals.contrib.devops
-# - victor-dataanalysis → victor.verticals.contrib.dataanalysis
-# - victor-research → victor.verticals.contrib.research
-#
-# All contrib verticals are now bundled with the main victor package.
-# =============================================================================
-[project.entry-points."victor.verticals"]
-# Legacy group — kept for backward compatibility with external packages.
-# New entries should use victor.plugins instead.
-# Entries here are auto-wrapped via _LegacyVerticalPluginAdapter.
-
 [project.entry-points."victor.plugins"]
 # Built-in verticals (canonical registration)
 benchmark = "victor.benchmark:plugin"
@@ -455,13 +438,13 @@ benchmark = "victor.benchmark:plugin"
 # External Vertical Registration (for third-party packages)
 # =============================================================================
 # Third-party packages can register custom verticals with Victor by defining
-# an entry point in the "victor.verticals" group.
+# an entry point in the "victor.plugins" group.
 #
 # Example in external package's pyproject.toml:
 #
-#   [project.entry-points."victor.verticals"]
-#   security = "victor_security:SecurityAssistant"
-#   ml_ops = "victor_mlops.vertical:MLOpsAssistant"
+#   [project.entry-points."victor.plugins"]
+#   security = "victor_security:SecurityPlugin"
+#   ml_ops = "victor_mlops.plugin:MLOpsPlugin"
 #
 # Requirements for external verticals:
 #   1. Must inherit from victor.core.verticals.VerticalBase

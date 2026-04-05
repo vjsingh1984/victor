@@ -30,7 +30,6 @@ import pytest
 
 from victor.core.plugins.registry import (
     PluginRegistry,
-    _LegacyVerticalPluginAdapter,
     call_lifecycle_hook,
 )
 from victor.core.plugins.protocol import VictorPlugin
@@ -177,125 +176,6 @@ class TestLifecycleHooks:
 
 
 # ===========================================================================
-# P1-4: Legacy Vertical Plugin Adapter
-# ===========================================================================
-
-
-class TestLegacyVerticalPluginAdapter:
-    """Tests for _LegacyVerticalPluginAdapter wrapping VerticalBase classes."""
-
-    def test_adapter_uses_vertical_name(self):
-        vertical_cls = type("MyVertical", (), {"name": "my_vertical"})
-        adapter = _LegacyVerticalPluginAdapter("my-ep", vertical_cls)
-        assert adapter.name == "my_vertical"
-
-    def test_adapter_falls_back_to_ep_name(self):
-        vertical_cls = type("NoName", (), {})
-        adapter = _LegacyVerticalPluginAdapter("fallback", vertical_cls)
-        assert adapter.name == "fallback"
-
-    def test_adapter_register_calls_register_vertical(self):
-        vertical_cls = type("V", (), {"name": "v"})
-        adapter = _LegacyVerticalPluginAdapter("v", vertical_cls)
-        ctx = MagicMock()
-        adapter.register(ctx)
-        ctx.register_vertical.assert_called_once_with(vertical_cls)
-
-    def test_adapter_lifecycle_hooks(self):
-        vertical_cls = type("V", (), {"name": "v"})
-        adapter = _LegacyVerticalPluginAdapter("v", vertical_cls)
-        # These should not raise
-        adapter.on_activate()
-        adapter.on_deactivate()
-        health = adapter.health_check()
-        assert health["healthy"] is True
-        assert health["adapter"] == "legacy_vertical"
-
-    def test_adapter_get_cli_app_returns_none(self):
-        vertical_cls = type("V", (), {"name": "v"})
-        adapter = _LegacyVerticalPluginAdapter("v", vertical_cls)
-        assert adapter.get_cli_app() is None
-
-
-# ===========================================================================
-# P1-4: Unified Entry Point Discovery
-# ===========================================================================
-
-
-class TestUnifiedEntryPoints:
-    """Tests for PluginRegistry scanning both victor.plugins and victor.verticals."""
-
-    @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_discover_scans_both_groups(self, mock_get_cache, mock_aot):
-        mock_aot.return_value.load_manifest.return_value = None
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {}
-        mock_get_cache.return_value = mock_cache
-
-        registry = PluginRegistry()
-        registry.discover(force=True)
-
-        calls = [c[0][0] for c in mock_cache.get_entry_points.call_args_list]
-        assert "victor.plugins" in calls
-        assert "victor.verticals" in calls
-
-    @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_plugins_group_takes_precedence(self, mock_get_cache, mock_aot):
-        mock_aot.return_value.load_manifest.return_value = None
-        mock_cache = MagicMock()
-
-        plugin_instance = _FullPlugin("overlap")
-
-        def side_effect(group, force_refresh=False):
-            if group == "victor.plugins":
-                return {"overlap": "pkg:OverlapPlugin"}
-            return {"overlap": "legacy:OverlapVertical"}
-
-        mock_cache.get_entry_points.side_effect = side_effect
-        mock_get_cache.return_value = mock_cache
-
-        registry = PluginRegistry()
-        with patch.object(
-            registry,
-            "_load_plugin_from_value",
-            return_value=plugin_instance,
-        ):
-            plugins = registry.discover(force=True)
-
-        # Should have exactly one plugin (not duplicated)
-        assert len(plugins) == 1
-        assert plugins[0].name == "overlap"
-
-    @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_legacy_vertical_wrapped_with_adapter(self, mock_get_cache, mock_aot):
-        mock_aot.return_value.load_manifest.return_value = None
-        mock_cache = MagicMock()
-
-        vertical_cls = type("BenchV", (), {"name": "bench"})
-
-        def side_effect(group, force_refresh=False):
-            if group == "victor.plugins":
-                return {}
-            return {"bench": "victor.benchmark:BenchmarkVertical"}
-
-        mock_cache.get_entry_points.side_effect = side_effect
-        mock_get_cache.return_value = mock_cache
-
-        registry = PluginRegistry()
-        with patch.object(registry, "_load_plugin_from_value", return_value=vertical_cls):
-            with warnings.catch_warnings(record=True):
-                warnings.simplefilter("always")
-                plugins = registry.discover(force=True)
-
-        assert len(plugins) == 1
-        assert plugins[0].name == "bench"
-        assert isinstance(plugins[0], _LegacyVerticalPluginAdapter)
-
-
-# ===========================================================================
 # P2-2: Version Skew Detection
 # ===========================================================================
 
@@ -415,7 +295,6 @@ class TestAOTManifestIntegration:
                         group="victor.plugins",
                     )
                 ],
-                "victor.verticals": [],
             },
         )
         mock_aot_cls.return_value.load_manifest.return_value = manifest
@@ -444,7 +323,7 @@ class TestAOTManifestIntegration:
         registry.discover(force=False)
 
         # EntryPointCache should be called
-        assert mock_cache.get_entry_points.call_count == 2  # plugins + verticals
+        assert mock_cache.get_entry_points.call_count == 1  # plugins only
 
         # AOT manifest should be updated after slow path
         mock_aot_cls.return_value.build_manifest.assert_called_once()

@@ -110,6 +110,75 @@ _METRICS_REPORTER_LOCK = threading.Lock()
 _METRICS_REPORTER_SINGLETON: Optional["ExtensionLoaderMetricsReporter"] = None
 
 
+def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
+    """Build a team-spec provider from an SDK VerticalDefinition's team metadata."""
+    from dataclasses import dataclass
+
+    if not definition.team_metadata.teams:
+        return None
+
+    from victor.framework.team_schema import TeamSpec
+    from victor.framework.teams import TeamMemberSpec
+    from victor.teams.types import MemoryConfig, TeamFormation
+
+    @dataclass(frozen=True)
+    class _TeamSpecProvider:
+        team_specs: Dict[str, Any]
+        default_team: Optional[str] = None
+
+        def get_team_specs(self) -> Dict[str, Any]:
+            return dict(self.team_specs)
+
+        def get_default_team(self) -> Optional[str]:
+            return self.default_team
+
+    team_specs: Dict[str, TeamSpec] = {}
+    for team in definition.team_metadata.teams:
+        members = []
+        for member in team.members:
+            memory_config = (
+                MemoryConfig(**member.memory_config) if member.memory_config else None
+            )
+            members.append(
+                TeamMemberSpec(
+                    role=member.role,
+                    goal=member.goal,
+                    name=member.name,
+                    tool_budget=member.tool_budget,
+                    allowed_tools=member.allowed_tools or None,
+                    is_manager=member.is_manager,
+                    priority=member.priority,
+                    backstory=member.backstory,
+                    expertise=member.expertise.copy(),
+                    personality=member.personality,
+                    max_delegation_depth=member.max_delegation_depth,
+                    memory=member.memory,
+                    memory_config=memory_config,
+                    cache=member.cache,
+                    verbose=member.verbose,
+                    max_iterations=member.max_iterations,
+                )
+            )
+
+        team_specs[team.team_id] = TeamSpec(
+            name=team.name,
+            description=team.description,
+            vertical=definition.name,
+            formation=TeamFormation(team.formation),
+            members=members,
+            total_tool_budget=team.total_tool_budget,
+            max_iterations=team.max_iterations,
+            tags=team.tags.copy(),
+            task_types=team.task_types.copy(),
+            metadata=dict(team.metadata),
+        )
+
+    return _TeamSpecProvider(
+        team_specs=team_specs,
+        default_team=definition.team_metadata.default_team,
+    )
+
+
 class ExtensionLoaderPressureMonitor:
     """Internal helper that owns all pressure monitoring and metrics state.
 
@@ -1155,11 +1224,11 @@ class VerticalExtensionLoader(ABC):
                 last_error = exc
 
         try:
-            from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
-
-            provider = VerticalRuntimeAdapter.build_team_spec_provider(cls)
-            if provider is not None:
-                return provider
+            defn = cls.get_definition() if hasattr(cls, "get_definition") else None
+            if defn and hasattr(defn, "team_metadata") and defn.team_metadata.teams:
+                provider = _build_team_spec_provider_from_definition(defn)
+                if provider is not None:
+                    return provider
         except Exception as exc:
             if last_error is None:
                 last_error = exc

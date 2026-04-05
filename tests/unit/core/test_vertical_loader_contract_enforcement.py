@@ -96,8 +96,8 @@ def test_loader_accepts_vertical_with_supported_api_version(monkeypatch):
     VerticalRegistry.unregister(vertical_name)
 
 
-def test_loader_wraps_sdk_only_verticals_at_activation_time(monkeypatch):
-    """SDK-only entry-point verticals should be discovered raw and activated as runtime shims."""
+def test_loader_passes_sdk_verticals_through_at_activation_time(monkeypatch):
+    """SDK entry-point verticals should be discovered and activated directly."""
 
     loader = VerticalLoader()
     loader._discovered_verticals = {}
@@ -115,9 +115,7 @@ def test_loader_wraps_sdk_only_verticals_at_activation_time(monkeypatch):
     assert loader._discovered_verticals["sdk_plugin"] is sdk_vertical
     assert VerticalRegistry.get(vertical_name) is sdk_vertical
     assert loaded is loader.active_vertical
-    assert loaded is not sdk_vertical
-    assert loaded.__victor_sdk_source__ is sdk_vertical
-    assert loaded.get_definition().name == vertical_name
+    assert loaded is sdk_vertical
 
     VerticalRegistry.unregister(vertical_name)
 
@@ -175,7 +173,7 @@ def test_discover_verticals_force_refresh_bypasses_loader_cache(monkeypatch):
 
     class _Cache:
         def get_entry_points(self, group: str, force_refresh: bool = False):
-            assert group == "victor.verticals"
+            assert group == "victor.plugins"
             call_flags.append(force_refresh)
             if force_refresh:
                 return {"refresh_two": "fake.module:RefreshTwo"}

@@ -10,7 +10,6 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from victor.core.verticals.base import VerticalBase
-from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
 from victor_sdk.core.types import VerticalConfig, VerticalDefinition, Tier
@@ -90,8 +89,8 @@ class TestSdkIntegration:
         assert definition.tool_requirements[0].tool_name == "read"
 
     @pytest.mark.asyncio
-    async def test_victor_ai_create_agent_delegates_to_runtime_adapter(self):
-        """victor-ai VerticalBase.create_agent should delegate to the host-owned adapter."""
+    async def test_victor_ai_create_agent_raises_not_implemented(self):
+        """victor-ai VerticalBase.create_agent should raise NotImplementedError."""
 
         class TestVertical(VerticalBase):
             name = "test"
@@ -105,27 +104,12 @@ class TestSdkIntegration:
             def get_system_prompt(cls):
                 return "Test prompt"
 
-        with patch(
-            "victor.framework.vertical_runtime_adapter.VerticalRuntimeAdapter.create_agent",
-            new=AsyncMock(return_value="agent-instance"),
-        ) as mock_create_agent:
-            with pytest.warns(
-                DeprecationWarning,
-                match="VerticalBase.create_agent\\(\\) is deprecated",
-            ):
-                result = await TestVertical.create_agent(
-                    provider="openai",
-                    model="gpt-4.1",
-                    thinking=True,
-                )
-
-        assert result == "agent-instance"
-        mock_create_agent.assert_awaited_once_with(
-            TestVertical,
-            provider="openai",
-            model="gpt-4.1",
-            thinking=True,
-        )
+        with pytest.raises(NotImplementedError, match="has been removed"):
+            await TestVertical.create_agent(
+                provider="openai",
+                model="gpt-4.1",
+                thinking=True,
+            )
 
     def test_sdk_definition_captures_prompt_and_workflow_metadata(self):
         """victor-ai subclasses should inherit SDK prompt/workflow definition hooks."""
@@ -206,12 +190,11 @@ class TestSdkIntegration:
                 return "review_team"
 
         definition = TestVertical.get_definition()
-        runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(TestVertical)
 
         assert definition.team_metadata.default_team == "review_team"
         assert definition.team_metadata.teams[0].team_id == "review_team"
-        assert runtime_vertical.get_team_spec_provider().get_default_team() == "review_team"
-        assert runtime_vertical.get_team_specs()["review_team"].members[0].role == "researcher"
+        assert TestVertical.get_team_spec_provider().get_default_team() == "review_team"
+        assert TestVertical.get_team_specs()["review_team"].members[0].role == "researcher"
 
     def test_backward_compatibility_class_attributes(self):
         """Existing class attributes should still work."""
@@ -420,10 +403,9 @@ class TestZeroDependencyVertical:
         # Note: get_config() will use the SDK's simple implementation
         # that returns a SDK VerticalConfig (not the enhanced victor-ai one)
 
-    def test_sdk_only_vertical_can_be_wrapped_for_runtime(self):
-        """Host runtime should provide a compatibility shim for SDK-only verticals."""
+    def test_sdk_only_vertical_definition(self):
+        """SDK-only verticals should produce valid definitions."""
 
-        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
         from victor_sdk.verticals.protocols.base import VerticalBase as SdkBase
 
         class SdkOnlyVertical(SdkBase):
@@ -446,8 +428,6 @@ class TestZeroDependencyVertical:
             def get_system_prompt(cls) -> str:
                 return "You are a helpful assistant."
 
-        runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(SdkOnlyVertical)
-
-        assert runtime_vertical is not SdkOnlyVertical
-        assert runtime_vertical.__victor_sdk_source__ is SdkOnlyVertical
-        assert runtime_vertical.get_definition().name == "sdk-only"
+        definition = SdkOnlyVertical.get_definition()
+        assert definition.name == "sdk-only"
+        assert definition.tools == ["read", "write"]

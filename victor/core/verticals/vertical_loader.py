@@ -51,7 +51,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from victor.core.events.emit_helper import emit_event_sync
 from victor.framework.module_loader import get_entry_point_cache
-from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 
 if TYPE_CHECKING:
@@ -181,7 +180,7 @@ class VerticalLoader:
                 available = self._get_available_names()
                 raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
 
-            runtime_vertical = VerticalRuntimeAdapter.as_runtime_vertical_class(vertical)
+            runtime_vertical = vertical
 
             # Capability negotiation: validate manifest before activation
             self._negotiate_manifest(runtime_vertical)
@@ -395,35 +394,15 @@ class VerticalLoader:
             self._discovered_verticals = {}
 
             try:
-                # Try PluginRegistry first — single source of truth
-                from victor.core.plugins.registry import PluginRegistry
-
-                registry = PluginRegistry.get_instance()
-                if registry.is_discovered and not force_refresh:
-                    vertical_classes = registry.get_vertical_classes()
-                    if vertical_classes:
-                        for name, cls in vertical_classes.items():
-                            self._discovered_verticals[name] = cls
-                        logger.debug(
-                            "Discovered %d verticals from PluginRegistry",
-                            len(vertical_classes),
-                        )
-                    # Still fall through to entry point scan to catch
-                    # verticals not registered via victor.plugins
-            except Exception:
-                pass  # PluginRegistry not initialized — fall through
-
-            if not self._discovered_verticals:
-                try:
-                    # Fallback: direct entry point scan
-                    cache = get_entry_point_cache()
-                    ep_entries = cache.get_entry_points(
-                        "victor.verticals",
-                        force_refresh=force_refresh,
-                    )
-                    self._load_vertical_entries(ep_entries)
-                except Exception as e:
-                    logger.warning("Failed to discover vertical entry points: %s", e)
+                # Discover verticals via entry point scan
+                cache = get_entry_point_cache()
+                ep_entries = cache.get_entry_points(
+                    "victor.plugins",
+                    force_refresh=force_refresh,
+                )
+                self._load_vertical_entries(ep_entries)
+            except Exception as e:
+                logger.warning("Failed to discover vertical entry points: %s", e)
 
             self._vertical_last_discovery_ms = max(
                 0.0,

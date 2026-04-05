@@ -181,7 +181,6 @@ class Agent:
             )
         """
         from victor.framework._internal import create_orchestrator_from_options
-        from victor.framework.vertical_runtime_adapter import VerticalRuntimeAdapter
 
         # Extract configuration from vertical if provided
         # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
@@ -190,8 +189,7 @@ class Agent:
         system_prompt: Optional[str] = None
 
         if vertical:
-            vertical_binding = VerticalRuntimeAdapter.build_runtime_binding(vertical)
-            vertical_config = vertical_binding.runtime_config
+            vertical_config = vertical.get_config()
             # Vertical tools override explicit tools if not provided
             # Note: Pipeline also handles this, but we do it here for tools kwarg compat
             if tools is None:

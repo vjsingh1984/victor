@@ -90,40 +90,6 @@ async def call_lifecycle_hook_async(plugin: VictorPlugin, hook: str, **kwargs: A
     return call_lifecycle_hook(plugin, hook, **kwargs)
 
 
-class _LegacyVerticalPluginAdapter:
-    """Wraps a VerticalBase subclass as a VictorPlugin for backward compatibility.
-
-    This adapter allows verticals registered via the deprecated 'victor.verticals'
-    entry point group to work within the unified plugin system.
-    """
-
-    def __init__(self, ep_name: str, vertical_cls: type) -> None:
-        self._ep_name = ep_name
-        self._vertical_cls = vertical_cls
-        self._name = getattr(vertical_cls, "name", ep_name)
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def register(self, context: Any) -> None:
-        """Register the wrapped vertical."""
-        if hasattr(context, "register_vertical"):
-            context.register_vertical(self._vertical_cls)
-
-    def get_cli_app(self) -> None:
-        return None
-
-    def on_activate(self) -> None:
-        pass
-
-    def on_deactivate(self) -> None:
-        pass
-
-    def health_check(self) -> Dict[str, Any]:
-        return {"healthy": True, "adapter": "legacy_vertical"}
-
-
 class _ExternalPluginAdapter:
     """Wraps an ExternalPluginManager RegisteredPlugin as a VictorPlugin.
 
@@ -179,8 +145,7 @@ class PluginRegistry:
     _instance: Optional[PluginRegistry] = None
     _lock = threading.Lock()
     ENTRY_POINT_GROUP = "victor.plugins"
-    LEGACY_ENTRY_POINT_GROUP = "victor.verticals"
-    AOT_GROUPS = ["victor.plugins", "victor.verticals"]
+    AOT_GROUPS = ["victor.plugins"]
 
     def __init__(self) -> None:
         """Initialize registry."""
@@ -245,47 +210,6 @@ class PluginRegistry:
                     )
             except Exception as e:
                 logger.error(f"Failed to load plugin from entry point {name}: {e}")
-
-        # Scan legacy 'victor.verticals' group for backward compatibility
-        if aot_entries is not None:
-            legacy_entries = aot_entries.get(self.LEGACY_ENTRY_POINT_GROUP, {})
-        else:
-            legacy_entries = cache.get_entry_points(
-                self.LEGACY_ENTRY_POINT_GROUP, force_refresh=force
-            )
-        for name, value in legacy_entries.items():
-            if name in self._plugins:
-                # victor.plugins takes precedence on name collision
-                continue
-            try:
-                obj = self._load_plugin_from_value(name, value)
-                if isinstance(obj, VictorPlugin):
-                    self._plugins[obj.name] = obj
-                    logger.info("Discovered plugin: %s (from legacy victor.verticals)", obj.name)
-                elif isinstance(obj, type):
-                    # Wrap VerticalBase subclass as a plugin adapter
-                    adapter = _LegacyVerticalPluginAdapter(name, obj)
-                    self._plugins[adapter.name] = adapter
-                    logger.info("Discovered legacy vertical: %s (wrapped as plugin)", name)
-                    import warnings
-
-                    warnings.warn(
-                        f"Vertical '{name}' registered via victor.verticals entry point. "
-                        "Migrate to victor.plugins for full plugin lifecycle support. "
-                        "The victor.verticals group is deprecated and will be removed in v0.7.0.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                else:
-                    # Try as an instance
-                    if hasattr(obj, "name"):
-                        adapter = _LegacyVerticalPluginAdapter(name, type(obj))
-                        self._plugins[adapter.name] = adapter
-                        logger.info(
-                            "Discovered legacy vertical instance: %s (wrapped as plugin)", name
-                        )
-            except Exception as e:
-                logger.error("Failed to load legacy entry point %s: %s", name, e)
 
         # Update AOT manifest after slow-path discovery
         if aot_entries is None:
@@ -441,28 +365,11 @@ class PluginRegistry:
         """Whether discovery has been run."""
         return self._discovered
 
-    def get_vertical_classes(self) -> Dict[str, type]:
-        """Extract vertical classes from discovered plugins.
-
-        Returns classes from `_LegacyVerticalPluginAdapter` instances,
-        enabling VerticalLoader to delegate discovery to this registry
-        instead of scanning entry points independently.
-
-        Returns:
-            Dict mapping vertical names to their classes.
-        """
-        result: Dict[str, type] = {}
-        for name, plugin in self._plugins.items():
-            if isinstance(plugin, _LegacyVerticalPluginAdapter):
-                result[plugin.name] = plugin._vertical_cls
-        return result
-
     def list_all_with_type(self) -> List[Dict[str, Any]]:
         """Return a unified view of all plugins with type classification.
 
         Each entry is a dict with keys: name, type, version, enabled.
         The ``type`` field classifies the plugin as:
-        - ``"vertical"`` — VerticalBase wrapped via _LegacyVerticalPluginAdapter
         - ``"external"`` — Subprocess plugin wrapped via _ExternalPluginAdapter
         - ``"plugin"`` — Regular VictorPlugin (entry-point-based)
 
@@ -474,11 +381,7 @@ class PluginRegistry:
 
         entries: List[Dict[str, Any]] = []
         for name, plugin in self._plugins.items():
-            if isinstance(plugin, _LegacyVerticalPluginAdapter):
-                plugin_type = "vertical"
-                version = getattr(plugin._vertical_cls, "version", "0.0.0")
-                enabled = True
-            elif isinstance(plugin, _ExternalPluginAdapter):
+            if isinstance(plugin, _ExternalPluginAdapter):
                 plugin_type = "external"
                 version = getattr(plugin, "_plugin", None)
                 version = getattr(version, "version", "0.0.0") if version else "0.0.0"
