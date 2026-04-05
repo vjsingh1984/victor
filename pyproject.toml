@@ -60,7 +60,7 @@ Repository = "https://github.com/vjsingh1984/victor-rag"
 Documentation = "https://docs.victor.dev/verticals/rag"
 Issues = "https://github.com/vjsingh1984/victor-rag/issues"
 
-[project.entry-points."victor.verticals"]
+[project.entry-points."victor.plugins"]
 rag = "victor_rag.assistant:RAGAssistant"
 
 [project.entry-points."victor.framework.teams.providers"]
