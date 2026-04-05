@@ -128,32 +128,50 @@ docker-push: docker
 	docker tag victor:latest vijayksingh/victor:latest
 	docker push vijayksingh/victor:latest
 
-# Version management (syncs victor-ai and victor-sdk)
-sync-version:  ## Sync all package versions from VERSION file
+# Version management
+sync-version:  ## Sync all package versions from VERSION files
 	python scripts/sync_version.py
 
-check-version:  ## Verify all package versions are in sync
+sync-version-ai:  ## Sync victor-ai version only
+	python scripts/sync_version.py --ai
+
+sync-version-sdk:  ## Sync victor-sdk version only
+	python scripts/sync_version.py --sdk
+
+check-version:  ## Verify all package versions are consistent
 	python scripts/check_version_sync.py
 
-# Release (requires VERSION)
+# Release victor-ai (requires VERSION)
 release:
 ifndef VERSION
 	$(error VERSION is required. Usage: make release VERSION=0.1.0)
 endif
-	@echo "Creating release v$(VERSION)..."
-	@# Update VERSION file (single source of truth)
+	@echo "Creating victor-ai release v$(VERSION)..."
 	echo "$(VERSION)" > VERSION
-	@# Sync all pyproject.toml files from VERSION
-	python scripts/sync_version.py
-	@# Verify consistency
+	python scripts/sync_version.py --ai
 	python scripts/check_version_sync.py
-	@# Commit and tag
-	git add VERSION pyproject.toml victor-sdk/pyproject.toml
-	git commit -m "release: v$(VERSION)"
-	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
+	git add VERSION pyproject.toml
+	git commit -m "release: victor-ai v$(VERSION)"
+	git tag -a "v$(VERSION)" -m "Release victor-ai v$(VERSION)"
 	@echo ""
 	@echo "Release v$(VERSION) created!"
 	@echo "Run 'git push && git push --tags' to trigger the release workflow"
+
+# Release victor-sdk independently (requires VERSION)
+release-sdk:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release-sdk VERSION=0.7.0)
+endif
+	@echo "Creating victor-sdk release sdk-v$(VERSION)..."
+	echo "$(VERSION)" > victor-sdk/VERSION
+	python scripts/sync_version.py --sdk
+	python scripts/check_version_sync.py
+	git add victor-sdk/VERSION victor-sdk/pyproject.toml pyproject.toml
+	git commit -m "release: victor-sdk v$(VERSION)"
+	git tag -a "sdk-v$(VERSION)" -m "Release victor-sdk v$(VERSION)"
+	@echo ""
+	@echo "SDK release sdk-v$(VERSION) created!"
+	@echo "Run 'git push && git push --tags' to trigger the SDK release workflow"
 
 # =============================================================================
 # Utilities

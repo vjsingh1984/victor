@@ -1,9 +1,11 @@
-# Victor Release Workflow
-# Automatically builds and publishes releases when a tag is pushed
+# Victor-AI Release Workflow
+# Automatically builds and publishes victor-ai when a tag is pushed
 #
 # Triggers:
-#   - Push tag: v* (e.g., v0.1.0, v1.0.0-beta)
+#   - Push tag: v* (e.g., v0.1.0, v1.0.0-beta) — excludes sdk-v* tags
 #   - Manual dispatch for testing
+#
+# For SDK-only releases, see release-sdk.yml (triggered by sdk-v* tags)
 #
 # Outputs:
 #   - PyPI package (and TestPyPI for pre-releases)
@@ -22,6 +24,7 @@ on:
   push:
     tags:
       - 'v*'
+      - '!sdk-v*'
   workflow_dispatch:
     inputs:
       publish_testpypi:
