@@ -511,9 +511,7 @@ class ConversationStateMachine:
             }
             result = stage_map.get(stage_name)
             if result:
-                logger.info(
-                    f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
-                )
+                logger.info(f"Edge stage detection: {stage_name} (confidence={confidence:.2f})")
             return result
 
         except Exception as e:

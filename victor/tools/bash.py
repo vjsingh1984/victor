@@ -33,7 +33,6 @@ from victor.security.command_safety import (
     is_dangerous_command as _is_dangerous_consolidated,
 )
 
-
 # Platform-specific readonly commands - safe for exploration/analysis
 # These commands cannot modify state, only read
 READONLY_COMMANDS_UNIX: Set[str] = {

@@ -629,9 +629,7 @@ class SystemPromptBuilder:
             if selected:
                 # Always include completion guidance (required for detection)
                 result = set(selected) | {"completion"}
-                logger.debug(
-                    f"Edge prompt focus: {len(result)}/{len(all_sections)} sections"
-                )
+                logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
                 return result
 
         except Exception:

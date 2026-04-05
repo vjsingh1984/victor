@@ -101,7 +101,6 @@ from victor.security.command_safety import (  # noqa: E402
     is_dangerous_command,
 )
 
-
 # =============================================================================
 # Tool Availability Checking
 # =============================================================================

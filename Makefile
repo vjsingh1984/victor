@@ -52,10 +52,10 @@ install-dev:
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short -n 2 --dist loadscope
+	pytest tests/unit -v --tb=short -n 2 --dist loadscope --timeout=120
 
 test-parallel:
-	pytest tests/unit -v --tb=short -n auto --dist loadscope
+	pytest tests/unit -v --tb=short -n auto --dist loadscope --timeout=120
 
 test-definition-boundaries:
 	pytest tests/unit/core/verticals/test_definition_import_boundaries.py -q

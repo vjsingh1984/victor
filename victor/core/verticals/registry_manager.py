@@ -276,7 +276,6 @@ class VerticalRegistryManager:
         self,
         source: str = "all",
     ) -> List[InstalledVertical]:
-
         """List verticals.
 
         Args:

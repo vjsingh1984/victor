@@ -50,6 +50,7 @@ from victor.storage.vector_stores.models import (
     EmbeddingModelConfig,
     create_embedding_model,
 )
+
 try:
     from victor_coding.languages.base import TreeSitterQueries
     from victor_coding.languages.registry import (

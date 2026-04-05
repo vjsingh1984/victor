@@ -458,9 +458,7 @@ class TaskCompletionDetector:
                     deliverables = _parse_deliverables(decision.result.deliverables)
                     # If LLM returned task_type but no deliverables, infer them
                     if not deliverables and hasattr(decision.result, "task_type"):
-                        deliverables = _infer_deliverables_from_task_type(
-                            decision.result.task_type
-                        )
+                        deliverables = _infer_deliverables_from_task_type(decision.result.task_type)
                     if deliverables:
                         self._state.expected_deliverables = list(deliverables)
                         logger.info(

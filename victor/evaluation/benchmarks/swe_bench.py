@@ -239,7 +239,10 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             patch_file = cached_repo / ".agent_patch.diff"
             patch_file.write_text(patch)
             apply_proc = await asyncio.create_subprocess_exec(
-                "git", "apply", "--allow-empty", str(patch_file),
+                "git",
+                "apply",
+                "--allow-empty",
+                str(patch_file),
                 cwd=cached_repo,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -248,9 +251,7 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
             if apply_proc.returncode != 0:
                 result.status = TaskStatus.FAILED
-                result.error_message = (
-                    f"Failed to apply patch: {apply_stderr.decode()[:200]}"
-                )
+                result.error_message = f"Failed to apply patch: {apply_stderr.decode()[:200]}"
                 logger.warning("Patch apply failed: %s", apply_stderr.decode()[:200])
                 return result
 
@@ -261,7 +262,10 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 test_patch_file = cached_repo / ".test_patch.diff"
                 test_patch_file.write_text(task.test_code)
                 test_proc = await asyncio.create_subprocess_exec(
-                    "git", "apply", "--allow-empty", str(test_patch_file),
+                    "git",
+                    "apply",
+                    "--allow-empty",
+                    str(test_patch_file),
                     cwd=cached_repo,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -285,8 +289,12 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     site_patch_file = cached_repo / ".site_patch.diff"
                     site_patch_file.write_text(patch)
                     apply_site = await asyncio.create_subprocess_exec(
-                        "git", "apply", "--allow-empty", "--directory",
-                        str(site_pkg_dir.parent), str(site_patch_file),
+                        "git",
+                        "apply",
+                        "--allow-empty",
+                        "--directory",
+                        str(site_pkg_dir.parent),
+                        str(site_patch_file),
                         cwd=cached_repo,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
@@ -376,7 +384,10 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                 (cached_repo / f).unlink(missing_ok=True)
             if task.base_commit:
                 proc = await asyncio.create_subprocess_exec(
-                    "git", "checkout", "--force", task.base_commit,
+                    "git",
+                    "checkout",
+                    "--force",
+                    task.base_commit,
                     cwd=cached_repo,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,

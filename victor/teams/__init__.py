@@ -260,6 +260,7 @@ def __getattr__(name: str) -> Any:
             TeamCoordinatorProtocol,
             TeamMemberProtocol,
         )
+
         # Store in module globals for future access
         globals()[name] = locals()[name]
         return locals()[name]

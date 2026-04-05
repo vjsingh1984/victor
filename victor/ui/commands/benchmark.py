@@ -443,7 +443,9 @@ async def _run_benchmark_async(
                 settings = load_settings()
                 profiles = settings.load_profiles()
                 profile_config = profiles.get(profile, profiles.get("default"))
-                effective_model = model or (profile_config.model if profile_config else "deepseek-chat")
+                effective_model = model or (
+                    profile_config.model if profile_config else "deepseek-chat"
+                )
 
                 api_key = get_api_key(provider_override)
                 provider = ProviderRegistry.create(
@@ -527,7 +529,8 @@ async def _run_benchmark_async(
                 if not patch and work_dir:
                     try:
                         diff_proc = await asyncio.create_subprocess_exec(
-                            "git", "diff",
+                            "git",
+                            "diff",
                             cwd=work_dir,
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,

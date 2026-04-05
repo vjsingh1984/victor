@@ -1955,9 +1955,7 @@ class ToolSelector(ModeAwareMixin):
                 keep_names = set(selected_names) | critical
                 filtered = [t for t in tools if t.name in keep_names]
                 if len(filtered) >= 3:
-                    logger.info(
-                        f"Edge model filtered tools: {len(tools)} -> {len(filtered)}"
-                    )
+                    logger.info(f"Edge model filtered tools: {len(tools)} -> {len(filtered)}")
                     return filtered
 
         except Exception as e:

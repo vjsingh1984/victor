@@ -143,18 +143,14 @@ class TeamNodeExecutor:
                 formation_enum.SEQUENTIAL,
             ),
             "pipeline": getattr(formation_enum, "PIPELINE", formation_enum.SEQUENTIAL),
-            "consensus": getattr(
-                formation_enum, "CONSENSUS", formation_enum.SEQUENTIAL
-            ),
+            "consensus": getattr(formation_enum, "CONSENSUS", formation_enum.SEQUENTIAL),
         }
         return formation_map.get((formation or "").lower(), formation_enum.SEQUENTIAL)
 
     def _resolve_merge_mode(self, merge_mode: str, merge_mode_enum: Any) -> Any:
         merge_mode_map = {
             "team_wins": merge_mode_enum.TEAM_WINS,
-            "graph_wins": getattr(
-                merge_mode_enum, "GRAPH_WINS", merge_mode_enum.TEAM_WINS
-            ),
+            "graph_wins": getattr(merge_mode_enum, "GRAPH_WINS", merge_mode_enum.TEAM_WINS),
             "merge": getattr(merge_mode_enum, "MERGE", merge_mode_enum.TEAM_WINS),
             "error": getattr(merge_mode_enum, "ERROR", merge_mode_enum.TEAM_WINS),
         }

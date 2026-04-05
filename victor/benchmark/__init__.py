@@ -73,6 +73,7 @@ from victor.benchmark.prompts import (
     get_task_type_hint,
 )
 
+
 class BenchmarkPlugin(VictorPlugin):
     """Victor Plugin for Benchmark vertical."""
 

@@ -136,9 +136,7 @@ def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
     for team in definition.team_metadata.teams:
         members = []
         for member in team.members:
-            memory_config = (
-                MemoryConfig(**member.memory_config) if member.memory_config else None
-            )
+            memory_config = MemoryConfig(**member.memory_config) if member.memory_config else None
             members.append(
                 TeamMemberSpec(
                     role=member.role,
@@ -1510,56 +1508,44 @@ class VerticalExtensionLoader(ABC):
         # import storm for extensions that are never used.
         def _make_list_factory(ext_type: str, loader: callable):
             """Create a factory for list-valued extensions."""
+
             def factory():
                 result = _load_extension(ext_type, loader, is_list=True)
                 return result if result else []
+
             return factory
 
         def _make_single_factory(ext_type: str, loader: callable):
             """Create a factory for optional single-valued extensions."""
+
             def factory():
                 return _load_extension(ext_type, loader)
+
             return factory
 
         def _make_wrapped_list_factory(ext_type: str, loader: callable):
             """Create a factory that wraps a single result in a list."""
+
             def factory():
                 result = _load_extension(ext_type, loader)
                 return [result] if result else []
+
             return factory
 
         extensions = VerticalExtensions(
             middleware=_make_list_factory("middleware", cls.get_middleware),
-            safety_extensions=_make_wrapped_list_factory(
-                "safety", cls.get_safety_extension
-            ),
-            prompt_contributors=_make_wrapped_list_factory(
-                "prompt", cls.get_prompt_contributor
-            ),
-            mode_config_provider=_make_single_factory(
-                "mode_config", cls.get_mode_config_provider
-            ),
+            safety_extensions=_make_wrapped_list_factory("safety", cls.get_safety_extension),
+            prompt_contributors=_make_wrapped_list_factory("prompt", cls.get_prompt_contributor),
+            mode_config_provider=_make_single_factory("mode_config", cls.get_mode_config_provider),
             tool_dependency_provider=_make_single_factory(
                 "tool_deps", cls.get_tool_dependency_provider
             ),
-            workflow_provider=_make_single_factory(
-                "workflow", cls.get_workflow_provider
-            ),
-            service_provider=_make_single_factory(
-                "service", cls.get_service_provider
-            ),
-            rl_config_provider=_make_single_factory(
-                "rl_config", cls.get_rl_config_provider
-            ),
-            team_spec_provider=_make_single_factory(
-                "team_spec", cls.get_team_spec_provider
-            ),
-            enrichment_strategy=_make_single_factory(
-                "enrichment", cls.get_enrichment_strategy
-            ),
-            tiered_tool_config=_make_single_factory(
-                "tiered_tools", cls.get_tiered_tool_config
-            ),
+            workflow_provider=_make_single_factory("workflow", cls.get_workflow_provider),
+            service_provider=_make_single_factory("service", cls.get_service_provider),
+            rl_config_provider=_make_single_factory("rl_config", cls.get_rl_config_provider),
+            team_spec_provider=_make_single_factory("team_spec", cls.get_team_spec_provider),
+            enrichment_strategy=_make_single_factory("enrichment", cls.get_enrichment_strategy),
+            tiered_tool_config=_make_single_factory("tiered_tools", cls.get_tiered_tool_config),
         )
 
         # Cache the extensions

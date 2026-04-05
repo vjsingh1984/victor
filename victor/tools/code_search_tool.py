@@ -511,7 +511,10 @@ async def _literal_search(
         use_rg = shutil.which("rg") is not None
         if use_rg:
             cmd = [
-                "rg", "--no-heading", "--line-number", "--color=never",
+                "rg",
+                "--no-heading",
+                "--line-number",
+                "--color=never",
                 "--max-count=5",  # max matches per file
                 "--max-columns=200",
             ]
@@ -520,15 +523,28 @@ async def _literal_search(
                     cmd.extend(["--glob", f"*{ext}"])
             else:
                 # Default: code files only
-                cmd.extend(["--type=py", "--type=js", "--type=ts",
-                            "--type=go", "--type=java", "--type=c", "--type=cpp",
-                            "--type=rust", "--type=yaml"])
+                cmd.extend(
+                    [
+                        "--type=py",
+                        "--type=js",
+                        "--type=ts",
+                        "--type=go",
+                        "--type=java",
+                        "--type=c",
+                        "--type=cpp",
+                        "--type=rust",
+                        "--type=yaml",
+                    ]
+                )
             cmd.extend(["--", query, search_path])
         else:
             cmd = ["grep", "-rn", "--include=*.py", "--", query, search_path]
 
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
 
         # Parse results: group by file, take top k files
@@ -549,11 +565,13 @@ async def _literal_search(
         results = []
         for fpath, matches in top:
             snippet = "\n".join(matches[:5])  # first 5 matching lines
-            results.append({
-                "path": fpath,
-                "score": len(matches),
-                "snippet": snippet,
-            })
+            results.append(
+                {
+                    "path": fpath,
+                    "score": len(matches),
+                    "snippet": snippet,
+                }
+            )
 
         logger.info(
             f"Literal search: found {len(file_matches)} files matching "

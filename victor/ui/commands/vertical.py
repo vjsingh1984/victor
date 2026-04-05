@@ -134,8 +134,7 @@ def list_verticals(
         verticals = [
             v
             for v in verticals
-            if v.metadata
-            and any(tg in [mt.lower() for mt in v.metadata.tags] for tg in tag_list)
+            if v.metadata and any(tg in [mt.lower() for mt in v.metadata.tags] for tg in tag_list)
         ]
 
     if not verticals:
@@ -229,9 +228,7 @@ def install_vertical(
     package: str = typer.Argument(..., help="Package name, path, or URL"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-installation"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed"),
-    no_validate: bool = typer.Option(
-        False, "--no-validate", help="Skip package validation"
-    ),
+    no_validate: bool = typer.Option(False, "--no-validate", help="Skip package validation"),
 ) -> None:
     """Install a new vertical plugin."""
     _deprecation_notice()

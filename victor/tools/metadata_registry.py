@@ -601,9 +601,7 @@ class ToolMetadataRegistry:
                         [item.strip() for item in env_raw.split(",") if item.strip()]
                     )
             else:
-                core_readonly.extend(
-                    [item.strip() for item in env_raw.split(",") if item.strip()]
-                )
+                core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
 
         # Runtime override/extension via settings (env: CORE_READONLY_TOOLS)
         try:

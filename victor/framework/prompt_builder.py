@@ -783,9 +783,7 @@ class ProjectContext:
     current_date: str
     git_status: Optional[str] = None
     git_diff_summary: Optional[str] = None
-    instruction_files: List[ContextFile] = field(
-        default_factory=list
-    )
+    instruction_files: List[ContextFile] = field(default_factory=list)
     is_git_repo: bool = False
     branch_name: Optional[str] = None
 
@@ -807,9 +805,7 @@ class PromptBudget:
     max_git_diff_chars: int = 3000
 
 
-def _truncate(
-    text: str, limit: int, label: str = "content"
-) -> str:
+def _truncate(text: str, limit: int, label: str = "content") -> str:
     """Truncate *text* to *limit* chars with a notice."""
     if len(text) <= limit:
         return text
@@ -838,9 +834,7 @@ class WorkspaceContextBuilder:
         prompt = builder.build()
     """
 
-    def __init__(
-        self, budget: Optional[PromptBudget] = None
-    ) -> None:
+    def __init__(self, budget: Optional[PromptBudget] = None) -> None:
         self._budget = budget or PromptBudget()
         self._base_prompt: Optional[str] = None
         self._output_style_name: Optional[str] = None
@@ -854,53 +848,39 @@ class WorkspaceContextBuilder:
 
     # -- fluent setters ------------------------------------------------
 
-    def with_base_prompt(
-        self, prompt: str
-    ) -> "WorkspaceContextBuilder":
+    def with_base_prompt(self, prompt: str) -> "WorkspaceContextBuilder":
         """Set the static base/vertical prompt."""
         self._base_prompt = prompt
         return self
 
-    def with_output_style(
-        self, name: str, prompt: str
-    ) -> "WorkspaceContextBuilder":
+    def with_output_style(self, name: str, prompt: str) -> "WorkspaceContextBuilder":
         """Set an output style directive."""
         self._output_style_name = name
         self._output_style_prompt = prompt
         return self
 
-    def with_os_info(
-        self, os_name: str, os_version: str
-    ) -> "WorkspaceContextBuilder":
+    def with_os_info(self, os_name: str, os_version: str) -> "WorkspaceContextBuilder":
         """Set operating system metadata."""
         self._os_name = os_name
         self._os_version = os_version
         return self
 
-    def with_model_info(
-        self, model_name: str
-    ) -> "WorkspaceContextBuilder":
+    def with_model_info(self, model_name: str) -> "WorkspaceContextBuilder":
         """Set the model identifier shown in the prompt."""
         self._model_name = model_name
         return self
 
-    def with_project_context(
-        self, context: ProjectContext
-    ) -> "WorkspaceContextBuilder":
+    def with_project_context(self, context: ProjectContext) -> "WorkspaceContextBuilder":
         """Attach a discovered project context snapshot."""
         self._context = context
         return self
 
-    def with_tools(
-        self, tool_names: List[str]
-    ) -> "WorkspaceContextBuilder":
+    def with_tools(self, tool_names: List[str]) -> "WorkspaceContextBuilder":
         """Declare which tools are available to the agent."""
         self._tool_names = list(tool_names)
         return self
 
-    def append_section(
-        self, section: str
-    ) -> "WorkspaceContextBuilder":
+    def append_section(self, section: str) -> "WorkspaceContextBuilder":
         """Append a free-form section after all standard parts."""
         self._extra_sections.append(section)
         return self
@@ -923,13 +903,9 @@ class WorkspaceContextBuilder:
         parts: List[str] = []
 
         # 1. Output style
-        if (
-            self._output_style_name
-            and self._output_style_prompt
-        ):
+        if self._output_style_name and self._output_style_prompt:
             parts.append(
-                f"# Output Style: {self._output_style_name}\n"
-                f"{self._output_style_prompt}"
+                f"# Output Style: {self._output_style_name}\n" f"{self._output_style_prompt}"
             )
 
         # 2. Base prompt
@@ -939,10 +915,7 @@ class WorkspaceContextBuilder:
         # 3. System capabilities
         if self._tool_names:
             tool_list = ", ".join(sorted(self._tool_names))
-            parts.append(
-                "# System Capabilities\n"
-                f"Tools available: {tool_list}"
-            )
+            parts.append("# System Capabilities\n" f"Tools available: {tool_list}")
 
         # 4. Environment
         env_lines = self._build_environment_section()
@@ -978,27 +951,17 @@ class WorkspaceContextBuilder:
             lines.append(f"Model: {self._model_name}")
 
         if self._context:
-            lines.append(
-                f"Working directory: {self._context.cwd}"
-            )
-            lines.append(
-                f"Current date: {self._context.current_date}"
-            )
+            lines.append(f"Working directory: {self._context.cwd}")
+            lines.append(f"Current date: {self._context.current_date}")
 
         if self._os_name and self._os_version:
-            lines.append(
-                f"Platform: {self._os_name} "
-                f"{self._os_version}"
-            )
+            lines.append(f"Platform: {self._os_name} " f"{self._os_version}")
 
         if self._context:
             if self._context.is_git_repo:
                 lines.append("Git repository: yes")
             if self._context.branch_name:
-                lines.append(
-                    f"Git branch: "
-                    f"{self._context.branch_name}"
-                )
+                lines.append(f"Git branch: " f"{self._context.branch_name}")
 
         if len(lines) <= 1:
             return ""
@@ -1006,10 +969,7 @@ class WorkspaceContextBuilder:
 
     def _build_instruction_section(self) -> str:
         """Render budget-truncated instruction files."""
-        if (
-            not self._context
-            or not self._context.instruction_files
-        ):
+        if not self._context or not self._context.instruction_files:
             return ""
 
         budget = self._budget
@@ -1017,37 +977,21 @@ class WorkspaceContextBuilder:
         total_chars = 0
 
         for ctx_file in self._context.instruction_files:
-            remaining = (
-                budget.max_total_instruction_chars
-                - total_chars
-            )
+            remaining = budget.max_total_instruction_chars - total_chars
             if remaining <= 0:
-                parts.append(
-                    "... [instruction budget exhausted, "
-                    "remaining files skipped]"
-                )
+                parts.append("... [instruction budget exhausted, " "remaining files skipped]")
                 break
 
-            per_file = min(
-                budget.max_per_file_chars, remaining
-            )
-            content = _truncate(
-                ctx_file.content, per_file, ctx_file.path
-            )
+            per_file = min(budget.max_per_file_chars, remaining)
+            content = _truncate(ctx_file.content, per_file, ctx_file.path)
             total_chars += len(content)
 
-            header = (
-                f"## {ctx_file.path} "
-                f"(scope: {ctx_file.scope})"
-            )
+            header = f"## {ctx_file.path} " f"(scope: {ctx_file.scope})"
             parts.append(f"{header}\n{content}")
 
         if not parts:
             return ""
-        return (
-            "# Project Instructions\n\n"
-            + "\n\n".join(parts)
-        )
+        return "# Project Instructions\n\n" + "\n\n".join(parts)
 
     def _build_git_context_section(self) -> str:
         """Render budget-truncated git status / diff."""
@@ -1063,9 +1007,7 @@ class WorkspaceContextBuilder:
                 budget.max_git_status_chars,
                 "git status",
             )
-            parts.append(
-                f"## Git Status\n```\n{status}\n```"
-            )
+            parts.append(f"## Git Status\n```\n{status}\n```")
 
         if self._context.git_diff_summary:
             diff = _truncate(
@@ -1073,15 +1015,11 @@ class WorkspaceContextBuilder:
                 budget.max_git_diff_chars,
                 "git diff",
             )
-            parts.append(
-                f"## Git Diff Summary\n```\n{diff}\n```"
-            )
+            parts.append(f"## Git Diff Summary\n```\n{diff}\n```")
 
         if not parts:
             return ""
-        return (
-            "# Git Context\n\n" + "\n\n".join(parts)
-        )
+        return "# Git Context\n\n" + "\n\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -1089,9 +1027,7 @@ class WorkspaceContextBuilder:
 # ---------------------------------------------------------------------------
 
 
-def _classify_scope(
-    file_dir: Path, workspace_dir: Path
-) -> str:
+def _classify_scope(file_dir: Path, workspace_dir: Path) -> str:
     """Determine the scope label for a discovered file.
 
     Args:
@@ -1108,9 +1044,7 @@ def _classify_scope(
     return "user"
 
 
-async def _run_git(
-    cmd: List[str], cwd: Path
-) -> Optional[str]:
+async def _run_git(cmd: List[str], cwd: Path) -> Optional[str]:
     """Execute a git command asynchronously.
 
     Args:
@@ -1132,9 +1066,7 @@ async def _run_git(
             return None
         return stdout.decode("utf-8", errors="replace")
     except (OSError, ValueError):
-        logger.debug(
-            "Git command failed: %s", " ".join(cmd)
-        )
+        logger.debug("Git command failed: %s", " ".join(cmd))
         return None
 
 
@@ -1181,28 +1113,17 @@ class ProjectContextDiscovery:
         is_git = (cwd / ".git").exists()
 
         if is_git:
-            branch, status, diff_summary = (
-                await asyncio.gather(
-                    ProjectContextDiscovery._get_branch_name(
-                        cwd
-                    ),
-                    ProjectContextDiscovery._get_git_status(
-                        cwd
-                    ),
-                    ProjectContextDiscovery._get_git_diff_summary(
-                        cwd
-                    ),
-                )
+            branch, status, diff_summary = await asyncio.gather(
+                ProjectContextDiscovery._get_branch_name(cwd),
+                ProjectContextDiscovery._get_git_status(cwd),
+                ProjectContextDiscovery._get_git_diff_summary(cwd),
             )
         else:
             branch = None
             status = None
             diff_summary = None
 
-        instruction_files = (
-            ProjectContextDiscovery
-            ._discover_instruction_files(cwd)
-        )
+        instruction_files = ProjectContextDiscovery._discover_instruction_files(cwd)
 
         return ProjectContext(
             cwd=cwd,
@@ -1240,18 +1161,13 @@ class ProjectContextDiscovery:
         root = Path(current.anchor)
 
         while True:
-            for name in (
-                ProjectContextDiscovery
-                ._INSTRUCTION_FILENAMES
-            ):
+            for name in ProjectContextDiscovery._INSTRUCTION_FILENAMES:
                 candidate = current / name
                 if not candidate.is_file():
                     continue
 
                 try:
-                    content = candidate.read_text(
-                        encoding="utf-8"
-                    )
+                    content = candidate.read_text(encoding="utf-8")
                 except OSError:
                     logger.debug(
                         "Could not read instruction file %s",

@@ -131,8 +131,8 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository first (includes constants module)
           pip install -e ./victor-sdk
-          # Then install victor-ai (which depends on victor-sdk)
-          pip install -e .
+          # Then install victor-ai with embeddings extra (needed for CLI import chain)
+          pip install -e ".[embeddings]"
 
       - name: Test CLI commands
         run: |

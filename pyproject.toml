@@ -504,7 +504,6 @@ addopts = [
     "--strict-config",
     "--cov=victor",
     "--cov-report=",
-    "--timeout=120",
 ]
 asyncio_mode = "auto"
 markers = [

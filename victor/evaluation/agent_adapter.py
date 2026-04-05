@@ -362,10 +362,11 @@ class VictorAgentAdapter:
             from victor.core.shared_types import ConversationStage
 
             state_mgr = getattr(
-                self.orchestrator, '_conversation_state',
-                getattr(self.orchestrator, 'conversation_state', None),
+                self.orchestrator,
+                "_conversation_state",
+                getattr(self.orchestrator, "conversation_state", None),
             )
-            if state_mgr and hasattr(state_mgr, '_transition_to'):
+            if state_mgr and hasattr(state_mgr, "_transition_to"):
                 state_mgr._transition_to(ConversationStage.EXECUTION, confidence=1.0)
                 # Prevent stage regression — don't let the detector push back
                 # to READING/ANALYSIS after grep/read tool calls.
@@ -379,7 +380,7 @@ class VictorAgentAdapter:
         # A minimal set forces decisive tool use at each stage.
         BENCHMARK_TOOLS = {"read", "edit", "write", "grep", "ls", "shell"}
         try:
-            if hasattr(self.orchestrator, 'tools'):
+            if hasattr(self.orchestrator, "tools"):
                 all_tools = set(self.orchestrator.tools.list_tools())
                 disable = all_tools - BENCHMARK_TOOLS
                 for tool_name in disable:
@@ -406,7 +407,7 @@ class VictorAgentAdapter:
 
         # Configure the orchestrator's detector to not prematurely stop.
         # The adapter's outer loop controls completion, not the orchestrator.
-        orch_detector = getattr(self.orchestrator, '_task_completion_detector', None)
+        orch_detector = getattr(self.orchestrator, "_task_completion_detector", None)
         if orch_detector:
             # Inject the edge decision service if available
             try:
@@ -428,9 +429,7 @@ class VictorAgentAdapter:
             if not orch_detector._state.expected_deliverables:
                 from victor.agent.task_completion import DeliverableType
 
-                orch_detector._state.expected_deliverables = [
-                    DeliverableType.FILE_MODIFIED
-                ]
+                orch_detector._state.expected_deliverables = [DeliverableType.FILE_MODIFIED]
 
             # High continuation budget — adapter controls stopping
             orch_detector._state.max_continuation_requests = 999
@@ -487,9 +486,7 @@ class VictorAgentAdapter:
                     logger.warning(f"[AgentAdapter] Turn {self._turns} timed out")
                     break
                 except Exception as e:
-                    logger.error(
-                        "[AgentAdapter] Turn %d provider error: %s", self._turns, e
-                    )
+                    logger.error("[AgentAdapter] Turn %d provider error: %s", self._turns, e)
                     # Provider error (disconnect, SSL, etc.) — don't retry,
                     # record what we have and move on
                     break
@@ -516,11 +513,13 @@ class VictorAgentAdapter:
                     assistant_content[:300] + ("..." if len(assistant_content) > 300 else ""),
                 )
 
-                self._messages.append({
-                    "role": "assistant",
-                    "content": assistant_content,
-                    "reasoning": reasoning,
-                })
+                self._messages.append(
+                    {
+                        "role": "assistant",
+                        "content": assistant_content,
+                        "reasoning": reasoning,
+                    }
+                )
 
                 # Use framework's completion detection (not gaming code)
                 self._completion_detector.analyze_response(assistant_content)

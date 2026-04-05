@@ -241,8 +241,8 @@ class LLMDecisionService:
                 decision_type=decision_type,
                 result=heuristic_result,
                 source="heuristic",
-            confidence=heuristic_confidence,
-        )
+                confidence=heuristic_confidence,
+            )
 
     async def decide_async(
         self,
