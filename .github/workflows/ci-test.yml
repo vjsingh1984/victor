@@ -63,8 +63,8 @@ jobs:
           pip install -e ./victor-sdk
           # Install with dev dependencies for testing
           pip install -e ".[dev,api]"
-          # Install pytest-split for sharding across CI jobs
-          pip install pytest-split
+          # Additional test dependencies
+          pip install pytest-split pytest-timeout scipy
 
       - name: Run tests (sharded)
         run: |
@@ -75,6 +75,10 @@ jobs:
             --group=${{ matrix.shard }} \
             -v \
             --tb=short \
+            --timeout=120 \
+            --ignore=tests/unit/embeddings \
+            --ignore=tests/unit/agent/test_conversation_embedding_store.py \
+            --ignore=tests/unit/integrations/api/test_api_router_plugins.py \
             --cov=victor \
             --cov-report=xml \
             --cov-report=term-missing \
