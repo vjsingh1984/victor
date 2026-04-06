@@ -80,7 +80,6 @@ jobs:
         # Blocks on any known vulnerability. Exceptions must be documented in
         # .pip-audit-known-vulnerabilities if a transitive dependency cannot be
         # updated immediately. See SECURITY.md § Dependency Audit Exceptions.
-        continue-on-error: true
 
   code-security:
     name: Code Security (Bandit, High-Severity Blocking)
@@ -103,7 +102,7 @@ jobs:
             -f json \
             -o bandit-report.json \
             --severity-level high \
-            --confidence-level high || true
+            --confidence-level high
         # Blocks on HIGH severity + HIGH confidence findings.
         # Lower severity findings are still reported in the artifact.
         # To add exceptions, use # nosec inline or .bandit config.
