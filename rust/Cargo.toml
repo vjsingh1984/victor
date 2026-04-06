@@ -17,6 +17,7 @@ members = [
     "crates/protocol",
     "crates/state",
     "crates/tools",
+    "crates/edge-runtime",
     "crates/python-bindings",
 ]
 resolver = "2"
