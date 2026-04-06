@@ -27,9 +27,11 @@ if TYPE_CHECKING:
         ArgumentNormalizerProtocol,
         AstIndexerProtocol,
         ContentHasherProtocol,
+        ContextFitterProtocol,
         SimilarityComputerProtocol,
         SymbolExtractorProtocol,
         TextChunkerProtocol,
+        TokenCounterProtocol,
     )
 
 
@@ -616,6 +618,8 @@ _argument_normalizer_instance: Optional["ArgumentNormalizerProtocol"] = None
 _similarity_computer_instance: Optional["SimilarityComputerProtocol"] = None
 _text_chunker_instance: Optional["TextChunkerProtocol"] = None
 _ast_indexer_instance: Optional["AstIndexerProtocol"] = None
+_token_counter_instance: Optional["TokenCounterProtocol"] = None
+_context_fitter_instance: Optional["ContextFitterProtocol"] = None
 
 
 def get_default_symbol_extractor() -> "SymbolExtractorProtocol":
@@ -656,6 +660,72 @@ def get_default_ast_indexer() -> "AstIndexerProtocol":
     if _ast_indexer_instance is None:
         _ast_indexer_instance = get_ast_indexer()
     return _ast_indexer_instance
+
+
+def get_default_token_counter() -> "TokenCounterProtocol":
+    """Get the default token counter singleton."""
+    global _token_counter_instance
+    if _token_counter_instance is None:
+        _token_counter_instance = get_token_counter()
+    return _token_counter_instance
+
+
+def get_default_context_fitter() -> "ContextFitterProtocol":
+    """Get the default context fitter singleton."""
+    global _context_fitter_instance
+    if _context_fitter_instance is None:
+        _context_fitter_instance = get_context_fitter()
+    return _context_fitter_instance
+
+
+def get_token_counter(backend: Optional[str] = None) -> "TokenCounterProtocol":
+    """Get a token counter implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        TokenCounterProtocol implementation
+    """
+    effective_backend = backend or get_preferred_backend("token_counting")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
+        try:
+            from victor.native.rust.tokenizer import RustTokenCounter
+
+            return RustTokenCounter()
+        except ImportError:
+            pass
+
+    from victor.native.python.tokenizer import PythonTokenCounter
+
+    return PythonTokenCounter()
+
+
+def get_context_fitter(backend: Optional[str] = None) -> "ContextFitterProtocol":
+    """Get a context fitter implementation.
+
+    Args:
+        backend: Explicit backend choice ("rust" or "python").
+                 If None, uses Rust if available, otherwise Python.
+
+    Returns:
+        ContextFitterProtocol implementation
+    """
+    effective_backend = backend or get_preferred_backend("context_fitting")
+
+    if effective_backend == "rust" and _NATIVE_AVAILABLE:
+        try:
+            from victor.native.rust.context_fitter import RustContextFitter
+
+            return RustContextFitter()
+        except ImportError:
+            pass
+
+    from victor.native.python.context_fitter import PythonContextFitter
+
+    return PythonContextFitter()
 
 
 def get_content_hasher(
@@ -718,6 +788,7 @@ def reset_protocol_singletons() -> None:
     global _symbol_extractor_instance, _argument_normalizer_instance
     global _similarity_computer_instance, _text_chunker_instance
     global _ast_indexer_instance, _content_hasher_fuzzy, _content_hasher_exact
+    global _token_counter_instance, _context_fitter_instance
     _symbol_extractor_instance = None
     _argument_normalizer_instance = None
     _similarity_computer_instance = None
@@ -725,3 +796,5 @@ def reset_protocol_singletons() -> None:
     _ast_indexer_instance = None
     _content_hasher_fuzzy = None
     _content_hasher_exact = None
+    _token_counter_instance = None
+    _context_fitter_instance = None

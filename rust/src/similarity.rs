@@ -490,3 +490,395 @@ mod tests {
         assert!((norm - 1.0).abs() < 1e-6);
     }
 }
+
+// ---------------------------------------------------------------------------
+// EmbeddingIndex — pre-normalized corpus for batch similarity queries
+// ---------------------------------------------------------------------------
+
+/// Pre-normalized embedding corpus for batch similarity queries.
+/// Stores vectors in a contiguous flat buffer for SIMD-friendly access.
+#[pyclass]
+pub struct EmbeddingIndex {
+    data: Vec<f32>,     // flat: dim * n_vectors
+    dim: usize,
+    n_vectors: usize,
+    labels: Vec<String>,
+}
+
+#[pymethods]
+impl EmbeddingIndex {
+    /// Create a new EmbeddingIndex from a list of vectors and their labels.
+    ///
+    /// Each vector is L2-normalized before storage so that dot product
+    /// equals cosine similarity at query time.
+    ///
+    /// # Arguments
+    /// * `vectors` - List of embedding vectors (must all have the same dimension)
+    /// * `labels` - List of labels, one per vector
+    ///
+    /// # Raises
+    /// * `ValueError` - If vectors/labels lengths differ or dimensions are inconsistent
+    #[new]
+    pub fn new(vectors: Vec<Vec<f32>>, labels: Vec<String>) -> PyResult<Self> {
+        if vectors.len() != labels.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "vectors length ({}) must match labels length ({})",
+                vectors.len(),
+                labels.len()
+            )));
+        }
+        if vectors.is_empty() {
+            return Ok(Self {
+                data: Vec::new(),
+                dim: 0,
+                n_vectors: 0,
+                labels,
+            });
+        }
+
+        let dim = vectors[0].len();
+        if dim == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Vectors must have non-zero dimension",
+            ));
+        }
+        for (i, v) in vectors.iter().enumerate() {
+            if v.len() != dim {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Dimension mismatch: vectors[0] has {} dims, vectors[{}] has {} dims",
+                    dim,
+                    i,
+                    v.len()
+                )));
+            }
+        }
+
+        let n_vectors = vectors.len();
+        let mut data = Vec::with_capacity(dim * n_vectors);
+        for v in &vectors {
+            let norm = simd_norm(v);
+            for &x in v {
+                data.push(x / norm);
+            }
+        }
+
+        Ok(Self {
+            data,
+            dim,
+            n_vectors,
+            labels,
+        })
+    }
+
+    /// Add more vectors to the index.
+    ///
+    /// # Arguments
+    /// * `vectors` - Additional embedding vectors
+    /// * `labels` - Labels for the new vectors
+    ///
+    /// # Raises
+    /// * `ValueError` - If dimensions don't match existing index or vectors/labels mismatch
+    pub fn add(&mut self, vectors: Vec<Vec<f32>>, labels: Vec<String>) -> PyResult<()> {
+        if vectors.len() != labels.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "vectors length ({}) must match labels length ({})",
+                vectors.len(),
+                labels.len()
+            )));
+        }
+        if vectors.is_empty() {
+            return Ok(());
+        }
+
+        // If the index is empty, initialize dim from the first vector
+        if self.n_vectors == 0 {
+            self.dim = vectors[0].len();
+            if self.dim == 0 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "Vectors must have non-zero dimension",
+                ));
+            }
+        }
+
+        for (i, v) in vectors.iter().enumerate() {
+            if v.len() != self.dim {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Dimension mismatch: index has {} dims, vectors[{}] has {} dims",
+                    self.dim,
+                    i,
+                    v.len()
+                )));
+            }
+        }
+
+        self.data.reserve(self.dim * vectors.len());
+        for v in &vectors {
+            let norm = simd_norm(v);
+            for &x in v {
+                self.data.push(x / norm);
+            }
+        }
+
+        self.n_vectors += vectors.len();
+        self.labels.extend(labels);
+        Ok(())
+    }
+
+    /// Query the index for the top-k most similar vectors.
+    ///
+    /// The query vector is L2-normalized internally.  Similarity is computed
+    /// as the dot product with each stored (pre-normalized) vector, which
+    /// equals cosine similarity for unit vectors.
+    ///
+    /// # Arguments
+    /// * `query` - Query embedding vector
+    /// * `k` - Number of top results to return (default 10)
+    /// * `threshold` - Minimum similarity score to include (default 0.0)
+    ///
+    /// # Returns
+    /// List of (label, similarity) tuples sorted by similarity descending
+    #[pyo3(signature = (query, k = 10, threshold = 0.0))]
+    pub fn query(&self, query: Vec<f32>, k: usize, threshold: f32) -> Vec<(String, f32)> {
+        if self.n_vectors == 0 || query.len() != self.dim {
+            return Vec::new();
+        }
+
+        // Normalize query
+        let q_norm = simd_norm(&query);
+        let q_normalized: Vec<f32> = query.iter().map(|&x| x / q_norm).collect();
+
+        // Compute dot products against all stored vectors
+        let mut scored: Vec<(usize, f32)> = Vec::with_capacity(self.n_vectors);
+        for i in 0..self.n_vectors {
+            let offset = i * self.dim;
+            let vec_slice = &self.data[offset..offset + self.dim];
+            let sim = simd_dot(&q_normalized, vec_slice);
+            if sim >= threshold {
+                scored.push((i, sim));
+            }
+        }
+
+        // Sort descending by similarity
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Take top-k
+        scored
+            .into_iter()
+            .take(k)
+            .map(|(idx, sim)| (self.labels[idx].clone(), sim))
+            .collect()
+    }
+
+    /// Return similarity scores for every vector in the index.
+    ///
+    /// # Arguments
+    /// * `query` - Query embedding vector
+    ///
+    /// # Returns
+    /// List of similarity scores, one per stored vector, in insertion order
+    ///
+    /// # Raises
+    /// * `ValueError` - If query dimension doesn't match index dimension
+    pub fn similarities(&self, query: Vec<f32>) -> PyResult<Vec<f32>> {
+        if self.n_vectors == 0 {
+            return Ok(Vec::new());
+        }
+        if query.len() != self.dim {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Dimension mismatch: index has {} dims, query has {} dims",
+                self.dim,
+                query.len()
+            )));
+        }
+
+        let q_norm = simd_norm(&query);
+        let q_normalized: Vec<f32> = query.iter().map(|&x| x / q_norm).collect();
+
+        let mut results = Vec::with_capacity(self.n_vectors);
+        for i in 0..self.n_vectors {
+            let offset = i * self.dim;
+            let vec_slice = &self.data[offset..offset + self.dim];
+            results.push(simd_dot(&q_normalized, vec_slice));
+        }
+
+        Ok(results)
+    }
+
+    /// Return the number of vectors in the index.
+    pub fn len(&self) -> usize {
+        self.n_vectors
+    }
+
+    /// Return the dimensionality of vectors in the index.
+    pub fn dim(&self) -> usize {
+        self.dim
+    }
+}
+
+#[cfg(test)]
+mod embedding_index_tests {
+    use super::*;
+
+    #[test]
+    fn test_new_empty() {
+        let idx = EmbeddingIndex::new(vec![], vec![]).unwrap();
+        assert_eq!(idx.len(), 0);
+        assert_eq!(idx.dim(), 0);
+    }
+
+    #[test]
+    fn test_new_stores_normalized() {
+        let vectors = vec![vec![3.0, 4.0], vec![1.0, 0.0]];
+        let labels = vec!["a".to_string(), "b".to_string()];
+        let idx = EmbeddingIndex::new(vectors, labels).unwrap();
+
+        assert_eq!(idx.len(), 2);
+        assert_eq!(idx.dim(), 2);
+
+        // First stored vector should be [0.6, 0.8]
+        assert!((idx.data[0] - 0.6).abs() < 1e-6);
+        assert!((idx.data[1] - 0.8).abs() < 1e-6);
+        // Second stored vector should be [1.0, 0.0]
+        assert!((idx.data[2] - 1.0).abs() < 1e-6);
+        assert!((idx.data[3] - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_new_dimension_mismatch() {
+        let vectors = vec![vec![1.0, 2.0], vec![1.0, 2.0, 3.0]];
+        let labels = vec!["a".to_string(), "b".to_string()];
+        assert!(EmbeddingIndex::new(vectors, labels).is_err());
+    }
+
+    #[test]
+    fn test_new_labels_mismatch() {
+        let vectors = vec![vec![1.0, 2.0]];
+        let labels = vec!["a".to_string(), "b".to_string()];
+        assert!(EmbeddingIndex::new(vectors, labels).is_err());
+    }
+
+    #[test]
+    fn test_add_vectors() {
+        let mut idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0]],
+            vec!["a".to_string()],
+        )
+        .unwrap();
+        assert_eq!(idx.len(), 1);
+
+        idx.add(vec![vec![0.0, 1.0]], vec!["b".to_string()]).unwrap();
+        assert_eq!(idx.len(), 2);
+        assert_eq!(idx.labels, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_add_to_empty_index() {
+        let mut idx = EmbeddingIndex::new(vec![], vec![]).unwrap();
+        idx.add(vec![vec![1.0, 0.0]], vec!["a".to_string()]).unwrap();
+        assert_eq!(idx.len(), 1);
+        assert_eq!(idx.dim(), 2);
+    }
+
+    #[test]
+    fn test_add_dimension_mismatch() {
+        let mut idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0]],
+            vec!["a".to_string()],
+        )
+        .unwrap();
+        assert!(idx.add(vec![vec![1.0, 0.0, 0.0]], vec!["b".to_string()]).is_err());
+    }
+
+    #[test]
+    fn test_query_identical() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            vec!["x-axis".to_string(), "y-axis".to_string()],
+        )
+        .unwrap();
+
+        let results = idx.query(vec![1.0, 0.0], 1, 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "x-axis");
+        assert!((results[0].1 - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_query_with_threshold() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![0.7, 0.7]],
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        )
+        .unwrap();
+
+        // Query close to a, threshold should filter out b
+        let results = idx.query(vec![1.0, 0.0], 10, 0.5);
+        // "a" similarity ~1.0, "c" similarity ~0.7, "b" similarity ~0.0
+        assert!(results.len() == 2);
+        assert_eq!(results[0].0, "a");
+        assert_eq!(results[1].0, "c");
+    }
+
+    #[test]
+    fn test_query_top_k_limit() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0], vec![0.9, 0.1], vec![0.8, 0.2]],
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        )
+        .unwrap();
+
+        let results = idx.query(vec![1.0, 0.0], 2, 0.0);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_query_wrong_dimension() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0]],
+            vec!["a".to_string()],
+        )
+        .unwrap();
+
+        let results = idx.query(vec![1.0, 0.0, 0.0], 1, 0.0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_similarities() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![-1.0, 0.0]],
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        )
+        .unwrap();
+
+        let sims = idx.similarities(vec![1.0, 0.0]).unwrap();
+        assert_eq!(sims.len(), 3);
+        assert!((sims[0] - 1.0).abs() < 1e-6);  // identical
+        assert!(sims[1].abs() < 1e-6);            // orthogonal
+        assert!((sims[2] + 1.0).abs() < 1e-6);   // opposite
+    }
+
+    #[test]
+    fn test_similarities_wrong_dimension() {
+        let idx = EmbeddingIndex::new(
+            vec![vec![1.0, 0.0]],
+            vec!["a".to_string()],
+        )
+        .unwrap();
+        assert!(idx.similarities(vec![1.0, 0.0, 0.0]).is_err());
+    }
+
+    #[test]
+    fn test_query_empty_index() {
+        let idx = EmbeddingIndex::new(vec![], vec![]).unwrap();
+        let results = idx.query(vec![1.0, 0.0], 10, 0.0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_similarities_empty_index() {
+        let idx = EmbeddingIndex::new(vec![], vec![]).unwrap();
+        let sims = idx.similarities(vec![1.0, 0.0]).unwrap();
+        assert!(sims.is_empty());
+    }
+}

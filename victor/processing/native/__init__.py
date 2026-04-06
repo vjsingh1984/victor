@@ -144,6 +144,20 @@ from victor.processing.native.tool_extraction import (  # noqa: F401
     validate_tool_name,
 )
 
+# Tokenizer
+from victor.processing.native.tokenizer import (  # noqa: F401
+    count_tokens,
+    count_tokens_fast,
+    count_tokens_batch,
+)
+
+# Context fitter
+from victor.processing.native.context_fitter import (  # noqa: F401
+    fit_context,
+    truncate_message,
+    FitResult,
+)
+
 # Accelerator, stdlib, YAML, protocol dispatch
 from victor.processing.native.accelerator import (  # noqa: F401
     # Stdlib detection
@@ -167,6 +181,11 @@ from victor.processing.native.accelerator import (  # noqa: F401
     get_default_text_chunker,
     get_default_ast_indexer,
     reset_protocol_singletons,
+    # Token counting
+    get_token_counter,
+    get_context_fitter,
+    get_default_token_counter,
+    get_default_context_fitter,
     # Content hashing
     get_content_hasher,
     get_default_content_hasher_fuzzy,
@@ -286,6 +305,19 @@ __all__ = [
     "get_default_text_chunker",
     "get_default_ast_indexer",
     "reset_protocol_singletons",
+    # Tokenizer
+    "count_tokens",
+    "count_tokens_fast",
+    "count_tokens_batch",
+    # Context fitter
+    "fit_context",
+    "truncate_message",
+    "FitResult",
+    # Token counter / context fitter dispatch
+    "get_token_counter",
+    "get_context_fitter",
+    "get_default_token_counter",
+    "get_default_context_fitter",
     # Content hashing
     "get_content_hasher",
     "get_default_content_hasher_fuzzy",
