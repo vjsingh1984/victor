@@ -183,6 +183,33 @@ def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) ->
     assert any("blocking Bandit step" in finding.message for finding in findings)
 
 
+def test_security_baseline_accepts_shell_based_blocking_pip_audit(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/ci-fast.yml",
+        "name: CI\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@0.33.1\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
+    )
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@0.33.1\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n      - name: Run pip-audit\n        run: |\n          pip install pip-audit\n          pip-audit --format json --output audit-report.json\n      - name: Run Bandit\n        run: |\n          bandit -r victor/ --severity-level high --confidence-level high\n",
+    )
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "SECURITY.md",
+        "## Current CI Enforcement Baseline\n**Blocking today**\n**Advisory today**\n### Current Thresholds\nTrivy filesystem scan\n| Dependency audit | Blocking |\n| Bandit (SAST) | Blocking |\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert not any("blocking pip-audit step" in finding.message for finding in findings)
+
+
 def test_security_baseline_requires_ignore_unfixed_for_blocking_trivy_path(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(

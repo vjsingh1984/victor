@@ -108,7 +108,7 @@ Current repository policy uses tiered enforcement:
 | Surface | Enforcement | Threshold | Exception Handling |
 | ------- | ----------- | --------- | ------------------ |
 | Secret scanning | Blocking | Any verified secret hit | Remove the secret or update scanner configuration with explicit justification |
-| Trivy filesystem scan | Blocking | `CRITICAL` findings only | `ignore-unfixed: true`; threshold changes require workflow + doc updates |
+| Trivy filesystem scan | Blocking | `CRITICAL` findings only | `ignore-unfixed: true`; accepted dependency CVEs must be mirrored in `.trivyignore` with justification in `.pip-audit-known-vulnerabilities` |
 | Dependency audit | Blocking | Any known vulnerability | Exceptions via `.pip-audit-known-vulnerabilities` with justification comment |
 | Bandit (SAST) | Blocking | `HIGH` severity + `HIGH` confidence | Exceptions via `# nosec` inline comment or `.bandit` config with justification |
 | Bandit (full) | Advisory | All findings reported | Review artifact for lower-severity trends |
@@ -117,7 +117,7 @@ Current repository policy uses tiered enforcement:
 
 ### Exception Process
 
-1. **Dependency exceptions**: Create `.pip-audit-known-vulnerabilities` listing CVE IDs that cannot be resolved due to transitive dependency constraints. Each entry must include a justification comment and a re-review date.
+1. **Dependency exceptions**: Create `.pip-audit-known-vulnerabilities` listing CVE IDs that cannot be resolved due to transitive dependency constraints. Each entry must include a justification comment and a re-review date. If the same CVE is surfaced by Trivy, add the CVE ID to `.trivyignore` and keep the justification synchronized.
 2. **SAST exceptions**: Use `# nosec` inline with a comment explaining why the finding is a false positive or accepted risk. Example: `eval(expr, {"__builtins__": {}}, ctx)  # nosec B307 — sandboxed eval`.
 3. **All exceptions are reviewed** at each milestone cut (M1/M2/M3) and removed when the underlying issue is resolved.
 

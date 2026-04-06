@@ -267,9 +267,14 @@ def _workflow_has_blocking_pip_audit_step(path: Path) -> bool:
             if not isinstance(step, dict):
                 continue
             uses = step.get("uses")
-            if not isinstance(uses, str) or "pypa/gh-action-pip-audit" not in uses:
+            run = step.get("run")
+            has_pip_audit_action = isinstance(uses, str) and "pypa/gh-action-pip-audit" in uses
+            has_pip_audit_command = isinstance(run, str) and "pip-audit" in run
+            if not has_pip_audit_action and not has_pip_audit_command:
                 continue
             if bool(step.get("continue-on-error", False)):
+                continue
+            if isinstance(run, str) and "|| true" in run:
                 continue
             return True
     return False
