@@ -247,6 +247,14 @@ class TestNoCircularImports:
     to detect circular dependencies.
     """
 
+    @staticmethod
+    def _clear_module_tree(module_name: str) -> None:
+        """Remove a module and its descendants from sys.modules."""
+
+        for loaded_name in list(sys.modules):
+            if loaded_name == module_name or loaded_name.startswith(f"{module_name}."):
+                del sys.modules[loaded_name]
+
     def test_can_import_all_modules(self) -> None:
         """Verify all top-level modules can be imported."""
         modules_to_test = [
@@ -264,8 +272,7 @@ class TestNoCircularImports:
         for module_name in modules_to_test:
             try:
                 # Fresh import by removing from sys.modules first
-                if module_name in sys.modules:
-                    del sys.modules[module_name]
+                self._clear_module_tree(module_name)
                 importlib.import_module(module_name)
             except Exception as e:
                 failed.append(f"{module_name}: {e}")
