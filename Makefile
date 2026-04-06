@@ -48,14 +48,11 @@ install:
 
 install-dev:
 	pip install -e ".[dev,docs,build]"
-	pip install pre-commit pytest-xdist pytest-split
+	pip install pre-commit pytest-split
 	pre-commit install || true
 
 test:
-	pytest tests/unit -v --tb=short -n 2 --dist loadscope --timeout=120
-
-test-parallel:
-	pytest tests/unit -v --tb=short -n auto --dist loadscope --timeout=120
+	pytest tests/unit -v --tb=short --timeout=120
 
 test-definition-boundaries:
 	@echo "Definition import boundaries enforced by SDK contract tests"
