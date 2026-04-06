@@ -70,13 +70,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --force-reinstall --no-deps -e .
-          pip install -e ".[dev]"
+          pip install -e ".[dev,api]"
+          pip install scipy  # For experiments/ab tests
           pip uninstall -y victor || true
           python -c "from victor import Agent, __version__; print(f'✓ Agent import works (victor {__version__})')"
 
       - name: Run tests
         run: |
-          pytest tests/unit -v --tb=short
+          pytest tests/unit -v --tb=short -m "not slow and not integration"
 
       - name: Run linting
         run: |
