@@ -42,6 +42,89 @@ def test_workflow_check_flags_missing_top_level_on(tmp_path: Path) -> None:
     assert any("non-empty top-level trigger" in finding.message for finding in findings)
 
 
+def test_vertical_extras_require_real_package_dependencies(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = []
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+        """.strip()
+        + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("extracted vertical extra 'coding'" in finding.message for finding in findings)
+
+
+def test_legacy_noop_vertical_extras_are_rejected(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = ["victor-coding>=0.6.0"]
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+rag = []
+        """.strip()
+        + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("legacy no-op vertical extra 'rag'" in finding.message for finding in findings)
+
+
+def test_self_referential_ci_extra_is_rejected(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = ["victor-coding>=0.6.0"]
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+ci = ["victor-ai[dev]", "pytest-split>=0.8"]
+        """.strip()
+        + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("must not self-reference victor-ai" in finding.message for finding in findings)
+
+
 def test_banned_repo_url_is_flagged(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")

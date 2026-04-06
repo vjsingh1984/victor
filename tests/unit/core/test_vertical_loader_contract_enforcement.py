@@ -7,6 +7,7 @@ from typing import List
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
 from victor_sdk import VerticalBase as SdkVerticalBase
+from victor_sdk.verticals.manifest import ExtensionManifest
 
 
 def _make_vertical(name: str, api_version: int):
@@ -106,18 +107,145 @@ def test_loader_passes_sdk_verticals_through_at_activation_time(monkeypatch):
 
     vertical_name = "sdk_only_vertical"
     VerticalRegistry.unregister(vertical_name)
-    sdk_vertical = _make_sdk_vertical(vertical_name, api_version=1)
 
-    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: sdk_vertical)
-    loader._load_vertical_entries({"sdk_plugin": "fake.module:SdkVertical"})
-    loaded = loader.load(vertical_name)
 
-    assert loader._discovered_verticals["sdk_plugin"] is sdk_vertical
-    assert VerticalRegistry.get(vertical_name) is sdk_vertical
-    assert loaded is loader.active_vertical
-    assert loaded is sdk_vertical
+def test_vertical_registry_register_attaches_manifest_for_legacy_sdk_vertical():
+    """Legacy registration should synthesize and attach a normalized manifest."""
 
-    VerticalRegistry.unregister(vertical_name)
+    class _LegacySdkVertical(SdkVerticalBase):
+        name = "legacy_manifest_vertical"
+        description = "Legacy manifest test"
+        version = "2.3.4"
+
+        @classmethod
+        def get_name(cls) -> str:
+            return cls.name
+
+        @classmethod
+        def get_description(cls) -> str:
+            return cls.description
+
+        @classmethod
+        def get_tools(cls) -> List[str]:
+            return ["read"]
+
+        @classmethod
+        def get_system_prompt(cls) -> str:
+            return "legacy prompt"
+
+    VerticalRegistry.unregister(_LegacySdkVertical.name)
+
+    VerticalRegistry.register(_LegacySdkVertical)
+
+    manifest = getattr(_LegacySdkVertical, "_victor_manifest", None)
+    assert isinstance(manifest, ExtensionManifest)
+    assert manifest.name == "legacy_manifest_vertical"
+    assert manifest.version == "2.3.4"
+
+    VerticalRegistry.unregister(_LegacySdkVertical.name)
+
+
+def test_loader_validation_does_not_invoke_runtime_prompt_or_tool_methods(monkeypatch):
+    """Entry-point validation should not execute runtime-heavy vertical methods."""
+
+    loader = VerticalLoader()
+    loader._discovered_verticals = {}
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    class _RuntimeSensitiveVertical(SdkVerticalBase):
+        name = "runtime_sensitive_vertical"
+        description = "Should validate without executing runtime hooks"
+
+        @classmethod
+        def get_name(cls) -> str:
+            return cls.name
+
+        @classmethod
+        def get_description(cls) -> str:
+            return cls.description
+
+        @classmethod
+        def get_tools(cls) -> List[str]:
+            raise AssertionError("get_tools must not run during discovery")
+
+        @classmethod
+        def get_system_prompt(cls) -> str:
+            raise AssertionError("get_system_prompt must not run during discovery")
+
+        @classmethod
+        def get_manifest(cls) -> ExtensionManifest:
+            return ExtensionManifest(name=cls.name, version="1.0.0", api_version=1)
+
+    VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: _RuntimeSensitiveVertical)
+
+    loader._load_vertical_entries({"runtime_sensitive": "fake.module:RuntimeSensitiveVertical"})
+
+    assert loader._discovered_verticals["runtime_sensitive"] is _RuntimeSensitiveVertical
+    assert VerticalRegistry.get(_RuntimeSensitiveVertical.name) is _RuntimeSensitiveVertical
+
+    VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
+
+
+def test_loader_resolves_requested_entry_point_without_importing_all_verticals(monkeypatch):
+    """Single-vertical resolution should only import the requested entry point."""
+
+    loader = VerticalLoader()
+    requested = _make_sdk_vertical("requested_vertical", api_version=1)
+
+    class _Cache:
+        def get_entry_points(self, group: str, force_refresh: bool = False):
+            assert group == "victor.plugins"
+            return {
+                "requested_vertical": "pkg.requested:Vertical",
+                "unused_vertical": "pkg.unused:Vertical",
+            }
+
+    def _load_entry_point(name: str, value: str):
+        if name != "requested_vertical":
+            raise AssertionError(f"unexpected import: {name} -> {value}")
+        return requested
+
+    VerticalRegistry.unregister("requested_vertical")
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_entry_point_cache",
+        lambda: _Cache(),
+    )
+    monkeypatch.setattr(loader, "_load_entry_point", _load_entry_point)
+
+    resolved = loader.resolve("requested_vertical")
+
+    assert resolved is requested
+    assert VerticalRegistry.get("requested_vertical") is requested
+
+    VerticalRegistry.unregister("requested_vertical")
+
+
+def test_discover_vertical_names_uses_entry_point_metadata_only(monkeypatch):
+    """Fast name discovery should not import entry-point modules."""
+
+    loader = VerticalLoader()
+
+    class _Cache:
+        def get_entry_points(self, group: str, force_refresh: bool = False):
+            assert group == "victor.plugins"
+            return {
+                "coding": "victor_coding:Assistant",
+                "research": "victor_research:Assistant",
+            }
+
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_entry_point_cache",
+        lambda: _Cache(),
+    )
+    monkeypatch.setattr(
+        loader,
+        "_load_entry_point",
+        lambda *_: (_ for _ in ()).throw(AssertionError("name discovery must not import")),
+    )
+
+    assert loader.discover_vertical_names(force_refresh=True) == ["coding", "research"]
 
 
 def test_refresh_plugins_clears_entry_point_loader_caches(monkeypatch):
@@ -272,7 +400,7 @@ def test_discover_verticals_logs_structured_telemetry(monkeypatch, caplog):
         "vertical": {"calls": 1, "cache_hits": 0, "scans": 1, "last_discovery_ms": 12.5},
         "entry_point_cache": {
             "groups_cached": 1,
-            "groups": {"victor.verticals": {"entries": 2}},
+            "groups": {"victor.plugins": {"entries": 2}},
         },
     }
     monkeypatch.setattr(loader, "get_discovery_stats", lambda: telemetry_stats)
@@ -303,7 +431,7 @@ def test_discover_verticals_logs_structured_telemetry(monkeypatch, caplog):
     assert record.discovered_count == 2
     assert record.force_refresh is True
     assert record.cache_hit is False
-    assert record.entry_point_cache_group == "victor.verticals"
+    assert record.entry_point_cache_group == "victor.plugins"
     assert record.entry_point_cache_group_stats == {"entries": 2}
     assert record.entry_point_groups_cached == 1
 

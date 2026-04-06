@@ -57,6 +57,9 @@ Repository = "https://github.com/vjsingh1984/victor"
 Documentation = "https://docs.victor.dev/sdk"
 Issues = "https://github.com/vjsingh1984/victor/issues"
 
+[project.scripts]
+victor-sdk = "victor_sdk.cli:main"
+
 [tool.setuptools]
 package-dir = { "" = "." }
 

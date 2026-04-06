@@ -112,6 +112,11 @@ from victor_sdk.discovery import (
     get_discovery_summary,
     reload_discovery,
 )
+from victor_sdk.validation import (
+    ValidationIssue,
+    ValidationReport,
+    validate_vertical_package,
+)
 
 # Stable SDK constants
 from victor_sdk.constants import (
@@ -211,6 +216,10 @@ __all__ = [
     "discover_protocols",
     "get_discovery_summary",
     "reload_discovery",
+    # Validation
+    "ValidationIssue",
+    "ValidationReport",
+    "validate_vertical_package",
     # Stable constants
     "CapabilityIds",
     "ToolNames",

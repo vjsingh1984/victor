@@ -8,6 +8,7 @@ from pathlib import Path
 import argparse
 import re
 import sys
+import tomllib
 
 import yaml
 
@@ -198,6 +199,67 @@ def check_makefile_lint_gate(root: Path) -> list[HygieneFinding]:
 
     if any("|| true" in line for line in mypy_lines):
         findings.append(HygieneFinding(rel_path, "lint target must not suppress mypy failure with `|| true`"))
+
+    return findings
+
+
+def check_vertical_extra_metadata(root: Path) -> list[HygieneFinding]:
+    """Reject stale no-op metadata for extracted vertical package extras."""
+
+    path = root / "pyproject.toml"
+    if not path.is_file():
+        return []
+    rel_path = _relative(path, root)
+    try:
+        data = tomllib.loads(path.read_text())
+    except Exception as exc:
+        return [HygieneFinding(rel_path, f"pyproject.toml failed to parse: {exc}")]
+
+    project = data.get("project", {})
+    optional_deps = project.get("optional-dependencies", {})
+    if not isinstance(optional_deps, dict):
+        return [HygieneFinding(rel_path, "project.optional-dependencies must be a mapping")]
+    project_name = str(project.get("name", "")).strip().lower()
+
+    findings: list[HygieneFinding] = []
+    for extra_name in ("coding", "research", "devops", "verticals"):
+        values = optional_deps.get(extra_name)
+        if not isinstance(values, list) or not values:
+            findings.append(
+                HygieneFinding(
+                    rel_path,
+                    f"extracted vertical extra '{extra_name}' must map to real package dependencies",
+                )
+            )
+
+    for legacy_name in ("rag", "dataanalysis"):
+        values = optional_deps.get(legacy_name)
+        if isinstance(values, list) and not values:
+            findings.append(
+                HygieneFinding(
+                    rel_path,
+                    f"legacy no-op vertical extra '{legacy_name}' must not be present",
+                )
+            )
+
+    if project_name:
+        self_reference_prefix = f"{project_name}["
+        for extra_name in ("dev", "ci", "verticals"):
+            values = optional_deps.get(extra_name)
+            if not isinstance(values, list):
+                continue
+            for value in values:
+                if not isinstance(value, str):
+                    continue
+                if value.lower().startswith(self_reference_prefix):
+                    findings.append(
+                        HygieneFinding(
+                            rel_path,
+                            f"extra '{extra_name}' must not self-reference {project_name}[...]"
+                            " because nested extras do not resolve reliably in CI",
+                        )
+                    )
+                    break
 
     return findings
 
@@ -394,6 +456,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_archived_doc_banners(root))
     findings.extend(check_removed_legacy_paths(root))
     findings.extend(check_makefile_lint_gate(root))
+    findings.extend(check_vertical_extra_metadata(root))
     findings.extend(check_security_baseline(root))
     return findings
 

@@ -253,15 +253,14 @@ def _ensure_registration() -> None:
     """Ensure verticals are registered (lazy initialization).
 
     This is called on first access to avoid circular dependencies during
-    framework initialization. External verticals may import from framework,
-    so we must complete framework initialization before loading them.
+    framework initialization. External verticals are resolved lazily on demand
+    to avoid importing every installed package for simple listing/help flows.
     """
     global _registration_done
     if _registration_done:
         return
 
     _register_builtin_verticals()
-    _discover_external_verticals()
     _registration_done = True
 
 
@@ -285,11 +284,31 @@ def get_vertical(name: str | None) -> type[VerticalBase] | None:
     if result:
         return result
 
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        result = loader.resolve(name)
+        if result:
+            return result
+    except Exception:
+        pass
+
     # Try case-insensitive match
     name_lower = name.lower()
     for registered_name in VerticalRegistry.list_names():
         if registered_name.lower() == name_lower:
             return VerticalRegistry.get(registered_name)
+
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        for discovered_name in loader.discover_vertical_names():
+            if discovered_name.lower() == name_lower:
+                return loader.resolve(discovered_name)
+    except Exception:
+        pass
 
     return None
 
@@ -302,4 +321,11 @@ def list_verticals() -> list[str]:
     """
     # Ensure verticals are registered before listing (lazy initialization)
     _ensure_registration()
-    return VerticalRegistry.list_names()
+    names = set(VerticalRegistry.list_names())
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        names.update(get_vertical_loader().discover_vertical_names())
+    except Exception:
+        pass
+    return sorted(names)
