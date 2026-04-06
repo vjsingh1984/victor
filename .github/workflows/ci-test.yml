@@ -1,6 +1,6 @@
-# Optimized Test Workflow with Parallel Execution and Sharding
-# Uses pytest-xdist for parallel test execution within jobs
-# Splits tests across multiple shards for faster matrix execution
+# Test Workflow with Sharding
+# Tests run sequentially within each shard for reliable isolation
+# Splits tests across 6 shards for parallel matrix execution
 
 name: CI - Tests
 
@@ -63,15 +63,13 @@ jobs:
           pip install -e ./victor-sdk
           # Install with dev dependencies for testing
           pip install -e ".[dev,api]"
-          # Install pytest-xdist for parallel execution
-          pip install pytest-xdist pytest-split
+          # Install pytest-split for sharding across CI jobs
+          pip install pytest-split
 
       - name: Run tests (sharded)
         run: |
           pytest tests/unit \
             -m "not slow and not integration" \
-            --dist loadscope \
-            -n auto \
             --splitting-algorithm=least_duration \
             --splits=6 \
             --group=${{ matrix.shard }} \
