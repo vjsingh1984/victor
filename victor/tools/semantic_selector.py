@@ -29,11 +29,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import httpx
-import numpy as np
 
 from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
-from victor.storage.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
@@ -51,9 +49,30 @@ from victor.config.tool_selection_defaults import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import numpy as np
+    from victor.storage.embeddings.service import EmbeddingService
     from victor.agent.unified_classifier import ClassificationResult
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_numpy():
+    """Lazy-import numpy into module namespace on first use.
+
+    numpy is an optional dependency (in [embeddings] extra). Deferring the
+    import prevents ``import victor`` from failing when numpy is absent.
+    """
+    global np  # noqa: F811 — intentional lazy assignment
+    import numpy as np  # noqa: F811
+
+    return np
+
+
+def _get_embedding_service_class():
+    """Lazy-load EmbeddingService to avoid triggering numpy at module level."""
+    from victor.storage.embeddings.service import EmbeddingService
+
+    return EmbeddingService
 
 
 # Lazy hook initialization to avoid circular imports
@@ -141,6 +160,9 @@ class SemanticToolSelector:
             cost_penalty_factor: Penalty per cost weight
             sequence_tracking: Enable tool sequence tracking for 15-20% boost (default: True)
         """
+        # Lazy-load numpy and EmbeddingService (optional dependencies)
+        _ensure_numpy()
+
         self.embedding_model = embedding_model
         self.embedding_provider = embedding_provider
         self.ollama_base_url = ollama_base_url
@@ -1534,6 +1556,7 @@ class SemanticToolSelector:
         """
         try:
             # Use shared embedding service (singleton)
+            EmbeddingService = _get_embedding_service_class()
             embedding_service = EmbeddingService.get_instance(model_name=self.embedding_model)
             return await embedding_service.embed_text(text)
 

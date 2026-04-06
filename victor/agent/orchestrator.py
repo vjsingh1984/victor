@@ -242,7 +242,6 @@ from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.tool_names import ToolNames, TOOL_ALIASES
 from victor.tools.alias_resolver import get_alias_resolver
 from victor.tools.progressive_registry import get_progressive_registry
-from victor.storage.embeddings.intent_classifier import IntentClassifier, IntentType
 from victor.workflows.base import WorkflowRegistry
 from victor.workflows.discovery import register_builtin_workflows
 

@@ -23,18 +23,43 @@ Design:
 - Single EmbeddingService singleton to load the model once
 - StaticEmbeddingCollection for pickle/numpy-backed small collections
 - Cosine similarity for semantic matching
+
+All imports are lazy to avoid pulling in numpy (optional dependency)
+at ``import victor`` time.
 """
 
-from victor.storage.embeddings.service import EmbeddingService
-from victor.storage.embeddings.collections import StaticEmbeddingCollection
-from victor.storage.embeddings.intent_classifier import IntentClassifier
-from victor.storage.embeddings.question_classifier import (
-    QuestionType,
-    QuestionTypeClassifier,
-    QuestionClassificationResult,
-    classify_question,
-    should_auto_continue,
-)
+
+def __getattr__(name: str):
+    """Lazy-load submodule symbols on first access.
+
+    This avoids importing numpy/sentence-transformers at module level,
+    which would break ``import victor`` when those optional dependencies
+    are not installed.
+    """
+    if name == "EmbeddingService":
+        from victor.storage.embeddings.service import EmbeddingService
+
+        return EmbeddingService
+    if name == "StaticEmbeddingCollection":
+        from victor.storage.embeddings.collections import StaticEmbeddingCollection
+
+        return StaticEmbeddingCollection
+    if name == "IntentClassifier":
+        from victor.storage.embeddings.intent_classifier import IntentClassifier
+
+        return IntentClassifier
+    if name in (
+        "QuestionType",
+        "QuestionTypeClassifier",
+        "QuestionClassificationResult",
+        "classify_question",
+        "should_auto_continue",
+    ):
+        import victor.storage.embeddings.question_classifier as _qc
+
+        return getattr(_qc, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "EmbeddingService",

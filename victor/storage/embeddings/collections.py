@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,11 +31,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
+
+# Lazy numpy import — numpy is an optional dependency (in [embeddings] extra).
+np = None  # type: ignore[assignment]
+
+
+def _ensure_numpy():
+    """Import numpy into module namespace on first actual use."""
+    global np
+    if np is None:
+        import numpy
+
+        np = numpy
+    return np
 
 
 @dataclass
@@ -93,6 +106,7 @@ class StaticEmbeddingCollection:
             cache_dir: Directory for cache files (default: ~/.victor/embeddings/)
             embedding_service: Shared embedding service (uses singleton if not provided)
         """
+        _ensure_numpy()
         from victor.config.settings import get_project_paths
 
         self.name = name

@@ -322,7 +322,7 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.storage.embeddings.question_classifier.classify_question", return_value=mock_result
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs
@@ -347,7 +347,7 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.storage.embeddings.question_classifier.classify_question", return_value=mock_result
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs
