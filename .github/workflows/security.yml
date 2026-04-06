@@ -45,7 +45,20 @@ jobs:
           fetch-depth: 0
 
       - name: Run Trivy critical scan
-        id: trivy_critical
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln'
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: '.trivyignore'
+          cache: false
+
+      - name: Generate Trivy SARIF report
+        if: always()
         uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
@@ -53,22 +66,11 @@ jobs:
           scanners: 'vuln'
           format: 'sarif'
           output: 'trivy-critical-results.sarif'
-          severity: 'CRITICAL'
-          exit-code: '1'
-          ignore-unfixed: true
-          trivyignores: '.trivyignore'
-
-      - name: Run Trivy table output on failure
-        if: failure()
-        uses: aquasecurity/trivy-action@v0.35.0
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          scanners: 'vuln'
-          format: 'table'
           severity: 'CRITICAL,HIGH'
+          exit-code: '0'
           ignore-unfixed: true
           trivyignores: '.trivyignore'
+          cache: false
 
       - name: Upload Trivy critical results
         uses: github/codeql-action/upload-sarif@v4
