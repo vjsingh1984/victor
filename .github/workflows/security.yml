@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Trivy critical scan
         id: trivy_critical
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -60,7 +60,7 @@ jobs:
 
       - name: Run Trivy table output on failure
         if: failure()
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
