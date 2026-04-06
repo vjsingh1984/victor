@@ -57,6 +57,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Uninstall any existing victor packages to ensure clean state
+          pip uninstall -y victor victor-ai victor-sdk || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository first (includes constants module)
@@ -126,6 +128,8 @@ jobs:
       - name: Install Victor
         run: |
           pip install --upgrade pip
+          # Uninstall any existing victor packages to ensure clean state
+          pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository first (includes constants module)
           pip install -e ./victor-sdk
