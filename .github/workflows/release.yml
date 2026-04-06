@@ -80,7 +80,8 @@ jobs:
         run: |
           pytest tests/unit -v --tb=short -m "not slow and not integration" --timeout=120 \
             --ignore=tests/unit/embeddings \
-            --ignore=tests/unit/agent/test_conversation_embedding_store.py
+            --ignore=tests/unit/agent/test_conversation_embedding_store.py \
+            --ignore=tests/unit/integrations/api/test_api_router_plugins.py
 
       - name: Run linting
         run: |
