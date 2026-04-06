@@ -164,7 +164,7 @@ jobs:
             -o bandit-report.json \
             --severity-level high \
             --confidence-level high \
-            -c .bandit
+            --ini .bandit
         # Blocks on HIGH severity + HIGH confidence findings.
         # Lower severity findings are still reported in the artifact.
         # To add exceptions, use # nosec inline or .bandit config.
@@ -175,6 +175,7 @@ jobs:
           bandit -r victor/ \
             -f json \
             -o bandit-report-full.json \
+            --ini .bandit \
             || true
 
       - name: Upload Bandit report
@@ -198,7 +199,7 @@ jobs:
         uses: returntocorp/semgrep-action@v1
         with:
           config: auto
-          sarif: true
+          args: --sarif --output=semgrep.sarif
         # Advisory until repo-specific exclusions are tuned and documented.
         continue-on-error: true
         env:
@@ -206,7 +207,7 @@ jobs:
 
       - name: Upload Semgrep results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('semgrep.sarif') != ''
         with:
           sarif_file: semgrep.sarif
         continue-on-error: true

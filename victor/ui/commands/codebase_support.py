@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
-import importlib
 from types import ModuleType
 
-_CODEBASE_ANALYZER_MODULES = (
-    "victor_coding.codebase_analyzer",
-    "victor.verticals.contrib.coding.codebase_analyzer",
+
+def _load_extracted_codebase_analyzer() -> ModuleType:
+    """Load the extracted analyzer from victor-coding."""
+
+    from victor_coding import codebase_analyzer as module
+
+    return module
+
+
+def _load_legacy_codebase_analyzer() -> ModuleType:
+    """Load the legacy in-tree analyzer as a compatibility fallback."""
+
+    from victor.verticals.contrib.coding import codebase_analyzer as module
+
+    return module
+
+
+_CODEBASE_ANALYZER_LOADERS = (
+    _load_extracted_codebase_analyzer,
+    _load_legacy_codebase_analyzer,
 )
 
 
@@ -15,9 +31,9 @@ def load_codebase_analyzer_module() -> ModuleType:
     """Load the extracted codebase analyzer module, with legacy fallback."""
 
     last_error: ImportError | None = None
-    for module_name in _CODEBASE_ANALYZER_MODULES:
+    for loader in _CODEBASE_ANALYZER_LOADERS:
         try:
-            module = importlib.import_module(module_name)
+            module = loader()
         except ImportError as exc:
             last_error = exc
             continue
