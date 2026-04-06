@@ -61,9 +61,9 @@ jobs:
           pip uninstall -y victor victor-ai victor-sdk || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository first (includes constants module)
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
-          # Install with dev dependencies for testing
+          # Install victor-sdk from local repository (non-editable for proper module exposure)
+          pip install --no-cache-dir ./victor-sdk
+          # Install victor-ai in editable mode from local source
           pip install --force-reinstall --no-cache-dir -e ".[dev,api]"
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
@@ -131,8 +131,8 @@ jobs:
           # Uninstall any existing victor packages to ensure clean state
           pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository first (includes constants module)
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
+          # Install victor-sdk from local repository (non-editable for proper module exposure)
+          pip install --no-cache-dir ./victor-sdk
           # Then install victor-ai with embeddings extra (needed for CLI import chain)
           pip install --force-reinstall --no-cache-dir -e ".[embeddings]"
 
