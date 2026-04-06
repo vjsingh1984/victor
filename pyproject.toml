@@ -120,7 +120,7 @@ examples = []
 
 dev = [
     # Embeddings (required for full test coverage)
-    "victor[embeddings]",
+    "victor-ai[embeddings]",
     # Testing
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -151,7 +151,7 @@ dev = [
 # CI/CD dependencies - includes all testing, linting, and build tools
 ci = [
     # All dev dependencies
-    "victor[dev]",
+    "victor-ai[dev]",
 
     # Additional CI-specific tools
     "pytest-split>=0.8",
@@ -215,7 +215,7 @@ build = [
 ]
 
 # HTTP API server for IDE integrations (VS Code, JetBrains, etc.)
-# Usage: pip install victor[api]
+# Usage: pip install victor-ai[api]
 api = [
     "fastapi>=0.109",
     "uvicorn>=0.27",
@@ -223,19 +223,19 @@ api = [
 ]
 
 # Checkpoint persistence with SQLite backend
-# Usage: pip install victor[checkpoints]
+# Usage: pip install victor-ai[checkpoints]
 checkpoints = [
     "aiosqlite>=0.19",
 ]
 
 # Google Gemini provider (using new google-genai SDK)
-# Usage: pip install victor[google]
+# Usage: pip install victor-ai[google]
 google = [
     "google-genai>=1.0",
 ]
 
 # Language-specific tree-sitter grammars (optional - install what you need)
-# Usage: pip install victor[lang-c] or pip install victor[lang-all]
+# Usage: pip install victor-ai[lang-c] or pip install victor-ai[lang-all]
 
 lang-c = [
     "tree-sitter-c>=0.23",
@@ -416,7 +416,7 @@ dataanalysis = []
 verticals = []
 
 all = [
-    "victor[dev,docs,build,lang-all,apple-silicon]",
+    "victor-ai[dev,docs,build,lang-all,apple-silicon]",
 ]
 
 [project.urls]
