@@ -60,8 +60,7 @@ coding = []
 research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -88,8 +87,7 @@ research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
 rag = []
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)
@@ -116,8 +114,7 @@ research = ["victor-research>=0.6.0"]
 devops = ["victor-devops>=0.6.0"]
 verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
 ci = ["victor-ai[dev]", "pytest-split>=0.8"]
-        """.strip()
-        + "\n",
+        """.strip() + "\n",
     )
 
     findings = repo_hygiene_check.run_checks(tmp_path)

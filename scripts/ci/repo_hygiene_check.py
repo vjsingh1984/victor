@@ -12,10 +12,7 @@ import tomllib
 
 import yaml
 
-
-BANNED_REPO_URLS = (
-    "https://github.com/vijay-singh/codingagent",
-)
+BANNED_REPO_URLS = ("https://github.com/vijay-singh/codingagent",)
 
 REPO_URL_SCAN_GLOBS = (
     "README.md",
@@ -91,12 +88,16 @@ def check_workflow_yaml(root: Path) -> list[HygieneFinding]:
 
         name = loaded.get("name")
         if not isinstance(name, str) or not name.strip():
-            findings.append(HygieneFinding(rel_path, "workflow is missing a non-empty top-level name"))
+            findings.append(
+                HygieneFinding(rel_path, "workflow is missing a non-empty top-level name")
+            )
 
         on_config = _workflow_on_config(loaded)
         if on_config in (None, "", []):
             findings.append(
-                HygieneFinding(rel_path, "workflow is missing a non-empty top-level trigger (`on`)"),
+                HygieneFinding(
+                    rel_path, "workflow is missing a non-empty top-level trigger (`on`)"
+                ),
             )
 
     return findings
@@ -198,7 +199,9 @@ def check_makefile_lint_gate(root: Path) -> list[HygieneFinding]:
         findings.append(HygieneFinding(rel_path, "lint target must run `mypy victor`"))
 
     if any("|| true" in line for line in mypy_lines):
-        findings.append(HygieneFinding(rel_path, "lint target must not suppress mypy failure with `|| true`"))
+        findings.append(
+            HygieneFinding(rel_path, "lint target must not suppress mypy failure with `|| true`")
+        )
 
     return findings
 
@@ -385,7 +388,9 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
         root / ".github" / "workflows" / "ci-fast.yml",
         root / ".github" / "workflows" / "security.yml",
     ]
-    if not any(_workflow_has_blocking_trivy_step(path) for path in blocking_sources if path.is_file()):
+    if not any(
+        _workflow_has_blocking_trivy_step(path) for path in blocking_sources if path.is_file()
+    ):
         findings.append(
             HygieneFinding(
                 Path(".github/workflows"),
@@ -415,15 +420,21 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
         text = security_doc.read_text()
         if "## Current CI Enforcement Baseline" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing the Current CI Enforcement Baseline section"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing the Current CI Enforcement Baseline section"
+                ),
             )
         if "**Blocking today**" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing the Blocking today security baseline summary"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing the Blocking today security baseline summary"
+                ),
             )
         if "**Advisory today**" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing the Advisory today security baseline summary"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing the Advisory today security baseline summary"
+                ),
             )
         if "### Current Thresholds" not in text:
             findings.append(
@@ -431,15 +442,21 @@ def check_security_baseline(root: Path) -> list[HygieneFinding]:
             )
         if "Trivy filesystem scan" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing Trivy filesystem scan threshold documentation"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing Trivy filesystem scan threshold documentation"
+                ),
             )
         if "| Dependency audit | Blocking |" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing blocking dependency-audit threshold documentation"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing blocking dependency-audit threshold documentation"
+                ),
             )
         if "| Bandit (SAST) | Blocking |" not in text:
             findings.append(
-                HygieneFinding(Path("SECURITY.md"), "missing blocking Bandit threshold documentation"),
+                HygieneFinding(
+                    Path("SECURITY.md"), "missing blocking Bandit threshold documentation"
+                ),
             )
     else:
         findings.append(HygieneFinding(Path("SECURITY.md"), "security policy document is missing"))

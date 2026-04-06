@@ -122,7 +122,9 @@ def _validate_vertical_class(vertical_cls: type[Any], report: ValidationReport) 
     try:
         assert_valid_vertical(vertical_cls)
     except AssertionError as exc:
-        report.add_issue("protocol_drift", f"Vertical '{vertical_name}' violates SDK contract: {exc}")
+        report.add_issue(
+            "protocol_drift", f"Vertical '{vertical_name}' violates SDK contract: {exc}"
+        )
         return
 
     _check_framework_version_compatibility(vertical_cls, report)
@@ -206,10 +208,7 @@ def _check_framework_version_compatibility(
 def _looks_like_plugin(candidate: Any) -> bool:
     """Return True when *candidate* resembles the VictorPlugin protocol."""
 
-    return all(
-        hasattr(candidate, attr)
-        for attr in ("name", "register", "get_cli_app")
-    )
+    return all(hasattr(candidate, attr) for attr in ("name", "register", "get_cli_app"))
 
 
 class _CollectingPluginContext:

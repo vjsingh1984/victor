@@ -90,7 +90,9 @@ def get_vertical_runtime_metadata(vertical_class: Type[Any]) -> dict[str, str]:
     manifest = get_or_create_vertical_manifest(vertical_class)
     if manifest is None:
         return {
-            "vertical_name": getattr(vertical_class, "name", getattr(vertical_class, "__name__", "")),
+            "vertical_name": getattr(
+                vertical_class, "name", getattr(vertical_class, "__name__", "")
+            ),
             "vertical_manifest_version": getattr(vertical_class, "version", "1.0.0"),
             "vertical_plugin_namespace": infer_plugin_namespace(vertical_class),
         }
@@ -98,7 +100,8 @@ def get_vertical_runtime_metadata(vertical_class: Type[Any]) -> dict[str, str]:
     return {
         "vertical_name": manifest.name,
         "vertical_manifest_version": manifest.version,
-        "vertical_plugin_namespace": manifest.plugin_namespace or infer_plugin_namespace(vertical_class),
+        "vertical_plugin_namespace": manifest.plugin_namespace
+        or infer_plugin_namespace(vertical_class),
     }
 
 

@@ -63,17 +63,18 @@ jobs:
           pip uninstall -y victor victor-ai victor-sdk || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository (non-editable for proper module exposure)
-          pip install --no-cache-dir ./victor-sdk
           # Install the full development + CI dependency set explicitly. Avoid relying on
           # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
           pip install --force-reinstall --no-cache-dir -e ".[dev,ci,api]"
+          # Reinstall the in-repo SDK last so the test matrix exercises the local SDK surface
+          # instead of any published victor-sdk version pulled in as a transitive dependency.
+          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
       - name: Verify local victor import path and CI extras
         run: |
-          python -c "import victor, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
+          python -c "import victor, victor_sdk.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
 
       - name: Run tests (sharded)
         run: |
@@ -140,14 +141,14 @@ jobs:
           # Uninstall any existing victor packages to ensure clean state
           pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository (non-editable for proper module exposure)
-          pip install --no-cache-dir ./victor-sdk
-          # Then install victor-ai with embeddings extra (needed for CLI import chain)
+          # Install victor-ai with embeddings extra (needed for CLI import chain)
           pip install --force-reinstall --no-cache-dir -e ".[embeddings]"
+          # Reinstall the local SDK last so smoke tests run against the in-repo contract surface.
+          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
 
       - name: Test CLI commands
         run: |
-          python -c "import victor; print(victor.__file__)"
+          python -c "import victor, victor_sdk.cli; print(victor.__file__)"
           victor --version
           victor --help
           echo "✓ CLI smoke test passed"
