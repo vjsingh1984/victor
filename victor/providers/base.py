@@ -545,14 +545,18 @@ class BaseProvider(ABC):
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
 
+        Uses tiktoken if available for exact counting, otherwise falls back
+        to character-based estimation.
+
         Args:
             text: Text to count tokens for
 
         Returns:
             Estimated token count
         """
-        # Simple estimation: ~4 characters per token
-        return len(text) // 4
+        from victor.processing.native import count_tokens
+
+        return count_tokens(text)
 
     @abstractmethod
     async def close(self) -> None:
