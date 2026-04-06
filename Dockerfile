@@ -35,11 +35,12 @@ WORKDIR /app
 # Copy only requirements first for better caching
 COPY requirements.txt pyproject.toml README.md ./
 COPY victor ./victor
+COPY victor-sdk ./victor-sdk
 
 # Install Python dependencies
-# Option 1: Install from main package (current, includes all features)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir -e ./victor-sdk && \
+    pip install --no-cache-dir -e ".[embeddings]" && \
     pip install --no-cache-dir lancedb
 
 # Option 2: Install from split packages (uncomment to use)
