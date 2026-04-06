@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 def load_repo_hygiene_module():
@@ -24,6 +25,26 @@ def write_file(root: Path, relative_path: str, content: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return path
+
+
+def test_load_toml_module_falls_back_to_tomli(monkeypatch) -> None:
+    calls: list[str] = []
+    tomli_module = SimpleNamespace(loads=lambda text: {"ok": text})
+
+    def fake_import_module(name: str):
+        calls.append(name)
+        if name == "tomllib":
+            raise ModuleNotFoundError(name)
+        if name == "tomli":
+            return tomli_module
+        raise AssertionError(f"unexpected import: {name}")
+
+    monkeypatch.setattr(repo_hygiene_check.importlib, "import_module", fake_import_module)
+
+    loaded = repo_hygiene_check._load_toml_module()
+
+    assert loaded is tomli_module
+    assert calls == ["tomllib", "tomli"]
 
 
 def test_workflow_check_flags_missing_top_level_on(tmp_path: Path) -> None:

@@ -149,6 +149,7 @@ dev = [
 
     # Integration test dependencies
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 # CI/CD dependencies - includes all testing, linting, and build tools
@@ -180,6 +181,7 @@ ci = [
 
     # Additional CI-specific tools
     "pytest-split>=0.8",
+    "tomli>=2.0; python_version < '3.11'",
 
     # Build tools
     "build>=0.10",

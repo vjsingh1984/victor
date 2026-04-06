@@ -6,9 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import argparse
+import importlib
 import re
 import sys
-import tomllib
 
 import yaml
 
@@ -47,6 +47,17 @@ class HygieneFinding:
 
     path: Path
     message: str
+
+
+def _load_toml_module():
+    """Load a TOML parser compatible with Python 3.10+."""
+    try:
+        return importlib.import_module("tomllib")
+    except ModuleNotFoundError:
+        return importlib.import_module("tomli")
+
+
+tomllib = _load_toml_module()
 
 
 def _iter_unique_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
