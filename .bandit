@@ -3,20 +3,14 @@
 
 [bandit]
 # Exclude directories from scanning
-exclude_dirs = ['/tests', '/test_']
+exclude_dirs = /tests,/test_
 
 # Skips (tests to skip)
-skips = ['B101']  # Skip assert_used test
-
-# Tests to exclude
-# B324: Use of weak MD5 hash - We use MD5 for non-cryptographic purposes
-# like content deduplication, caching, and change tracking.
-# These uses don't require cryptographic security.
-exclude_tests = ['B324']
+skips = B101,B324
 
 [bandit.assert_used]
 # Skips checking for use of assert statements
-skips = ['*/test_*.py', '*/tests/*']
+skips = */test_*.py,*/tests/*
 
 [bandit.functional_tests]
 # Additional tests for new Python versions

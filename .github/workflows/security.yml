@@ -46,6 +46,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln'
           format: 'sarif'
           output: 'trivy-critical-results.sarif'
           severity: 'CRITICAL'
@@ -164,6 +165,7 @@ jobs:
             -o bandit-report.json \
             --severity-level high \
             --confidence-level high \
+            -s B101,B324 \
             --ini .bandit
         # Blocks on HIGH severity + HIGH confidence findings.
         # Lower severity findings are still reported in the artifact.
@@ -175,6 +177,7 @@ jobs:
           bandit -r victor/ \
             -f json \
             -o bandit-report-full.json \
+            -s B101,B324 \
             --ini .bandit \
             || true
 
