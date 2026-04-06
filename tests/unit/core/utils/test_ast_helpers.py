@@ -10,14 +10,12 @@ def _parse(source: str) -> ast.Module:
 
 
 def test_stdlib_detection_and_import_extraction() -> None:
-    tree = _parse(
-        """
+    tree = _parse("""
 import os
 import json as js
 from typing import Optional
 from project.local import helper
-"""
-    )
+""")
 
     assert ast_helpers.is_stdlib_module("os.path") is True
     assert ast_helpers.is_stdlib_module("typing.Optional") is True
@@ -32,8 +30,7 @@ from project.local import helper
 
 
 def test_symbol_extraction_includes_enrichment_for_python_nodes() -> None:
-    tree = _parse(
-        '''
+    tree = _parse('''
 class Base:
     pass
 
@@ -45,8 +42,7 @@ class Worker(Base):
     async def run(self, value: int, label: str = "x") -> str:
         """Run docs."""
         return label
-'''
-    )
+''')
 
     symbols = ast_helpers.extract_symbols(tree, enrich=True)
     by_name = {(symbol.name, symbol.line_number): symbol for symbol in symbols}
@@ -71,13 +67,11 @@ class Worker(Base):
 
 
 def test_helper_primitives_cover_common_python_syntax() -> None:
-    function_node = _parse(
-        """
+    function_node = _parse("""
 @retry(3)
 def work(item: list[str], enabled: bool = True, *args, **kwargs) -> dict[str, int]:
     pass
-"""
-    ).body[0]
+""").body[0]
     assert isinstance(function_node, ast.FunctionDef)
 
     class_node = _parse("class Child(Parent, mixins.Base):\n    pass\n").body[0]

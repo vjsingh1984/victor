@@ -7,7 +7,6 @@ import sys
 from dataclasses import dataclass, field
 from typing import Iterable, List, Optional
 
-
 STDLIB_MODULES: frozenset[str] = frozenset(getattr(sys, "stdlib_module_names", ()))
 
 
@@ -71,13 +70,17 @@ def extract_parameters(
         parameters.append((arg.arg, get_annotation_str(arg.annotation)))
 
     if node.args.vararg is not None:
-        parameters.append((f"*{node.args.vararg.arg}", get_annotation_str(node.args.vararg.annotation)))
+        parameters.append(
+            (f"*{node.args.vararg.arg}", get_annotation_str(node.args.vararg.annotation))
+        )
 
     for arg in node.args.kwonlyargs:
         parameters.append((arg.arg, get_annotation_str(arg.annotation)))
 
     if node.args.kwarg is not None:
-        parameters.append((f"**{node.args.kwarg.arg}", get_annotation_str(node.args.kwarg.annotation)))
+        parameters.append(
+            (f"**{node.args.kwarg.arg}", get_annotation_str(node.args.kwarg.annotation))
+        )
 
     return parameters
 
