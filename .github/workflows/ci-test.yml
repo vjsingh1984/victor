@@ -62,9 +62,10 @@ jobs:
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository first (includes constants module)
-          pip install -e ./victor-sdk
+          # Use --no-cache-dir to prevent stale cached packages
+          pip install --no-cache-dir -e ./victor-sdk
           # Install with dev dependencies for testing
-          pip install -e ".[dev,api]"
+          pip install --no-cache-dir -e ".[dev,api]"
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
@@ -132,9 +133,10 @@ jobs:
           pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository first (includes constants module)
-          pip install -e ./victor-sdk
+          # Use --no-cache-dir to prevent stale cached packages
+          pip install --no-cache-dir -e ./victor-sdk
           # Then install victor-ai with embeddings extra (needed for CLI import chain)
-          pip install -e ".[embeddings]"
+          pip install --no-cache-dir -e ".[embeddings]"
 
       - name: Test CLI commands
         run: |
