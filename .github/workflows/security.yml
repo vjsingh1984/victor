@@ -76,11 +76,65 @@ jobs:
           pip install -e .
 
       - name: Run pip-audit (blocking on high+ severity)
-        uses: pypa/gh-action-pip-audit@v1.0.8
-        # Known vulnerabilities documented in .pip-audit-known-vulnerabilities
-        # The action doesn't support filtering, so we make it non-blocking
-        # and document exceptions separately. Vulnerabilities are reviewed manually.
-        continue-on-error: true
+        run: |
+          pip install pip-audit
+          # Run pip-audit with JSON output for parsing
+          pip-audit --format json --output audit-report.json 2>&1 | tee /tmp/pip-audit-output.txt
+
+          # Parse and filter vulnerabilities
+          python3 << 'PYEOF'
+import json
+import sys
+
+try:
+    with open('audit-report.json', 'r') as f:
+        report = json.load(f)
+except FileNotFoundError:
+    print("No audit report found, checking exit status...")
+    import subprocess
+    result = subprocess.run(['pip-audit'], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("pip-audit failed (no JSON output available)")
+        print(result.stdout)
+        print(result.stderr)
+    sys.exit(result.returncode)
+    sys.exit(0)
+
+# Read known CVEs from exceptions file
+known_cvbes = set()
+try:
+    with open('.pip-audit-known-vulnerabilities', 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                parts = line.split('|')
+                if len(parts) >= 1 and parts[0].strip().startswith('CVE-'):
+                    known_cvbes.add(parts[0].strip())
+except FileNotFoundError:
+    print("No .pip-audit-known-vulnerabilities file found")
+
+# Filter out known CVEs
+if 'vulnerabilities' in report:
+    filtered = [v for v in report['vulnerabilities'] if v['id'] not in known_cvbes]
+
+    if filtered:
+        print(f"❌ Found {len(filtered)} vulnerabilities not in exceptions:", file=sys.stderr)
+        for vuln in filtered:
+            fix_versions = vuln.get('fix_versions', [])
+            if fix_versions:
+                fix_info = fix_versions[0].get('version', 'no fix') if isinstance(fix_versions[0], dict) else fix_versions[0]
+            else:
+                fix_info = 'no fix available'
+            print(f"  {vuln['id']} - {vuln['package']} ({fix_info})")
+        sys.exit(1)
+    else:
+        print("✅ All vulnerabilities documented in .pip-audit-known-vulnerabilities")
+        print(f"   Known CVEs: {', '.join(sorted(known_cvbes))}")
+        sys.exit(0)
+else:
+    print("✅ No vulnerabilities found")
+    sys.exit(0)
+PYEOF
         # Blocks on any known vulnerability. Exceptions must be documented in
         # .pip-audit-known-vulnerabilities if a transitive dependency cannot be
         # updated immediately. See SECURITY.md § Dependency Audit Exceptions.
