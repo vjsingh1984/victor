@@ -160,14 +160,17 @@ class TestVictorSDKNoDependencies:
 
     def test_victor_sdk_dependencies(self) -> None:
         """Verify victor-sdk only has minimal dependencies."""
-        import tomli
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            import tomli as tomllib
 
         pyproject_path = Path("victor-sdk/pyproject.toml")
         if not pyproject_path.exists():
             pytest.skip("victor-sdk pyproject.toml not found")
 
         with open(pyproject_path, "rb") as f:
-            pyproject = tomli.load(f)
+            pyproject = tomllib.load(f)
 
         dependencies = pyproject.get("project", {}).get("dependencies", [])
 

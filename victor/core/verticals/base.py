@@ -981,6 +981,14 @@ class VerticalRegistry:
                 )
                 return False
 
+        raw_api_version = getattr(vertical_class, "VERTICAL_API_VERSION", None)
+        if raw_api_version is None:
+            logger.warning(
+                "External vertical '%s' (%s) has no VERTICAL_API_VERSION; defaulting to 1.",
+                entry_point_name,
+                vertical_class.__name__,
+            )
+
         manifest = get_or_create_vertical_manifest(vertical_class)
         if manifest is None:
             logger.warning(

@@ -81,6 +81,9 @@ from victor.tools.metadata_registry import (
     get_cache_invalidating_tools as registry_get_cache_invalidating_tools,
 )
 
+_DEFAULT_CACHEABLE_TOOLS = {"read", "ls", "grep", "overview", "diff"}
+_DEFAULT_CACHE_INVALIDATING_TOOLS = {"write", "edit", "shell", "patch"}
+
 
 class ValidationMode(Enum):
     """Mode for pre-execution argument validation.
@@ -198,7 +201,10 @@ class ToolExecutor:
         Returns:
             True if tool results can be cached
         """
-        return tool_name in registry_get_idempotent_tools()
+        from victor.tools.decorators import resolve_tool_name
+
+        canonical_name = resolve_tool_name(tool_name)
+        return canonical_name in (registry_get_idempotent_tools() | _DEFAULT_CACHEABLE_TOOLS)
 
     @classmethod
     def is_cache_invalidating_tool(cls, tool_name: str) -> bool:
@@ -212,7 +218,12 @@ class ToolExecutor:
         Returns:
             True if tool modifies state
         """
-        return tool_name in registry_get_cache_invalidating_tools()
+        from victor.tools.decorators import resolve_tool_name
+
+        canonical_name = resolve_tool_name(tool_name)
+        return canonical_name in (
+            registry_get_cache_invalidating_tools() | _DEFAULT_CACHE_INVALIDATING_TOOLS
+        )
 
     def __init__(
         self,
