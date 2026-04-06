@@ -75,6 +75,18 @@ except ImportError:
     client = None  # type: ignore
     k8s_config = None  # type: ignore
 
+    class ApiException(Exception):
+        """Fallback Kubernetes API exception used in tests without kubernetes."""
+
+        def __init__(self, status: Optional[int] = None, reason: Optional[str] = None):
+            super().__init__(reason or "Kubernetes API error")
+            self.status = status
+            self.reason = reason
+
+    def stream(*args: Any, **kwargs: Any) -> Any:
+        """Fallback stream helper that preserves module surface without kubernetes."""
+        raise ImportError("kubernetes not available. Install with: pip install kubernetes")
+
 
 class KubernetesServiceProvider(BaseServiceProvider):
     """Service provider for Kubernetes deployments.

@@ -4,8 +4,10 @@ import logging
 
 from typing import List
 
+from victor.core import tool_dependency_loader
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
+from victor.framework import entry_point_loader
 from victor_sdk import VerticalBase as SdkVerticalBase
 from victor_sdk.verticals.manifest import ExtensionManifest
 
@@ -269,15 +271,16 @@ def test_refresh_plugins_clears_entry_point_loader_caches(monkeypatch):
         return 0
 
     monkeypatch.setattr(
-        "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
-        _clear_framework_cache,
+        entry_point_loader, "clear_entry_point_loader_cache", _clear_framework_cache
     )
     monkeypatch.setattr(
-        "victor.core.tool_dependency_loader.clear_tool_dependency_entry_point_cache",
+        tool_dependency_loader,
+        "clear_tool_dependency_entry_point_cache",
         _clear_tool_dep_cache,
     )
     monkeypatch.setattr(
-        "victor.core.tool_dependency_loader.clear_vertical_tool_dependency_provider_cache",
+        tool_dependency_loader,
+        "clear_vertical_tool_dependency_provider_cache",
         _clear_provider_cache,
     )
 

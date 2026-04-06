@@ -126,6 +126,19 @@ def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
 logger = logging.getLogger(__name__)
 
 
+def classify_question(text: str):
+    """Classify a model-generated question via the embedding-backed classifier.
+
+    Exposed at module scope so tests and compatibility shims can patch it
+    without depending on the internal import location used by the strategy.
+    """
+    from victor.storage.embeddings.question_classifier import (
+        classify_question as _classify_question,
+    )
+
+    return _classify_question(text)
+
+
 class ContinuationStrategy:
     """Handles continuation decision logic for orchestrator.
 
@@ -754,10 +767,7 @@ class ContinuationStrategy:
 
             # Use QuestionTypeClassifier to determine if question is rhetorical/continuation
             # or if it genuinely needs user input (clarification/information)
-            from victor.storage.embeddings.question_classifier import (
-                classify_question,
-                QuestionType,
-            )
+            from victor.storage.embeddings.question_classifier import QuestionType
 
             question_result = classify_question(full_content or "")
 
