@@ -38,12 +38,12 @@ env:
 
 jobs:
   # ==========================================================================
-  # Test before release
+  # Smoke test before release (full testing done by CI shards on PR)
   # ==========================================================================
   test:
-    name: Test
+    name: Smoke Test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -53,38 +53,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install build tools
+      - name: Install
         run: |
-          pip install build twine
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ./victor-sdk
+          pip install -e ".[embeddings]"
 
-      - name: Build victor-sdk
-        working-directory: victor-sdk
+      - name: Verify imports and CLI
         run: |
-          python -m build
+          python -c "from victor import Agent, __version__; print(f'victor {__version__}')"
+          python -c "from victor.framework.graph import StateGraph; print('StateGraph OK')"
+          victor --version
+          victor --help
 
-      - name: Install victor-sdk from local wheel
+      - name: Lint
         run: |
-          pip uninstall -y victor-ai victor-sdk || true
-          pip install victor-sdk/dist/*.whl
-          python -c "from victor_sdk import __version__; print(f'victor-sdk {__version__} installed from local wheel')"
-
-      - name: Install dependencies
-        run: |
-          pip install --force-reinstall --no-deps -e .
-          pip install -e ".[dev,api]"
-          pip install scipy pytest-timeout
-          pip uninstall -y victor || true
-          python -c "from victor import Agent, __version__; print(f'✓ Agent import works (victor {__version__})')"
-
-      - name: Run tests
-        run: |
-          pytest tests/unit -v --tb=short -m "not slow and not integration" --timeout=120 \
-            --ignore=tests/unit/embeddings \
-            --ignore=tests/unit/agent/test_conversation_embedding_store.py \
-            --ignore=tests/unit/integrations/api/test_api_router_plugins.py
-
-      - name: Run linting
-        run: |
+          pip install ruff
           ruff check victor
 
   # ==========================================================================
