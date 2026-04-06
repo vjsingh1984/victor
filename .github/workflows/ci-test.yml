@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: []  # No dependencies - run in parallel with ci-fast
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,14 +65,18 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install victor-sdk from local repository (non-editable for proper module exposure)
           pip install --no-cache-dir ./victor-sdk
-          # Install victor-ai in editable mode from local source
-          pip install --force-reinstall --no-cache-dir -e ".[dev,api]"
+          # Install victor-ai in editable mode with CI extras so test-only deps are present
+          pip install --force-reinstall --no-cache-dir -e ".[ci,api]"
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
+      - name: Verify local victor import path
+        run: |
+          python -c "import victor; print(victor.__file__)"
+
       - name: Run tests (sharded)
         run: |
-          pytest tests/unit \
+          python -m pytest tests/unit \
             -m "not slow and not integration" \
             --splitting-algorithm=least_duration \
             --splits=6 \
@@ -108,6 +114,8 @@ jobs:
     name: CLI Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
 
@@ -138,6 +146,7 @@ jobs:
 
       - name: Test CLI commands
         run: |
+          python -c "import victor; print(victor.__file__)"
           victor --version
           victor --help
           echo "✓ CLI smoke test passed"
