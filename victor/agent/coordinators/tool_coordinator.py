@@ -522,7 +522,7 @@ class ToolCoordinator:
             if tool_name in config.disallowed_tools:
                 return False
             if config.allow_all_tools:
-                if self._registry and tool_name in self._registry.list_tools():
+                if tool_name in self.get_available_tools():
                     return True
 
         # Fall back to session/vertical restrictions
@@ -536,7 +536,15 @@ class ToolCoordinator:
             Set of tool names available in registry
         """
         if self._registry:
-            return set(self._registry.list_tools())
+            tool_names: Set[str] = set()
+            for tool in self._registry.list_tools():
+                if isinstance(tool, str):
+                    tool_names.add(tool)
+                    continue
+                tool_name = getattr(tool, "name", None)
+                if isinstance(tool_name, str) and tool_name:
+                    tool_names.add(tool_name)
+            return tool_names
         return set()
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
