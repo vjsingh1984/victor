@@ -135,7 +135,7 @@ jobs:
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
-    needs: build-packages
+    needs: [build-sdk, build-packages]
     steps:
       - uses: actions/checkout@v4
 
@@ -150,6 +150,15 @@ jobs:
         with:
           name: victor-ai-dist
           path: dist/
+
+      - name: Download victor-sdk artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: victor-sdk-dist
+          path: sdk-dist/
+
+      - name: Install victor-sdk from built wheel
+        run: pip install sdk-dist/*.whl
 
       - name: Install package from built wheel
         run: |

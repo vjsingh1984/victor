@@ -144,11 +144,25 @@ from victor.core.vertical_types import StageDefinition, TieredToolConfig
 # Composite Vertical Extension
 # =============================================================================
 
+import importlib
 from typing import Any, Callable, Dict, List, Optional, Union
 
-# VerticalExtensions canonical definition lives in the SDK.
-# Re-exported here for backward compatibility.
-from victor_sdk.verticals.extensions import VerticalExtensions  # noqa: F401
+
+def _load_sdk_vertical_extensions() -> Optional[type[Any]]:
+    """Resolve the SDK VerticalExtensions type across compatible SDK layouts."""
+
+    try:
+        return importlib.import_module("victor_sdk.verticals.extensions").VerticalExtensions
+    except (AttributeError, ImportError, ModuleNotFoundError):
+        pass
+
+    try:
+        return importlib.import_module("victor_sdk.verticals").VerticalExtensions
+    except (AttributeError, ImportError, ModuleNotFoundError):
+        return None
+
+
+_SDK_VERTICAL_EXTENSIONS = _load_sdk_vertical_extensions()
 
 
 class _VerticalExtensionsFallback:
@@ -395,6 +409,12 @@ class _VerticalExtensionsFallback:
     def pending_factories(self) -> int:
         """Number of extensions not yet loaded (still deferred)."""
         return len(self._factories)
+
+
+# VerticalExtensions canonical definition lives in the SDK.
+# Re-exported here for backward compatibility, with a local fallback for
+# package-install flows that resolve an older victor-sdk layout.
+VerticalExtensions = _SDK_VERTICAL_EXTENSIONS or _VerticalExtensionsFallback
 
 
 __all__ = [
