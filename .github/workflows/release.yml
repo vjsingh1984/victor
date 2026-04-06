@@ -76,7 +76,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/unit -v --tb=short -n auto --dist loadscope
+          pytest tests/unit -v --tb=short
 
       - name: Run linting
         run: |

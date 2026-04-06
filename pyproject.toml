@@ -128,7 +128,7 @@ dev = [
     "pytest-mock>=3.12",
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",  # For performance tests
-    "pytest-xdist>=3.5",  # For parallel test execution
+
     "respx>=0.21",
     "pandas>=2.0",  # For data analysis handler tests
 
