@@ -27,6 +27,16 @@ import pytest
 from victor.core.events import MessagingEvent
 
 
+@pytest.fixture(autouse=True)
+def reset_event_broadcaster_singleton():
+    """Avoid carrying the singleton broadcaster across function-scoped event loops."""
+    yield
+
+    from victor.integrations.api.event_bridge import EventBroadcaster
+
+    EventBroadcaster._instance = None
+
+
 class TestEventBridgeEventTypes:
     """Tests for EventBridge event type handling."""
 
@@ -309,6 +319,7 @@ class TestEventBridgeReliability:
         bridge._broadcaster.remove_client("event-loss-check")
         bridge.stop()
         await wait_for(lambda: not bridge._broadcaster._running)
+        await bus.disconnect()
 
     def _reset_reliability_state(self, bridge) -> None:
         """Reset singleton broadcaster reliability state between tests."""
@@ -816,6 +827,32 @@ class TestEventBridgeAsyncBackwardCompatibility:
 
         # Clean up
         await adapter.disconnect_async()
+
+
+class TestEventBroadcasterLoopIsolation:
+    def test_stop_tolerates_broadcast_task_from_different_loop(self):
+        """Stopping the singleton broadcaster should not hang across event loops."""
+        from victor.integrations.api.event_bridge import EventBroadcaster
+
+        broadcaster = EventBroadcaster()
+        old_loop = asyncio.new_event_loop()
+        try:
+            old_loop.run_until_complete(broadcaster.start())
+
+            async def _stop_on_new_loop() -> None:
+                await asyncio.wait_for(broadcaster.stop(), timeout=0.5)
+
+            asyncio.run(_stop_on_new_loop())
+
+            assert broadcaster._running is False
+            assert broadcaster._broadcast_task is None
+        finally:
+            pending = asyncio.all_tasks(old_loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                old_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            old_loop.close()
 
 
 class TestEventBridgeSyncBridge:
