@@ -17,6 +17,23 @@
 
 ---
 
+## Scope
+
+This page mixes two kinds of APIs:
+
+- **Public authoring contract**: external vertical packages should depend on
+  `victor-sdk` and use `victor_sdk.VerticalBase`,
+  `victor_sdk.register_vertical`, `VictorPlugin`, and
+  `victor_sdk.validation.validate_vertical_package`.
+- **Core runtime internals**: `victor.core.verticals.*` modules remain useful for
+  framework contributors and advanced in-process integrations inside Victor, but
+  they are not the preferred authoring surface for new external packages.
+
+When in doubt, external package authors should start with the SDK-first path and
+use the core runtime APIs only when extending Victor itself.
+
+---
+
 ## Vertical Metadata
 
 ### `VerticalMetadata`
@@ -210,7 +227,7 @@ print(f"Scanned {metrics.total_entry_points} entry points in {metrics.scan_durat
 Get a specific entry point by group and name.
 
 **Parameters**:
-- `group` (`str`): Entry point group (e.g., "victor.verticals")
+- `group` (`str`): Entry point group (e.g., `"victor.plugins"`)
 - `name` (`str`): Entry point name (e.g., "coding")
 
 **Returns**: Entry point object or None if not found
@@ -219,9 +236,9 @@ Get a specific entry point by group and name.
 ```python
 from victor.framework.entry_point_registry import get_entry_point
 
-coding = get_entry_point("victor.verticals", "coding")
-if coding:
-    vertical_class = coding.load()
+coding_plugin = get_entry_point("victor.plugins", "coding")
+if coding_plugin:
+    print(coding_plugin.name)
 ```
 
 ---
@@ -239,11 +256,15 @@ Get all entry points in a group.
 ```python
 from victor.framework.entry_point_registry import get_entry_point_group
 
-group = get_entry_point_group("victor.verticals")
+group = get_entry_point_group("victor.plugins")
 if group:
     for name, (ep, loaded) in group.entry_points.items():
         print(f"Found: {name}")
 ```
+
+`victor.verticals` remains a legacy compatibility group for raw vertical class
+entry points, but new packages should publish `VictorPlugin` objects through
+`victor.plugins`.
 
 ---
 
@@ -739,42 +760,55 @@ Predefined namespace types with priority ordering.
 
 Decorator for declarative vertical registration.
 
-**Function**: `victor.core.verticals.registration.register_vertical
+**Function**: `victor_sdk.verticals.registration.register_vertical`
 
 **Parameters**:
 - `name` (`str`): Vertical name/identifier
 - `version` (`str`): Vertical version (PEP 440)
+- `api_version` (`int`, optional): Manifest API version
 - `min_framework_version` (`str`, optional): Minimum compatible framework version
-- `description` (`str`, optional): Human-readable description
-- `extension_dependencies` (`List[str]`, optional): Required extension dependencies
-- `requires_features` (`List[str]`, optional): Required framework features
-- `excludes_features` (`List[str]`, optional): Incompatible framework features
+- `requires` (`Set[ExtensionType]`, optional): Required extension types
+- `provides` (`Set[ExtensionType]`, optional): Provided extension types
+- `extension_dependencies` (`List[ExtensionDependency]`, optional): Required extension dependencies
+- `requires_features` (`Set[str]`, optional): Required framework features
+- `excludes_features` (`Set[str]`, optional): Incompatible framework features
 - `canonicalize_tool_names` (`bool`, optional): Auto-prefix tool names
 - `tool_dependency_strategy` (`str`, optional): Tool dependency strategy
 - `strict_mode` (`bool`, optional): Fail on missing tools/features
 - `load_priority` (`int`, optional): Load order priority
-- `namespace` (`str`, optional): Plugin namespace
+- `plugin_namespace` (`str`, optional): Plugin namespace
+- `lazy_load` (`bool`, optional): Allow lazy runtime loading
 
 **Example**:
 ```python
-from victor.core.verticals.registration import register_vertical
+from victor_sdk import ToolRequirement, VerticalBase, register_vertical
 
 @register_vertical(
     name="my_vertical",
     version="1.0.0",
     min_framework_version=">=0.6.0",
-    description="My custom vertical",
-    extension_dependencies=["base_tools"],
+    plugin_namespace="my_company",
     canonicalize_tool_names=True,
 )
 class MyVertical(VerticalBase):
     """My vertical implementation."""
 
     @classmethod
-    def get_name(cls) -> str:
-        return "my_vertical"
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
+        return [ToolRequirement("read"), ToolRequirement("write", required=False)]
 
-    # ... other methods
+    @classmethod
+    def get_tools(cls) -> list[str]:
+        return [requirement.tool_name for requirement in cls.get_tool_requirements()]
+```
+
+**Validation**:
+
+```python
+from victor_sdk.validation import validate_vertical_package
+
+report = validate_vertical_package("my-vertical")
+assert report.is_valid
 ```
 
 ---

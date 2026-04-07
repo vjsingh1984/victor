@@ -690,10 +690,14 @@ class VerticalExtensionLoader(ABC):
             return None
 
         last_error: Optional[Exception] = None
-        # Try direct class import first (using __import__ to match original pattern)
+        # Try direct class import first.
+        #
+        # ``importlib.import_module()`` handles nested synthetic/runtime package
+        # layouts more reliably than ``__import__`` during mixed-mode migration
+        # tests, while preserving the same observable behavior for real packages.
         for module_path in candidate_paths:
             try:
-                module = __import__(module_path, fromlist=[class_name])
+                module = importlib.import_module(module_path)
                 provider_cls = getattr(module, class_name, None)
                 if provider_cls is not None:
                     return provider_cls()

@@ -4,7 +4,7 @@ This module provides utilities for discovering protocol implementations
 via entry points and other mechanisms.
 
 Entry Point Groups:
-- victor.verticals: Main vertical registration (built-in and external)
+- victor.plugins: Main plugin registration (plugins register one or more verticals)
 - victor.sdk.protocols: Protocol implementations (tool, safety, workflow, etc.)
 - victor.sdk.capabilities: Capability providers (LSP, Git, etc.)
 - victor.sdk.validators: Validator functions
@@ -17,6 +17,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type, Callable
 
+from victor_sdk.core.plugins import VictorPlugin
+from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor_sdk.verticals.protocols import (
     ToolProvider,
     SafetyProvider,
@@ -107,7 +109,7 @@ class ProtocolRegistry:
     """
 
     # Entry point groups
-    VERTICALS_GROUP = "victor.verticals"
+    VERTICALS_GROUP = "victor.plugins"
     SDK_PROTOCOLS_GROUP = "victor.sdk.protocols"
     CAPABILITIES_GROUP = "victor.sdk.capabilities"
     VALIDATORS_GROUP = "victor.sdk.validators"
@@ -167,25 +169,25 @@ class ProtocolRegistry:
         return self._discovery_stats
 
     def _load_verticals(self) -> None:
-        """Load verticals from victor.verticals entry point group."""
+        """Load verticals from victor.plugins entry point group."""
         try:
             for ep in importlib.metadata.entry_points(group=self.VERTICALS_GROUP):
                 try:
-                    vertical_class = ep.load()
-                    self._verticals[ep.name] = vertical_class
-                    self._discovery_stats.total_verticals += 1
-
-                    # Track metadata
-                    self._track_metadata(
-                        name=ep.name,
-                        entry_point=ep,
-                        protocol_type="vertical",
-                    )
+                    candidate = ep.load()
+                    for vertical_name, vertical_class in collect_verticals_from_candidate(
+                        candidate
+                    ).items():
+                        self._verticals[vertical_name] = vertical_class
+                        self._discovery_stats.total_verticals += 1
+                        self._track_metadata(
+                            name=vertical_name,
+                            entry_point=ep,
+                            protocol_type="vertical",
+                        )
                 except Exception as e:
                     self._handle_load_error(ep.name, "vertical", e)
         except Exception:
-            # No entry points or importlib.metadata not available
-            logger.debug("No victor.verticals entry points found")
+            logger.debug("No victor.plugins entry points found")
 
     def _load_protocols(self) -> None:
         """Load protocol implementations from victor.sdk.protocols group."""
@@ -429,7 +431,9 @@ class ProtocolRegistry:
             Dictionary of protocol metadata.
         """
         if name:
-            return {name: self._protocol_metadata.get(name)} if name in self._protocol_metadata else {}
+            return (
+                {name: self._protocol_metadata.get(name)} if name in self._protocol_metadata else {}
+            )
         return self._protocol_metadata.copy()
 
     def get_discovery_stats(self) -> DiscoveryStats:
@@ -473,9 +477,7 @@ class ProtocolRegistry:
         Returns:
             List of protocol names that had load errors.
         """
-        return [
-            name for name, meta in self._protocol_metadata.items() if not meta.is_loaded
-        ]
+        return [name for name, meta in self._protocol_metadata.items() if not meta.is_loaded]
 
 
 # Global registry instance
@@ -499,6 +501,77 @@ def reset_global_registry() -> None:
     """Reset the global registry (useful for testing)."""
     global _global_registry
     _global_registry = None
+
+
+def _looks_like_plugin(candidate: Any) -> bool:
+    """Return True when *candidate* resembles the VictorPlugin protocol."""
+
+    return all(hasattr(candidate, attr) for attr in ("name", "register", "get_cli_app"))
+
+
+class _CollectingPluginContext:
+    """Minimal PluginContext implementation for discovery-only plugin registration."""
+
+    def __init__(self) -> None:
+        self.verticals: list[type[Any]] = []
+
+    def register_tool(self, tool_instance: Any) -> None:
+        return None
+
+    def register_vertical(self, vertical_class: type[Any]) -> None:
+        self.verticals.append(vertical_class)
+
+    def register_chunker(self, chunker_instance: Any) -> None:
+        return None
+
+    def register_command(self, name: str, app: Any) -> None:
+        return None
+
+    def register_workflow_node_executor(
+        self,
+        node_type: str,
+        executor_factory: Any,
+        *,
+        replace: bool = False,
+    ) -> None:
+        return None
+
+    def get_service(self, service_type: type[Any]) -> None:
+        return None
+
+    def get_settings(self) -> None:
+        return None
+
+
+def collect_verticals_from_candidate(candidate: Any) -> Dict[str, Type[SdkVerticalBase]]:
+    """Collect SDK vertical classes from a direct vertical or VictorPlugin candidate.
+
+    This helper is the definition-layer contract parser shared by SDK discovery,
+    core runtime loading, and install/discovery smoke tests.
+    """
+
+    if isinstance(candidate, type) and issubclass(candidate, SdkVerticalBase):
+        return {getattr(candidate, "name", candidate.__name__): candidate}
+
+    plugin = candidate
+    if isinstance(candidate, type):
+        try:
+            plugin = candidate()
+        except Exception as exc:
+            raise TypeError(
+                "Entry point class must be an SDK VerticalBase subclass or an instantiable "
+                "VictorPlugin"
+            ) from exc
+
+    if isinstance(plugin, VictorPlugin) or _looks_like_plugin(plugin):
+        context = _CollectingPluginContext()
+        plugin.register(context)
+        return {
+            getattr(vertical_class, "name", vertical_class.__name__): vertical_class
+            for vertical_class in context.verticals
+        }
+
+    raise TypeError("Entry point must resolve to a VictorPlugin or an SDK VerticalBase subclass")
 
 
 # Convenience functions for common operations

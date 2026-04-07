@@ -469,32 +469,51 @@ benchmark = "victor.benchmark:plugin"
 # Example in external package's pyproject.toml:
 #
 #   [project.entry-points."victor.plugins"]
-#   security = "victor_security:SecurityPlugin"
-#   ml_ops = "victor_mlops.plugin:MLOpsPlugin"
+#   security = "victor_security:plugin"
+#   ml_ops = "victor_mlops.plugin:plugin"
 #
 # Requirements for external verticals:
-#   1. Must inherit from victor.core.verticals.VerticalBase
-#   2. Must define a non-empty 'name' class attribute
-#   3. Must implement get_tools() -> List[str]
-#   4. Must implement get_system_prompt() -> str
+#   1. Publish a VictorPlugin implementation under "victor.plugins"
+#   2. The plugin should register SDK-authored vertical definitions via PluginContext
+#   3. Vertical definitions should inherit from victor_sdk.VerticalBase
+#   4. Runtime-only extensions/providers should be published through explicit extension groups
 #
-# Example vertical implementation:
+# Example plugin + vertical implementation:
 #
-#   from victor.core.verticals import VerticalBase
+#   from victor_sdk import VictorPlugin, PluginContext, VerticalBase, ToolNames
 #
 #   class SecurityAssistant(VerticalBase):
 #       name = "security"
 #       description = "Security vulnerability analysis assistant"
 #
 #       @classmethod
+#       def get_name(cls):
+#           return cls.name
+#
+#       @classmethod
+#       def get_description(cls):
+#           return cls.description
+#
+#       @classmethod
 #       def get_tools(cls):
-#           return ["read", "grep", "security_scan", "dependency_audit"]
+#           return [ToolNames.READ, ToolNames.GREP, "security_scan", "dependency_audit"]
 #
 #       @classmethod
 #       def get_system_prompt(cls):
 #           return "You are a security expert..."
 #
-# Victor will automatically discover and register external verticals on import.
+#   class SecurityPlugin(VictorPlugin):
+#       @property
+#       def name(self):
+#           return "security"
+#
+#       def register(self, context: PluginContext) -> None:
+#           context.register_vertical(SecurityAssistant)
+#
+#   plugin = SecurityPlugin()
+#
+# Victor discovers plugins lazily via "victor.plugins" and resolves their
+# registered verticals at runtime.
 # =============================================================================
 
 [tool.setuptools.packages.find]

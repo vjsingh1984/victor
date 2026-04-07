@@ -19,6 +19,7 @@ from rich.console import Console
 from typing import Optional
 
 from victor import __version__
+from victor.core.utils.coding_support import load_coding_analyze_app
 from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
@@ -167,9 +168,7 @@ def _register_plugin_commands():
         # 3. Fallback: register analyze from contrib if plugin context didn't provide it
         if not analyze_registered:
             try:
-                from victor.verticals.contrib.coding.commands.analyze import (
-                    app as _analyze_fallback,
-                )
+                _analyze_fallback = load_coding_analyze_app()
 
                 coding_app.add_typer(_analyze_fallback, name="analyze")
                 app.add_typer(_analyze_fallback, name="analyze")

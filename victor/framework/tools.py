@@ -26,6 +26,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set, Union
 
+from victor_sdk.core.types import Tier as SdkTier
+from victor_sdk.core.types import ToolSet as SdkToolSet
+
 
 class ToolCategory(str, Enum):
     """Built-in tool categories.
@@ -640,6 +643,12 @@ class ToolSet:
             object.__setattr__(self, "_resolved_names_cache", self._resolve_tool_names())
         return self._resolved_names_cache
 
+    @property
+    def names(self) -> List[str]:
+        """Return resolved tool names in SDK-compatible list form."""
+
+        return sorted(self.get_tool_names())
+
     def _get_resolved_names(self) -> Set[str]:
         """Get resolved tool names from cache.
 
@@ -666,6 +675,31 @@ class ToolSet:
     def __contains__(self, tool: str) -> bool:
         """Check if a tool is in this set (cached O(1) after first call)."""
         return tool in self._get_resolved_names()
+
+    def to_sdk_toolset(
+        self,
+        *,
+        description: str = "",
+        tier: Union[SdkTier, str] = SdkTier.STANDARD,
+    ) -> SdkToolSet:
+        """Convert the runtime toolset into the declarative SDK contract."""
+
+        resolved_tier = SdkTier(tier) if isinstance(tier, str) else tier
+        return SdkToolSet(
+            names=self.names,
+            description=description,
+            tier=resolved_tier,
+        )
+
+    @classmethod
+    def from_sdk_toolset(cls, toolset: Union[SdkToolSet, List[str], Set[str]]) -> "ToolSet":
+        """Create a runtime toolset from an SDK toolset or tool-name list."""
+
+        if isinstance(toolset, SdkToolSet):
+            return cls.from_tools(toolset.names)
+        if isinstance(toolset, (list, set)):
+            return cls.from_tools(sorted(toolset))
+        raise TypeError(f"Unsupported sdk toolset input: {type(toolset)!r}")
 
 
 # Type alias for convenience

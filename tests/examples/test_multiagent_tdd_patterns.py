@@ -521,20 +521,27 @@ class TestUnifiedCoordinatorTDD:
 class TestFactoryFunctionTDD:
     """TDD pattern: Testing create_coordinator factory."""
 
-    def test_default_creates_unified(self):
-        """RED -> GREEN: Default should create UnifiedTeamCoordinator."""
-        coordinator = create_coordinator()
-        assert isinstance(coordinator, UnifiedTeamCoordinator)
+    def test_default_requires_orchestrator(self):
+        """Default production coordinators require an orchestrator."""
+        with pytest.raises(ValueError, match="orchestrator is required"):
+            create_coordinator()
 
-    def test_lightweight_creates_framework(self):
-        """RED -> GREEN: Lightweight should create framework coordinator."""
+    def test_lightweight_creates_unified(self):
+        """Lightweight mode creates a coordinator without an orchestrator."""
         coordinator = create_coordinator(lightweight=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
     def test_respects_observability_flag(self):
-        """RED -> GREEN: Should respect observability configuration."""
-        with_obs = create_coordinator(with_observability=True)
-        without_obs = create_coordinator(with_observability=False)
+        """Factory forwards the observability flag to production coordinators."""
+        orchestrator = MagicMock()
+        with_obs = create_coordinator(
+            orchestrator=orchestrator,
+            enable_observability=True,
+        )
+        without_obs = create_coordinator(
+            orchestrator=orchestrator,
+            enable_observability=False,
+        )
 
         assert with_obs._observability_enabled is True
         assert without_obs._observability_enabled is False

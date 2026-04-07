@@ -197,35 +197,56 @@ The benchmark vertical includes a safety extension that blocks dangerous operati
 victor vertical new my-vertical --description "My custom domain vertical"
 ```
 
-This generates a complete package structure with `pyproject.toml`, entry points, and a starter `victor-vertical.toml`.
+This generates a complete package structure with `pyproject.toml`, a plugin wrapper,
+an SDK-first assistant definition, and starter tests.
 
 ### The Minimal Vertical
 
 ```python
 # my_vertical/assistant.py
-from victor_sdk import VerticalBase
+from victor_sdk import ToolNames, ToolRequirement, VerticalBase, register_vertical
 
+
+@register_vertical(
+    name="my-vertical",
+    version="0.1.0",
+    min_framework_version=">=0.6.0",
+    plugin_namespace="my_vertical",
+)
 class MyAssistant(VerticalBase):
-    name = "my-vertical"
+    name = "my_vertical"
+    description = "Demo vertical"
     version = "0.1.0"
 
-    def get_system_prompt(self):
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
         return "You are a specialist in ..."
 
-    def get_tools(self):
-        return ["read", "write", "shell"]
-
-    def get_stages(self):
+    @classmethod
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
         return [
-            {"name": "research", "tools": ["read", "code_search"]},
-            {"name": "execute",  "tools": ["write", "shell"]},
+            ToolRequirement(ToolNames.READ, purpose="inspect project files"),
+            ToolRequirement(ToolNames.WRITE, required=False, purpose="apply changes"),
+            ToolRequirement(ToolNames.SHELL, required=False, purpose="run checks"),
         ]
+
+    @classmethod
+    def get_tools(cls) -> list[str]:
+        return [requirement.tool_name for requirement in cls.get_tool_requirements()]
 ```
 
 ```toml
 # pyproject.toml
-[project.entry-points."victor.verticals"]
-my-vertical = "my_vertical.assistant:MyAssistant"
+[project.entry-points."victor.plugins"]
+my-vertical = "my_vertical:plugin"
 ```
 
 ```bash
@@ -233,7 +254,7 @@ pip install -e .
 victor vertical list   # your vertical appears automatically
 ```
 
-**Talking point:** No framework registration, no plugin config, no decorators. Just implement the protocol, declare the entry point, and `pip install`. Victor discovers it at runtime.
+**Talking point:** No core runtime subclassing. Define the vertical against `victor-sdk`, expose a thin `VictorPlugin` wrapper, publish it through `victor.plugins`, and `pip install`. Victor discovers it at runtime.
 
 ---
 

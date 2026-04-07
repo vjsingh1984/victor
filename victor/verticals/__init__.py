@@ -12,13 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Victor Verticals - Domain-specific AI assistant verticals.
+"""Victor runtime vertical compatibility package.
 
-This package contains all Victor verticals, organized into:
-- Built-in verticals (in victor/ package): benchmark, classification, iac, security
-- Contrib verticals (here): coding, rag, devops, dataanalysis, research
+This module exists primarily for runtime consumption and backward compatibility.
+Historically it exposed in-repo and contrib vertical implementations directly, and
+those imports remain available for compatibility and internal runtime integration.
 
-Verticals are discovered and loaded via entry points in pyproject.toml.
+New external vertical packages should not be authored against ``victor.verticals``.
+Instead:
+- define verticals against ``victor_sdk.VerticalBase``
+- decorate them with ``victor_sdk.register_vertical``
+- publish a thin ``VictorPlugin`` through the canonical ``victor.plugins``
+  entry-point group
+
+Core runtime loading, activation, and compatibility handling now live under
+``victor.core.verticals``.
 """
 
 from __future__ import annotations

@@ -24,6 +24,7 @@ Tests the complete workflow visualization feature including:
 import asyncio
 import json
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from datetime import datetime, timezone
 
@@ -41,23 +42,23 @@ from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
 from victor.core.events import get_observability_bus
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def fastapi_server():
     """Create a FastAPI server for testing.
 
-    Note: This fixture uses module scope to ensure a single server instance
-    is shared across all tests in the module. This prevents port binding errors
-    when multiple test classes try to create server instances on the same port.
+    Note: These tests use ASGITransport directly against ``server.app``, so
+    they do not need a live TCP listener. Keeping the fixture in-process avoids
+    port conflicts when the broader suite has other API tests running.
     """
     server = VictorFastAPIServer(
         host="localhost",
-        port=8765,
+        port=0,
         enable_cors=True,
     )
-    await server.start_async()
 
     # Manually initialize the event bridge if not already initialized
-    # This is needed because start_async() doesn't trigger the lifespan
+    # because these tests intentionally do not launch a real uvicorn server.
+    event_bus = None
     if server._workflow_event_bridge is None:
         event_bus = get_observability_bus()
         await event_bus.connect()
@@ -65,10 +66,14 @@ async def fastapi_server():
         await server._workflow_event_bridge.start()
 
     yield server
-    await server.shutdown()
+
+    if server._workflow_event_bridge is not None:
+        await server._workflow_event_bridge.stop()
+    if event_bus is not None:
+        await event_bus.disconnect()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def http_client(fastapi_server):
     """Create an HTTP client for testing."""
     transport = ASGITransport(app=fastapi_server.app)

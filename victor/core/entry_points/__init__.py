@@ -18,7 +18,8 @@ This module defines the protocols that vertical packages must implement
 to register their capabilities with the Victor framework via entry points.
 
 Entry Point Groups:
-    victor.verticals           - Vertical assistant classes
+    victor.plugins            - Canonical plugin packages that register verticals
+    victor.verticals          - Legacy raw-class compatibility path
     victor.safety_rules        - Safety rule registration functions
     victor.tool_dependencies  - Tool dependency provider factories
     victor.rl_configs          - RL configuration provider factories
@@ -26,6 +27,10 @@ Entry Point Groups:
     victor.commands            - CLI command registration functions
 
 Example:
+    # Canonical plugin registration
+    [project.entry-points."victor.plugins"]
+    coding = "victor_coding:plugin"
+
     # In victor-coding/pyproject.toml:
     [project.entry-points."victor.safety_rules"]
     coding = "victor_coding.safety:register_coding_safety_rules"

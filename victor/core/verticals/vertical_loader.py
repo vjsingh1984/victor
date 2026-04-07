@@ -19,7 +19,7 @@ verticals at runtime. It integrates with the DI container to register
 vertical-specific services.
 
 Supports plugin discovery via entry points:
-- victor.verticals: Entry point group for vertical plugins
+- victor.plugins: Canonical entry point group for vertical packages
 - victor.tools: Entry point group for tool plugins
 
 Usage:
@@ -52,11 +52,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
 from victor.framework.module_loader import get_entry_point_cache
+from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     get_vertical_runtime_metadata,
 )
+from victor_sdk.discovery import collect_verticals_from_candidate
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -85,7 +87,7 @@ class VerticalLoader:
     Python entry points for verticals and tools.
 
     Entry Point Groups:
-        - victor.verticals: Vertical plugins (e.g., coding, research)
+        - victor.plugins: Vertical plugins (e.g., coding, research)
         - victor.tools: Tool plugins (e.g., code_search, refactor)
 
     Attributes:
@@ -136,7 +138,7 @@ class VerticalLoader:
 
         Searches for verticals in this order:
         1. Global VerticalRegistry (includes built-ins registered on import)
-        2. Entry point plugins (victor.verticals group)
+        2. Entry point plugins (victor.plugins group)
 
         Args:
             name: Vertical name (e.g., "coding", "research")
@@ -203,7 +205,7 @@ class VerticalLoader:
             if vertical is None:
                 vertical = ep_vertical
 
-            return vertical
+            return ensure_runtime_vertical(vertical) if vertical is not None else None
 
     def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
         """Import a vertical from entry points.
@@ -227,15 +229,29 @@ class VerticalLoader:
             return None
 
         value = ep_entries[entry_name]
-        vertical_cls = self._load_entry_point(entry_name, value)
-        if isinstance(vertical_cls, type) and VerticalRegistry._validate_external_vertical(
-            vertical_cls, entry_name
-        ):
+        candidate = self._load_entry_point(entry_name, value)
+        try:
+            discovered_verticals = self._collect_validated_verticals(candidate, entry_name)
+        except TypeError:
+            return None
+        if discovered_verticals:
             if self._discovered_verticals is None:
                 self._discovered_verticals = {}
-            self._discovered_verticals[entry_name] = vertical_cls
-            VerticalRegistry.register(vertical_cls)
-            return vertical_cls
+            self._discovered_verticals.update(discovered_verticals)
+            for vertical_cls in discovered_verticals.values():
+                if VerticalRegistry.get(vertical_cls.name) is None:
+                    VerticalRegistry.register(vertical_cls)
+            requested = discovered_verticals.get(name)
+            if requested is None:
+                requested = next(
+                    (
+                        vertical_cls
+                        for vertical_name, vertical_cls in discovered_verticals.items()
+                        if vertical_name.lower() == name.lower()
+                    ),
+                    None,
+                )
+            return requested
         return None
 
     def _get_vertical_entry_points(self, force_refresh: bool = False) -> Dict[str, str]:
@@ -388,8 +404,8 @@ class VerticalLoader:
     ) -> Dict[str, Type[VerticalBase]]:
         """Discover verticals from installed packages via entry points.
 
-        Scans the 'victor.verticals' entry point group for installed
-        vertical plugins. Results are cached for performance using
+        Scans the canonical 'victor.plugins' entry point group for installed
+        vertical packages. Results are cached for performance using
         EntryPointCache for fast startup.
 
         Args:
@@ -402,8 +418,8 @@ class VerticalLoader:
 
         Example:
             # In victor-coding's pyproject.toml:
-            # [project.entry-points."victor.verticals"]
-            # coding = "victor_coding:CodingVertical"
+            # [project.entry-points."victor.plugins"]
+            # coding = "victor_coding.plugin:plugin"
 
             loader = VerticalLoader()
             verticals = loader.discover_verticals()
@@ -503,11 +519,13 @@ class VerticalLoader:
         """
         for name, value in ep_entries.items():
             try:
-                # Parse "module:attr" format and load
-                vertical_cls = self._load_entry_point(name, value)
-                if isinstance(vertical_cls, type) and VerticalRegistry._validate_external_vertical(
-                    vertical_cls, name
-                ):
+                candidate = self._load_entry_point(name, value)
+                discovered_verticals = self._collect_validated_verticals(candidate, name)
+                if not discovered_verticals:
+                    logger.warning("Entry point '%s' did not register any valid verticals", name)
+                    continue
+
+                for vertical_name, vertical_cls in discovered_verticals.items():
                     existing = VerticalRegistry.get(vertical_cls.name)
                     if existing is not None and existing is not vertical_cls:
                         existing_module = getattr(existing, "__module__", "")
@@ -529,16 +547,24 @@ class VerticalLoader:
                             )
                             continue
                         # External overriding contrib — let register() handle it
-                    self._discovered_verticals[name] = vertical_cls
+                    self._discovered_verticals[vertical_name] = vertical_cls
                     VerticalRegistry.register(vertical_cls)
-                    logger.debug("Discovered vertical plugin: %s", name)
-                else:
-                    logger.warning(
-                        "Entry point '%s' is not a VerticalBase subclass",
-                        name,
-                    )
+                    logger.debug("Discovered vertical plugin: %s -> %s", name, vertical_name)
             except Exception as e:
                 logger.warning("Failed to load vertical entry point '%s': %s", name, e)
+
+    def _collect_validated_verticals(
+        self,
+        candidate: Any,
+        entry_point_name: str,
+    ) -> Dict[str, Type[VerticalBase]]:
+        """Collect and validate vertical classes using the shared SDK helper."""
+
+        discovered: Dict[str, Type[VerticalBase]] = {}
+        for vertical_cls in collect_verticals_from_candidate(candidate).values():
+            if VerticalRegistry._validate_external_vertical(vertical_cls, entry_point_name):
+                discovered[vertical_cls.name] = vertical_cls
+        return discovered
 
     def _load_entry_point(self, name: str, value: str) -> Type:
         """Load an entry point by its value string.

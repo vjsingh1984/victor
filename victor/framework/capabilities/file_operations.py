@@ -12,73 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generic file operations capability provider (Phase 3)."""
+"""Framework compatibility re-export for SDK file operation capability contracts."""
 
-from typing import List, Set
-from dataclasses import dataclass
-from enum import Enum
+from victor_sdk.capabilities import (
+    FileOperation,
+    FileOperationsCapability,
+    FileOperationType,
+)
 
-
-class FileOperationType(Enum):
-    """Types of file operations."""
-
-    READ = "read"
-    WRITE = "write"
-    EDIT = "edit"
-    SEARCH = "search"
-
-
-@dataclass
-class FileOperation:
-    """A file operation configuration."""
-
-    operation: FileOperationType
-    tool_name: str
-    required: bool = True
-
-
-class FileOperationsCapability:
-    """Generic file operations capability provider.
-
-    Provides common file operation tools that are used across multiple
-    verticals (Coding, DevOps, RAG, Research, DataAnalysis).
-
-    This promotes the DRY principle and reduces code duplication by
-    centralizing file operation tool definitions.
-
-    Phase 3: Generic Capabilities - Framework Layer
-    """
-
-    DEFAULT_OPERATIONS = [
-        FileOperation(FileOperationType.READ, "read", required=True),
-        FileOperation(FileOperationType.WRITE, "write", required=True),
-        FileOperation(FileOperationType.EDIT, "edit", required=True),
-        FileOperation(FileOperationType.SEARCH, "grep", required=True),
-    ]
-
-    def __init__(
-        self,
-        operations: List[FileOperation] = None,
-    ):
-        """Initialize file operations capability.
-
-        Args:
-            operations: List of file operations (uses DEFAULT if None)
-        """
-        self.operations = operations or self.DEFAULT_OPERATIONS.copy()
-
-    def get_tools(self) -> Set[str]:
-        """Get tool names for this capability.
-
-        Returns:
-            Set of tool names
-        """
-        return {op.tool_name for op in self.operations if op.required}
-
-    def get_tool_list(self) -> List[str]:
-        """Get tool names as a list.
-
-        Returns:
-            List of tool names
-        """
-        return [op.tool_name for op in self.operations if op.required]
+__all__ = [
+    "FileOperation",
+    "FileOperationsCapability",
+    "FileOperationType",
+]

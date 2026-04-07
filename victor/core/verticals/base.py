@@ -55,9 +55,10 @@ if TYPE_CHECKING:
     from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Optional, Set, Type, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set, Type, TYPE_CHECKING
 
 from victor.framework.tools import ToolSet
+from victor_sdk.core.types import Tier
 
 # Import SDK base class for dependency inversion
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
@@ -111,12 +112,16 @@ class VerticalConfig:
         metadata: Additional vertical-specific metadata
     """
 
-    tools: ToolSet
-    system_prompt: str
+    name: str = ""
+    description: str = ""
+    tools: ToolSet = field(default_factory=ToolSet)
+    system_prompt: str = ""
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
     provider_hints: Dict[str, Any] = field(default_factory=dict)
     evaluation_criteria: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    tier: Tier = Tier.STANDARD
+    extensions: Dict[str, Any] = field(default_factory=dict)
 
     def to_agent_kwargs(self) -> Dict[str, Any]:
         """Convert to kwargs for Agent.create().
@@ -136,7 +141,9 @@ class VerticalConfig:
             Dictionary representation of the configuration.
         """
         return {
-            "tools": self.tools.tools if self.tools else [],
+            "name": self.name,
+            "description": self.description,
+            "tools": self.get_tool_names(),
             "system_prompt": self.system_prompt,
             "stages": {
                 k: {"name": v.name, "description": v.description} for k, v in self.stages.items()
@@ -144,7 +151,53 @@ class VerticalConfig:
             "provider_hints": self.provider_hints,
             "evaluation_criteria": self.evaluation_criteria,
             "metadata": self.metadata,
+            "tier": self.tier.value,
+            "extensions": self.extensions,
         }
+
+    def get_tool_names(self) -> List[str]:
+        """Return tool names in SDK-compatible list form."""
+
+        if not self.tools:
+            return []
+        return sorted(self.tools.get_tool_names())
+
+    def get_stage_names(self) -> List[str]:
+        """Return stage names in declaration order."""
+
+        return list(self.stages.keys())
+
+    def with_metadata(self, **kwargs: Any) -> "VerticalConfig":
+        """Return a copy with additional metadata merged in."""
+
+        return VerticalConfig(
+            name=self.name,
+            description=self.description,
+            tools=self.tools,
+            system_prompt=self.system_prompt,
+            stages=self.stages,
+            provider_hints=self.provider_hints,
+            evaluation_criteria=self.evaluation_criteria,
+            metadata={**self.metadata, **kwargs},
+            tier=self.tier,
+            extensions=self.extensions,
+        )
+
+    def with_extension(self, key: str, value: Any) -> "VerticalConfig":
+        """Return a copy with one additional extension entry."""
+
+        return VerticalConfig(
+            name=self.name,
+            description=self.description,
+            tools=self.tools,
+            system_prompt=self.system_prompt,
+            stages=self.stages,
+            provider_hints=self.provider_hints,
+            evaluation_criteria=self.evaluation_criteria,
+            metadata=self.metadata,
+            tier=self.tier,
+            extensions={**self.extensions, key: value},
+        )
 
     def keys(self):
         """Return keys for dict-like access compatibility.
@@ -188,10 +241,10 @@ class VerticalConfig:
 
 
 class VerticalBase(
-    SdkVerticalBase,  # Inherit from SDK for dependency inversion
     VerticalMetadataProvider,
     VerticalExtensionLoader,
     VerticalWorkflowProvider,
+    SdkVerticalBase,  # Keep SDK contract in the hierarchy without shadowing runtime mixins
 ):
     """Abstract base class for domain-specific assistants.
 
@@ -561,6 +614,8 @@ class VerticalBase(
 
         # Build config
         config = VerticalConfig(
+            name=cls.name,
+            description=cls.description,
             tools=tools,
             system_prompt=cls.get_system_prompt(),
             stages=cls.get_stages(),
@@ -682,12 +737,13 @@ class VerticalRegistry:
 
     Implements the Registry pattern for vertical discovery.
 
-    Supports both built-in verticals and external verticals installed as
-    pip packages via entry_points. External packages can register verticals
-    using the 'victor.verticals' entry point group.
+    Supports both built-in verticals and externally registered verticals.
+    The canonical external packaging path is ``victor.plugins``, where a
+    ``VictorPlugin`` registers one or more vertical classes with the host.
+    ``victor.verticals`` remains as a legacy compatibility discovery path.
 
     Example:
-        # Register a vertical
+        # Runtime registration path used by VictorPlugin/plugin bootstrap
         VerticalRegistry.register(MyVertical)
 
         # List available verticals
@@ -697,8 +753,12 @@ class VerticalRegistry:
         # Get a specific vertical
         coding = VerticalRegistry.get("coding")
 
-    Entry Point Format (for external packages):
+    Canonical External Packaging Format:
         # In external package's pyproject.toml
+        [project.entry-points."victor.plugins"]
+        security = "victor_security:plugin"
+
+    Legacy Entry Point Format (compatibility only):
         [project.entry-points."victor.verticals"]
         security = "victor_security:SecurityAssistant"
     """
@@ -706,6 +766,7 @@ class VerticalRegistry:
     _registry: Dict[str, Type[VerticalBase]] = {}
     _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
+    _legacy_entry_point_warning_emitted: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
     MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
     CURRENT_API_VERSION: ClassVar[int] = 1
@@ -841,6 +902,7 @@ class VerticalRegistry:
         cls._registry.clear()
         cls._provenance.clear()
         cls._external_discovered = False
+        cls._legacy_entry_point_warning_emitted = False
 
         if reregister_builtins:
             # Re-register built-in verticals to prevent test pollution
@@ -852,15 +914,17 @@ class VerticalRegistry:
     def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:
         """Discover and register external verticals from entry points.
 
-        Scans installed packages for the 'victor.verticals' entry point group
-        and registers any valid vertical classes found. External verticals must:
+        Scans installed packages for the legacy ``victor.verticals`` entry point
+        group and registers any valid vertical classes found. New external
+        packages should publish ``VictorPlugin`` objects through
+        ``victor.plugins`` instead. Legacy raw entry points must:
         - Inherit from the SDK VerticalBase protocol
         - Have a non-empty 'name' attribute
 
         Returns:
             Dictionary of newly discovered vertical names to their classes.
 
-        Example entry point in external package's pyproject.toml:
+        Example legacy entry point in external package's pyproject.toml:
             [project.entry-points."victor.verticals"]
             security = "victor_security:SecurityAssistant"
 
@@ -883,6 +947,8 @@ class VerticalRegistry:
         group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
         eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+        if eps:
+            cls._warn_legacy_entry_point_usage(ep.name for ep, _loaded in eps)
 
         for ep, loaded in eps:
             try:
@@ -931,6 +997,23 @@ class VerticalRegistry:
             )
 
         return discovered
+
+    @classmethod
+    def _warn_legacy_entry_point_usage(cls, entry_names: Iterable[str]) -> None:
+        """Emit a one-time deprecation warning for raw ``victor.verticals`` usage."""
+
+        if cls._legacy_entry_point_warning_emitted:
+            return
+
+        names = ", ".join(sorted(entry_names))
+        message = (
+            "Legacy raw vertical entry points via 'victor.verticals' are deprecated. "
+            "Publish VictorPlugin objects via 'victor.plugins' instead. "
+            f"Observed legacy entries: {names}"
+        )
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        logger.warning(message)
+        cls._legacy_entry_point_warning_emitted = True
 
     @classmethod
     def _validate_external_vertical(
@@ -1028,9 +1111,12 @@ class VerticalRegistry:
     def reset_discovery(cls) -> None:
         """Reset the external discovery flag (for testing).
 
-        This allows discover_external_verticals() to run again.
+        This allows discover_external_verticals() to run again and clears both
+        the legacy ``victor.verticals`` cache path and the canonical
+        ``victor.plugins`` cache path used by runtime loading.
         """
         cls._external_discovered = False
+        cls._legacy_entry_point_warning_emitted = False
         try:
             from victor.core.verticals.vertical_loader import get_vertical_loader
 
@@ -1042,6 +1128,7 @@ class VerticalRegistry:
             from victor.framework.module_loader import get_entry_point_cache
 
             get_entry_point_cache().invalidate(cls.ENTRY_POINT_GROUP)
+            get_entry_point_cache().invalidate("victor.plugins")
         except Exception:
             pass
 

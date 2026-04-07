@@ -93,10 +93,11 @@ class TestSessionsCLIIntegration:
         # Test list command
         result = runner.invoke(sessions_app, ["list"])
         assert result.exit_code == 0
-        # Title is displayed across multiple lines in table, check for key parts
-        assert "Integrati" in result.stdout or "Integration" in result.stdout
-        assert "Test" in result.stdout
-        assert "Session" in result.stdout
+        # Rich table rendering may wrap and ellipsize long titles.
+        rendered = strip_ansi(result.stdout)
+        assert "Integr" in rendered
+        assert "Test" in rendered
+        assert "Session" in rendered
 
     @pytest.mark.integration
     def test_sessions_show_command(self, backup_db):

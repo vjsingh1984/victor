@@ -7,8 +7,10 @@ implementations that raise NotImplementedError.
 
 from __future__ import annotations
 
+import importlib
+import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, ClassVar, Dict, List, Optional
 
 from victor_sdk.core.types import (
     CapabilityRequirementLike,
@@ -31,6 +33,7 @@ from victor_sdk.core.types import (
     normalize_tool_requirements,
     normalize_workflow_metadata,
 )
+from victor_sdk.verticals.extensions import VerticalExtensions
 from victor_sdk.core.api_version import CURRENT_API_VERSION
 from victor_sdk.core.exceptions import VerticalConfigurationError
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
@@ -72,6 +75,9 @@ class VerticalBase(ABC):
     name: str
     description: str
     version: str = "1.0.0"
+    _config_cache: ClassVar[Dict[str, VerticalConfig]] = {}
+    _extension_cache: ClassVar[Dict[str, Any]] = {}
+    _extension_cache_lock: ClassVar[threading.RLock] = threading.RLock()
 
     @classmethod
     @abstractmethod
@@ -126,7 +132,7 @@ class VerticalBase(ABC):
         ...
 
     @classmethod
-    def get_config(cls) -> VerticalConfig:
+    def get_config(cls, *, use_cache: bool = True) -> VerticalConfig:
         """Generate vertical configuration.
 
         This is a template method that assembles configuration from various
@@ -139,7 +145,101 @@ class VerticalBase(ABC):
         Returns:
             VerticalConfig object with all necessary configuration
         """
-        return cls.get_definition().to_config()
+        cache_key = cls._extension_cache_key("config")
+        with cls._extension_cache_lock:
+            if use_cache and cache_key in cls._config_cache:
+                return cls._config_cache[cache_key]
+
+        config = cls.get_definition().to_config()
+        with cls._extension_cache_lock:
+            cls._config_cache[cache_key] = config
+        return config
+
+    @classmethod
+    def _cache_namespace(cls) -> str:
+        """Return a stable cache namespace for this vertical class."""
+
+        return f"{cls.__module__}:{cls.__qualname__}"
+
+    @classmethod
+    def _extension_cache_key(cls, extension_key: str) -> str:
+        """Return the composite cache key for an extension object."""
+
+        return f"{cls._cache_namespace()}:{extension_key}"
+
+    @classmethod
+    def _get_cached_extension(cls, key: str, factory: Callable[[], Any]) -> Any:
+        """Get an extension value from the SDK-local cache.
+
+        This keeps lazy extension helpers available to SDK-pure verticals
+        without pulling in the core runtime extension loader.
+        """
+
+        cache_key = cls._extension_cache_key(key)
+        with cls._extension_cache_lock:
+            if cache_key in cls._extension_cache:
+                return cls._extension_cache[cache_key]
+
+        value = factory()
+        with cls._extension_cache_lock:
+            cls._extension_cache[cache_key] = value
+        return value
+
+    @classmethod
+    def _auto_extension_class_name(cls, extension_key: str) -> str:
+        """Auto-generate a conventional class name for lazy imports."""
+
+        prefix = cls.__name__
+        for suffix in ("Assistant", "Vertical"):
+            if prefix.endswith(suffix):
+                prefix = prefix[: -len(suffix)]
+                break
+        suffix = "".join(part.capitalize() for part in extension_key.split("_"))
+        return f"{prefix}{suffix}"
+
+    @classmethod
+    def _get_extension_factory(
+        cls,
+        extension_key: str,
+        import_path: str,
+        attribute_name: Optional[str] = None,
+    ) -> Any:
+        """Lazily import and instantiate an extension class.
+
+        This mirrors the most common helper used by extracted verticals while
+        staying definition-layer only: it relies only on importlib and a
+        conventional class naming pattern.
+        """
+
+        def _create() -> Any:
+            module = importlib.import_module(import_path)
+            target_name = attribute_name or cls._auto_extension_class_name(extension_key)
+            extension_cls = getattr(module, target_name)
+            return extension_cls()
+
+        return cls._get_cached_extension(extension_key, _create)
+
+    @classmethod
+    def clear_config_cache(cls, *, clear_all: bool = False) -> None:
+        """Clear SDK-local extension caches.
+
+        The SDK base does not cache config objects, but extracted verticals and
+        tests rely on this hook existing to invalidate lazy extension helpers.
+        """
+
+        with cls._extension_cache_lock:
+            if clear_all:
+                cls._config_cache.clear()
+                cls._extension_cache.clear()
+                return
+
+            prefix = f"{cls._cache_namespace()}:"
+            stale_config_keys = [key for key in cls._config_cache if key.startswith(prefix)]
+            for key in stale_config_keys:
+                cls._config_cache.pop(key, None)
+            stale_keys = [key for key in cls._extension_cache if key.startswith(prefix)]
+            for key in stale_keys:
+                cls._extension_cache.pop(key, None)
 
     @classmethod
     def get_definition(cls) -> VerticalDefinition:
@@ -148,17 +248,13 @@ class VerticalBase(ABC):
 
         try:
             vertical_name = cls.get_name()
+            tool_requirements = normalize_tool_requirements(cls.get_tool_requirements())
             return VerticalDefinition(
                 name=vertical_name,
                 description=cls.get_description(),
                 version=cls.get_version(),
-                tools=[
-                    requirement.tool_name
-                    for requirement in normalize_tool_requirements(
-                        cls.get_tool_requirements()
-                    )
-                ],
-                tool_requirements=normalize_tool_requirements(cls.get_tool_requirements()),
+                tools=[requirement.tool_name for requirement in tool_requirements],
+                tool_requirements=tool_requirements,
                 capability_requirements=normalize_capability_requirements(
                     cls.get_capability_requirements()
                 ),
@@ -215,6 +311,122 @@ class VerticalBase(ABC):
                 optional_tools=["test", "shell"],
             ),
         }
+
+    @classmethod
+    def get_middleware(cls) -> List[Any]:
+        """Return middleware implementations for this vertical."""
+
+        return []
+
+    @classmethod
+    def get_safety_extension(cls) -> Optional[Any]:
+        """Return the safety extension for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_prompt_contributor(cls) -> Optional[Any]:
+        """Return the prompt contributor for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_mode_config_provider(cls) -> Optional[Any]:
+        """Return the mode-config provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_tool_dependency_provider(cls) -> Optional[Any]:
+        """Return the tool-dependency provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Return the workflow provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_service_provider(cls) -> Optional[Any]:
+        """Return the DI service provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_rl_config_provider(cls) -> Optional[Any]:
+        """Return the RL config provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_rl_hooks(cls) -> List[Any]:
+        """Return RL hooks for this vertical, if any."""
+
+        return []
+
+    @classmethod
+    def get_team_spec_provider(cls) -> Optional[Any]:
+        """Return the team-spec provider for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_enrichment_strategy(cls) -> Optional[Any]:
+        """Return the enrichment strategy for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_tool_selection_strategy(cls) -> Optional[Any]:
+        """Return the tool-selection strategy for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_tiered_tool_config(cls) -> Optional[Any]:
+        """Return the tiered tool config for this vertical, if any."""
+
+        return None
+
+    @classmethod
+    def get_extensions(
+        cls,
+        *,
+        use_cache: bool = True,
+        strict: Optional[bool] = None,
+    ) -> VerticalExtensions:
+        """Return a lazy extension container for this SDK vertical.
+
+        The SDK keeps this method lightweight and best-effort. It aggregates
+        only hooks already exposed by the vertical class and avoids importing
+        core runtime extension infrastructure.
+        """
+
+        _ = strict
+
+        def _build() -> VerticalExtensions:
+            safety_extension = cls.get_safety_extension()
+            prompt_contributor = cls.get_prompt_contributor()
+            return VerticalExtensions(
+                middleware=lambda: list(cls.get_middleware() or []),
+                safety_extensions=lambda: [safety_extension] if safety_extension else [],
+                prompt_contributors=lambda: [prompt_contributor] if prompt_contributor else [],
+                mode_config_provider=cls.get_mode_config_provider,
+                tool_dependency_provider=cls.get_tool_dependency_provider,
+                workflow_provider=cls.get_workflow_provider,
+                service_provider=cls.get_service_provider,
+                rl_config_provider=cls.get_rl_config_provider,
+                team_spec_provider=cls.get_team_spec_provider,
+                enrichment_strategy=cls.get_enrichment_strategy,
+                tool_selection_strategy=cls.get_tool_selection_strategy,
+                tiered_tool_config=cls.get_tiered_tool_config,
+            )
+
+        if not use_cache:
+            return _build()
+        return cls._get_cached_extension("vertical_extensions", _build)
 
     @classmethod
     def get_tier(cls) -> Tier:

@@ -196,6 +196,7 @@ class TestVerticalProtocolsContract:
         from victor_sdk import verticals
 
         helpers = {
+            "ExtensionDependency",
             "MiddlewarePriority",
             "MiddlewareResult",
             "SafetyPattern",
@@ -205,6 +206,20 @@ class TestVerticalProtocolsContract:
         }
         actual = set(dir(verticals))
         assert helpers.issubset(actual), f"Missing helpers: {helpers - actual}"
+
+    def test_root_sdk_exports_extension_dependency(self):
+        from victor_sdk import ExtensionDependency
+        from victor_sdk.verticals.registration import ExtensionDependency as RegistrationDependency
+
+        assert ExtensionDependency is RegistrationDependency
+
+    def test_framework_vertical_base_shim_reexports_sdk_registration_contract(self):
+        from victor.framework.vertical_base import ExtensionDependency, register_vertical
+        from victor_sdk import ExtensionDependency as SdkExtensionDependency
+        from victor_sdk import register_vertical as sdk_register_vertical
+
+        assert ExtensionDependency is SdkExtensionDependency
+        assert register_vertical is sdk_register_vertical
 
     def test_sdk_register_vertical_attaches_manifest_without_runtime_registration(self):
         from victor_sdk.verticals import register_vertical

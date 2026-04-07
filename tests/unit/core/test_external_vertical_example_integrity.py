@@ -33,10 +33,10 @@ def test_external_vertical_example_metadata_matches_security_assistant(
 
     project_data = _example_project_data()
     project = project_data["project"]
-    entry_points = project["entry-points"]["victor.verticals"]
+    entry_points = project["entry-points"]["victor.plugins"]
 
     monkeypatch.syspath_prepend(str(EXAMPLE_SRC_DIR))
-    from victor_security import SecurityAssistant
+    from victor_security import SecurityAssistant, plugin
 
     definition = SecurityAssistant.get_definition()
 
@@ -44,7 +44,8 @@ def test_external_vertical_example_metadata_matches_security_assistant(
     assert project["version"] == SecurityAssistant.version
     assert "victor-sdk>=0.6.0" in project["dependencies"]
     assert "victor-ai>=0.3.0" in project["optional-dependencies"]["runtime"]
-    assert entry_points["security"] == "victor_security:SecurityAssistant"
+    assert entry_points["security"] == "victor_security:plugin"
+    assert plugin.name == "security"
 
     assert SecurityAssistant.get_name() == "security"
     assert definition.name == "security"
@@ -63,12 +64,13 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
     required_snippets = [
         "pip install -e .",
         'pip install -e ".[runtime]"',
-        'security = "victor_security:SecurityAssistant"',
+        'security = "victor_security:plugin"',
         "get_definition()",
         "`victor-sdk`",
         "`victor-ai`",
         "SecurityAssistant",
         "SDK-only package dependency for authoring",
+        "`victor.plugins`",
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)

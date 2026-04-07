@@ -16,6 +16,8 @@
 
 from datetime import datetime
 import io
+from pathlib import Path
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
@@ -1307,3 +1309,48 @@ class TestCodebaseCommands:
         meta = cmd.metadata
 
         assert meta.name == "init"
+
+    @pytest.mark.asyncio
+    async def test_init_command_quick_mode_writes_generated_content(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """InitCommand executes the quick-mode analyzer path and writes init.md."""
+        from victor.ui.slash.commands.codebase import InitCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        target_path = tmp_path / ".victor" / "init.md"
+        project_victor_dir = target_path.parent
+
+        monkeypatch.setattr(
+            "victor.config.settings.get_project_paths",
+            lambda: SimpleNamespace(
+                project_context_file=target_path,
+                project_victor_dir=project_victor_dir,
+            ),
+        )
+
+        generated = "# Generated init\n"
+
+        def load_attr(name: str):
+            if name == "generate_smart_victor_md":
+                return lambda: generated
+            if name == "generate_enhanced_init_md":
+                return AsyncMock(return_value="# deep init\n")
+            if name == "generate_victor_md_from_index":
+                return AsyncMock(return_value="# index init\n")
+            raise AssertionError(f"unexpected analyzer export requested: {name}")
+
+        monkeypatch.setattr(
+            "victor.ui.slash.commands.codebase.load_codebase_analyzer_attr", load_attr
+        )
+
+        ctx = CommandContext(console=console, settings=settings, args=[])
+
+        await InitCommand().execute(ctx)
+
+        assert target_path.read_text(encoding="utf-8") == generated
+        assert "Created" in stdout.getvalue()

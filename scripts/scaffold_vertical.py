@@ -65,7 +65,9 @@ def scaffold(name: str, output_dir: Path) -> Path:
     print()
 
     # pyproject.toml
-    create_file(pkg_dir / "pyproject.toml", f"""
+    create_file(
+        pkg_dir / "pyproject.toml",
+        f"""
         [build-system]
         requires = ["setuptools>=68.0", "wheel"]
         build-backend = "setuptools.build_meta"
@@ -76,18 +78,18 @@ def scaffold(name: str, output_dir: Path) -> Path:
         description = "Victor vertical for {vertical_name}"
         requires-python = ">=3.10"
         dependencies = [
-            "victor-sdk>=0.5.0",
+            "victor-sdk>=0.6.0",
         ]
 
         [project.entry-points."victor.plugins"]
         {vertical_name} = "{mod_name}:plugin"
-
-        [project.entry-points."victor.verticals"]
-        {vertical_name} = "{mod_name}:{class_name}Assistant"
-    """)
+    """,
+    )
 
     # Package __init__.py
-    create_file(src_dir / "__init__.py", f'''
+    create_file(
+        src_dir / "__init__.py",
+        f'''
         """{class_name} Vertical Package for Victor."""
 
         from typing import Optional
@@ -118,64 +120,109 @@ def scaffold(name: str, output_dir: Path) -> Path:
             def on_deactivate(self) -> None:
                 pass
 
-            def health_check(self) -> dict:
-                return {{"healthy": True}}
+            async def on_activate_async(self) -> None:
+                pass
+
+            async def on_deactivate_async(self) -> None:
+                pass
+
+            def health_check(self) -> dict[str, object]:
+                return {{"healthy": True, "vertical": "{vertical_name}"}}
 
 
         plugin = {class_name}Plugin()
 
         __all__ = ["{class_name}Assistant", "{class_name}Plugin", "plugin"]
-    ''')
+    ''',
+    )
 
     # Assistant module
-    create_file(src_dir / "assistant.py", f'''
-        """{class_name} Assistant - VerticalBase implementation."""
+    create_file(
+        src_dir / "assistant.py",
+        f'''
+        """{class_name} Assistant - SDK-first vertical definition."""
 
         from __future__ import annotations
 
-        from typing import Any, ClassVar, Dict, List, Optional, Set
+        from typing import ClassVar
 
-        from victor_sdk import VerticalBase, ExtensionManifest, ExtensionType
+        from victor_sdk import (
+            CapabilityIds,
+            CapabilityRequirement,
+            StageDefinition,
+            ToolNames,
+            ToolRequirement,
+            VerticalBase,
+            register_vertical,
+        )
 
 
+        @register_vertical(
+            name="{vertical_name}",
+            version="0.1.0",
+            min_framework_version=">=0.6.0",
+            plugin_namespace="{mod_name}",
+        )
         class {class_name}Assistant(VerticalBase):
             """Domain-specific assistant for {vertical_name}."""
 
             name: ClassVar[str] = "{vertical_name}"
             description: ClassVar[str] = "Assistant for {vertical_name} tasks"
+            version: ClassVar[str] = "0.1.0"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
-                """Return the tools this vertical provides."""
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return cls.description
+
+            @classmethod
+            def get_tool_requirements(cls) -> list[ToolRequirement]:
                 return [
-                    "read",
-                    "write",
-                    "bash",
+                    ToolRequirement(ToolNames.READ, purpose="inspect project files"),
+                    ToolRequirement(ToolNames.WRITE, required=False, purpose="apply changes"),
+                    ToolRequirement(ToolNames.SHELL, required=False, purpose="run project checks"),
+                ]
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return [requirement.tool_name for requirement in cls.get_tool_requirements()]
+
+            @classmethod
+            def get_capability_requirements(cls) -> list[CapabilityRequirement]:
+                return [
+                    CapabilityRequirement(
+                        capability_id=CapabilityIds.FILE_OPS,
+                        purpose="read and update local project files",
+                    ),
                 ]
 
             @classmethod
             def get_system_prompt(cls) -> str:
-                """Return the system prompt for this vertical."""
                 return (
                     "You are a specialized assistant for {vertical_name} tasks. "
                     "Help the user accomplish their goals efficiently and safely."
                 )
 
             @classmethod
-            def get_manifest(cls) -> ExtensionManifest:
-                """Declare capabilities for framework negotiation."""
-                return ExtensionManifest(
-                    api_version=2,
-                    name=cls.name,
-                    version="0.1.0",
-                    min_framework_version="0.5.0",
-                    provides={{ExtensionType.TOOLS, ExtensionType.SAFETY}},
-                    requires=set(),
-                )
-    ''')
+            def get_stages(cls) -> dict[str, StageDefinition]:
+                return {{
+                    "default": StageDefinition(
+                        name="default",
+                        description="Default execution stage for {vertical_name} work.",
+                        required_tools=[ToolNames.READ],
+                        optional_tools=[ToolNames.WRITE, ToolNames.SHELL],
+                    )
+                }}
+    ''',
+    )
 
     # Safety module
-    create_file(src_dir / "safety.py", f'''
+    create_file(
+        src_dir / "safety.py",
+        f'''
         """{class_name} Safety Patterns."""
 
         from __future__ import annotations
@@ -188,10 +235,13 @@ def scaffold(name: str, output_dir: Path) -> Path:
 
         # Commands that are always blocked
         BLOCKED_COMMANDS: List[str] = []
-    ''')
+    ''',
+    )
 
     # Prompts module
-    create_file(src_dir / "prompts.py", f'''
+    create_file(
+        src_dir / "prompts.py",
+        f'''
         """{class_name} Prompt Templates."""
 
         from __future__ import annotations
@@ -201,12 +251,15 @@ def scaffold(name: str, output_dir: Path) -> Path:
             "You are a specialized assistant for {vertical_name} tasks. "
             "Help the user accomplish their goals efficiently and safely."
         )
-    ''')
+    ''',
+    )
 
     # Tests
     create_file(pkg_dir / "tests" / "__init__.py", "")
 
-    create_file(pkg_dir / "tests" / f"test_{to_module_name(vertical_name)}.py", f'''
+    create_file(
+        pkg_dir / "tests" / f"test_{to_module_name(vertical_name)}.py",
+        f'''
         """Tests for {class_name} vertical."""
 
         from {mod_name}.assistant import {class_name}Assistant
@@ -228,11 +281,19 @@ def scaffold(name: str, output_dir: Path) -> Path:
             assert len(prompt) > 0
 
 
+        def test_get_definition():
+            definition = {class_name}Assistant.get_definition()
+            assert definition.name == "{vertical_name}"
+            assert definition.version == "0.1.0"
+            assert definition.tools
+
+
         def test_get_manifest():
             manifest = {class_name}Assistant.get_manifest()
             assert manifest.name == "{vertical_name}"
-            assert manifest.api_version == 2
-    ''')
+            assert manifest.version == "0.1.0"
+    ''',
+    )
 
     print(f"\nVertical package created at: {pkg_dir}")
     print("\nNext steps:")
@@ -244,18 +305,13 @@ def scaffold(name: str, output_dir: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Scaffold a new Victor vertical package"
-    )
-    parser.add_argument(
-        "name",
-        help="Vertical name (e.g., 'my-vertical' or 'security')"
-    )
+    parser = argparse.ArgumentParser(description="Scaffold a new Victor vertical package")
+    parser.add_argument("name", help="Vertical name (e.g., 'my-vertical' or 'security')")
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path.cwd(),
-        help="Parent directory for the package (default: current directory)"
+        help="Parent directory for the package (default: current directory)",
     )
 
     args = parser.parse_args()

@@ -35,55 +35,25 @@ Protocol Categories:
     - CapabilityProvider: Capability declarations
 
 Usage:
-    from victor.core.verticals.protocols.providers import (
-        MiddlewareProvider,
-        SafetyProvider,
-        ToolProvider,
-    )
-
-    # Type-safe isinstance checks
-    if isinstance(vertical, MiddlewareProvider):
-        middleware = vertical.get_middleware()
-
-    if isinstance(vertical, SafetyProvider):
-        safety = vertical.get_safety_extension()
-
-Example Implementation:
-    from victor.core.verticals import VerticalBase
-    from victor.core.verticals.protocols.providers import (
-        MiddlewareProvider,
-        SafetyProvider,
-    )
+    from victor_sdk import VerticalBase
+    from victor.core.verticals.protocols.providers import MiddlewareProvider, SafetyProvider
 
     class SecurityVertical(VerticalBase):
-        '''Security-focused vertical implementing specific provider protocols.'''
         name = "security"
 
         @classmethod
-        def get_tools(cls) -> List[str]:
-            return ["read", "security_scan", "audit"]
-
-        @classmethod
-        def get_system_prompt(cls) -> str:
-            return "You are a security expert..."
-
-        # Only implement the providers relevant to this vertical
-        @classmethod
         def get_middleware(cls) -> List[Any]:
-            from mypackage.middleware import SecurityMiddleware
             return [SecurityMiddleware()]
 
         @classmethod
         def get_safety_extension(cls) -> Optional[Any]:
-            from mypackage.safety import SecuritySafetyExtension
             return SecuritySafetyExtension()
 
-    # Framework code can check capabilities:
-    vertical = SecurityVertical
-    if isinstance(vertical, MiddlewareProvider):
-        print("Has middleware support")
-    if isinstance(vertical, SafetyProvider):
-        print("Has safety extensions")
+    if isinstance(SecurityVertical, MiddlewareProvider):
+        middleware = SecurityVertical.get_middleware()
+
+    if isinstance(SecurityVertical, SafetyProvider):
+        safety = SecurityVertical.get_safety_extension()
 """
 
 from __future__ import annotations
@@ -99,23 +69,15 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 class MiddlewareProvider(Protocol):
     """Protocol for verticals that provide middleware.
 
-        Middleware intercepts and modifies tool calls before and after execution.
-        Verticals implementing this protocol can provide domain-specific middleware
-        for validation, transformation, logging, or processing.
+    Middleware intercepts and modifies tool calls before and after execution.
+    Verticals implementing this protocol can provide domain-specific middleware
+    for validation, transformation, logging, or processing.
 
-        Example:
-            class CodingVertical(VerticalBase, MiddlewareProvider):
-                @classmethod
-                def get_middleware(cls) -> List[Any]:
-    try:
-    try:
-                            from victor_coding.middleware import CodeValidationMiddleware
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return [CodeValidationMiddleware()]
+    Example:
+        class ExampleVertical(VerticalBase, MiddlewareProvider):
+            @classmethod
+            def get_middleware(cls) -> List[Any]:
+                return [ExampleMiddleware()]
     """
 
     @classmethod
@@ -137,20 +99,15 @@ class MiddlewareProvider(Protocol):
 class SafetyProvider(Protocol):
     """Protocol for verticals that provide safety extensions.
 
-        Safety extensions define dangerous operation patterns specific to the
-        vertical's domain. These patterns are used to warn users or block
-        potentially harmful operations.
+    Safety extensions define dangerous operation patterns specific to the
+    vertical's domain. These patterns are used to warn users or block
+    potentially harmful operations.
 
-        Example:
-            class DevOpsVertical(VerticalBase, SafetyProvider):
-                @classmethod
-                def get_safety_extension(cls) -> Optional[Any]:
-    try:
-                        from victor_devops.safety import DevOpsSafetyExtension
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-                    return DevOpsSafetyExtension()
+    Example:
+        class ExampleVertical(VerticalBase, SafetyProvider):
+            @classmethod
+            def get_safety_extension(cls) -> Optional[Any]:
+                return ExampleSafetyExtension()
     """
 
     @classmethod
@@ -172,27 +129,19 @@ class SafetyProvider(Protocol):
 class WorkflowProvider(Protocol):
     """Protocol for verticals that provide workflows.
 
-        Workflows are named sequences of operations that can be triggered
-        by user commands or automatically detected based on context.
+    Workflows are named sequences of operations that can be triggered
+    by user commands or automatically detected based on context.
 
-        Example:
-            class CodingVertical(VerticalBase, WorkflowProvider):
-                @classmethod
-                def get_workflow_provider(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.workflows import CodingWorkflowProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingWorkflowProvider()
+    Example:
+        class ExampleVertical(VerticalBase, WorkflowProvider):
+            @classmethod
+            def get_workflow_provider(cls) -> Optional[Any]:
+                return ExampleWorkflowProvider()
 
-                @classmethod
-                def get_workflows(cls) -> Dict[str, Any]:
-                    provider = cls.get_workflow_provider()
-                    return provider.get_workflows() if provider else {}
+            @classmethod
+            def get_workflows(cls) -> Dict[str, Any]:
+                provider = cls.get_workflow_provider()
+                return provider.get_workflows() if provider else {}
     """
 
     @classmethod
@@ -223,24 +172,19 @@ class WorkflowProvider(Protocol):
 class TeamProvider(Protocol):
     """Protocol for verticals that provide team specs.
 
-        Team specifications define multi-agent team configurations for
-        complex task execution with multiple specialized agents.
+    Team specifications define multi-agent team configurations for
+    complex task execution with multiple specialized agents.
 
-        Example:
-            class ResearchVertical(VerticalBase, TeamProvider):
-                @classmethod
-                def get_team_spec_provider(cls) -> Optional[Any]:
-    try:
-                        from victor_research.teams import ResearchTeamProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-                    return ResearchTeamProvider()
+    Example:
+        class ExampleVertical(VerticalBase, TeamProvider):
+            @classmethod
+            def get_team_spec_provider(cls) -> Optional[Any]:
+                return ExampleTeamProvider()
 
-                @classmethod
-                def get_team_specs(cls) -> Dict[str, Any]:
-                    provider = cls.get_team_spec_provider()
-                    return provider.get_team_specs() if provider else {}
+            @classmethod
+            def get_team_specs(cls) -> Dict[str, Any]:
+                provider = cls.get_team_spec_provider()
+                return provider.get_team_specs() if provider else {}
     """
 
     @classmethod
@@ -271,27 +215,19 @@ class TeamProvider(Protocol):
 class RLProvider(Protocol):
     """Protocol for verticals that provide RL configuration.
 
-        RL (Reinforcement Learning) configuration enables adaptive behavior
-        through learner configurations, task type mappings, and quality thresholds.
+    RL (Reinforcement Learning) configuration enables adaptive behavior
+    through learner configurations, task type mappings, and quality thresholds.
 
-        Example:
-            class CodingVertical(VerticalBase, RLProvider):
-                @classmethod
-                def get_rl_config_provider(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.rl import CodingRLProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingRLProvider()
+    Example:
+        class ExampleVertical(VerticalBase, RLProvider):
+            @classmethod
+            def get_rl_config_provider(cls) -> Optional[Any]:
+                return ExampleRLProvider()
 
-                @classmethod
-                def get_rl_hooks(cls) -> List[Any]:
-                    provider = cls.get_rl_config_provider()
-                    return [provider.get_rl_hooks()] if provider else []
+            @classmethod
+            def get_rl_hooks(cls) -> List[Any]:
+                provider = cls.get_rl_config_provider()
+                return [provider.get_rl_hooks()] if provider else []
     """
 
     @classmethod
@@ -322,26 +258,15 @@ class RLProvider(Protocol):
 class EnrichmentProvider(Protocol):
     """Protocol for verticals that provide enrichment strategies.
 
-        Enrichment strategies provide vertical-specific context for prompt
-        optimization (DSPy-like auto prompt enhancement). Examples include:
-        - Coding: Knowledge graph symbols, related code snippets
-        - Research: Web search results, source citations
-        - DevOps: Infrastructure context, command patterns
-        - Data Analysis: Schema context, query patterns
+    Enrichment strategies provide vertical-specific context for prompt
+    optimization, such as symbols, citations, infrastructure context,
+    or schema metadata.
 
-        Example:
-            class CodingVertical(VerticalBase, EnrichmentProvider):
-                @classmethod
-                def get_enrichment_strategy(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.enrichment import CodingEnrichmentStrategy
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingEnrichmentStrategy()
+    Example:
+        class ExampleVertical(VerticalBase, EnrichmentProvider):
+            @classmethod
+            def get_enrichment_strategy(cls) -> Optional[Any]:
+                return ExampleEnrichmentStrategy()
     """
 
     @classmethod
@@ -363,26 +288,18 @@ class EnrichmentProvider(Protocol):
 class ToolProvider(Protocol):
     """Protocol for verticals that provide tools.
 
-        Defines the tools available to the vertical and optional tool execution
-        graphs for defining tool dependencies and sequences.
+    Defines the tools available to the vertical and optional tool execution
+    graphs for defining tool dependencies and sequences.
 
-        Example:
-            class CodingVertical(VerticalBase, ToolProvider):
-                @classmethod
-                def get_tools(cls) -> List[str]:
-                    return ["read", "write", "edit", "grep", "run_tests"]
+    Example:
+        class ExampleVertical(VerticalBase, ToolProvider):
+            @classmethod
+            def get_tools(cls) -> List[str]:
+                return ["read", "write", "grep"]
 
-                @classmethod
-                def get_tool_graph(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.tools import CodingToolGraph
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingToolGraph()
+            @classmethod
+            def get_tool_graph(cls) -> Optional[Any]:
+                return ExampleToolGraph()
     """
 
     @classmethod
@@ -413,19 +330,14 @@ class ToolProvider(Protocol):
 class HandlerProvider(Protocol):
     """Protocol for verticals that provide compute handlers.
 
-        Compute handlers are registered with the HandlerRegistry for
-        workflow execution. They process specific node types in YAML workflows.
+    Compute handlers are registered with the HandlerRegistry for
+    workflow execution. They process specific node types in YAML workflows.
 
-        Example:
-            class DataAnalysisVertical(VerticalBase, HandlerProvider):
-                @classmethod
-                def get_handlers(cls) -> Dict[str, Any]:
-    try:
-                        from victor_dataanalysis.handlers import HANDLERS
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-                    return HANDLERS
+    Example:
+        class ExampleVertical(VerticalBase, HandlerProvider):
+            @classmethod
+            def get_handlers(cls) -> Dict[str, Any]:
+                return {"analyze": ExampleAnalyzeHandler()}
     """
 
     @classmethod
@@ -447,22 +359,14 @@ class HandlerProvider(Protocol):
 class CapabilityProvider(Protocol):
     """Protocol for verticals that provide capabilities.
 
-        Capability providers declare which features the vertical supports,
-        enabling runtime discovery and feature toggling.
+    Capability providers declare which features the vertical supports,
+    enabling runtime discovery and feature toggling.
 
-        Example:
-            class CodingVertical(VerticalBase, CapabilityProvider):
-                @classmethod
-                def get_capability_provider(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.capabilities import CodingCapabilityProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingCapabilityProvider()
+    Example:
+        class ExampleVertical(VerticalBase, CapabilityProvider):
+            @classmethod
+            def get_capability_provider(cls) -> Optional[Any]:
+                return ExampleCapabilityProvider()
     """
 
     @classmethod
@@ -484,30 +388,21 @@ class CapabilityProvider(Protocol):
 class ModeConfigProvider(Protocol):
     """Protocol for verticals that provide mode configurations.
 
-        Mode configurations define operational modes like 'fast', 'thorough',
-        or 'explore' with their respective tool budgets, iterations, and
-        temperature settings.
+    Mode configurations define operational modes like ``fast`` or ``thorough``
+    with their respective tool budgets, iterations, and temperature settings.
 
-        Example:
-            class CodingVertical(VerticalBase, ModeConfigProvider):
-                @classmethod
-                def get_mode_config_provider(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.modes import CodingModeProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingModeProvider()
+    Example:
+        class ExampleVertical(VerticalBase, ModeConfigProvider):
+            @classmethod
+            def get_mode_config_provider(cls) -> Optional[Any]:
+                return ExampleModeProvider()
 
-                @classmethod
-                def get_mode_config(cls) -> Dict[str, Any]:
-                    return {
-                        "fast": {"tool_budget": 10, "max_iterations": 20},
-                        "thorough": {"tool_budget": 50, "max_iterations": 50},
-                    }
+            @classmethod
+            def get_mode_config(cls) -> Dict[str, Any]:
+                return {
+                    "fast": {"tool_budget": 10, "max_iterations": 20},
+                    "thorough": {"tool_budget": 50, "max_iterations": 50},
+                }
     """
 
     @classmethod
@@ -538,26 +433,21 @@ class ModeConfigProvider(Protocol):
 class PromptContributorProvider(Protocol):
     """Protocol for verticals that provide prompt contributors.
 
-        Prompt contributors add vertical-specific hints, sections, and
-        task type mappings to prompts.
+    Prompt contributors add vertical-specific hints, sections, and
+    task type mappings to prompts.
 
-        Example:
-            class ResearchVertical(VerticalBase, PromptContributorProvider):
-                @classmethod
-                def get_prompt_contributor(cls) -> Optional[Any]:
-    try:
-                        from victor_research.prompts import ResearchPromptContributor
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-                    return ResearchPromptContributor()
+    Example:
+        class ExampleVertical(VerticalBase, PromptContributorProvider):
+            @classmethod
+            def get_prompt_contributor(cls) -> Optional[Any]:
+                return ExamplePromptContributor()
 
-                @classmethod
-                def get_task_type_hints(cls) -> Dict[str, Any]:
-                    return {
-                        "search": {"hint": "Use web search tools", "priority_tools": ["web"]},
-                        "synthesize": {"hint": "Combine sources", "priority_tools": ["write"]},
-                    }
+            @classmethod
+            def get_task_type_hints(cls) -> Dict[str, Any]:
+                return {
+                    "search": {"hint": "Use search tools", "priority_tools": ["search"]},
+                    "synthesize": {"hint": "Combine sources", "priority_tools": ["write"]},
+                }
     """
 
     @classmethod
@@ -592,11 +482,10 @@ class ToolDependencyProvider(Protocol):
     enabling intelligent tool sequencing and pre-requisite handling.
 
     Example:
-        class CodingVertical(VerticalBase, ToolDependencyProvider):
+        class ExampleVertical(VerticalBase, ToolDependencyProvider):
             @classmethod
             def get_tool_dependency_provider(cls) -> Optional[Any]:
-                from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-                return create_vertical_tool_dependency_provider("coding")
+                return ExampleToolDependencyProvider()
     """
 
     @classmethod
@@ -625,15 +514,14 @@ class TieredToolConfigProvider(Protocol):
     3. Semantic Pool: Selected based on query similarity
 
     Example:
-        class ResearchVertical(VerticalBase, TieredToolConfigProvider):
+        class ExampleVertical(VerticalBase, TieredToolConfigProvider):
             @classmethod
             def get_tiered_tool_config(cls) -> Optional[Any]:
-                from victor.core.vertical_types import TieredToolConfig
-                return TieredToolConfig(
-                    mandatory={"read", "ls"},
-                    vertical_core={"web_search", "web_fetch"},
-                    semantic_pool={"write", "edit"},
-                )
+                return {
+                    "basic_tools": {"read", "ls"},
+                    "standard_tools": {"web_search", "web_fetch"},
+                    "advanced_tools": {"write", "edit"},
+                }
     """
 
     @classmethod
@@ -655,22 +543,14 @@ class TieredToolConfigProvider(Protocol):
 class ServiceProvider(Protocol):
     """Protocol for verticals that provide DI services.
 
-        Service providers register vertical-specific services with the
-        dependency injection container.
+    Service providers register vertical-specific services with the
+    dependency injection container.
 
-        Example:
-            class CodingVertical(VerticalBase, ServiceProvider):
-                @classmethod
-                def get_service_provider(cls) -> Optional[Any]:
-    try:
-    try:
-                            from victor_coding.services import CodingServiceProvider
-    except ImportError:
-        # External vertical package may not be installed
-        pass
-    except ImportError:
-        # victor-coding is an external package and may not be installed
-                    return CodingServiceProvider()
+    Example:
+        class ExampleVertical(VerticalBase, ServiceProvider):
+            @classmethod
+            def get_service_provider(cls) -> Optional[Any]:
+                return ExampleServiceProvider()
     """
 
     @classmethod

@@ -239,7 +239,7 @@ class VerticalTester:
     async def test_vertical_loading(self, vertical: str) -> TestResult:
         """Test loading a specific vertical."""
         try:
-            from victor.verticals.vertical_loader import VerticalLoader
+            from victor.core.verticals.vertical_loader import VerticalLoader
 
             loader = VerticalLoader()
             vertical_cls = loader.load(vertical)
@@ -270,7 +270,7 @@ class VerticalTester:
     async def test_vertical_tools(self, vertical: str) -> TestResult:
         """Test that vertical has expected tools."""
         try:
-            from victor.verticals.vertical_loader import VerticalLoader
+            from victor.core.verticals.vertical_loader import VerticalLoader
 
             loader = VerticalLoader()
             loader.load(vertical)

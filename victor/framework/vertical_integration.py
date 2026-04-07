@@ -154,10 +154,12 @@ from victor.agent.vertical_context import VerticalContext, create_vertical_conte
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
 from victor.core.verticals.base import VerticalRegistry
+from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     get_vertical_runtime_metadata,
 )
+from victor.core.verticals.namespace_executor import get_namespace_executor_pool
 
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
@@ -2164,14 +2166,15 @@ class VerticalIntegrationPipeline:
                 for idx, maybe_exc in enumerate(results_or_exc):
                     if isinstance(maybe_exc, Exception):
                         failed_handler = parallel_handlers[idx]
+                        message = self._format_handler_failure(
+                            vertical,
+                            failed_handler.name,
+                            maybe_exc,
+                        )
                         if self._strict_mode:
-                            result.add_error(
-                                f"Parallel handler '{failed_handler.name}' failed: {maybe_exc}"
-                            )
+                            result.add_error(message)
                         else:
-                            result.add_warning(
-                                f"Parallel handler '{failed_handler.name}' error: {maybe_exc}"
-                            )
+                            result.add_warning(message)
 
     async def _run_handler_async(
         self,
@@ -2193,6 +2196,8 @@ class VerticalIntegrationPipeline:
         Raises:
             Exception: If handler fails and strict_mode is enabled
         """
+        runtime_metadata = get_vertical_runtime_metadata(vertical)
+        namespace = runtime_metadata["vertical_plugin_namespace"] or "default"
         try:
             # Check if handler has async apply method
             if hasattr(handler, "apply_async"):
@@ -2208,8 +2213,9 @@ class VerticalIntegrationPipeline:
                 import asyncio
 
                 loop = asyncio.get_event_loop()
+                executor = get_namespace_executor_pool().get_executor(namespace)
                 await loop.run_in_executor(
-                    None,
+                    executor,
                     lambda: handler.apply(
                         orchestrator,
                         vertical,
@@ -2221,11 +2227,15 @@ class VerticalIntegrationPipeline:
         except Exception as e:
             if self._strict_mode:
                 raise
-            else:
-                logger.debug(
-                    f"Handler '{handler.name}' failed: {e}",
-                    exc_info=True,
-                )
+            result.add_warning(self._format_handler_failure(vertical, handler.name, e))
+            logger.debug(
+                "Handler '%s' failed for vertical '%s' in namespace '%s': %s",
+                handler.name,
+                runtime_metadata["vertical_name"],
+                namespace,
+                e,
+                exc_info=True,
+            )
 
     def _apply_with_step_handlers(
         self,
@@ -2267,14 +2277,30 @@ class VerticalIntegrationPipeline:
                     strict_mode=self._strict_mode,
                 )
             except Exception as e:
+                message = self._format_handler_failure(vertical, handler.name, e)
                 if self._strict_mode:
-                    result.add_error(f"Step handler '{handler.name}' failed: {e}")
+                    result.add_error(message)
                 else:
-                    result.add_warning(f"Step handler '{handler.name}' error: {e}")
+                    result.add_warning(message)
                 logger.debug(
-                    f"Step handler '{handler.name}' failed: {e}",
+                    message,
                     exc_info=True,
                 )
+
+    def _format_handler_failure(
+        self,
+        vertical: Type["VerticalBase"],
+        handler_name: str,
+        error: Exception,
+    ) -> str:
+        """Format a namespace-aware handler failure message."""
+
+        runtime_metadata = get_vertical_runtime_metadata(vertical)
+        namespace = runtime_metadata["vertical_plugin_namespace"] or "default"
+        return (
+            f"Step handler '{handler_name}' failed for vertical "
+            f"'{runtime_metadata['vertical_name']}' [namespace={namespace}]: {error}"
+        )
 
     # Legacy method removed in Phase 1 refactoring
     # Step handlers now provide SOLID-compliant single responsibility implementation
@@ -2299,9 +2325,10 @@ class VerticalIntegrationPipeline:
                 # Try case-insensitive match
                 for name in VerticalRegistry.list_names():
                     if name.lower() == vertical.lower():
-                        return VerticalRegistry.get(name)
-            return resolved
-        return vertical
+                        resolved = VerticalRegistry.get(name)
+                        break
+            return ensure_runtime_vertical(resolved) if resolved is not None else None
+        return ensure_runtime_vertical(vertical)
 
     def _create_context(
         self,

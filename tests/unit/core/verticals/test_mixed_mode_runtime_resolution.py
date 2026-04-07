@@ -105,6 +105,10 @@ def test_capability_provider_prefers_runtime_module(monkeypatch: pytest.MonkeyPa
         ResearchCapabilityProvider=RootResearchCapabilityProvider,
     )
     monkeypatch.setattr(
+        "victor.framework.entry_point_loader.load_runtime_extension_from_entry_points",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
         ResearchAssistant,
         "_extension_module_available",
         classmethod(lambda cls, module_path: module_path.startswith("victor_research")),

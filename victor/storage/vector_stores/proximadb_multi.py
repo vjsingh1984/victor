@@ -45,6 +45,7 @@ from victor.storage.vector_stores.base import (
     EmbeddingConfig,
     EmbeddingSearchResult,
 )
+from victor.core.utils.coding_support import load_tree_sitter_get_parser
 from victor.storage.vector_stores.models import (
     BaseEmbeddingModel,
     EmbeddingModelConfig,
@@ -1325,8 +1326,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             queries = plugin.tree_sitter_queries
             if not queries.symbols:
                 return None
-            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
-
+            get_parser = load_tree_sitter_get_parser()
             parser = get_parser(language)
             tree = parser.parse(content.encode("utf-8"))
         except Exception as exc:
@@ -1668,8 +1668,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             return []
 
         try:
-            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
-
+            get_parser = load_tree_sitter_get_parser()
             parser = get_parser(language)
             tree = parser.parse(content.encode("utf-8"))
             captures = self._run_query(tree, parser, query_src)
