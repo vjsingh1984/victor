@@ -19,8 +19,8 @@ def _repo_root() -> Path:
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_wheel_contains_vertical_runtime_assets(tmp_path: Path) -> None:
-    """Wheel build should contain contrib vertical YAML/TOML/SVG runtime assets."""
+def test_wheel_omits_extracted_vertical_runtime_assets(tmp_path: Path) -> None:
+    """Core wheel should not bundle runtime assets for extracted vertical repos."""
     repo_root = _repo_root()
 
     build_attempts = [
@@ -69,7 +69,7 @@ def test_wheel_contains_vertical_runtime_assets(tmp_path: Path) -> None:
     assert wheels, "Expected victor_ai wheel artifact"
     wheel_path = wheels[-1]
 
-    required_paths = {
+    legacy_vertical_assets = {
         "victor/verticals/contrib/coding/tool_dependencies.yaml",
         "victor/verticals/contrib/devops/tool_dependencies.yaml",
         "victor/verticals/contrib/research/tool_dependencies.yaml",
@@ -79,14 +79,12 @@ def test_wheel_contains_vertical_runtime_assets(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(wheel_path) as archive:
         names = set(archive.namelist())
-        missing = sorted(required_paths - names)
-        assert not missing, f"Missing required vertical assets in wheel: {missing}"
+        assert "victor/verticals/contrib/__init__.py" in names
+        bundled_legacy_assets = sorted(legacy_vertical_assets & names)
+        assert not bundled_legacy_assets, (
+            "Core wheel should not bundle extracted vertical runtime assets: "
+            f"{bundled_legacy_assets}"
+        )
 
-        workflow_assets = [
-            name
-            for name in names
-            if name.startswith("victor/verticals/contrib/")
-            and "/workflows/" in name
-            and (name.endswith(".yaml") or name.endswith(".svg"))
-        ]
-        assert workflow_assets, "Expected contrib workflow assets in wheel"
+        entry_point_files = [name for name in names if name.endswith("entry_points.txt")]
+        assert entry_point_files, "Expected wheel entry_points metadata"

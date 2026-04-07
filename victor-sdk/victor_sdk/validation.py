@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, distribution, version as installed_version
 from typing import Any, List
 
-from victor_sdk.core.plugins import VictorPlugin
+from victor_sdk.discovery import collect_verticals_from_candidate
 from victor_sdk.testing import assert_valid_vertical
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 
@@ -81,26 +81,30 @@ def validate_vertical_package(package_name: str) -> ValidationReport:
             _validate_vertical_class(candidate, report)
             continue
 
-        if isinstance(candidate, type):
-            try:
-                plugin = candidate()
-            except Exception as exc:
-                report.add_issue(
-                    "plugin_instantiation_failed",
-                    f"Failed to instantiate plugin entry point '{entry_point.name}': {exc}",
-                )
-                continue
-        else:
-            plugin = candidate
-        if isinstance(plugin, VictorPlugin) or _looks_like_plugin(plugin):
-            _validate_plugin(plugin, report)
+        try:
+            discovered = collect_verticals_from_candidate(candidate)
+        except TypeError as exc:
+            report.add_issue(
+                "unsupported_entry_point",
+                f"Entry point '{entry_point.name}' is invalid: {exc}",
+            )
+            continue
+        except Exception as exc:
+            report.add_issue(
+                "plugin_register_failed",
+                f"Plugin entry point '{entry_point.name}' failed during register(): {exc}",
+            )
             continue
 
-        report.add_issue(
-            "unsupported_entry_point",
-            f"Entry point '{entry_point.name}' must resolve to an SDK VerticalBase subclass "
-            "or a VictorPlugin implementation",
-        )
+        if not discovered:
+            report.add_issue(
+                "plugin_no_verticals",
+                f"Plugin entry point '{entry_point.name}' did not register any verticals",
+            )
+            continue
+
+        for vertical_cls in discovered.values():
+            _validate_vertical_class(vertical_cls, report)
 
     return report
 
@@ -128,30 +132,6 @@ def _validate_vertical_class(vertical_cls: type[Any], report: ValidationReport) 
         return
 
     _check_framework_version_compatibility(vertical_cls, report)
-
-
-def _validate_plugin(plugin: Any, report: ValidationReport) -> None:
-    """Validate a VictorPlugin by observing the verticals it registers."""
-
-    context = _CollectingPluginContext()
-    try:
-        plugin.register(context)
-    except Exception as exc:
-        report.add_issue(
-            "plugin_register_failed",
-            f"Plugin '{getattr(plugin, 'name', type(plugin).__name__)}' failed during register(): {exc}",
-        )
-        return
-
-    if not context.verticals:
-        report.add_issue(
-            "plugin_no_verticals",
-            f"Plugin '{getattr(plugin, 'name', type(plugin).__name__)}' did not register any verticals",
-        )
-        return
-
-    for vertical_cls in context.verticals:
-        _validate_vertical_class(vertical_cls, report)
 
 
 def _check_framework_version_compatibility(
@@ -203,43 +183,3 @@ def _check_framework_version_compatibility(
             "framework_version_invalid",
             f"Could not parse min_framework_version '{min_framework_version}': {exc}",
         )
-
-
-def _looks_like_plugin(candidate: Any) -> bool:
-    """Return True when *candidate* resembles the VictorPlugin protocol."""
-
-    return all(hasattr(candidate, attr) for attr in ("name", "register", "get_cli_app"))
-
-
-class _CollectingPluginContext:
-    """Minimal PluginContext implementation for validation-only plugin registration."""
-
-    def __init__(self) -> None:
-        self.verticals: list[type[Any]] = []
-
-    def register_tool(self, tool_instance: Any) -> None:
-        return None
-
-    def register_vertical(self, vertical_class: type[Any]) -> None:
-        self.verticals.append(vertical_class)
-
-    def register_chunker(self, chunker_instance: Any) -> None:
-        return None
-
-    def register_command(self, name: str, app: Any) -> None:
-        return None
-
-    def register_workflow_node_executor(
-        self,
-        node_type: str,
-        executor_factory: Any,
-        *,
-        replace: bool = False,
-    ) -> None:
-        return None
-
-    def get_service(self, service_type: type[Any]) -> None:
-        return None
-
-    def get_settings(self) -> None:
-        return None

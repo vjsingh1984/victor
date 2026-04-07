@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import warnings
 from types import ModuleType
 from typing import List, Optional, Tuple
 
@@ -44,6 +45,7 @@ _RUNTIME_MODULE_PREFIXES = frozenset(
         "workflows",
     }
 )
+_WARNED_LEGACY_RESOLUTIONS: set[str] = set()
 
 
 def normalize_vertical_name(vertical_name: str) -> str:
@@ -189,8 +191,34 @@ def import_module_with_fallback(module_path: str) -> Tuple[Optional[ModuleType],
     for candidate in module_import_candidates(module_path):
         try:
             module = importlib.import_module(candidate)
+            _warn_legacy_resolution(candidate)
             return module, candidate
         except Exception as exc:
             logger.debug("Failed importing module candidate '%s': %s", candidate, exc)
             continue
     return None, None
+
+
+def _warn_legacy_resolution(resolved_module_path: str) -> None:
+    """Emit a one-time warning when runtime falls back to legacy module paths."""
+
+    if resolved_module_path.startswith("victor_"):
+        return
+    if resolved_module_path not in _WARNED_LEGACY_RESOLUTIONS and (
+        resolved_module_path.startswith("victor.verticals.contrib.")
+        or resolved_module_path.startswith("victor.")
+    ):
+        if resolved_module_path.startswith("victor.verticals.contrib."):
+            message = (
+                "Resolved vertical module via deprecated contrib fallback "
+                f"'{resolved_module_path}'. Migrate to the extracted 'victor_<vertical>' package."
+            )
+        else:
+            message = (
+                "Resolved vertical module via deprecated legacy package path "
+                f"'{resolved_module_path}'. Migrate to the extracted 'victor_<vertical>' package."
+            )
+
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        logger.warning(message)
+        _WARNED_LEGACY_RESOLUTIONS.add(resolved_module_path)

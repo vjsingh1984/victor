@@ -624,3 +624,38 @@ class TestVerticalIntegrationWithProtocols:
 
         assert ext.rl_config_provider is not None
         assert ext.team_spec_provider is not None
+
+
+def test_provider_protocol_docstrings_are_package_neutral():
+    """Public provider protocol docs should not hardcode extracted package names."""
+    import victor.core.verticals.protocols.providers as provider_protocols
+
+    banned_snippets = (
+        "victor_coding",
+        "victor_research",
+        "victor_devops",
+        "victor_dataanalysis",
+        "victor_rag",
+        "try:\n    try:",
+    )
+
+    provider_names = (
+        "MiddlewareProvider",
+        "SafetyProvider",
+        "WorkflowProvider",
+        "TeamProvider",
+        "RLProvider",
+        "EnrichmentProvider",
+        "ToolProvider",
+        "HandlerProvider",
+        "CapabilityProvider",
+        "ModeConfigProvider",
+        "PromptContributorProvider",
+        "ToolDependencyProvider",
+        "TieredToolConfigProvider",
+        "ServiceProvider",
+    )
+
+    for provider_name in provider_names:
+        doc = getattr(provider_protocols, provider_name).__doc__ or ""
+        assert not any(snippet in doc for snippet in banned_snippets), provider_name

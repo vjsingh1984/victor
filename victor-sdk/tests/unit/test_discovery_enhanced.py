@@ -6,6 +6,7 @@ from victor_sdk.discovery import (
     ProtocolRegistry,
     ProtocolMetadata,
     DiscoveryStats,
+    collect_verticals_from_candidate,
     get_global_registry,
     reset_global_registry,
     discover_verticals,
@@ -13,6 +14,8 @@ from victor_sdk.discovery import (
     get_discovery_summary,
     reload_discovery,
 )
+from victor_sdk.core.plugins import VictorPlugin
+from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols import ToolProvider, SafetyProvider
 
 
@@ -146,6 +149,7 @@ class TestProtocolRegistryEnhanced:
 
     def test_get_validators(self):
         """get_validators returns all validators."""
+
         def validator1():
             pass
 
@@ -284,14 +288,19 @@ class TestProtocolRegistration:
             return provider_instance
 
         mock_eps = [
-            type("MockEP", (), {
-                "name": "mock-tools",
-                "load": mock_load,
-                "dist": type("MockDist", (), {"version": "1.0.0"}),
-            })(),
+            type(
+                "MockEP",
+                (),
+                {
+                    "name": "mock-tools",
+                    "load": mock_load,
+                    "dist": type("MockDist", (), {"version": "1.0.0"}),
+                },
+            )(),
         ]
 
         import importlib.metadata
+
         original_entry_points = importlib.metadata.entry_points
 
         def mock_entry_points(*args, **kwargs):
@@ -327,15 +336,20 @@ class TestProtocolRegistration:
             return provider_instance
 
         mock_eps = [
-            type("MockEP", (), {
-                "name": "mock-safety",
-                "load": mock_load,
-                "dist": type("MockDist", (), {"version": "1.0.0"}),
-                "value": "mock-package",
-            })(),
+            type(
+                "MockEP",
+                (),
+                {
+                    "name": "mock-safety",
+                    "load": mock_load,
+                    "dist": type("MockDist", (), {"version": "1.0.0"}),
+                    "value": "mock-package",
+                },
+            )(),
         ]
 
         import importlib.metadata
+
         original_entry_points = importlib.metadata.entry_points
 
         def mock_entry_points(*args, **kwargs):
@@ -355,6 +369,138 @@ class TestProtocolRegistration:
         assert metadata is not None
         assert metadata.name == "mock-safety"
         assert metadata.protocol_type == "protocol"
+
+    def test_plugin_entry_point_registers_sdk_verticals(self, monkeypatch):
+        """Plugin-based victor.plugins discovery should collect registered SDK verticals."""
+
+        class _Vertical(VerticalBase):
+            name = "plugin-registered"
+            description = "registered via plugin"
+
+            @classmethod
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return cls.description
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "plugin vertical"
+
+        class _Plugin(VictorPlugin):
+            @property
+            def name(self) -> str:
+                return "plugin-registered"
+
+            def register(self, context) -> None:
+                context.register_vertical(_Vertical)
+
+            def get_cli_app(self):
+                return None
+
+            def on_activate(self) -> None:
+                return None
+
+            def on_deactivate(self) -> None:
+                return None
+
+            async def on_activate_async(self) -> None:
+                return None
+
+            async def on_deactivate_async(self) -> None:
+                return None
+
+            def health_check(self) -> dict[str, object]:
+                return {"healthy": True}
+
+        mock_eps = [
+            type(
+                "MockEP",
+                (),
+                {
+                    "name": "plugin-registered",
+                    "load": lambda self=None: _Plugin(),
+                    "dist": type("MockDist", (), {"version": "1.0.0"}),
+                    "value": "victor_plugin:plugin",
+                },
+            )(),
+        ]
+
+        import importlib.metadata
+
+        original_entry_points = importlib.metadata.entry_points
+
+        def mock_entry_points(*args, **kwargs):
+            if kwargs.get("group") == "victor.plugins":
+                return mock_eps
+            return original_entry_points(*args, **kwargs)
+
+        monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
+
+        registry = ProtocolRegistry()
+        stats = registry.load_from_entry_points(reload=True)
+
+        assert stats.total_verticals >= 1
+        assert registry.get_vertical("plugin-registered") is _Vertical
+
+    def test_collect_verticals_from_candidate_supports_plugin_class(self):
+        """The shared helper should extract verticals from plugin classes too."""
+
+        class _Vertical(VerticalBase):
+            name = "helper-registered"
+            description = "registered via shared helper"
+
+            @classmethod
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return cls.description
+
+            @classmethod
+            def get_tools(cls) -> list[str]:
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "helper vertical"
+
+        class _Plugin(VictorPlugin):
+            @property
+            def name(self) -> str:
+                return "helper-registered"
+
+            def register(self, context) -> None:
+                context.register_vertical(_Vertical)
+
+            def get_cli_app(self):
+                return None
+
+            def on_activate(self) -> None:
+                return None
+
+            def on_deactivate(self) -> None:
+                return None
+
+            async def on_activate_async(self) -> None:
+                return None
+
+            async def on_deactivate_async(self) -> None:
+                return None
+
+            def health_check(self) -> dict[str, object]:
+                return {"healthy": True}
+
+        discovered = collect_verticals_from_candidate(_Plugin)
+
+        assert discovered == {"helper-registered": _Vertical}
 
 
 class TestErrorHandling:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from victor_sdk.cli import main
+from victor_sdk.core.plugins import VictorPlugin
 from victor_sdk.validation import validate_vertical_package
 from victor_sdk.verticals.manifest import ExtensionManifest
 from victor_sdk.verticals.protocols.base import VerticalBase
@@ -76,6 +77,33 @@ class _TooNewVertical(VerticalBase):
         return "too new prompt"
 
 
+class _PluginWrappingValidVertical(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "valid-plugin"
+
+    def register(self, context) -> None:
+        context.register_vertical(_ValidVertical)
+
+    def get_cli_app(self):
+        return None
+
+    def on_activate(self) -> None:
+        return None
+
+    def on_deactivate(self) -> None:
+        return None
+
+    async def on_activate_async(self) -> None:
+        return None
+
+    async def on_deactivate_async(self) -> None:
+        return None
+
+    def health_check(self) -> dict[str, object]:
+        return {"healthy": True}
+
+
 def _patch_distribution(monkeypatch, entry_points):
     fake_dist = SimpleNamespace(entry_points=entry_points, metadata={"Name": "victor-fake"})
     monkeypatch.setattr(
@@ -110,6 +138,18 @@ def test_validate_vertical_package_reports_framework_version_skew(monkeypatch):
 
     assert report.ok is False
     assert any(issue.code == "framework_version_incompatible" for issue in report.issues)
+
+
+def test_validate_vertical_package_accepts_valid_plugin_entry_point(monkeypatch):
+    """Validator should share plugin parsing semantics with SDK discovery."""
+
+    _patch_distribution(monkeypatch, [_FakeEntryPoint("valid", _PluginWrappingValidVertical)])
+
+    report = validate_vertical_package("victor-fake")
+
+    assert report.ok is True
+    assert report.verticals == ["valid_vertical"]
+    assert report.issues == []
 
 
 def test_cli_returns_nonzero_for_invalid_package(monkeypatch, capsys):

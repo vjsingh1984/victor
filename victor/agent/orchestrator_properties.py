@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from victor.agent.usage_analytics import UsageAnalytics
     from victor.agent.tool_sequence_tracker import ToolSequenceTracker
     from victor.agent.streaming.handler import StreamingChatHandler
-    from victor.verticals.vertical_context import VerticalContext
+    from victor.agent.vertical_context import VerticalContext
     from victor.agent.recovery import RecoveryHandler
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.session_state_manager import SessionStateManager

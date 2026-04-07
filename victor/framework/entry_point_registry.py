@@ -72,7 +72,7 @@ class EntryPointGroup:
     """Entry points for a single group.
 
     Attributes:
-        group_name: The entry point group name (e.g., "victor.verticals")
+        group_name: The entry point group name (e.g., "victor.plugins")
         entry_points: Dict mapping entry point names to (entry_point, loaded) tuples
         scan_order: Order in which this group was scanned (for determinism)
     """
@@ -115,13 +115,13 @@ class UnifiedEntryPointRegistry:
         registry.scan_all()
 
         # Get entry points for a group
-        group = registry.get_group("victor.verticals")
+        group = registry.get_group("victor.plugins")
         if group:
             eps = group.entry_points
             # Access entry points...
 
         # Load specific entry point
-        ep = registry.get("victor.verticals", "coding")
+        ep = registry.get("victor.plugins", "coding")
     """
 
     _instance: Optional["UnifiedEntryPointRegistry"] = None
@@ -232,7 +232,7 @@ class UnifiedEntryPointRegistry:
         """Get entry points for a specific group (lazy scan).
 
         Args:
-            group_name: Entry point group name (e.g., "victor.verticals")
+            group_name: Entry point group name (e.g., "victor.plugins")
 
         Returns:
             EntryPointGroup if found, None otherwise

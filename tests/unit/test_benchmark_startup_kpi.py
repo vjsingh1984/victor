@@ -182,6 +182,40 @@ def test_measure_discovery_probe_returns_summary(monkeypatch):
     assert probe["discovered_vertical_names"] == ["coding", "research"]
 
 
+def test_measure_discovery_probe_targets_canonical_plugin_cache_group(monkeypatch):
+    module = _load_benchmark_module()
+    captured: dict[str, object] = {}
+
+    def _fake_run_snippet(**kwargs):
+        captured.update(kwargs)
+        return {
+            "cold_ms": 18.0,
+            "warm_ms": [1.0],
+            "warm_mean_ms": 1.0,
+            "warm_p95_ms": 1.0,
+            "discovered_count": 0,
+            "discovered_vertical_names": [],
+            "call_total": 1,
+            "cache_hit_total": 0,
+            "scan_total": 1,
+            "last_discovery_ms": 18.0,
+            "entry_point_groups_cached": 1,
+            "entry_point_vertical_entries": 0,
+        }
+
+    monkeypatch.setattr(module, "_run_snippet", _fake_run_snippet)
+
+    module._measure_discovery_probe(
+        python_executable=sys.executable,
+        iterations=1,
+        timeout_seconds=30.0,
+    )
+
+    code = str(captured["code"])
+    assert '"victor.plugins"' in code
+    assert '"victor.verticals"' not in code
+
+
 def test_main_can_run_discovery_probe_without_agent_create(monkeypatch, capsys):
     module = _load_benchmark_module()
     monkeypatch.setattr(

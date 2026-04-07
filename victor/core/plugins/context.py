@@ -52,11 +52,36 @@ class HostPluginContext(PluginContext):
 
     def register_tool(self, tool_instance: Any) -> None:
         """Register a tool with the framework's ToolRegistry."""
-        from victor.tools.registry import ToolRegistry
-
         try:
-            registry = ToolRegistry()
-            registry.register_tool(tool_instance)
+            registry = None
+
+            if not self._container:
+                from victor.core.container import get_container
+
+                self._container = get_container()
+
+            if self._container is not None:
+                try:
+                    from victor.agent.protocols import ToolRegistryProtocol
+
+                    if hasattr(self._container, "get_optional"):
+                        registry = self._container.get_optional(ToolRegistryProtocol)
+                    elif hasattr(
+                        self._container, "is_registered"
+                    ) and self._container.is_registered(ToolRegistryProtocol):
+                        registry = self._container.get(ToolRegistryProtocol)
+                except Exception as e:
+                    logger.debug("Plugin failed to resolve live ToolRegistry from container: %s", e)
+
+            if registry is None:
+                from victor.tools.registry import ToolRegistry
+
+                registry = ToolRegistry()
+
+            if hasattr(registry, "register_tool"):
+                registry.register_tool(tool_instance)
+            else:
+                registry.register(tool_instance)
             logger.debug(f"Plugin registered tool: {getattr(tool_instance, 'name', tool_instance)}")
         except Exception as e:
             logger.error(f"Plugin failed to register tool: {e}")

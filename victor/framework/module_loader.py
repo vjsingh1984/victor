@@ -690,10 +690,10 @@ class EntryPointCache:
         cache = EntryPointCache()
 
         # Get entry points for a group (cached)
-        eps = cache.get_entry_points("victor.verticals")
+        eps = cache.get_entry_points("victor.plugins")
 
         # Force refresh if needed
-        eps = cache.get_entry_points("victor.verticals", force_refresh=True)
+        eps = cache.get_entry_points("victor.plugins", force_refresh=True)
 
         # Async version
         eps = await cache.get_entry_points_async("victor.tools")
@@ -926,7 +926,7 @@ class EntryPointCache:
         """Get entry points for a group (cached).
 
         Args:
-            group: Entry point group name (e.g., "victor.verticals")
+            group: Entry point group name (e.g., "victor.plugins")
             force_refresh: Force refresh from metadata (bypass cache)
 
         Returns:

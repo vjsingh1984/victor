@@ -5,6 +5,7 @@ import logging
 from typing import List
 
 from victor.core import tool_dependency_loader
+from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
 from victor.core.verticals.vertical_loader import VerticalLoader
 from victor.framework import entry_point_loader
@@ -92,15 +93,15 @@ def test_loader_accepts_vertical_with_supported_api_version(monkeypatch):
     monkeypatch.setattr(loader, "_load_entry_point", lambda *_: current_vertical)
     loader._load_vertical_entries({"current_plugin": "fake.module:CurrentVertical"})
 
-    assert "current_plugin" in loader._discovered_verticals
-    assert loader._discovered_verticals["current_plugin"] is current_vertical
+    assert vertical_name in loader._discovered_verticals
+    assert loader._discovered_verticals[vertical_name] is current_vertical
     assert VerticalRegistry.get(vertical_name) is current_vertical
 
     VerticalRegistry.unregister(vertical_name)
 
 
 def test_loader_passes_sdk_verticals_through_at_activation_time(monkeypatch):
-    """SDK entry-point verticals should be discovered and activated directly."""
+    """SDK entry-point verticals should be adapted at activation time."""
 
     loader = VerticalLoader()
     loader._discovered_verticals = {}
@@ -108,6 +109,24 @@ def test_loader_passes_sdk_verticals_through_at_activation_time(monkeypatch):
     loader._emit_observability_event_async = lambda *args, **kwargs: None
 
     vertical_name = "sdk_only_vertical"
+    sdk_vertical = _make_sdk_vertical(vertical_name, api_version=1)
+    VerticalRegistry.unregister(vertical_name)
+
+    activated = []
+    monkeypatch.setattr(loader, "_negotiate_manifest", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(loader, "_validate_dependencies", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(loader, "_activate", lambda vertical: activated.append(vertical))
+
+    VerticalRegistry.register(sdk_vertical)
+    resolved = loader.load(vertical_name)
+
+    expected = ensure_runtime_vertical(sdk_vertical)
+
+    assert resolved is expected
+    assert activated == [expected]
+    assert issubclass(resolved, VerticalBase)
+    assert VerticalRegistry.get(vertical_name) is sdk_vertical
+
     VerticalRegistry.unregister(vertical_name)
 
 
@@ -184,7 +203,7 @@ def test_loader_validation_does_not_invoke_runtime_prompt_or_tool_methods(monkey
 
     loader._load_vertical_entries({"runtime_sensitive": "fake.module:RuntimeSensitiveVertical"})
 
-    assert loader._discovered_verticals["runtime_sensitive"] is _RuntimeSensitiveVertical
+    assert loader._discovered_verticals[_RuntimeSensitiveVertical.name] is _RuntimeSensitiveVertical
     assert VerticalRegistry.get(_RuntimeSensitiveVertical.name) is _RuntimeSensitiveVertical
 
     VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
@@ -218,10 +237,24 @@ def test_loader_resolves_requested_entry_point_without_importing_all_verticals(m
 
     resolved = loader.resolve("requested_vertical")
 
-    assert resolved is requested
+    assert resolved is ensure_runtime_vertical(requested)
+    assert issubclass(resolved, VerticalBase)
     assert VerticalRegistry.get("requested_vertical") is requested
 
     VerticalRegistry.unregister("requested_vertical")
+
+
+def test_ensure_runtime_vertical_reuses_cached_adapter_for_sdk_vertical():
+    """SDK vertical adaptation should be idempotent and cache adapter classes."""
+
+    requested = _make_sdk_vertical("cached_sdk_vertical", api_version=1)
+
+    first = ensure_runtime_vertical(requested)
+    second = ensure_runtime_vertical(requested)
+
+    assert first is second
+    assert issubclass(first, VerticalBase)
+    assert first is not requested
 
 
 def test_discover_vertical_names_uses_entry_point_metadata_only(monkeypatch):

@@ -16,10 +16,12 @@
 
 from __future__ import annotations
 
+import warnings
 from types import ModuleType
 from unittest.mock import patch
 
 from victor.core.verticals.import_resolver import (
+    _WARNED_LEGACY_RESOLUTIONS,
     import_module_with_fallback,
     module_import_candidates,
     normalize_vertical_name,
@@ -105,6 +107,7 @@ def test_module_import_candidates_normalize_data_analysis_legacy_path() -> None:
 def test_import_module_with_fallback_returns_first_importable_candidate() -> None:
     """Importer should skip missing candidates and return the first importable one."""
     legacy_module = ModuleType("victor.research.escape_hatches")
+    _WARNED_LEGACY_RESOLUTIONS.clear()
 
     def _fake_import(module_name: str):
         if module_name == "victor_research.escape_hatches":
@@ -114,10 +117,71 @@ def test_import_module_with_fallback_returns_first_importable_candidate() -> Non
         raise ImportError("missing")
 
     with patch("importlib.import_module", side_effect=_fake_import):
-        module, resolved = import_module_with_fallback("victor.research.escape_hatches")
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter("always")
+            module, resolved = import_module_with_fallback("victor.research.escape_hatches")
 
     assert module is legacy_module
     assert resolved == "victor.research.escape_hatches"
+    assert len(recorded) == 1
+    assert "deprecated legacy package path" in str(recorded[0].message)
+
+
+def test_import_module_with_fallback_warns_for_contrib_resolution() -> None:
+    """Importer should warn when the contrib fallback is the resolved module."""
+    contrib_module = ModuleType("victor.verticals.contrib.research.escape_hatches")
+    _WARNED_LEGACY_RESOLUTIONS.clear()
+
+    def _fake_import(module_name: str):
+        if module_name == "victor.verticals.contrib.research.escape_hatches":
+            return contrib_module
+        raise ImportError("missing")
+
+    with patch("importlib.import_module", side_effect=_fake_import):
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter("always")
+            module, resolved = import_module_with_fallback("victor.research.escape_hatches")
+
+    assert module is contrib_module
+    assert resolved == "victor.verticals.contrib.research.escape_hatches"
+    assert len(recorded) == 1
+    assert "deprecated contrib fallback" in str(recorded[0].message)
+
+
+def test_import_module_with_fallback_does_not_warn_for_external_resolution() -> None:
+    """Canonical external package resolution should stay warning-free."""
+    external_module = ModuleType("victor_research.escape_hatches")
+    _WARNED_LEGACY_RESOLUTIONS.clear()
+
+    with patch("importlib.import_module", return_value=external_module):
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter("always")
+            module, resolved = import_module_with_fallback("victor.research.escape_hatches")
+
+    assert module is external_module
+    assert resolved == "victor_research.escape_hatches"
+    assert not recorded
+
+
+def test_import_module_with_fallback_warns_once_per_resolved_legacy_module() -> None:
+    """Repeated legacy resolution should not spam deprecation warnings."""
+    legacy_module = ModuleType("victor.research.escape_hatches")
+    _WARNED_LEGACY_RESOLUTIONS.clear()
+
+    def _fake_import(module_name: str):
+        if module_name == "victor_research.escape_hatches":
+            raise ImportError("external package missing")
+        if module_name == "victor.research.escape_hatches":
+            return legacy_module
+        raise ImportError("missing")
+
+    with patch("importlib.import_module", side_effect=_fake_import):
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter("always")
+            import_module_with_fallback("victor.research.escape_hatches")
+            import_module_with_fallback("victor.research.escape_hatches")
+
+    assert len(recorded) == 1
 
 
 def test_import_module_with_fallback_returns_none_when_all_candidates_fail() -> None:

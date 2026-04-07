@@ -59,6 +59,13 @@ from victor_sdk.core.types import (
     validate_definition_version,
     normalize_workflow_metadata,
 )
+from victor_sdk.capabilities import (
+    FileOperation,
+    FileOperationsCapability,
+    FileOperationType,
+    PromptContribution,
+    PromptContributionCapability,
+)
 from victor_sdk.core.plugins import PluginContext, VictorPlugin
 
 # Core exceptions
@@ -70,6 +77,7 @@ from victor_sdk.core.exceptions import (
 
 # Vertical protocols
 from victor_sdk.verticals import (
+    ExtensionDependency,
     MiddlewarePriority,
     MiddlewareResult,
     SafetyPattern,
@@ -105,6 +113,7 @@ from victor_sdk.discovery import (
     ProtocolRegistry,
     ProtocolMetadata,
     DiscoveryStats,
+    collect_verticals_from_candidate,
     get_global_registry,
     reset_global_registry,
     discover_verticals,
@@ -181,6 +190,11 @@ __all__ = [
     "validate_definition_version",
     "normalize_workflow_metadata",
     # Plugins
+    "FileOperation",
+    "FileOperationsCapability",
+    "FileOperationType",
+    "PromptContribution",
+    "PromptContributionCapability",
     "PluginContext",
     "VictorPlugin",
     # Exceptions
@@ -190,6 +204,7 @@ __all__ = [
     # Base class
     "VerticalBase",
     "register_vertical",
+    "ExtensionDependency",
     # Capability protocols
     "CapabilityProvider",
     "ChainProvider",
@@ -210,6 +225,7 @@ __all__ = [
     "ProtocolRegistry",
     "ProtocolMetadata",
     "DiscoveryStats",
+    "collect_verticals_from_candidate",
     "get_global_registry",
     "reset_global_registry",
     "discover_verticals",

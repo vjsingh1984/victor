@@ -66,6 +66,18 @@ STALE_VERTICAL_CONTRACT_PATTERNS = {
         "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
         " not victor.framework.vertical_base"
     ),
+    "from victor.framework.extensions import VerticalBase": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        " not victor.framework.extensions.VerticalBase"
+    ),
+    "from victor.framework.extensions import StageDefinition": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition,"
+        " not victor.framework.extensions.StageDefinition"
+    ),
+    "from victor.framework.extensions import VerticalConfig": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig,"
+        " not victor.framework.extensions.VerticalConfig"
+    ),
     "from victor.core.verticals.registration import register_vertical": (
         "primary vertical contract docs/examples must import register_vertical from victor_sdk,"
         " not victor.core.verticals.registration"

@@ -92,8 +92,7 @@ def _measure_import_victor(
     iterations: int,
     timeout_seconds: float,
 ) -> _TimingSummary:
-    code = textwrap.dedent(
-        f"""
+    code = textwrap.dedent(f"""
         import importlib
         import json
         import time
@@ -110,8 +109,7 @@ def _measure_import_victor(
             warm.append((time.perf_counter() - t) * 1000.0)
 
         print(json.dumps({{"cold_ms": cold_ms, "warm_ms": warm}}))
-        """
-    )
+        """)
     payload = _run_snippet(
         python_executable=python_executable,
         code=code,
@@ -133,8 +131,7 @@ def _measure_agent_create(
 ) -> _TimingSummary:
     provider_literal = json.dumps(provider)
     model_literal = json.dumps(model)
-    code = textwrap.dedent(
-        f"""
+    code = textwrap.dedent(f"""
         import asyncio
         import json
         import time
@@ -169,8 +166,7 @@ def _measure_agent_create(
             print(json.dumps({{"cold_ms": cold_ms, "warm_ms": warm}}))
 
         asyncio.run(run())
-        """
-    )
+        """)
     payload = _run_snippet(
         python_executable=python_executable,
         code=code,
@@ -195,8 +191,7 @@ def _measure_activation_probe(
     provider_literal = json.dumps(provider)
     vertical_literal = json.dumps(vertical)
     model_literal = json.dumps(model)
-    code = textwrap.dedent(
-        f"""
+    code = textwrap.dedent(f"""
         import asyncio
         import json
         import time
@@ -351,8 +346,7 @@ def _measure_activation_probe(
             }}))
 
         asyncio.run(run())
-        """
-    )
+        """)
     payload = _run_snippet(
         python_executable=python_executable,
         code=code,
@@ -368,8 +362,7 @@ def _measure_discovery_probe(
     timeout_seconds: float,
 ) -> Dict[str, Any]:
     """Measure cold/warm vertical discovery behavior and cache usage."""
-    code = textwrap.dedent(
-        f"""
+    code = textwrap.dedent(f"""
         import json
         import time
 
@@ -397,7 +390,7 @@ def _measure_discovery_probe(
         initial_vertical_stats = initial_loader_stats.get("vertical", {{}})
         entry_point_cache_stats = entry_point_cache.get_cache_stats()
         cached_vertical_group = entry_point_cache_stats.get("groups", {{}}).get(
-            "victor.verticals",
+            "victor.plugins",
             {{}},
         )
 
@@ -431,8 +424,7 @@ def _measure_discovery_probe(
             "entry_point_groups_cached": int(entry_point_cache_stats.get("groups_cached", 0) or 0),
             "entry_point_vertical_entries": int(cached_vertical_group.get("entries", 0) or 0),
         }}))
-        """
-    )
+        """)
     payload = _run_snippet(
         python_executable=python_executable,
         code=code,
@@ -495,21 +487,27 @@ def _collect_thresholds(args: argparse.Namespace) -> Dict[str, float]:
     """Collect threshold values from CLI args."""
     thresholds: Dict[str, float] = {}
 
-    if hasattr(args, 'max_import_cold_ms') and args.max_import_cold_ms is not None:
+    if hasattr(args, "max_import_cold_ms") and args.max_import_cold_ms is not None:
         thresholds["import_victor.cold_ms"] = args.max_import_cold_ms
-    if hasattr(args, 'max_import_warm_mean_ms') and args.max_import_warm_mean_ms is not None:
+    if hasattr(args, "max_import_warm_mean_ms") and args.max_import_warm_mean_ms is not None:
         thresholds["import_victor.warm_mean_ms"] = args.max_import_warm_mean_ms
-    if hasattr(args, 'max_agent_create_cold_ms') and args.max_agent_create_cold_ms is not None:
+    if hasattr(args, "max_agent_create_cold_ms") and args.max_agent_create_cold_ms is not None:
         thresholds["agent_create.cold_ms"] = args.max_agent_create_cold_ms
-    if hasattr(args, 'max_agent_create_warm_mean_ms') and args.max_agent_create_warm_mean_ms is not None:
+    if (
+        hasattr(args, "max_agent_create_warm_mean_ms")
+        and args.max_agent_create_warm_mean_ms is not None
+    ):
         thresholds["agent_create.warm_mean_ms"] = args.max_agent_create_warm_mean_ms
-    if hasattr(args, 'max_activation_cold_ms') and args.max_activation_cold_ms is not None:
+    if hasattr(args, "max_activation_cold_ms") and args.max_activation_cold_ms is not None:
         thresholds["activation_probe.cold_ms"] = args.max_activation_cold_ms
-    if hasattr(args, 'max_activation_warm_mean_ms') and args.max_activation_warm_mean_ms is not None:
+    if (
+        hasattr(args, "max_activation_warm_mean_ms")
+        and args.max_activation_warm_mean_ms is not None
+    ):
         thresholds["activation_probe.warm_mean_ms"] = args.max_activation_warm_mean_ms
-    if hasattr(args, 'max_discovery_cold_ms') and args.max_discovery_cold_ms is not None:
+    if hasattr(args, "max_discovery_cold_ms") and args.max_discovery_cold_ms is not None:
         thresholds["discovery_probe.cold_ms"] = args.max_discovery_cold_ms
-    if hasattr(args, 'max_discovery_warm_mean_ms') and args.max_discovery_warm_mean_ms is not None:
+    if hasattr(args, "max_discovery_warm_mean_ms") and args.max_discovery_warm_mean_ms is not None:
         thresholds["discovery_probe.warm_mean_ms"] = args.max_discovery_warm_mean_ms
 
     return thresholds
@@ -534,13 +532,26 @@ def _collect_minimums(args: argparse.Namespace) -> Dict[str, float]:
     """Collect minimum value requirements from CLI args."""
     minimums: Dict[str, float] = {}
 
-    if hasattr(args, 'min_framework_registry_attempted_total') and args.min_framework_registry_attempted_total is not None:
-        minimums["activation_probe.framework_registry_attempted_total"] = args.min_framework_registry_attempted_total
-    if hasattr(args, 'min_framework_registry_applied_total') and args.min_framework_registry_applied_total is not None:
-        minimums["activation_probe.framework_registry_applied_total"] = args.min_framework_registry_applied_total
-    if hasattr(args, 'min_discovery_vertical_count') and args.min_discovery_vertical_count is not None:
+    if (
+        hasattr(args, "min_framework_registry_attempted_total")
+        and args.min_framework_registry_attempted_total is not None
+    ):
+        minimums["activation_probe.framework_registry_attempted_total"] = (
+            args.min_framework_registry_attempted_total
+        )
+    if (
+        hasattr(args, "min_framework_registry_applied_total")
+        and args.min_framework_registry_applied_total is not None
+    ):
+        minimums["activation_probe.framework_registry_applied_total"] = (
+            args.min_framework_registry_applied_total
+        )
+    if (
+        hasattr(args, "min_discovery_vertical_count")
+        and args.min_discovery_vertical_count is not None
+    ):
         minimums["discovery_probe.discovered_count"] = args.min_discovery_vertical_count
-    if hasattr(args, 'min_discovery_cache_hits') and args.min_discovery_cache_hits is not None:
+    if hasattr(args, "min_discovery_cache_hits") and args.min_discovery_cache_hits is not None:
         minimums["discovery_probe.cache_hit_total"] = args.min_discovery_cache_hits
 
     return minimums
@@ -565,21 +576,35 @@ def _collect_flag_expectations(args: argparse.Namespace) -> Dict[str, bool]:
     """Collect runtime flag expectations from CLI args."""
     expectations: Dict[str, bool] = {}
 
-    if hasattr(args, 'require_generic_result_cache_enabled') and args.require_generic_result_cache_enabled:
+    if (
+        hasattr(args, "require_generic_result_cache_enabled")
+        and args.require_generic_result_cache_enabled
+    ):
         expectations["activation_probe.runtime_flags.generic_result_cache_enabled"] = True
-    if hasattr(args, 'require_http_connection_pool_enabled') and args.require_http_connection_pool_enabled:
+    if (
+        hasattr(args, "require_http_connection_pool_enabled")
+        and args.require_http_connection_pool_enabled
+    ):
         expectations["activation_probe.runtime_flags.http_connection_pool_enabled"] = True
-    if hasattr(args, 'require_framework_preload_enabled') and args.require_framework_preload_enabled:
+    if (
+        hasattr(args, "require_framework_preload_enabled")
+        and args.require_framework_preload_enabled
+    ):
         expectations["activation_probe.runtime_flags.framework_preload_enabled"] = True
-    if hasattr(args, 'require_coordination_runtime_lazy') and args.require_coordination_runtime_lazy:
+    if (
+        hasattr(args, "require_coordination_runtime_lazy")
+        and args.require_coordination_runtime_lazy
+    ):
         expectations["activation_probe.runtime_flags.coordination_runtime_lazy"] = True
-    if hasattr(args, 'require_interaction_runtime_lazy') and args.require_interaction_runtime_lazy:
+    if hasattr(args, "require_interaction_runtime_lazy") and args.require_interaction_runtime_lazy:
         expectations["activation_probe.runtime_flags.interaction_runtime_lazy"] = True
 
     return expectations
 
 
-def _evaluate_flag_expectation_failures(report: Dict[str, Any], expectations: Dict[str, bool]) -> List[str]:
+def _evaluate_flag_expectation_failures(
+    report: Dict[str, Any], expectations: Dict[str, bool]
+) -> List[str]:
     """Evaluate report against flag expectations and return list of failure messages."""
     failures: List[str] = []
 
@@ -811,7 +836,9 @@ def main() -> int:
 
     # Collect and evaluate flag expectations
     flag_expectations = _collect_flag_expectations(args)
-    flag_failures = _evaluate_flag_expectation_failures(report, flag_expectations) if flag_expectations else []
+    flag_failures = (
+        _evaluate_flag_expectation_failures(report, flag_expectations) if flag_expectations else []
+    )
 
     # Combine all failures
     all_failures = threshold_failures + minimum_failures + flag_failures

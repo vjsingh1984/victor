@@ -57,14 +57,14 @@ class TestUnifiedEntryPointRegistry:
         """Test single-pass scanning with mocked entry points."""
         # Mock entry points
         mock_ep1 = MagicMock()
-        mock_ep1.group = "victor.verticals"
+        mock_ep1.group = "victor.plugins"
         mock_ep1.name = "coding"
-        mock_ep1.value = "victor.verticals.coding:CodingAssistant"
+        mock_ep1.value = "victor_coding.plugin:plugin"
 
         mock_ep2 = MagicMock()
-        mock_ep2.group = "victor.verticals"
+        mock_ep2.group = "victor.plugins"
         mock_ep2.name = "devops"
-        mock_ep2.value = "victor.verticals.devops:DevOpsAssistant"
+        mock_ep2.value = "victor_devops.plugin:plugin"
 
         mock_ep3 = MagicMock()
         mock_ep3.group = "victor.capabilities"
@@ -78,7 +78,7 @@ class TestUnifiedEntryPointRegistry:
             metrics = registry.scan_all()
 
             # Verify metrics
-            assert metrics.total_groups == 2  # victor.verticals and victor.capabilities
+            assert metrics.total_groups == 2  # victor.plugins and victor.capabilities
             assert metrics.total_entry_points == 3
             assert metrics.scan_duration_ms >= 0
 
@@ -97,7 +97,7 @@ class TestUnifiedEntryPointRegistry:
     def test_scan_all_idempotent(self):
         """Test that multiple scans produce same result."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -118,7 +118,7 @@ class TestUnifiedEntryPointRegistry:
     def test_scan_all_force_rescan(self):
         """Test forced rescan clears previous data."""
         mock_ep1 = MagicMock()
-        mock_ep1.group = "victor.verticals"
+        mock_ep1.group = "victor.plugins"
         mock_ep1.name = "test1"
         mock_ep1.value = "test1:Test1"
 
@@ -131,7 +131,7 @@ class TestUnifiedEntryPointRegistry:
 
             # Add another mock entry point
             mock_ep2 = MagicMock()
-            mock_ep2.group = "victor.verticals"
+            mock_ep2.group = "victor.plugins"
             mock_ep2.name = "test2"
             mock_ep2.value = "test2:Test2"
             mock_eps.return_value = [mock_ep1, mock_ep2]
@@ -143,9 +143,9 @@ class TestUnifiedEntryPointRegistry:
     def test_get_group(self):
         """Test getting entry points for a specific group."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "coding"
-        mock_ep.value = "victor.verticals.coding:CodingAssistant"
+        mock_ep.value = "victor_coding.plugin:plugin"
 
         with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
             mock_eps.return_value = [mock_ep]
@@ -153,9 +153,9 @@ class TestUnifiedEntryPointRegistry:
             registry = UnifiedEntryPointRegistry.get_instance()
             registry.scan_all()
 
-            group = registry.get_group("victor.verticals")
+            group = registry.get_group("victor.plugins")
             assert group is not None
-            assert group.group_name == "victor.verticals"
+            assert group.group_name == "victor.plugins"
             assert "coding" in group.entry_points
             assert len(group.entry_points) == 1
 
@@ -172,7 +172,7 @@ class TestUnifiedEntryPointRegistry:
     def test_get_group_triggers_lazy_scan(self):
         """Test that get_group triggers lazy scan if not scanned."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -182,7 +182,7 @@ class TestUnifiedEntryPointRegistry:
             registry = UnifiedEntryPointRegistry.get_instance()
 
             # Don't call scan_all() - get_group should trigger it
-            group = registry.get_group("victor.verticals")
+            group = registry.get_group("victor.plugins")
 
             assert group is not None
             assert "test" in group.entry_points
@@ -190,9 +190,9 @@ class TestUnifiedEntryPointRegistry:
     def test_get_entry_point(self):
         """Test getting a specific entry point."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "coding"
-        mock_ep.value = "victor.verticals.coding:CodingAssistant"
+        mock_ep.value = "victor_coding.plugin:plugin"
         mock_ep.load.return_value = "loaded_value"
 
         with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
@@ -202,16 +202,16 @@ class TestUnifiedEntryPointRegistry:
             registry.scan_all()
 
             # Get entry point (should load it)
-            result = registry.get("victor.verticals", "coding")
+            result = registry.get("victor.plugins", "coding")
             assert result == "loaded_value"
             mock_ep.load.assert_called_once()
 
     def test_get_entry_point_caches_loaded_value(self):
         """Test that loaded entry points are cached."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "coding"
-        mock_ep.value = "victor.verticals.coding:CodingAssistant"
+        mock_ep.value = "victor_coding.plugin:plugin"
         mock_ep.load.return_value = "loaded_value"
 
         with patch("victor.framework.entry_point_registry.entry_points") as mock_eps:
@@ -221,8 +221,8 @@ class TestUnifiedEntryPointRegistry:
             registry.scan_all()
 
             # Get entry point twice
-            result1 = registry.get("victor.verticals", "coding")
-            result2 = registry.get("victor.verticals", "coding")
+            result1 = registry.get("victor.plugins", "coding")
+            result2 = registry.get("victor.plugins", "coding")
 
             assert result1 == result2
             # Should only load once
@@ -241,7 +241,7 @@ class TestUnifiedEntryPointRegistry:
     def test_get_entry_point_load_failure(self):
         """Test that load failure is handled gracefully."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "broken"
         mock_ep.value = "broken:Broken"
         mock_ep.load.side_effect = Exception("Load failed")
@@ -253,13 +253,13 @@ class TestUnifiedEntryPointRegistry:
             registry.scan_all()
 
             # Should return None on load failure
-            result = registry.get("victor.verticals", "broken")
+            result = registry.get("victor.plugins", "broken")
             assert result is None
 
     def test_list_groups(self):
         """Test listing all discovered groups."""
         mock_ep1 = MagicMock()
-        mock_ep1.group = "victor.verticals"
+        mock_ep1.group = "victor.plugins"
         mock_ep1.name = "coding"
         mock_ep1.value = "test:Test"
 
@@ -275,19 +275,19 @@ class TestUnifiedEntryPointRegistry:
             registry.scan_all()
 
             groups = registry.list_groups()
-            assert "victor.verticals" in groups
+            assert "victor.plugins" in groups
             assert "victor.capabilities" in groups
             assert len(groups) == 2
 
     def test_list_entry_points(self):
         """Test listing entry points in a group."""
         mock_ep1 = MagicMock()
-        mock_ep1.group = "victor.verticals"
+        mock_ep1.group = "victor.plugins"
         mock_ep1.name = "coding"
         mock_ep1.value = "test:Coding"
 
         mock_ep2 = MagicMock()
-        mock_ep2.group = "victor.verticals"
+        mock_ep2.group = "victor.plugins"
         mock_ep2.name = "devops"
         mock_ep2.value = "test:DevOps"
 
@@ -297,7 +297,7 @@ class TestUnifiedEntryPointRegistry:
             registry = UnifiedEntryPointRegistry.get_instance()
             registry.scan_all()
 
-            entry_points = registry.list_entry_points("victor.verticals")
+            entry_points = registry.list_entry_points("victor.plugins")
             assert "coding" in entry_points
             assert "devops" in entry_points
             assert len(entry_points) == 2
@@ -315,7 +315,7 @@ class TestUnifiedEntryPointRegistry:
     def test_invalidate(self):
         """Test cache invalidation."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -325,7 +325,7 @@ class TestUnifiedEntryPointRegistry:
             registry = UnifiedEntryPointRegistry.get_instance()
             registry.scan_all()
 
-            assert registry.list_groups() == ["victor.verticals"]
+            assert registry.list_groups() == ["victor.plugins"]
             assert registry._scanned is True
 
             # Invalidate - clears cache and marks as not scanned
@@ -347,7 +347,7 @@ class TestUnifiedEntryPointRegistry:
     def test_cache_hit_tracking(self):
         """Test that cache hits are tracked."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
         mock_ep.load.return_value = "loaded"
@@ -359,11 +359,11 @@ class TestUnifiedEntryPointRegistry:
             registry.scan_all()
 
             # First access - cache miss
-            registry.get_group("victor.verticals")
+            registry.get_group("victor.plugins")
             initial_misses = registry.get_metrics().cache_misses
 
             # Second access - cache hit
-            registry.get_group("victor.verticals")
+            registry.get_group("victor.plugins")
 
             assert registry.get_metrics().cache_misses == initial_misses
 
@@ -389,7 +389,7 @@ class TestConvenienceFunctions:
     def test_scan_all_entry_points(self):
         """Test scan_all_entry_points convenience function."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -403,7 +403,7 @@ class TestConvenienceFunctions:
     def test_scan_all_entry_points_with_force(self):
         """Test scan_all_entry_points with force parameter."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -421,7 +421,7 @@ class TestConvenienceFunctions:
     def test_get_entry_point_convenience(self):
         """Test get_entry_point convenience function."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "coding"
         mock_ep.value = "test:Coding"
         mock_ep.load.return_value = "loaded_value"
@@ -433,13 +433,13 @@ class TestConvenienceFunctions:
             scan_all_entry_points()
 
             # Get entry point
-            result = get_entry_point("victor.verticals", "coding")
+            result = get_entry_point("victor.plugins", "coding")
             assert result == "loaded_value"
 
     def test_get_entry_point_group_convenience(self):
         """Test get_entry_point_group convenience function."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -450,9 +450,9 @@ class TestConvenienceFunctions:
             scan_all_entry_points()
 
             # Get group
-            group = get_entry_point_group("victor.verticals")
+            group = get_entry_point_group("victor.plugins")
             assert group is not None
-            assert group.group_name == "victor.verticals"
+            assert group.group_name == "victor.plugins"
 
 
 class TestPerformanceBenchmarks:
@@ -474,7 +474,7 @@ class TestPerformanceBenchmarks:
         mock_eps = []
         for i in range(50):
             mock_ep = MagicMock()
-            mock_ep.group = "victor.verticals"
+            mock_ep.group = "victor.plugins"
             mock_ep.name = f"vertical_{i}"
             mock_ep.value = f"test:Vertical{i}"
             mock_eps.append(mock_ep)
@@ -496,7 +496,7 @@ class TestPerformanceBenchmarks:
     def test_lazy_scan_performance(self):
         """Test that lazy scan on first access is fast."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -506,7 +506,7 @@ class TestPerformanceBenchmarks:
             registry = UnifiedEntryPointRegistry.get_instance()
 
             start = time.perf_counter()
-            group = registry.get_group("victor.verticals")
+            group = registry.get_group("victor.plugins")
             duration_ms = (time.perf_counter() - start) * 1000
 
             # Lazy scan should trigger automatically
@@ -516,7 +516,7 @@ class TestPerformanceBenchmarks:
     def test_cache_hit_performance(self):
         """Test that cached access is very fast."""
         mock_ep = MagicMock()
-        mock_ep.group = "victor.verticals"
+        mock_ep.group = "victor.plugins"
         mock_ep.name = "test"
         mock_ep.value = "test:Test"
 
@@ -529,7 +529,7 @@ class TestPerformanceBenchmarks:
             # Time multiple cache hits
             start = time.perf_counter()
             for _ in range(100):
-                registry.get_group("victor.verticals")
+                registry.get_group("victor.plugins")
             duration_ms = (time.perf_counter() - start) * 1000
 
             # Should be very fast (less than 10ms for 100 cache hits)
@@ -546,12 +546,12 @@ class TestEntryPointGroup:
         mock_ep.value = "test:Test"
 
         group = EntryPointGroup(
-            group_name="victor.verticals",
+            group_name="victor.plugins",
             entry_points={"test": (mock_ep, False)},
             scan_order=0,
         )
 
-        assert group.group_name == "victor.verticals"
+        assert group.group_name == "victor.plugins"
         assert "test" in group.entry_points
         assert group.scan_order == 0
 

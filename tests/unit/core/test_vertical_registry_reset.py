@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from victor.core.verticals.base import VerticalRegistry
 
@@ -48,7 +48,13 @@ def test_reset_discovery_clears_loader_and_entry_point_caches() -> None:
 
     assert VerticalRegistry._external_discovered is False
     loader.reset_discovery_state.assert_called_once()
-    cache.invalidate.assert_called_once_with(VerticalRegistry.ENTRY_POINT_GROUP)
+    assert cache.invalidate.call_count == 2
+    cache.invalidate.assert_has_calls(
+        [
+            call(VerticalRegistry.ENTRY_POINT_GROUP),
+            call("victor.plugins"),
+        ]
+    )
     framework_cache_clear.assert_called_once()
     tool_dep_cache_clear.assert_called_once()
     provider_cache_clear.assert_called_once()
