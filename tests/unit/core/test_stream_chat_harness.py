@@ -5,6 +5,7 @@ import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.stream_handler import StreamChunk
+from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.config.settings import Settings, ProfileConfig
 
 # Singleton reset is handled globally in tests/conftest.py
@@ -100,7 +101,14 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
     settings.airgapped_mode = False
     settings.load_tool_config = lambda: {}
 
-    return AgentOrchestrator(settings=settings, provider=provider, model="fake")
+    orchestrator = AgentOrchestrator(settings=settings, provider=provider, model="fake")
+
+    def _detect_task_type(_: str) -> TrackerTaskType:
+        orchestrator.unified_tracker.set_task_type(TrackerTaskType.GENERAL)
+        return TrackerTaskType.GENERAL
+
+    orchestrator.unified_tracker.detect_task_type = _detect_task_type
+    return orchestrator
 
 
 # ---------------------------------------------------------------------------
