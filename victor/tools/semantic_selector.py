@@ -32,7 +32,6 @@ import httpx
 
 from victor.providers.base import ToolDefinition
 from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
-from victor.storage.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
@@ -53,11 +52,13 @@ if TYPE_CHECKING:
     import numpy as np
 
     from victor.agent.unified_classifier import ClassificationResult
+    from victor.storage.embeddings.service import EmbeddingService as EmbeddingServiceType
 
 logger = logging.getLogger(__name__)
 
 # Lazy numpy import — keeps ``import victor`` lightweight when numpy is absent.
 _np = None
+EmbeddingService = None  # type: ignore[assignment]
 
 
 def _ensure_numpy():  # type: ignore[no-untyped-def]
@@ -68,6 +69,17 @@ def _ensure_numpy():  # type: ignore[no-untyped-def]
 
         _np = numpy
     return _np
+
+
+def _get_embedding_service_class():
+    """Load EmbeddingService only when embedding execution is needed."""
+
+    global EmbeddingService
+    if EmbeddingService is None:
+        from victor.storage.embeddings.service import EmbeddingService as _EmbeddingService
+
+        EmbeddingService = _EmbeddingService
+    return EmbeddingService
 
 
 # Lazy hook initialization to avoid circular imports
@@ -1563,7 +1575,9 @@ class SemanticToolSelector:
         """
         try:
             # Use shared embedding service (singleton)
-            embedding_service = EmbeddingService.get_instance(model_name=self.embedding_model)
+            embedding_service = _get_embedding_service_class().get_instance(
+                model_name=self.embedding_model
+            )
             return await embedding_service.embed_text(text)
 
         except Exception as e:

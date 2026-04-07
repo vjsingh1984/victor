@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,9 +30,10 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 # Import TRACE level from debug_logger (initializes the level on import)
 from victor.agent.debug_logger import TRACE
@@ -45,6 +48,20 @@ from victor.agent.debug_logger import TRACE
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
+
+np = None  # type: ignore[assignment]
+
+
+def _ensure_numpy():
+    """Import numpy into module scope on first actual use."""
+
+    global np
+    if np is None:
+        import numpy
+
+        np = numpy
+    return np
+
 
 # Default embedding model - matches unified_embedding_model in settings.py
 # BAAI/bge-small-en-v1.5: 130MB, 384-dim, ~6ms, MTEB 62.2
@@ -313,6 +330,7 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array (float32)
         """
+        _ensure_numpy()
         # Check cache first
         if use_cache:
             cache_key = self._get_cache_key(text)
@@ -410,6 +428,7 @@ class EmbeddingService:
         Returns:
             2D numpy array of embeddings (shape: [len(texts), dimension])
         """
+        _ensure_numpy()
         if not texts:
             return np.empty((0, self.dimension), dtype=np.float32)
 
@@ -493,6 +512,7 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array (float32)
         """
+        _ensure_numpy()
         # Check shutdown flag before starting operation
         if self._shutdown:
             logger.log(
@@ -511,6 +531,7 @@ class EmbeddingService:
         Returns:
             2D numpy array of embeddings (shape: [len(texts), dimension])
         """
+        _ensure_numpy()
         # Check shutdown flag before starting operation
         if self._shutdown:
             logger.log(
@@ -536,6 +557,7 @@ class EmbeddingService:
             Similarity score (0-1 for normalized vectors, -1 to 1 in general)
         """
         # NumPy with BLAS is faster than Rust for vectorized operations
+        _ensure_numpy()
         dot_product = np.dot(a, b)
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)
@@ -563,6 +585,7 @@ class EmbeddingService:
         Returns:
             Similarity scores (shape: [n_items])
         """
+        _ensure_numpy()
         if corpus.size == 0:
             return np.array([])
 
