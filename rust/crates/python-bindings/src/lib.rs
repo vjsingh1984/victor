@@ -39,6 +39,8 @@
 //! - `ast_indexer`: Fast stdlib detection and identifier extraction (v0.4.0)
 //! - `arg_normalizer`: Fast JSON repair and type coercion (v0.4.0)
 //! - `graph_algo`: Graph algorithm accelerators for module-level analysis (WS-2)
+//! - `tokenizer`: BPE tokenizer for accurate and fast token counting
+//! - `context_fitter`: Context window fitting and message truncation
 
 use pyo3::prelude::*;
 
@@ -46,6 +48,7 @@ mod arg_normalizer;
 mod ast_indexer;
 mod chunking;
 mod classifier;
+mod context_fitter;
 mod dedup;
 mod embeddings;
 mod extractor;
@@ -58,6 +61,7 @@ mod secrets;
 mod similarity;
 mod streaming_filter;
 mod thinking;
+mod tokenizer;
 mod yaml_loader;
 
 /// Victor Native Extensions Module
@@ -85,6 +89,7 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
     m.add_function(wrap_pyfunction!(similarity::top_k_similar_normalized, m)?)?;
+    m.add_class::<similarity::EmbeddingIndex>()?;
 
     // JSON repair functions
     m.add_function(wrap_pyfunction!(json_repair::repair_json, m)?)?;
@@ -235,6 +240,16 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(graph_algo::betweenness_centrality, m)?)?;
     m.add_function(wrap_pyfunction!(graph_algo::connected_components, m)?)?;
     m.add_function(wrap_pyfunction!(graph_algo::detect_cycles, m)?)?;
+
+    // BPE tokenizer (token counting and encoding)
+    m.add_class::<tokenizer::BpeTokenizer>()?;
+    m.add_function(wrap_pyfunction!(tokenizer::count_tokens_fast, m)?)?;
+
+    // Context fitting and message truncation
+    m.add_class::<context_fitter::MessageSlot>()?;
+    m.add_class::<context_fitter::FitResult>()?;
+    m.add_function(wrap_pyfunction!(context_fitter::fit_context, m)?)?;
+    m.add_function(wrap_pyfunction!(context_fitter::truncate_message, m)?)?;
 
     Ok(())
 }

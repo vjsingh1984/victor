@@ -40,3 +40,4 @@ classifiers = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "victor_native"
+manifest-path = "crates/python-bindings/Cargo.toml"

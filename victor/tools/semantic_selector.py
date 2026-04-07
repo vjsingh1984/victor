@@ -191,6 +191,7 @@ class SemanticToolSelector:
 
         # In-memory cache: tool_name → embedding vector
         self._tool_embedding_cache: Dict[str, Any] = {}
+        self._embedding_index: Optional[Any] = None
 
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
@@ -260,6 +261,7 @@ class SemanticToolSelector:
 
         # Try to load from cache
         if self._load_from_cache(tools_hash):
+            self._build_embedding_index()
             logger.info(
                 f"Loaded tool embeddings from cache for {len(self._tool_embedding_cache)} tools"
             )
@@ -283,10 +285,44 @@ class SemanticToolSelector:
 
         # Save to disk
         self._save_to_cache(tools_hash)
+        self._build_embedding_index()
 
         logger.info(
             f"Tool embeddings computed and cached for {len(self._tool_embedding_cache)} tools"
         )
+
+    def _build_embedding_index(self) -> None:
+        """Build a native embedding index from cached tool embeddings."""
+        if not self._tool_embedding_cache:
+            self._embedding_index = None
+            return
+
+        try:
+            import victor_native
+
+            vectors = [embedding.tolist() for embedding in self._tool_embedding_cache.values()]
+            labels = list(self._tool_embedding_cache.keys())
+            self._embedding_index = victor_native.EmbeddingIndex(vectors, labels)
+        except Exception as exc:
+            self._embedding_index = None
+            logger.debug("Native EmbeddingIndex unavailable, using batch fallback: %s", exc)
+
+    def _query_embedding_index(
+        self, query_embedding: np.ndarray, k: int, threshold: float
+    ) -> Optional[Dict[str, float]]:
+        """Query the native embedding index if it is available."""
+        if self._embedding_index is None:
+            return None
+
+        try:
+            results = self._embedding_index.query(
+                query_embedding.tolist(), k=k, threshold=threshold
+            )
+        except Exception as exc:
+            logger.debug("Native EmbeddingIndex query failed, using batch fallback: %s", exc)
+            return None
+
+        return {name: float(score) for name, score in results}
 
     # Cache version - aligned with Victor version, increment on breaking cache format changes
     # Format: "{victor_version}.{cache_revision}" e.g., "0.2.0.1" for first revision of 0.2.0
@@ -1281,31 +1317,18 @@ class SemanticToolSelector:
         # Get embedding for enhanced query
         query_embedding = await self._get_embedding(enhanced_query)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
             if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1436,31 +1459,18 @@ class SemanticToolSelector:
         # Get embedding for user message
         query_embedding = await self._get_embedding(user_message)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
             if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1611,6 +1621,50 @@ class SemanticToolSelector:
             # Fallback to random embedding (better than crashing)
             np = _ensure_numpy()
             return np.random.randn(768).astype(np.float32)
+
+    async def _score_candidate_tools(
+        self, query_embedding: np.ndarray, candidate_tools: List[Any]
+    ) -> List[Tuple[Any, float]]:
+        """Compute similarity scores for candidate tools.
+
+        Prefers the native EmbeddingIndex when available and falls back to the
+        existing batch cosine-similarity path otherwise.
+        """
+        if not candidate_tools:
+            return []
+
+        index_scores = self._query_embedding_index(
+            query_embedding=query_embedding,
+            k=max(len(self._tool_embedding_cache), len(candidate_tools)),
+            threshold=0.0,
+        )
+        if index_scores is not None:
+            similarities: List[Tuple[Any, float]] = []
+            for tool in candidate_tools:
+                if tool.name in index_scores:
+                    similarity = index_scores[tool.name]
+                elif tool.name in self._tool_embedding_cache:
+                    similarity = self._cosine_similarity(
+                        query_embedding, self._tool_embedding_cache[tool.name]
+                    )
+                else:
+                    tool_text = self._create_tool_text(tool)
+                    tool_embedding = await self._get_embedding(tool_text)
+                    similarity = self._cosine_similarity(query_embedding, tool_embedding)
+                similarities.append((tool, similarity))
+            return similarities
+
+        tool_embeddings: List[np.ndarray] = []
+        for tool in candidate_tools:
+            if tool.name in self._tool_embedding_cache:
+                tool_embedding = self._tool_embedding_cache[tool.name]
+            else:
+                tool_text = self._create_tool_text(tool)
+                tool_embedding = await self._get_embedding(tool_text)
+            tool_embeddings.append(tool_embedding)
+
+        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
+        return list(zip(candidate_tools, all_similarities))
 
     @staticmethod
     def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -1867,9 +1921,7 @@ class SemanticToolSelector:
         # Get query embedding
         query_embedding = await self._get_embedding(user_message)
 
-        # Collect relevant tools and their embeddings for batch processing
         relevant_tools: List[Any] = []
-        tool_embeddings: List[np.ndarray] = []
 
         for tool in tools.list_tools():
             # Skip excluded tools
@@ -1884,22 +1936,11 @@ class SemanticToolSelector:
             ):
                 continue
 
-            # Get cached embedding or compute on-demand
-            if tool.name in self._tool_embedding_cache:
-                tool_embedding = self._tool_embedding_cache[tool.name]
-            else:
-                tool_text = self._create_tool_text(tool)
-                tool_embedding = await self._get_embedding(tool_text)
-
             relevant_tools.append(tool)
-            tool_embeddings.append(tool_embedding)
-
-        # Batch compute all similarities in one FFI call (5-10x speedup)
-        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in zip(relevant_tools, all_similarities):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)

@@ -12,27 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[workspace]
-members = [
-    "crates/protocol",
-    "crates/state",
-    "crates/tools",
-    "crates/python-bindings",
-]
-resolver = "2"
+[package]
+name = "victor-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Portable message and protocol types for Victor AI framework (no PyO3)"
 
-[workspace.package]
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-authors = ["Vijaykumar Singh <singhvjd@gmail.com>"]
-
-[profile.release]
-opt-level = 3
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-
-[profile.release-with-debug]
-inherits = "release"
-debug = true
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

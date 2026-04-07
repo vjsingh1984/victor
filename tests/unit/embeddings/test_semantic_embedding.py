@@ -14,6 +14,9 @@
 
 """Tests for semantic embedding providers (sentence-transformers, Ollama, etc.)."""
 
+import sys
+from types import SimpleNamespace
+
 import pytest
 import numpy as np
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -137,6 +140,69 @@ class TestSentenceTransformersEmbedding:
             # Verify it's a valid embedding (384-dim)
             assert embedding.shape == (384,)
             assert embedding.dtype == np.float32
+
+
+class FakeEmbeddingIndex:
+    def __init__(self, vectors, labels):
+        self.vectors = vectors
+        self.labels = labels
+        self.last_query = None
+
+    def query(self, query, k, threshold):
+        self.last_query = {"query": query, "k": k, "threshold": threshold}
+        return [("mock_tool", 0.91)]
+
+
+class TestEmbeddingIndexAcceleration:
+    @pytest.mark.asyncio
+    async def test_initialize_tool_embeddings_builds_native_index(
+        self, temp_cache_dir, mock_tool_registry
+    ):
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        fake_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        fake_index_class = MagicMock(side_effect=FakeEmbeddingIndex)
+
+        with (
+            patch.object(selector, "_get_embedding", AsyncMock(return_value=fake_embedding)),
+            patch.dict(
+                sys.modules,
+                {"victor_native": SimpleNamespace(EmbeddingIndex=fake_index_class)},
+            ),
+        ):
+            await selector.initialize_tool_embeddings(mock_tool_registry)
+
+        assert selector._embedding_index is not None
+        fake_index_class.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tools_prefers_native_embedding_index(
+        self, temp_cache_dir, mock_tool_registry
+    ):
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir, cache_embeddings=False)
+        selector._tool_embedding_cache = {"mock_tool": np.array([1.0, 0.0, 0.0], dtype=np.float32)}
+        selector._embedding_index = FakeEmbeddingIndex(
+            [selector._tool_embedding_cache["mock_tool"].tolist()],
+            ["mock_tool"],
+        )
+
+        with (
+            patch.object(
+                selector,
+                "_get_embedding",
+                AsyncMock(return_value=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+            ),
+            patch.object(selector, "_batch_cosine_similarity", side_effect=AssertionError),
+            patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]),
+            patch.object(selector, "_get_mandatory_tools", return_value=[]),
+        ):
+            selected = await selector.select_relevant_tools(
+                "find the relevant tool",
+                mock_tool_registry,
+                max_tools=1,
+                similarity_threshold=0.1,
+            )
+
+        assert [tool.name for tool in selected] == ["mock_tool"]
 
     @pytest.mark.asyncio
     async def test_async_execution_in_thread_pool(self, temp_cache_dir):
