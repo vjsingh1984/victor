@@ -36,8 +36,8 @@ runtime = [
     "victor-ai>=0.3.0",
 ]
 
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityAssistant"
+[project.entry-points."victor.plugins"]
+security = "victor_security:plugin"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -179,13 +179,14 @@ name = "victor-security"
 version = "1.0.0"
 dependencies = ["victor-sdk>=1.0.0"]
 
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityVertical"
+[project.entry-points."victor.plugins"]
+security = "victor_security:plugin"
 ```
 
 ## Discovery
 
-Victor discovers external verticals through Python entry points:
+Victor discovers external vertical packages through `victor.plugins` entry
+points, then each plugin registers one or more SDK vertical definitions:
 
 ```python
 from victor_sdk.discovery import get_global_registry

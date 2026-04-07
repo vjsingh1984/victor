@@ -69,11 +69,11 @@ validators = registry.get_validators()
 
 ## Entry Points
 
-This vertical demonstrates the new entry point groups from Phase 4:
+This vertical demonstrates the current entry point groups:
 
-### victor.verticals (Standard)
+### victor.plugins (Standard)
 ```
-minimal = "victor_minimal_vertical:MinimalVertical"
+minimal = "victor_minimal_vertical:plugin"
 ```
 
 ### victor.sdk.protocols (NEW)

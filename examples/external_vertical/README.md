@@ -3,7 +3,7 @@
 This example shows the supported external package model for Victor verticals:
 author the vertical against `victor-sdk` only, publish it as a normal Python
 package, and let `victor-ai` discover it at runtime through the
-`victor.verticals` entry point.
+`victor.plugins` entry point.
 
 ## What This Example Demonstrates
 
@@ -66,8 +66,8 @@ After installing the runtime extra, Victor can discover the package through the
 entry point declared in `pyproject.toml`:
 
 ```toml
-[project.entry-points."victor.verticals"]
-security = "victor_security:SecurityAssistant"
+[project.entry-points."victor.plugins"]
+security = "victor_security:plugin"
 ```
 
 Examples:

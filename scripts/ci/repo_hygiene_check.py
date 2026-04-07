@@ -26,6 +26,74 @@ MARKDOWN_SCAN_GLOBS = (
     "feps/**/*.md",
 )
 
+PRIMARY_VERTICAL_CONTRACT_FILES = (
+    Path("pyproject.toml"),
+    Path("scripts/scaffold_vertical.py"),
+    Path("docs/guides/vertical-quickstart.md"),
+    Path("docs/guides/FRAMEWORK_CAPABILITIES.md"),
+    Path("docs/reference/verticals/index.md"),
+    Path("docs/verticals/api_reference.md"),
+    Path("docs/verticals/best_practices.md"),
+    Path("docs/verticals/migration_guide.md"),
+    Path("docs/demos/10-minute-vertical-demo.md"),
+    Path("victor-sdk/README.md"),
+    Path("victor-sdk/VERTICAL_DEVELOPMENT.md"),
+    Path("victor-sdk/examples/minimal_vertical/README.md"),
+    Path("victor-sdk/examples/minimal_vertical/pyproject.toml"),
+    Path("examples/external_vertical/README.md"),
+    Path("examples/external_vertical/pyproject.toml"),
+)
+
+STALE_VERTICAL_CONTRACT_PATTERNS = {
+    '[project.entry-points."victor.verticals"]': (
+        "primary vertical contract docs/examples must use victor.plugins, not victor.verticals"
+    ),
+    '[project.entry-points."victor.plugins.': (
+        "primary vertical contract docs/examples must use the canonical victor.plugins"
+        " group, not nested victor.plugins.* groups"
+    ),
+    "Must inherit from victor.core.verticals.VerticalBase": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase"
+    ),
+    "from victor.core.verticals import VerticalBase": (
+        "primary vertical contract docs/examples must not import victor.core.verticals.VerticalBase"
+    ),
+    "from victor.verticals import VerticalBase": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        " not victor.verticals.VerticalBase"
+    ),
+    "from victor.framework.vertical_base import": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalBase,"
+        " not victor.framework.vertical_base"
+    ),
+    "from victor.core.verticals.registration import register_vertical": (
+        "primary vertical contract docs/examples must import register_vertical from victor_sdk,"
+        " not victor.core.verticals.registration"
+    ),
+    "victor.core.verticals.registration.register_vertical": (
+        "primary vertical contract docs/examples must reference victor_sdk.register_vertical,"
+        " not victor.core.verticals.registration.register_vertical"
+    ),
+    "from victor.verticals.base import StageDefinition": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.StageDefinition"
+    ),
+    "from victor.verticals.base import VerticalConfig": (
+        "primary vertical contract docs/examples must point authors at victor_sdk.VerticalConfig"
+    ),
+    "VerticalRegistry.register(": (
+        "primary vertical contract docs/examples must register external verticals through"
+        " VictorPlugin/context.register_vertical(), not VerticalRegistry.register()"
+    ),
+    'get_entry_point("victor.verticals"': (
+        "primary vertical contract docs/examples must use victor.plugins, not victor.verticals,"
+        " for entry-point lookups"
+    ),
+    'get_entry_point_group("victor.verticals"': (
+        "primary vertical contract docs/examples must use victor.plugins, not victor.verticals,"
+        " for entry-point lookups"
+    ),
+}
+
 ARCHIVED_DOC_BANNERS = {
     Path("docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md"): "Archived planning document",
 }
@@ -278,6 +346,23 @@ def check_vertical_extra_metadata(root: Path) -> list[HygieneFinding]:
     return findings
 
 
+def check_primary_vertical_contract_docs(root: Path) -> list[HygieneFinding]:
+    """Keep the primary authoring surfaces aligned with the plugin-first SDK contract."""
+
+    findings: list[HygieneFinding] = []
+    for rel_path in PRIMARY_VERTICAL_CONTRACT_FILES:
+        path = root / rel_path
+        if not path.is_file():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        for needle, message in STALE_VERTICAL_CONTRACT_PATTERNS.items():
+            if needle in text:
+                findings.append(HygieneFinding(rel_path, message))
+
+    return findings
+
+
 def _workflow_has_blocking_trivy_step(path: Path) -> bool:
     try:
         loaded = yaml.safe_load(path.read_text())
@@ -485,6 +570,7 @@ def run_checks(root: Path) -> list[HygieneFinding]:
     findings.extend(check_removed_legacy_paths(root))
     findings.extend(check_makefile_lint_gate(root))
     findings.extend(check_vertical_extra_metadata(root))
+    findings.extend(check_primary_vertical_contract_docs(root))
     findings.extend(check_security_baseline(root))
     return findings
 

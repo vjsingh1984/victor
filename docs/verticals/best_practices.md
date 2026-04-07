@@ -21,6 +21,13 @@
 
 ## Registration
 
+Unless noted otherwise, the examples in this guide assume new external verticals are
+defined against `victor-sdk`:
+
+```python
+from victor_sdk import VerticalBase, register_vertical
+```
+
 ### DO: Use the @register_vertical Decorator
 
 Always use the decorator for new verticals:
@@ -273,7 +280,7 @@ Register plugins in appropriate namespaces:
 @register_vertical(
     name="my_tool",
     version="1.0.0",
-    namespace="external",  # External package
+    plugin_namespace="external",  # External package
 )
 ```
 
@@ -296,13 +303,13 @@ Create organization-specific namespaces:
 @register_vertical(
     name="my_tool",
     version="1.0.0",
-    namespace="my_company",  # Custom namespace
+    plugin_namespace="my_company",  # Custom namespace
 )
 
-# Register in custom entry point group
+# Keep the canonical entry point group and namespace the plugin name if desired
 # pyproject.toml:
-# [project.entry-points."victor.plugins.my_company"]
-# my_tool = "my_package.tools:MyTool"
+# [project.entry-points."victor.plugins"]
+# my_company.my_tool = "my_package.plugin:plugin"
 ```
 
 **Why**:
@@ -319,14 +326,14 @@ Avoid the default namespace for external plugins:
 @register_vertical(
     name="my_tool",
     version="1.0.0",
-    # namespace defaults to "default"
+    # plugin_namespace defaults to "default"
 )
 
 # Recommended
 @register_vertical(
     name="my_tool",
     version="1.0.0",
-    namespace="external",  # Explicit
+    plugin_namespace="external",  # Explicit
 )
 ```
 
@@ -341,21 +348,30 @@ Avoid the default namespace for external plugins:
 
 ### DO: Write Comprehensive Tests
 
-Test all aspects of your vertical:
+Start with SDK contract validation, then add full-runtime integration coverage only
+when you need to verify activation inside `victor-ai`:
+
+```python
+from victor_sdk.validation import validate_vertical_package
+
+def test_sdk_contracts():
+    """Validate the published vertical package contract."""
+    report = validate_vertical_package("my-vertical")
+    assert report.is_valid
+```
+
+For full-runtime verification inside a Victor environment, add a separate integration
+test:
 
 ```python
 import pytest
+
 from victor.core.verticals import VerticalLoader
 
-class TestMyVertical:
-    def test_metadata(self):
-        """Test metadata extraction."""
-        metadata = VerticalMetadata.from_class(MyVertical)
-        assert metadata.canonical_name == "my_vertical"
-        assert metadata.version == "1.0.0"
 
+class TestMyVerticalIntegration:
     def test_loading(self):
-        """Test vertical loads successfully."""
+        """Test vertical loads successfully inside victor-ai."""
         loader = VerticalLoader()
         vertical = loader.load("my_vertical")
         assert vertical is not None
@@ -450,22 +466,24 @@ class MyVertical(VerticalBase):
 
 ### DO: Cache Expensive Operations
 
-Use async-safe caching:
+Prefer package-local lazy caching for definition-layer code. Core runtime caching,
+telemetry, and DI are composed by Victor during activation.
 
 ```python
-from victor.core.verticals.async_cache_manager import AsyncSafeCacheManager
-
-cache = AsyncSafeCacheManager()
+import asyncio
 
 class MyVertical(VerticalBase):
+    _heavy_object = None
+    _heavy_object_lock = asyncio.Lock()
+
     @classmethod
-    def get_heavy_object(cls):
+    async def get_heavy_object(cls):
         """Get or create expensive object."""
-        return cache.get_or_create(
-            "MyVertical:mod:qual",
-            "heavy_object",
-            lambda: HeavyObject()  # Created once, cached
-        )
+        if cls._heavy_object is None:
+            async with cls._heavy_object_lock:
+                if cls._heavy_object is None:
+                    cls._heavy_object = await build_heavy_object_async()
+        return cls._heavy_object
 ```
 
 **Why**:

@@ -21,37 +21,79 @@ Verticals are domain-specialized configurations that define:
 
 ## Quick Start
 
-### 1. Create Minimal Vertical
+### 1. Define an SDK-First Vertical
 
 ```python
-# victor/myvertical/assistant.py
-from victor.core.verticals import VerticalBase
+# my_vertical/assistant.py
+from victor_sdk import ToolNames, ToolRequirement, VerticalBase, register_vertical
 
+
+@register_vertical(
+    name="my-vertical",
+    version="0.1.0",
+    min_framework_version=">=0.6.0",
+    plugin_namespace="my_vertical",
+)
 class MyVertical(VerticalBase):
     name = "my_vertical"
     description = "Domain-specific assistant"
+    version = "0.1.0"
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
+        return [
+            ToolRequirement(ToolNames.READ, purpose="inspect project files"),
+            ToolRequirement(ToolNames.WRITE, required=False, purpose="apply changes"),
+            ToolRequirement(ToolNames.SHELL, required=False, purpose="run checks"),
+        ]
 
     @classmethod
     def get_tools(cls) -> list[str]:
-        return ["read", "write", "grep"]
+        return [requirement.tool_name for requirement in cls.get_tool_requirements()]
 
     @classmethod
     def get_system_prompt(cls) -> str:
         return "You are an expert in..."
 ```
 
-### 2. Register Vertical
+### 2. Add a Thin Plugin Wrapper
 
 ```python
-# victor/core/verticals/__init__.py
-def _register_builtin_verticals():
-    from victor.myvertical import MyVertical
-    VerticalRegistry.register(MyVertical)
+# my_vertical/__init__.py
+from victor_sdk import PluginContext, VictorPlugin
+
+from my_vertical.assistant import MyVertical
+
+
+class MyVerticalPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "my-vertical"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(MyVertical)
 ```
 
-### 3. Use Vertical
+### 3. Publish the Canonical Entry Point
+
+```toml
+# pyproject.toml
+[project.entry-points."victor.plugins"]
+my-vertical = "my_vertical:plugin"
+```
+
+### 4. Install and Use
 
 ```bash
+pip install -e .
 victor chat --vertical my_vertical
 ```
 
@@ -146,7 +188,7 @@ workflows:
 
 ## Testing Checklist
 
-- [ ] Vertical inherits from `VerticalBase`
+- [ ] Vertical inherits from `victor_sdk.VerticalBase`
 - [ ] Implements `get_tools()` - returns `List[str]`
 - [ ] Implements `get_system_prompt()` - returns `str`
 - [ ] Tools list is non-empty
@@ -155,12 +197,13 @@ workflows:
 
 ## External Packages
 
-Create external verticals via entry points:
+External packages should publish a `VictorPlugin` under the canonical
+`victor.plugins` entry-point group:
 
 ```toml
 # pyproject.toml
-[project.entry-points."victor.verticals"]
-myvertical = "victor_myvertical:MyVertical"
+[project.entry-points."victor.plugins"]
+myvertical = "victor_myvertical:plugin"
 ```
 
 ## Reference
