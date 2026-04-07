@@ -26,6 +26,7 @@ Run with: pytest tests/unit/architecture/test_import_boundaries.py -v
 from __future__ import annotations
 
 import importlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -160,14 +161,17 @@ class TestVictorSDKNoDependencies:
 
     def test_victor_sdk_dependencies(self) -> None:
         """Verify victor-sdk only has minimal dependencies."""
-        import tomli
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            import tomli as tomllib
 
         pyproject_path = Path("victor-sdk/pyproject.toml")
         if not pyproject_path.exists():
             pytest.skip("victor-sdk pyproject.toml not found")
 
         with open(pyproject_path, "rb") as f:
-            pyproject = tomli.load(f)
+            pyproject = tomllib.load(f)
 
         dependencies = pyproject.get("project", {}).get("dependencies", [])
 
@@ -244,6 +248,43 @@ class TestNoCircularImports:
     to detect circular dependencies.
     """
 
+    @staticmethod
+    def _run_import_order(modules_to_test: list[str]) -> None:
+        """Run import-order validation in a clean subprocess.
+
+        Importing, deleting, and re-importing package trees inside the active
+        pytest worker mutates module identities and can poison later tests.
+        Execute the import smoke check in a separate interpreter instead.
+        """
+
+        script = """
+import importlib
+import json
+import sys
+
+modules = json.loads(sys.argv[1])
+failed = []
+for module_name in modules:
+    try:
+        importlib.import_module(module_name)
+    except Exception as exc:
+        failed.append(f"{module_name}: {exc}")
+
+if failed:
+    print("\\n".join(failed))
+    raise SystemExit(1)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script, json.dumps(modules_to_test)],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=Path(__file__).resolve().parents[3],
+        )
+        if result.returncode != 0:
+            details = result.stdout.strip() or result.stderr.strip() or "unknown import failure"
+            pytest.fail(f"Failed to import modules:\n{details}")
+
     def test_can_import_all_modules(self) -> None:
         """Verify all top-level modules can be imported."""
         modules_to_test = [
@@ -256,19 +297,7 @@ class TestNoCircularImports:
             "victor.teams",
             "victor.workflows",
         ]
-
-        failed = []
-        for module_name in modules_to_test:
-            try:
-                # Fresh import by removing from sys.modules first
-                if module_name in sys.modules:
-                    del sys.modules[module_name]
-                importlib.import_module(module_name)
-            except Exception as e:
-                failed.append(f"{module_name}: {e}")
-
-        if failed:
-            pytest.fail("Failed to import modules:\n" + "\n".join(failed))
+        self._run_import_order(modules_to_test)
 
     def test_reverse_import_order(self) -> None:
         """Test importing modules in reverse order."""
@@ -282,16 +311,7 @@ class TestNoCircularImports:
             "victor.framework",
             "victor_sdk",
         ]
-
-        failed = []
-        for module_name in modules_to_test:
-            try:
-                importlib.import_module(module_name)
-            except Exception as e:
-                failed.append(f"{module_name}: {e}")
-
-        if failed:
-            pytest.fail("Failed to import in reverse order:\n" + "\n".join(failed))
+        self._run_import_order(modules_to_test)
 
 
 class TestPublicAPIExports:

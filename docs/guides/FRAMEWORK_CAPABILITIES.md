@@ -11,6 +11,10 @@ Victor's framework capabilities provide common patterns and functionality that c
 - Make verticals easier to maintain and extend
 - Provide a unified API for common operations
 
+External vertical authors should consume these capabilities from SDK-first verticals
+that inherit from `victor_sdk.VerticalBase`. Core runtime shims remain supported for
+compatibility, but new packages should not be authored against `victor.core.verticals`.
+
 ## Available Capabilities
 
 ### 1. Stage Builder Capability (`victor.framework.capabilities.stages`)
@@ -59,7 +63,7 @@ Pre-configured stage builders are available for common verticals:
 #### Integration in Verticals
 
 ```python
-from victor.core.verticals import VerticalBase
+from victor_sdk import VerticalBase
 from victor.framework.capabilities import StageBuilderPresets
 
 class MyVertical(VerticalBase):
@@ -129,7 +133,7 @@ Pre-configured grounding rules for common verticals:
 #### Integration in Verticals
 
 ```python
-from victor.core.verticals import VerticalBase
+from victor_sdk import VerticalBase
 from victor.framework.capabilities import GroundingRulesPresets
 
 class MyVertical(VerticalBase):
@@ -589,6 +593,9 @@ To migrate an existing vertical to use framework capabilities:
 Example migration:
 
 ```python
+from victor_sdk import VerticalBase
+from victor.framework.capabilities import StageBuilderPresets
+
 # Before
 class MyVertical(VerticalBase):
     def get_stages(self):

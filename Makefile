@@ -54,9 +54,6 @@ install-dev:
 test:
 	pytest tests/unit -v --tb=short --timeout=120
 
-test-quick:
-	pytest tests/unit -v --tb=short -m "not slow" --timeout=120
-
 test-definition-boundaries:
 	@echo "Definition import boundaries enforced by SDK contract tests"
 	pytest tests/unit/sdk -q 2>/dev/null || echo "No SDK boundary tests found"
@@ -66,6 +63,9 @@ test-all:
 
 test-cov:
 	pytest tests/unit --cov=victor --cov-report=html --cov-report=term-missing
+
+test-quick:
+	pytest tests/unit -v --tb=short -m "not slow"
 
 test-split:
 	pytest tests/unit --splits=4 --group=1 -v --tb=short

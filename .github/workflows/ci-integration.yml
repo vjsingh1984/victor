@@ -100,10 +100,20 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository first (includes constants module)
+          # Install the in-repo SDK and core first.
           pip install -e ./victor-sdk
-          # Then install victor-ai (which depends on victor-sdk)
-          pip install -e ".[dev,verticals]"
+          pip install -e .
+
+      - name: Install external vertical packages
+        run: |
+          # Extracted verticals live outside this repo and are not guaranteed to be available
+          # from PyPI at the versions declared in local meta-extras. Install them directly from
+          # their source repositories to exercise the current external integration path.
+          pip install git+https://github.com/vjsingh1984/victor-coding.git@main
+          pip install git+https://github.com/vjsingh1984/victor-devops.git@main
+          pip install git+https://github.com/vjsingh1984/victor-rag.git@main
+          pip install git+https://github.com/vjsingh1984/victor-dataanalysis.git@main
+          pip install git+https://github.com/vjsingh1984/victor-research.git@main
 
       - name: Verify vertical packages are installed
         run: |
@@ -119,13 +129,14 @@ jobs:
           echo "=== Checking vertical entry point discovery ==="
           python - <<'PY'
           from importlib.metadata import entry_points
-          try:
-              victor_eps = entry_points(group="victor.verticals")
-              print(f"Found {len(victor_eps)} vertical entry points:")
-              for ep in victor_eps:
-                  print(f"  - {ep.name}: {ep.value}")
-          except Exception as e:
-              print(f"Error loading entry points: {e}")
+          for group in ("victor.plugins", "victor.verticals"):
+              try:
+                  victor_eps = entry_points(group=group)
+                  print(f"Found {len(victor_eps)} entry points in {group}:")
+                  for ep in victor_eps:
+                      print(f"  - {ep.name}: {ep.value}")
+              except Exception as e:
+                  print(f"Error loading {group}: {e}")
           PY
 
       - name: Test vertical loading via core framework

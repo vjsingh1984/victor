@@ -50,6 +50,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
 from victor.framework.vertical_service import apply_vertical_configuration
+from victor.core.verticals.adapters import ensure_runtime_vertical
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -171,10 +172,10 @@ class FrameworkShim:
             return None
 
         if isinstance(vertical, str):
-            from victor.core.verticals.base import VerticalRegistry
-
-            resolved = VerticalRegistry.get(vertical)
+            resolved = get_vertical(vertical)
             if resolved is None:
+                from victor.core.verticals.base import VerticalRegistry
+
                 logger.warning(
                     f"Vertical '{vertical}' not found in registry. "
                     f"Available: {VerticalRegistry.list_names()}"
@@ -401,13 +402,14 @@ def get_vertical(name: Optional[str]) -> Optional[Type["VerticalBase"]]:
     # Try exact match first
     result = VerticalRegistry.get(name)
     if result:
-        return result
+        return ensure_runtime_vertical(result)
 
     # Try case-insensitive match
     name_lower = name.lower()
     for registered_name in VerticalRegistry.list_names():
         if registered_name.lower() == name_lower:
-            return VerticalRegistry.get(registered_name)
+            result = VerticalRegistry.get(registered_name)
+            return ensure_runtime_vertical(result) if result is not None else None
 
     return None
 

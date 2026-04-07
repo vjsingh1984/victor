@@ -17,10 +17,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Awaitable, Callable, cast
 
 from rich.markdown import Markdown
 from rich.panel import Panel
 
+from victor.core.utils.coding_support import load_codebase_analyzer_attr
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -191,15 +193,23 @@ class InitCommand(BaseSlashCommand):
             ctx.console.print("[dim]Analyzing codebase (quick mode)...[/]")
 
         try:
-            from victor.verticals.contrib.coding.codebase_analyzer import (
-                generate_enhanced_init_md,
-                generate_smart_victor_md,
-                generate_victor_md_from_index,
+            generate_enhanced_init_md = cast(
+                Callable[..., Awaitable[str]],
+                load_codebase_analyzer_attr("generate_enhanced_init_md"),
+            )
+            generate_smart_victor_md = cast(
+                Callable[..., str],
+                load_codebase_analyzer_attr("generate_smart_victor_md"),
+            )
+            generate_victor_md_from_index = cast(
+                Callable[..., Awaitable[str]],
+                load_codebase_analyzer_attr("generate_victor_md_from_index"),
             )
         except ImportError:
             ctx.console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
             return
 
+        try:
             if deep or use_learn:
                 new_content = await generate_enhanced_init_md(
                     use_llm=deep,

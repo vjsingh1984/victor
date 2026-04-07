@@ -1672,10 +1672,12 @@ class ConversationStore:
     def _estimate_tokens(self, content: str) -> int:
         """Estimate token count from content.
 
-        Uses a simple character-based estimation.
-        For production, consider using tiktoken or provider-specific tokenizers.
+        Uses tiktoken if available for exact counting, otherwise falls back
+        to character-based estimation.
         """
-        return len(content) // self.chars_per_token + 1
+        from victor.processing.native import count_tokens
+
+        return count_tokens(content)
 
     def _score_messages(
         self,

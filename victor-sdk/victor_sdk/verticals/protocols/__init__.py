@@ -17,6 +17,8 @@ Usage (external verticals):
 
 # SDK-native protocols
 from victor_sdk.verticals.protocols.tools import (
+    ToolDependency,
+    ToolDependencyProviderProtocol,
     ToolProvider,
     ToolSelectionStrategy,
     TieredToolConfigProvider,
@@ -112,6 +114,8 @@ __all__ = [
     "ToolProvider",
     "ToolSelectionStrategy",
     "TieredToolConfigProvider",
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
     "SafetyProvider",
     "SafetyExtension",
     "SafetyPattern",

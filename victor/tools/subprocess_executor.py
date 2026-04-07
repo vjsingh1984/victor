@@ -244,7 +244,7 @@ def run_command(
             timeout=timeout,
             cwd=working_dir,
             env=env,
-            shell=shell,
+            shell=shell,  # nosec B602
         )
 
         duration_ms = (time.time() - start_time) * 1000

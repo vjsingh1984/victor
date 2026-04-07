@@ -187,9 +187,54 @@ class TestVerticalProtocolsContract:
             "EnrichmentStrategyProtocol",
             "CapabilityProviderProtocol",
             "TeamSpecProviderProtocol",
+            "ToolDependencyProviderProtocol",
         }
         actual = set(dir(protocols))
         assert promoted.issubset(actual), f"Missing promoted: {promoted - actual}"
+
+    def test_sdk_boundary_helpers_exported(self):
+        from victor_sdk import verticals
+
+        helpers = {
+            "ExtensionDependency",
+            "MiddlewarePriority",
+            "MiddlewareResult",
+            "SafetyPattern",
+            "TaskTypeHint",
+            "ToolDependency",
+            "register_vertical",
+        }
+        actual = set(dir(verticals))
+        assert helpers.issubset(actual), f"Missing helpers: {helpers - actual}"
+
+    def test_root_sdk_exports_extension_dependency(self):
+        from victor_sdk import ExtensionDependency
+        from victor_sdk.verticals.registration import ExtensionDependency as RegistrationDependency
+
+        assert ExtensionDependency is RegistrationDependency
+
+    def test_framework_vertical_base_shim_reexports_sdk_registration_contract(self):
+        from victor.framework.vertical_base import ExtensionDependency, register_vertical
+        from victor_sdk import ExtensionDependency as SdkExtensionDependency
+        from victor_sdk import register_vertical as sdk_register_vertical
+
+        assert ExtensionDependency is SdkExtensionDependency
+        assert register_vertical is sdk_register_vertical
+
+    def test_sdk_register_vertical_attaches_manifest_without_runtime_registration(self):
+        from victor_sdk.verticals import register_vertical
+
+        @register_vertical(name="sdk-test", version="2.1.0", load_priority=42)
+        class ExampleVertical:
+            pass
+
+        manifest = ExampleVertical._victor_manifest
+
+        assert manifest.name == "sdk-test"
+        assert manifest.version == "2.1.0"
+        assert manifest.load_priority == 42
+        assert ExampleVertical.name == "sdk-test"
+        assert ExampleVertical.version == "2.1.0"
 
     def test_extended_protocols_exported(self):
         from victor_sdk.verticals import protocols

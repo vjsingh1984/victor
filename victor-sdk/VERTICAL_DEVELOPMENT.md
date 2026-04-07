@@ -113,8 +113,8 @@ where = ["."]
 include = ["my_vertical*"]
 
 # Register your vertical
-[project.entry-points."victor.verticals"]
-my-vertical = "my_vertical:MyVertical"
+[project.entry-points."victor.plugins"]
+my-vertical = "my_vertical:plugin"
 ```
 
 ### Step 2: Define Your Vertical

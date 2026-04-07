@@ -11,7 +11,12 @@ _FORBIDDEN_PREFIXES = (
     "victor.research",
     "victor.rag",
     "victor.dataanalysis",
+    "victor.verticals.contrib.coding",
 )
+
+_ALLOWED_IMPORT_FILES = {
+    Path("core/utils/coding_support.py"),
+}
 
 
 def _iter_runtime_python_files() -> list[Path]:
@@ -31,6 +36,8 @@ def test_runtime_code_has_no_direct_legacy_vertical_imports() -> None:
 
         # Contrib vertical packages are the source modules and can import internally.
         if len(rel.parts) >= 2 and rel.parts[:2] == ("verticals", "contrib"):
+            continue
+        if rel in _ALLOWED_IMPORT_FILES:
             continue
 
         module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

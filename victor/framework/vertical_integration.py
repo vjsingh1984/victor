@@ -151,7 +151,15 @@ from typing import (
 )
 
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
+from victor.core.verticals.base import VerticalRegistry
+from victor.core.verticals.adapters import ensure_runtime_vertical
+from victor.core.verticals.manifest_contract import (
+    get_or_create_vertical_manifest,
+    get_vertical_runtime_metadata,
+)
+from victor.core.verticals.namespace_executor import get_namespace_executor_pool
 
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
@@ -948,126 +956,140 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
-        result.vertical_name = vertical_class.name
+        manifest = get_or_create_vertical_manifest(vertical_class)
+        runtime_metadata = get_vertical_runtime_metadata(vertical_class)
 
-        cache_key: Optional[str] = None
-        cache_hit = False
+        with bind_active_vertical(
+            runtime_metadata["vertical_name"],
+            manifest_version=runtime_metadata["vertical_manifest_version"],
+            namespace=runtime_metadata["vertical_plugin_namespace"],
+        ):
+            result.vertical_name = vertical_class.name
 
-        # Check cache for pre-computed integration metadata (Phase 1: Caching)
-        # NOTE: cached IntegrationResult does not include VerticalContext; we must
-        # always replay step handlers to apply side effects on the target orchestrator.
-        if self._enable_cache:
-            cache_key = self._generate_cache_key(vertical_class)
-            if cache_key:
-                cached_result = self._load_from_cache(cache_key)
-                if cached_result:
-                    cache_hit = True
-                    logger.debug(
-                        f"Cache HIT for vertical '{vertical_class.name}' "
-                        f"(key: {cache_key[:16]}...) - replaying integration"
-                    )
-                else:
-                    logger.debug(
-                        f"Cache MISS for vertical '{vertical_class.name}' "
-                        f"(key: {cache_key[:16]}...)"
-                    )
+            cache_key: Optional[str] = None
+            cache_hit = False
 
-        # Run pre-hooks
-        for hook in self._pre_hooks:
-            try:
-                hook(orchestrator, vertical_class)
-            except Exception as e:
-                result.add_warning(f"Pre-hook error: {e}")
+            # Check cache for pre-computed integration metadata (Phase 1: Caching)
+            # NOTE: cached IntegrationResult does not include VerticalContext; we must
+            # always replay step handlers to apply side effects on the target orchestrator.
+            if self._enable_cache:
+                cache_key = self._generate_cache_key(vertical_class)
+                if cache_key:
+                    cached_result = self._load_from_cache(cache_key)
+                    if cached_result:
+                        cache_hit = True
+                        logger.debug(
+                            f"Cache HIT for vertical '{vertical_class.name}' "
+                            f"(key: {cache_key[:16]}...) - replaying integration"
+                        )
+                    else:
+                        logger.debug(
+                            f"Cache MISS for vertical '{vertical_class.name}' "
+                            f"(key: {cache_key[:16]}...)"
+                        )
 
-        # Create context
-        context = self._create_context(orchestrator, vertical_class, result)
-        if context is None:
-            return result
-        result.context = context
-
-        # Apply integration steps (Phase 1: Remove legacy path)
-        # Step handlers are now mandatory for SOLID compliance
-        if self._step_registry is None:
-            raise RuntimeError(
-                "StepHandlerRegistry required for vertical integration. "
-                "Ensure step handlers are initialized. "
-                "Use create_integration_pipeline() factory for proper setup."
-            )
-
-        self._validate_step_handler_dependency_contract(result)
-
-        cached_plan: Optional[Dict[str, Any]] = None
-        skip_handlers: Set[str] = set()
-        if cache_hit and cache_key:
-            cached_plan = self._load_plan_from_cache(cache_key)
-            if cached_plan:
+            # Run pre-hooks
+            for hook in self._pre_hooks:
                 try:
-                    context.set_capability_config(
-                        "framework.internal.registration_version",
-                        cached_plan.get("signature"),
-                    )
-                except Exception:
-                    pass
-            skip_handlers = self._compute_skip_handlers(
-                orchestrator,
-                cache_key=cache_key,
-                cached_plan=cached_plan,
-            )
-            if skip_handlers:
-                result.add_info(
-                    f"Skipped {len(skip_handlers)} side-effect handler(s) via integration-plan delta"
+                    hook(orchestrator, vertical_class)
+                except Exception as e:
+                    result.add_warning(f"Pre-hook error: {e}")
+
+            # Create context
+            context = self._create_context(orchestrator, vertical_class, result)
+            if context is None:
+                return result
+            result.context = context
+
+            # Apply integration steps (Phase 1: Remove legacy path)
+            # Step handlers are now mandatory for SOLID compliance
+            if self._step_registry is None:
+                raise RuntimeError(
+                    "StepHandlerRegistry required for vertical integration. "
+                    "Ensure step handlers are initialized. "
+                    "Use create_integration_pipeline() factory for proper setup."
                 )
 
-        # Use step handlers (Phase 3.1 - SOLID compliant single responsibility)
-        self._apply_with_step_handlers(
-            orchestrator,
-            vertical_class,
-            context,
-            result,
-            skip_handlers=skip_handlers,
-        )
+            self._validate_step_handler_dependency_contract(result)
 
-        # Run post-hooks
-        for hook in self._post_hooks:
-            try:
-                hook(orchestrator, result)
-            except Exception as e:
-                result.add_warning(f"Post-hook error: {e}")
-
-        logger.debug(
-            f"Vertical integration complete: {result.vertical_name}, "
-            f"tools={len(result.tools_applied)}, "
-            f"middleware={result.middleware_count}, "
-            f"safety_patterns={result.safety_patterns_count}"
-        )
-
-        # Emit vertical_applied event for observability
-        self._emit_vertical_applied_event(orchestrator, result, cache_hit=cache_hit)
-
-        # Note: result.persist() available for opt-in audit logging
-        # Not called automatically to avoid duplication with EventBus
-
-        # Save to cache (Phase 1: Caching)
-        if self._enable_cache and result.success:
-            if cache_key is None:
-                cache_key = self._generate_cache_key(vertical_class)
-            if cache_key:
-                self._save_to_cache(cache_key, result)
-                plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
-                self._save_plan_to_cache(cache_key, plan)
-                self._set_applied_plan_for_orchestrator(orchestrator, plan)
-                if result.context is not None:
+            cached_plan: Optional[Dict[str, Any]] = None
+            skip_handlers: Set[str] = set()
+            if cache_hit and cache_key:
+                cached_plan = self._load_plan_from_cache(cache_key)
+                if cached_plan:
                     try:
-                        result.context.set_capability_config(
-                            "framework.internal.integration_plan",
-                            plan,
+                        context.set_capability_config(
+                            "framework.internal.registration_version",
+                            cached_plan.get("signature"),
                         )
                     except Exception:
                         pass
-                if cache_hit:
-                    result.add_info("Integration replayed from cache metadata")
+                skip_handlers = self._compute_skip_handlers(
+                    orchestrator,
+                    cache_key=cache_key,
+                    cached_plan=cached_plan,
+                )
+                if skip_handlers:
+                    result.add_info(
+                        f"Skipped {len(skip_handlers)} side-effect handler(s) via integration-plan delta"
+                    )
 
-        return result
+            # Use step handlers (Phase 3.1 - SOLID compliant single responsibility)
+            self._apply_with_step_handlers(
+                orchestrator,
+                vertical_class,
+                context,
+                result,
+                skip_handlers=skip_handlers,
+            )
+
+            # Run post-hooks
+            for hook in self._post_hooks:
+                try:
+                    hook(orchestrator, result)
+                except Exception as e:
+                    result.add_warning(f"Post-hook error: {e}")
+
+            logger.debug(
+                f"Vertical integration complete: {result.vertical_name}, "
+                f"tools={len(result.tools_applied)}, "
+                f"middleware={result.middleware_count}, "
+                f"safety_patterns={result.safety_patterns_count}"
+            )
+
+            # Emit vertical_applied event for observability
+            self._emit_vertical_applied_event(orchestrator, result, cache_hit=cache_hit)
+
+            # Note: result.persist() available for opt-in audit logging
+            # Not called automatically to avoid duplication with EventBus
+
+            # Save to cache (Phase 1: Caching)
+            if self._enable_cache and result.success:
+                if cache_key is None:
+                    cache_key = self._generate_cache_key(vertical_class)
+                if cache_key:
+                    self._save_to_cache(cache_key, result)
+                    plan = self._build_integration_plan(cache_key, result, base_plan=cached_plan)
+                    self._save_plan_to_cache(cache_key, plan)
+                    self._set_applied_plan_for_orchestrator(orchestrator, plan)
+                    if result.context is not None:
+                        try:
+                            result.context.set_capability_config(
+                                "framework.internal.integration_plan",
+                                plan,
+                            )
+                        except Exception:
+                            pass
+                    if cache_hit:
+                        result.add_info("Integration replayed from cache metadata")
+
+            if manifest is not None:
+                result.add_info(
+                    "vertical_metadata="
+                    f"{manifest.name}@{manifest.version}[{manifest.plugin_namespace}]"
+                )
+
+            return result
 
     def _generate_cache_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
         """Generate stable cache key from vertical signature.
@@ -1628,6 +1650,17 @@ class VerticalIntegrationPipeline:
 
         return {
             "vertical": result.vertical_name,
+            **(
+                get_vertical_runtime_metadata(vertical_cls)
+                if (
+                    result.vertical_name
+                    and (vertical_cls := VerticalRegistry.get(result.vertical_name)) is not None
+                )
+                else {
+                    "vertical_manifest_version": "",
+                    "vertical_plugin_namespace": "",
+                }
+            ),
             "tools_count": len(result.tools_applied),
             "middleware_count": result.middleware_count,
             "safety_patterns_count": result.safety_patterns_count,
@@ -2133,14 +2166,15 @@ class VerticalIntegrationPipeline:
                 for idx, maybe_exc in enumerate(results_or_exc):
                     if isinstance(maybe_exc, Exception):
                         failed_handler = parallel_handlers[idx]
+                        message = self._format_handler_failure(
+                            vertical,
+                            failed_handler.name,
+                            maybe_exc,
+                        )
                         if self._strict_mode:
-                            result.add_error(
-                                f"Parallel handler '{failed_handler.name}' failed: {maybe_exc}"
-                            )
+                            result.add_error(message)
                         else:
-                            result.add_warning(
-                                f"Parallel handler '{failed_handler.name}' error: {maybe_exc}"
-                            )
+                            result.add_warning(message)
 
     async def _run_handler_async(
         self,
@@ -2162,6 +2196,8 @@ class VerticalIntegrationPipeline:
         Raises:
             Exception: If handler fails and strict_mode is enabled
         """
+        runtime_metadata = get_vertical_runtime_metadata(vertical)
+        namespace = runtime_metadata["vertical_plugin_namespace"] or "default"
         try:
             # Check if handler has async apply method
             if hasattr(handler, "apply_async"):
@@ -2177,8 +2213,9 @@ class VerticalIntegrationPipeline:
                 import asyncio
 
                 loop = asyncio.get_event_loop()
+                executor = get_namespace_executor_pool().get_executor(namespace)
                 await loop.run_in_executor(
-                    None,
+                    executor,
                     lambda: handler.apply(
                         orchestrator,
                         vertical,
@@ -2190,11 +2227,15 @@ class VerticalIntegrationPipeline:
         except Exception as e:
             if self._strict_mode:
                 raise
-            else:
-                logger.debug(
-                    f"Handler '{handler.name}' failed: {e}",
-                    exc_info=True,
-                )
+            result.add_warning(self._format_handler_failure(vertical, handler.name, e))
+            logger.debug(
+                "Handler '%s' failed for vertical '%s' in namespace '%s': %s",
+                handler.name,
+                runtime_metadata["vertical_name"],
+                namespace,
+                e,
+                exc_info=True,
+            )
 
     def _apply_with_step_handlers(
         self,
@@ -2236,14 +2277,30 @@ class VerticalIntegrationPipeline:
                     strict_mode=self._strict_mode,
                 )
             except Exception as e:
+                message = self._format_handler_failure(vertical, handler.name, e)
                 if self._strict_mode:
-                    result.add_error(f"Step handler '{handler.name}' failed: {e}")
+                    result.add_error(message)
                 else:
-                    result.add_warning(f"Step handler '{handler.name}' error: {e}")
+                    result.add_warning(message)
                 logger.debug(
-                    f"Step handler '{handler.name}' failed: {e}",
+                    message,
                     exc_info=True,
                 )
+
+    def _format_handler_failure(
+        self,
+        vertical: Type["VerticalBase"],
+        handler_name: str,
+        error: Exception,
+    ) -> str:
+        """Format a namespace-aware handler failure message."""
+
+        runtime_metadata = get_vertical_runtime_metadata(vertical)
+        namespace = runtime_metadata["vertical_plugin_namespace"] or "default"
+        return (
+            f"Step handler '{handler_name}' failed for vertical "
+            f"'{runtime_metadata['vertical_name']}' [namespace={namespace}]: {error}"
+        )
 
     # Legacy method removed in Phase 1 refactoring
     # Step handlers now provide SOLID-compliant single responsibility implementation
@@ -2268,9 +2325,10 @@ class VerticalIntegrationPipeline:
                 # Try case-insensitive match
                 for name in VerticalRegistry.list_names():
                     if name.lower() == vertical.lower():
-                        return VerticalRegistry.get(name)
-            return resolved
-        return vertical
+                        resolved = VerticalRegistry.get(name)
+                        break
+            return ensure_runtime_vertical(resolved) if resolved is not None else None
+        return ensure_runtime_vertical(vertical)
 
     def _create_context(
         self,

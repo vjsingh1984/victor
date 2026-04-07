@@ -330,24 +330,26 @@ class VerticalRegistryManager:
         """List installed external verticals.
 
         Uses importlib.metadata to discover packages that register
-        verticals via entry points.
+        verticals via either the canonical ``victor.plugins`` group or the
+        legacy ``victor.verticals`` compatibility group.
         """
         verticals = []
+        seen_names = set()
 
         try:
             from importlib.metadata import distributions
 
             for dist in distributions():
-                # Check for victor.verticals entry point
-                entry_points = list(dist.entry_points.select(group="victor.verticals"))
-                if entry_points:
-                    # Resolve source root once per distribution
-                    location = self._resolve_source_root(dist)
+                location = self._resolve_source_root(dist)
 
+                for group in ("victor.plugins", "victor.verticals"):
+                    entry_points = list(dist.entry_points.select(group=group))
                     for ep in entry_points:
-                        # Try to load metadata from package
-                        metadata = self._load_metadata_from_dist(ep, dist, location)
+                        if ep.name in seen_names:
+                            continue
+                        seen_names.add(ep.name)
 
+                        metadata = self._load_metadata_from_dist(ep, dist, location)
                         verticals.append(
                             InstalledVertical(
                                 name=ep.name,

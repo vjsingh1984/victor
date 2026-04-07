@@ -29,11 +29,6 @@ from typing import Any, Dict, List, Optional
 
 from victor.core.events import ObservabilityBus
 from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
-from victor.storage.embeddings.question_classifier import (
-    QuestionTypeClassifier,
-    QuestionType,
-    classify_question,
-)
 
 # Patterns for detecting output requirements in response content
 # PRE-COMPILED at module load for performance (avoid re.compile in hot path)
@@ -129,6 +124,19 @@ def _get_tool_mention_patterns(tool_name: str) -> List[re.Pattern]:
 
 
 logger = logging.getLogger(__name__)
+
+
+def classify_question(text: str):
+    """Classify a model-generated question via the embedding-backed classifier.
+
+    Exposed at module scope so tests and compatibility shims can patch it
+    without depending on the internal import location used by the strategy.
+    """
+    from victor.storage.embeddings.question_classifier import (
+        classify_question as _classify_question,
+    )
+
+    return _classify_question(text)
 
 
 class ContinuationStrategy:
@@ -759,6 +767,8 @@ class ContinuationStrategy:
 
             # Use QuestionTypeClassifier to determine if question is rhetorical/continuation
             # or if it genuinely needs user input (clarification/information)
+            from victor.storage.embeddings.question_classifier import QuestionType
+
             question_result = classify_question(full_content or "")
 
             # Emit event for observability

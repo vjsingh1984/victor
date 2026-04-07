@@ -14,8 +14,42 @@
 
 """SDK-only external security vertical example."""
 
+from victor_sdk import PluginContext, VictorPlugin
+
 from victor_security.assistant import SecurityAssistant
 
 __version__ = "0.2.0"
 
-__all__ = ["SecurityAssistant"]
+
+class SecurityPlugin(VictorPlugin):
+    """VictorPlugin wrapper for the SDK-only security example."""
+
+    @property
+    def name(self) -> str:
+        return "security"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(SecurityAssistant)
+
+    def get_cli_app(self):
+        return None
+
+    def on_activate(self) -> None:
+        return None
+
+    def on_deactivate(self) -> None:
+        return None
+
+    async def on_activate_async(self) -> None:
+        return None
+
+    async def on_deactivate_async(self) -> None:
+        return None
+
+    def health_check(self) -> dict[str, object]:
+        return {"healthy": True, "vertical": "security"}
+
+
+plugin = SecurityPlugin()
+
+__all__ = ["SecurityAssistant", "SecurityPlugin", "plugin"]

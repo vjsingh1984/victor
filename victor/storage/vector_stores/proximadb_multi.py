@@ -45,6 +45,7 @@ from victor.storage.vector_stores.base import (
     EmbeddingConfig,
     EmbeddingSearchResult,
 )
+from victor.core.utils.coding_support import load_tree_sitter_get_parser
 from victor.storage.vector_stores.models import (
     BaseEmbeddingModel,
     EmbeddingModelConfig,
@@ -199,6 +200,28 @@ class _GraphSnapshot:
     imports: List[str]
 
 
+class _NullLanguageRegistry:
+    """Fallback registry used when victor-coding is not installed."""
+
+    def __init__(self) -> None:
+        self._plugins: Dict[str, Any] = {}
+
+    def discover_plugins(self) -> None:
+        return None
+
+    def get(self, language: str) -> Any:
+        del language
+        return None
+
+    def detect_from_content(self, content: str, filename: Optional[str] = None) -> Optional[str]:
+        del content, filename
+        return None
+
+    def detect_language(self, path: Path) -> Optional[str]:
+        del path
+        return None
+
+
 class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
     """Victor provider backed by ProximaDB's vector and graph primitives."""
 
@@ -218,8 +241,14 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self.embedding_model: Optional[BaseEmbeddingModel] = None
         self._client = client
         self._graph_api: Optional[Any] = None
-        self._language_registry = language_registry or get_language_registry()
-        if not self._language_registry._plugins:
+        if language_registry is not None:
+            self._language_registry = language_registry
+        elif callable(get_language_registry):
+            self._language_registry = get_language_registry()
+        else:
+            self._language_registry = _NullLanguageRegistry()
+
+        if not getattr(self._language_registry, "_plugins", {}):
             self._language_registry.discover_plugins()
 
         self._dimension = int(config.extra_config.get("dimension", 384))
@@ -1297,8 +1326,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             queries = plugin.tree_sitter_queries
             if not queries.symbols:
                 return None
-            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
-
+            get_parser = load_tree_sitter_get_parser()
             parser = get_parser(language)
             tree = parser.parse(content.encode("utf-8"))
         except Exception as exc:
@@ -1640,8 +1668,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             return []
 
         try:
-            from victor.verticals.contrib.coding.codebase.tree_sitter_manager import get_parser
-
+            get_parser = load_tree_sitter_get_parser()
             parser = get_parser(language)
             tree = parser.parse(content.encode("utf-8"))
             captures = self._run_query(tree, parser, query_src)

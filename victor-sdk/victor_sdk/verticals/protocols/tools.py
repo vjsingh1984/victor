@@ -5,9 +5,10 @@ These protocols define how verticals provide and configure tools.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, List, Dict, Any, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Protocol, Set, runtime_checkable
 
-from victor_sdk.core.types import TieredToolConfig, StageDefinition
+from victor_sdk.core.types import StageDefinition, Tier, TieredToolConfig
 
 
 @runtime_checkable
@@ -78,3 +79,35 @@ class TieredToolConfigProvider(Protocol):
             List of Tier enums that have at least one tool
         """
         ...
+
+
+@dataclass(frozen=True)
+class ToolDependency:
+    """Dependency relationship between tools exposed through the SDK."""
+
+    tool_name: str
+    depends_on: Set[str] = field(default_factory=set)
+    enables: Set[str] = field(default_factory=set)
+    weight: float = 1.0
+
+
+@runtime_checkable
+class ToolDependencyProviderProtocol(Protocol):
+    """Protocol for verticals providing tool dependency metadata."""
+
+    def get_dependencies(self) -> List[ToolDependency]:
+        """Return tool dependency definitions for this vertical."""
+        ...
+
+    def get_tool_sequences(self) -> List[List[str]]:
+        """Return common tool-call sequences for this vertical."""
+        return []
+
+
+__all__ = [
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
+    "ToolProvider",
+    "ToolSelectionStrategy",
+    "TieredToolConfigProvider",
+]

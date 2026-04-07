@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.tools.base import ToolConfig
+from victor.tools import web_search_tool as web_search_tool_module
 from victor.tools.web_search_tool import (
     _parse_ddg_results,
     _get_web_config,
@@ -176,7 +177,7 @@ class TestRuntimeInfraIntegration:
     @pytest.mark.asyncio
     async def test_web_fetch_uses_generic_cache_on_repeated_calls(self, monkeypatch):
         """web_fetch should serve repeated identical requests from GenericResultCache."""
-        monkeypatch.setattr("victor.tools.web_search_tool._GENERIC_WEB_CACHE", None)
+        monkeypatch.setattr(web_search_tool_module, "_GENERIC_WEB_CACHE", None)
         html = "<html><body><main>" + ("content " * 30) + "</main></body></html>"
         url = f"https://example.com/{uuid.uuid4().hex}"
         tool_config = ToolConfig(generic_result_cache_enabled=True, generic_result_cache_ttl=120)

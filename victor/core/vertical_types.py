@@ -38,8 +38,14 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, Union
+
+from victor_sdk.core.types import Tier
+from victor_sdk.verticals.protocols.promoted_types import (
+    MiddlewarePriority,
+    MiddlewareResult,
+    TaskTypeHintData as TaskTypeHint,
+)
 
 if TYPE_CHECKING:
     from victor.framework.tools import ToolSet
@@ -73,20 +79,40 @@ class StageDefinition:
     """
 
     name: str
-    description: str
+    description: str = ""
     tools: Set[str] = field(default_factory=set)
     keywords: List[str] = field(default_factory=list)
     next_stages: Set[str] = field(default_factory=set)
     min_confidence: float = 0.5
+    required_tools: List[str] = field(default_factory=list)
+    optional_tools: List[str] = field(default_factory=list)
+    allow_custom_tools: bool = True
+
+    def __post_init__(self) -> None:
+        """Normalize legacy and SDK-compatible tool declarations."""
+
+        self.required_tools = list(self.required_tools)
+        self.optional_tools = list(self.optional_tools)
+
+        if not self.required_tools and not self.optional_tools and self.tools:
+            self.optional_tools = sorted(self.tools)
+
+        normalized_tools = set(self.tools)
+        normalized_tools.update(self.required_tools)
+        normalized_tools.update(self.optional_tools)
+        self.tools = normalized_tools
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
             "description": self.description,
-            "tools": list(self.tools),
-            "keywords": self.keywords,
-            "next_stages": list(self.next_stages),
+            "tools": sorted(self.tools),
+            "required_tools": self.required_tools.copy(),
+            "optional_tools": self.optional_tools.copy(),
+            "allow_custom_tools": self.allow_custom_tools,
+            "keywords": self.keywords.copy(),
+            "next_stages": sorted(self.next_stages),
             "min_confidence": self.min_confidence,
         }
 
@@ -96,39 +122,7 @@ class StageDefinition:
 # =============================================================================
 
 
-@dataclass
-class TaskTypeHint:
-    """Hint for a specific task type.
-
-    Task type hints provide guidance for handling specific types of tasks
-    (edit, search, explain, debug, etc.). They include prompt text,
-    tool budget recommendations, and priority tools.
-
-    This type is used by:
-    - PromptContributorProtocol implementations in each vertical
-    - Task classifier to adjust behavior based on detected task type
-    - Tool selection to prioritize appropriate tools
-
-    Attributes:
-        task_type: Task type identifier (e.g., "edit", "search")
-        hint: Prompt hint text to include in system prompt
-        tool_budget: Recommended tool budget for this task type
-        priority_tools: Tools to prioritize for this task
-    """
-
-    task_type: str
-    hint: str
-    tool_budget: Optional[int] = None
-    priority_tools: List[str] = field(default_factory=list)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "task_type": self.task_type,
-            "hint": self.hint,
-            "tool_budget": self.tool_budget,
-            "priority_tools": self.priority_tools,
-        }
+# Canonical task hint contract now lives in victor-sdk.
 
 
 # =============================================================================
@@ -330,51 +324,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
 # Middleware Types
 # =============================================================================
 
-
-class MiddlewarePriority(Enum):
-    """Priority levels for middleware execution order.
-
-    Middleware executes in priority order - lower values execute first
-    in before_tool_call, higher values execute first in after_tool_call.
-
-    This enables layered processing:
-    - CRITICAL (0): Security validation, permission checks
-    - HIGH (25): Core functionality, format validation
-    - NORMAL (50): Standard processing, transformations
-    - LOW (75): Logging, metrics collection
-    - DEFERRED (100): Cleanup, finalization tasks
-
-    Example:
-        class SecurityMiddleware(MiddlewareProtocol):
-            def get_priority(self) -> MiddlewarePriority:
-                return MiddlewarePriority.CRITICAL
-    """
-
-    CRITICAL = 0  # Security, validation
-    HIGH = 25  # Core functionality
-    NORMAL = 50  # Standard processing
-    LOW = 75  # Logging, metrics
-    DEFERRED = 100  # Cleanup, finalization
-
-
-@dataclass
-class MiddlewareResult:
-    """Result from middleware processing.
-
-    Middleware returns this result to indicate whether processing should
-    continue and optionally provide modified arguments or error messages.
-
-    Attributes:
-        proceed: Whether to proceed with the operation (False blocks execution)
-        modified_arguments: Modified arguments to pass downstream (if any)
-        error_message: Error message if proceed is False
-        metadata: Additional metadata for downstream processing
-    """
-
-    proceed: bool = True
-    modified_arguments: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+# Canonical middleware contracts now live in victor-sdk.
 
 
 # =============================================================================
@@ -420,6 +370,9 @@ class TieredToolConfig:
 
     _deprecation_warned: ClassVar[Set[str]] = set()
 
+    basic_tools: List[str] = field(default_factory=list)
+    standard_tools: List[str] = field(default_factory=list)
+    advanced_tools: List[str] = field(default_factory=list)
     mandatory: Set[str] = field(default_factory=set)
     vertical_core: Set[str] = field(default_factory=set)
     semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
@@ -429,7 +382,29 @@ class TieredToolConfig:
     readonly_only_for_analysis: bool = True
 
     def __post_init__(self) -> None:
-        if self.semantic_pool and "semantic_pool" not in TieredToolConfig._deprecation_warned:
+        explicit_semantic_pool = bool(self.semantic_pool)
+        explicit_stage_tools = bool(self.stage_tools)
+
+        normalized_mandatory = set(self.mandatory) or set(self.basic_tools)
+        normalized_vertical_core = set(self.vertical_core) or set(self.standard_tools)
+        normalized_semantic_pool = set(self.semantic_pool) or set(self.advanced_tools)
+        normalized_stage_tools = {
+            stage_name: set(tool_names) for stage_name, tool_names in self.stage_tools.items()
+        }
+
+        self.mandatory = normalized_mandatory
+        self.vertical_core = normalized_vertical_core
+        self.semantic_pool = normalized_semantic_pool
+        self.stage_tools = normalized_stage_tools
+
+        if not self.basic_tools:
+            self.basic_tools = sorted(normalized_mandatory)
+        if not self.standard_tools:
+            self.standard_tools = sorted(normalized_vertical_core)
+        if not self.advanced_tools:
+            self.advanced_tools = sorted(normalized_semantic_pool)
+
+        if explicit_semantic_pool and "semantic_pool" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.semantic_pool is deprecated. "
                 "Use get_effective_semantic_pool() instead. "
@@ -438,7 +413,7 @@ class TieredToolConfig:
                 stacklevel=2,
             )
             TieredToolConfig._deprecation_warned.add("semantic_pool")
-        if self.stage_tools and "stage_tools" not in TieredToolConfig._deprecation_warned:
+        if explicit_stage_tools and "stage_tools" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.stage_tools is deprecated. "
                 "Use get_tools_for_stage_from_registry() instead. "
@@ -504,6 +479,33 @@ class TieredToolConfig:
         if self.semantic_pool:
             return self.semantic_pool
         return self.get_semantic_pool_from_registry()
+
+    def get_tools_for_tier(self, tier: Union[Tier, str]) -> List[str]:
+        """Get tools available at a specific compatibility tier."""
+
+        tier = Tier(tier) if isinstance(tier, str) else tier
+
+        if tier == Tier.BASIC:
+            return self.basic_tools.copy()
+        if tier == Tier.STANDARD:
+            return self.basic_tools + self.standard_tools
+        if tier == Tier.ADVANCED:
+            return self.basic_tools + self.standard_tools + self.advanced_tools
+
+        return self.basic_tools.copy()
+
+    def get_max_tier_for_tools(self, available_tools: List[str]) -> Tier:
+        """Determine the highest SDK compatibility tier for a tool set."""
+
+        available_set = set(available_tools)
+
+        if available_set.issuperset(
+            set(self.basic_tools + self.standard_tools + self.advanced_tools)
+        ):
+            return Tier.ADVANCED
+        if available_set.issuperset(set(self.basic_tools + self.standard_tools)):
+            return Tier.STANDARD
+        return Tier.BASIC
 
     def get_tools_for_stage_from_registry(self, stage: str) -> Set[str]:
         """Get tools for a stage using @tool decorator metadata.

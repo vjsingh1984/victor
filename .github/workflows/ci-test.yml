@@ -1,6 +1,6 @@
 # Test Workflow with Sharding
-# Splits tests across 6 shards for parallel matrix execution
 # Tests run sequentially within each shard for reliable isolation
+# Splits tests across 6 shards for parallel matrix execution
 
 name: CI - Tests
 
@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: []  # No dependencies - run in parallel with ci-fast
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       fail-fast: false
       matrix:
@@ -57,18 +59,26 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Uninstall any existing victor packages to ensure clean state
+          pip uninstall -y victor victor-ai victor-sdk || true
           # Use CPU-only torch for faster CI
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository first (includes constants module)
-          pip install -e ./victor-sdk
-          # Install with dev dependencies for testing
-          pip install -e ".[dev,api]"
+          # Install the full development + CI dependency set explicitly. Avoid relying on
+          # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
+          pip install --force-reinstall --no-cache-dir -e ".[dev,ci,api]"
+          # Reinstall the in-repo SDK last so the test matrix exercises the local SDK surface
+          # instead of any published victor-sdk version pulled in as a transitive dependency.
+          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
+      - name: Verify local victor import path and CI extras
+        run: |
+          python -c "import victor, victor_sdk.cli, lancedb, pytest_asyncio, scipy; print(victor.__file__)"
+
       - name: Run tests (sharded)
         run: |
-          pytest tests/unit \
+          python -m pytest tests/unit \
             -m "not slow and not integration" \
             --splitting-algorithm=least_duration \
             --splits=6 \
@@ -106,6 +116,8 @@ jobs:
     name: CLI Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
 
@@ -126,14 +138,17 @@ jobs:
       - name: Install Victor
         run: |
           pip install --upgrade pip
+          # Uninstall any existing victor packages to ensure clean state
+          pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install victor-sdk from local repository first (includes constants module)
-          pip install -e ./victor-sdk
-          # Then install victor-ai with embeddings extra (needed for CLI import chain)
-          pip install -e ".[embeddings]"
+          # Install victor-ai with embeddings extra (needed for CLI import chain)
+          pip install --force-reinstall --no-cache-dir -e ".[embeddings]"
+          # Reinstall the local SDK last so smoke tests run against the in-repo contract surface.
+          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
 
       - name: Test CLI commands
         run: |
+          python -c "import victor, victor_sdk.cli; print(victor.__file__)"
           victor --version
           victor --help
           echo "✓ CLI smoke test passed"
@@ -156,3 +171,4 @@ jobs:
             echo "Smoke test: ${{ needs.smoke-test.result }}"
             exit 1
           fi
+# CI Fix

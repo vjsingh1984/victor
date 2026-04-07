@@ -432,15 +432,24 @@ class TestEscapeHatchRegistry:
     def test_discover_from_vertical_imports_and_registers(self):
         """Test discover_from_vertical imports and registers escape hatches."""
         registry = EscapeHatchRegistry()
+        fake_module = type(
+            "_FakeEscapeHatches",
+            (),
+            {
+                "CONDITIONS": {"tests_passing": sample_condition},
+                "TRANSFORMS": {"merge_results": sample_transform},
+            },
+        )()
 
-        # Use coding vertical which is bundled in contrib
-        cond_count, trans_count = registry.discover_from_vertical("coding")
+        with patch(
+            "victor.framework.escape_hatch_registry.importlib.import_module",
+            return_value=fake_module,
+        ):
+            cond_count, trans_count = registry.discover_from_vertical("coding")
 
-        # coding/escape_hatches.py has conditions and transforms
         assert cond_count > 0
         assert trans_count > 0
 
-        # Verify some known conditions are registered
         assert registry.get_condition("tests_passing", vertical="coding") is not None
 
     def test_discover_from_vertical_raises_for_invalid(self):

@@ -272,6 +272,42 @@ class TestToolCoordinator:
         assert len(warning_called) == 1
         assert warning_called[0] == (4, 25)
 
+    def test_get_available_tools_returns_tool_names(self, mock_pipeline, mock_selector):
+        """ToolCoordinator should expose tool names, not tool instances."""
+        read_tool = MagicMock()
+        read_tool.name = "read"
+        write_tool = MagicMock()
+        write_tool.name = "write"
+        registry = MagicMock()
+        registry.list_tools.return_value = [read_tool, write_tool]
+
+        coordinator = ToolCoordinator(
+            tool_pipeline=mock_pipeline,
+            tool_registry=registry,
+            tool_selector=mock_selector,
+        )
+
+        assert coordinator.get_available_tools() == {"read", "write"}
+
+    def test_is_tool_enabled_with_registry_tool_instances(self, mock_pipeline, mock_selector):
+        """Enabled-tool fallback should work when registry.list_tools returns tool instances."""
+        read_tool = MagicMock()
+        read_tool.name = "read"
+        write_tool = MagicMock()
+        write_tool.name = "write"
+        registry = MagicMock()
+        registry.list_tools.return_value = [read_tool, write_tool]
+
+        coordinator = ToolCoordinator(
+            tool_pipeline=mock_pipeline,
+            tool_registry=registry,
+            tool_selector=mock_selector,
+        )
+
+        assert coordinator.is_tool_enabled("read") is True
+        coordinator.set_enabled_tools({"read"})
+        assert coordinator.is_tool_enabled("write") is False
+
 
 class TestCreateToolCoordinator:
     """Tests for create_tool_coordinator factory function."""

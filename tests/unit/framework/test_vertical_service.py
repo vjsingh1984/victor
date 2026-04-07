@@ -25,6 +25,7 @@ from victor.framework.vertical_service import (
     clear_vertical_integration_pipeline_cache,
     get_vertical_integration_pipeline,
 )
+from victor_sdk import VerticalBase as SdkVerticalBase
 from victor_sdk.constants import CapabilityIds
 
 
@@ -48,6 +49,34 @@ class DefinitionOnlyVertical(VerticalBase):
     @classmethod
     def get_system_prompt(cls):
         return "Definition-only prompt"
+
+
+class SdkDefinitionOnlyVertical(SdkVerticalBase):
+    """SDK-only vertical that relies on runtime adaptation."""
+
+    name = "sdk_definition_only"
+    description = "SDK definition only test vertical"
+    version = "2.0.0"
+
+    @classmethod
+    def get_name(cls):
+        return cls.name
+
+    @classmethod
+    def get_description(cls):
+        return cls.description
+
+    @classmethod
+    def get_tools(cls):
+        return ["read", "write"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "SDK definition-only prompt"
+
+    @classmethod
+    def customize_config(cls, config):
+        return config.with_metadata(runtime_adapter="sdk")
 
 
 class CapabilityRequirementVertical(VerticalBase):
@@ -193,6 +222,25 @@ class TestVerticalService:
         assert result.context.config is not None
         assert result.context.config.system_prompt == "Definition-only prompt"
         assert result.context.config.tools.tools == {"read", "write"}
+
+    def test_apply_vertical_configuration_supports_sdk_only_verticals(self):
+        """SDK-only verticals should be adapted into runtime verticals transparently."""
+        orchestrator = StubOrchestrator()
+        get_vertical_integration_pipeline(reset=True)
+
+        result = apply_vertical_configuration(
+            orchestrator,
+            SdkDefinitionOnlyVertical,
+            source="sdk",
+        )
+
+        assert result.success is True
+        assert result.vertical_name == "sdk_definition_only"
+        assert result.context is not None
+        assert result.context.config is not None
+        assert result.context.config.system_prompt == "SDK definition-only prompt"
+        assert result.context.config.tools.tools == {"read", "write"}
+        assert result.context.config.metadata["runtime_adapter"] == "sdk"
 
     def test_apply_vertical_configuration_records_capability_requirement_diagnostics(self):
         """Capability requirements should be resolved and surfaced during application."""

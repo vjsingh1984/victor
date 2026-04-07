@@ -266,6 +266,17 @@ class TestCircuitBreakerRegistry:
         assert breaker1.is_closed
         assert breaker2.is_closed
 
+    def test_reset_all_normalizes_legacy_string_states(self) -> None:
+        """reset_all should tolerate legacy string-valued breaker states."""
+        breaker = CircuitBreakerRegistry.get_or_create("legacy")
+        breaker._state = "OPEN"
+        breaker._last_failure_time = None
+
+        CircuitBreakerRegistry.reset_all()
+
+        assert breaker.state == CircuitState.CLOSED
+        assert breaker.is_closed
+
     def test_get_all_stats(self) -> None:
         """Test getting stats from all breakers."""
         CircuitBreakerRegistry.get_or_create("stats1")
@@ -348,6 +359,13 @@ class TestCircuitBreakerEdgeCases:
         breaker._failure_count = 3
         breaker._record_success()
         assert breaker._failure_count == 0
+
+    def test_state_property_normalizes_legacy_string_values(self) -> None:
+        """Legacy string state values should be coerced to CircuitState enums."""
+        breaker = CircuitBreaker(name="legacy_state")
+        breaker._state = "HALF_OPEN"
+
+        assert breaker.state == CircuitState.HALF_OPEN
 
 
 class TestCircuitBreakerObservability:

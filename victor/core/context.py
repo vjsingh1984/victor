@@ -20,9 +20,10 @@ and other cross-cutting concerns using contextvars.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import contextvars
 import uuid
-from typing import Optional
+from typing import Iterator, Optional
 
 # Trace ID for the current request/session
 trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")
@@ -32,6 +33,18 @@ session_id: contextvars.ContextVar[str] = contextvars.ContextVar("session_id", d
 
 # Vertical name for the current operation
 active_vertical: contextvars.ContextVar[str] = contextvars.ContextVar("active_vertical", default="")
+
+# Vertical manifest version for the current operation
+active_vertical_manifest_version: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "active_vertical_manifest_version",
+    default="",
+)
+
+# Vertical plugin namespace for the current operation
+active_vertical_namespace: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "active_vertical_namespace",
+    default="",
+)
 
 
 def get_trace_id() -> str:
@@ -56,3 +69,53 @@ def get_session_id() -> str:
 def set_session_id(sid: str) -> contextvars.Token:
     """Set the current session ID."""
     return session_id.set(sid)
+
+
+def get_active_vertical() -> str:
+    """Get the current active vertical name."""
+    return active_vertical.get()
+
+
+def set_active_vertical(name: str) -> contextvars.Token:
+    """Set the current active vertical name."""
+    return active_vertical.set(name)
+
+
+def get_active_vertical_manifest_version() -> str:
+    """Get the current active vertical manifest version."""
+    return active_vertical_manifest_version.get()
+
+
+def set_active_vertical_manifest_version(version: str) -> contextvars.Token:
+    """Set the current active vertical manifest version."""
+    return active_vertical_manifest_version.set(version)
+
+
+def get_active_vertical_namespace() -> str:
+    """Get the current active vertical plugin namespace."""
+    return active_vertical_namespace.get()
+
+
+def set_active_vertical_namespace(namespace: str) -> contextvars.Token:
+    """Set the current active vertical plugin namespace."""
+    return active_vertical_namespace.set(namespace)
+
+
+@contextmanager
+def bind_active_vertical(
+    name: str,
+    *,
+    manifest_version: str = "",
+    namespace: str = "",
+) -> Iterator[None]:
+    """Bind vertical metadata to the current execution context."""
+
+    name_token = active_vertical.set(name)
+    version_token = active_vertical_manifest_version.set(manifest_version)
+    namespace_token = active_vertical_namespace.set(namespace)
+    try:
+        yield
+    finally:
+        active_vertical.reset(name_token)
+        active_vertical_manifest_version.reset(version_token)
+        active_vertical_namespace.reset(namespace_token)

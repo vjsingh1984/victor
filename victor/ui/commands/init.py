@@ -3,12 +3,13 @@ import re
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from pathlib import Path
-from typing import Optional, List
+from typing import Awaitable, Callable, List, Mapping, Optional, cast
 import yaml
 
 from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
 from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
+from victor.core.utils.coding_support import load_codebase_analyzer_attr
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()
@@ -23,7 +24,10 @@ async def _generate_enhanced_init_content_async(
     include_dirs: Optional[List[str]],
     exclude_dirs: Optional[List[str]],
 ) -> str:
-    from victor.verticals.contrib.coding.codebase_analyzer import generate_enhanced_init_md
+    generate_enhanced_init_md = cast(
+        Callable[..., Awaitable[str]],
+        load_codebase_analyzer_attr("generate_enhanced_init_md"),
+    )
 
     return await generate_enhanced_init_md(
         use_llm=use_llm,
@@ -62,7 +66,10 @@ async def _generate_index_init_content_async(
     include_dirs: Optional[List[str]],
     exclude_dirs: Optional[List[str]],
 ) -> str:
-    from victor.verticals.contrib.coding.codebase_analyzer import generate_victor_md_from_index
+    generate_victor_md_from_index = cast(
+        Callable[..., Awaitable[str]],
+        load_codebase_analyzer_attr("generate_victor_md_from_index"),
+    )
 
     return await generate_victor_md_from_index(
         force=force,
@@ -457,8 +464,9 @@ providers:
                     return
             else:
                 try:
-                    from victor.verticals.contrib.coding.codebase_analyzer import (
-                        generate_smart_victor_md,
+                    generate_smart_victor_md = cast(
+                        Callable[..., str],
+                        load_codebase_analyzer_attr("generate_smart_victor_md"),
                     )
                 except ImportError:
                     console.print(
@@ -490,9 +498,13 @@ providers:
 
             if symlinks:
                 try:
-                    from victor.verticals.contrib.coding.codebase_analyzer import (
-                        CONTEXT_FILE_ALIASES,
-                        create_context_symlinks,
+                    CONTEXT_FILE_ALIASES = cast(
+                        Mapping[str, str],
+                        load_codebase_analyzer_attr("CONTEXT_FILE_ALIASES"),
+                    )
+                    create_context_symlinks = cast(
+                        Callable[[], dict[str, str]],
+                        load_codebase_analyzer_attr("create_context_symlinks"),
                     )
                 except ImportError:
                     console.print(

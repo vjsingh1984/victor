@@ -185,9 +185,24 @@ class CircuitBreaker:
         self._total_rejected = 0
         self._state_changes: deque[tuple[float, CircuitState, CircuitState]] = deque(maxlen=100)
 
+    @staticmethod
+    def _coerce_state(state: Any) -> Any:
+        """Normalize legacy string state values to CircuitState enums."""
+        if isinstance(state, CircuitState):
+            return state
+        if isinstance(state, str):
+            normalized = state.strip().lower()
+            for candidate in CircuitState:
+                if normalized in {candidate.value, candidate.name.lower()}:
+                    return candidate
+        return state
+
     @property
     def state(self) -> CircuitState:
         """Get current circuit state, checking for automatic recovery."""
+        coerced = self._coerce_state(self._state)
+        if isinstance(coerced, CircuitState) and coerced is not self._state:
+            self._state = coerced
         if self._state == CircuitState.OPEN:
             if self._should_attempt_recovery():
                 self._transition_to(CircuitState.HALF_OPEN)
@@ -252,6 +267,11 @@ class CircuitBreaker:
 
     def _transition_to(self, new_state: CircuitState) -> None:
         """Transition to a new state."""
+        old_state = self._coerce_state(self._state)
+        new_state = self._coerce_state(new_state)
+        if not isinstance(old_state, CircuitState) or not isinstance(new_state, CircuitState):
+            return
+        self._state = old_state
         if self._state != new_state:
             old_state = self._state
             self._state = new_state
@@ -278,11 +298,12 @@ class CircuitBreaker:
 
     def _record_success(self) -> None:
         """Record a successful call."""
-        if self._state == CircuitState.HALF_OPEN:
+        current_state = self.state
+        if current_state == CircuitState.HALF_OPEN:
             self._success_count += 1
             if self._success_count >= self.success_threshold:
                 self._transition_to(CircuitState.CLOSED)
-        elif self._state == CircuitState.CLOSED:
+        elif current_state == CircuitState.CLOSED:
             # Reset failure count on success
             self._failure_count = 0
 
@@ -292,10 +313,11 @@ class CircuitBreaker:
         self._last_failure_time = time.time()
         self._last_exception = exception
 
-        if self._state == CircuitState.HALF_OPEN:
+        current_state = self.state
+        if current_state == CircuitState.HALF_OPEN:
             # Any failure in half-open immediately opens circuit
             self._transition_to(CircuitState.OPEN)
-        elif self._state == CircuitState.CLOSED:
+        elif current_state == CircuitState.CLOSED:
             self._failure_count += 1
             if self._failure_count >= self.failure_threshold:
                 self._transition_to(CircuitState.OPEN)

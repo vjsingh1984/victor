@@ -36,6 +36,8 @@ from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
 from victor.observability.integration import ObservabilityIntegration
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor_sdk import VerticalBase as SdkVerticalBase
+from victor_sdk import register_vertical
 
 
 def _try_load_vertical_attr(module_path: str, attr_name: str):
@@ -68,6 +70,31 @@ class MockVertical(VerticalBase):
             "PLANNING": {"allowed_tools": ["read", "write"], "next": ["EXECUTION"]},
             "EXECUTION": {"allowed_tools": ["read", "write", "edit"], "next": ["INITIAL"]},
         }
+
+
+@register_vertical(name="sdk_only_test_vertical", version="1.0.0")
+class SdkOnlyTestVertical(SdkVerticalBase):
+    """SDK-only vertical used to verify runtime adaptation at lookup boundaries."""
+
+    name = "sdk_only_test_vertical"
+    description = "SDK-only test vertical"
+    version = "1.0.0"
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.name
+
+    @classmethod
+    def get_description(cls) -> str:
+        return cls.description
+
+    @classmethod
+    def get_tools(cls):
+        return ["read"]
+
+    @classmethod
+    def get_system_prompt(cls):
+        return "You are an SDK-only test assistant."
 
 
 class TestFrameworkShimBasic:
@@ -563,6 +590,19 @@ class TestGetVerticalFunction:
         vertical = get_vertical("nonexistent")
         assert vertical is None
 
+    def test_get_vertical_adapts_sdk_only_verticals(self):
+        """SDK-only registry entries should resolve to runtime-compatible classes."""
+        VerticalRegistry.register(SdkOnlyTestVertical)
+        try:
+            vertical = get_vertical("sdk_only_test_vertical")
+
+            assert vertical is not None
+            assert vertical is not SdkOnlyTestVertical
+            assert issubclass(vertical, VerticalBase)
+            assert vertical.get_name() == "sdk_only_test_vertical"
+        finally:
+            VerticalRegistry.unregister("sdk_only_test_vertical")
+
 
 class TestListVerticalsFunction:
     """Tests for list_verticals helper function."""
@@ -599,8 +639,8 @@ class TestListVerticalsFunction:
     def test_list_verticals_includes_builtins(self):
         """Test that list_verticals includes built-in verticals."""
         names = list_verticals()
-        # Contrib verticals are registered via victor.plugins entry points
-        assert "coding" in names
+        # Benchmark is still core-provided; extracted verticals are optional.
+        assert "benchmark" in names
 
 
 class TestFrameworkShimProperties:

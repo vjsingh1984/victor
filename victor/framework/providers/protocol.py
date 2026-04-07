@@ -29,10 +29,22 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Protocol, Dict, Any, runtime_checkable, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+TEAM_PROVIDER_GROUPS = (
+    "victor.team_spec_providers",
+    "victor.framework.teams.providers",
+)
+WORKFLOW_PROVIDER_GROUPS = (
+    "victor.workflow_providers",
+    "victor.framework.workflows.providers",
+)
+SAFETY_PROVIDER_GROUPS = ("victor.framework.safety.providers",)
+_WARNED_LEGACY_PROVIDER_GROUPS: set[str] = set()
 
 
 @runtime_checkable
@@ -133,7 +145,11 @@ class ProviderRegistry:
     4. Provides combined results from all providers
 
     Entry Points:
-        Packages can register providers via entry points:
+        Packages can register providers via entry points. Canonical groups:
+        [project.entry-points."victor.team_spec_providers"]
+        coding = "victor_coding.teams:CodingTeamSpecProvider"
+
+        Legacy compatibility groups are still accepted as fallbacks:
         [project.entry-points."victor.framework.teams.providers"]
         coding = "victor_coding.teams:CodingTeamSpecProvider"
 
@@ -162,57 +178,117 @@ class ProviderRegistry:
 
             # Load team spec providers
             try:
-                for entry_point in importlib.metadata.entry_points(
-                    group="victor.framework.teams.providers"
+                for entry_point in self._iter_provider_entry_points(
+                    importlib.metadata,
+                    TEAM_PROVIDER_GROUPS,
                 ):
-                    try:
-                        provider_class = entry_point.load()
-                        provider = provider_class()
-                        if isinstance(provider, TeamSpecProviderProtocol):
-                            self._team_providers.append(provider)
-                            self._team_provider_names[id(provider)] = entry_point.name
-                            logger.info(f"Loaded team provider: {entry_point.name}")
-                    except Exception as e:
-                        logger.warning(f"Failed to load team provider {entry_point.name}: {e}")
+                    self._load_provider_entry_point(
+                        entry_point,
+                        TeamSpecProviderProtocol,
+                        self._team_providers,
+                        self._team_provider_names,
+                        "team provider",
+                    )
             except Exception as e:
                 logger.debug(f"No team provider entry points found: {e}")
 
             # Load workflow providers
             try:
-                for entry_point in importlib.metadata.entry_points(
-                    group="victor.framework.workflows.providers"
+                for entry_point in self._iter_provider_entry_points(
+                    importlib.metadata,
+                    WORKFLOW_PROVIDER_GROUPS,
                 ):
-                    try:
-                        provider_class = entry_point.load()
-                        provider = provider_class()
-                        if isinstance(provider, WorkflowProviderProtocol):
-                            self._workflow_providers.append(provider)
-                            self._workflow_provider_names[id(provider)] = entry_point.name
-                            logger.info(f"Loaded workflow provider: {entry_point.name}")
-                    except Exception as e:
-                        logger.warning(f"Failed to load workflow provider {entry_point.name}: {e}")
+                    self._load_provider_entry_point(
+                        entry_point,
+                        WorkflowProviderProtocol,
+                        self._workflow_providers,
+                        self._workflow_provider_names,
+                        "workflow provider",
+                    )
             except Exception as e:
                 logger.debug(f"No workflow provider entry points found: {e}")
 
             # Load safety rules providers
             try:
-                for entry_point in importlib.metadata.entry_points(
-                    group="victor.framework.safety.providers"
+                for entry_point in self._iter_provider_entry_points(
+                    importlib.metadata,
+                    SAFETY_PROVIDER_GROUPS,
                 ):
-                    try:
-                        provider_class = entry_point.load()
-                        provider = provider_class()
-                        if isinstance(provider, SafetyRulesProviderProtocol):
-                            self._safety_providers.append(provider)
-                            self._safety_provider_names[id(provider)] = entry_point.name
-                            logger.info(f"Loaded safety provider: {entry_point.name}")
-                    except Exception as e:
-                        logger.warning(f"Failed to load safety provider {entry_point.name}: {e}")
+                    self._load_provider_entry_point(
+                        entry_point,
+                        SafetyRulesProviderProtocol,
+                        self._safety_providers,
+                        self._safety_provider_names,
+                        "safety provider",
+                    )
             except Exception as e:
                 logger.debug(f"No safety provider entry points found: {e}")
 
         except Exception as e:
             logger.debug(f"Entry points discovery failed: {e}")
+
+    @staticmethod
+    def _iter_provider_entry_points(metadata_module: Any, groups: tuple[str, ...]) -> list[Any]:
+        """Return entry points from canonical groups with legacy fallback de-duplication."""
+
+        discovered: list[Any] = []
+        seen_names: set[str] = set()
+        canonical_group = groups[0] if groups else None
+
+        for index, group in enumerate(groups):
+            group_entry_points = list(metadata_module.entry_points(group=group))
+            if index > 0 and group_entry_points and canonical_group is not None:
+                ProviderRegistry._warn_legacy_provider_group_usage(group, canonical_group)
+            for entry_point in group_entry_points:
+                if entry_point.name in seen_names:
+                    continue
+                seen_names.add(entry_point.name)
+                discovered.append(entry_point)
+
+        return discovered
+
+    @staticmethod
+    def _warn_legacy_provider_group_usage(group: str, canonical_group: str) -> None:
+        """Emit a one-time warning when legacy provider groups are still published."""
+
+        if group in _WARNED_LEGACY_PROVIDER_GROUPS:
+            return
+
+        message = (
+            f"Legacy provider entry-point group '{group}' is deprecated. "
+            f"Publish providers via '{canonical_group}' instead."
+        )
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        logger.warning(message)
+        _WARNED_LEGACY_PROVIDER_GROUPS.add(group)
+
+    @staticmethod
+    def _instantiate_provider(entry_point: Any) -> Any:
+        """Instantiate a provider entry point when it resolves to a class."""
+
+        provider_class_or_instance = entry_point.load()
+        if isinstance(provider_class_or_instance, type):
+            return provider_class_or_instance()
+        return provider_class_or_instance
+
+    def _load_provider_entry_point(
+        self,
+        entry_point: Any,
+        protocol: type[Any],
+        providers: list[Any],
+        provider_names: dict[str, str],
+        label: str,
+    ) -> None:
+        """Load and register a single provider entry point with failure isolation."""
+
+        try:
+            provider = self._instantiate_provider(entry_point)
+            if isinstance(provider, protocol):
+                providers.append(provider)
+                provider_names[id(provider)] = entry_point.name
+                logger.info("Loaded %s: %s", label, entry_point.name)
+        except Exception as e:
+            logger.warning("Failed to load %s %s: %s", label, entry_point.name, e)
 
     def register_team_provider(self, provider: TeamSpecProviderProtocol):
         """Directly register a team spec provider (for testing or manual setup)."""

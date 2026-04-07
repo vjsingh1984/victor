@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Stable public API surface for vertical base classes.
+"""Compatibility shim for core vertical runtime types.
 
-External verticals should import from this module (or ``victor.framework.*``)
-rather than from ``victor.core.verticals.base`` directly.  This provides an
-indirection layer that insulates external packages from internal refactoring.
+This module remains as a stable framework-facing surface for in-repo code and
+incremental migrations, but new external vertical packages should prefer
+``victor_sdk`` definition-layer contracts directly. In particular, external
+authors should import ``VerticalBase`` from ``victor_sdk`` and publish
+``victor.plugins`` entry points via a ``VictorPlugin`` wrapper.
 
 Usage::
 
+    # Compatibility shim for framework-side code
     from victor.framework.vertical_base import (
         VerticalBase,
         VerticalConfig,
@@ -28,11 +31,14 @@ Usage::
         register_vertical,
         ExtensionDependency,
     )
+
+    # Preferred contract for external vertical packages
+    from victor_sdk import ExtensionDependency, VerticalBase, register_vertical
 """
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.core.vertical_types import StageDefinition, StageBuilder
-from victor.core.verticals.registration import register_vertical, ExtensionDependency
+from victor_sdk import ExtensionDependency, register_vertical
 
 __all__ = [
     "VerticalBase",

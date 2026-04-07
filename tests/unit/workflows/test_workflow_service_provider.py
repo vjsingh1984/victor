@@ -1,6 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
+from victor.agent.protocols import ToolRegistryProtocol
 from victor.config.settings import Settings
 from victor.core.bootstrap import bootstrap_container
 from victor.core.plugins.context import HostPluginContext
@@ -68,3 +69,29 @@ def test_plugin_context_registers_custom_workflow_node_executors_for_factory() -
         assert result["custom_registered"] == "custom"
     finally:
         clear_registered_workflow_node_executors()
+
+
+def test_plugin_context_register_tool_uses_live_container_registry() -> None:
+    class _Registry:
+        def __init__(self) -> None:
+            self.tools = []
+
+        def register_tool(self, tool) -> None:
+            self.tools.append(tool)
+
+    class _Container:
+        def __init__(self, registry) -> None:
+            self.registry = registry
+
+        def get_optional(self, service_type):
+            if service_type is ToolRegistryProtocol:
+                return self.registry
+            return None
+
+    registry = _Registry()
+    context = HostPluginContext(_Container(registry))
+    tool = SimpleNamespace(name="plugin_tool")
+
+    context.register_tool(tool)
+
+    assert registry.tools == [tool]

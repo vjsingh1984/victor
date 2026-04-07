@@ -66,6 +66,23 @@ except ImportError:
     BOTO3_AVAILABLE = False
     boto3 = None  # type: ignore
 
+    class ClientError(Exception):
+        """Fallback botocore-style client error used in tests without boto3."""
+
+        def __init__(self, error_response: Dict[str, Any], operation_name: str):
+            super().__init__(f"{operation_name}: {error_response}")
+            self.response = error_response
+            self.operation_name = operation_name
+
+    class WaiterError(Exception):
+        """Fallback waiter error used in tests without boto3."""
+
+        def __init__(self, name: str, reason: str, last_response: Optional[Dict[str, Any]] = None):
+            super().__init__(f"{name}: {reason}")
+            self.name = name
+            self.reason = reason
+            self.last_response = last_response
+
 
 class AWSServiceProvider(BaseServiceProvider):
     """Service provider for AWS managed services.

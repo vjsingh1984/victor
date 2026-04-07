@@ -59,6 +59,13 @@ from victor_sdk.core.types import (
     validate_definition_version,
     normalize_workflow_metadata,
 )
+from victor_sdk.capabilities import (
+    FileOperation,
+    FileOperationsCapability,
+    FileOperationType,
+    PromptContribution,
+    PromptContributionCapability,
+)
 from victor_sdk.core.plugins import PluginContext, VictorPlugin
 
 # Core exceptions
@@ -69,6 +76,16 @@ from victor_sdk.core.exceptions import (
 )
 
 # Vertical protocols
+from victor_sdk.verticals import (
+    ExtensionDependency,
+    MiddlewarePriority,
+    MiddlewareResult,
+    SafetyPattern,
+    TaskTypeHint,
+    ToolDependency,
+    ToolDependencyProviderProtocol,
+    register_vertical,
+)
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols.capabilities import (
     CapabilityProvider,
@@ -96,12 +113,18 @@ from victor_sdk.discovery import (
     ProtocolRegistry,
     ProtocolMetadata,
     DiscoveryStats,
+    collect_verticals_from_candidate,
     get_global_registry,
     reset_global_registry,
     discover_verticals,
     discover_protocols,
     get_discovery_summary,
     reload_discovery,
+)
+from victor_sdk.validation import (
+    ValidationIssue,
+    ValidationReport,
+    validate_vertical_package,
 )
 
 # Stable SDK constants
@@ -167,6 +190,11 @@ __all__ = [
     "validate_definition_version",
     "normalize_workflow_metadata",
     # Plugins
+    "FileOperation",
+    "FileOperationsCapability",
+    "FileOperationType",
+    "PromptContribution",
+    "PromptContributionCapability",
     "PluginContext",
     "VictorPlugin",
     # Exceptions
@@ -175,10 +203,18 @@ __all__ = [
     "VerticalProtocolError",
     # Base class
     "VerticalBase",
+    "register_vertical",
+    "ExtensionDependency",
     # Capability protocols
     "CapabilityProvider",
     "ChainProvider",
     "PersonaProvider",
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
+    "MiddlewarePriority",
+    "MiddlewareResult",
+    "SafetyPattern",
+    "TaskTypeHint",
     # Extension manifest
     "ExtensionManifest",
     "ExtensionType",
@@ -189,12 +225,17 @@ __all__ = [
     "ProtocolRegistry",
     "ProtocolMetadata",
     "DiscoveryStats",
+    "collect_verticals_from_candidate",
     "get_global_registry",
     "reset_global_registry",
     "discover_verticals",
     "discover_protocols",
     "get_discovery_summary",
     "reload_discovery",
+    # Validation
+    "ValidationIssue",
+    "ValidationReport",
+    "validate_vertical_package",
     # Stable constants
     "CapabilityIds",
     "ToolNames",

@@ -191,10 +191,14 @@ def test_external_vertical_sdk_only_install_exposes_entry_point_and_definition(
         textwrap.dedent("""
             import json
             from importlib.metadata import entry_points
+            from victor_sdk.discovery import collect_verticals_from_candidate
 
-            eps = {ep.name: ep for ep in entry_points(group="victor.verticals")}
+            eps = {ep.name: ep for ep in entry_points(group="victor.plugins")}
             assert "security" in eps, sorted(eps)
-            assistant_cls = eps["security"].load()
+            plugin = eps["security"].load()
+            discovered = collect_verticals_from_candidate(plugin)
+            assert list(discovered) == ["security"]
+            assistant_cls = discovered["security"]
             definition = assistant_cls.get_definition()
             print(
                 json.dumps(
@@ -282,7 +286,7 @@ def test_external_vertical_runtime_install_is_discoverable_by_vertical_loader(
                             requirement.tool_name for requirement in definition.tool_requirements
                         ],
                         "team_specs": sorted(team_specs),
-                        "default_team": vertical.get_team_spec_provider().get_default_team(),
+                        "default_team": definition.team_metadata.default_team,
                     }}
                 )
             )

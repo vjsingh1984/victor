@@ -97,6 +97,18 @@ class _TeamMemberAdapter:
             # Merge TeamContext.shared_state into coordinator context
             merged_context = {**self._context, **context.shared_state}
 
+            # Preserve caller-owned mutable context objects when present so
+            # external observers can track execution side effects without
+            # losing formation-managed shared-state overlays like
+            # ``previous_output``.
+            for key, value in self._context.items():
+                if (
+                    key in context.shared_state
+                    and context.shared_state[key] is not value
+                    and isinstance(value, (list, dict, set))
+                ):
+                    merged_context[key] = value
+
             # Call ITeamMember's execute_task
             output = await self._member.execute_task(task.content, merged_context)
 

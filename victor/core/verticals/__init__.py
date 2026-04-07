@@ -12,22 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core vertical base classes and utilities.
+"""Core vertical runtime APIs and compatibility surfaces.
 
-This module provides the base infrastructure for Victor verticals:
-- VerticalBase: Abstract base class for domain-specific assistants
-- VerticalConfig: Configuration dataclass
-- VerticalRegistry: Registry for vertical discovery
-- StageDefinition: Stage definitions for conversation flow
+This package provides the runtime infrastructure for Victor verticals:
+- ``VerticalBase``: core runtime compatibility base class
+- ``VerticalConfig``: runtime configuration dataclass
+- ``VerticalRegistry``: runtime registry and legacy discovery bridge
+- ``StageDefinition``: stage definitions for conversation flow
+
+New external vertical packages should generally be authored against
+``victor_sdk.VerticalBase`` and published through ``victor.plugins``. Core then
+adapts SDK-pure definitions into runtime verticals on demand.
 
 Phase 2.3 SRP Compliance:
-VerticalBase now composes functionality from focused classes:
-- VerticalMetadataProvider: Metadata capabilities
-- VerticalExtensionLoader: Extension loading and caching
-- VerticalWorkflowProvider: Workflow and handler providers
-
-Verticals (coding, rag, devops, research, dataanalysis) are separate
-modules at the same level as core in the victor namespace.
+``VerticalBase`` now composes functionality from focused classes:
+- ``VerticalMetadataProvider``: metadata capabilities
+- ``VerticalExtensionLoader``: extension loading and caching
+- ``VerticalWorkflowProvider``: workflow and handler providers
 """
 
 from victor.core.verticals.base import (
@@ -36,6 +37,7 @@ from victor.core.verticals.base import (
     VerticalConfig,
     VerticalRegistry,
 )
+from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.metadata import (
     VerticalMetadataProvider,
     VerticalMetadata,
@@ -212,17 +214,20 @@ def _register_builtin_verticals() -> None:
 def _discover_external_verticals() -> None:
     """Discover and register external verticals from entry points.
 
-    This function scans installed packages for the 'victor.verticals'
-    entry point group and registers any valid vertical classes found.
+    The canonical external packaging path is ``victor.plugins``: each plugin
+    package publishes a ``VictorPlugin`` entry point and registers one or more
+    SDK or runtime vertical classes with the host. The legacy
+    ``victor.verticals`` raw-class entry point group remains as a compatibility
+    fallback only.
 
-    External packages can register verticals by adding an entry point
-    to their pyproject.toml:
+    Canonical external packages register plugins by adding an entry point to
+    their ``pyproject.toml``:
 
-        [project.entry-points."victor.verticals"]
-        my_vertical = "my_package:MyVerticalAssistant"
+        [project.entry-points."victor.plugins"]
+        my_vertical = "my_package:plugin"
 
-    The vertical class must inherit from VerticalBase and implement
-    the required abstract methods (get_tools, get_system_prompt).
+    The plugin then calls ``context.register_vertical(...)`` with vertical
+    definitions that satisfy the Victor SDK or runtime contract.
     """
     try:
         # Primary path: use VerticalLoader so runtime discovery has a single
@@ -253,15 +258,14 @@ def _ensure_registration() -> None:
     """Ensure verticals are registered (lazy initialization).
 
     This is called on first access to avoid circular dependencies during
-    framework initialization. External verticals may import from framework,
-    so we must complete framework initialization before loading them.
+    framework initialization. External verticals are resolved lazily on demand
+    to avoid importing every installed package for simple listing/help flows.
     """
     global _registration_done
     if _registration_done:
         return
 
     _register_builtin_verticals()
-    _discover_external_verticals()
     _registration_done = True
 
 
@@ -283,13 +287,44 @@ def get_vertical(name: str | None) -> type[VerticalBase] | None:
     # Try exact match first
     result = VerticalRegistry.get(name)
     if result:
-        return result
+        return ensure_runtime_vertical(result)
+
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        result = loader.resolve(name)
+        if result:
+            return result
+    except Exception:
+        pass
 
     # Try case-insensitive match
     name_lower = name.lower()
     for registered_name in VerticalRegistry.list_names():
         if registered_name.lower() == name_lower:
-            return VerticalRegistry.get(registered_name)
+            result = VerticalRegistry.get(registered_name)
+            return ensure_runtime_vertical(result) if result is not None else None
+
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        for discovered_name in loader.discover_vertical_names():
+            if discovered_name.lower() == name_lower:
+                return loader.resolve(discovered_name)
+    except Exception:
+        pass
+
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        for discovered_name in loader.discover_vertical_names():
+            if discovered_name.lower() == name_lower:
+                return loader.resolve(discovered_name)
+    except Exception:
+        pass
 
     return None
 
@@ -302,4 +337,11 @@ def list_verticals() -> list[str]:
     """
     # Ensure verticals are registered before listing (lazy initialization)
     _ensure_registration()
-    return VerticalRegistry.list_names()
+    names = set(VerticalRegistry.list_names())
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        names.update(get_vertical_loader().discover_vertical_names())
+    except Exception:
+        pass
+    return sorted(names)

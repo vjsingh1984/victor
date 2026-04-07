@@ -103,6 +103,7 @@ def test_victor_sdk_wheel_and_sdist_include_contract_files(tmp_path: Path) -> No
         "victor_sdk/constants/tool_names.py",
         "victor_sdk/constants/capability_ids.py",
         "victor_sdk/core/types.py",
+        "victor_sdk/verticals/extensions.py",
         "victor_sdk/verticals/protocols/base.py",
         "METADATA",
     }
@@ -111,6 +112,7 @@ def test_victor_sdk_wheel_and_sdist_include_contract_files(tmp_path: Path) -> No
         "victor_sdk/constants/tool_names.py",
         "victor_sdk/constants/capability_ids.py",
         "victor_sdk/core/types.py",
+        "victor_sdk/verticals/extensions.py",
         "victor_sdk/verticals/protocols/base.py",
         "README.md",
         "pyproject.toml",
@@ -143,8 +145,8 @@ def test_external_vertical_wheel_and_sdist_include_entry_point_and_sources(tmp_p
         )
         entry_points_name = next(name for name in names if name.endswith("entry_points.txt"))
         entry_points = archive.read(entry_points_name).decode("utf-8")
-        assert "[victor.verticals]" in entry_points
-        assert "security = victor_security:SecurityAssistant" in entry_points
+        assert "[victor.plugins]" in entry_points
+        assert "security = victor_security:plugin" in entry_points
 
     with tarfile.open(sdist_path, "r:gz") as archive:
         _assert_archive_contains_suffixes(

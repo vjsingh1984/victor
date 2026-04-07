@@ -36,9 +36,9 @@ packages = ["victor_minimal_vertical"]
 # ENTRY POINT REGISTRATIONS
 # ============================================================================
 
-# Vertical registration (standard)
-[project.entry-points."victor.verticals"]
-minimal = "victor_minimal_vertical:MinimalVertical"
+# Plugin registration (standard)
+[project.entry-points."victor.plugins"]
+minimal = "victor_minimal_vertical:plugin"
 
 # Protocol implementations (NEW - Phase 4)
 [project.entry-points."victor.sdk.protocols"]

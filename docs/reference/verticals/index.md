@@ -1,10 +1,20 @@
 # Verticals - Domain-Specific Assistants
 
-Verticals are pre-configured assistant templates optimized for specific domains. Each vertical defines tool sets, stage configurations, system prompts, and evaluation criteria tailored to its use case.
+Verticals are pre-configured assistant templates optimized for specific domains. Each
+vertical defines tool sets, stage configurations, system prompts, and evaluation
+criteria tailored to its use case.
 
 ## Overview
 
-Victor's vertical system uses the **Template Method Pattern** - `VerticalBase` defines the skeleton, and concrete verticals override specific steps.
+Victor's runtime vertical system still exposes a **Template Method Pattern**
+compatibility surface, but new external vertical packages should be authored against
+`victor_sdk.VerticalBase` and published via `victor.plugins`.
+
+> External authoring path: define the vertical in `victor-sdk`, decorate it with
+> `@register_vertical`, and publish a thin `VictorPlugin` wrapper through
+> `victor.plugins`. This page focuses on runtime consumption plus compatibility
+> surfaces that still exist inside Victor. See `../guides/vertical-quickstart.md`
+> for the canonical authoring flow.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -239,7 +249,12 @@ print(config.stages)         # {"ASSESSMENT": StageDefinition(...), ...}
 print(config.metadata)       # {"supports_docker": True, ...}
 ```
 
-### Using VerticalRegistry
+### Using VerticalRegistry (Runtime/Compatibility)
+
+`VerticalRegistry` is still useful for runtime inspection and compatibility flows
+inside Victor. New external packages should not perform raw registry registration;
+they should publish a `VictorPlugin` and call `context.register_vertical()` from the
+plugin wrapper.
 
 ```python
 from victor.verticals import VerticalRegistry
@@ -257,8 +272,22 @@ config = vertical.get_config()
 ### Minimal Vertical
 
 ```python
-from victor.verticals import VerticalBase, StageDefinition
+from victor_sdk import (
+    PluginContext,
+    StageDefinition,
+    ToolRequirement,
+    VictorPlugin,
+    VerticalBase,
+    register_vertical,
+)
 
+
+@register_vertical(
+    name="mlops",
+    version="1.0.0",
+    min_framework_version=">=0.6.0",
+    plugin_namespace="mlops",
+)
 class MLOpsAssistant(VerticalBase):
     """Vertical for ML operations tasks."""
 
@@ -267,61 +296,61 @@ class MLOpsAssistant(VerticalBase):
     version = "1.0.0"
 
     @classmethod
-    def get_tools(cls):
-        return ["read", "write", "shell", "docker"]
+    def get_tool_requirements(cls) -> list[ToolRequirement]:
+        return [
+            ToolRequirement("read", purpose="inspect project state"),
+            ToolRequirement("write", required=False, purpose="update configs"),
+            ToolRequirement("shell", required=False, purpose="run local commands"),
+            ToolRequirement("docker", required=False, purpose="build and deploy images"),
+        ]
 
     @classmethod
-    def get_system_prompt(cls):
+    def get_tools(cls) -> list[str]:
+        return [requirement.tool_name for requirement in cls.get_tool_requirements()]
+
+    @classmethod
+    def get_system_prompt(cls) -> str:
         return """You are an MLOps assistant.
         Focus on: model training, deployment, monitoring.
         Use Python with MLflow, Docker, Kubernetes."""
 
     @classmethod
-    def get_stages(cls):
+    def get_stages(cls) -> dict[str, StageDefinition]:
         return {
             "EXPLORATION": StageDefinition(
                 name="EXPLORATION",
                 description="Exploring model requirements",
-                tools={"read", "shell"},
+                required_tools=["read"],
+                optional_tools=["shell"],
                 keywords=["explore", "requirements", "data"],
                 next_stages={"TRAINING", "DEPLOYMENT"},
             ),
             "TRAINING": StageDefinition(
                 name="TRAINING",
                 description="Training and evaluating models",
-                tools={"read", "write", "shell"},
+                required_tools=["read"],
+                optional_tools=["write", "shell"],
                 keywords=["train", "evaluate", "model", "metrics"],
                 next_stages={"DEPLOYMENT"},
             ),
-            "DEPLOYMENT": StageDefinition(
-                name="DEPLOYMENT",
-                description="Deploying models to production",
-                tools={"shell", "docker", "write"},
-                keywords=["deploy", "serve", "container", "endpoint"],
-                next_stages={"MONITORING", "COMPLETION"},
-            ),
-            "MONITORING": StageDefinition(
-                name="MONITORING",
-                description="Monitoring model performance",
-                tools={"shell", "read"},
-                keywords=["monitor", "metrics", "drift", "performance"],
-                next_stages={"COMPLETION"},
-            ),
-            "COMPLETION": StageDefinition(
-                name="COMPLETION",
-                description="Task complete",
-                tools={"read"},
-                keywords=["done", "complete"],
-                next_stages=set(),
-            ),
         }
 
-# Register the vertical
-from victor.verticals import VerticalRegistry
-VerticalRegistry.register(MLOpsAssistant)
+
+class MLOpsPlugin(VictorPlugin):
+    @property
+    def name(self) -> str:
+        return "mlops"
+
+    def register(self, context: PluginContext) -> None:
+        context.register_vertical(MLOpsAssistant)
 ```
 
-### Extending Existing Vertical
+### Extending Existing Runtime Vertical (Compatibility/Internal)
+
+If you are customizing an in-process runtime vertical that is already available
+through Victor, subclassing a compatibility shim is still possible. New external
+packages should generally prefer an SDK-first vertical plus a thin plugin wrapper
+instead of subclassing runtime classes from `victor.verticals`.
 
 ```python
 from victor.verticals import CodingAssistant
@@ -360,15 +389,16 @@ class SecurityAuditAssistant(CodingAssistant):
 
 ## StageDefinition
 
-Each stage is defined using `StageDefinition`:
+For external vertical authors, `StageDefinition` is an SDK contract type:
 
 ```python
-from victor.verticals.base import StageDefinition
+from victor_sdk import StageDefinition
 
 stage = StageDefinition(
     name="ANALYSIS",
     description="Analyzing code patterns",
-    tools={"read", "search", "code_search"},
+    required_tools=["read", "search"],
+    optional_tools=["code_search"],
     keywords=["analyze", "understand", "examine"],
     next_stages={"EXECUTION", "PLANNING"},
 )
@@ -379,25 +409,31 @@ stage_dict = stage.to_dict()
 
 ## VerticalConfig
 
-The complete configuration returned by `get_config()`:
+The complete definition-layer configuration uses the SDK `VerticalConfig` contract:
 
 ```python
-from victor.verticals.base import VerticalConfig
+from victor_sdk import StageDefinition, VerticalConfig
 
 config = VerticalConfig(
     name="my_vertical",
     description="Custom vertical",
-    version="1.0.0",
     tools=["read", "write", "shell"],
     system_prompt="You are a helpful assistant...",
-    stages={"STAGE1": stage_def, ...},
-    provider_hints={"preferred_providers": ["anthropic"]},
-    evaluation_criteria=["Correctness", "Clarity"],
+    stages={
+        "STAGE1": StageDefinition(
+            name="STAGE1",
+            description="Primary working stage",
+            required_tools=["read"],
+            optional_tools=["write", "shell"],
+        )
+    },
     metadata={"custom_key": "value"},
 )
 
-# Get kwargs for agent creation
-agent_kwargs = config.to_agent_kwargs()
+# Inspect normalized contract helpers
+tool_names = config.get_tool_names()
+stage_names = config.get_stage_names()
+config = config.with_metadata(owner="ml-platform")
 ```
 
 ## Provider Hints

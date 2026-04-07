@@ -44,6 +44,7 @@ from __future__ import annotations
 import functools
 import logging
 import threading
+import warnings
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from importlib.metadata import entry_points
@@ -91,6 +92,7 @@ _ENTRY_POINT_LOADER_STATS: Dict[str, int] = {
     "cache_clears": 0,
 }
 _ENTRY_POINT_LOADER_STATS_LOCK = threading.Lock()
+_WARNED_LEGACY_VERTICAL_LISTINGS = False
 
 
 def _increment_loader_stat(name: str) -> None:
@@ -118,11 +120,13 @@ def get_entry_point_loader_stats() -> Dict[str, int]:
 
 def reset_entry_point_loader_stats(clear_cache: bool = False) -> None:
     """Reset entry-point loader telemetry counters and optionally clear cache."""
+    global _WARNED_LEGACY_VERTICAL_LISTINGS
     if clear_cache:
         _cached_entry_points.cache_clear()
     with _ENTRY_POINT_LOADER_STATS_LOCK:
         for key in _ENTRY_POINT_LOADER_STATS:
             _ENTRY_POINT_LOADER_STATS[key] = 0
+    _WARNED_LEGACY_VERTICAL_LISTINGS = False
 
 
 def _get_normalize_fn() -> Callable[[str], str]:
@@ -195,8 +199,10 @@ def clear_entry_point_loader_cache() -> None:
 
     Clears both the legacy LRU cache and the unified registry cache.
     """
+    global _WARNED_LEGACY_VERTICAL_LISTINGS
     _cached_entry_points.cache_clear()
     _increment_loader_stat("cache_clears")
+    _WARNED_LEGACY_VERTICAL_LISTINGS = False
 
     # Also clear the unified registry
     try:
@@ -575,14 +581,28 @@ def list_installed_verticals() -> List[str]:
         verticals = list_installed_verticals()
         print(f"Installed verticals: {', '.join(verticals)}")
     """
+    global _WARNED_LEGACY_VERTICAL_LISTINGS
     verticals = set()
+    legacy_verticals = set()
     try:
-        # Check victor.verticals entry points
-        eps = _cached_entry_points("victor.verticals")
-        for ep in eps:
-            verticals.add(ep.name)
+        for group in ("victor.plugins", "victor.verticals"):
+            eps = _cached_entry_points(group)
+            for ep in eps:
+                verticals.add(ep.name)
+                if group == "victor.verticals":
+                    legacy_verticals.add(ep.name)
     except Exception:
         pass
+
+    if legacy_verticals and not _WARNED_LEGACY_VERTICAL_LISTINGS:
+        message = (
+            "Installed vertical inventory includes deprecated raw entry points from "
+            "'victor.verticals'. Migrate these packages to 'victor.plugins'. "
+            f"Observed legacy entries: {', '.join(sorted(legacy_verticals))}"
+        )
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        logger.warning(message)
+        _WARNED_LEGACY_VERTICAL_LISTINGS = True
 
     return sorted(list(verticals))
 

@@ -12,28 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Stable public API surface for external vertical extensions.
+"""Stable compatibility API surface for framework-owned extension helpers.
 
-External verticals (packages like victor-coding, victor-research) should
-import framework internals ONLY through this module or other
-victor.framework.* modules. This provides a stable contract that
-insulates verticals from internal refactoring.
+New external verticals should prefer ``victor_sdk`` for definition-layer
+contracts such as ``VerticalBase``, ``StageDefinition``, ``VerticalConfig``,
+and ``register_vertical``. This module remains as a stable compatibility
+surface for framework-owned helpers and older external packages that still
+import through ``victor.framework.*``.
 
 Importing directly from victor.agent.*, victor.core.container.*,
 victor.workflows.executor.*, or victor.evaluation.* is deprecated
 and may break without notice.
 
 Usage:
-    from victor.framework.extensions import (
-        SafetyCoordinator,
-        ConversationCoordinator,
-        WorkflowExecutor,
-        WorkflowContext,
-        ComputeNode,
-        CodeCorrectionMiddleware,
-        ModeConfigRegistry,
-        AgentSpec,
-    )
+    from victor.framework.extensions import SafetyCoordinator, WorkflowExecutor
+    from victor_sdk import StageDefinition, VerticalBase, register_vertical
 """
 
 from __future__ import annotations
@@ -208,12 +201,12 @@ def __getattr__(name: str):
         "register_vertical_handlers": "victor.framework.handler_registry",
         # Provider access
         "ProviderRegistry": "victor.providers.registry",
-        # Vertical registration and base types
-        "register_vertical": "victor.core.verticals.registration",
-        "VerticalBase": "victor.core.verticals.base",
-        "StageDefinition": "victor.core.verticals.base",
-        "VerticalConfig": "victor.core.verticals.base",
-        "VerticalExtensions": "victor.core.verticals.protocols",
+        # Vertical registration and definition-layer types
+        "register_vertical": "victor_sdk",
+        "VerticalBase": "victor_sdk",
+        "StageDefinition": "victor_sdk",
+        "VerticalConfig": "victor_sdk",
+        "VerticalExtensions": "victor_sdk",
         # Tool dependency types
         "ToolDependencyConfig": "victor.core.tool_dependency_base",
         "ToolDependency": "victor.core.tool_types",

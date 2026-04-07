@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-
 # =============================================================================
 # Safety Types (promoted from victor.security.safety.types)
 # =============================================================================
@@ -100,6 +99,16 @@ class TaskTypeHintData:
     hint: str
     tool_budget: Optional[int] = None
     priority_tools: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the hint to the legacy serializable mapping."""
+
+        return {
+            "task_type": self.task_type,
+            "hint": self.hint,
+            "tool_budget": self.tool_budget,
+            "priority_tools": self.priority_tools.copy(),
+        }
 
 
 # =============================================================================
@@ -223,14 +232,20 @@ class StageValidationResult:
         }
 
 
+SafetyPattern = SafetyPatternData
+TaskTypeHint = TaskTypeHintData
+
+
 __all__ = [
     # Safety
     "SafetyPatternData",
+    "SafetyPattern",
     # Middleware
     "MiddlewarePriority",
     "MiddlewareResult",
     # Task hints
     "TaskTypeHintData",
+    "TaskTypeHint",
     # Mode config
     "ModeConfig",
     # Tool selection

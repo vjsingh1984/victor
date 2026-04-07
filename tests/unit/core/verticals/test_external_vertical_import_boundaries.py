@@ -335,6 +335,19 @@ def test_framework_extensions_lazy_import():
         assert hasattr(extensions, name), f"extensions.{name} failed to resolve"
 
 
+def test_framework_extensions_uses_sdk_vertical_contracts():
+    """Public extension-layer vertical symbols should resolve to SDK contracts."""
+    from victor.framework import extensions
+    from victor_sdk import StageDefinition, VerticalBase, VerticalConfig, VerticalExtensions
+    from victor_sdk import register_vertical
+
+    assert extensions.register_vertical is register_vertical
+    assert extensions.VerticalBase is VerticalBase
+    assert extensions.StageDefinition is StageDefinition
+    assert extensions.VerticalConfig is VerticalConfig
+    assert extensions.VerticalExtensions is VerticalExtensions
+
+
 def test_framework_processing_module_exports():
     """Verify victor.framework.processing exports all documented symbols."""
     from victor.framework import processing
