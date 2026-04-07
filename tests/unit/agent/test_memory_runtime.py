@@ -133,3 +133,33 @@ def test_session_coordinator_init_embedding_store_schedules_on_running_loop():
     assert len(scheduled) == 1
     run_sync_mock.assert_not_called()
     store.initialize.assert_called_once_with()
+
+
+def test_session_coordinator_init_embedding_store_reuses_existing_embedding_service():
+    memory_manager = MagicMock()
+    existing_embedding_service = object()
+    memory_manager._embedding_service = existing_embedding_service
+    store = MagicMock()
+    store.is_initialized = True
+    semantic_cache = object()
+
+    with (
+        patch(
+            "victor.storage.embeddings.service.EmbeddingService.get_instance",
+            side_effect=AssertionError("singleton lookup should not run"),
+        ),
+        patch(
+            "victor.agent.conversation_embedding_store.ConversationEmbeddingStore",
+            return_value=store,
+        ),
+        patch("victor.agent.conversation_embedding_store._embedding_store", None),
+        patch("victor.agent.tool_result_cache.ToolResultCache", return_value=semantic_cache),
+    ):
+        result_store, result_cache = SessionCoordinator.init_conversation_embedding_store(
+            memory_manager=memory_manager
+        )
+
+    assert result_store is store
+    assert result_cache is semantic_cache
+    memory_manager.set_embedding_store.assert_called_once_with(store)
+    memory_manager.set_embedding_service.assert_called_once_with(existing_embedding_service)
