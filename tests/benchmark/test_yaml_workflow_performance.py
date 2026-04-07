@@ -29,6 +29,7 @@ import pytest
 # Try to import YAML workflow components
 try:
     from victor.workflows.yaml_loader import YAMLWorkflowLoader, YAMLWorkflowError
+
     YAML_WORKFLOWS_AVAILABLE = True
 except ImportError:
     YAML_WORKFLOWS_AVAILABLE = False
@@ -77,7 +78,7 @@ class YAMLWorkflowBenchmark:
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = len(workflow_def.workflows) if hasattr(workflow_def, 'workflows') else 1
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return BenchmarkResult(
                 name="compilation",
@@ -138,7 +139,7 @@ workflows:
         """
         nodes_yaml = []
         for i in range(node_count):
-            is_last = (i == node_count - 1)
+            is_last = i == node_count - 1
             node_yaml = f"""
       - id: node{i}
         type: agent
@@ -217,8 +218,12 @@ class TestYAMLWorkflowCompilation:
         print(f"Node Count: {result.node_count}")
 
         assert result.success, f"Compilation failed: {result.error}"
-        assert result.time_ms < 100, f"Compilation too slow: {result.time_ms:.2f}ms (target: < 100ms)"
-        assert result.memory_peak_mb < 50, f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
+        assert (
+            result.time_ms < 100
+        ), f"Compilation too slow: {result.time_ms:.2f}ms (target: < 100ms)"
+        assert (
+            result.memory_peak_mb < 50
+        ), f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
 
     def test_complex_workflow_compilation(self):
         """Benchmark complex workflow compilation (20 nodes).
@@ -238,8 +243,12 @@ class TestYAMLWorkflowCompilation:
         print(f"Node Count: {result.node_count}")
 
         assert result.success, f"Compilation failed: {result.error}"
-        assert result.time_ms < 500, f"Compilation too slow: {result.time_ms:.2f}ms (target: < 500ms)"
-        assert result.memory_peak_mb < 50, f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
+        assert (
+            result.time_ms < 500
+        ), f"Compilation too slow: {result.time_ms:.2f}ms (target: < 500ms)"
+        assert (
+            result.memory_peak_mb < 50
+        ), f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
 
     def test_conditional_workflow_compilation(self):
         """Benchmark workflow with conditional branching.
@@ -259,8 +268,12 @@ class TestYAMLWorkflowCompilation:
         print(f"Node Count: {result.node_count}")
 
         assert result.success, f"Compilation failed: {result.error}"
-        assert result.time_ms < 200, f"Compilation too slow: {result.time_ms:.2f}ms (target: < 200ms)"
-        assert result.memory_peak_mb < 50, f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
+        assert (
+            result.time_ms < 200
+        ), f"Compilation too slow: {result.time_ms:.2f}ms (target: < 200ms)"
+        assert (
+            result.memory_peak_mb < 50
+        ), f"Memory too high: {result.memory_peak_mb:.2f}MB (target: < 50MB)"
 
 
 @pytest.mark.benchmark
@@ -283,7 +296,9 @@ class TestYAMLWorkflowScaling:
             result = harness.benchmark_compilation(yaml_content)
             results.append(result)
 
-            print(f"Nodes: {count:3d} | Time: {result.time_ms:6.2f}ms | Memory: {result.memory_peak_mb:5.2f}MB")
+            print(
+                f"Nodes: {count:3d} | Time: {result.time_ms:6.2f}ms | Memory: {result.memory_peak_mb:5.2f}MB"
+            )
 
             assert result.success, f"Compilation failed for {count} nodes: {result.error}"
 
@@ -336,9 +351,9 @@ workflows:
         result = harness.benchmark_compilation(yaml_content)
 
         if not result.success:
-            assert "empty" in result.error.lower() or "nodes" in result.error.lower(), (
-                f"Error should mention empty/nodes, got: {result.error}"
-            )
+            assert (
+                "empty" in result.error.lower() or "nodes" in result.error.lower()
+            ), f"Error should mention empty/nodes, got: {result.error}"
 
 
 @pytest.mark.integration

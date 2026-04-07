@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     from victor.workflows.yaml_loader import YAMLWorkflowLoader
+
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -58,7 +59,7 @@ class WorkflowBenchmarkSuite:
         nodes_yaml = []
 
         for i in range(node_count):
-            is_last = (i == node_count - 1)
+            is_last = i == node_count - 1
             is_middle = (i == node_count // 2) and with_conditions
 
             if is_middle:
@@ -116,7 +117,7 @@ workflows:
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = len(workflow_def.workflows) if hasattr(workflow_def, 'workflows') else 1
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return {
                 "name": name,
@@ -221,7 +222,7 @@ workflows:
         print(f"Successful:     {analysis['successful']}")
         print(f"Failed:         {analysis['failed']}")
 
-        if analysis['successful'] > 0:
+        if analysis["successful"] > 0:
             print(f"\nTime Performance:")
             print(f"  Min:  {analysis['time_min_ms']:6.2f}ms")
             print(f"  Max:  {analysis['time_max_ms']:6.2f}ms")
@@ -236,11 +237,11 @@ workflows:
         print("SUCCESS CRITERIA")
         print("=" * 80)
 
-        if analysis['successful'] > 0:
+        if analysis["successful"] > 0:
             # Check success criteria
-            simple_fast = analysis['time_min_ms'] < 100
-            large_ok = analysis['time_max_ms'] < 2000
-            memory_ok = analysis['memory_max_mb'] < 50
+            simple_fast = analysis["time_min_ms"] < 100
+            large_ok = analysis["time_max_ms"] < 2000
+            memory_ok = analysis["memory_max_mb"] < 50
 
             print(f"\n✓ Simple workflow < 100ms:    {simple_fast}")
             print(f"✓ Large workflow < 2000ms:      {large_ok}")
@@ -255,9 +256,9 @@ workflows:
             else:
                 print("\n⚠️  SOME BENCHMARKS DID NOT MEET CRITERIA")
 
-        if analysis['failed'] > 0:
+        if analysis["failed"] > 0:
             print(f"\nErrors:")
-            for error in analysis.get('errors', []):
+            for error in analysis.get("errors", []):
                 print(f"  - {error}")
 
     def run(self):
@@ -270,13 +271,12 @@ workflows:
         self.print_summary(analysis)
 
         # Return exit code based on success
-        if analysis['failed'] > 0:
+        if analysis["failed"] > 0:
             return 1
 
         # Check if criteria met
-        if analysis['successful'] > 0:
-            if (analysis['time_max_ms'] > 2000 or
-                analysis['memory_max_mb'] > 50):
+        if analysis["successful"] > 0:
+            if analysis["time_max_ms"] > 2000 or analysis["memory_max_mb"] > 50:
                 return 1
 
         return 0
