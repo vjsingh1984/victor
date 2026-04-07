@@ -316,6 +316,16 @@ def get_vertical(name: str | None) -> type[VerticalBase] | None:
     except Exception:
         pass
 
+    try:
+        from victor.core.verticals.vertical_loader import get_vertical_loader
+
+        loader = get_vertical_loader()
+        for discovered_name in loader.discover_vertical_names():
+            if discovered_name.lower() == name_lower:
+                return loader.resolve(discovered_name)
+    except Exception:
+        pass
+
     return None
 
 
