@@ -599,8 +599,8 @@ class TestListVerticalsFunction:
     def test_list_verticals_includes_builtins(self):
         """Test that list_verticals includes built-in verticals."""
         names = list_verticals()
-        # Contrib verticals are registered via victor.plugins entry points
-        assert "coding" in names
+        # Benchmark is still core-provided; extracted verticals are optional.
+        assert "benchmark" in names
 
 
 class TestFrameworkShimProperties:

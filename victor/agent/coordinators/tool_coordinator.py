@@ -522,7 +522,7 @@ class ToolCoordinator:
             if tool_name in config.disallowed_tools:
                 return False
             if config.allow_all_tools:
-                if self._registry and tool_name in self._registry.list_tools():
+                if tool_name in self.get_available_tools():
                     return True
 
         # Fall back to session/vertical restrictions
@@ -536,7 +536,15 @@ class ToolCoordinator:
             Set of tool names available in registry
         """
         if self._registry:
-            return set(self._registry.list_tools())
+            tool_names: Set[str] = set()
+            for tool in self._registry.list_tools():
+                if isinstance(tool, str):
+                    tool_names.add(tool)
+                    continue
+                tool_name = getattr(tool, "name", None)
+                if isinstance(tool_name, str) and tool_name:
+                    tool_names.add(tool_name)
+            return tool_names
         return set()
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
@@ -1042,8 +1050,22 @@ class ToolCoordinator:
                 },
             )
 
-        # Format validation (reject hallucinated/malformed names)
-        if not sanitizer.is_valid_tool_name(tool_name):
+        # Resolve legacy/alias names to canonical form
+        try:
+            from victor.tools.decorators import resolve_tool_name
+
+            canonical = resolve_tool_name(tool_name)
+        except Exception:
+            canonical = tool_name
+
+        available_tools = self.get_available_tools()
+        enabled = _is_enabled(canonical)
+        # Reject malformed names unless the resolved tool is explicitly enabled.
+        # This keeps legitimate registered tools working even if a sanitizer has
+        # been over-mocked or leaked test state into the current orchestrator.
+        if not sanitizer.is_valid_tool_name(tool_name) and not (
+            enabled and canonical in available_tools
+        ):
             return ToolCallValidation(
                 valid=False,
                 original_name=tool_name,
@@ -1060,16 +1082,8 @@ class ToolCoordinator:
                 },
             )
 
-        # Resolve legacy/alias names to canonical form
-        try:
-            from victor.tools.decorators import resolve_tool_name
-
-            canonical = resolve_tool_name(tool_name)
-        except Exception:
-            canonical = tool_name
-
         # Check if enabled
-        if not _is_enabled(canonical):
+        if not enabled:
             return ToolCallValidation(
                 valid=False,
                 original_name=tool_name,

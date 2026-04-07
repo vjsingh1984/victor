@@ -15,8 +15,40 @@
 """Pytest fixtures for unit tests."""
 
 import logging
+import os
+from pathlib import Path
 
 import pytest
+
+_UNIT_TEST_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _safe_current_working_directory() -> Path:
+    """Return a valid current working directory, recovering from deleted cwd state."""
+    try:
+        return Path.cwd()
+    except FileNotFoundError:
+        os.chdir(_UNIT_TEST_REPO_ROOT)
+        return _UNIT_TEST_REPO_ROOT
+
+
+@pytest.fixture(autouse=True)
+def isolate_working_directory():
+    """Ensure each unit test starts and ends with a valid working directory.
+
+    Some tests chdir into temporary directories that are later deleted. When that
+    leaks into the next test, imports and subprocess helpers can fail with
+    FileNotFoundError during collection or runtime. Restore a safe directory after
+    every test, defaulting to the repo root if the original cwd vanished.
+    """
+    original_cwd = _safe_current_working_directory()
+
+    yield
+
+    target = original_cwd if original_cwd.exists() else _UNIT_TEST_REPO_ROOT
+    current_cwd = _safe_current_working_directory()
+    if current_cwd != target:
+        os.chdir(target)
 
 
 @pytest.fixture(autouse=True)

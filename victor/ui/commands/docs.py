@@ -12,6 +12,7 @@ This module provides the `victor docs` command for accessing Victor's
 documentation guides directly from the terminal.
 """
 
+import os
 import subprocess
 import sys
 import webbrowser
@@ -322,7 +323,7 @@ def _open_doc(doc_path: Path) -> None:
             console.print(f"[green]Opened:[/green] {doc_path}")
         elif sys.platform == "win32":
             # Windows
-            subprocess.run(["start", "", str(doc_path)], shell=True, check=True)
+            os.startfile(str(doc_path))
             console.print(f"[green]Opened:[/green] {doc_path}")
         else:
             # Linux and others: try xdg-open

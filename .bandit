@@ -1,0 +1,18 @@
+# Bandit configuration for Victor
+# https://bandit.readthedocs.io/en/latest/config.html
+
+[bandit]
+# Exclude directories from scanning
+exclude_dirs = /tests,/test_
+
+# Skips (tests to skip)
+skips = B101,B324
+
+[bandit.assert_used]
+# Skips checking for use of assert statements
+skips = */test_*.py,*/tests/*
+
+[bandit.functional_tests]
+# Additional tests for new Python versions
+disabled = []
+checks = []

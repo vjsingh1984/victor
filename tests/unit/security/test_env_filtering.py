@@ -61,7 +61,7 @@ class TestGetFilteredEnv:
 
     def test_strips_all_sensitive_vars(self):
         # Build an env with all sensitive vars present
-        env = {var: "secret" for var in SENSITIVE_ENV_VARS}
+        env = dict.fromkeys(SENSITIVE_ENV_VARS, "secret")
         env["PATH"] = "/bin"
         filtered = get_filtered_env(env)
         for var in SENSITIVE_ENV_VARS:

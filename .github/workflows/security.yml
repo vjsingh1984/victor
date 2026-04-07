@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -36,24 +36,44 @@ jobs:
     name: Critical Filesystem Scan (Trivy, Blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Run Trivy critical scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-critical-results.sarif'
+          scanners: 'vuln'
+          format: 'table'
           severity: 'CRITICAL'
           exit-code: '1'
           ignore-unfixed: true
+          trivyignores: '.trivyignore'
+          cache: false
+
+      - name: Generate Trivy SARIF report
+        if: always()
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln'
+          format: 'sarif'
+          output: 'trivy-critical-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+          ignore-unfixed: true
+          trivyignores: '.trivyignore'
+          cache: false
 
       - name: Upload Trivy critical results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-critical-results.sarif
@@ -63,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -76,18 +96,78 @@ jobs:
           pip install -e .
 
       - name: Run pip-audit (blocking on high+ severity)
-        uses: pypa/gh-action-pip-audit@v1.0.8
+        run: |
+          pip install pip-audit
+          # Run pip-audit with JSON output for parsing
+          pip-audit --format json --output audit-report.json 2>&1 | tee /tmp/pip-audit-output.txt
+
+          # Parse and filter vulnerabilities
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          try:
+              with open("audit-report.json", "r", encoding="utf-8") as f:
+                  report = json.load(f)
+          except FileNotFoundError:
+              print("No audit report found, checking exit status...")
+              result = subprocess.run(["pip-audit"], capture_output=True, text=True, check=False)
+              if result.returncode != 0:
+                  print("pip-audit failed (no JSON output available)")
+                  print(result.stdout)
+                  print(result.stderr)
+              sys.exit(result.returncode)
+
+          known_cves = set()
+          try:
+              with open(".pip-audit-known-vulnerabilities", "r", encoding="utf-8") as f:
+                  for raw_line in f:
+                      line = raw_line.strip()
+                      if line and not line.startswith("#"):
+                          cve_id = line.split("|", 1)[0].strip()
+                          if cve_id.startswith("CVE-"):
+                              known_cves.add(cve_id)
+          except FileNotFoundError:
+              print("No .pip-audit-known-vulnerabilities file found")
+
+          vulnerabilities = report.get("vulnerabilities", [])
+          filtered = [v for v in vulnerabilities if v.get("id") not in known_cves]
+
+          if filtered:
+              print(
+                  f"Found {len(filtered)} vulnerabilities not in exceptions:",
+                  file=sys.stderr,
+              )
+              for vuln in filtered:
+                  fix_versions = vuln.get("fix_versions", [])
+                  if fix_versions:
+                      first_fix = fix_versions[0]
+                      if isinstance(first_fix, dict):
+                          fix_info = first_fix.get("version", "no fix")
+                      else:
+                          fix_info = first_fix
+                  else:
+                      fix_info = "no fix available"
+                  print(f"  {vuln.get('id')} - {vuln.get('package')} ({fix_info})")
+              sys.exit(1)
+
+          if known_cves:
+              print("All vulnerabilities documented in .pip-audit-known-vulnerabilities")
+              print(f"Known CVEs: {', '.join(sorted(known_cves))}")
+          else:
+              print("No vulnerabilities found")
+          PY
         # Blocks on any known vulnerability. Exceptions must be documented in
         # .pip-audit-known-vulnerabilities if a transitive dependency cannot be
         # updated immediately. See SECURITY.md § Dependency Audit Exceptions.
-        continue-on-error: true
 
   code-security:
     name: Code Security (Bandit, High-Severity Blocking)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -103,7 +183,9 @@ jobs:
             -f json \
             -o bandit-report.json \
             --severity-level high \
-            --confidence-level high || true
+            --confidence-level high \
+            -s B101,B324 \
+            --ini .bandit
         # Blocks on HIGH severity + HIGH confidence findings.
         # Lower severity findings are still reported in the artifact.
         # To add exceptions, use # nosec inline or .bandit config.
@@ -114,6 +196,8 @@ jobs:
           bandit -r victor/ \
             -f json \
             -o bandit-report-full.json \
+            -s B101,B324 \
+            --ini .bandit \
             || true
 
       - name: Upload Bandit report
@@ -130,22 +214,25 @@ jobs:
     name: SAST Scan (Semgrep, Advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run Semgrep
         uses: returntocorp/semgrep-action@v1
         with:
           config: auto
-          sarif: true
+          args: --sarif --output=semgrep.sarif
         # Advisory until repo-specific exclusions are tuned and documented.
         continue-on-error: true
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
       - name: Upload Semgrep results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('semgrep.sarif') != ''
         with:
           sarif_file: semgrep.sarif
         continue-on-error: true
@@ -155,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5

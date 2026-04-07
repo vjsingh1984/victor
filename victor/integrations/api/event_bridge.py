@@ -157,6 +157,7 @@ class EventBroadcaster:
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
         self._recent_events: deque[BridgeEvent] = deque(maxlen=500)
         self._broadcast_task: Optional[asyncio.Task] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._dispatch_latency_ms_window: deque[float] = deque(maxlen=2000)
         self._client_send_success_count = 0
         self._client_send_failure_count = 0
@@ -170,7 +171,39 @@ class EventBroadcaster:
 
     async def start(self) -> None:
         """Start the broadcast loop."""
-        if self._running:
+        current_loop = asyncio.get_running_loop()
+
+        if self._loop is not None and self._loop is not current_loop:
+            if self._broadcast_task is not None and not self._broadcast_task.done():
+                self._broadcast_task.cancel()
+            # Client send callables and queue waiters are loop-bound. Reset the
+            # broadcaster state when pytest or another runtime swaps loops.
+            self._clients.clear()
+            self._event_queue = asyncio.Queue()
+            self._broadcast_task = None
+            self._running = False
+
+        self._loop = current_loop
+
+        if self._broadcast_task is not None:
+            try:
+                task_loop = self._broadcast_task.get_loop()
+            except RuntimeError:
+                task_loop = None
+
+            if (
+                self._broadcast_task.done()
+                or task_loop is None
+                or task_loop.is_closed()
+                or task_loop is not current_loop
+            ):
+                # The broadcaster is a process-wide singleton, but pytest async
+                # tests use function-scoped loops. Drop stale task references so
+                # a later loop can safely restart the broadcaster.
+                self._broadcast_task = None
+                self._running = False
+
+        if self._running and self._broadcast_task is not None:
             return
 
         self._running = True
@@ -180,12 +213,26 @@ class EventBroadcaster:
     async def stop(self) -> None:
         """Stop the broadcast loop."""
         self._running = False
-        if self._broadcast_task:
-            self._broadcast_task.cancel()
+        task = self._broadcast_task
+        self._broadcast_task = None
+        if task:
             try:
-                await self._broadcast_task
-            except asyncio.CancelledError:
-                pass
+                task_loop = task.get_loop()
+            except RuntimeError:
+                task_loop = None
+
+            if not task.done():
+                task.cancel()
+
+            if task_loop is asyncio.get_running_loop():
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            else:
+                logger.debug(
+                    "Skipping await for EventBroadcaster task bound to a different event loop"
+                )
         logger.info("EventBroadcaster stopped")
 
     def add_client(

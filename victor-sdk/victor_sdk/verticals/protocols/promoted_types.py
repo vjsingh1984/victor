@@ -223,14 +223,20 @@ class StageValidationResult:
         }
 
 
+SafetyPattern = SafetyPatternData
+TaskTypeHint = TaskTypeHintData
+
+
 __all__ = [
     # Safety
     "SafetyPatternData",
+    "SafetyPattern",
     # Middleware
     "MiddlewarePriority",
     "MiddlewareResult",
     # Task hints
     "TaskTypeHintData",
+    "TaskTypeHint",
     # Mode config
     "ModeConfig",
     # Tool selection

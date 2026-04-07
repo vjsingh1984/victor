@@ -120,7 +120,10 @@ examples = []
 
 dev = [
     # Embeddings (required for full test coverage)
-    "victor[embeddings]",
+    "numpy>=1.24",  # Required by victor.storage.embeddings.service
+    "sentence-transformers>=2.2.0",
+    "lancedb>=0.6.0",
+    "pyarrow>=14.0",
     # Testing
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -146,29 +149,47 @@ dev = [
 
     # Integration test dependencies
     "strawberry-graphql[fastapi]>=0.243",  # For GraphQL API integration tests
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 # CI/CD dependencies - includes all testing, linting, and build tools
 ci = [
-    # All dev dependencies
-    "victor[dev]",
+    # Embeddings and optional runtime surfaces exercised in unit tests
+    "numpy>=1.24",
+    "sentence-transformers>=2.2.0",
+    "lancedb>=0.6.0",
+    "pyarrow>=14.0",
+
+    # Core test dependencies
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "pytest-json-report>=1.5.0",
+    "pytest-benchmark>=5.0",
+    "respx>=0.21",
+    "pandas>=2.0",
+    "scipy>=1.10",
+
+    # Linting/Formatting/Typing
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "black==26.1.0",
+    "radon>=6.0",
+    "types-pyyaml",
+    "types-aiofiles",
 
     # Additional CI-specific tools
     "pytest-split>=0.8",
+    "tomli>=2.0; python_version < '3.11'",
 
     # Build tools
     "build>=0.10",
     "wheel>=0.42",
     "twine>=4.0",
 
-    # API dependencies for integration tests
+    # API and integration dependencies
     "strawberry-graphql[fastapi]>=0.243",
-
-    # Statistical analysis (ab_testing)
-    "scipy>=1.10",
-
-    # Coverage and reporting
-    "pytest-cov>=4.1",
     "codecov>=2.1",
 
     # Pre-commit hooks
@@ -215,7 +236,7 @@ build = [
 ]
 
 # HTTP API server for IDE integrations (VS Code, JetBrains, etc.)
-# Usage: pip install victor[api]
+# Usage: pip install victor-ai[api]
 api = [
     "fastapi>=0.109",
     "uvicorn>=0.27",
@@ -223,19 +244,19 @@ api = [
 ]
 
 # Checkpoint persistence with SQLite backend
-# Usage: pip install victor[checkpoints]
+# Usage: pip install victor-ai[checkpoints]
 checkpoints = [
     "aiosqlite>=0.19",
 ]
 
 # Google Gemini provider (using new google-genai SDK)
-# Usage: pip install victor[google]
+# Usage: pip install victor-ai[google]
 google = [
     "google-genai>=1.0",
 ]
 
 # Language-specific tree-sitter grammars (optional - install what you need)
-# Usage: pip install victor[lang-c] or pip install victor[lang-all]
+# Usage: pip install victor-ai[lang-c] or pip install victor-ai[lang-all]
 
 lang-c = [
     "tree-sitter-c>=0.23",
@@ -396,27 +417,32 @@ native = [
     "maturin>=1.4",
 ]
 
-# Vertical packages are now included in the main package (migrated 2026-03-01)
-# Contrib verticals: coding, rag, devops, dataanalysis, research
-# Built-in verticals: benchmark, classification, iac, security
-# All verticals are available via victor.verticals.* entry points
-# No additional dependencies needed - all verticals are bundled
+# Extracted vertical packages (optional meta-extras for cross-repo installs)
+coding = [
+    "victor-coding>=0.6.0,<1.0.0",
+]
 
-# Individual vertical installations (no-ops, kept for backward compatibility)
-rag = []
+research = [
+    "victor-research>=0.6.0,<1.0.0",
+]
 
-coding = []
+devops = [
+    "victor-devops>=0.6.0,<1.0.0",
+]
 
-research = []
+invest = [
+    "victor-invest>=0.5.0,<1.0.0",
+]
 
-devops = []
-
-dataanalysis = []
-
-verticals = []
+verticals = [
+    "victor-coding>=0.6.0,<1.0.0",
+    "victor-research>=0.6.0,<1.0.0",
+    "victor-devops>=0.6.0,<1.0.0",
+    "victor-invest>=0.5.0,<1.0.0",
+]
 
 all = [
-    "victor[dev,docs,build,lang-all,apple-silicon]",
+    "victor-ai[dev,docs,build,lang-all,apple-silicon]",
 ]
 
 [project.urls]
@@ -506,6 +532,7 @@ addopts = [
     "--cov-report=",
 ]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests as integration tests (require external services)",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

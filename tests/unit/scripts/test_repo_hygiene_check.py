@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 def load_repo_hygiene_module():
@@ -26,6 +27,26 @@ def write_file(root: Path, relative_path: str, content: str) -> Path:
     return path
 
 
+def test_load_toml_module_falls_back_to_tomli(monkeypatch) -> None:
+    calls: list[str] = []
+    tomli_module = SimpleNamespace(loads=lambda text: {"ok": text})
+
+    def fake_import_module(name: str):
+        calls.append(name)
+        if name == "tomllib":
+            raise ModuleNotFoundError(name)
+        if name == "tomli":
+            return tomli_module
+        raise AssertionError(f"unexpected import: {name}")
+
+    monkeypatch.setattr(repo_hygiene_check.importlib, "import_module", fake_import_module)
+
+    loaded = repo_hygiene_check._load_toml_module()
+
+    assert loaded is tomli_module
+    assert calls == ["tomllib", "tomli"]
+
+
 def test_workflow_check_flags_missing_top_level_on(tmp_path: Path) -> None:
     write_file(
         tmp_path,
@@ -40,6 +61,86 @@ def test_workflow_check_flags_missing_top_level_on(tmp_path: Path) -> None:
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any("non-empty top-level trigger" in finding.message for finding in findings)
+
+
+def test_vertical_extras_require_real_package_dependencies(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = []
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("extracted vertical extra 'coding'" in finding.message for finding in findings)
+
+
+def test_legacy_noop_vertical_extras_are_rejected(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = ["victor-coding>=0.6.0"]
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+rag = []
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("legacy no-op vertical extra 'rag'" in finding.message for finding in findings)
+
+
+def test_self_referential_ci_extra_is_rejected(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "pyproject.toml",
+        """
+[project]
+name = "victor-ai"
+
+[project.optional-dependencies]
+coding = ["victor-coding>=0.6.0"]
+research = ["victor-research>=0.6.0"]
+devops = ["victor-devops>=0.6.0"]
+verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0.6.0"]
+ci = ["victor-ai[dev]", "pytest-split>=0.8"]
+        """.strip() + "\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert any("must not self-reference victor-ai" in finding.message for finding in findings)
 
 
 def test_banned_repo_url_is_flagged(tmp_path: Path) -> None:
@@ -181,6 +282,33 @@ def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) ->
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any("blocking Bandit step" in finding.message for finding in findings)
+
+
+def test_security_baseline_accepts_shell_based_blocking_pip_audit(tmp_path: Path) -> None:
+    write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
+    write_file(
+        tmp_path,
+        ".github/workflows/ci-fast.yml",
+        "name: CI\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@0.33.1\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
+    )
+    write_file(
+        tmp_path,
+        ".github/workflows/security.yml",
+        "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@0.33.1\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n      - name: Run pip-audit\n        run: |\n          pip install pip-audit\n          pip-audit --format json --output audit-report.json\n      - name: Run Bandit\n        run: |\n          bandit -r victor/ --severity-level high --confidence-level high\n",
+    )
+    write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
+    write_file(
+        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "Archived planning document\n"
+    )
+    write_file(
+        tmp_path,
+        "SECURITY.md",
+        "## Current CI Enforcement Baseline\n**Blocking today**\n**Advisory today**\n### Current Thresholds\nTrivy filesystem scan\n| Dependency audit | Blocking |\n| Bandit (SAST) | Blocking |\n",
+    )
+
+    findings = repo_hygiene_check.run_checks(tmp_path)
+
+    assert not any("blocking pip-audit step" in finding.message for finding in findings)
 
 
 def test_security_baseline_requires_ignore_unfixed_for_blocking_trivy_path(tmp_path: Path) -> None:

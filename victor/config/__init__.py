@@ -31,6 +31,9 @@ Example:
     config = manager.resolve_provider_config(account)
 """
 
+from importlib import import_module
+from importlib.util import find_spec
+
 # New unified configuration system
 from victor.config.accounts import (
     ProviderAccount,
@@ -117,3 +120,27 @@ __all__ = [
     "DefaultProviderConfig",
     "DEFAULT_PROVIDER_ENDPOINTS",
 ]
+
+
+def __getattr__(name: str):
+    """Lazily expose config submodules on the package object.
+
+    Some test and plugin flows reload ``victor.config`` without clearing its
+    descendant submodules from ``sys.modules``. In that state, package-level
+    attribute lookup such as ``victor.config.api_keys`` should still resolve to
+    the already-imported submodule instead of failing with ``AttributeError``.
+    """
+
+    submodule_name = f"{__name__}.{name}"
+    if find_spec(submodule_name) is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module = import_module(submodule_name)
+    globals()[name] = module
+    return module
+
+
+def __dir__() -> list[str]:
+    """Include lazily exposed submodules in package introspection."""
+
+    return sorted(set(globals()) | {"api_keys", "config_loaders", "settings", "validation"})

@@ -9,6 +9,7 @@ import pytest
 
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.metadata import VerticalMetadataProvider
+from victor.framework import entry_point_loader
 
 
 class ResearchAssistant(VerticalExtensionLoader, VerticalMetadataProvider):
@@ -120,7 +121,8 @@ def test_provider_style_runtime_extensions_prefer_entry_points(
         return EntryPointExtension()
 
     monkeypatch.setattr(
-        "victor.framework.entry_point_loader.load_runtime_extension_from_entry_points",
+        entry_point_loader,
+        "load_runtime_extension_from_entry_points",
         _load_from_entry_points,
     )
 
@@ -145,7 +147,8 @@ def test_tool_dependency_provider_uses_entry_point_loader(
         return provider
 
     monkeypatch.setattr(
-        "victor.framework.entry_point_loader.load_tool_dependency_provider_from_entry_points",
+        entry_point_loader,
+        "load_tool_dependency_provider_from_entry_points",
         _load,
     )
 
@@ -172,10 +175,7 @@ def test_rl_config_provider_uses_entry_point_loader(
         calls["count"] += 1
         return EntryPointRLConfig()
 
-    monkeypatch.setattr(
-        "victor.framework.entry_point_loader.load_rl_config_provider_from_entry_points",
-        _load,
-    )
+    monkeypatch.setattr(entry_point_loader, "load_rl_config_provider_from_entry_points", _load)
 
     resolved = ResearchAssistant.get_rl_config_provider()
     again = ResearchAssistant.get_rl_config_provider()

@@ -69,6 +69,15 @@ from victor_sdk.core.exceptions import (
 )
 
 # Vertical protocols
+from victor_sdk.verticals import (
+    MiddlewarePriority,
+    MiddlewareResult,
+    SafetyPattern,
+    TaskTypeHint,
+    ToolDependency,
+    ToolDependencyProviderProtocol,
+    register_vertical,
+)
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols.capabilities import (
     CapabilityProvider,
@@ -102,6 +111,11 @@ from victor_sdk.discovery import (
     discover_protocols,
     get_discovery_summary,
     reload_discovery,
+)
+from victor_sdk.validation import (
+    ValidationIssue,
+    ValidationReport,
+    validate_vertical_package,
 )
 
 # Stable SDK constants
@@ -175,10 +189,17 @@ __all__ = [
     "VerticalProtocolError",
     # Base class
     "VerticalBase",
+    "register_vertical",
     # Capability protocols
     "CapabilityProvider",
     "ChainProvider",
     "PersonaProvider",
+    "ToolDependency",
+    "ToolDependencyProviderProtocol",
+    "MiddlewarePriority",
+    "MiddlewareResult",
+    "SafetyPattern",
+    "TaskTypeHint",
     # Extension manifest
     "ExtensionManifest",
     "ExtensionType",
@@ -195,6 +216,10 @@ __all__ = [
     "discover_protocols",
     "get_discovery_summary",
     "reload_discovery",
+    # Validation
+    "ValidationIssue",
+    "ValidationReport",
+    "validate_vertical_package",
     # Stable constants
     "CapabilityIds",
     "ToolNames",

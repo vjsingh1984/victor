@@ -61,6 +61,7 @@ from victor.framework.tools import ToolSet
 
 # Import SDK base class for dependency inversion
 from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
+from victor.core.verticals.manifest_contract import get_or_create_vertical_manifest
 
 # Import focused capability providers for SRP compliance
 from victor.core.verticals.metadata import VerticalMetadataProvider
@@ -735,10 +736,17 @@ class VerticalRegistry:
 
         logger = logging.getLogger(__name__)
 
-        if not vertical.name:
+        manifest = get_or_create_vertical_manifest(vertical)
+        if manifest is None:
+            raise ValueError(
+                f"Vertical {vertical.__name__} does not expose a valid ExtensionManifest"
+            )
+
+        name = manifest.name or getattr(vertical, "name", "")
+        if not name:
             raise ValueError(f"Vertical {vertical.__name__} has no name defined")
 
-        name = vertical.name
+        vertical.name = name
         new_module = getattr(vertical, "__module__", "<unknown>")
 
         if name in cls._registry:
@@ -960,22 +968,46 @@ class VerticalRegistry:
             )
             return False
 
-        # Check if it has a name defined
-        if not getattr(vertical_class, "name", None):
+        # Validate the minimal callable contract without executing runtime-heavy hooks.
+        required_methods = ("get_name", "get_description", "get_tools", "get_system_prompt")
+        for method_name in required_methods:
+            method = getattr(vertical_class, method_name, None)
+            if method is None or not callable(method):
+                logger.warning(
+                    "External vertical '%s' (%s) is missing required method '%s'. Skipping.",
+                    entry_point_name,
+                    vertical_class.__name__,
+                    method_name,
+                )
+                return False
+
+        raw_api_version = getattr(vertical_class, "VERTICAL_API_VERSION", None)
+        if raw_api_version is None:
             logger.warning(
-                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                f"has no 'name' attribute defined. Skipping."
+                "External vertical '%s' (%s) has no VERTICAL_API_VERSION; defaulting to 1.",
+                entry_point_name,
+                vertical_class.__name__,
+            )
+
+        manifest = get_or_create_vertical_manifest(vertical_class)
+        if manifest is None:
+            logger.warning(
+                "External vertical '%s' (%s) has no valid manifest metadata. Skipping.",
+                entry_point_name,
+                vertical_class.__name__,
+            )
+            return False
+
+        if not manifest.name:
+            logger.warning(
+                "External vertical '%s' (%s) has no manifest name defined. Skipping.",
+                entry_point_name,
+                vertical_class.__name__,
             )
             return False
 
         # Check API version compatibility
-        api_version = getattr(vertical_class, "VERTICAL_API_VERSION", None)
-        if api_version is None:
-            logger.warning(
-                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                f"has no VERTICAL_API_VERSION. Assuming version 1."
-            )
-            api_version = 1
+        api_version = int(getattr(manifest, "api_version", 0) or 0)
         if api_version < cls.MINIMUM_SUPPORTED_API_VERSION:
             logger.error(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
@@ -989,39 +1021,6 @@ class VerticalRegistry:
                 f"API version {api_version} is newer than current "
                 f"version {cls.CURRENT_API_VERSION}. It may use unsupported features."
             )
-
-        # Check if abstract methods are implemented
-        # VerticalBase requires get_tools() and get_system_prompt()
-        try:
-            # Try to call the abstract methods to ensure they're implemented
-            # These are classmethods so we can call them on the class
-            tools = vertical_class.get_tools()
-            if not isinstance(tools, list):
-                logger.warning(
-                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                    f"get_tools() must return a list. Skipping."
-                )
-                return False
-
-            prompt = vertical_class.get_system_prompt()
-            if not isinstance(prompt, str):
-                logger.warning(
-                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                    f"get_system_prompt() must return a string. Skipping."
-                )
-                return False
-        except NotImplementedError:
-            logger.warning(
-                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                f"has unimplemented abstract methods. Skipping."
-            )
-            return False
-        except Exception as e:
-            logger.warning(
-                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                f"failed validation: {e}. Skipping."
-            )
-            return False
 
         return True
 
