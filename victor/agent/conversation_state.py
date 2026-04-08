@@ -275,6 +275,11 @@ class ConversationStateMachine:
     # while still preventing thrashing
     TRANSITION_COOLDOWN_SECONDS: float = 2.0
 
+    # Stage detection strategy order — loaded from settings.pipeline.stage_detection_order.
+    # Default: ["heuristic", "llm"] — heuristics first, LLM as tiebreaker.
+    # Override per-instance or via ~/.victor/config.yaml
+    STAGE_DETECTION_ORDER: List[str] = ["heuristic", "llm"]
+
     # Thrashing detection: if >MAX transitions in WINDOW seconds, apply longer cooldown.
     # Tuned conservatively — natural EXECUTION↔READING cycling (read-edit-read) is
     # expected in agentic workflows. Only flag true oscillation (>8 in 2 min).
@@ -317,6 +322,17 @@ class ConversationStateMachine:
         self._track_history = track_history
         self._max_history_size = max_history_size
         self._transition_history: List[Dict[str, Any]] = []
+
+        # Load stage detection order from settings
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            pipeline = getattr(settings, "pipeline", None)
+            if pipeline and hasattr(pipeline, "stage_detection_order"):
+                self.STAGE_DETECTION_ORDER = pipeline.stage_detection_order
+        except Exception:
+            pass  # Use class default
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
 
@@ -475,11 +491,11 @@ class ConversationStateMachine:
         }
 
     def _detect_stage_from_content(self, content: str) -> Optional[ConversationStage]:
-        """Detect stage from message content.
+        """Detect stage from message content using configurable strategy order.
 
-        Priority: LLM decision service → keyword heuristics (fallback).
-        The LLM considers full context (message, stage, files observed).
-        Heuristics are fast fallback when LLM is unavailable or budget exhausted.
+        The detection order is configurable via STAGE_DETECTION_ORDER:
+        - "heuristic": Fast keyword-based detection (default first)
+        - "llm": LLM decision service with full context (default tiebreaker)
 
         Args:
             content: Message content to analyze
@@ -487,22 +503,32 @@ class ConversationStateMachine:
         Returns:
             Detected stage or None
         """
-        # 1. Try LLM decision service FIRST (considers full context)
-        edge_stage, edge_conf = self._detect_stage_with_edge_model(content)
-        if edge_stage is not None:
-            # Guard: suppress EXECUTION before any files are read
-            if (
-                edge_stage == ConversationStage.EXECUTION
-                and self.state.message_count <= 1
-                and not self.state.observed_files
-            ):
-                logger.info(
-                    "LLM detected EXECUTION but no files read yet — using READING"
-                )
-                return ConversationStage.READING
-            return edge_stage
+        for strategy in self.STAGE_DETECTION_ORDER:
+            result = None
+            if strategy == "heuristic":
+                result = self._detect_stage_heuristic(content)
+            elif strategy == "llm":
+                edge_stage, _ = self._detect_stage_with_edge_model(content)
+                result = edge_stage
 
-        # 2. Fallback: keyword heuristics with weighted scoring
+            if result is not None:
+                # Guard: suppress EXECUTION before any files are read
+                if (
+                    result == ConversationStage.EXECUTION
+                    and self.state.message_count <= 1
+                    and not self.state.observed_files
+                ):
+                    return ConversationStage.READING
+                return result
+
+        return None
+
+    def _detect_stage_heuristic(self, content: str) -> Optional[ConversationStage]:
+        """Keyword-based stage detection with weighted scoring.
+
+        Returns:
+            Detected stage if confidence >= 2, else None (falls to next strategy)
+        """
         content_lower = content.lower()
         scores: Dict[ConversationStage, float] = {}
 
@@ -519,13 +545,9 @@ class ConversationStateMachine:
 
         if scores:
             best_stage = max(scores, key=scores.get)  # type: ignore
-            # Guard: suppress EXECUTION before any files are read
-            if (
-                best_stage == ConversationStage.EXECUTION
-                and self.state.message_count <= 1
-                and not self.state.observed_files
-            ):
-                return ConversationStage.READING
+            if scores[best_stage] >= 2:  # High confidence
+                return best_stage
+            # Low confidence — return best match but let next strategy override
             return best_stage
 
         return None

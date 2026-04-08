@@ -779,6 +779,14 @@ class UISettings(_BaseModel):
 class PipelineSettings(_BaseModel):
     """Intelligent agent pipeline, quality scoring, and recovery."""
 
+    # Stage detection strategy order — configurable fallback chain.
+    # "heuristic": Fast keyword matching (default first — proven at 60% SWE-bench)
+    # "llm": LLM decision service via edge/main model (tiebreaker)
+    # Examples: ["heuristic", "llm"], ["llm", "heuristic"], ["heuristic"]
+    stage_detection_order: List[str] = Field(
+        default=["heuristic", "llm"]
+    )
+
     intelligent_pipeline_enabled: bool = True
     intelligent_quality_scoring: bool = True
     intelligent_mode_learning: bool = True
