@@ -23,7 +23,10 @@ class MemoryGraphStore(GraphStoreProtocol):
             self._edges[(e.src, e.dst, e.type)] = e
 
     async def get_neighbors(
-        self, node_id: str, edge_types: Optional[Iterable[str]] = None, max_depth: int = 1
+        self,
+        node_id: str,
+        edge_types: Optional[Iterable[str]] = None,
+        max_depth: int = 1,
     ) -> List[GraphEdge]:
         types = set(edge_types) if edge_types else None
         return [
@@ -33,7 +36,11 @@ class MemoryGraphStore(GraphStoreProtocol):
         ]
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]:
         results: List[GraphNode] = []
         for node in self._nodes.values():
@@ -51,4 +58,8 @@ class MemoryGraphStore(GraphStoreProtocol):
         self._edges.clear()
 
     async def stats(self) -> Dict[str, Any]:
-        return {"nodes": len(self._nodes), "edges": len(self._edges), "path": ":memory:"}
+        return {
+            "nodes": len(self._nodes),
+            "edges": len(self._edges),
+            "path": ":memory:",
+        }

@@ -147,7 +147,8 @@ class DebugAdapterRegistry:
         if language not in self._adapters:
             available = ", ".join(sorted(self._adapters.keys()))
             raise ValueError(
-                f"No debug adapter registered for '{language}'. " f"Available: {available}"
+                f"No debug adapter registered for '{language}'. "
+                f"Available: {available}"
             )
 
         # Return cached instance if available and not forcing new
@@ -242,7 +243,9 @@ class DebugAdapterRegistry:
             except ImportError:
                 logger.debug(f"Adapter not available: {module_name}")
             except AttributeError:
-                logger.warning(f"Adapter class not found: {class_name} in {module_name}")
+                logger.warning(
+                    f"Adapter class not found: {class_name} in {module_name}"
+                )
 
         # Plugin adapters from paths
         if paths:

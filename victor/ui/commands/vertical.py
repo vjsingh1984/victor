@@ -112,7 +112,9 @@ def list_verticals(
     _deprecation_notice()
 
     if source not in _VALID_SOURCES:
-        _handle_error(f"Invalid source '{source}'. Must be one of: {', '.join(_VALID_SOURCES)}")
+        _handle_error(
+            f"Invalid source '{source}'. Must be one of: {', '.join(_VALID_SOURCES)}"
+        )
         return
 
     manager = VerticalRegistryManager()
@@ -126,7 +128,9 @@ def list_verticals(
 
     # Filter by category if provided
     if category:
-        verticals = [v for v in verticals if v.metadata and v.metadata.category == category]
+        verticals = [
+            v for v in verticals if v.metadata and v.metadata.category == category
+        ]
 
     # Filter by tags if provided
     if tags:
@@ -134,7 +138,8 @@ def list_verticals(
         verticals = [
             v
             for v in verticals
-            if v.metadata and any(tg in [mt.lower() for mt in v.metadata.tags] for tg in tag_list)
+            if v.metadata
+            and any(tg in [mt.lower() for mt in v.metadata.tags] for tg in tag_list)
         ]
 
     if not verticals:
@@ -156,7 +161,11 @@ def list_verticals(
             v.name,
             v.version,
             "Builtin" if v.is_builtin else "External",
-            v.metadata.description if v.metadata else "[dim]No description available[/]",
+            (
+                v.metadata.description
+                if v.metadata
+                else "[dim]No description available[/]"
+            ),
         ]
 
         if verbose:
@@ -187,14 +196,18 @@ def vertical_info(name: str) -> None:
 
         console.print(f"\n[bold cyan]Vertical: {vertical.name}[/]")
         console.print(f"[bold]Version:[/] {vertical.version}")
-        console.print(f"[bold]Source:[/] {'Built-in' if vertical.is_builtin else 'External'}")
+        console.print(
+            f"[bold]Source:[/] {'Built-in' if vertical.is_builtin else 'External'}"
+        )
         console.print(f"[bold]Location:[/] {vertical.location or 'Embedded'}")
 
         if vertical.metadata:
             m = vertical.metadata
             console.print(f"\n[bold]Description:[/] {m.description}")
             if m.authors:
-                author_names = [a.name if hasattr(a, "name") else str(a) for a in m.authors]
+                author_names = [
+                    a.name if hasattr(a, "name") else str(a) for a in m.authors
+                ]
                 console.print(f"[bold]Authors:[/] {', '.join(author_names)}")
             if m.category:
                 console.print(f"[bold]Category:[/] {m.category}")
@@ -227,8 +240,12 @@ def vertical_info(name: str) -> None:
 def install_vertical(
     package: str = typer.Argument(..., help="Package name, path, or URL"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-installation"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed"),
-    no_validate: bool = typer.Option(False, "--no-validate", help="Skip package validation"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be installed"
+    ),
+    no_validate: bool = typer.Option(
+        False, "--no-validate", help="Skip package validation"
+    ),
 ) -> None:
     """Install a new vertical plugin."""
     _deprecation_notice()
@@ -256,7 +273,9 @@ def install_vertical(
 @vertical_app.command("uninstall")
 def uninstall_vertical(
     name: str = typer.Argument(..., help="Package name to uninstall"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be uninstalled"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be uninstalled"
+    ),
 ) -> None:
     """Uninstall a vertical plugin."""
     _deprecation_notice()
@@ -313,7 +332,9 @@ def create_vertical(
         False, "--service", help="Include service provider boilerplate"
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite if directory exists"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show files that would be created"
+    ),
 ) -> None:
     """Create (scaffold) a new vertical package."""
     from victor.ui.commands.scaffold import new_vertical
@@ -335,7 +356,9 @@ def scaffold_vertical(
         False, "--service", help="Include service provider boilerplate"
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite if directory exists"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show files that would be created"
+    ),
 ) -> None:
     """Scaffold a new vertical package."""
     from victor.ui.commands.scaffold import new_vertical

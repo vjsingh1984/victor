@@ -61,7 +61,9 @@ class OrchestratorPool:
             AgentOrchestrator instance
         """
         # TODO: Implement proper orchestrator pool
-        logger.debug(f"OrchestratorPool.get_orchestrator({profile}) - stub implementation")
+        logger.debug(
+            f"OrchestratorPool.get_orchestrator({profile}) - stub implementation"
+        )
         return None
 
     def get_default_orchestrator(self) -> Any:

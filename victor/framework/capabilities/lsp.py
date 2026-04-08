@@ -21,7 +21,10 @@ and LSPPoolProtocol defined in victor.framework.lsp_protocols.
 
 from typing import Any, Dict, List, Optional
 
-from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
+from victor.framework.capabilities.base import (
+    BaseCapabilityProvider,
+    CapabilityMetadata,
+)
 from victor.framework.lsp_protocols import (
     LSPCompletionItem,
     LSPDiagnostic,
@@ -54,7 +57,9 @@ class LSPCapability(LSPServiceProtocol, LSPPoolProtocol):
 
     # --- LSPServiceProtocol implementation ---
 
-    async def open_document(self, file_path: str, content: Optional[str] = None) -> bool:
+    async def open_document(
+        self, file_path: str, content: Optional[str] = None
+    ) -> bool:
         if self._impl and hasattr(self._impl, "open_document"):
             return await self._impl.open_document(file_path, content)
         return False
@@ -68,7 +73,9 @@ class LSPCapability(LSPServiceProtocol, LSPPoolProtocol):
             return await self._impl.update_document(file_path, content)
         return False
 
-    async def get_hover(self, file_path: str, line: int, character: int) -> Optional[LSPHoverInfo]:
+    async def get_hover(
+        self, file_path: str, line: int, character: int
+    ) -> Optional[LSPHoverInfo]:
         if self._impl and hasattr(self._impl, "get_hover"):
             return await self._impl.get_hover(file_path, line, character)
         return None
@@ -80,12 +87,16 @@ class LSPCapability(LSPServiceProtocol, LSPPoolProtocol):
             return await self._impl.get_completions(file_path, line, character)
         return []
 
-    async def get_definition(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_definition(
+        self, file_path: str, line: int, character: int
+    ) -> List[LSPLocation]:
         if self._impl and hasattr(self._impl, "get_definition"):
             return await self._impl.get_definition(file_path, line, character)
         return []
 
-    async def get_references(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_references(
+        self, file_path: str, line: int, character: int
+    ) -> List[LSPLocation]:
         if self._impl and hasattr(self._impl, "get_references"):
             return await self._impl.get_references(file_path, line, character)
         return []

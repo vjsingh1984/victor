@@ -151,8 +151,12 @@ class StepAwareToolSelector:
 
         # 3. Add task-type specific tools from config
         task_type = STEP_TO_TASK_TYPE.get(step_type, "general")
-        stage_name = conversation_stage.name.lower() if conversation_stage else "initial"
-        task_stage_tools = self.task_config_loader.get_stage_tools(task_type, stage_name)
+        stage_name = (
+            conversation_stage.name.lower() if conversation_stage else "initial"
+        )
+        task_stage_tools = self.task_config_loader.get_stage_tools(
+            task_type, stage_name
+        )
         step_tools.update(task_stage_tools)
 
         # 4. Get complexity limit

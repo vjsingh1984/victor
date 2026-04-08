@@ -473,7 +473,9 @@ class EscapeHatchRegistry:
             )
             if last_error is not None:
                 raise last_error
-            raise ImportError(f"No import candidates found for vertical '{vertical_name}'")
+            raise ImportError(
+                f"No import candidates found for vertical '{vertical_name}'"
+            )
 
         conditions = getattr(module, "CONDITIONS", {})
         transforms = getattr(module, "TRANSFORMS", {})

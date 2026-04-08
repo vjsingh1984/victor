@@ -44,7 +44,9 @@ class ToolCallingAdapterRegistry:
     _adapters: Dict[str, Type[BaseToolCallingAdapter]] = {}
 
     @classmethod
-    def register(cls, provider_name: str, adapter_class: Type[BaseToolCallingAdapter]) -> None:
+    def register(
+        cls, provider_name: str, adapter_class: Type[BaseToolCallingAdapter]
+    ) -> None:
         """Register an adapter class for a provider.
 
         Args:
@@ -145,7 +147,9 @@ class ToolCallingAdapterRegistry:
             # xAI uses OpenAI-compatible format
             if provider_key == "xai":
                 return OpenAIToolCallingAdapter(model=model, config=config)
-            raise ValueError(f"No adapter registered for cloud provider: {provider_name}")
+            raise ValueError(
+                f"No adapter registered for cloud provider: {provider_name}"
+            )
 
         # Default to OpenAI-compatible for unknown providers
         logger.warning(

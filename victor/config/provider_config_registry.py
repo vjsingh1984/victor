@@ -218,7 +218,9 @@ class OpenAIConfig(ProviderConfigStrategy):
         else:
             # API key mode
             raw_key = settings.openai_api_key
-            api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key("openai")
+            api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key(
+                "openai"
+            )
             if api_key:
                 result["api_key"] = api_key
             result.setdefault("base_url", "https://api.openai.com/v1")
@@ -331,7 +333,9 @@ class QwenConfig(ProviderConfigStrategy):
             api_key = get_api_key("qwen")
             if api_key:
                 result["api_key"] = api_key
-            result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
+            result.setdefault(
+                "base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+            )
         return result
 
 
@@ -392,7 +396,9 @@ class ProviderConfigRegistry:
             base_settings = {}
             provider_config = settings.load_provider_config(resolved)
             if provider_config:
-                base_settings.update(unwrap_secrets(provider_config.model_dump(exclude_none=True)))
+                base_settings.update(
+                    unwrap_secrets(provider_config.model_dump(exclude_none=True))
+                )
 
             # Apply profile overrides BEFORE calling strategy
             # This allows the strategy to see auth_mode and make decisions
@@ -407,10 +413,14 @@ class ProviderConfigRegistry:
             # Fallback to DefaultProviderConfig for simple API key providers
             if provider in DEFAULT_PROVIDER_ENDPOINTS:
                 logger.debug(f"Using default config strategy for provider '{provider}'")
-                return DefaultProviderConfig(provider).get_settings(settings, base_settings)
+                return DefaultProviderConfig(provider).get_settings(
+                    settings, base_settings
+                )
 
             # Last resort: return base settings if no strategy
-            logger.debug(f"No config strategy for provider '{provider}', using base settings")
+            logger.debug(
+                f"No config strategy for provider '{provider}', using base settings"
+            )
             return base_settings
 
     def list_providers(self) -> List[str]:

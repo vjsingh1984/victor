@@ -254,7 +254,8 @@ class ProfileReport:
             "total_duration_ms": self.total_duration_ms,
             "span_count": self.span_count,
             "categories": {
-                cat: self.get_category_stats(cat) for cat in self.spans_by_category.keys()
+                cat: self.get_category_stats(cat)
+                for cat in self.spans_by_category.keys()
             },
             "slowest_spans": [s.to_dict() for s in self.get_slowest_spans(10)],
             "created_at": self.created_at,
@@ -464,7 +465,9 @@ class PerformanceProfiler:
             spans_by_category[span_obj.category].append(span_obj)
 
         # Get root spans
-        root_spans = [self._spans[sid] for sid in self._root_spans if sid in self._spans]
+        root_spans = [
+            self._spans[sid] for sid in self._root_spans if sid in self._spans
+        ]
 
         return ProfileReport(
             total_duration_ms=total_duration,

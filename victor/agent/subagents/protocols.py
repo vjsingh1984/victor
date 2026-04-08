@@ -249,7 +249,17 @@ class DefaultRoleToolProvider:
             "web_fetch",
         ],
         "planner": ["read", "ls", "grep", "search", "plan_files"],
-        "executor": ["read", "write", "edit", "ls", "grep", "search", "shell", "test", "git"],
+        "executor": [
+            "read",
+            "write",
+            "edit",
+            "ls",
+            "grep",
+            "search",
+            "shell",
+            "test",
+            "git",
+        ],
         "reviewer": ["read", "ls", "grep", "search", "git", "test", "shell"],
         "tester": ["read", "write", "ls", "grep", "search", "test", "shell"],
     }

@@ -106,7 +106,9 @@ class SessionContextLinker:
         hierarchy_data = session_data.get("compaction_hierarchy")
         if hierarchy_data:
             try:
-                from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+                from victor.agent.compaction_hierarchy import (
+                    HierarchicalCompactionManager,
+                )
 
                 hm = HierarchicalCompactionManager.from_dict(hierarchy_data)
                 active_ctx = hm.get_active_context()

@@ -255,7 +255,9 @@ def _auto_register_providers() -> None:
         pass  # ProximaDB not installed
 
     try:
-        from victor.storage.vector_stores.proximadb_multi import ProximaDBMultiModelProvider
+        from victor.storage.vector_stores.proximadb_multi import (
+            ProximaDBMultiModelProvider,
+        )
 
         EmbeddingRegistry.register("proximadb_multi", ProximaDBMultiModelProvider)
     except Exception:

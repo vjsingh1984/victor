@@ -75,7 +75,9 @@ class GraphPath:
         """Number of edges in the path."""
         return len(self.relations)
 
-    def append(self, entity: Entity, relation: Optional[EntityRelation] = None) -> "GraphPath":
+    def append(
+        self, entity: Entity, relation: Optional[EntityRelation] = None
+    ) -> "GraphPath":
         """Append an entity and optional relation to the path."""
         self.entities.append(entity)
         if relation:
@@ -570,9 +572,13 @@ class EntityGraph:
 
         # Remove from other entities' adjacency lists
         for eid in list(self._outgoing.keys()):
-            self._outgoing[eid] = [r for r in self._outgoing[eid] if r.target_id != entity_id]
+            self._outgoing[eid] = [
+                r for r in self._outgoing[eid] if r.target_id != entity_id
+            ]
         for eid in list(self._incoming.keys()):
-            self._incoming[eid] = [r for r in self._incoming[eid] if r.source_id != entity_id]
+            self._incoming[eid] = [
+                r for r in self._incoming[eid] if r.source_id != entity_id
+            ]
 
         # Remove from database
         if self._conn:

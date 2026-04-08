@@ -76,7 +76,9 @@ class AccessLayer(ABC):
     NAME: str = "base"
 
     @abstractmethod
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check if a tool is allowed by this layer.
 
         Args:
@@ -156,7 +158,9 @@ class SafetyLayer(AccessLayer):
         """
         self._sandbox_mode = sandbox_mode
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check safety constraints for a tool."""
         if tool_name in self.BLOCKED_TOOLS:
             return False, f"Tool '{tool_name}' is blocked for safety reasons"
@@ -186,7 +190,9 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
     PRECEDENCE = AccessPrecedence.MODE.value
     NAME = "mode"
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check mode restrictions for a tool."""
         # If BUILD mode (allow_all_tools=True), allow everything
         if self.is_build_mode:
@@ -232,7 +238,9 @@ class SessionLayer(AccessLayer):
     PRECEDENCE = AccessPrecedence.SESSION.value
     NAME = "session"
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check session restrictions for a tool."""
         if context is None or context.session_enabled_tools is None:
             return True, "No session restrictions"
@@ -280,7 +288,9 @@ class VerticalLayer(AccessLayer):
         """Update the tiered config (e.g., when vertical changes)."""
         self._tiered_config = config
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check vertical restrictions for a tool."""
         if self._tiered_config is None:
             return True, "No vertical restrictions"
@@ -363,7 +373,9 @@ class StageLayer(AccessLayer, ModeAwareMixin):
     NAME = "stage"
 
     # Stages where write tools should be filtered
-    EXPLORATION_STAGES: Set[str] = frozenset({"INITIAL", "PLANNING", "READING", "ANALYSIS"})
+    EXPLORATION_STAGES: Set[str] = frozenset(
+        {"INITIAL", "PLANNING", "READING", "ANALYSIS"}
+    )
 
     # Write/execute tools to filter during exploration
     WRITE_TOOLS: Set[str] = frozenset(
@@ -383,7 +395,15 @@ class StageLayer(AccessLayer, ModeAwareMixin):
 
     # Core tools never filtered (basic operation)
     CORE_TOOLS: Set[str] = frozenset(
-        {"read", "read_file", "ls", "list_directory", "search", "code_search", "shell_readonly"}
+        {
+            "read",
+            "read_file",
+            "ls",
+            "list_directory",
+            "search",
+            "code_search",
+            "shell_readonly",
+        }
     )
 
     def __init__(self, preserved_tools: Optional[Set[str]] = None):
@@ -398,7 +418,9 @@ class StageLayer(AccessLayer, ModeAwareMixin):
         """Update preserved tools (e.g., from vertical config)."""
         self._preserved_tools = tools
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check stage restrictions for a tool."""
         # Skip stage filtering in BUILD mode
         if self.is_build_mode:
@@ -470,7 +492,9 @@ class IntentLayer(AccessLayer):
         }
     )
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(
+        self, tool_name: str, context: Optional[ToolAccessContext]
+    ) -> Tuple[bool, str]:
         """Check intent restrictions for a tool."""
         if context is None or context.intent is None:
             return True, "No intent context available"
@@ -482,7 +506,10 @@ class IntentLayer(AccessLayer):
         # Check if read-only intent
         if intent_name in self.READ_ONLY_INTENTS:
             if tool_name in self.WRITE_TOOLS:
-                return False, f"Write tool '{tool_name}' blocked for {intent_name} intent"
+                return (
+                    False,
+                    f"Write tool '{tool_name}' blocked for {intent_name} intent",
+                )
 
         return True, f"Tool allowed for {intent_name} intent"
 
@@ -536,8 +563,16 @@ class ToolAccessController(IToolAccessController):
             (
                 context.current_mode,
                 context.conversation_stage.name if context.conversation_stage else None,
-                context.intent.name if context.intent and hasattr(context.intent, "name") else None,
-                frozenset(context.session_enabled_tools) if context.session_enabled_tools else None,
+                (
+                    context.intent.name
+                    if context.intent and hasattr(context.intent, "name")
+                    else None
+                ),
+                (
+                    frozenset(context.session_enabled_tools)
+                    if context.session_enabled_tools
+                    else None
+                ),
             )
         )
 
@@ -635,7 +670,9 @@ class ToolAccessController(IToolAccessController):
 
         return allowed, denials
 
-    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
+    def get_allowed_tools(
+        self, context: Optional[ToolAccessContext] = None
+    ) -> Set[str]:
         """Get all tools allowed in the given context.
 
         Uses layer-specific optimization and caching for scalability.
@@ -671,7 +708,9 @@ class ToolAccessController(IToolAccessController):
         self._allowed_tools_cache = allowed.copy()
         return allowed
 
-    def explain_decision(self, tool_name: str, context: Optional[ToolAccessContext] = None) -> str:
+    def explain_decision(
+        self, tool_name: str, context: Optional[ToolAccessContext] = None
+    ) -> str:
         """Get detailed explanation for a tool access decision.
 
         Args:

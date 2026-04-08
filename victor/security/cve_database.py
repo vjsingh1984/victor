@@ -253,8 +253,12 @@ class LocalCVECache:
                 if cve.cvss
                 else None
             ),
-            "published_date": cve.published_date.isoformat() if cve.published_date else None,
-            "modified_date": cve.modified_date.isoformat() if cve.modified_date else None,
+            "published_date": (
+                cve.published_date.isoformat() if cve.published_date else None
+            ),
+            "modified_date": (
+                cve.modified_date.isoformat() if cve.modified_date else None
+            ),
             "references": cve.references,
             "cwe_ids": cve.cwe_ids,
             "affected_products": cve.affected_products,
@@ -280,7 +284,9 @@ class LocalCVECache:
                 else None
             ),
             modified_date=(
-                datetime.fromisoformat(data["modified_date"]) if data.get("modified_date") else None
+                datetime.fromisoformat(data["modified_date"])
+                if data.get("modified_date")
+                else None
             ),
             references=data.get("references", []),
             cwe_ids=data.get("cwe_ids", []),
@@ -446,17 +452,23 @@ class OSVDatabase(BaseCVEDatabase):
         modified = None
         if data.get("published"):
             try:
-                published = datetime.fromisoformat(data["published"].replace("Z", "+00:00"))
+                published = datetime.fromisoformat(
+                    data["published"].replace("Z", "+00:00")
+                )
             except Exception:
                 pass
         if data.get("modified"):
             try:
-                modified = datetime.fromisoformat(data["modified"].replace("Z", "+00:00"))
+                modified = datetime.fromisoformat(
+                    data["modified"].replace("Z", "+00:00")
+                )
             except Exception:
                 pass
 
         # Parse references
-        references = [ref.get("url", "") for ref in data.get("references", []) if ref.get("url")]
+        references = [
+            ref.get("url", "") for ref in data.get("references", []) if ref.get("url")
+        ]
 
         # Parse CWEs
         cwe_ids = []

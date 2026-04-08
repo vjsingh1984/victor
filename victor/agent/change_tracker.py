@@ -265,7 +265,13 @@ class FileChangeHistory:
             change_cols = {row[1]: row[2] for row in cursor.fetchall()}
             if change_cols:
                 # Check required columns exist
-                required_change = {"id", "group_id", "change_type", "file_path", "timestamp"}
+                required_change = {
+                    "id",
+                    "group_id",
+                    "change_type",
+                    "file_path",
+                    "timestamp",
+                }
                 if not required_change.issubset(change_cols.keys()):
                     return True
                 # Check id column type is TEXT (not INTEGER)
@@ -359,12 +365,15 @@ class FileChangeHistory:
             change_type=change_type,
             file_path=str(file_path),
             timestamp=time.time(),
-            tool_name=tool_name or (self._current_group.tool_name if self._current_group else ""),
+            tool_name=tool_name
+            or (self._current_group.tool_name if self._current_group else ""),
             tool_args=tool_args or {},
             original_content=original_content,
             new_content=new_content,
             original_path=original_path,
-            checksum_before=self.compute_checksum(original_content) if original_content else None,
+            checksum_before=(
+                self.compute_checksum(original_content) if original_content else None
+            ),
             checksum_after=self.compute_checksum(new_content) if new_content else None,
             session_id=self.session_id,
         )
@@ -406,7 +415,9 @@ class FileChangeHistory:
         # Trim history if needed
         self._trim_history()
 
-        logger.info(f"Committed change group: {group.id} with {len(group.changes)} changes")
+        logger.info(
+            f"Committed change group: {group.id} with {len(group.changes)} changes"
+        )
         return group
 
     def _save_group(self, group: ChangeGroup) -> None:
@@ -510,7 +521,11 @@ class FileChangeHistory:
         self._save_group(group)
 
         if errors:
-            return False, f"Partial undo with errors: {'; '.join(errors)}", affected_files
+            return (
+                False,
+                f"Partial undo with errors: {'; '.join(errors)}",
+                affected_files,
+            )
 
         # Generate summary
         tool_name = group.tool_name
@@ -551,7 +566,11 @@ class FileChangeHistory:
         self._save_group(group)
 
         if errors:
-            return False, f"Partial redo with errors: {'; '.join(errors)}", affected_files
+            return (
+                False,
+                f"Partial redo with errors: {'; '.join(errors)}",
+                affected_files,
+            )
 
         tool_name = group.tool_name
         file_count = len(affected_files)

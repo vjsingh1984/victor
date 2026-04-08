@@ -32,7 +32,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Type, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Optional,
+    Protocol,
+    Type,
+    runtime_checkable,
+)
 
 from victor.core.container import (
     ServiceContainer,
@@ -42,7 +50,11 @@ from victor.core.container import (
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
-    from victor.framework.agent_components import AgentBuilder, AgentBridge, AgentSession
+    from victor.framework.agent_components import (
+        AgentBuilder,
+        AgentBridge,
+        AgentSession,
+    )
     from victor.framework.event_registry import EventRegistry
     from victor.framework.tool_config import ToolConfigurator
 
@@ -429,7 +441,9 @@ def configure_framework_services(
     return container
 
 
-def get_tool_configurator(container: Optional[ServiceContainer] = None) -> "ToolConfigurator":
+def get_tool_configurator(
+    container: Optional[ServiceContainer] = None,
+) -> "ToolConfigurator":
     """Get tool configurator from container.
 
     Args:
@@ -471,7 +485,9 @@ def create_builder(container: Optional[ServiceContainer] = None) -> "AgentBuilde
     return container.get(AgentBuilderService)
 
 
-def create_framework_scope(container: Optional[ServiceContainer] = None) -> FrameworkScope:
+def create_framework_scope(
+    container: Optional[ServiceContainer] = None,
+) -> FrameworkScope:
     """Create a scoped container for framework services.
 
     Args:

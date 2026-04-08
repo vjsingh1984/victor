@@ -25,7 +25,9 @@ from victor.storage.checkpoints.backends.memory_backend import MemoryCheckpointB
 
 # SQLiteCheckpointBackend requires aiosqlite - lazy import
 if TYPE_CHECKING:
-    from victor.storage.checkpoints.backends.sqlite_backend import SQLiteCheckpointBackend
+    from victor.storage.checkpoints.backends.sqlite_backend import (
+        SQLiteCheckpointBackend,
+    )
 
 __all__ = ["SQLiteCheckpointBackend", "MemoryCheckpointBackend"]
 

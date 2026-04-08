@@ -268,7 +268,9 @@ class StreamingMetricsCollector:
         self._callbacks: List[Callable[[StreamMetrics], None]] = []
         self._lock = asyncio.Lock()
 
-        logger.debug(f"StreamingMetricsCollector initialized. Max history: {max_history}")
+        logger.debug(
+            f"StreamingMetricsCollector initialized. Max history: {max_history}"
+        )
 
     def create_metrics(
         self,
@@ -549,7 +551,9 @@ class StreamingMetricsCollector:
                     "model": m.model or "",
                     "provider": m.provider or "",
                     "ttft_ms": f"{m.ttft_ms:.2f}" if m.ttft_ms else "",
-                    "duration_ms": f"{m.total_duration_ms:.2f}" if m.total_duration_ms else "",
+                    "duration_ms": (
+                        f"{m.total_duration_ms:.2f}" if m.total_duration_ms else ""
+                    ),
                     "tokens_per_second": (
                         f"{m.tokens_per_second:.2f}" if m.tokens_per_second else ""
                     ),
@@ -601,7 +605,11 @@ class StreamingMetricsCollector:
                     f"  Min: {summary.ttft_ms['min']:.0f}ms",
                     f"  Max: {summary.ttft_ms['max']:.0f}ms",
                     f"  P50: {summary.ttft_ms['p50']:.0f}ms",
-                    f"  P95: {summary.ttft_ms['p95']:.0f}ms" if summary.ttft_ms.get("p95") else "",
+                    (
+                        f"  P95: {summary.ttft_ms['p95']:.0f}ms"
+                        if summary.ttft_ms.get("p95")
+                        else ""
+                    ),
                 ]
             )
         else:

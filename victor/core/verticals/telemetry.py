@@ -247,7 +247,9 @@ class VerticalLoadTelemetry:
                 },
             ) as otel_span:
                 if span.is_error:
-                    otel_span.set_status(trace.Status(trace.StatusCode.ERROR, span.error))
+                    otel_span.set_status(
+                        trace.Status(trace.StatusCode.ERROR, span.error)
+                    )
                 elif span.status == "skipped":
                     otel_span.set_status(trace.Status(trace.StatusCode.UNSET))
 

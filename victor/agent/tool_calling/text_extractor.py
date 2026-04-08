@@ -260,7 +260,9 @@ class PythonCallExtractor:
         # Calculate overall confidence
         overall_confidence = 0.0
         if tool_calls:
-            overall_confidence = sum(tc.confidence for tc in tool_calls) / len(tool_calls)
+            overall_confidence = sum(tc.confidence for tc in tool_calls) / len(
+                tool_calls
+            )
 
         return ExtractionResult(
             tool_calls=tool_calls,
@@ -437,7 +439,9 @@ class PythonCallExtractor:
             # Unknown node type - return string representation
             return ast.dump(node)
 
-    def _parse_arguments_regex(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments_regex(
+        self, args_str: str
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse arguments using regex (fallback method).
 
         Args:

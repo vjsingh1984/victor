@@ -20,7 +20,14 @@ of processing user messages and generating responses.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterator, Dict, Optional, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    AsyncIterator,
+    Dict,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.providers.base import CompletionResponse, StreamChunk
@@ -90,7 +97,9 @@ class ChatServiceProtocol(Protocol):
         """
         ...
 
-    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(
+        self, user_message: str, **kwargs
+    ) -> AsyncIterator["StreamChunk"]:
         """Stream chat response in chunks for real-time feedback.
 
         Provides incremental response chunks as they're generated,

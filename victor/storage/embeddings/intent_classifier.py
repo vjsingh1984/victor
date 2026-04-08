@@ -29,7 +29,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
@@ -59,12 +62,18 @@ CONTINUATION_HEURISTIC_PATTERNS = [
     re.compile(r"\b(first|now|next),?\s+let\s+me\b", re.IGNORECASE),
     # "I'll read/check/examine..."
     re.compile(
-        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b", re.IGNORECASE
+        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b",
+        re.IGNORECASE,
     ),
     # "I need to read/check..."
-    re.compile(r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    re.compile(
+        r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b",
+        re.IGNORECASE,
+    ),
     # "I should read/check..."
-    re.compile(r"\bi\s+should\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    re.compile(
+        r"\bi\s+should\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE
+    ),
     # "Let me start by..."
     re.compile(r"\blet\s+me\s+start\s+by\b", re.IGNORECASE),
 ]
@@ -74,7 +83,9 @@ CONTINUATION_HEURISTIC_PATTERNS = [
 # These should be detected to prevent continuation loops
 STUCK_LOOP_HEURISTIC_PATTERNS = [
     # "I'm going to" without tool call
-    re.compile(r"\bi[''`]?m\s+going\s+to\s+(read|examine|check|call|use)\b", re.IGNORECASE),
+    re.compile(
+        r"\bi[''`]?m\s+going\s+to\s+(read|examine|check|call|use)\b", re.IGNORECASE
+    ),
     # "I will now" without action
     re.compile(r"\bi\s+will\s+now\s+(read|examine|check|call|use)\b", re.IGNORECASE),
     # Long preamble about what will be done (indicates stalling)
@@ -83,7 +94,9 @@ STUCK_LOOP_HEURISTIC_PATTERNS = [
         re.IGNORECASE,
     ),
     # Repeating tool name like "I'll use search... I'll use read..."
-    re.compile(r"\bi[''`]?ll\s+use\s+\w+.*\bi[''`]?ll\s+use\s+\w+", re.IGNORECASE | re.DOTALL),
+    re.compile(
+        r"\bi[''`]?ll\s+use\s+\w+.*\bi[''`]?ll\s+use\s+\w+", re.IGNORECASE | re.DOTALL
+    ),
 ]
 
 
@@ -128,7 +141,9 @@ def _has_stuck_loop_heuristic(text: str) -> bool:
 
     # The repeating pattern is a strong signal on its own (implies 2+ I'll use statements)
     if has_repeating_pattern:
-        logger.debug("Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern")
+        logger.debug(
+            "Stuck loop heuristic: found repeating 'I'll use X... I'll use Y' pattern"
+        )
         return True
 
     # Require 3+ planning statements OR 2+ from different pattern types
@@ -185,7 +200,8 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "Let me know if you'd like more details on any of these"
     re.compile(
-        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b", re.IGNORECASE
+        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b",
+        re.IGNORECASE,
     ),
     # "Would you like more details on any of..."
     re.compile(
@@ -194,7 +210,8 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "I can elaborate on any of these if you'd like"
     re.compile(
-        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b", re.IGNORECASE
+        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b",
+        re.IGNORECASE,
     ),
 ]
 
@@ -242,7 +259,9 @@ def _has_completion_marker_heuristic(text: str) -> bool:
     """
     for pattern in COMPLETION_MARKER_HEURISTIC_PATTERNS:
         if pattern.search(text):
-            logger.debug(f"Completion-marker heuristic matched: {pattern.pattern[:40]}...")
+            logger.debug(
+                f"Completion-marker heuristic matched: {pattern.pattern[:40]}..."
+            )
             return True
     return False
 
@@ -267,7 +286,9 @@ def _has_completion_offer_heuristic(text: str) -> bool:
     # Check all heuristic patterns
     for pattern in COMPLETION_OFFER_HEURISTIC_PATTERNS:
         if pattern.search(text):
-            logger.debug(f"Completion-offer heuristic matched: {pattern.pattern[:40]}...")
+            logger.debug(
+                f"Completion-offer heuristic matched: {pattern.pattern[:40]}..."
+            )
             return True
 
     return False
@@ -583,13 +604,18 @@ def _classify_with_heuristics(
             confidence=best_asking_input,
             top_matches=top_matches,
         )
-    elif best_continuation >= continuation_threshold and best_continuation > best_completion:
+    elif (
+        best_continuation >= continuation_threshold
+        and best_continuation > best_completion
+    ):
         return IntentResult(
             intent=IntentType.CONTINUATION,
             confidence=best_continuation,
             top_matches=top_matches,
         )
-    elif best_completion >= completion_threshold and best_completion > best_continuation:
+    elif (
+        best_completion >= completion_threshold and best_completion > best_continuation
+    ):
         return IntentResult(
             intent=IntentType.COMPLETION,
             confidence=best_completion,
@@ -868,9 +894,13 @@ class IntentClassifier:
             await self.initialize()
 
         # Search all collections
-        continuation_results = await self._continuation_collection.search(text, top_k=top_k)
+        continuation_results = await self._continuation_collection.search(
+            text, top_k=top_k
+        )
         completion_results = await self._completion_collection.search(text, top_k=top_k)
-        asking_input_results = await self._asking_input_collection.search(text, top_k=top_k)
+        asking_input_results = await self._asking_input_collection.search(
+            text, top_k=top_k
+        )
 
         # Get best scores
         best_continuation = continuation_results[0][1] if continuation_results else 0.0
@@ -920,9 +950,13 @@ class IntentClassifier:
             self.initialize_sync()
 
         # Search all collections
-        continuation_results = self._continuation_collection.search_sync(text, top_k=top_k)
+        continuation_results = self._continuation_collection.search_sync(
+            text, top_k=top_k
+        )
         completion_results = self._completion_collection.search_sync(text, top_k=top_k)
-        asking_input_results = self._asking_input_collection.search_sync(text, top_k=top_k)
+        asking_input_results = self._asking_input_collection.search_sync(
+            text, top_k=top_k
+        )
 
         # Get best scores
         best_continuation = continuation_results[0][1] if continuation_results else 0.0

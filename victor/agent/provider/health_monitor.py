@@ -167,7 +167,9 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         Returns:
             True if monitoring is active, False otherwise
         """
-        return self._health_check_task is not None and not self._health_check_task.done()
+        return (
+            self._health_check_task is not None and not self._health_check_task.done()
+        )
 
     async def get_healthy_providers(self) -> List[str]:
         """Get list of healthy providers.

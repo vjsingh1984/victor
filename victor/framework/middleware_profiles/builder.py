@@ -127,7 +127,9 @@ class MiddlewareProfileBuilder:
         Returns:
             Self for method chaining
         """
-        self._middlewares = [m for m in self._middlewares if not isinstance(m, middleware_type)]
+        self._middlewares = [
+            m for m in self._middlewares if not isinstance(m, middleware_type)
+        ]
         return self
 
     def set_priority(self, priority: int) -> "MiddlewareProfileBuilder":

@@ -463,7 +463,9 @@ class TeamCoordinator(ITeamCoordinator):
                 if result.total_duration < 60:
                     quality_score += 0.1
                 # Penalty for many failures
-                failed_members = sum(1 for r in result.member_results.values() if not r.success)
+                failed_members = sum(
+                    1 for r in result.member_results.values() if not r.success
+                )
                 if failed_members > 0:
                     quality_score -= 0.1 * failed_members
 
@@ -618,7 +620,10 @@ class TeamCoordinator(ITeamCoordinator):
                     sender_id=member.id,
                     message_type=MessageType.RESULT,
                     content=result.output[:500],
-                    data={"success": result.success, "tool_calls": result.tool_calls_used},
+                    data={
+                        "success": result.success,
+                        "tool_calls": result.tool_calls_used,
+                    },
                 )
             )
 
@@ -631,7 +636,9 @@ class TeamCoordinator(ITeamCoordinator):
             member_results=member_results,
             total_tool_calls=total_tool_calls,
             total_duration=time.time() - execution.start_time,
-            communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
+            communication_log=[
+                m.to_dict() for m in execution.message_bus.get_message_log()
+            ],
             shared_context=execution.shared_memory.get_all(),
             formation=TeamFormation.SEQUENTIAL,
         )
@@ -659,7 +666,9 @@ class TeamCoordinator(ITeamCoordinator):
         for member in config.members:
             execution.member_statuses[member.id] = MemberStatus.WORKING
 
-        self._report_progress(execution.team_id, "Running all members in parallel...", 10)
+        self._report_progress(
+            execution.team_id, "Running all members in parallel...", 10
+        )
 
         # Create tasks for parallel execution
         tasks = []
@@ -687,7 +696,9 @@ class TeamCoordinator(ITeamCoordinator):
 
         # Process results
         member_results: Dict[str, MemberResult] = {}
-        for i, (member, sub_result) in enumerate(zip(config.members, fan_out_result.results)):
+        for i, (member, sub_result) in enumerate(
+            zip(config.members, fan_out_result.results)
+        ):
             result = self._convert_subagent_result(member.id, sub_result)
             member_results[member.id] = result
 
@@ -947,7 +958,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             member_results=member_results,
             total_tool_calls=total_tool_calls,
             total_duration=time.time() - execution.start_time,
-            communication_log=[m.to_dict() for m in execution.message_bus.get_message_log()],
+            communication_log=[
+                m.to_dict() for m in execution.message_bus.get_message_log()
+            ],
             shared_context=execution.shared_memory.get_all(),
             formation=TeamFormation.PIPELINE,
         )
@@ -976,7 +989,8 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 task=context,
                 tool_budget=member.tool_budget,
                 allowed_tools=member.allowed_tools,
-                timeout_seconds=execution.config.timeout_seconds // len(execution.config.members),
+                timeout_seconds=execution.config.timeout_seconds
+                // len(execution.config.members),
             )
 
             return MemberResult(
@@ -1153,7 +1167,13 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 line = line.strip()
                 if any(
                     line.lower().startswith(prefix)
-                    for prefix in ["found", "discovered", "identified", "located", "detected"]
+                    for prefix in [
+                        "found",
+                        "discovered",
+                        "identified",
+                        "located",
+                        "detected",
+                    ]
                 ):
                     discoveries.append(line)
         return discoveries
@@ -1243,7 +1263,9 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             "member_statuses": {
                 mid: status.value for mid, status in execution.member_statuses.items()
             },
-            "duration": time.time() - execution.start_time if execution.start_time else 0,
+            "duration": (
+                time.time() - execution.start_time if execution.start_time else 0
+            ),
         }
 
     def get_active_teams(self) -> List[str]:

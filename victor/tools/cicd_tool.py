@@ -182,7 +182,12 @@ CIRCLECI_TEMPLATES = {
                 "docker": [{"image": "cimg/python:3.12"}],
                 "steps": [
                     "checkout",
-                    {"run": {"name": "Install dependencies", "command": "pip install -e .[dev]"}},
+                    {
+                        "run": {
+                            "name": "Install dependencies",
+                            "command": "pip install -e .[dev]",
+                        }
+                    },
                     {"run": {"name": "Run tests", "command": "pytest"}},
                 ],
             },
@@ -342,7 +347,10 @@ async def cicd(
     # Validate operation
     elif operation == "validate":
         if not file:
-            return {"success": False, "error": "Validate operation requires 'file' parameter"}
+            return {
+                "success": False,
+                "error": "Validate operation requires 'file' parameter",
+            }
 
         file_obj = Path(file)
         if not file_obj.exists():
@@ -383,10 +391,13 @@ async def cicd(
                 # Check for best practices
                 if "steps" in job:
                     has_checkout = any(
-                        step.get("uses", "").startswith("actions/checkout") for step in job["steps"]
+                        step.get("uses", "").startswith("actions/checkout")
+                        for step in job["steps"]
                     )
                     if not has_checkout:
-                        warnings.append(f"Job '{job_name}': No checkout step (usually needed)")
+                        warnings.append(
+                            f"Job '{job_name}': No checkout step (usually needed)"
+                        )
 
         external_output = None
         if validate_command:

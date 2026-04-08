@@ -193,7 +193,9 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
 def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     """Get the protocol adapter for DIP compliance (lazy init)."""
     if self._protocol_adapter is None:
-        from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
+        from victor.agent.coordinators.protocol_adapters import (
+            OrchestratorProtocolAdapter,
+        )
 
         self._protocol_adapter = OrchestratorProtocolAdapter(self)
     return self._protocol_adapter
@@ -263,7 +265,9 @@ def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
     return self._unified_chat_coordinator
 
 
-def _intelligent_integration(self: "AgentOrchestrator") -> Optional["OrchestratorIntegration"]:
+def _intelligent_integration(
+    self: "AgentOrchestrator",
+) -> Optional["OrchestratorIntegration"]:
     """Get the intelligent pipeline integration (lazy init)."""
     if not self._intelligent_pipeline_enabled:
         return None
@@ -296,13 +300,16 @@ def _intelligent_integration(self: "AgentOrchestrator") -> Optional["Orchestrato
                 config=self._intelligent_integration_config,
             )
             logger.info(
-                f"IntelligentPipeline initialized for " f"{self.provider_name}:{self.model}"
+                f"IntelligentPipeline initialized for "
+                f"{self.provider_name}:{self.model}"
             )
         except ImportError as e:
             logger.debug(f"IntelligentPipeline dependencies not available: {e}")
             self._intelligent_pipeline_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
+            logger.warning(
+                f"Failed to initialize IntelligentPipeline (config error): {e}"
+            )
             self._intelligent_pipeline_enabled = False
 
     return self._intelligent_integration
@@ -323,7 +330,9 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
             logger.debug(f"SubAgentOrchestrator module not available: {e}")
             self._subagent_orchestration_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
+            logger.warning(
+                f"Failed to initialize SubAgentOrchestrator (config error): {e}"
+            )
             self._subagent_orchestration_enabled = False
 
     return self._subagent_orchestrator
@@ -332,8 +341,8 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
 def _coordination(self: "AgentOrchestrator") -> Any:
     """Get the mode-workflow-team coordinator (lazy init)."""
     if self._mode_workflow_team_coordinator is None:
-        self._mode_workflow_team_coordinator = self._factory.create_mode_workflow_team_coordinator(
-            self._vertical_context
+        self._mode_workflow_team_coordinator = (
+            self._factory.create_mode_workflow_team_coordinator(self._vertical_context)
         )
         logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
 
@@ -355,7 +364,9 @@ def _recovery_handler(self: "AgentOrchestrator") -> Optional["RecoveryHandler"]:
     return handler
 
 
-def _recovery_integration(self: "AgentOrchestrator") -> "OrchestratorRecoveryIntegration":
+def _recovery_integration(
+    self: "AgentOrchestrator",
+) -> "OrchestratorRecoveryIntegration":
     """Get the recovery integration submodule."""
     integration = getattr(self, "_recovery_integration", None)
     if hasattr(integration, "get_instance"):
@@ -503,8 +514,14 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "tool_calls_used": (_tool_calls_used_get, _tool_calls_used_set),
     "observed_files": (_observed_files_get, _observed_files_set),
     "executed_tools": (_executed_tools_get, _executed_tools_set),
-    "failed_tool_signatures": (_failed_tool_signatures_get, _failed_tool_signatures_set),
-    "_tool_capability_warned": (_tool_capability_warned_get, _tool_capability_warned_set),
+    "failed_tool_signatures": (
+        _failed_tool_signatures_get,
+        _failed_tool_signatures_set,
+    ),
+    "_tool_capability_warned": (
+        _tool_capability_warned_get,
+        _tool_capability_warned_set,
+    ),
     "_read_files_session": (_read_files_session_get, None),
     "_required_files": (_required_files_get, _required_files_set),
     "_required_outputs": (_required_outputs_get, _required_outputs_set),
@@ -512,7 +529,10 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
         _all_files_read_nudge_sent_get,
         _all_files_read_nudge_sent_set,
     ),
-    "_cumulative_token_usage": (_cumulative_token_usage_get, _cumulative_token_usage_set),
+    "_cumulative_token_usage": (
+        _cumulative_token_usage_get,
+        _cumulative_token_usage_set,
+    ),
 }
 
 

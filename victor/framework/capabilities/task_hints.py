@@ -211,7 +211,9 @@ class TaskTypeHintCapabilityProvider:
         self._custom_hints = custom_hints or {}
         self._hint_cache: Optional[Dict[str, TaskTypeHint]] = None
 
-    def get_hints(self, category: Optional[TaskCategory] = None) -> Dict[str, TaskTypeHint]:
+    def get_hints(
+        self, category: Optional[TaskCategory] = None
+    ) -> Dict[str, TaskTypeHint]:
         """Get all task type hints, optionally filtered by category.
 
         Args:
@@ -259,7 +261,9 @@ class TaskTypeHintCapabilityProvider:
 
         for hint in hints.values():
             score = sum(
-                1 for keyword in keywords if any(kw in keyword.lower() for kw in hint.keywords)
+                1
+                for keyword in keywords
+                if any(kw in keyword.lower() for kw in hint.keywords)
             )
             if score > best_score:
                 best_score = score

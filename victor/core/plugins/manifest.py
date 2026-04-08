@@ -66,7 +66,9 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 VALID_PERMISSIONS = frozenset({"read", "write", "execute"})
-VALID_REQUIRED_PERMISSIONS = frozenset({"read-only", "workspace-write", "danger-full-access"})
+VALID_REQUIRED_PERMISSIONS = frozenset(
+    {"read-only", "workspace-write", "danger-full-access"}
+)
 
 
 class PluginKind(Enum):
@@ -162,7 +164,9 @@ class PluginManifest:
         return cls.from_dict(data, plugin_root=path.parent)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], plugin_root: Optional[Path] = None) -> PluginManifest:
+    def from_dict(
+        cls, data: Dict[str, Any], plugin_root: Optional[Path] = None
+    ) -> PluginManifest:
         """Parse and validate manifest from a dictionary.
 
         Args:
@@ -193,7 +197,9 @@ class PluginManifest:
         seen_perms: set[str] = set()
         for perm in permissions:
             if perm not in VALID_PERMISSIONS:
-                errors.append(f"Invalid permission '{perm}' (valid: {VALID_PERMISSIONS})")
+                errors.append(
+                    f"Invalid permission '{perm}' (valid: {VALID_PERMISSIONS})"
+                )
             if perm in seen_perms:
                 errors.append(f"Duplicate permission '{perm}'")
             seen_perms.add(perm)
@@ -238,11 +244,15 @@ class PluginManifest:
             elif plugin_root and _is_path_command(command):
                 resolved = plugin_root / command
                 if not resolved.exists():
-                    errors.append(f"Tool '{tool_name}' command path '{command}' does not exist")
+                    errors.append(
+                        f"Tool '{tool_name}' command path '{command}' does not exist"
+                    )
 
             req_perm = tool_data.get("requiredPermission", "workspace-write")
             if req_perm not in VALID_REQUIRED_PERMISSIONS:
-                errors.append(f"Tool '{tool_name}' invalid requiredPermission '{req_perm}'")
+                errors.append(
+                    f"Tool '{tool_name}' invalid requiredPermission '{req_perm}'"
+                )
 
             tools.append(
                 PluginToolSpec(
@@ -312,4 +322,6 @@ def sanitize_plugin_id(name: str, marketplace: str) -> str:
 
 def _is_path_command(command: str) -> bool:
     """Check if a command string looks like a file path vs a literal command."""
-    return command.startswith("./") or command.startswith("../") or command.startswith("/")
+    return (
+        command.startswith("./") or command.startswith("../") or command.startswith("/")
+    )

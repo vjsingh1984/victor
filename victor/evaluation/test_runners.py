@@ -291,7 +291,9 @@ class PythonTestRunner(BaseTestRunner):
                 test_cmd = f"{test_cmd} -v --tb=short"
 
             # Add JSON report for structured output
-            test_cmd = f"{test_cmd} --json-report --json-report-file=/dev/stdout 2>&1 || true"
+            test_cmd = (
+                f"{test_cmd} --json-report --json-report-file=/dev/stdout 2>&1 || true"
+            )
         elif "unittest" in test_cmd:
             if test_filter:
                 # Run specific test classes/methods
@@ -391,7 +393,9 @@ class PythonTestRunner(BaseTestRunner):
                 results.errors = count
 
         if results.total == 0:
-            results.total = results.passed + results.failed + results.skipped + results.errors
+            results.total = (
+                results.passed + results.failed + results.skipped + results.errors
+            )
 
         return results
 
@@ -769,7 +773,9 @@ class RustTestRunner(BaseTestRunner):
                 results.failed += 1
 
         # Parse summary: test result: ok. X passed; Y failed; Z ignored
-        summary_pattern = r"test result:.*?(\d+)\s+passed.*?(\d+)\s+failed.*?(\d+)\s+ignored"
+        summary_pattern = (
+            r"test result:.*?(\d+)\s+passed.*?(\d+)\s+failed.*?(\d+)\s+ignored"
+        )
         summary_match = re.search(summary_pattern, combined)
         if summary_match:
             results.passed = int(summary_match.group(1))
@@ -799,7 +805,9 @@ class JavaTestRunner(BaseTestRunner):
         """Detect Maven vs Gradle."""
         if (project_dir / "pom.xml").exists():
             return "mvn test -B"
-        elif (project_dir / "build.gradle").exists() or (project_dir / "build.gradle.kts").exists():
+        elif (project_dir / "build.gradle").exists() or (
+            project_dir / "build.gradle.kts"
+        ).exists():
             return "./gradlew test"
         return "mvn test -B"
 
@@ -845,9 +853,7 @@ class JavaTestRunner(BaseTestRunner):
         combined = stdout + stderr
 
         # Maven surefire pattern: Tests run: X, Failures: Y, Errors: Z, Skipped: W
-        maven_pattern = (
-            r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)"
-        )
+        maven_pattern = r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)"
         maven_match = re.search(maven_pattern, combined)
 
         if maven_match:
@@ -855,7 +861,9 @@ class JavaTestRunner(BaseTestRunner):
             results.failed = int(maven_match.group(2))
             results.errors = int(maven_match.group(3))
             results.skipped = int(maven_match.group(4))
-            results.passed = results.total - results.failed - results.errors - results.skipped
+            results.passed = (
+                results.total - results.failed - results.errors - results.skipped
+            )
 
         # Gradle pattern: X tests completed, Y failed
         gradle_pattern = r"(\d+)\s+tests?\s+completed,\s+(\d+)\s+failed"
@@ -923,7 +931,9 @@ class TestRunnerRegistry:
         """Auto-detect runner and execute tests."""
         runner = self.detect_runner(project_dir)
         if not runner:
-            return TestRunResults(error_message=f"No test runner detected for {project_dir}")
+            return TestRunResults(
+                error_message=f"No test runner detected for {project_dir}"
+            )
 
         return await runner.run_tests(project_dir, test_filter, config)
 

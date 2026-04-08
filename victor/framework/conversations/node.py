@@ -342,11 +342,15 @@ class ConversationalNode:
         # Route message and get responses
         responses = []
         if self._router:
-            recipients = await self._router.route_message(message, self.participants, self._context)
+            recipients = await self._router.route_message(
+                message, self.participants, self._context
+            )
 
             # Collect responses (optional, depending on protocol)
             for recipient_id in recipients:
-                should_reply = await self._router.should_reply(recipient_id, message, self._context)
+                should_reply = await self._router.should_reply(
+                    recipient_id, message, self._context
+                )
                 if should_reply and orchestrator:
                     # Get response from recipient
                     recipient = self._context.participants.get(recipient_id)
@@ -412,9 +416,13 @@ class ConversationalNode:
             recent = self._history.turns[-3:]  # Last 3 turns
             history_parts = []
             for turn in recent:
-                history_parts.append(f"[{turn.speaker}]: {turn.message.content[:200]}...")
+                history_parts.append(
+                    f"[{turn.speaker}]: {turn.message.content[:200]}..."
+                )
                 for resp in turn.responses[:2]:
-                    history_parts.append(f"  -> [{resp.sender}]: {resp.content[:100]}...")
+                    history_parts.append(
+                        f"  -> [{resp.sender}]: {resp.content[:100]}..."
+                    )
             history_context = "\n".join(history_parts)
 
         prompt = f"""You are participating in a multi-agent conversation.

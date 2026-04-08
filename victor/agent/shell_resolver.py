@@ -19,7 +19,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Shell-related aliases that should resolve intelligently
-SHELL_ALIASES = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
+SHELL_ALIASES = {
+    "run",
+    "bash",
+    "execute",
+    "cmd",
+    "execute_bash",
+    "shell_readonly",
+    "shell",
+}
 
 
 def resolve_shell_variant(
@@ -65,7 +73,9 @@ def _shell_alias_resolver(
     if mc is not None:
         config = mc.config
         if config.allow_all_tools and "shell" not in config.disallowed_tools:
-            logger.debug(f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)")
+            logger.debug(
+                f"Resolved '{tool_name}' to 'shell' (BUILD mode allows all tools)"
+            )
             return ToolNames.SHELL
 
     if tools.is_tool_enabled(ToolNames.SHELL):
@@ -77,5 +87,7 @@ def _shell_alias_resolver(
         return ToolNames.SHELL_READONLY
 
     canonical = get_canonical_name(tool_name)
-    logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+    logger.debug(
+        f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
+    )
     return canonical

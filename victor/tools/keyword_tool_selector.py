@@ -32,7 +32,10 @@ from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+    from victor.agent.conversation_state import (
+        ConversationStage,
+        ConversationStateMachine,
+    )
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
 
 logger = logging.getLogger(__name__)
@@ -148,7 +151,9 @@ class KeywordToolSelector:
 
         # Fallback: Build selected tool names using core tools + registry keyword matches
         # Uses keywords from @tool decorators as single source of truth
-        selected_tool_names = self._get_stage_core_tools(context.conversation_stage).copy()
+        selected_tool_names = self._get_stage_core_tools(
+            context.conversation_stage
+        ).copy()
 
         # Use registry-based keyword matching (from @tool decorators)
         registry_matches = get_tools_from_message(prompt)
@@ -302,7 +307,9 @@ class KeywordToolSelector:
                 or entry.execution_category == ExecutionCategory.READ_ONLY
             )
         except ImportError as e:
-            logger.debug(f"Metadata registry module not available for readonly check: {e}")
+            logger.debug(
+                f"Metadata registry module not available for readonly check: {e}"
+            )
             return False
         except Exception as e:
             logger.debug(
@@ -344,7 +351,10 @@ class KeywordToolSelector:
         return any(kw in prompt_lower for kw in write_keywords)
 
     def _filter_tools_for_stage(
-        self, tools: List[ToolDefinition], stage: Optional["ConversationStage"], prompt: str = ""
+        self,
+        tools: List[ToolDefinition],
+        stage: Optional["ConversationStage"],
+        prompt: str = "",
     ) -> List[ToolDefinition]:
         """Remove write/execute tools during exploration/analysis stages.
 
@@ -364,7 +374,9 @@ class KeywordToolSelector:
 
         # Skip stage filtering if user has write intent
         if prompt and self._has_write_intent(prompt):
-            logger.info("Write intent detected in prompt, skipping stage-based filtering")
+            logger.info(
+                "Write intent detected in prompt, skipping stage-based filtering"
+            )
             return tools
 
         from victor.agent.conversation_state import ConversationStage

@@ -96,7 +96,9 @@ def create_provider_runtime_components(
             provider_manager=provider_manager,
             config=ProviderCoordinatorConfig(
                 max_rate_limit_retries=getattr(settings, "max_rate_limit_retries", 3),
-                enable_health_monitoring=getattr(settings, "provider_health_checks", True),
+                enable_health_monitoring=getattr(
+                    settings, "provider_health_checks", True
+                ),
             ),
         )
 

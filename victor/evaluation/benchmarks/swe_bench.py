@@ -251,7 +251,9 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
             if apply_proc.returncode != 0:
                 result.status = TaskStatus.FAILED
-                result.error_message = f"Failed to apply patch: {apply_stderr.decode()[:200]}"
+                result.error_message = (
+                    f"Failed to apply patch: {apply_stderr.decode()[:200]}"
+                )
                 logger.warning("Patch apply failed: %s", apply_stderr.decode()[:200])
                 return result
 
@@ -301,7 +303,10 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     )
                     site_out, site_err = await apply_site.communicate()
                     if apply_site.returncode == 0:
-                        logger.info("Patch also applied to installed package at %s", site_pkg_dir)
+                        logger.info(
+                            "Patch also applied to installed package at %s",
+                            site_pkg_dir,
+                        )
                     site_patch_file.unlink(missing_ok=True)
                 except Exception as e:
                     logger.debug("Could not patch installed package: %s", e)
@@ -523,7 +528,9 @@ class HumanEvalRunner(BaseBenchmarkRunner):
                 tasks.append(task)
 
         except ImportError:
-            logger.error("datasets library not installed. " "Install with: pip install datasets")
+            logger.error(
+                "datasets library not installed. " "Install with: pip install datasets"
+            )
             raise RuntimeError(
                 "Cannot load HumanEval: datasets library required. "
                 "Install with: pip install datasets"
@@ -649,7 +656,9 @@ class MBPPRunner(BaseBenchmarkRunner):
         try:
             from datasets import load_dataset
 
-            logger.info(f"Loading MBPP dataset (split={self._split}) from HuggingFace...")
+            logger.info(
+                f"Loading MBPP dataset (split={self._split}) from HuggingFace..."
+            )
             dataset = load_dataset(
                 "google-research-datasets/mbpp",
                 split=self._split,
@@ -672,9 +681,12 @@ class MBPPRunner(BaseBenchmarkRunner):
                 tasks.append(task)
 
         except ImportError:
-            logger.error("datasets library not installed. " "Install with: pip install datasets")
+            logger.error(
+                "datasets library not installed. " "Install with: pip install datasets"
+            )
             raise RuntimeError(
-                "Cannot load MBPP: datasets library required. " "Install with: pip install datasets"
+                "Cannot load MBPP: datasets library required. "
+                "Install with: pip install datasets"
             )
         except Exception as e:
             logger.error(f"Failed to load MBPP from HuggingFace: {e}")
@@ -760,7 +772,9 @@ class MBPPRunner(BaseBenchmarkRunner):
                 result.status = TaskStatus.FAILED
                 result.tests_failed = 1
                 result.tests_total = 1
-                result.error_message = result.stderr[:500] if result.stderr else "Test failed"
+                result.error_message = (
+                    result.stderr[:500] if result.stderr else "Test failed"
+                )
 
         except asyncio.TimeoutError:
             result.status = TaskStatus.TIMEOUT

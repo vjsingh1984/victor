@@ -294,7 +294,9 @@ class ResponseProcessor:
                 logger.debug(f"Filtered out disabled tool: {name}")
 
         if len(valid_calls) != len(tool_calls):
-            logger.warning(f"Filtered {len(tool_calls) - len(valid_calls)} invalid tool calls")
+            logger.warning(
+                f"Filtered {len(tool_calls) - len(valid_calls)} invalid tool calls"
+            )
 
         return valid_calls if valid_calls else None
 

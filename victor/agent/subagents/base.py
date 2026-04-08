@@ -53,7 +53,16 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Protocol, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Union,
+)
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
@@ -347,7 +356,9 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
             )
             if hasattr(orchestrator, "_session_state_manager"):
-                orchestrator._session_state_manager.execution_state.disable_embeddings = True
+                orchestrator._session_state_manager.execution_state.disable_embeddings = (
+                    True
+                )
 
         # Set role-specific system prompt
         system_prompt = self._get_role_prompt()
@@ -442,7 +453,9 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt > 1:
-                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
+                    logger.debug(
+                        f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}..."
+                    )
 
                 # Try to execute the chat
                 response = await self.orchestrator.chat(self.config.task)
@@ -491,7 +504,9 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 raise
 
         # All retries exhausted
-        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
+        logger.error(
+            f"   {error_icon} All retry attempts exhausted for {self.config.role.value}"
+        )
         raise last_exception
 
     async def execute(self) -> SubAgentResult:
@@ -511,7 +526,9 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
             if self.orchestrator is None:
                 self.orchestrator = self._create_constrained_orchestrator()
 
-            logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
+            logger.info(
+                f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}..."
+            )
 
             # Run the task with retry on rate limits
             response = await self._execute_with_retry()
@@ -655,7 +672,9 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
                 except Exception as e:
-                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
+                    logger.debug(
+                        "Failed to compute sub-agent stream context size: %s", e
+                    )
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

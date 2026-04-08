@@ -116,7 +116,9 @@ class PromptExtensionsProtocol(Protocol):
             Merged dict of task type hints
         """
         merged: Dict[str, TaskTypeHint] = {}
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             merged.update(contributor.get_task_type_hints())
         return merged
 
@@ -127,7 +129,9 @@ class PromptExtensionsProtocol(Protocol):
             Combined list of system prompt sections (excluding empty strings)
         """
         sections = []
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             section = contributor.get_system_prompt_section()
             if section:
                 sections.append(section)

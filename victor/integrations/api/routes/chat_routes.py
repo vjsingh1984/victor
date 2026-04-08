@@ -74,7 +74,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                 yield f'data: {json.dumps({"type": "request", "request_id": request_id})}\n\n'
 
                 with request_correlation_id(request_id):
-                    async for chunk in orchestrator.stream_chat(request.messages[-1].content):
+                    async for chunk in orchestrator.stream_chat(
+                        request.messages[-1].content
+                    ):
                         if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                             content = getattr(chunk, "content", "")
                             tool_calls = getattr(chunk, "tool_calls", None)
@@ -120,7 +122,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             },
         )
 
-    @router.post("/completions", response_model=CompletionResponse, tags=["Completions"])
+    @router.post(
+        "/completions", response_model=CompletionResponse, tags=["Completions"]
+    )
     async def completions(request: CompletionRequest) -> CompletionResponse:
         """Get fast code completions with FIM support."""
         start_time = time.perf_counter()

@@ -76,7 +76,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         super().__init__(config)
 
         if not CHROMADB_AVAILABLE:
-            raise ImportError("ChromaDB not available. Install with: pip install chromadb")
+            raise ImportError(
+                "ChromaDB not available. Install with: pip install chromadb"
+            )
 
         self.client: Optional[chromadb.Client] = None
         self.collection: Optional[chromadb.Collection] = None
@@ -113,7 +115,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             print("💾 Using in-memory storage")
 
         # Get or create collection
-        collection_name = self.config.extra_config.get("collection_name", "victor_codebase")
+        collection_name = self.config.extra_config.get(
+            "collection_name", "victor_codebase"
+        )
         try:
             self.collection = self.client.get_or_create_collection(
                 name=collection_name,
@@ -128,7 +132,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         embedding_config = EmbeddingModelConfig(
             model_type=model_type,
             model_name=model_name,
-            dimension=self.config.extra_config.get("dimension", 4096),  # Default to 4096 for Qwen3
+            dimension=self.config.extra_config.get(
+                "dimension", 4096
+            ),  # Default to 4096 for Qwen3
             api_key=self.config.embedding_api_key,  # For OpenAI/Cohere API key, or Ollama base_url
             batch_size=self.config.extra_config.get(
                 "batch_size", 16
@@ -170,7 +176,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         return await self.embedding_model.embed_batch(texts)
 
-    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
+    async def index_document(
+        self, doc_id: str, content: str, metadata: Dict[str, Any]
+    ) -> None:
         """Index a single document.
 
         Args:
@@ -356,7 +364,9 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model_name": self.config.embedding_model_name,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
+            "dimension": (
+                self.embedding_model.get_dimension() if self.embedding_model else 4096
+            ),
             "distance_metric": self.config.distance_metric,
             "collection_name": self.collection.name,
             "persist_directory": self.config.persist_directory,

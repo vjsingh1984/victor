@@ -295,7 +295,9 @@ class SandboxedProcess:
         if os.path.exists(sandbox_exec) and self.config.allowed_paths:
             # Create sandbox profile
             profile = self._create_macos_sandbox_profile()
-            profile_file = tempfile.NamedTemporaryFile(mode="w", suffix=".sb", delete=False)
+            profile_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".sb", delete=False
+            )
             profile_file.write(profile)
             profile_file.close()
 
@@ -444,7 +446,9 @@ class SandboxedProcess:
                 await asyncio.wait_for(
                     asyncio.get_event_loop().run_in_executor(
                         None,
-                        lambda: process.wait(timeout=self.config.graceful_shutdown_seconds),
+                        lambda: process.wait(
+                            timeout=self.config.graceful_shutdown_seconds
+                        ),
                     ),
                     timeout=self.config.graceful_shutdown_seconds + 1,
                 )

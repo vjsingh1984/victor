@@ -20,7 +20,9 @@ from typing import List
 from victor.processing.native._base import _NATIVE_AVAILABLE, _native
 
 
-def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) -> List[str]:
+def chunk_by_sentences(
+    text: str, chunk_size: int = 1344, overlap: int = 128
+) -> List[str]:
     """Chunk text by sentence boundaries with overlap.
 
     Args:
@@ -85,7 +87,9 @@ def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> Lis
     return chunks
 
 
-def chunk_by_paragraphs(text: str, chunk_size: int = 1344, overlap: int = 128) -> List[str]:
+def chunk_by_paragraphs(
+    text: str, chunk_size: int = 1344, overlap: int = 128
+) -> List[str]:
     """Chunk text by paragraph boundaries with overlap.
 
     Args:

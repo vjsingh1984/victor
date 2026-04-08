@@ -66,7 +66,14 @@ class GroundingThresholdLearner(BaseLearner):
     DEFAULT_THRESHOLD = 0.70
 
     # Response types for state categorization
-    RESPONSE_TYPES = ["code_generation", "explanation", "analysis", "edit", "search", "general"]
+    RESPONSE_TYPES = [
+        "code_generation",
+        "explanation",
+        "analysis",
+        "edit",
+        "search",
+        "general",
+    ]
 
     # Minimum observations before confident recommendation
     MIN_SAMPLES_FOR_CONFIDENCE = 10
@@ -236,7 +243,9 @@ class GroundingThresholdLearner(BaseLearner):
                 result_type = "fn"  # False negative - missed hallucination
 
         if not result_type:
-            logger.debug("RL: grounding_threshold outcome missing result info, skipping")
+            logger.debug(
+                "RL: grounding_threshold outcome missing result info, skipping"
+            )
             return
 
         # Build context key
@@ -285,7 +294,9 @@ class GroundingThresholdLearner(BaseLearner):
         }
         return rewards.get(result_type, 0.0)
 
-    def _update_beta_params(self, context_key: str, threshold: float, result_type: str) -> None:
+    def _update_beta_params(
+        self, context_key: str, threshold: float, result_type: str
+    ) -> None:
         """Update Beta distribution parameters for Thompson Sampling.
 
         For each threshold level, we track:
@@ -473,7 +484,10 @@ class GroundingThresholdLearner(BaseLearner):
             Tuple of (threshold, confidence)
         """
         rec = self.get_recommendation(provider, "", response_type)
-        return (rec.value if rec else self.DEFAULT_THRESHOLD, rec.confidence if rec else 0.3)
+        return (
+            rec.value if rec else self.DEFAULT_THRESHOLD,
+            rec.confidence if rec else 0.3,
+        )
 
     def get_provider_error_rates(self, provider: str) -> Dict[str, float]:
         """Get error rates for a provider.
@@ -485,7 +499,9 @@ class GroundingThresholdLearner(BaseLearner):
             Dictionary with fp_rate, fn_rate, precision, recall
         """
         cursor = self.db.cursor()
-        cursor.execute(f"SELECT * FROM {Tables.RL_GROUNDING_STAT} WHERE provider = ?", (provider,))
+        cursor.execute(
+            f"SELECT * FROM {Tables.RL_GROUNDING_STAT} WHERE provider = ?", (provider,)
+        )
         row = cursor.fetchone()
 
         if not row:
@@ -522,7 +538,9 @@ class GroundingThresholdLearner(BaseLearner):
         cursor.execute(f"SELECT DISTINCT provider FROM {Tables.RL_GROUNDING_STAT}")
         providers = [row[0] for row in cursor.fetchall()]
 
-        return {provider: self.get_provider_error_rates(provider) for provider in providers}
+        return {
+            provider: self.get_provider_error_rates(provider) for provider in providers
+        }
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export learner metrics for monitoring.

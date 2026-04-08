@@ -218,7 +218,9 @@ class ExternalPluginManager:
             enabled=enabled,
         )
 
-    def _resolve_enabled(self, plugin_id: str, manifest: PluginManifest, kind: PluginKind) -> bool:
+    def _resolve_enabled(
+        self, plugin_id: str, manifest: PluginManifest, kind: PluginKind
+    ) -> bool:
         """Determine if a plugin should be enabled.
 
         Uses explicit setting if available, otherwise falls back to manifest default.
@@ -246,7 +248,8 @@ class ExternalPluginManager:
                 if tool.name in self._tool_index:
                     existing = self._tool_index[tool.name]
                     logger.warning(
-                        "Tool name conflict: '%s' in plugin '%s' " "already registered by '%s'",
+                        "Tool name conflict: '%s' in plugin '%s' "
+                        "already registered by '%s'",
                         tool.name,
                         plugin.plugin_id,
                         existing,
@@ -275,9 +278,13 @@ class ExternalPluginManager:
                 try:
                     await self._run_lifecycle_command(cmd, plugin.root_path)
                 except Exception as e:
-                    logger.warning("Shutdown failed for plugin %s: %s", plugin.plugin_id, e)
+                    logger.warning(
+                        "Shutdown failed for plugin %s: %s", plugin.plugin_id, e
+                    )
 
-    async def execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> PluginToolResult:
+    async def execute_tool(
+        self, tool_name: str, tool_input: Dict[str, Any]
+    ) -> PluginToolResult:
         """Execute an external plugin tool via subprocess.
 
         Args:
@@ -524,7 +531,8 @@ class ExternalPluginManager:
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(
-                f"Lifecycle command failed (exit {proc.returncode}): " f"{stderr.decode().strip()}"
+                f"Lifecycle command failed (exit {proc.returncode}): "
+                f"{stderr.decode().strip()}"
             )
 
     async def _clone_git_plugin(self, url: str) -> Path:

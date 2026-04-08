@@ -458,7 +458,9 @@ class RequirementExtractor:
 
         return requirements
 
-    def _build_extraction_prompt(self, description: str, context: Optional[Dict[str, Any]]) -> str:
+    def _build_extraction_prompt(
+        self, description: str, context: Optional[Dict[str, Any]]
+    ) -> str:
         """Build the extraction prompt.
 
         Args:
@@ -644,7 +646,9 @@ Do not include any explanatory text outside the JSON structure."""
         # Functional confidence: based on task completeness
         if requirements.functional.tasks:
             complete_tasks = sum(
-                1 for t in requirements.functional.tasks if t.description and t.task_type
+                1
+                for t in requirements.functional.tasks
+                if t.description and t.task_type
             )
             scores["functional"] = complete_tasks / len(requirements.functional.tasks)
         else:

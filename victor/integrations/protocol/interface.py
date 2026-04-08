@@ -51,7 +51,9 @@ class ChatMessage:
             content=data["content"],
             tool_calls=[ToolCall.from_dict(tc) for tc in data.get("tool_calls", [])],
             timestamp=(
-                datetime.fromisoformat(data["timestamp"]) if "timestamp" in data else datetime.now()
+                datetime.fromisoformat(data["timestamp"])
+                if "timestamp" in data
+                else datetime.now()
             ),
         )
 
@@ -233,7 +235,9 @@ class VictorProtocol(ABC):
         ...
 
     @abstractmethod
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(
+        self, messages: list[ChatMessage]
+    ) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response.
 
         Args:
@@ -254,7 +258,9 @@ class VictorProtocol(ABC):
     # =========================================================================
 
     @abstractmethod
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
+    async def semantic_search(
+        self, query: str, max_results: int = 10
+    ) -> list[CodeSearchResult]:
         """Search code by semantic meaning.
 
         Args:
@@ -374,7 +380,9 @@ class VictorProtocol(ABC):
     # LSP Operations (optional, for IDE integrations)
     # =========================================================================
 
-    async def get_definition(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
+    async def get_definition(
+        self, file: str, line: int, character: int
+    ) -> list[dict[str, Any]]:
         """Get definition locations for symbol at position.
 
         Args:
@@ -387,7 +395,9 @@ class VictorProtocol(ABC):
         """
         return []
 
-    async def get_references(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
+    async def get_references(
+        self, file: str, line: int, character: int
+    ) -> list[dict[str, Any]]:
         """Get reference locations for symbol at position.
 
         Args:

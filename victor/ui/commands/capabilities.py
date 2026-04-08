@@ -360,12 +360,14 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     summary_table.add_row(
         "Providers",
         str(len(manifest.providers)),
-        ", ".join(manifest.providers[:5]) + ("..." if len(manifest.providers) > 5 else ""),
+        ", ".join(manifest.providers[:5])
+        + ("..." if len(manifest.providers) > 5 else ""),
     )
     summary_table.add_row(
         "Personas",
         str(len(manifest.personas)),
-        ", ".join(manifest.personas[:3]) + ("..." if len(manifest.personas) > 3 else ""),
+        ", ".join(manifest.personas[:3])
+        + ("..." if len(manifest.personas) > 3 else ""),
     )
     summary_table.add_row(
         "Teams",
@@ -380,12 +382,14 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     summary_table.add_row(
         "Task Types",
         str(len(manifest.task_types)),
-        ", ".join(manifest.task_types[:3]) + ("..." if len(manifest.task_types) > 3 else ""),
+        ", ".join(manifest.task_types[:3])
+        + ("..." if len(manifest.task_types) > 3 else ""),
     )
     summary_table.add_row(
         "Handlers",
         str(len(manifest.handlers)),
-        ", ".join(manifest.handlers[:3]) + ("..." if len(manifest.handlers) > 3 else ""),
+        ", ".join(manifest.handlers[:3])
+        + ("..." if len(manifest.handlers) > 3 else ""),
     )
     summary_table.add_row(
         "Event Types",
@@ -401,7 +405,9 @@ def _display_full_capabilities(manifest: CapabilityManifest) -> None:
     console.print("  [cyan]victor capabilities tools[/cyan]      - List all tools")
     console.print("  [cyan]victor capabilities verticals[/cyan]  - List all verticals")
     console.print("  [cyan]victor capabilities providers[/cyan]  - List all providers")
-    console.print("  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical")
+    console.print(
+        "  [cyan]victor capabilities --vertical coding[/cyan] - Filter by vertical"
+    )
     console.print()
 
 
@@ -433,7 +439,9 @@ def _display_vertical_capabilities(vertical: str, manifest: Dict[str, Any]) -> N
 
 @capabilities_app.command("tools")
 def list_tools(
-    category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
+    category: Optional[str] = typer.Option(
+        None, "--category", "-c", help="Filter by category"
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
 ) -> None:
     """List all available tools."""
@@ -452,7 +460,9 @@ def list_tools(
         return
 
     console.print()
-    console.print(Panel.fit("[bold cyan]Available Tools[/bold cyan]", border_style="cyan"))
+    console.print(
+        Panel.fit("[bold cyan]Available Tools[/bold cyan]", border_style="cyan")
+    )
     console.print()
 
     # Show categories
@@ -484,7 +494,9 @@ def list_verticals(
         return
 
     console.print()
-    console.print(Panel.fit("[bold cyan]Available Verticals[/bold cyan]", border_style="cyan"))
+    console.print(
+        Panel.fit("[bold cyan]Available Verticals[/bold cyan]", border_style="cyan")
+    )
     console.print()
 
     for v in sorted(manifest.verticals):
@@ -509,7 +521,9 @@ def list_providers(
         return
 
     console.print()
-    console.print(Panel.fit("[bold cyan]Available Providers[/bold cyan]", border_style="cyan"))
+    console.print(
+        Panel.fit("[bold cyan]Available Providers[/bold cyan]", border_style="cyan")
+    )
     console.print()
 
     for p in sorted(manifest.providers):
@@ -521,7 +535,9 @@ def list_providers(
 
 @capabilities_app.command("teams")
 def list_teams(
-    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    vertical: Optional[str] = typer.Option(
+        None, "--vertical", "-v", help="Filter by vertical"
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
 ) -> None:
     """List all available team configurations."""
@@ -557,7 +573,9 @@ def list_teams(
 
 @capabilities_app.command("personas")
 def list_personas(
-    vertical: Optional[str] = typer.Option(None, "--vertical", "-v", help="Filter by vertical"),
+    vertical: Optional[str] = typer.Option(
+        None, "--vertical", "-v", help="Filter by vertical"
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
 ) -> None:
     """List all available personas."""
@@ -573,7 +591,9 @@ def list_personas(
     if json_output:
         import json
 
-        console.print(json.dumps({"personas": personas, "vertical": vertical}, indent=2))
+        console.print(
+            json.dumps({"personas": personas, "vertical": vertical}, indent=2)
+        )
         return
 
     console.print()

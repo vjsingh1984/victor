@@ -337,7 +337,11 @@ class ExecutionPlan:
         for i, step in enumerate(self.steps, 1):
             status_icon = _get_step_status_icon(step.status, presentation)
 
-            deps = f" (depends on: {', '.join(step.depends_on)})" if step.depends_on else ""
+            deps = (
+                f" (depends on: {', '.join(step.depends_on)})"
+                if step.depends_on
+                else ""
+            )
             approval = " *[requires approval]*" if step.requires_approval else ""
             agent = f" {arrow} _{step.sub_agent_role}_" if step.sub_agent_role else ""
 

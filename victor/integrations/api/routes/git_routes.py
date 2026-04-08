@@ -116,7 +116,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     "staged": staged,
                     "unstaged": unstaged,
                     "untracked": untracked,
-                    "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
+                    "is_clean": len(staged) == 0
+                    and len(unstaged) == 0
+                    and len(untracked) == 0,
                 }
             )
 
@@ -174,9 +176,13 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             )
 
             if result.returncode != 0:
-                return JSONResponse({"success": False, "error": result.stderr or "Commit failed"})
+                return JSONResponse(
+                    {"success": False, "error": result.stderr or "Commit failed"}
+                )
 
-            return JSONResponse({"success": True, "message": message, "output": result.stdout})
+            return JSONResponse(
+                {"success": True, "message": message, "output": result.stdout}
+            )
 
         except HTTPException:
             raise

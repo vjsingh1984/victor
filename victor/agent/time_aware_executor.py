@@ -27,7 +27,16 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -133,7 +142,9 @@ class ExecutionBudget:
             metadata=metadata,
         )
         self.checkpoints.append(cp)
-        logger.debug(f"ExecutionCheckpoint: {description} (elapsed: {self.elapsed:.1f}s)")
+        logger.debug(
+            f"ExecutionCheckpoint: {description} (elapsed: {self.elapsed:.1f}s)"
+        )
         return cp
 
     def get_summary(self) -> Dict[str, Any]:
@@ -264,7 +275,9 @@ class TimeAwareExecutor:
         if phase != self._last_notified_phase:
             if self._on_phase_change:
                 self._on_phase_change(self._last_notified_phase, phase)
-            logger.info(f"Phase transition: {self._last_notified_phase.value} -> {phase.value}")
+            logger.info(
+                f"Phase transition: {self._last_notified_phase.value} -> {phase.value}"
+            )
             self._last_notified_phase = phase
 
         return phase

@@ -154,7 +154,9 @@ class VictorAPIServer:
         self._app.router.add_get("/workspace/overview", self._workspace_overview)
         self._app.router.add_get("/workspace/metrics", self._workspace_metrics)
         self._app.router.add_get("/workspace/security", self._workspace_security)
-        self._app.router.add_get("/workspace/dependencies", self._workspace_dependencies)
+        self._app.router.add_get(
+            "/workspace/dependencies", self._workspace_dependencies
+        )
 
         # Tool approval endpoints
         self._app.router.add_post("/tools/approve", self._approve_tool)
@@ -295,18 +297,24 @@ class VictorAPIServer:
             messages = data.get("messages", [])
 
             if not messages:
-                await response.write(b'data: {"type": "error", "message": "No messages"}\n\n')
+                await response.write(
+                    b'data: {"type": "error", "message": "No messages"}\n\n'
+                )
                 return response
 
             orchestrator = await self._get_orchestrator()
 
             # Stream response
-            async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+            async for chunk in orchestrator.stream_chat(
+                messages[-1].get("content", "")
+            ):
                 # Support both dict and StreamChunk objects
                 if hasattr(chunk, "content") or hasattr(chunk, "tool_calls"):
                     content = getattr(chunk, "content", "")
                     tool_calls = getattr(chunk, "tool_calls", None)
-                    event_type = "content" if content else "tool_call" if tool_calls else "chunk"
+                    event_type = (
+                        "content" if content else "tool_call" if tool_calls else "chunk"
+                    )
                     if event_type == "content":
                         event = {"type": "content", "content": content}
                     elif event_type == "tool_call":
@@ -317,7 +325,10 @@ class VictorAPIServer:
                     if chunk.get("type") == "content":
                         event = {"type": "content", "content": chunk.get("content", "")}
                     elif chunk.get("type") == "tool_call":
-                        event = {"type": "tool_call", "tool_call": chunk.get("tool_call", {})}
+                        event = {
+                            "type": "tool_call",
+                            "tool_call": chunk.get("tool_call", {}),
+                        }
                     else:
                         event = chunk
 
@@ -445,7 +456,9 @@ class VictorAPIServer:
                             {
                                 "file": data.get("path", {}).get("text", ""),
                                 "line": data.get("line_number", 0),
-                                "content": data.get("lines", {}).get("text", "").strip(),
+                                "content": data.get("lines", {})
+                                .get("text", "")
+                                .strip(),
                                 "score": 1.0,
                             }
                         )
@@ -466,7 +479,9 @@ class VictorAPIServer:
             model = data.get("model")
 
             if not provider or not model:
-                return web.json_response({"error": "provider and model required"}, status=400)
+                return web.json_response(
+                    {"error": "provider and model required"}, status=400
+                )
 
             from victor.agent.model_switcher import get_model_switcher
 
@@ -592,7 +607,9 @@ class VictorAPIServer:
         """Placeholder session token endpoint for clients expecting /session/token."""
         session_id = str(uuid.uuid4())
         session_token = str(uuid.uuid4())
-        return web.json_response({"session_token": session_token, "session_id": session_id})
+        return web.json_response(
+            {"session_token": session_token, "session_id": session_id}
+        )
 
     async def _list_tools(self, request: Request) -> Response:
         """List available tools with their metadata."""
@@ -620,7 +637,9 @@ class VictorAPIServer:
                         "description": tool.description or "",
                         "category": category,
                         "cost_tier": cost_tier,
-                        "parameters": tool.parameters if hasattr(tool, "parameters") else {},
+                        "parameters": (
+                            tool.parameters if hasattr(tool, "parameters") else {}
+                        ),
                         "is_dangerous": self._is_dangerous_tool(tool.name),
                         "requires_approval": cost_tier in ("medium", "high")
                         or self._is_dangerous_tool(tool.name),
@@ -790,7 +809,9 @@ class VictorAPIServer:
                     {"error": "file_path and new_content required"}, status=400
                 )
 
-            result = await create_patch_request(file_path=target_file, new_content=new_content)
+            result = await create_patch_request(
+                file_path=target_file, new_content=new_content
+            )
             return web.json_response(result)
 
         except Exception as e:
@@ -810,7 +831,9 @@ class VictorAPIServer:
 
             provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
             if provider is None:
-                return web.json_response({"completions": [], "error": "LSP not available"})
+                return web.json_response(
+                    {"completions": [], "error": "LSP not available"}
+                )
             manager = provider.get_lsp_manager()
             completions = await manager.get_completions(file_path, line, character)
 
@@ -845,7 +868,9 @@ class VictorAPIServer:
 
             provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
             if provider is None:
-                return web.json_response({"contents": None, "error": "LSP not available"})
+                return web.json_response(
+                    {"contents": None, "error": "LSP not available"}
+                )
             manager = provider.get_lsp_manager()
             hover = await manager.get_hover(file_path, line, character)
 
@@ -872,7 +897,9 @@ class VictorAPIServer:
 
             provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
             if provider is None:
-                return web.json_response({"locations": [], "error": "LSP not available"})
+                return web.json_response(
+                    {"locations": [], "error": "LSP not available"}
+                )
             manager = provider.get_lsp_manager()
             locations = await manager.get_definition(file_path, line, character)
 
@@ -895,7 +922,9 @@ class VictorAPIServer:
 
             provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
             if provider is None:
-                return web.json_response({"locations": [], "error": "LSP not available"})
+                return web.json_response(
+                    {"locations": [], "error": "LSP not available"}
+                )
             manager = provider.get_lsp_manager()
             locations = await manager.get_references(file_path, line, character)
 
@@ -916,7 +945,9 @@ class VictorAPIServer:
 
             provider = CapabilityRegistry.get_instance().get(LSPManagerProtocol)
             if provider is None:
-                return web.json_response({"diagnostics": [], "error": "LSP not available"})
+                return web.json_response(
+                    {"diagnostics": [], "error": "LSP not available"}
+                )
             manager = provider.get_lsp_manager()
             diagnostics = manager.get_diagnostics(file_path)
 
@@ -946,11 +977,15 @@ class VictorAPIServer:
                     logger.error(f"WebSocket error: {ws.exception()}")
         finally:
             self._ws_clients.remove(ws)
-            logger.info(f"WebSocket client disconnected. Total: {len(self._ws_clients)}")
+            logger.info(
+                f"WebSocket client disconnected. Total: {len(self._ws_clients)}"
+            )
 
         return ws
 
-    async def _handle_ws_message(self, ws: web.WebSocketResponse, data: Dict[str, Any]) -> None:
+    async def _handle_ws_message(
+        self, ws: web.WebSocketResponse, data: Dict[str, Any]
+    ) -> None:
         """Handle incoming WebSocket messages."""
         msg_type = data.get("type", "")
 
@@ -964,11 +999,17 @@ class VictorAPIServer:
             orchestrator = await self._get_orchestrator()
 
             try:
-                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
+                async for chunk in orchestrator.stream_chat(
+                    messages[-1].get("content", "")
+                ):
                     if chunk.get("type") == "content":
-                        await ws.send_json({"type": "content", "content": chunk["content"]})
+                        await ws.send_json(
+                            {"type": "content", "content": chunk["content"]}
+                        )
                     elif chunk.get("type") == "tool_call":
-                        await ws.send_json({"type": "tool_call", "tool_call": chunk["tool_call"]})
+                        await ws.send_json(
+                            {"type": "tool_call", "tool_call": chunk["tool_call"]}
+                        )
 
                 await ws.send_json({"type": "done"})
             except Exception as e:
@@ -1127,7 +1168,9 @@ class VictorAPIServer:
 
             # Get updated Q-value for logging
             rankings = learner.get_provider_rankings()
-            provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
+            provider_ranking = next(
+                (r for r in rankings if r["provider"] == provider.name), None
+            )
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
             logger.info(
@@ -1161,7 +1204,14 @@ class VictorAPIServer:
 
             # Walk directory tree (limit depth)
             max_depth = int(request.query.get("depth", "3"))
-            exclude_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".victor"}
+            exclude_dirs = {
+                ".git",
+                "node_modules",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".victor",
+            }
 
             def scan_dir(path: Path, depth: int = 0) -> Dict[str, Any]:
                 if depth > max_depth:
@@ -1178,7 +1228,10 @@ class VictorAPIServer:
                     for entry in sorted(
                         path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
                     ):
-                        if entry.name.startswith(".") and entry.name not in {".github", ".vscode"}:
+                        if entry.name.startswith(".") and entry.name not in {
+                            ".github",
+                            ".vscode",
+                        }:
                             continue
                         if entry.name in exclude_dirs:
                             continue
@@ -1187,7 +1240,9 @@ class VictorAPIServer:
                             result["children"].append(scan_dir(entry, depth + 1))
                         else:
                             ext = entry.suffix.lower()
-                            overview["file_counts"][ext] = overview["file_counts"].get(ext, 0) + 1
+                            overview["file_counts"][ext] = (
+                                overview["file_counts"].get(ext, 0) + 1
+                            )
                             overview["total_files"] += 1
                             try:
                                 overview["total_size"] += entry.stat().st_size
@@ -1223,7 +1278,9 @@ class VictorAPIServer:
 
             # Execute metrics tool if available
             try:
-                tool_result = await orchestrator.execute_tool("metrics", path=self.workspace_root)
+                tool_result = await orchestrator.execute_tool(
+                    "metrics", path=self.workspace_root
+                )
                 if tool_result.success:
                     return web.json_response(tool_result.data)
             except Exception:
@@ -1263,7 +1320,9 @@ class VictorAPIServer:
                     ext = path.suffix.lower()
                     if ext in code_extensions:
                         try:
-                            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            with open(
+                                path, "r", encoding="utf-8", errors="ignore"
+                            ) as f:
                                 lines = len(f.readlines())
                                 metrics["lines_of_code"] += lines
                                 metrics["files_by_type"][ext] = (
@@ -1320,14 +1379,26 @@ class VictorAPIServer:
 
             secret_patterns = [
                 (r'(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[\w-]{20,}', "API Key"),
-                (r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}', "Secret/Password"),
+                (
+                    r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}',
+                    "Secret/Password",
+                ),
                 (r"(?i)bearer\s+[\w-]{20,}", "Bearer Token"),
                 (r"sk-[a-zA-Z0-9]{20,}", "OpenAI API Key"),
                 (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
                 (r"AKIA[A-Z0-9]{16}", "AWS Access Key"),
             ]
 
-            code_extensions = {".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".sh"}
+            code_extensions = {
+                ".py",
+                ".ts",
+                ".js",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".env",
+                ".sh",
+            }
 
             for path in root.rglob("*"):
                 if path.is_file() and path.suffix.lower() in code_extensions:
@@ -1394,7 +1465,9 @@ class VictorAPIServer:
                         for line in req_path.read_text().splitlines():
                             line = line.strip()
                             if line and not line.startswith("#"):
-                                deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
+                                deps.append(
+                                    line.split("==")[0].split(">=")[0].split("<")[0]
+                                )
                         dependencies["python"] = {
                             "file": req_file,
                             "count": len(deps),
@@ -1437,7 +1510,9 @@ class VictorAPIServer:
             return web.json_response(
                 {
                     "workspace": str(root),
-                    "dependencies": {k: v for k, v in dependencies.items() if v is not None},
+                    "dependencies": {
+                        k: v for k, v in dependencies.items() if v is not None
+                    },
                 }
             )
 
@@ -1584,14 +1659,18 @@ class VictorAPIServer:
                     "staged": staged,
                     "unstaged": unstaged,
                     "untracked": untracked,
-                    "is_clean": len(staged) == 0 and len(unstaged) == 0 and len(untracked) == 0,
+                    "is_clean": len(staged) == 0
+                    and len(unstaged) == 0
+                    and len(untracked) == 0,
                 }
             )
 
         except subprocess.TimeoutExpired:
             return web.json_response({"error": "Git command timed out"}, status=500)
         except FileNotFoundError:
-            return web.json_response({"is_git_repo": False, "error": "Git not installed"})
+            return web.json_response(
+                {"is_git_repo": False, "error": "Git not installed"}
+            )
         except Exception as e:
             logger.exception("Git status error")
             return web.json_response({"error": str(e)}, status=500)
@@ -1638,7 +1717,9 @@ class VictorAPIServer:
                         message = message[1:-1]
 
             if not message:
-                return web.json_response({"error": "Commit message required"}, status=400)
+                return web.json_response(
+                    {"error": "Commit message required"}, status=400
+                )
 
             # Perform commit
             result = subprocess.run(
@@ -1853,7 +1934,9 @@ class VictorAPIServer:
             task_q_summary = {}
             conn = sqlite3.connect(str(coordinator.db_path))
             cursor = conn.cursor()
-            cursor.execute("SELECT provider, task_type, q_value FROM model_selector_task_q_values")
+            cursor.execute(
+                "SELECT provider, task_type, q_value FROM model_selector_task_q_values"
+            )
             for row in cursor.fetchall():
                 provider, task_type, q_value = row
                 if provider not in task_q_summary:
@@ -1904,7 +1987,9 @@ class VictorAPIServer:
             task_type = request.query.get("task_type")
 
             # Get available providers from learner's Q-table
-            available = list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+            available = (
+                list(learner._q_table.keys()) if learner._q_table else ["ollama"]
+            )
 
             # Get recommendation from coordinator
             recommendation = coordinator.get_recommendation(
@@ -1915,7 +2000,9 @@ class VictorAPIServer:
             )
 
             if recommendation is None:
-                return web.json_response({"error": "No recommendation available"}, status=500)
+                return web.json_response(
+                    {"error": "No recommendation available"}, status=500
+                )
 
             # Get rankings for alternatives
             rankings = learner.get_provider_rankings()
@@ -2161,20 +2248,26 @@ class VictorAPIServer:
                     # Mark as completed
                     if agent_id in self._agents:
                         self._agents[agent_id]["status"] = "completed"
-                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+                        self._agents[agent_id][
+                            "completed_at"
+                        ] = asyncio.get_event_loop().time()
                         self._agents[agent_id]["progress"] = 100
 
                 except asyncio.CancelledError:
                     if agent_id in self._agents:
                         self._agents[agent_id]["status"] = "cancelled"
-                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+                        self._agents[agent_id][
+                            "completed_at"
+                        ] = asyncio.get_event_loop().time()
 
                 except Exception as e:
                     logger.exception(f"Agent {agent_id} error")
                     if agent_id in self._agents:
                         self._agents[agent_id]["status"] = "failed"
                         self._agents[agent_id]["error"] = str(e)
-                        self._agents[agent_id]["completed_at"] = asyncio.get_event_loop().time()
+                        self._agents[agent_id][
+                            "completed_at"
+                        ] = asyncio.get_event_loop().time()
 
             # Create and store the task
             task_handle = asyncio.create_task(run_agent())
@@ -2234,7 +2327,8 @@ class VictorAPIServer:
             agent = self._agents[agent_id]
             if agent.get("status") != "running":
                 return web.json_response(
-                    {"error": f"Agent is not running (status: {agent.get('status')})"}, status=400
+                    {"error": f"Agent is not running (status: {agent.get('status')})"},
+                    status=400,
                 )
 
             # Cancel the task
@@ -2245,7 +2339,9 @@ class VictorAPIServer:
             agent["status"] = "cancelled"
             agent["completed_at"] = asyncio.get_event_loop().time()
 
-            return web.json_response({"success": True, "message": f"Agent {agent_id} cancelled"})
+            return web.json_response(
+                {"success": True, "message": f"Agent {agent_id} cancelled"}
+            )
 
         except Exception as e:
             logger.exception("Cancel agent error")
@@ -2269,7 +2365,9 @@ class VictorAPIServer:
 
             del self._agents[agent_id]
 
-            return web.json_response({"success": True, "message": f"Agent {agent_id} deleted"})
+            return web.json_response(
+                {"success": True, "message": f"Agent {agent_id} deleted"}
+            )
 
         except Exception as e:
             logger.exception("Delete agent error")
@@ -2294,7 +2392,11 @@ class VictorAPIServer:
                 cleared += 1
 
             return web.json_response(
-                {"success": True, "cleared": cleared, "message": f"Cleared {cleared} agents"}
+                {
+                    "success": True,
+                    "cleared": cleared,
+                    "message": f"Cleared {cleared} agents",
+                }
             )
 
         except Exception as e:
@@ -2397,7 +2499,9 @@ class VictorAPIServer:
             plan = self._plans[plan_id]
             if plan.get("status") != "draft":
                 return web.json_response(
-                    {"error": f"Plan is not in draft status (status: {plan.get('status')})"},
+                    {
+                        "error": f"Plan is not in draft status (status: {plan.get('status')})"
+                    },
                     status=400,
                 )
 
@@ -2405,7 +2509,11 @@ class VictorAPIServer:
             plan["approved_at"] = asyncio.get_event_loop().time()
 
             return web.json_response(
-                {"success": True, "message": f"Plan {plan_id} approved", "status": "approved"}
+                {
+                    "success": True,
+                    "message": f"Plan {plan_id} approved",
+                    "status": "approved",
+                }
             )
 
         except Exception as e:
@@ -2446,11 +2554,15 @@ class VictorAPIServer:
 
                         plan["current_step"] = i
                         step_desc = (
-                            step.get("description", step) if isinstance(step, dict) else step
+                            step.get("description", step)
+                            if isinstance(step, dict)
+                            else step
                         )
 
                         # Execute step
-                        response = await orchestrator.chat(f"Execute this step: {step_desc}")
+                        response = await orchestrator.chat(
+                            f"Execute this step: {step_desc}"
+                        )
                         content = getattr(response, "content", "") or ""
                         plan["output"] += f"\n## Step {i+1}: {step_desc}\n{content}\n"
 
@@ -2497,7 +2609,9 @@ class VictorAPIServer:
 
             del self._plans[plan_id]
 
-            return web.json_response({"success": True, "message": f"Plan {plan_id} deleted"})
+            return web.json_response(
+                {"success": True, "message": f"Plan {plan_id} deleted"}
+            )
 
         except Exception as e:
             logger.exception("Delete plan error")

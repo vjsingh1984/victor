@@ -98,7 +98,10 @@ async def _do_outdated() -> Dict[str, Any]:
     """Check for outdated packages."""
     success, stdout, stderr = await run_pip_async("list", "--outdated", "--format=json")
     if not success:
-        return {"success": False, "error": f"Failed to check outdated packages: {stderr}"}
+        return {
+            "success": False,
+            "error": f"Failed to check outdated packages: {stderr}",
+        }
 
     try:
         outdated = json.loads(stdout)
@@ -135,7 +138,9 @@ async def _do_outdated() -> Dict[str, Any]:
     if major_updates:
         report.append(f"Major updates ({len(major_updates)}):")
         for pkg in major_updates[:5]:
-            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
+            report.append(
+                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
+            )
         if len(major_updates) > 5:
             report.append(f"  ... and {len(major_updates) - 5} more")
         report.append("")
@@ -143,7 +148,9 @@ async def _do_outdated() -> Dict[str, Any]:
     if minor_updates:
         report.append(f"Minor updates ({len(minor_updates)}):")
         for pkg in minor_updates[:5]:
-            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
+            report.append(
+                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
+            )
         if len(minor_updates) > 5:
             report.append(f"  ... and {len(minor_updates) - 5} more")
         report.append("")
@@ -151,7 +158,9 @@ async def _do_outdated() -> Dict[str, Any]:
     if patch_updates:
         report.append(f"Patch updates ({len(patch_updates)}):")
         for pkg in patch_updates[:5]:
-            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
+            report.append(
+                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
+            )
         if len(patch_updates) > 5:
             report.append(f"  ... and {len(patch_updates) - 5} more")
 
@@ -159,7 +168,11 @@ async def _do_outdated() -> Dict[str, Any]:
         "success": True,
         "outdated": outdated,
         "count": len(outdated),
-        "by_severity": {"major": major_updates, "minor": minor_updates, "patch": patch_updates},
+        "by_severity": {
+            "major": major_updates,
+            "minor": minor_updates,
+            "patch": patch_updates,
+        },
         "formatted_report": "\n".join(report),
     }
 
@@ -199,7 +212,9 @@ async def _do_security() -> Dict[str, Any]:
 
     if not vulnerabilities:
         report.append("No known vulnerabilities found!")
-        report.append("\nNote: This is a basic check. For comprehensive auditing, use: pip-audit")
+        report.append(
+            "\nNote: This is a basic check. For comprehensive auditing, use: pip-audit"
+        )
     else:
         report.append(f"Found {len(vulnerabilities)} potential vulnerabilities:\n")
         for vuln in vulnerabilities:
@@ -286,7 +301,10 @@ async def _do_tree(package: Optional[str]) -> Dict[str, Any]:
 
     result = await run_command_async(cmd, timeout=60, check_dangerous=False)
     if not result.success:
-        return {"success": False, "error": f"Failed to show dependency tree: {result.stderr}"}
+        return {
+            "success": False,
+            "error": f"Failed to show dependency tree: {result.stderr}",
+        }
 
     return {"success": True, "tree": result.stdout, "package": package}
 
@@ -295,7 +313,10 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
     """Check requirements satisfaction."""
     req_path = Path(requirements_file)
     if not req_path.exists():
-        return {"success": False, "error": f"Requirements file not found: {requirements_file}"}
+        return {
+            "success": False,
+            "error": f"Requirements file not found: {requirements_file}",
+        }
 
     success, stdout, stderr = await run_pip_async("list", "--format=json")
     if not success:
@@ -309,7 +330,10 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
     try:
         requirements = req_path.read_text().strip().split("\n")
     except Exception as e:
-        return {"success": False, "error": f"Failed to read requirements file: {str(e)}"}
+        return {
+            "success": False,
+            "error": f"Failed to read requirements file: {str(e)}",
+        }
 
     missing = []
     mismatched = []
@@ -330,7 +354,11 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
             missing.append(req)
         elif operator == "==" and version and installed[pkg_name] != version:
             mismatched.append(
-                {"package": pkg_name, "required": version, "installed": installed[pkg_name]}
+                {
+                    "package": pkg_name,
+                    "required": version,
+                    "installed": installed[pkg_name],
+                }
             )
         else:
             satisfied.append(pkg_name)

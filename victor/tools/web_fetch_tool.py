@@ -40,7 +40,9 @@ from victor.tools.enums import (
 
 logger = logging.getLogger(__name__)
 
-_USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
+_USER_AGENT = (
+    "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
+)
 
 
 @dataclass
@@ -99,7 +101,9 @@ def _check_domain_restrictions(
     hostname = parsed.hostname or ""
 
     if allowed_domains is not None:
-        if not any(hostname == d or hostname.endswith("." + d) for d in allowed_domains):
+        if not any(
+            hostname == d or hostname.endswith("." + d) for d in allowed_domains
+        ):
             return f"Domain '{hostname}' is not in the allowed domains list"
 
     if blocked_domains is not None:

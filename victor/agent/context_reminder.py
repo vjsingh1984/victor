@@ -168,7 +168,9 @@ class ContextReminderManager:
         self,
         provider: str = "unknown",
         configs: Optional[Dict[ReminderType, ReminderConfig]] = None,
-        custom_formatters: Optional[Dict[ReminderType, Callable[[ContextState], str]]] = None,
+        custom_formatters: Optional[
+            Dict[ReminderType, Callable[[ContextState], str]]
+        ] = None,
         presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize the context reminder manager.
@@ -255,7 +257,8 @@ class ContextReminderManager:
         # Special case: task hint only injected once
         if reminder_type == ReminderType.TASK_HINT:
             return (
-                self.state.task_hint and ReminderType.TASK_HINT not in self.state.reminder_history
+                self.state.task_hint
+                and ReminderType.TASK_HINT not in self.state.reminder_history
             )
 
         # Special case: budget reminder only when running low

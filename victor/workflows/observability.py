@@ -327,7 +327,9 @@ class ObservabilityEmitter:
                 except Exception as e:
                     logger.warning(f"Async observer error: {e}")
 
-    def emit_workflow_start(self, metadata: Optional[Dict[str, Any]] = None) -> WorkflowStreamChunk:
+    def emit_workflow_start(
+        self, metadata: Optional[Dict[str, Any]] = None
+    ) -> WorkflowStreamChunk:
         """Emit a WORKFLOW_START event.
 
         Args:

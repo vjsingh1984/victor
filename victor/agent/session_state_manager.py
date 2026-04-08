@@ -113,7 +113,9 @@ class ExecutionState:
             "tool_calls_used": self.tool_calls_used,
             "observed_files": list(self.observed_files),
             "executed_tools": list(self.executed_tools),
-            "failed_tool_signatures": [list(sig) for sig in self.failed_tool_signatures],
+            "failed_tool_signatures": [
+                list(sig) for sig in self.failed_tool_signatures
+            ],
             "read_files_session": list(self.read_files_session),
             "required_files": list(self.required_files),
             "required_outputs": list(self.required_outputs),
@@ -135,7 +137,9 @@ class ExecutionState:
             tool_calls_used=data.get("tool_calls_used", 0),
             observed_files=set(data.get("observed_files", [])),
             executed_tools=list(data.get("executed_tools", [])),
-            failed_tool_signatures={tuple(sig) for sig in data.get("failed_tool_signatures", [])},
+            failed_tool_signatures={
+                tuple(sig) for sig in data.get("failed_tool_signatures", [])
+            },
             read_files_session=set(data.get("read_files_session", [])),
             required_files=list(data.get("required_files", [])),
             required_outputs=list(data.get("required_outputs", [])),
@@ -484,7 +488,10 @@ class SessionStateManager:
         Returns:
             True if all files are read and nudge hasn't been sent
         """
-        return self.check_all_files_read() and not self._session_flags.all_files_read_nudge_sent
+        return (
+            self.check_all_files_read()
+            and not self._session_flags.all_files_read_nudge_sent
+        )
 
     def mark_tool_capability_warned(self) -> None:
         """Mark that tool capability warning has been shown."""
@@ -553,11 +560,15 @@ class SessionStateManager:
         """
         self._execution_state.token_usage["prompt_tokens"] += prompt_tokens
         self._execution_state.token_usage["completion_tokens"] += completion_tokens
-        self._execution_state.token_usage["total_tokens"] += prompt_tokens + completion_tokens
+        self._execution_state.token_usage["total_tokens"] += (
+            prompt_tokens + completion_tokens
+        )
         self._execution_state.token_usage[
             "cache_creation_input_tokens"
         ] += cache_creation_input_tokens
-        self._execution_state.token_usage["cache_read_input_tokens"] += cache_read_input_tokens
+        self._execution_state.token_usage[
+            "cache_read_input_tokens"
+        ] += cache_read_input_tokens
 
     # =========================================================================
     # Checkpoint/Restore

@@ -337,7 +337,9 @@ class ProviderConfig(BaseSettings):
         for name in secret_fields:
             val = getattr(self, name, None)
             if val is not None:
-                result[name] = val.get_secret_value() if isinstance(val, SecretStr) else val
+                result[name] = (
+                    val.get_secret_value() if isinstance(val, SecretStr) else val
+                )
         return result
 
 
@@ -346,7 +348,9 @@ class ProfileConfig(BaseSettings):
 
     model_config = SettingsConfigDict(extra="allow")
 
-    provider: str = Field(..., description="Provider name (ollama, anthropic, openai, google)")
+    provider: str = Field(
+        ..., description="Provider name (ollama, anthropic, openai, google)"
+    )
     model: str = Field(..., description="Model identifier")
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
@@ -370,7 +374,8 @@ class ProfileConfig(BaseSettings):
     # -------------------------------------------------------------------------
 
     planning_provider: Optional[str] = Field(
-        None, description="Override provider for planning (e.g., 'deepseek', 'anthropic')"
+        None,
+        description="Override provider for planning (e.g., 'deepseek', 'anthropic')",
     )
     planning_model: Optional[str] = Field(
         None,
@@ -388,7 +393,8 @@ class ProfileConfig(BaseSettings):
         None, description="Number of identical calls before triggering loop detection"
     )
     max_continuation_prompts: Optional[int] = Field(
-        None, description="Max consecutive continuation prompts before forcing completion"
+        None,
+        description="Max consecutive continuation prompts before forcing completion",
     )
 
     # Quality thresholds - controls response quality requirements
@@ -396,7 +402,10 @@ class ProfileConfig(BaseSettings):
         None, ge=0.0, le=1.0, description="Minimum quality score to accept response"
     )
     grounding_threshold: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Confidence threshold for grounding verification"
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for grounding verification",
     )
 
     # Tool behavior - controls tool usage patterns
@@ -421,7 +430,9 @@ class ProfileConfig(BaseSettings):
 
     @field_validator("tool_selection")
     @classmethod
-    def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def validate_tool_selection(
+        cls, v: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """Validate tool_selection configuration.
 
         Args:
@@ -458,15 +469,21 @@ class ProfileConfig(BaseSettings):
         if "base_threshold" in v:
             threshold = v["base_threshold"]
             if not isinstance(threshold, (int, float)):
-                raise ValueError(f"base_threshold must be a number, got {type(threshold)}")
+                raise ValueError(
+                    f"base_threshold must be a number, got {type(threshold)}"
+                )
             if not (0.0 <= threshold <= 1.0):
-                raise ValueError(f"base_threshold must be between 0.0 and 1.0, got {threshold}")
+                raise ValueError(
+                    f"base_threshold must be between 0.0 and 1.0, got {threshold}"
+                )
 
         # Validate base_max_tools
         if "base_max_tools" in v:
             max_tools = v["base_max_tools"]
             if not isinstance(max_tools, int):
-                raise ValueError(f"base_max_tools must be an integer, got {type(max_tools)}")
+                raise ValueError(
+                    f"base_max_tools must be an integer, got {type(max_tools)}"
+                )
             if max_tools < 1:
                 raise ValueError(f"base_max_tools must be positive, got {max_tools}")
 
@@ -497,7 +514,9 @@ class ProviderSettings(_BaseModel):
     moonshot_api_key: Optional[SecretStr] = None
     deepseek_api_key: Optional[SecretStr] = None
     ollama_base_url: str = "http://localhost:11434"
-    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
+    lmstudio_base_urls: List[str] = Field(
+        default_factory=lambda: ["http://127.0.0.1:1234"]
+    )
     vllm_base_url: str = "http://localhost:8000"
     lmstudio_max_vram_gb: Optional[float] = 48.0
 
@@ -558,7 +577,9 @@ class ProviderSettings(_BaseModel):
 class ToolSettings(_BaseModel):
     """Tool execution, selection, and retry configuration."""
 
-    tool_call_budget: int = Field(default_factory=lambda: BUDGET_LIMITS.max_session_budget)
+    tool_call_budget: int = Field(
+        default_factory=lambda: BUDGET_LIMITS.max_session_budget
+    )
     tool_call_budget_warning_threshold: int = Field(
         default_factory=lambda: int(
             BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
@@ -879,7 +900,9 @@ class ExplorationSettings(_BaseModel):
     max_continuation_prompts_default: int = 3
     max_continuation_prompts_action: int = 5
     max_continuation_prompts_analysis: int = 6
-    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
+        default_factory=dict
+    )
     enable_continuation_rl_learning: bool = False
 
 
@@ -1120,7 +1143,9 @@ class Settings(BaseSettings):
             api_key_value = data["api_key"]
             if isinstance(api_key_value, str):
                 # Try to determine which provider based on the default_provider
-                default_provider = data.get("default_provider", data.get("provider", "ollama"))
+                default_provider = data.get(
+                    "default_provider", data.get("provider", "ollama")
+                )
                 if default_provider in ["anthropic", "claude"]:
                     data["anthropic_api_key"] = api_key_value
                 elif default_provider in ["openai", "gpt"]:
@@ -1142,31 +1167,55 @@ class Settings(BaseSettings):
     provider: Optional[ProviderSettings] = Field(default=None, exclude=True, repr=False)
     tools: Optional[ToolSettings] = Field(default=None, exclude=True, repr=False)
     search: Optional[SearchSettings] = Field(default=None, exclude=True, repr=False)
-    resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
+    resilience: Optional[ResilienceSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
     events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
     pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
-    observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
+    observability: Optional[ObservabilitySettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)
-    checkpoint: Optional[CheckpointSettings] = Field(default=None, exclude=True, repr=False)
+    checkpoint: Optional[CheckpointSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     ui: Optional[UISettings] = Field(default=None, exclude=True, repr=False)
-    feature_flags: Optional[FeatureFlagSettings] = Field(default=None, exclude=True, repr=False)
-    enrichment: Optional[PromptEnrichmentSettings] = Field(default=None, exclude=True, repr=False)
+    feature_flags: Optional[FeatureFlagSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    enrichment: Optional[PromptEnrichmentSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     hitl: Optional[HITLSettings] = Field(default=None, exclude=True, repr=False)
     plugins: Optional[PluginSettings] = Field(default=None, exclude=True, repr=False)
-    prompt_policy: Optional[PromptPolicySettings] = Field(default=None, exclude=True, repr=False)
-    conversation: Optional[ConversationSettings] = Field(default=None, exclude=True, repr=False)
-    exploration: Optional[ExplorationSettings] = Field(default=None, exclude=True, repr=False)
-    serialization: Optional[SerializationSettings] = Field(default=None, exclude=True, repr=False)
-    automation: Optional[AutomationSettings] = Field(default=None, exclude=True, repr=False)
+    prompt_policy: Optional[PromptPolicySettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    conversation: Optional[ConversationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    exploration: Optional[ExplorationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    serialization: Optional[SerializationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    automation: Optional[AutomationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     code_correction: Optional[CodeCorrectionSettings] = Field(
         default=None, exclude=True, repr=False
     )
     mcp: Optional[McpSettings] = Field(default=None, exclude=True, repr=False)
     sandbox: Optional[SandboxSettings] = Field(default=None, exclude=True, repr=False)
     hooks: Optional[HooksSettings] = Field(default=None, exclude=True, repr=False)
-    compaction: Optional[CompactionSettings] = Field(default=None, exclude=True, repr=False)
-    permissions: Optional[PermissionSettings] = Field(default=None, exclude=True, repr=False)
+    compaction: Optional[CompactionSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    permissions: Optional[PermissionSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"
@@ -1206,7 +1255,9 @@ class Settings(BaseSettings):
     # This allows the dashboard to show events from agent runs
     # Off by default for performance - enable with: victor chat --log-events
     enable_observability_logging: bool = False
-    observability_log_path: Optional[str] = None  # Defaults to ~/.victor/metrics/victor.jsonl
+    observability_log_path: Optional[str] = (
+        None  # Defaults to ~/.victor/metrics/victor.jsonl
+    )
 
     # Privacy and Security
     airgapped_mode: bool = False
@@ -1217,7 +1268,9 @@ class Settings(BaseSettings):
     # Verticals are domain-specific configurations that customize Victor's behavior.
     # Available verticals: coding, research, devops (extensible via plugins)
     default_vertical: str = "coding"  # Default vertical when --vertical not specified
-    auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
+    auto_detect_vertical: bool = (
+        False  # Auto-detect vertical from project context (experimental)
+    )
 
     # Server Security (FastAPI/WebSocket layer)
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
@@ -1273,8 +1326,12 @@ class Settings(BaseSettings):
     unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # Tool Selection Strategy
-    use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
-    preload_embeddings: bool = False  # Defer embedding model load to first semantic query
+    use_semantic_tool_selection: bool = (
+        True  # Use embeddings instead of keywords (DEFAULT)
+    )
+    preload_embeddings: bool = (
+        False  # Defer embedding model load to first semantic query
+    )
     embedding_provider: str = (
         "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
     )
@@ -1283,28 +1340,42 @@ class Settings(BaseSettings):
     # Codebase Semantic Search (Air-gapped by Default)
     codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb
     codebase_embedding_provider: str = "sentence-transformers"  # Local, offline, fast
-    codebase_embedding_model: str = unified_embedding_model  # Shared with tool selection
-    codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
+    codebase_embedding_model: str = (
+        unified_embedding_model  # Shared with tool selection
+    )
+    codebase_persist_directory: Optional[str] = (
+        None  # Default: ~/.victor/embeddings/codebase
+    )
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
     codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
-    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
+    core_readonly_tools: Optional[List[str]] = (
+        None  # Override/extend curated read-only tool set
+    )
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
     semantic_similarity_threshold: float = (
         0.25  # Min score [0.1-0.9], lowered from 0.5 for better recall on technical queries
     )
-    semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
-    semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
+    semantic_query_expansion_enabled: bool = (
+        True  # Expand queries with synonyms/related terms
+    )
+    semantic_max_query_expansions: int = (
+        5  # Max query variations to try (including original)
+    )
 
     # Hybrid Search (Semantic + Keyword with RRF)
-    enable_hybrid_search: bool = False  # Enable hybrid search combining semantic + keyword
+    enable_hybrid_search: bool = (
+        False  # Enable hybrid search combining semantic + keyword
+    )
     hybrid_search_semantic_weight: float = 0.6  # Weight for semantic search (0.0-1.0)
     hybrid_search_keyword_weight: float = 0.4  # Weight for keyword search (0.0-1.0)
 
     # RL-based threshold learning per (embedding_model, task_type, tool_context)
-    enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
+    enable_semantic_threshold_rl_learning: bool = (
+        False  # Enable automatic threshold learning
+    )
     semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
 
     # Tool call deduplication
@@ -1327,11 +1398,15 @@ class Settings(BaseSettings):
 
     # MCP
     use_mcp_tools: bool = False
-    mcp_command: Optional[str] = None  # e.g., "python mcp_server.py" or "node mcp-server.js"
+    mcp_command: Optional[str] = (
+        None  # e.g., "python mcp_server.py" or "node mcp-server.js"
+    )
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
-    tool_call_budget: int = BUDGET_LIMITS.max_session_budget  # Maximum tool calls per session
+    tool_call_budget: int = (
+        BUDGET_LIMITS.max_session_budget
+    )  # Maximum tool calls per session
     tool_call_budget_warning_threshold: int = int(
         BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
     )  # Warn when approaching budget limit
@@ -1354,7 +1429,8 @@ class Settings(BaseSettings):
     # Autonomous Planning Settings
     # When enabled, complex multi-step tasks use structured planning instead of direct chat
     enable_planning: bool = Field(
-        default=False, description="Auto-detect and use planning for complex tasks (default: off)"
+        default=False,
+        description="Auto-detect and use planning for complex tasks (default: off)",
     )
     planning_min_complexity: str = Field(
         default="moderate",
@@ -1383,7 +1459,9 @@ class Settings(BaseSettings):
     # Caches semantic tool selection results to avoid repeated embedding computation
     # Typical 20-40% latency reduction for conversational agents
     tool_selection_cache_enabled: bool = True  # Enable by default for performance
-    tool_selection_cache_ttl: int = 300  # 5 minutes TTL (short TTL ensures fresh selections)
+    tool_selection_cache_ttl: int = (
+        300  # 5 minutes TTL (short TTL ensures fresh selections)
+    )
 
     # Shared HTTP connection pool for network tools (feature-flagged integration path)
     http_connection_pool_enabled: bool = False
@@ -1489,10 +1567,16 @@ class Settings(BaseSettings):
     #   - Enables OCP compliance (add tool types without modifying registry)
 
     # Phase 3 - Service Implementation flags
-    use_new_chat_service: bool = False  # Use ChatService instead of orchestrator methods
-    use_new_tool_service: bool = False  # Use ToolService instead of orchestrator methods
+    use_new_chat_service: bool = (
+        False  # Use ChatService instead of orchestrator methods
+    )
+    use_new_tool_service: bool = (
+        False  # Use ToolService instead of orchestrator methods
+    )
     use_new_context_service: bool = False  # Use ContextService for context management
-    use_new_provider_service: bool = False  # Use ProviderService for provider management
+    use_new_provider_service: bool = (
+        False  # Use ProviderService for provider management
+    )
     use_new_recovery_service: bool = False  # Use RecoveryService for error recovery
     use_new_session_service: bool = False  # Use SessionService for session management
 
@@ -1500,7 +1584,9 @@ class Settings(BaseSettings):
     use_composition_over_inheritance: bool = False  # Use composition-based verticals
 
     # Phase 5 - Tool Registration Strategy flag
-    use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
+    use_strategy_based_tool_registration: bool = (
+        False  # Use strategy pattern for tool registration
+    )
 
     # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
@@ -1514,7 +1600,9 @@ class Settings(BaseSettings):
     prompt_enrichment_enabled: bool = True  # Master toggle for prompt enrichment
     prompt_enrichment_max_tokens: int = 2000  # Max tokens to add via enrichment
     prompt_enrichment_timeout_ms: float = 500.0  # Timeout in milliseconds
-    prompt_enrichment_cache_enabled: bool = True  # Cache enrichments for repeated prompts
+    prompt_enrichment_cache_enabled: bool = (
+        True  # Cache enrichments for repeated prompts
+    )
     prompt_enrichment_cache_ttl: int = 300  # Cache TTL in seconds (5 minutes)
     prompt_enrichment_strategies: List[str] = Field(
         default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
@@ -1559,7 +1647,9 @@ class Settings(BaseSettings):
     max_exploration_iterations_analysis: int = (
         1000  # Effectively unlimited for analysis - rely on task completion (was 75)
     )
-    min_content_threshold: int = 50  # Minimum chars to consider "substantial" output (was 100)
+    min_content_threshold: int = (
+        50  # Minimum chars to consider "substantial" output (was 100)
+    )
     max_research_iterations: int = 50  # Allow thorough web research (was 15)
 
     # ==========================================================================
@@ -1602,7 +1692,9 @@ class Settings(BaseSettings):
     # Timer resets on each provider response or tool execution
     # Set below provider timeout (300s default) to provide graceful completion
     # Can be overridden per profile in profiles.yaml
-    session_idle_timeout: int = 180  # 3 minutes idle time, leaves 120s buffer for summary
+    session_idle_timeout: int = (
+        180  # 3 minutes idle time, leaves 120s buffer for summary
+    )
 
     # Future: session_time_limit will be separate config for total session duration
     # regardless of activity (for sub-task agents, resource limits, etc.)
@@ -1610,8 +1702,12 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
-    conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
-    conversation_embeddings_enabled: bool = True  # Enable LanceDB embeddings for semantic retrieval
+    conversation_memory_enabled: bool = (
+        True  # Enable SQLite-backed conversation persistence
+    )
+    conversation_embeddings_enabled: bool = (
+        True  # Enable LanceDB embeddings for semantic retrieval
+    )
     # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
     # Embeddings stored at get_project_paths().embeddings_dir / "conversations"
     max_context_tokens: int = 100000  # Maximum tokens in context window
@@ -1658,7 +1754,9 @@ class Settings(BaseSettings):
     # TOON (Token-Oriented Object Notation) provides 30-60% savings for tabular data.
     serialization_enabled: bool = True  # Enable token-optimized serialization
     serialization_default_format: Optional[str] = None  # None = auto-select best format
-    serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
+    serialization_min_savings_threshold: float = (
+        0.15  # Min savings to use alternative format
+    )
 
     # ==========================================================================
     # Intelligent Agent Pipeline (RL-based Learning, Quality Scoring)
@@ -1671,7 +1769,9 @@ class Settings(BaseSettings):
     intelligent_pipeline_enabled: bool = True  # Master switch for intelligent features
     intelligent_quality_scoring: bool = True  # Enable multi-dimensional quality scoring
     intelligent_mode_learning: bool = True  # Enable Q-learning for mode transitions
-    intelligent_prompt_optimization: bool = True  # Enable embedding-based prompt selection
+    intelligent_prompt_optimization: bool = (
+        True  # Enable embedding-based prompt selection
+    )
     intelligent_grounding_verification: bool = True  # Enable hallucination detection
 
     # Quality thresholds
@@ -1682,7 +1782,9 @@ class Settings(BaseSettings):
     intelligent_exploration_rate: float = 0.3  # Initial exploration vs exploitation
     intelligent_learning_rate: float = 0.1  # Q-learning alpha parameter
     intelligent_discount_factor: float = 0.9  # Q-learning gamma parameter
-    serialization_include_format_hint: bool = True  # Include format description in output
+    serialization_include_format_hint: bool = (
+        True  # Include format description in output
+    )
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output
 
@@ -1795,7 +1897,9 @@ class Settings(BaseSettings):
         default=50, ge=1, description="Maximum chat iterations per session"
     )
     max_consecutive_tool_calls: int = Field(
-        default=20, ge=1, description="Maximum consecutive tool calls before forcing synthesis"
+        default=20,
+        ge=1,
+        description="Maximum consecutive tool calls before forcing synthesis",
     )
 
     # ==========================================================================
@@ -1817,7 +1921,9 @@ class Settings(BaseSettings):
         default="smart", description="Truncation strategy: simple, smart, preserve_code"
     )
     file_structure_threshold: int = Field(
-        default=50000, ge=1000, description="File size threshold for structure-based truncation"
+        default=50000,
+        ge=1000,
+        description="File size threshold for structure-based truncation",
     )
 
     # ==========================================================================
@@ -1829,7 +1935,9 @@ class Settings(BaseSettings):
         description="Maximum characters in context (alternative to token-based limit)",
     )
     max_conversation_history: int = Field(
-        default=100, ge=10, description="Maximum messages to retain in conversation history"
+        default=100,
+        ge=10,
+        description="Maximum messages to retain in conversation history",
     )
 
     # ==========================================================================
@@ -1869,7 +1977,10 @@ class Settings(BaseSettings):
     # Grounding (from VictorSettings merge)
     # ==========================================================================
     grounding_confidence_threshold: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Confidence threshold for grounding verification"
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for grounding verification",
     )
 
     # ==========================================================================
@@ -1879,7 +1990,8 @@ class Settings(BaseSettings):
         default=True, description="Enable periodic provider health checks"
     )
     provider_auto_fallback: bool = Field(
-        default=True, description="Automatically fallback to secondary providers on failure"
+        default=True,
+        description="Automatically fallback to secondary providers on failure",
     )
     fallback_providers: List[str] = Field(
         default_factory=list, description="Ordered list of fallback providers"
@@ -1920,7 +2032,9 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Debug Settings (from VictorSettings merge)
     # ==========================================================================
-    debug_logging: bool = Field(default=False, description="Enable verbose debug logging")
+    debug_logging: bool = Field(
+        default=False, description="Enable verbose debug logging"
+    )
 
     # ==========================================================================
     # System Prompt Policy (from VictorSettings merge)
@@ -1988,14 +2102,18 @@ class Settings(BaseSettings):
     ) -> Dict[str, str]:
         """Validate per-topic overflow policy overrides."""
         if not isinstance(value, dict):
-            raise ValueError("event_queue_overflow_topic_policies must be a dict[str, str]")
+            raise ValueError(
+                "event_queue_overflow_topic_policies must be a dict[str, str]"
+            )
 
         allowed = {"drop_newest", "drop_oldest", "block_with_timeout"}
         normalized: Dict[str, str] = {}
         for topic_pattern, policy in value.items():
             pattern = str(topic_pattern).strip()
             if not pattern:
-                raise ValueError("event_queue_overflow_topic_policies keys must be non-empty")
+                raise ValueError(
+                    "event_queue_overflow_topic_policies keys must be non-empty"
+                )
             normalized_policy = str(policy).strip().lower()
             if normalized_policy not in allowed:
                 allowed_csv = ", ".join(sorted(allowed))
@@ -2032,7 +2150,9 @@ class Settings(BaseSettings):
                     "event_queue_overflow_topic_block_timeout_ms values must be numeric"
                 ) from None
             if parsed_timeout < 0:
-                raise ValueError("event_queue_overflow_topic_block_timeout_ms values must be >= 0")
+                raise ValueError(
+                    "event_queue_overflow_topic_block_timeout_ms values must be >= 0"
+                )
             normalized[pattern] = parsed_timeout
         return normalized
 
@@ -2088,8 +2208,13 @@ class Settings(BaseSettings):
         if self.extension_loader_pressure_cooldown_seconds < 0:
             raise ValueError("extension_loader_pressure_cooldown_seconds must be >= 0")
         if self.extension_loader_metrics_reporter_interval_seconds <= 0:
-            raise ValueError("extension_loader_metrics_reporter_interval_seconds must be > 0")
-        if self.extension_loader_error_queue_threshold < self.extension_loader_warn_queue_threshold:
+            raise ValueError(
+                "extension_loader_metrics_reporter_interval_seconds must be > 0"
+            )
+        if (
+            self.extension_loader_error_queue_threshold
+            < self.extension_loader_warn_queue_threshold
+        ):
             raise ValueError(
                 "extension_loader_error_queue_threshold must be >= "
                 "extension_loader_warn_queue_threshold"
@@ -2109,7 +2234,9 @@ class Settings(BaseSettings):
         if self.http_connection_pool_max_connections < 1:
             raise ValueError("http_connection_pool_max_connections must be >= 1")
         if self.http_connection_pool_max_connections_per_host < 1:
-            raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
+            raise ValueError(
+                "http_connection_pool_max_connections_per_host must be >= 1"
+            )
         if self.http_connection_pool_connection_timeout <= 0:
             raise ValueError("http_connection_pool_connection_timeout must be > 0")
         if self.http_connection_pool_total_timeout <= 0:
@@ -2171,7 +2298,9 @@ class Settings(BaseSettings):
         """Validate write approval mode."""
         valid_modes = ["off", "risky_only", "all_writes"]
         if v not in valid_modes:
-            raise ValueError(f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}")
+            raise ValueError(
+                f"Invalid write_approval_mode: {v}. Must be one of {valid_modes}"
+            )
         return v
 
     @field_validator("tool_validation_mode")
@@ -2180,7 +2309,9 @@ class Settings(BaseSettings):
         """Validate tool validation mode."""
         valid_modes = ["strict", "lenient", "off"]
         if v not in valid_modes:
-            raise ValueError(f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}")
+            raise ValueError(
+                f"Invalid tool_validation_mode: {v}. Must be one of {valid_modes}"
+            )
         return v
 
     @field_validator("context_compaction_strategy")
@@ -2190,7 +2321,8 @@ class Settings(BaseSettings):
         valid_strategies = ["simple", "tiered", "semantic", "hybrid"]
         if v not in valid_strategies:
             raise ValueError(
-                f"Invalid context_compaction_strategy: {v}. " f"Must be one of {valid_strategies}"
+                f"Invalid context_compaction_strategy: {v}. "
+                f"Must be one of {valid_strategies}"
             )
         return v
 
@@ -2198,9 +2330,13 @@ class Settings(BaseSettings):
     def validate_hybrid_search_weights(self) -> "Settings":
         """Validate that hybrid search weights sum to 1.0."""
         if self.enable_hybrid_search:
-            total_weight = self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
+            total_weight = (
+                self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
+            )
             if abs(total_weight - 1.0) > 0.01:
-                raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
+                raise ValueError(
+                    f"Hybrid search weights must sum to 1.0, got {total_weight}"
+                )
         return self
 
     @model_validator(mode="after")
@@ -2217,7 +2353,8 @@ class Settings(BaseSettings):
             val = getattr(self, field_name, "")
             if val and val not in known_providers:
                 warnings.warn(
-                    f"Unknown {field_name}='{val}'. " f"Known providers: {sorted(known_providers)}",
+                    f"Unknown {field_name}='{val}'. "
+                    f"Known providers: {sorted(known_providers)}",
                     UserWarning,
                     stacklevel=2,
                 )
@@ -2307,7 +2444,9 @@ class Settings(BaseSettings):
         if cli_args:
             # Filter out None values and non-field keys
             filtered_args = {
-                k: v for k, v in cli_args.items() if v is not None and k in cls.model_fields
+                k: v
+                for k, v in cli_args.items()
+                if v is not None and k in cls.model_fields
             }
             if filtered_args:
                 settings = settings.model_copy(update=filtered_args)
@@ -2403,7 +2542,9 @@ class Settings(BaseSettings):
 
         detected_vram = cls._detect_vram_gb()
         max_vram = (
-            max_vram_gb if max_vram_gb is not None else getattr(cls, "lmstudio_max_vram_gb", None)
+            max_vram_gb
+            if max_vram_gb is not None
+            else getattr(cls, "lmstudio_max_vram_gb", None)
         )
         available_vram = None
         if detected_vram and max_vram:
@@ -2531,7 +2672,11 @@ class Settings(BaseSettings):
             if provider_data:
                 # Expand environment variables
                 for key, value in provider_data.items():
-                    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                    if (
+                        isinstance(value, str)
+                        and value.startswith("${")
+                        and value.endswith("}")
+                    ):
                         env_var = value[2:-1]
                         provider_data[key] = os.getenv(env_var)
 

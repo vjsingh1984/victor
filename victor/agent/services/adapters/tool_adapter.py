@@ -7,7 +7,17 @@ ToolCoordinator, enabling feature-flagged service layer migration.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.tool_coordinator import ToolCoordinator

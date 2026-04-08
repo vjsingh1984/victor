@@ -150,7 +150,9 @@ class CollaborationPattern:
         """Get success rate from metrics."""
         return self.metrics.success_rate
 
-    def record_usage(self, success: bool, duration_ms: float, cost: float = 0.0) -> None:
+    def record_usage(
+        self, success: bool, duration_ms: float, cost: float = 0.0
+    ) -> None:
         """Record a usage of this pattern.
 
         Args:

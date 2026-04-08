@@ -385,7 +385,11 @@ ACCELERATOR_BENCHMARKS: Dict[str, AcceleratorBenchmark] = {
         "chunk_with_overlap", 0.03, 0.14, "rust", "Line-aware text chunking"
     ),
     "content_hashing": AcceleratorBenchmark(
-        "content_hashing", 0.71, 1.76, "rust", "Hash with normalization (SHA-256 dominates)"
+        "content_hashing",
+        0.71,
+        1.76,
+        "rust",
+        "Hash with normalization (SHA-256 dominates)",
     ),
     "count_lines": AcceleratorBenchmark(
         "count_lines", 0.004, 0.009, "rust", "SIMD-optimized line counting"
@@ -508,7 +512,9 @@ def get_symbol_extractor(backend: Optional[str] = None) -> "SymbolExtractorProto
     return PythonSymbolExtractor()
 
 
-def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalizerProtocol":
+def get_argument_normalizer(
+    backend: Optional[str] = None,
+) -> "ArgumentNormalizerProtocol":
     """Get an argument normalizer implementation.
 
     Args:
@@ -528,7 +534,9 @@ def get_argument_normalizer(backend: Optional[str] = None) -> "ArgumentNormalize
     return PythonArgumentNormalizer()
 
 
-def get_similarity_computer(backend: Optional[str] = None) -> "SimilarityComputerProtocol":
+def get_similarity_computer(
+    backend: Optional[str] = None,
+) -> "SimilarityComputerProtocol":
     """Get a similarity computer implementation.
 
     Note: Benchmark data shows NumPy+BLAS (Python) is ~6x faster than Rust FFI

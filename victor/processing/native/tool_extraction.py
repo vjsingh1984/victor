@@ -115,7 +115,8 @@ def extract_code_blocks(text: str) -> List[str]:
             if non_empty:
                 min_indent = min(len(line) - len(line.lstrip()) for line in non_empty)
                 dedented = "\n".join(
-                    line[min_indent:] if len(line) > min_indent else line for line in lines
+                    line[min_indent:] if len(line) > min_indent else line
+                    for line in lines
                 )
                 blocks.append(dedented.strip())
 
@@ -297,7 +298,10 @@ _CLEANUP_PATTERNS = [
     (re.compile(r"</?parameter[^>]*>"), ""),  # Parameter tags
     (re.compile(r"</?tool[^>]*>"), ""),  # Tool tags
     (re.compile(r"</?IMPORTANT[^>]*>"), ""),  # Important tags
-    (re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'), ""),  # JSON tool calls
+    (
+        re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'),
+        "",
+    ),  # JSON tool calls
     (re.compile(r"\n{4,}"), "\n\n\n"),  # Excessive newlines
 ]
 

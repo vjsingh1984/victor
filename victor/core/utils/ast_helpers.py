@@ -71,7 +71,10 @@ def extract_parameters(
 
     if node.args.vararg is not None:
         parameters.append(
-            (f"*{node.args.vararg.arg}", get_annotation_str(node.args.vararg.annotation))
+            (
+                f"*{node.args.vararg.arg}",
+                get_annotation_str(node.args.vararg.annotation),
+            )
         )
 
     for arg in node.args.kwonlyargs:
@@ -181,7 +184,9 @@ def _summarize_function(
         signature=build_signature(node) if enrich else None,
         parameters=extract_parameters(node) if enrich else [],
         return_type=get_annotation_str(node.returns) if enrich else None,
-        decorators=[get_decorator_name(item) for item in node.decorator_list] if enrich else [],
+        decorators=(
+            [get_decorator_name(item) for item in node.decorator_list] if enrich else []
+        ),
         docstring=ast.get_docstring(node) if enrich else None,
         is_async=isinstance(node, ast.AsyncFunctionDef),
     )
@@ -215,11 +220,15 @@ def extract_symbols(tree: ast.AST, *, enrich: bool = False) -> List[SymbolSummar
     def visit(body: Iterable[ast.stmt], parent_symbol: Optional[str] = None) -> None:
         for node in _iter_symbol_nodes(body):
             if isinstance(node, ast.ClassDef):
-                symbols.append(_summarize_class(node, parent_symbol=parent_symbol, enrich=enrich))
+                symbols.append(
+                    _summarize_class(node, parent_symbol=parent_symbol, enrich=enrich)
+                )
                 visit(node.body, parent_symbol=node.name)
             else:
                 symbols.append(
-                    _summarize_function(node, parent_symbol=parent_symbol, enrich=enrich)
+                    _summarize_function(
+                        node, parent_symbol=parent_symbol, enrich=enrich
+                    )
                 )
                 visit(node.body, parent_symbol=node.name)
 

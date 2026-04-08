@@ -249,7 +249,9 @@ class UnifiedAgentConfig:
             UnifiedAgentConfig with equivalent settings
         """
         # Map SubAgentRole to string
-        role_str = config.role.value if hasattr(config.role, "value") else str(config.role)
+        role_str = (
+            config.role.value if hasattr(config.role, "value") else str(config.role)
+        )
 
         return cls(
             mode="team_member",

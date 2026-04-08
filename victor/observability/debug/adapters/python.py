@@ -152,7 +152,9 @@ class PythonDebugAdapter(BaseDebugAdapter):
     async def initialize(self) -> DebugAdapterCapabilities:
         """Initialize the debugpy adapter."""
         if not HAS_DEBUGPY:
-            raise RuntimeError("debugpy is not installed. Install with: pip install debugpy")
+            raise RuntimeError(
+                "debugpy is not installed. Install with: pip install debugpy"
+            )
 
         if self._initialized:
             return self.capabilities
@@ -368,7 +370,9 @@ class PythonDebugAdapter(BaseDebugAdapter):
 
         return result
 
-    async def set_function_breakpoints(self, session_id: str, names: List[str]) -> List[Breakpoint]:
+    async def set_function_breakpoints(
+        self, session_id: str, names: List[str]
+    ) -> List[Breakpoint]:
         """Set breakpoints on function names."""
         response = await self._send_request(
             "setFunctionBreakpoints",
@@ -406,7 +410,9 @@ class PythonDebugAdapter(BaseDebugAdapter):
 
     # Execution control
 
-    async def continue_execution(self, session_id: str, thread_id: Optional[int] = None) -> None:
+    async def continue_execution(
+        self, session_id: str, thread_id: Optional[int] = None
+    ) -> None:
         """Continue execution."""
         args = {}
         if thread_id is not None:
@@ -554,16 +560,22 @@ class PythonDebugAdapter(BaseDebugAdapter):
         max_retries = 10
         for i in range(max_retries):
             try:
-                self._reader, self._writer = await asyncio.open_connection(host, self._port)
+                self._reader, self._writer = await asyncio.open_connection(
+                    host, self._port
+                )
                 logger.info(f"Connected to debugpy at {host}:{self._port}")
                 return
             except ConnectionRefusedError:
                 if i < max_retries - 1:
                     await asyncio.sleep(0.5)
                 else:
-                    raise RuntimeError(f"Could not connect to debugpy at {host}:{self._port}")
+                    raise RuntimeError(
+                        f"Could not connect to debugpy at {host}:{self._port}"
+                    )
 
-    async def _send_request(self, command: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _send_request(
+        self, command: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Send DAP request and wait for response."""
         if self._writer is None:
             raise RuntimeError("Not connected to debugpy")

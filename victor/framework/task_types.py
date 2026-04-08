@@ -212,7 +212,9 @@ class TaskTypeRegistry:
             f"(category={definition.category.value}, budget={definition.tool_budget})"
         )
 
-    def register_for_vertical(self, vertical: str, definition: TaskTypeDefinition) -> None:
+    def register_for_vertical(
+        self, vertical: str, definition: TaskTypeDefinition
+    ) -> None:
         """Register a task type definition for a specific vertical.
 
         Vertical-specific definitions override core definitions when
@@ -247,7 +249,9 @@ class TaskTypeRegistry:
         """
         self._registration_hooks.append(hook)
 
-    def get(self, task_type: str, vertical: Optional[str] = None) -> Optional[TaskTypeDefinition]:
+    def get(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> Optional[TaskTypeDefinition]:
         """Look up a task type definition.
 
         Resolution order:
@@ -316,7 +320,9 @@ class TaskTypeRegistry:
         definition = self.get(task_type, vertical)
         return definition.max_iterations if definition else 30
 
-    def get_priority_tools(self, task_type: str, vertical: Optional[str] = None) -> List[str]:
+    def get_priority_tools(
+        self, task_type: str, vertical: Optional[str] = None
+    ) -> List[str]:
         """Get priority tools for a task type.
 
         Args:
@@ -729,7 +735,9 @@ class TaskTypeRegistry:
             except Exception as e:
                 logger.warning(f"TaskTypeRegistry: Hook failed: {e}")
 
-        logger.info(f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types")
+        logger.info(
+            f"TaskTypeRegistry: Initialized with {len(self._core_types)} core types"
+        )
 
 
 # =================================================================
@@ -825,7 +833,12 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[INFRA] Create or modify infrastructure configs. Review existing setup first.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "write_file", "execute_bash", "list_directory"],
+            priority_tools=[
+                "read_file",
+                "write_file",
+                "execute_bash",
+                "list_directory",
+            ],
         ),
     )
 
@@ -1160,5 +1173,6 @@ def setup_vertical_task_types() -> None:
     register_research_task_types(registry)
 
     logger.info(
-        f"TaskTypeRegistry: Set up vertical task types. " f"Verticals: {registry.list_verticals()}"
+        f"TaskTypeRegistry: Set up vertical task types. "
+        f"Verticals: {registry.list_verticals()}"
     )

@@ -92,7 +92,9 @@ class MetricSeries:
             return sum(v.value for v in self.values)
 
         return sum(
-            v.value for v in self.values if all(v.labels.get(k) == labels.get(k) for k in labels)
+            v.value
+            for v in self.values
+            if all(v.labels.get(k) == labels.get(k) for k in labels)
         )
 
 
@@ -394,9 +396,13 @@ def record_team_completed(
     # Prometheus recording
     if registry._prometheus_available:
         registry._team_completed_counter.labels(**completion_labels).inc()
-        registry._team_duration_histogram.labels(**duration_labels).observe(duration_seconds)
+        registry._team_duration_histogram.labels(**duration_labels).observe(
+            duration_seconds
+        )
         if tool_calls > 0:
-            registry._team_tool_calls_histogram.labels(**duration_labels).observe(tool_calls)
+            registry._team_tool_calls_histogram.labels(**duration_labels).observe(
+                tool_calls
+            )
         if member_count > 0:
             registry._team_members_gauge.labels(team_name=team_name).set(member_count)
 
@@ -482,7 +488,9 @@ def record_workflow_completed(
 
     if registry._prometheus_available:
         registry._workflow_completed_counter.labels(**completion_labels).inc()
-        registry._workflow_duration_histogram.labels(**duration_labels).observe(duration_seconds)
+        registry._workflow_duration_histogram.labels(**duration_labels).observe(
+            duration_seconds
+        )
 
     logger.debug(
         f"Workflow completed: {workflow_name} (success={success}, "

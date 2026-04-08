@@ -693,7 +693,11 @@ class AgentTeam:
         """
         member = self._config.get_member(member_id)
         event = TeamEvent(
-            type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+            type=(
+                TeamEventType.MEMBER_COMPLETE
+                if result.success
+                else TeamEventType.MEMBER_ERROR
+            ),
             team_name=self.name,
             member_id=member_id,
             member_name=member.name if member else member_id,
@@ -751,7 +755,11 @@ class AgentTeam:
         """
         member = self._config.get_member(member_id)
         event = TeamEvent(
-            type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+            type=(
+                TeamEventType.MEMBER_COMPLETE
+                if result.success
+                else TeamEventType.MEMBER_ERROR
+            ),
             team_name=self.name,
             member_id=member_id,
             member_name=member.name if member else member_id,
@@ -847,7 +855,11 @@ def member_complete_event(
 ) -> TeamEvent:
     """Create a member complete event."""
     return TeamEvent(
-        type=TeamEventType.MEMBER_COMPLETE if result.success else TeamEventType.MEMBER_ERROR,
+        type=(
+            TeamEventType.MEMBER_COMPLETE
+            if result.success
+            else TeamEventType.MEMBER_ERROR
+        ),
         team_name=team_name,
         member_id=member_id,
         member_name=member_name,

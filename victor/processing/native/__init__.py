@@ -38,7 +38,10 @@ Performance:
 """
 
 # Base: native availability check
-from victor.processing.native._base import is_native_available, get_native_version  # noqa: F401
+from victor.processing.native._base import (
+    is_native_available,
+    get_native_version,
+)  # noqa: F401
 
 # Deduplication & hashing
 from victor.processing.native.deduplication import (  # noqa: F401

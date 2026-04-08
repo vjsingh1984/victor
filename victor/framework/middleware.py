@@ -141,7 +141,9 @@ class ContentValidationResult:
     @property
     def warning_count(self) -> int:
         """Count of WARNING severity issues."""
-        return sum(1 for issue in self.issues if issue.severity == ValidationSeverity.WARNING)
+        return sum(
+            1 for issue in self.issues if issue.severity == ValidationSeverity.WARNING
+        )
 
     @property
     def has_fix(self) -> bool:
@@ -306,7 +308,9 @@ class LoggingMiddleware(MiddlewareProtocol):
         sanitized = {k: self._sanitize_value(k, v) for k, v in arguments.items()}
         return f" args={sanitized}"
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
         """Log tool call before execution.
 
         Args:
@@ -452,12 +456,16 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
             elif isinstance(value, dict):
                 result[key] = self._mask_dict_values(value)
             elif isinstance(value, list):
-                result[key] = [self._mask_content(v) if isinstance(v, str) else v for v in value]
+                result[key] = [
+                    self._mask_content(v) if isinstance(v, str) else v for v in value
+                ]
             else:
                 result[key] = value
         return result
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
         """Optionally mask secrets in input arguments.
 
         Args:
@@ -632,7 +640,9 @@ class MetricsMiddleware(MiddlewareProtocol):
             self._metrics[tool_name] = ToolMetrics(tool_name=tool_name)
         return self._metrics[tool_name]
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
         """Record call start time.
 
         Args:
@@ -755,7 +765,9 @@ class MetricsMiddleware(MiddlewareProtocol):
         lines.append("# HELP tool_duration_ms_avg Average tool duration in ms")
         lines.append("# TYPE tool_duration_ms_avg gauge")
         for name, m in self._metrics.items():
-            lines.append(f'tool_duration_ms_avg{{tool="{name}"}} {m.avg_duration_ms:.2f}')
+            lines.append(
+                f'tool_duration_ms_avg{{tool="{name}"}} {m.avg_duration_ms:.2f}'
+            )
 
         return "\n".join(lines)
 
@@ -844,7 +856,9 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         self._block_dangerous = block_dangerous
         self._warn_on_risky = warn_on_risky
-        self._protected_branches = self.PROTECTED_BRANCHES | (protected_branches or set())
+        self._protected_branches = self.PROTECTED_BRANCHES | (
+            protected_branches or set()
+        )
         self._allowed_force_branches = allowed_force_branches or set()
         self._blocked = self.BLOCKED_OPERATIONS | (custom_blocked or set())
         self._warned = self.WARNED_OPERATIONS | (custom_warned or set())
@@ -860,7 +874,9 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         for branch in self._protected_branches:
             # Check for patterns like "push origin main --force"
-            if branch in command and any(force in command for force in ["--force", "-f"]):
+            if branch in command and any(
+                force in command for force in ["--force", "-f"]
+            ):
                 return branch
         return None
 
@@ -883,7 +899,9 @@ class GitSafetyMiddleware(MiddlewareProtocol):
                     return True
         return False
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> MiddlewareResult:
         """Check git operations for safety.
 
         Args:
@@ -1044,7 +1062,13 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         """
         self.validator = validator
         self._applicable_tools = applicable_tools
-        self._argument_names = argument_names or {"content", "code", "data", "text", "body"}
+        self._argument_names = argument_names or {
+            "content",
+            "code",
+            "data",
+            "text",
+            "body",
+        }
         self.auto_fix = auto_fix
         self.block_on_error = block_on_error
         self.max_fix_iterations = max_fix_iterations
@@ -1119,19 +1143,29 @@ class OutputValidationMiddleware(MiddlewareProtocol):
                 for i in all_issues
                 if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
             ),
-            "warning_count": sum(1 for i in all_issues if i.severity == ValidationSeverity.WARNING),
+            "warning_count": sum(
+                1 for i in all_issues if i.severity == ValidationSeverity.WARNING
+            ),
             "content_fixed": any_fixed,
         }
 
         if all_issues:
             metadata["validation_issues"] = [
-                {"message": i.message, "severity": i.severity.value, "location": i.location}
+                {
+                    "message": i.message,
+                    "severity": i.severity.value,
+                    "location": i.location,
+                }
                 for i in all_issues[:10]  # Limit to first 10 issues
             ]
 
         # Determine if we should block
-        has_critical = any(i.severity == ValidationSeverity.CRITICAL for i in all_issues)
-        should_block = self.block_on_error and (has_critical or metadata["error_count"] > 0)
+        has_critical = any(
+            i.severity == ValidationSeverity.CRITICAL for i in all_issues
+        )
+        should_block = self.block_on_error and (
+            has_critical or metadata["error_count"] > 0
+        )
 
         if should_block and not any_fixed:
             error_msg = f"Validation failed: {metadata['error_count']} errors"

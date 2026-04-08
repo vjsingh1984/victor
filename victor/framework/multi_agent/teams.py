@@ -242,7 +242,9 @@ class TeamSpec:
         errors = []
         role_counts: Dict[str, int] = {}
         for member in self.members:
-            role_counts[member.role_in_team] = role_counts.get(member.role_in_team, 0) + 1
+            role_counts[member.role_in_team] = (
+                role_counts.get(member.role_in_team, 0) + 1
+            )
 
         for role, required_count in self.template.member_slots.items():
             actual_count = role_counts.get(role, 0)

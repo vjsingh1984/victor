@@ -156,7 +156,9 @@ class LifecycleManager:
                 self._usage_analytics.end_session()
             self._usage_analytics.start_session()
 
-        logger.debug("Conversation and session state reset (including optimization components)")
+        logger.debug(
+            "Conversation and session state reset (including optimization components)"
+        )
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
@@ -172,7 +174,9 @@ class LifecycleManager:
         # Flush analytics data
         try:
             flush_results = self._flush_analytics()
-            results["analytics_flushed"] = all(flush_results.values()) if flush_results else True
+            results["analytics_flushed"] = (
+                all(flush_results.values()) if flush_results else True
+            )
         except Exception as e:
             logger.warning(f"Failed to flush analytics during shutdown: {e}")
             results["analytics_flushed"] = False
@@ -214,7 +218,9 @@ class LifecycleManager:
 
         # Cancel all background tasks first
         if self._background_tasks:
-            logger.debug("Cancelling %d background task(s)...", len(self._background_tasks))
+            logger.debug(
+                "Cancelling %d background task(s)...", len(self._background_tasks)
+            )
             for task in self._background_tasks:
                 if not task.done():
                     task.cancel()
@@ -223,7 +229,9 @@ class LifecycleManager:
             if self._background_tasks:
                 try:
                     # Filter for actual asyncio.Task objects
-                    real_tasks = [t for t in self._background_tasks if hasattr(t, "_coroutine")]
+                    real_tasks = [
+                        t for t in self._background_tasks if hasattr(t, "_coroutine")
+                    ]
                     if real_tasks:
                         await asyncio.gather(*real_tasks, return_exceptions=True)
                 except Exception as e:
@@ -240,7 +248,9 @@ class LifecycleManager:
                 ):
                     await self._provider.close()
                     logger.debug("Provider connection closed")
-                elif hasattr(self._provider, "close") and callable(self._provider.close):
+                elif hasattr(self._provider, "close") and callable(
+                    self._provider.close
+                ):
                     # Synchronous close method
                     self._provider.close()
                     logger.debug("Provider connection closed (sync)")
@@ -261,9 +271,9 @@ class LifecycleManager:
         if self._semantic_selector is not None:
             try:
                 # Check if semantic selector has a close method
-                if hasattr(self._semantic_selector, "close") and asyncio.iscoroutinefunction(
-                    self._semantic_selector.close
-                ):
+                if hasattr(
+                    self._semantic_selector, "close"
+                ) and asyncio.iscoroutinefunction(self._semantic_selector.close):
                     await self._semantic_selector.close()
                     logger.debug("Semantic selector closed")
                 elif hasattr(self._semantic_selector, "close") and callable(
@@ -350,7 +360,9 @@ class LifecycleManager:
 
                 self._conversation_controller.add_message(role, content, **kwargs)
 
-            logger.info(f"Recovered session {session_id} with {len(session.messages)} messages")
+            logger.info(
+                f"Recovered session {session_id} with {len(session.messages)} messages"
+            )
             return True
 
         except Exception as e:

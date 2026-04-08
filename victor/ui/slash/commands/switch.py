@@ -149,7 +149,9 @@ class SwitchCommand(BaseSlashCommand):
         Args:
             ctx: Command context
         """
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         try:
             persistence = get_sqlite_session_persistence()
@@ -201,7 +203,9 @@ class SwitchCommand(BaseSlashCommand):
         Returns:
             True if resume succeeded
         """
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         try:
             persistence = get_sqlite_session_persistence()
@@ -273,7 +277,9 @@ class SwitchCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error switching model:[/] {e}")
             logger.exception("Error switching model")
 
-    async def _switch_provider(self, ctx: CommandContext, provider: str, model: str) -> None:
+    async def _switch_provider(
+        self, ctx: CommandContext, provider: str, model: str
+    ) -> None:
         """Switch to a different provider and model.
 
         Args:

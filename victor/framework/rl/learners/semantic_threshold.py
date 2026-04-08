@@ -103,7 +103,9 @@ class SemanticThresholdLearner(BaseLearner):
         embedding_model = outcome.metadata.get("embedding_model", "unknown")
         tool_name = outcome.metadata.get("tool_name", "code_search")
 
-        context_key = self._get_context_key(embedding_model, outcome.task_type, tool_name)
+        context_key = self._get_context_key(
+            embedding_model, outcome.task_type, tool_name
+        )
 
         cursor = self.db.cursor()
 

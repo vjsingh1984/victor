@@ -315,7 +315,9 @@ class PromptBuilder:
             ValueError: If mode is not "minimal" or "extended"
         """
         if mode not in ("minimal", "extended"):
-            raise ValueError(f"Invalid grounding mode: {mode}. Use 'minimal' or 'extended'.")
+            raise ValueError(
+                f"Invalid grounding mode: {mode}. Use 'minimal' or 'extended'."
+            )
         self._grounding_mode = mode
         return self
 
@@ -523,7 +525,9 @@ class PromptBuilder:
             hints = contributor.get_task_type_hints()
             if task_type.lower() in hints:
                 task_hint = hints[task_type.lower()]
-                hint_text = task_hint.hint if hasattr(task_hint, "hint") else str(task_hint)
+                hint_text = (
+                    task_hint.hint if hasattr(task_hint, "hint") else str(task_hint)
+                )
                 self.add_section(
                     name="task_hint",
                     content=hint_text,
@@ -619,7 +623,9 @@ class PromptBuilder:
 
         # Add tool hints if any
         if self._tool_hints:
-            hints_lines = [f"- {hint.tool_name}: {hint.hint}" for hint in self._tool_hints.values()]
+            hints_lines = [
+                f"- {hint.tool_name}: {hint.hint}" for hint in self._tool_hints.values()
+            ]
             hints_text = "\n".join(hints_lines)
             parts.append(f"## Tool Hints\n{hints_text}")
 
@@ -671,9 +677,17 @@ def create_coding_prompt_builder() -> PromptBuilder:
 
     return (
         PromptBuilder()
-        .add_section("identity", CODING_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
-        .add_section("guidelines", CODING_GUIDELINES, priority=PromptBuilder.PRIORITY_GUIDELINES)
-        .add_section("tool_usage", CODING_TOOL_USAGE, priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE)
+        .add_section(
+            "identity", CODING_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY
+        )
+        .add_section(
+            "guidelines", CODING_GUIDELINES, priority=PromptBuilder.PRIORITY_GUIDELINES
+        )
+        .add_section(
+            "tool_usage",
+            CODING_TOOL_USAGE,
+            priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE,
+        )
     )
 
 
@@ -691,9 +705,19 @@ def create_devops_prompt_builder() -> PromptBuilder:
 
     return (
         PromptBuilder()
-        .add_section("identity", DEVOPS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
-        .add_section("security", DEVOPS_SECURITY_CHECKLIST, priority=PromptBuilder.PRIORITY_SAFETY)
-        .add_section("pitfalls", DEVOPS_COMMON_PITFALLS, priority=PromptBuilder.PRIORITY_GUIDELINES)
+        .add_section(
+            "identity", DEVOPS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY
+        )
+        .add_section(
+            "security",
+            DEVOPS_SECURITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_SAFETY,
+        )
+        .add_section(
+            "pitfalls",
+            DEVOPS_COMMON_PITFALLS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
+        )
     )
 
 
@@ -711,12 +735,18 @@ def create_research_prompt_builder() -> PromptBuilder:
 
     return (
         PromptBuilder()
-        .add_section("identity", RESEARCH_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "quality", RESEARCH_QUALITY_CHECKLIST, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "identity", RESEARCH_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY
         )
         .add_section(
-            "sources", RESEARCH_SOURCE_HIERARCHY, priority=PromptBuilder.PRIORITY_GUIDELINES + 5
+            "quality",
+            RESEARCH_QUALITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
+        )
+        .add_section(
+            "sources",
+            RESEARCH_SOURCE_HIERARCHY,
+            priority=PromptBuilder.PRIORITY_GUIDELINES + 5,
         )
     )
 
@@ -735,12 +765,18 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
 
     return (
         PromptBuilder()
-        .add_section("identity", DATA_ANALYSIS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "libraries", DATA_ANALYSIS_LIBRARIES, priority=PromptBuilder.PRIORITY_CAPABILITIES
+            "identity", DATA_ANALYSIS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY
         )
         .add_section(
-            "operations", DATA_ANALYSIS_OPERATIONS, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "libraries",
+            DATA_ANALYSIS_LIBRARIES,
+            priority=PromptBuilder.PRIORITY_CAPABILITIES,
+        )
+        .add_section(
+            "operations",
+            DATA_ANALYSIS_OPERATIONS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
         )
     )
 
@@ -870,7 +906,9 @@ class WorkspaceContextBuilder:
         self._model_name = model_name
         return self
 
-    def with_project_context(self, context: ProjectContext) -> "WorkspaceContextBuilder":
+    def with_project_context(
+        self, context: ProjectContext
+    ) -> "WorkspaceContextBuilder":
         """Attach a discovered project context snapshot."""
         self._context = context
         return self
@@ -905,7 +943,8 @@ class WorkspaceContextBuilder:
         # 1. Output style
         if self._output_style_name and self._output_style_prompt:
             parts.append(
-                f"# Output Style: {self._output_style_name}\n" f"{self._output_style_prompt}"
+                f"# Output Style: {self._output_style_name}\n"
+                f"{self._output_style_prompt}"
             )
 
         # 2. Base prompt
@@ -979,7 +1018,9 @@ class WorkspaceContextBuilder:
         for ctx_file in self._context.instruction_files:
             remaining = budget.max_total_instruction_chars - total_chars
             if remaining <= 0:
-                parts.append("... [instruction budget exhausted, " "remaining files skipped]")
+                parts.append(
+                    "... [instruction budget exhausted, " "remaining files skipped]"
+                )
                 break
 
             per_file = min(budget.max_per_file_chars, remaining)

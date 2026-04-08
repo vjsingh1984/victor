@@ -108,7 +108,10 @@ class CapabilityRegistry:
         existing = self._providers.get(protocol_type)
         if existing is not None:
             _, existing_status = existing
-            if existing_status == CapabilityStatus.ENHANCED and status == CapabilityStatus.STUB:
+            if (
+                existing_status == CapabilityStatus.ENHANCED
+                and status == CapabilityStatus.STUB
+            ):
                 logger.debug(
                     f"Skipping STUB registration for {protocol_type.__name__} "
                     f"— ENHANCED provider already registered"
@@ -116,7 +119,9 @@ class CapabilityRegistry:
                 return
 
         self._providers[protocol_type] = (provider, status)
-        logger.debug(f"Registered {status.value} capability for {protocol_type.__name__}")
+        logger.debug(
+            f"Registered {status.value} capability for {protocol_type.__name__}"
+        )
 
     def get(self, protocol_type: Type[T]) -> Optional[T]:
         """Get a capability provider by protocol type.
@@ -165,7 +170,10 @@ class CapabilityRegistry:
         Returns:
             Dict mapping protocol name to status value
         """
-        return {proto.__name__: status.value for proto, (_, status) in self._providers.items()}
+        return {
+            proto.__name__: status.value
+            for proto, (_, status) in self._providers.items()
+        }
 
 
 # Module-level shortcut for convenient access

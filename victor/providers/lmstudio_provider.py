@@ -102,7 +102,9 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
 
     thinking = "\n".join(matches) if matches else ""
-    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+    content = re.sub(
+        think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE
+    ).strip()
 
     return (thinking, content)
 
@@ -164,8 +166,12 @@ class LMStudioProvider(BaseProvider):
         self._api_key = api_key
         self._models_available: Optional[bool] = None  # Set during URL discovery
         self._context_window_cache: Dict[str, int] = {}
-        self._current_model: Optional[str] = None  # Track current model for capability detection
-        self._model_tool_support_cache: Dict[str, bool] = {}  # Cache tool support per model
+        self._current_model: Optional[str] = (
+            None  # Track current model for capability detection
+        )
+        self._model_tool_support_cache: Dict[str, bool] = (
+            {}
+        )  # Cache tool support per model
 
         # Log provider initialization
         self._provider_logger.log_provider_init(
@@ -206,7 +212,9 @@ class LMStudioProvider(BaseProvider):
         Returns:
             Initialized LMStudioProvider with best available endpoint
         """
-        chosen_base, models_available = await cls._select_base_url_async(base_url, timeout)
+        chosen_base, models_available = await cls._select_base_url_async(
+            base_url, timeout
+        )
         instance = cls(
             base_url=chosen_base,
             timeout=timeout,
@@ -343,15 +351,20 @@ class LMStudioProvider(BaseProvider):
             raw_response = resp.json()
 
             models = raw_response.get("data", [])
-            match = next((m for m in models if m.get("id") == model), models[0] if models else None)
+            match = next(
+                (m for m in models if m.get("id") == model),
+                models[0] if models else None,
+            )
 
             if match:
                 capabilities = match.get("capabilities", {}) or {}
                 supports_tools = bool(
-                    capabilities.get("functions", True) or capabilities.get("tools", True)
+                    capabilities.get("functions", True)
+                    or capabilities.get("tools", True)
                 )
                 supports_streaming = bool(
-                    capabilities.get("streaming", True) or capabilities.get("stream", True)
+                    capabilities.get("streaming", True)
+                    or capabilities.get("stream", True)
                 )
                 context_window = self._extract_context_window(match)
 
@@ -393,7 +406,9 @@ class LMStudioProvider(BaseProvider):
                 continue
         return None
 
-    def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
+    def _select_base_url(
+        self, base_url: Union[str, List[str], None], timeout: int
+    ) -> str:
         """Pick the first reachable LMStudio endpoint from a tiered list.
 
         Priority:
@@ -532,7 +547,9 @@ class LMStudioProvider(BaseProvider):
                         )
                         return url, False
             except Exception as exc:
-                logger.warning(f"LMStudio endpoint {url} not reachable ({exc}); trying next.")
+                logger.warning(
+                    f"LMStudio endpoint {url} not reachable ({exc}); trying next."
+                )
 
         fallback = (
             base_url
@@ -779,7 +796,9 @@ class LMStudioProvider(BaseProvider):
                 f"tools={num_tools}, thinking_model={uses_thinking}"
             )
 
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
+            async with self.client.stream(
+                "POST", "/chat/completions", json=payload
+            ) as response:
                 response.raise_for_status()
 
                 accumulated_content = ""
@@ -801,7 +820,9 @@ class LMStudioProvider(BaseProvider):
                             final_metadata = None
 
                             if uses_thinking and accumulated_content:
-                                thinking, _ = _extract_thinking_content(accumulated_content)
+                                thinking, _ = _extract_thinking_content(
+                                    accumulated_content
+                                )
                                 if thinking:
                                     final_metadata = {"reasoning_content": thinking}
                                     self._provider_logger.logger.debug(
@@ -814,7 +835,9 @@ class LMStudioProvider(BaseProvider):
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(
-                                    accumulated_tool_calls if accumulated_tool_calls else None
+                                    accumulated_tool_calls
+                                    if accumulated_tool_calls
+                                    else None
                                 ),
                                 stop_reason="stop",
                                 is_final=True,
@@ -1022,7 +1045,9 @@ class LMStudioProvider(BaseProvider):
 
         return normalized if normalized else None
 
-    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
+    def _parse_json_tool_call_from_content(
+        self, content: str
+    ) -> Optional[List[Dict[str, Any]]]:
         """Parse tool calls from JSON text in content (fallback for models without native support).
 
         Some LMStudio models return tool calls as JSON in content instead of using
@@ -1204,16 +1229,22 @@ class LMStudioProvider(BaseProvider):
 
         # Finalize tool calls on stream end
         final_tool_calls = None
-        if finish_reason == "tool_calls" or (finish_reason == "stop" and accumulated_tool_calls):
+        if finish_reason == "tool_calls" or (
+            finish_reason == "stop" and accumulated_tool_calls
+        ):
             final_tool_calls = []
             for tc in accumulated_tool_calls:
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
+                        parsed_args = (
+                            json.loads(args) if isinstance(args, str) else args
+                        )
                     except json.JSONDecodeError:
                         parsed_args = {}
-                    final_tool_calls.append({"name": tc["name"], "arguments": parsed_args})
+                    final_tool_calls.append(
+                        {"name": tc["name"], "arguments": parsed_args}
+                    )
 
         return StreamChunk(
             content=content,

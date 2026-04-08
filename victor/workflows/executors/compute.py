@@ -53,7 +53,9 @@ class ComputeNodeExecutor:
         """
         self._context = context
 
-    async def execute(self, node: "ComputeNode", state: "WorkflowState") -> "WorkflowState":
+    async def execute(
+        self, node: "ComputeNode", state: "WorkflowState"
+    ) -> "WorkflowState":
         """Execute a compute node.
 
         Args:
@@ -138,7 +140,9 @@ class ComputeNodeExecutor:
                 output = result.output if result else None
                 tool_calls_used = result.tool_calls_used if result else 0
             else:
-                logger.warning(f"Handler '{node.handler}' not found for node '{node.id}'")
+                logger.warning(
+                    f"Handler '{node.handler}' not found for node '{node.id}'"
+                )
                 output = {"error": f"Handler '{node.handler}' not found"}
         else:
             # Step 4: Execute tools directly
@@ -163,7 +167,8 @@ class ComputeNodeExecutor:
                                     "workflow_context": state,
                                     "constraints": (
                                         node.constraints.to_dict()
-                                        if hasattr(node, "constraints") and node.constraints
+                                        if hasattr(node, "constraints")
+                                        and node.constraints
                                         else {}
                                     ),
                                 },
@@ -178,7 +183,11 @@ class ComputeNodeExecutor:
                         else:
                             outputs[tool_name] = {"error": result.error}
 
-                        if hasattr(node, "fail_fast") and node.fail_fast and not result.success:
+                        if (
+                            hasattr(node, "fail_fast")
+                            and node.fail_fast
+                            and not result.success
+                        ):
                             break
 
                     except asyncio.TimeoutError:

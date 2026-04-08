@@ -288,7 +288,9 @@ class RecoveryCoordinator:
             return FailureType.STUCK_LOOP
 
         # Priority 6: Repeated response
-        if recent_responses and self._detect_repeated_response(content, recent_responses):
+        if recent_responses and self._detect_repeated_response(
+            content, recent_responses
+        ):
             return FailureType.REPEATED_RESPONSE
 
         # Priority 7: Low quality
@@ -415,7 +417,9 @@ class RecoveryCoordinator:
 
         # Handle temperature adjustment
         if result.action == RecoveryAction.ADJUST_TEMPERATURE:
-            new_temp, reason = self._temperature.get_adjusted_temperature(context, session_id)
+            new_temp, reason = self._temperature.get_adjusted_temperature(
+                context, session_id
+            )
             outcome.new_temperature = new_temp
             result.new_temperature = new_temp
 
@@ -470,8 +474,14 @@ class RecoveryCoordinator:
         """Get fallback model using circuit breaker status if available."""
         # Default fallback chains
         fallback_chains = {
-            "anthropic": [("openai", "gpt-4o"), ("anthropic", "claude-3-5-haiku-latest")],
-            "openai": [("anthropic", "claude-3-5-sonnet-latest"), ("openai", "gpt-4o-mini")],
+            "anthropic": [
+                ("openai", "gpt-4o"),
+                ("anthropic", "claude-3-5-haiku-latest"),
+            ],
+            "openai": [
+                ("anthropic", "claude-3-5-sonnet-latest"),
+                ("openai", "gpt-4o-mini"),
+            ],
             "ollama": [("ollama", "qwen2.5-coder:14b"), ("ollama", "llama3.1:8b")],
             "lmstudio": [("ollama", "qwen2.5-coder:14b")],
         }
@@ -568,7 +578,9 @@ class RecoveryCoordinator:
         diagnostics = {
             "recovery_attempts": self._recovery_attempts,
             "recovery_successes": self._recovery_successes,
-            "success_rate": (self._recovery_successes / max(self._recovery_attempts, 1)),
+            "success_rate": (
+                self._recovery_successes / max(self._recovery_attempts, 1)
+            ),
             "strategy_metrics": self._strategy.get_strategy_metrics(),
             "template_stats": self._prompts.get_template_stats(),
             "learned_temperatures": self._temperature.get_learned_optima(),

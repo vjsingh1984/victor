@@ -619,7 +619,9 @@ class SQLiteEventStore(EventStore):
         """
         self._db_path = Path(db_path)
         self._lock = asyncio.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sqlite-event-store")
+        self._executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="sqlite-event-store"
+        )
         self._init_db()
 
     def _init_db(self) -> None:
@@ -666,7 +668,8 @@ class SQLiteEventStore(EventStore):
         """Synchronous append — runs in executor thread."""
         with sqlite3.connect(self._db_path) as conn:
             cursor = conn.execute(
-                "SELECT COALESCE(MAX(stream_version), 0) " "FROM events WHERE stream_id = ?",
+                "SELECT COALESCE(MAX(stream_version), 0) "
+                "FROM events WHERE stream_id = ?",
                 (stream_id,),
             )
             current_version = cursor.fetchone()[0]
@@ -735,12 +738,15 @@ class SQLiteEventStore(EventStore):
         """Synchronous get_stream_version — runs in executor thread."""
         with sqlite3.connect(self._db_path) as conn:
             cursor = conn.execute(
-                "SELECT COALESCE(MAX(stream_version), 0) " "FROM events WHERE stream_id = ?",
+                "SELECT COALESCE(MAX(stream_version), 0) "
+                "FROM events WHERE stream_id = ?",
                 (stream_id,),
             )
             return cursor.fetchone()[0]
 
-    def _save_snapshot_sync(self, stream_id: str, version: int, snapshot: Dict[str, Any]) -> None:
+    def _save_snapshot_sync(
+        self, stream_id: str, version: int, snapshot: Dict[str, Any]
+    ) -> None:
         """Synchronous save_snapshot — runs in executor thread."""
         with sqlite3.connect(self._db_path) as conn:
             conn.execute(
@@ -776,7 +782,9 @@ class SQLiteEventStore(EventStore):
                 event_data = json.loads(row[2])
                 event = DomainEvent.from_dict(event_data)
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.warning("Skipping corrupt event in stream %s v%s: %s", row[0], row[1], e)
+                logger.warning(
+                    "Skipping corrupt event in stream %s v%s: %s", row[0], row[1], e
+                )
                 continue
             envelope = EventEnvelope(
                 stream_id=row[0],
@@ -866,7 +874,9 @@ class SQLiteEventStore(EventStore):
         """
         async with self._lock:
             loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(self._executor, self._load_snapshot_sync, stream_id)
+            return await loop.run_in_executor(
+                self._executor, self._load_snapshot_sync, stream_id
+            )
 
 
 # =============================================================================

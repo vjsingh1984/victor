@@ -28,7 +28,9 @@ from victor.storage.cache.tiered_cache import TieredCache
 logger = logging.getLogger(__name__)
 
 
-def _get_cache_manager(context: Optional[Dict[str, Any]] = None) -> Optional[TieredCache]:
+def _get_cache_manager(
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional[TieredCache]:
     """Get cache manager from execution context.
 
     Args:
@@ -71,7 +73,9 @@ async def _do_stats(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
     if "memory_size" in stats:
         report.append("Memory Cache:")
-        report.append(f"  Current Size: {stats['memory_size']}/{stats.get('memory_max_size', 0)}")
+        report.append(
+            f"  Current Size: {stats['memory_size']}/{stats.get('memory_max_size', 0)}"
+        )
         report.append("")
 
     if "disk_size" in stats:
@@ -127,7 +131,9 @@ async def _do_info(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     report.append(f"  Enabled: {config.enable_memory}")
     if config.enable_memory:
         report.append(f"  Max Size: {config.memory_max_size} entries")
-        report.append(f"  TTL: {config.memory_ttl} seconds ({config.memory_ttl//60} min)")
+        report.append(
+            f"  TTL: {config.memory_ttl} seconds ({config.memory_ttl//60} min)"
+        )
     report.append("")
 
     report.append("L2 Disk Cache:")
@@ -135,7 +141,9 @@ async def _do_info(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if config.enable_disk:
         size_mb = config.disk_max_size / (1024 * 1024)
         report.append(f"  Max Size: {size_mb:.0f} MB")
-        report.append(f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)")
+        report.append(
+            f"  TTL: {config.disk_ttl} seconds ({config.disk_ttl//86400} days)"
+        )
         report.append(f"  Path: {config.disk_path}")
     report.append("")
 

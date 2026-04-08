@@ -45,7 +45,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from victor.classification import TaskType, NudgeEngine, get_nudge_engine
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 if TYPE_CHECKING:
@@ -66,7 +69,9 @@ class TaskTypeResult:
     top_matches: List[Tuple[str, float]]  # Top matching phrases with scores
     has_file_context: bool  # Whether the prompt mentions specific files
     nudge_applied: Optional[str] = None  # Name of nudge rule applied, if any
-    preprocessed_prompt: Optional[str] = None  # Preprocessed prompt used for classification
+    preprocessed_prompt: Optional[str] = (
+        None  # Preprocessed prompt used for classification
+    )
 
 
 # NudgeRule is now imported from victor.classification.nudge_engine
@@ -1527,7 +1532,9 @@ class TaskTypeClassifier:
         self._collection.initialize_sync(all_items)
 
         self._initialized = True
-        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
+        logger.info(
+            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
+        )
 
     async def initialize(self) -> None:
         """Initialize unified task classifier collection (async version)."""
@@ -1550,7 +1557,9 @@ class TaskTypeClassifier:
         await self._collection.initialize(all_items)
 
         self._initialized = True
-        logger.info(f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases")
+        logger.info(
+            f"TaskTypeClassifier initialized with {len(all_items)} canonical phrases"
+        )
 
     def _detect_file_context(self, prompt: str) -> bool:
         """Detect if prompt mentions specific file paths.

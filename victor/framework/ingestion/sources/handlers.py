@@ -27,7 +27,10 @@ from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from victor.framework.ingestion.models import DocumentType, SourceContent
-from victor.framework.ingestion.chunker import detect_document_type, EXTENSION_TO_DOCTYPE
+from victor.framework.ingestion.chunker import (
+    detect_document_type,
+    EXTENSION_TO_DOCTYPE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,9 +104,14 @@ def extract_text_from_html(html_content: str) -> str:
         logger.warning("BeautifulSoup not available, using basic HTML extraction")
         # Remove script and style tags
         text = re.sub(
-            r"<script[^>]*>.*?</script>", "", html_content, flags=re.DOTALL | re.IGNORECASE
+            r"<script[^>]*>.*?</script>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
         )
-        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(
+            r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE
+        )
         # Remove all tags
         text = re.sub(r"<[^>]+>", " ", text)
         # Clean up entities and whitespace
@@ -327,7 +335,9 @@ class URLHandler:
             # Check content size
             if len(content) > self._max_size:
                 content = content[: self._max_size]
-                logger.warning(f"Truncated content from {source} to {self._max_size} bytes")
+                logger.warning(
+                    f"Truncated content from {source} to {self._max_size} bytes"
+                )
 
         # Determine document type from content-type header and URL
         if "text/html" in content_type or "application/xhtml" in content_type:
@@ -437,7 +447,9 @@ class DirectoryHandler:
                 # Check exclusions
                 should_exclude = False
                 for exclude in self._exclude_patterns:
-                    if any(part.startswith(exclude.rstrip("*")) for part in file_path.parts):
+                    if any(
+                        part.startswith(exclude.rstrip("*")) for part in file_path.parts
+                    ):
                         should_exclude = True
                         break
 

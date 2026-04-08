@@ -72,7 +72,9 @@ def _get_oauth_client_id_from_keyring(provider: str) -> Optional[str]:
     try:
         import keyring
 
-        key = keyring.get_password(KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}")
+        key = keyring.get_password(
+            KEYRING_SERVICE, f"{KEYRING_OAUTH_CLIENT_ID_PREFIX}{provider}"
+        )
         return key
     except ImportError:
         logger.debug("Keyring not available for OAuth client_id retrieval")
@@ -101,7 +103,9 @@ def _set_oauth_client_id_in_keyring(provider: str, client_id: str) -> bool:
         logger.info(f"OAuth client_id for {provider} stored in system keyring")
         return True
     except ImportError:
-        logger.warning("Keyring not available. Install 'keyring' package for secure storage.")
+        logger.warning(
+            "Keyring not available. Install 'keyring' package for secure storage."
+        )
         return False
     except Exception as e:
         logger.warning(f"Failed to store OAuth client_id in keyring: {e}")
@@ -153,7 +157,9 @@ def _get_oauth_client_id(provider: str) -> str:
     # Priority 3: Well-known public client_id (OpenAI ecosystem)
     public_id = _PUBLIC_OAUTH_CLIENT_IDS.get(provider)
     if public_id:
-        logger.debug(f"OAuth client_id for {provider} using well-known public client_id")
+        logger.debug(
+            f"OAuth client_id for {provider} using well-known public client_id"
+        )
         return public_id
 
     # No client_id found
@@ -335,7 +341,9 @@ class OAuthTokenManager:
             "refresh_token": tokens.refresh_token,
             "id_token": tokens.id_token,
             "token_type": tokens.token_type,
-            "expires_at": (tokens.expires_at.isoformat() if tokens.expires_at else None),
+            "expires_at": (
+                tokens.expires_at.isoformat() if tokens.expires_at else None
+            ),
             "scopes": tokens.scopes,
         }
         self._write_all(all_tokens)
@@ -387,5 +395,7 @@ class OAuthTokenManager:
         """Check if tokens need refresh (expired or expiring within grace period)."""
         if tokens.expires_at is None:
             return False
-        threshold = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_GRACE_MINUTES)
+        threshold = datetime.now(timezone.utc) + timedelta(
+            minutes=REFRESH_GRACE_MINUTES
+        )
         return tokens.expires_at <= threshold

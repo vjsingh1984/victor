@@ -25,7 +25,10 @@ import logging
 from typing import Any, Optional
 
 from victor.agent.protocols import IToolAdapterCoordinator, IProviderSwitcher
-from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.agent.tool_calling import (
+    ToolCallingAdapterRegistry,
+    ToolCallingCapabilities,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +114,9 @@ class ToolAdapterCoordinator(IToolAdapterCoordinator):
             ValueError: If adapter not initialized
         """
         if self._capabilities is None:
-            raise ValueError("Tool adapter not initialized. Call initialize_adapter() first.")
+            raise ValueError(
+                "Tool adapter not initialized. Call initialize_adapter() first."
+            )
 
         return self._capabilities
 
@@ -125,7 +130,9 @@ class ToolAdapterCoordinator(IToolAdapterCoordinator):
             ValueError: If adapter not initialized
         """
         if self._adapter is None:
-            raise ValueError("Tool adapter not initialized. Call initialize_adapter() first.")
+            raise ValueError(
+                "Tool adapter not initialized. Call initialize_adapter() first."
+            )
 
         return self._adapter
 

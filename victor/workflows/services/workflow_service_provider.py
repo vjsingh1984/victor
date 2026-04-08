@@ -202,7 +202,9 @@ class WorkflowServiceProvider:
             container: DI container to register services in
         """
         # Import concrete implementations for registration
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
         from victor.workflows.compiled_executor import WorkflowExecutor
         from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
 
@@ -293,7 +295,9 @@ class WorkflowServiceProvider:
         from victor.workflows.executors.factory import NodeExecutorFactory
 
         factory = NodeExecutorFactory(container=self.container)
-        logger.debug("Created node executor factory with built-in executor registrations")
+        logger.debug(
+            "Created node executor factory with built-in executor registrations"
+        )
 
         return factory
 
@@ -315,7 +319,9 @@ class WorkflowServiceProvider:
 
         # Auto-discover and register handlers from all verticals
         # This will be called after vertical initialization
-        logger.debug("Created ComputeHandlerRegistry (handlers will be registered by verticals)")
+        logger.debug(
+            "Created ComputeHandlerRegistry (handlers will be registered by verticals)"
+        )
 
         return registry
 
@@ -411,7 +417,9 @@ class WorkflowServiceProvider:
         Returns:
             WorkflowCompilerImpl instance
         """
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
         from victor.workflows.validator import WorkflowValidator
         from victor.workflows.yaml_loader import YAMLWorkflowLoader

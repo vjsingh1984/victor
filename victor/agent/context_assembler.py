@@ -23,7 +23,10 @@ from __future__ import annotations
 import logging
 from typing import Callable, List, Optional
 
-from victor.config.orchestrator_constants import ContextAssemblerConfig, CONTEXT_ASSEMBLER_CONFIG
+from victor.config.orchestrator_constants import (
+    ContextAssemblerConfig,
+    CONTEXT_ASSEMBLER_CONFIG,
+)
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
@@ -166,7 +169,9 @@ class TurnBoundaryContextAssembler:
 
         # 5. Semantic augmentation: retrieve relevant compacted context
         if self._conversation_controller and current_query:
-            retrieve_fn = getattr(self._conversation_controller, "retrieve_relevant_history", None)
+            retrieve_fn = getattr(
+                self._conversation_controller, "retrieve_relevant_history", None
+            )
             if retrieve_fn:
                 try:
                     remaining_budget = older_budget - older_chars

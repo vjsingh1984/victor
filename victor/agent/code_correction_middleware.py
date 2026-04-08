@@ -79,7 +79,15 @@ class CodeCorrectionConfig:
 
     code_argument_names: Set[str] = field(
         default_factory=lambda: frozenset(
-            {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
+            {
+                "code",
+                "python_code",
+                "content",
+                "source",
+                "script",
+                "new_content",
+                "file_content",
+            }
         )
     )
 
@@ -158,10 +166,16 @@ class CodeCorrectionMiddleware:
             return False
         return tool_name in self.config.code_tools
 
-    def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    def find_code_argument(
+        self, arguments: Dict[str, Any]
+    ) -> Optional[Tuple[str, str]]:
         """Find the code argument in tool arguments."""
         for arg_name in self.config.code_argument_names:
-            if (value := arguments.get(arg_name)) and isinstance(value, str) and value.strip():
+            if (
+                (value := arguments.get(arg_name))
+                and isinstance(value, str)
+                and value.strip()
+            ):
                 return (arg_name, value)
         return None
 
@@ -186,7 +200,10 @@ class CodeCorrectionMiddleware:
 
         if not code_arg:
             return CorrectionResult(
-                "", "", CodeValidationResult(True, Language.UNKNOWN, True, True, (), ()), False
+                "",
+                "",
+                CodeValidationResult(True, Language.UNKNOWN, True, True, (), ()),
+                False,
             )
 
         arg_name, code = code_arg
@@ -224,7 +241,9 @@ class CodeCorrectionMiddleware:
         self, arguments: Dict[str, Any], result: CorrectionResult
     ) -> Dict[str, Any]:
         """Apply correction to tool arguments."""
-        if not result.was_corrected or not (code_arg := self.find_code_argument(arguments)):
+        if not result.was_corrected or not (
+            code_arg := self.find_code_argument(arguments)
+        ):
             return arguments
 
         updated = arguments.copy()
@@ -243,16 +262,22 @@ class CodeCorrectionMiddleware:
 
         if not result.validation.imports_valid:
             lines.append("  - Import issues detected")
-            if hasattr(result.validation, "missing_imports") and result.validation.missing_imports:
+            if (
+                hasattr(result.validation, "missing_imports")
+                and result.validation.missing_imports
+            ):
                 lines.extend(
-                    f"    - Missing: {imp}" for imp in result.validation.missing_imports[:5]
+                    f"    - Missing: {imp}"
+                    for imp in result.validation.missing_imports[:5]
                 )
 
         lines.extend(f"  - {error}" for error in result.validation.errors[:5])
 
         if result.feedback and result.feedback.suggestions:
             lines.append("\nSuggestions:")
-            lines.extend(f"  - {suggestion}" for suggestion in result.feedback.suggestions[:3])
+            lines.extend(
+                f"  - {suggestion}" for suggestion in result.feedback.suggestions[:3]
+            )
 
         return "\n".join(lines)
 

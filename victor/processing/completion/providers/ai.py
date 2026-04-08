@@ -108,7 +108,9 @@ class AICompletionProvider(StreamingCompletionProvider):
         if isinstance(fim_template, dict):
             self._fim_template = fim_template
         else:
-            self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])
+            self._fim_template = FIM_TEMPLATES.get(
+                fim_template, FIM_TEMPLATES["default"]
+            )
 
     @property
     def name(self) -> str:
@@ -181,7 +183,9 @@ class AICompletionProvider(StreamingCompletionProvider):
             # Create completion item
             item = CompletionItem(
                 label=(
-                    completion_text[:50] + "..." if len(completion_text) > 50 else completion_text
+                    completion_text[:50] + "..."
+                    if len(completion_text) > 50
+                    else completion_text
                 ),
                 kind=CompletionItemKind.TEXT,
                 insert_text=completion_text,
@@ -252,7 +256,9 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
-    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
+    async def stream_inline_completion(
+        self, params: InlineCompletionParams
+    ) -> AsyncIterator[str]:
         """Stream inline completion tokens.
 
         Args:

@@ -155,7 +155,9 @@ class StateCoordinator:
         conversation_controller: "ConversationController",
         state_machine: Optional["ConversationStateMachine"] = None,
         config: Optional[StateCoordinatorConfig] = None,
-        on_stage_change: Optional[Callable[[ConversationStage, ConversationStage], None]] = None,
+        on_stage_change: Optional[
+            Callable[[ConversationStage, ConversationStage], None]
+        ] = None,
     ) -> None:
         """Initialize the StateCoordinator.
 

@@ -162,7 +162,9 @@ class ReadableTaskPlan(BaseModel):
         ...,
         description="Steps: [[id, type, description, tools, dependencies], ...]",
     )
-    duration: Optional[str] = Field(None, description="Estimated duration (e.g., '30min', '2hr')")
+    duration: Optional[str] = Field(
+        None, description="Estimated duration (e.g., '30min', '2hr')"
+    )
     approval: bool = Field(False, description="Requires user approval")
 
     @field_validator("steps")
@@ -175,7 +177,9 @@ class ReadableTaskPlan(BaseModel):
                     f"Step {i}: must be list with at least [id, type, desc], got {step_data}"
                 )
             if not isinstance(step_data[0], (int, str)):
-                raise ValueError(f"Step {i}: id must be int or str, got {type(step_data[0])}")
+                raise ValueError(
+                    f"Step {i}: id must be int or str, got {type(step_data[0])}"
+                )
         return v
 
     def to_execution_plan(self) -> ExecutionPlan:
@@ -233,7 +237,9 @@ class ReadableTaskPlan(BaseModel):
 
         # Check if deployment or high-risk step
         requires_approval = (
-            step_type == StepType.DEPLOYMENT or step_type == StepType.PLANNING or self.approval
+            step_type == StepType.DEPLOYMENT
+            or step_type == StepType.PLANNING
+            or self.approval
         )
 
         return PlanStep(
@@ -696,7 +702,9 @@ async def generate_task_plan(
         elif hasattr(provider, "_provider") and hasattr(provider._provider, "model"):
             model = provider._provider.model
         else:
-            raise ValueError("Model identifier must be provided or available from provider")
+            raise ValueError(
+                "Model identifier must be provided or available from provider"
+            )
 
     # Classify complexity if not provided
     task_complexity = complexity
@@ -762,7 +770,9 @@ async def generate_task_plan(
                     else:
                         logger.debug(f"Response dict[{key}] type: {type(value)}")
             elif hasattr(plan_response, "__dict__"):
-                logger.debug(f"Response object attributes: {list(plan_response.__dict__.keys())}")
+                logger.debug(
+                    f"Response object attributes: {list(plan_response.__dict__.keys())}"
+                )
 
             response_content = extract_llm_response_content(plan_response)
             logger.info(

@@ -215,7 +215,9 @@ def create_default_registry() -> ServiceRegistry:
         pass
 
     try:
-        from victor.workflows.services.providers.kubernetes import KubernetesServiceProvider
+        from victor.workflows.services.providers.kubernetes import (
+            KubernetesServiceProvider,
+        )
 
         registry.register_provider("kubernetes", KubernetesServiceProvider())
     except ImportError:

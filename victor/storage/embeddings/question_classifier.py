@@ -81,7 +81,8 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
     ),
     (
         re.compile(
-            r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b", re.IGNORECASE
+            r"\bwould\s+you\s+like\s+(?:me\s+to|to)\s+(?:continue|proceed)\b",
+            re.IGNORECASE,
         ),
         QuestionType.CONTINUATION,
         0.95,
@@ -92,37 +93,47 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
         0.95,
     ),
     (
-        re.compile(r"\bdo\s+you\s+want\s+me\s+to\s+(?:continue|proceed)\b", re.IGNORECASE),
+        re.compile(
+            r"\bdo\s+you\s+want\s+me\s+to\s+(?:continue|proceed)\b", re.IGNORECASE
+        ),
         QuestionType.CONTINUATION,
         0.90,
     ),
     (
-        re.compile(r"\bready\s+(?:to|for)\s+(?:continue|proceed|move\s+on)\?", re.IGNORECASE),
+        re.compile(
+            r"\bready\s+(?:to|for)\s+(?:continue|proceed|move\s+on)\?", re.IGNORECASE
+        ),
         QuestionType.CONTINUATION,
         0.85,
     ),
     (
         re.compile(
-            r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b", re.IGNORECASE
+            r"\blet\s+me\s+know\s+(?:if|when)\s+(?:you(?:'re|\s+are)\s+)?ready\b",
+            re.IGNORECASE,
         ),
         QuestionType.CONTINUATION,
         0.80,
     ),
     (
         re.compile(
-            r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?", re.IGNORECASE
+            r"\bany(?:thing)?\s+else\s+(?:you(?:'d|\s+would)\s+like|to\s+add)\?",
+            re.IGNORECASE,
         ),
         QuestionType.RHETORICAL,
         0.80,
     ),
     (
-        re.compile(r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?", re.IGNORECASE),
+        re.compile(
+            r"\bdoes\s+(?:this|that)\s+(?:look|sound)\s+(?:good|right|ok)\?",
+            re.IGNORECASE,
+        ),
         QuestionType.RHETORICAL,
         0.85,
     ),
     (
         re.compile(
-            r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?", re.IGNORECASE
+            r"\bis\s+(?:this|that)\s+what\s+you\s+(?:wanted|meant|had\s+in\s+mind)\?",
+            re.IGNORECASE,
         ),
         QuestionType.RHETORICAL,
         0.80,
@@ -130,30 +141,39 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
     (re.compile(r"\bmake\s+sense\?", re.IGNORECASE), QuestionType.RHETORICAL, 0.85),
     # CLARIFICATION - needs user input
     (
-        re.compile(r"\bwhich\s+(?:one|option|approach|method|file|directory)\b", re.IGNORECASE),
+        re.compile(
+            r"\bwhich\s+(?:one|option|approach|method|file|directory)\b", re.IGNORECASE
+        ),
         QuestionType.CLARIFICATION,
         0.90,
     ),
     (
-        re.compile(r"\bwhat\s+(?:should|would)\s+(?:i|we|you)\s+(?:name|call)\b", re.IGNORECASE),
-        QuestionType.CLARIFICATION,
-        0.85,
-    ),
-    (
-        re.compile(r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b", re.IGNORECASE),
-        QuestionType.CLARIFICATION,
-        0.85,
-    ),
-    (
         re.compile(
-            r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b", re.IGNORECASE
+            r"\bwhat\s+(?:should|would)\s+(?:i|we|you)\s+(?:name|call)\b", re.IGNORECASE
         ),
         QuestionType.CLARIFICATION,
         0.85,
     ),
     (
         re.compile(
-            r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b", re.IGNORECASE
+            r"\bhow\s+(?:should|would)\s+you\s+like\s+(?:me|this|it)\s+to\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bwhere\s+(?:should|would)\s+(?:i|we)\s+(?:put|place|store|save)\b",
+            re.IGNORECASE,
+        ),
+        QuestionType.CLARIFICATION,
+        0.85,
+    ),
+    (
+        re.compile(
+            r"\bdo\s+you\s+(?:prefer|want)\s+(?:me\s+to\s+use|to\s+use|using)\b",
+            re.IGNORECASE,
         ),
         QuestionType.CLARIFICATION,
         0.80,
@@ -184,12 +204,17 @@ QUESTION_PATTERNS: List[Tuple[re.Pattern, QuestionType, float]] = [
         0.90,
     ),
     (
-        re.compile(r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b", re.IGNORECASE),
+        re.compile(
+            r"\bwhat(?:'s|\s+is)\s+(?:your|the)\s+(?:email|phone|contact)\b",
+            re.IGNORECASE,
+        ),
         QuestionType.INFORMATION,
         0.85,
     ),
     (
-        re.compile(r"\bcan\s+you\s+(?:provide|share|give\s+me)\s+(?:your|the)\b", re.IGNORECASE),
+        re.compile(
+            r"\bcan\s+you\s+(?:provide|share|give\s+me)\s+(?:your|the)\b", re.IGNORECASE
+        ),
         QuestionType.INFORMATION,
         0.80,
     ),
@@ -226,7 +251,9 @@ class QuestionTypeClassifier:
         """
         self._patterns = QUESTION_PATTERNS
         self._decision_service = decision_service
-        logger.debug(f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns")
+        logger.debug(
+            f"QuestionTypeClassifier initialized with {len(self._patterns)} patterns"
+        )
 
     @classmethod
     def get_instance(cls) -> "QuestionTypeClassifier":
@@ -292,7 +319,9 @@ class QuestionTypeClassifier:
                     context={"question_text": text[-300:]},
                     heuristic_confidence=0.5,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "question_type"):
+                if decision.source == "llm" and hasattr(
+                    decision.result, "question_type"
+                ):
                     type_map = {
                         "rhetorical": QuestionType.RHETORICAL,
                         "continuation": QuestionType.CONTINUATION,

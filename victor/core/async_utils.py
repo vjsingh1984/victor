@@ -92,7 +92,9 @@ def run_sync(coro: Awaitable[T]) -> T:
     if inspect.iscoroutine(coro):
         coro.close()
 
-    raise RuntimeError("Cannot use run_sync() from within an async context. Use 'await' instead.")
+    raise RuntimeError(
+        "Cannot use run_sync() from within an async context. Use 'await' instead."
+    )
 
 
 def run_sync_in_thread(coro: Awaitable[T], timeout: float | None = None) -> T:

@@ -46,7 +46,11 @@ class GraphStoreProtocol(Protocol):
     ) -> List[GraphEdge]: ...
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]: ...
 
     async def search_symbols(

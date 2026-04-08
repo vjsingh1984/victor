@@ -60,10 +60,18 @@ class EditTransaction(BaseModel):
     """Represents a transaction of multiple file edits."""
 
     id: str = Field(description="Transaction ID")
-    operations: List[EditOperation] = Field(default_factory=list, description="List of operations")
-    committed: bool = Field(default=False, description="Whether transaction was committed")
-    rolled_back: bool = Field(default=False, description="Whether transaction was rolled back")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Transaction timestamp")
+    operations: List[EditOperation] = Field(
+        default_factory=list, description="List of operations"
+    )
+    committed: bool = Field(
+        default=False, description="Whether transaction was committed"
+    )
+    rolled_back: bool = Field(
+        default=False, description="Whether transaction was rolled back"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="Transaction timestamp"
+    )
     description: str = Field(default="", description="Transaction description")
 
 
@@ -115,7 +123,9 @@ class FileEditor:
             raise RuntimeError("Transaction already in progress")
 
         transaction_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        self.current_transaction = EditTransaction(id=transaction_id, description=description)
+        self.current_transaction = EditTransaction(
+            id=transaction_id, description=description
+        )
 
         self.console.print(f"\n[bold cyan]📝 Started transaction:[/] {transaction_id}")
         if description:
@@ -137,7 +147,9 @@ class FileEditor:
         if path_obj.exists():
             raise FileExistsError(f"File already exists: {path}")
 
-        operation = EditOperation(type=OperationType.CREATE, path=path, new_content=content)
+        operation = EditOperation(
+            type=OperationType.CREATE, path=path, new_content=content
+        )
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[green]+ Create:[/] {path}")
@@ -160,7 +172,10 @@ class FileEditor:
         old_content = path_obj.read_text()
 
         operation = EditOperation(
-            type=OperationType.MODIFY, path=path, old_content=old_content, new_content=new_content
+            type=OperationType.MODIFY,
+            path=path,
+            old_content=old_content,
+            new_content=new_content,
         )
 
         self.current_transaction.operations.append(operation)
@@ -182,7 +197,9 @@ class FileEditor:
         # Read current content for backup
         old_content = path_obj.read_text() if path_obj.is_file() else None
 
-        operation = EditOperation(type=OperationType.DELETE, path=path, old_content=old_content)
+        operation = EditOperation(
+            type=OperationType.DELETE, path=path, old_content=old_content
+        )
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[red]- Delete:[/] {path}")
@@ -205,7 +222,9 @@ class FileEditor:
         if new_path_obj.exists():
             raise FileExistsError(f"Target already exists: {new_path}")
 
-        operation = EditOperation(type=OperationType.RENAME, path=old_path, new_path=new_path)
+        operation = EditOperation(
+            type=OperationType.RENAME, path=old_path, new_path=new_path
+        )
 
         self.current_transaction.operations.append(operation)
         self.console.print(f"[blue]→ Rename:[/] {old_path} → {new_path}")
@@ -273,7 +292,11 @@ class FileEditor:
         new_lines = (op.new_content or "").splitlines(keepends=True)
 
         diff = difflib.unified_diff(
-            old_lines, new_lines, fromfile=f"a/{op.path}", tofile=f"b/{op.path}", n=context_lines
+            old_lines,
+            new_lines,
+            fromfile=f"a/{op.path}",
+            tofile=f"b/{op.path}",
+            n=context_lines,
         )
 
         diff_text = "".join(diff)
@@ -337,7 +360,9 @@ class FileEditor:
         # Apply operations
         try:
             for i, op in enumerate(self.current_transaction.operations, 1):
-                self.console.print(f"\n[{i}/{len(self.current_transaction.operations)}] ", end="")
+                self.console.print(
+                    f"\n[{i}/{len(self.current_transaction.operations)}] ", end=""
+                )
                 self._apply_operation(op)
                 op.applied = True
 
@@ -462,7 +487,9 @@ class FileEditor:
                 backup_path = Path(op.backup_path)
                 if backup_path.exists():
                     shutil.copy2(backup_path, path_obj)
-                    self.console.print(f"[yellow]✓ Rolled back (restored):[/] {op.path}")
+                    self.console.print(
+                        f"[yellow]✓ Rolled back (restored):[/] {op.path}"
+                    )
             elif op.old_content is not None:
                 path_obj.write_text(op.old_content)
                 self.console.print(f"[yellow]✓ Rolled back (content):[/] {op.path}")
@@ -487,7 +514,9 @@ class FileEditor:
             new_path_obj = Path(op.new_path)
             if new_path_obj.exists():
                 new_path_obj.rename(path_obj)
-                self.console.print(f"[blue]✓ Rolled back (renamed):[/] {op.new_path} → {op.path}")
+                self.console.print(
+                    f"[blue]✓ Rolled back (renamed):[/] {op.new_path} → {op.path}"
+                )
 
     def abort(self) -> None:
         """Abort the current transaction without applying changes."""

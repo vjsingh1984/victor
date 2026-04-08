@@ -317,7 +317,9 @@ class PlanCommand(BaseSlashCommand):
                 return
 
             # Attach plan to agent using public interface
-            conversation_controller = getattr(ctx.agent, "conversation_controller", None)
+            conversation_controller = getattr(
+                ctx.agent, "conversation_controller", None
+            )
             if conversation_controller:
                 conversation_controller.set_current_plan(plan)
 

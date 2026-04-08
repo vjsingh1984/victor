@@ -138,7 +138,9 @@ def normalize_for_git_branch(name: str, prefix: Optional[str] = None) -> str:
     normalized = normalized.strip("-")
 
     if not normalized:
-        raise ValueError(f"Feature name '{name}' contains no valid characters for a branch name")
+        raise ValueError(
+            f"Feature name '{name}' contains no valid characters for a branch name"
+        )
 
     # Add prefix if provided
     if prefix:

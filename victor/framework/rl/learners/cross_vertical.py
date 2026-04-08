@@ -319,7 +319,9 @@ class CrossVerticalLearner(BaseLearner):
         Returns:
             Recommendation text
         """
-        quality_level = "high" if avg_quality > 0.7 else "moderate" if avg_quality > 0.5 else "low"
+        quality_level = (
+            "high" if avg_quality > 0.7 else "moderate" if avg_quality > 0.5 else "low"
+        )
 
         if recommended_mode:
             return (
@@ -388,7 +390,8 @@ class CrossVerticalLearner(BaseLearner):
         if matching_pattern:
             return RLRecommendation(
                 value=matching_pattern.avg_quality,
-                confidence=matching_pattern.confidence * 0.8,  # Slightly reduce for transfer
+                confidence=matching_pattern.confidence
+                * 0.8,  # Slightly reduce for transfer
                 reason=(
                     f"Cross-vertical pattern from {', '.join(matching_pattern.source_verticals)}: "
                     f"{matching_pattern.recommendation}"

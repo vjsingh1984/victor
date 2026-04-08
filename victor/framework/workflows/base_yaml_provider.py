@@ -41,7 +41,16 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 from victor.core.verticals.import_resolver import (
     import_module_with_fallback,
@@ -54,7 +63,10 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.framework.graph import GraphExecutionResult
-    from victor.workflows.unified_compiler import CachedCompiledGraph, UnifiedWorkflowCompiler
+    from victor.workflows.unified_compiler import (
+        CachedCompiledGraph,
+        UnifiedWorkflowCompiler,
+    )
     from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 
@@ -378,7 +390,9 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
                     pattern="*.yaml",
                     config=config,
                 )
-                logger.debug(f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}")
+                logger.debug(
+                    f"Loaded {len(self._workflows)} YAML workflows from {workflows_dir}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to load YAML workflows: {e}")
                 self._workflows = {}

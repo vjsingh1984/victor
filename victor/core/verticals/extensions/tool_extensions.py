@@ -108,7 +108,11 @@ class ToolExtensions:
             # Handle both 'tool' and 'tool_name' attributes for compatibility
             dep_tool = getattr(dep, "tool_name", getattr(dep, "tool", None))
             if dep_tool == tool_name:
-                return list(dep.depends_on) if isinstance(dep.depends_on, set) else dep.depends_on
+                return (
+                    list(dep.depends_on)
+                    if isinstance(dep.depends_on, set)
+                    else dep.depends_on
+                )
         return []
 
     def has_dependency(self, tool_name: str, dependency: str) -> bool:

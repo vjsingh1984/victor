@@ -191,7 +191,9 @@ def parse_session_id(session_id: str) -> dict[str, str | int]:
         # Convert to ISO format
         from datetime import datetime, timezone
 
-        timestamp_iso = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat()
+        timestamp_iso = datetime.fromtimestamp(
+            timestamp_ms / 1000, tz=timezone.utc
+        ).isoformat()
 
         return {
             "project_root": project_root,

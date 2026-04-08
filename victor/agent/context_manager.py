@@ -56,7 +56,10 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_controller import ConversationController, ContextMetrics
+    from victor.agent.conversation_controller import (
+        ConversationController,
+        ContextMetrics,
+    )
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.debug_logger import DebugLogger
     from victor.config.settings import Settings
@@ -163,12 +166,17 @@ class ContextManager:
                 return settings_max
 
         # Check config override
-        if self._config.max_context_chars is not None and self._config.max_context_chars > 0:
+        if (
+            self._config.max_context_chars is not None
+            and self._config.max_context_chars > 0
+        ):
             return self._config.max_context_chars
 
         # Calculate from model context window
         context_tokens = self.get_model_context_window()
-        return int(context_tokens * self._config.chars_per_token * self._config.safety_margin)
+        return int(
+            context_tokens * self._config.chars_per_token * self._config.safety_margin
+        )
 
     def check_context_overflow(self, max_context_chars: Optional[int] = None) -> bool:
         """Check if context is at risk of overflow.
@@ -188,7 +196,9 @@ class ContextManager:
 
         # Update debug logger if available
         if self._debug_logger is not None:
-            self._debug_logger.log_context_size(metrics.char_count, metrics.estimated_tokens)
+            self._debug_logger.log_context_size(
+                metrics.char_count, metrics.estimated_tokens
+            )
 
         if metrics.is_overflow_risk:
             logger.warning(
@@ -213,7 +223,9 @@ class ContextManager:
         if self._context_compactor is None:
             return None
 
-        compaction_action = self._context_compactor.check_and_compact(current_query=user_message)
+        compaction_action = self._context_compactor.check_and_compact(
+            current_query=user_message
+        )
         if not compaction_action.action_taken:
             return None
 
@@ -240,7 +252,9 @@ class ContextManager:
 
         return chunk
 
-    async def handle_compaction_async(self, user_message: str) -> Optional["StreamChunk"]:
+    async def handle_compaction_async(
+        self, user_message: str
+    ) -> Optional["StreamChunk"]:
         """Perform proactive compaction asynchronously if enabled.
 
         Non-blocking version of handle_compaction for use in async hot paths.

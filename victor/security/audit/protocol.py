@@ -55,9 +55,7 @@ class AuditEventType(str, Enum):
     # Security events
     SECRET_DETECTED = "secret_detected"
     SECRET_ACCESS = "secret_access"  # API key / credential access attempts
-    SECURITY_EVENT = (
-        "security_event"  # General security events (HOME manipulation, path traversal, etc.)
-    )
+    SECURITY_EVENT = "security_event"  # General security events (HOME manipulation, path traversal, etc.)
     SECURITY_SCAN = "security_scan"
     ACCESS_DENIED = "access_denied"
 
@@ -251,7 +249,9 @@ class RetentionPolicy:
     def to_dict(self) -> dict[str, Any]:
         return {
             "default_retention_days": self.default_retention_days,
-            "framework_overrides": {k.value: v for k, v in self.framework_overrides.items()},
+            "framework_overrides": {
+                k.value: v for k, v in self.framework_overrides.items()
+            },
             "sensitive_data_retention_days": self.sensitive_data_retention_days,
             "auto_purge": self.auto_purge,
             "archive_before_purge": self.archive_before_purge,

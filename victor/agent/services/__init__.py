@@ -30,7 +30,10 @@ Services:
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
-from victor.agent.services.decision_service import LLMDecisionService, LLMDecisionServiceConfig
+from victor.agent.services.decision_service import (
+    LLMDecisionService,
+    LLMDecisionServiceConfig,
+)
 from victor.agent.services.provider_service import ProviderService
 from victor.agent.services.recovery_service import RecoveryService, RecoveryContextImpl
 from victor.agent.services.session_service import SessionService, SessionInfoImpl

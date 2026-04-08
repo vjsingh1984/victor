@@ -222,12 +222,16 @@ class ToolCatalogLoader:
         if not self._config.airgapped_mode:
             try:
                 tool_config = self._settings.load_tool_config()
-                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
+                web_cfg = (
+                    tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
+                )
                 config.update(
                     {
                         "web_fetch_top": web_cfg.get("summarize_fetch_top"),
                         "web_fetch_pool": web_cfg.get("summarize_fetch_pool"),
-                        "max_content_length": web_cfg.get("summarize_max_content_length"),
+                        "max_content_length": web_cfg.get(
+                            "summarize_max_content_length"
+                        ),
                     }
                 )
             except Exception as exc:

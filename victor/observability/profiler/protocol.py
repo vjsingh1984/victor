@@ -179,7 +179,9 @@ class ProfileResult:
         """Profiling duration in seconds."""
         return self.end_time - self.start_time
 
-    def get_top_functions(self, n: int = 10, by: str = "cumulative") -> list[FunctionStats]:
+    def get_top_functions(
+        self, n: int = 10, by: str = "cumulative"
+    ) -> list[FunctionStats]:
         """Get top N functions by metric.
 
         Args:

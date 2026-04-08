@@ -195,12 +195,16 @@ class MCPServer:
                 return self._create_response(msg_id, {"pong": True})
 
             else:
-                return self._create_error(msg_id, -32601, f"Method not found: {mcp_msg.method}")
+                return self._create_error(
+                    msg_id, -32601, f"Method not found: {mcp_msg.method}"
+                )
 
         except Exception as e:
             return self._create_error(None, -32700, f"Parse error: {str(e)}")
 
-    async def _handle_initialize(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_initialize(
+        self, msg_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle initialize request.
 
         Args:
@@ -240,7 +244,9 @@ class MCPServer:
 
         return self._create_response(msg_id, {"tools": tools})
 
-    async def _handle_call_tool(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_call_tool(
+        self, msg_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle call tool request.
 
         Args:
@@ -299,7 +305,9 @@ class MCPServer:
         resources = [r.model_dump() for r in self.resources]
         return self._create_response(msg_id, {"resources": resources})
 
-    async def _handle_read_resource(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_read_resource(
+        self, msg_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle read resource request.
 
         Args:
@@ -345,7 +353,9 @@ class MCPServer:
                 return self._create_response(msg_id, resource_content.model_dump())
 
             except Exception as e:
-                return self._create_error(msg_id, -32603, f"Error reading resource: {str(e)}")
+                return self._create_error(
+                    msg_id, -32603, f"Error reading resource: {str(e)}"
+                )
 
         return self._create_error(msg_id, -32001, "Resource type not supported")
 
@@ -361,7 +371,9 @@ class MCPServer:
         """
         return {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
-    def _create_error(self, msg_id: Optional[str], code: int, message: str) -> Dict[str, Any]:
+    def _create_error(
+        self, msg_id: Optional[str], code: int, message: str
+    ) -> Dict[str, Any]:
         """Create error response.
 
         Args:
@@ -406,7 +418,9 @@ class MCPServer:
                 lambda: asyncio.streams.FlowControlMixin(loop=loop),
                 sys.stdout,
             )
-            writer = asyncio.StreamWriter(writer_transport, writer_protocol, reader, loop)
+            writer = asyncio.StreamWriter(
+                writer_transport, writer_protocol, reader, loop
+            )
         except (OSError, ValueError) as e:
             raise OSError(f"Failed to set up async stdout writer: {e}") from e
 
@@ -416,7 +430,9 @@ class MCPServer:
 
         return reader, writer
 
-    async def _write_response(self, writer: asyncio.StreamWriter, response: Dict[str, Any]) -> None:
+    async def _write_response(
+        self, writer: asyncio.StreamWriter, response: Dict[str, Any]
+    ) -> None:
         """Write a JSON response to the output stream.
 
         Args:
@@ -483,7 +499,9 @@ class MCPServer:
                     await self._write_response(writer, response)
 
                 except json.JSONDecodeError as e:
-                    error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
+                    error_response = self._create_error(
+                        None, -32700, f"Parse error: {str(e)}"
+                    )
                     await self._write_response(writer, error_response)
 
                 except (ConnectionError, BrokenPipeError):
@@ -491,7 +509,9 @@ class MCPServer:
                     break
 
                 except Exception as e:
-                    error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
+                    error_response = self._create_error(
+                        None, -32603, f"Internal error: {str(e)}"
+                    )
                     try:
                         await self._write_response(writer, error_response)
                     except (ConnectionError, BrokenPipeError):
@@ -531,16 +551,22 @@ class MCPServer:
 
                 # Write response to stdout
                 response_json = json.dumps(response)
-                await loop.run_in_executor(None, lambda: print(response_json, flush=True))
+                await loop.run_in_executor(
+                    None, lambda: print(response_json, flush=True)
+                )
 
             except json.JSONDecodeError as e:
-                error_response = self._create_error(None, -32700, f"Parse error: {str(e)}")
+                error_response = self._create_error(
+                    None, -32700, f"Parse error: {str(e)}"
+                )
                 await loop.run_in_executor(
                     None, lambda r=error_response: print(json.dumps(r), flush=True)
                 )
 
             except Exception as e:
-                error_response = self._create_error(None, -32603, f"Internal error: {str(e)}")
+                error_response = self._create_error(
+                    None, -32603, f"Internal error: {str(e)}"
+                )
                 await loop.run_in_executor(
                     None, lambda r=error_response: print(json.dumps(r), flush=True)
                 )

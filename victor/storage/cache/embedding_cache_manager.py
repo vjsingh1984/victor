@@ -355,7 +355,9 @@ class EmbeddingCacheManager:
                 if pattern == "**/*":
                     # Clear entire directory
                     file_count = sum(1 for _ in path.glob("**/*") if _.is_file())
-                    total_size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
+                    total_size = sum(
+                        f.stat().st_size for f in path.glob("**/*") if f.is_file()
+                    )
 
                     if file_count > 0:
                         shutil.rmtree(path)
@@ -368,7 +370,9 @@ class EmbeddingCacheManager:
                                 if total_size >= 1024
                                 else f"{total_size} B"
                             )
-                            progress_callback(f"  {cat['name']}: {file_count} files ({size_str})")
+                            progress_callback(
+                                f"  {cat['name']}: {file_count} files ({size_str})"
+                            )
                     else:
                         if progress_callback:
                             progress_callback(f"  {cat['name']}: empty")
@@ -390,7 +394,9 @@ class EmbeddingCacheManager:
                                 if total_size >= 1024
                                 else f"{total_size} B"
                             )
-                            progress_callback(f"  {cat['name']}: {file_count} files ({size_str})")
+                            progress_callback(
+                                f"  {cat['name']}: {file_count} files ({size_str})"
+                            )
                     else:
                         if progress_callback:
                             progress_callback(f"  {cat['name']}: empty")
@@ -433,12 +439,16 @@ class EmbeddingCacheManager:
         classifier.initialize_sync()
 
         # Count total phrases
-        phrase_count = sum(len(phrases) for phrases in classifier._phrase_lists.values())
+        phrase_count = sum(
+            len(phrases) for phrases in classifier._phrase_lists.values()
+        )
 
         if progress_callback:
             progress_callback(f"Task classifiers rebuilt ({phrase_count} phrases)")
 
-        logger.info(f"EmbeddingCacheManager: rebuilt task classifiers with {phrase_count} phrases")
+        logger.info(
+            f"EmbeddingCacheManager: rebuilt task classifiers with {phrase_count} phrases"
+        )
         return phrase_count
 
     def rebuild_task_classifiers_sync(

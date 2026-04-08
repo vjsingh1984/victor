@@ -288,7 +288,9 @@ class WorkflowCacheConfig:
     enabled: bool = False
     ttl_seconds: int = 3600  # 1 hour default
     max_entries: int = 500
-    cacheable_node_types: Set[str] = field(default_factory=lambda: {"transform", "condition"})
+    cacheable_node_types: Set[str] = field(
+        default_factory=lambda: {"transform", "condition"}
+    )
     excluded_context_keys: Set[str] = field(
         default_factory=lambda: {"_internal", "_debug", "_timestamps"}
     )
@@ -410,7 +412,9 @@ class WorkflowCache:
                 if entry is not None:
                     entry.hit_count += 1
                     self._stats["hits"] += 1
-                    logger.debug(f"Workflow cache hit: node={node.id}, key={cache_key[:16]}...")
+                    logger.debug(
+                        f"Workflow cache hit: node={node.id}, key={cache_key[:16]}..."
+                    )
                     return entry.result
             except KeyError:
                 pass
@@ -458,7 +462,9 @@ class WorkflowCache:
             try:
                 self._cache[cache_key] = entry
                 self._stats["sets"] += 1
-                logger.debug(f"Workflow cache set: node={node.id}, key={cache_key[:16]}...")
+                logger.debug(
+                    f"Workflow cache set: node={node.id}, key={cache_key[:16]}..."
+                )
                 return True
             except Exception as e:
                 logger.warning(f"Failed to cache workflow result: {e}")
@@ -592,17 +598,23 @@ class WorkflowCache:
         # Build key data
         key_data = {
             "node_id": node.id,
-            "node_type": node.node_type.value if hasattr(node, "node_type") else "unknown",
+            "node_type": (
+                node.node_type.value if hasattr(node, "node_type") else "unknown"
+            ),
             "context": relevant_context,
         }
 
         # Add node-specific data for more accurate cache matching
         if hasattr(node, "transform"):
             # For transform nodes, include function identity if possible
-            key_data["transform_name"] = getattr(node.transform, "__name__", "anonymous")
+            key_data["transform_name"] = getattr(
+                node.transform, "__name__", "anonymous"
+            )
         elif hasattr(node, "condition"):
             # For condition nodes, include condition function identity
-            key_data["condition_name"] = getattr(node.condition, "__name__", "anonymous")
+            key_data["condition_name"] = getattr(
+                node.condition, "__name__", "anonymous"
+            )
 
         # Generate hash
         key_str = json.dumps(key_data, sort_keys=True, default=str)
@@ -639,10 +651,14 @@ class WorkflowCache:
             # Limit value size for large strings/lists
             if isinstance(value, str) and len(value) > 1000:
                 # Use hash for large strings
-                relevant[key] = f"hash:{hashlib.sha256(value.encode()).hexdigest()[:16]}"
+                relevant[key] = (
+                    f"hash:{hashlib.sha256(value.encode()).hexdigest()[:16]}"
+                )
             elif isinstance(value, (list, dict)) and len(str(value)) > 1000:
                 # Use hash for large collections
-                relevant[key] = f"hash:{hashlib.sha256(str(value).encode()).hexdigest()[:16]}"
+                relevant[key] = (
+                    f"hash:{hashlib.sha256(str(value).encode()).hexdigest()[:16]}"
+                )
             else:
                 relevant[key] = value
 
@@ -899,7 +915,9 @@ class WorkflowDefinitionCache:
         path_str = str(path.resolve())
 
         with self._lock:
-            keys_to_delete = [k for k in self._cache.keys() if path_str in k]  # Key contains path
+            keys_to_delete = [
+                k for k in self._cache.keys() if path_str in k
+            ]  # Key contains path
 
             for key in keys_to_delete:
                 del self._cache[key]

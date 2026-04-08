@@ -286,7 +286,9 @@ def _set_key_in_keyring(provider: str, key: str) -> bool:
         True if successful, False otherwise
     """
     if not _KEYRING_AVAILABLE:
-        logger.warning("Keyring not available. Install 'keyring' package for secure storage.")
+        logger.warning(
+            "Keyring not available. Install 'keyring' package for secure storage."
+        )
         return False
 
     try:

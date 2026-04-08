@@ -54,7 +54,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage

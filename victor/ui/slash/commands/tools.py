@@ -192,7 +192,9 @@ class LMStudioCommand(BaseSlashCommand):
 
             content += "\n[dim]Tip: Use /provider lmstudio to switch[/]"
 
-            ctx.console.print(Panel(content, title="LMStudio Status", border_style="green"))
+            ctx.console.print(
+                Panel(content, title="LMStudio Status", border_style="green")
+            )
 
         except ImportError:
             ctx.console.print("[red]LMStudio provider not available[/]")
@@ -323,7 +325,9 @@ class ReviewCommand(BaseSlashCommand):
 
         # Build review prompt
         if target_path.is_file():
-            prompt = f"Please review the code in {target_path} and provide feedback on:\n"
+            prompt = (
+                f"Please review the code in {target_path} and provide feedback on:\n"
+            )
         else:
             prompt = f"Please review recent changes in {target_path} and provide feedback on:\n"
 

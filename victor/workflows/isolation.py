@@ -630,7 +630,9 @@ class DeploymentConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DeploymentConfig":
         connection_data = data.get("connection")
-        connection = ConnectionConfig.from_dict(connection_data) if connection_data else None
+        connection = (
+            ConnectionConfig.from_dict(connection_data) if connection_data else None
+        )
 
         return cls(
             locality=data.get("locality", "local"),
@@ -675,7 +677,9 @@ class DeploymentConfig:
         return cls(
             locality="remote",
             target="eks",
-            connection=ConnectionConfig(protocol="k8s", auth_method="iam", region=region),
+            connection=ConnectionConfig(
+                protocol="k8s", auth_method="iam", region=region
+            ),
             cluster_name=cluster_name,
             namespace=namespace,
             gpu_required=gpu,
@@ -778,7 +782,9 @@ class IsolationConfig:
             "sandbox_type": self.sandbox_type,
             "network_allowed": self.network_allowed,
             "filesystem_readonly": self.filesystem_readonly,
-            "resource_limits": (self.resource_limits.to_dict() if self.resource_limits else None),
+            "resource_limits": (
+                self.resource_limits.to_dict() if self.resource_limits else None
+            ),
             "working_directory": self.working_directory,
             "environment": self.environment,
             "docker_image": self.docker_image,
@@ -788,7 +794,9 @@ class IsolationConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "IsolationConfig":
         resource_data = data.get("resource_limits")
-        resource_limits = ResourceLimits.from_dict(resource_data) if resource_data else None
+        resource_limits = (
+            ResourceLimits.from_dict(resource_data) if resource_data else None
+        )
 
         return cls(
             sandbox_type=data.get("sandbox_type", "none"),

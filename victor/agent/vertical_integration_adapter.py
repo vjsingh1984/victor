@@ -306,7 +306,9 @@ class VerticalIntegrationAdapter:
 
         # Store in vertical context via capability (DIP-compliant read)
         vertical_context = self._get_capability_value("vertical_context")
-        if vertical_context is not None and hasattr(vertical_context, "apply_middleware"):
+        if vertical_context is not None and hasattr(
+            vertical_context, "apply_middleware"
+        ):
             vertical_context.apply_middleware(middleware)
 
         # Persist middleware via public storage protocol.
@@ -374,7 +376,9 @@ class VerticalIntegrationAdapter:
 
         # Store in vertical context via capability (DIP-compliant read)
         vertical_context = self._get_capability_value("vertical_context")
-        if vertical_context is not None and hasattr(vertical_context, "apply_safety_patterns"):
+        if vertical_context is not None and hasattr(
+            vertical_context, "apply_safety_patterns"
+        ):
             vertical_context.apply_safety_patterns(patterns)
 
         # Persist safety patterns via public storage protocol.
@@ -412,7 +416,9 @@ class VerticalIntegrationAdapter:
             elif hasattr(checker, "add_patterns"):
                 checker.add_patterns(patterns)
             else:
-                logger.debug("SafetyChecker does not support pattern addition via public API")
+                logger.debug(
+                    "SafetyChecker does not support pattern addition via public API"
+                )
                 return
 
             logger.debug(f"Applied {len(patterns)} safety patterns from vertical")

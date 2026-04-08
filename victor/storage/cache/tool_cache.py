@@ -60,7 +60,9 @@ class ToolCache:
             return
         name, hashed = self._key(tool_name, args)
         # Use RL-aware set with tool metadata
-        self.cache.set_with_tool(hashed, value, tool_name=tool_name, namespace=name, ttl=self.ttl)
+        self.cache.set_with_tool(
+            hashed, value, tool_name=tool_name, namespace=name, ttl=self.ttl
+        )
         # index by path if provided
         path = args.get("path") or args.get("root")
         paths = args.get("paths")
@@ -112,7 +114,9 @@ class ToolCache:
         # Clean up path index entries for this tool
         keys_to_remove = []
         for path, key_refs in self._path_index.items():
-            updated_refs = {ref for ref in key_refs if not ref.startswith(f"{tool_name}:")}
+            updated_refs = {
+                ref for ref in key_refs if not ref.startswith(f"{tool_name}:")
+            }
             if updated_refs != key_refs:
                 if updated_refs:
                     self._path_index[path] = updated_refs

@@ -41,7 +41,16 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Protocol
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+)
 
 if TYPE_CHECKING:
     from victor.framework.graph import StateGraph
@@ -354,7 +363,9 @@ class NodeExecutorProtocol(Protocol):
     - OCP compliance: Add new node types by creating new executor classes
     """
 
-    async def execute(self, node: "WorkflowNode", state: "WorkflowState") -> "WorkflowState":
+    async def execute(
+        self, node: "WorkflowNode", state: "WorkflowState"
+    ) -> "WorkflowState":
         """Execute a workflow node.
 
         Args:

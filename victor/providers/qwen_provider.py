@@ -252,7 +252,9 @@ class QwenProvider(BaseProvider):
         await self._ensure_valid_token()
 
         try:
-            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+            openai_messages = [
+                {"role": msg.role, "content": msg.content} for msg in messages
+            ]
             request_params: Dict[str, Any] = {
                 "model": model,
                 "messages": openai_messages,
@@ -331,7 +333,9 @@ class QwenProvider(BaseProvider):
         await self._ensure_valid_token()
 
         try:
-            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+            openai_messages = [
+                {"role": msg.role, "content": msg.content} for msg in messages
+            ]
             request_params: Dict[str, Any] = {
                 "model": model,
                 "messages": openai_messages,
@@ -343,7 +347,9 @@ class QwenProvider(BaseProvider):
                 request_params["tools"] = convert_tools_to_openai_format(tools)
                 request_params["tool_choice"] = "auto"
 
-            stream_response = await self.client.chat.completions.create(**request_params)
+            stream_response = await self.client.chat.completions.create(
+                **request_params
+            )
 
             async for chunk in stream_response:
                 if not chunk.choices:

@@ -278,7 +278,9 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_selection(method, num_tools)
 
-    def record_tool_execution(self, tool_name: str, success: bool, elapsed_ms: float) -> None:
+    def record_tool_execution(
+        self, tool_name: str, success: bool, elapsed_ms: float
+    ) -> None:
         """Record tool execution statistics.
 
         Args:
@@ -288,7 +290,9 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
+    def on_tool_start(
+        self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0
+    ) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:
@@ -369,7 +373,9 @@ class MetricsCoordinator:
 
         # Context Compactor
         if context_compactor:
-            status["components"]["context_compactor"] = context_compactor.get_statistics()
+            status["components"][
+                "context_compactor"
+            ] = context_compactor.get_statistics()
 
         # Usage Analytics
         if usage_analytics:
@@ -385,7 +391,9 @@ class MetricsCoordinator:
         # Sequence Tracker
         if sequence_tracker:
             try:
-                status["components"]["sequence_tracker"] = sequence_tracker.get_statistics()
+                status["components"][
+                    "sequence_tracker"
+                ] = sequence_tracker.get_statistics()
             except Exception:
                 status["components"]["sequence_tracker"] = {"status": "error"}
 
@@ -402,14 +410,18 @@ class MetricsCoordinator:
             else:
                 status["components"]["code_correction"]["config"] = {
                     "auto_fix": getattr(code_correction_middleware, "auto_fix", True),
-                    "max_iterations": getattr(code_correction_middleware, "max_iterations", 1),
+                    "max_iterations": getattr(
+                        code_correction_middleware, "max_iterations", 1
+                    ),
                 }
 
         # Safety Checker
         status["components"]["safety_checker"] = {
             "enabled": safety_checker is not None,
             "has_confirmation_callback": (
-                safety_checker.confirmation_callback is not None if safety_checker else False
+                safety_checker.confirmation_callback is not None
+                if safety_checker
+                else False
             ),
         }
 
@@ -418,7 +430,9 @@ class MetricsCoordinator:
             "enabled": auto_committer is not None,
         }
         if auto_committer:
-            status["components"]["auto_committer"]["auto_commit"] = auto_committer.auto_commit
+            status["components"]["auto_committer"][
+                "auto_commit"
+            ] = auto_committer.auto_commit
 
         # Search Router
         status["components"]["search_router"] = {
@@ -526,7 +540,9 @@ class MetricsCoordinator:
                         "error_type": error_type,
                     },
                 )
-                rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
+                rl_coordinator.record_outcome(
+                    "tool_selector", tool_outcome, vertical_name
+                )
             except ImportError:
                 logger.debug("RLOutcome not available, skipping RL recording")
             except KeyError as e:
@@ -564,7 +580,9 @@ class MetricsCoordinator:
             # Get tool execution count from metrics collector
             tool_calls_made = 0
             if self._metrics_collector:
-                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
+                tool_calls_made = (
+                    self._metrics_collector._selection_stats.total_tools_executed
+                )
 
             # Determine success: no error and not cancelled
             success = session.error is None and not session.cancelled
@@ -598,7 +616,9 @@ class MetricsCoordinator:
             )
 
             # Record outcome for model selector
-            vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
+            vertical_name = (
+                getattr(vertical_context, "vertical_name", None) or "default"
+            )
             rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
 
             logger.debug(

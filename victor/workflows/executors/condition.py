@@ -52,7 +52,9 @@ class ConditionNodeExecutor:
         """
         self._context = context
 
-    async def execute(self, node: "ConditionNode", state: "WorkflowState") -> "WorkflowState":
+    async def execute(
+        self, node: "ConditionNode", state: "WorkflowState"
+    ) -> "WorkflowState":
         """Execute a condition node.
 
         Args:
@@ -69,7 +71,9 @@ class ConditionNodeExecutor:
         """
         from victor.workflows.runtime_types import GraphNodeResult
 
-        logger.debug(f"Condition node {node.id} is passthrough (routing handled by StateGraph)")
+        logger.debug(
+            f"Condition node {node.id} is passthrough (routing handled by StateGraph)"
+        )
 
         # Make mutable copy of state
         state = dict(state)
@@ -83,7 +87,9 @@ class ConditionNodeExecutor:
             success=True,
             output={
                 "passthrough": True,
-                "branches": list(node.branches.keys()) if hasattr(node, "branches") else [],
+                "branches": (
+                    list(node.branches.keys()) if hasattr(node, "branches") else []
+                ),
             },
         )
 

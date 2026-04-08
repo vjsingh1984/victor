@@ -141,13 +141,16 @@ class CodeChunkingStrategy(ChunkingStrategy):
 
             # Extract symbol name from match
             symbol_match = re.search(
-                r"(?:def|function|fn|func|class|struct|enum|interface|impl)\s+(\w+)", match_text
+                r"(?:def|function|fn|func|class|struct|enum|interface|impl)\s+(\w+)",
+                match_text,
             )
             symbol_name = symbol_match.group(1) if symbol_match else None
 
             # If section is too large, sub-chunk it
             if len(section) > self.config.max_chunk_size:
-                sub_chunks = self._chunk_large_definition(section, start, def_type, symbol_name)
+                sub_chunks = self._chunk_large_definition(
+                    section, start, def_type, symbol_name
+                )
                 chunks.extend(sub_chunks)
             elif len(section) >= self.config.min_chunk_size:
                 chunks.append(

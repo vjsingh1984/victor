@@ -270,11 +270,15 @@ class SubAgentOrchestrator:
             effective_tools = allowed_tools
         else:
             # Use role provider for vertical-aware tool selection
-            effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
+            effective_tools = self._role_provider.get_tools_for_role(
+                role_name, self._vertical
+            )
 
-        effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
-        effective_context = context_limit or self._role_provider.get_context_limit_for_role(
+        effective_budget = tool_budget or self._role_provider.get_budget_for_role(
             role_name
+        )
+        effective_context = (
+            context_limit or self._role_provider.get_context_limit_for_role(role_name)
         )
 
         # Create configuration
@@ -354,7 +358,8 @@ class SubAgentOrchestrator:
                 )
 
         logger.info(
-            f"Fan-out: spawning {len(tasks)} sub-agents " f"(max concurrent: {max_concurrent})"
+            f"Fan-out: spawning {len(tasks)} sub-agents "
+            f"(max concurrent: {max_concurrent})"
         )
 
         # Execute all tasks
@@ -371,9 +376,7 @@ class SubAgentOrchestrator:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 # Convert exception to failed result
-                error_msg = (
-                    f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
-                )
+                error_msg = f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
                 errors.append(error_msg)
                 processed_results.append(
                     SubAgentResult(
@@ -496,7 +499,10 @@ class SubAgentOrchestrator:
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
-            logger.error(f"{role.value} sub-agent stream spawn failed: {error_msg}", exc_info=True)
+            logger.error(
+                f"{role.value} sub-agent stream spawn failed: {error_msg}",
+                exc_info=True,
+            )
             yield StreamChunk(
                 content="",
                 is_final=True,

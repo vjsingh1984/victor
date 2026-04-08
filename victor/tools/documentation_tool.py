@@ -122,7 +122,10 @@ def _generate_class_docstring(node: ast.ClassDef, format: str) -> str:
                 if isinstance(stmt, ast.Assign):
                     for target in stmt.targets:
                         if isinstance(target, ast.Attribute):
-                            if isinstance(target.value, ast.Name) and target.value.id == "self":
+                            if (
+                                isinstance(target.value, ast.Name)
+                                and target.value.id == "self"
+                            ):
                                 attributes.append(target.attr)
 
     attrs_lines = []
@@ -165,12 +168,20 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
             methods = []
             for item in node.body:
                 if isinstance(item, ast.FunctionDef):
-                    if not item.name.startswith("_") or item.name in ("__init__", "__str__"):
+                    if not item.name.startswith("_") or item.name in (
+                        "__init__",
+                        "__str__",
+                    ):
                         methods.append(
                             {
                                 "name": item.name,
-                                "docstring": ast.get_docstring(item) or "No description",
-                                "args": [arg.arg for arg in item.args.args if arg.arg != "self"],
+                                "docstring": ast.get_docstring(item)
+                                or "No description",
+                                "args": [
+                                    arg.arg
+                                    for arg in item.args.args
+                                    if arg.arg != "self"
+                                ],
                             }
                         )
 
@@ -226,7 +237,9 @@ def _build_markdown_docs(api_info: Dict[str, Any]) -> str:
                 lines.append("**Methods:**")
                 lines.append("")
                 for method in cls["methods"]:
-                    lines.append(f"#### `{method['name']}({', '.join(method['args'])})`")
+                    lines.append(
+                        f"#### `{method['name']}({', '.join(method['args'])})`"
+                    )
                     lines.append("")
                     lines.append(method["docstring"])
                     lines.append("")
@@ -626,8 +639,20 @@ def _analyze_non_python_file(
     priority=Priority.MEDIUM,  # Task-specific documentation generation
     access_mode=AccessMode.WRITE,  # Writes documentation files
     danger_level=DangerLevel.LOW,  # File changes are additive and undoable
-    keywords=["docs", "documentation", "docstring", "api", "readme", "type hints", "generate"],
-    mandatory_keywords=["generate docs", "add documentation", "document code"],  # Force inclusion
+    keywords=[
+        "docs",
+        "documentation",
+        "docstring",
+        "api",
+        "readme",
+        "type hints",
+        "generate",
+    ],
+    mandatory_keywords=[
+        "generate docs",
+        "add documentation",
+        "document code",
+    ],  # Force inclusion
     task_types=["documentation", "generation"],  # Classification-aware selection
     stages=["planning", "analysis", "completion"],  # Conversation stages where relevant
 )
@@ -732,7 +757,12 @@ async def docs(
                 elif isinstance(node, ast.ClassDef):
                     if not ast.get_docstring(node):
                         items_to_document.append(
-                            {"type": "class", "name": node.name, "node": node, "line": node.lineno}
+                            {
+                                "type": "class",
+                                "name": node.name,
+                                "node": node,
+                                "line": node.lineno,
+                            }
                         )
 
             if items_to_document:
@@ -758,7 +788,9 @@ async def docs(
                             formatted_docstring.append("")
                     formatted_docstring.append(f'{indent}"""')
 
-                    lines = lines[:insert_line] + formatted_docstring + lines[insert_line:]
+                    lines = (
+                        lines[:insert_line] + formatted_docstring + lines[insert_line:]
+                    )
 
                 new_content = "\n".join(lines)
                 file_obj.write_text(new_content)
@@ -948,11 +980,18 @@ async def docs_coverage(
         if _extractor is None and _extractor_error is None:
             try:
                 from victor.core.capability_registry import CapabilityRegistry
-                from victor.framework.vertical_protocols import TreeSitterExtractorProtocol
+                from victor.framework.vertical_protocols import (
+                    TreeSitterExtractorProtocol,
+                )
 
-                provider = CapabilityRegistry.get_instance().get(TreeSitterExtractorProtocol)
-                if provider is not None and CapabilityRegistry.get_instance().is_enhanced(
+                provider = CapabilityRegistry.get_instance().get(
                     TreeSitterExtractorProtocol
+                )
+                if (
+                    provider is not None
+                    and CapabilityRegistry.get_instance().is_enhanced(
+                        TreeSitterExtractorProtocol
+                    )
                 ):
                     _extractor = provider
                 else:
@@ -999,7 +1038,9 @@ async def docs_coverage(
                                         f" at {file_obj}:{node.lineno}"
                                     )
                             else:
-                                missing.append(f"Function: {node.name} ({file_obj}:{node.lineno})")
+                                missing.append(
+                                    f"Function: {node.name} ({file_obj}:{node.lineno})"
+                                )
 
                     elif isinstance(node, ast.ClassDef):
                         total_classes += 1
@@ -1012,7 +1053,9 @@ async def docs_coverage(
                                     f" at {file_obj}:{node.lineno}"
                                 )
                         else:
-                            missing.append(f"Class: {node.name} ({file_obj}:{node.lineno})")
+                            missing.append(
+                                f"Class: {node.name} ({file_obj}:{node.lineno})"
+                            )
             continue
 
         # Non-Python path: tree-sitter symbols + text-based doc detection
@@ -1024,7 +1067,9 @@ async def docs_coverage(
             from victor.core.capability_registry import CapabilityRegistry
             from victor.framework.vertical_protocols import LanguageRegistryProtocol
 
-            lang_registry = CapabilityRegistry.get_instance().get(LanguageRegistryProtocol)
+            lang_registry = CapabilityRegistry.get_instance().get(
+                LanguageRegistryProtocol
+            )
             if lang_registry is None:
                 continue
             plugin = lang_registry.get(language)
@@ -1050,7 +1095,9 @@ async def docs_coverage(
                 c_documented,
                 f_missing,
                 f_quality,
-            ) = _analyze_non_python_file(file_obj, extractor, language, doc_pattern, check_quality)
+            ) = _analyze_non_python_file(
+                file_obj, extractor, language, doc_pattern, check_quality
+            )
         except Exception as e:
             logger.warning(f"Error analyzing {file_obj}: {e}")
             continue
@@ -1126,7 +1173,9 @@ async def docs_coverage(
         level_icon = (
             _get_icon("level_critical")
             if coverage < 50
-            else (_get_icon("level_medium") if coverage < 80 else _get_icon("level_low"))
+            else (
+                _get_icon("level_medium") if coverage < 80 else _get_icon("level_low")
+            )
         )
         report.append(f"  {level_icon} {rec}")
 
@@ -1135,11 +1184,15 @@ async def docs_coverage(
     MAX_QUALITY_ISSUES = 15
     missing_truncated = missing[:MAX_MISSING_ITEMS]
     if len(missing) > MAX_MISSING_ITEMS:
-        missing_truncated.append(f"... and {len(missing) - MAX_MISSING_ITEMS} more items")
+        missing_truncated.append(
+            f"... and {len(missing) - MAX_MISSING_ITEMS} more items"
+        )
 
     quality_truncated = quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
     if check_quality and len(quality_issues) > MAX_QUALITY_ISSUES:
-        quality_truncated.append(f"... and {len(quality_issues) - MAX_QUALITY_ISSUES} more issues")
+        quality_truncated.append(
+            f"... and {len(quality_issues) - MAX_QUALITY_ISSUES} more issues"
+        )
 
     return {
         "success": True,

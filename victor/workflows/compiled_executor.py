@@ -108,7 +108,9 @@ class CompiledWorkflowExecutor:
             ExecutionEventProtocol: Execution events as they occur
         """
         if hasattr(compiled_graph, "stream"):
-            async for event in compiled_graph.stream(initial_state, thread_id=thread_id):
+            async for event in compiled_graph.stream(
+                initial_state, thread_id=thread_id
+            ):
                 yield event
 
 

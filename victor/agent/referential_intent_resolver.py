@@ -25,7 +25,10 @@ import logging
 import re
 from typing import List, Optional
 
-from victor.config.orchestrator_constants import ReferentialIntentConfig, REFERENTIAL_INTENT_CONFIG
+from victor.config.orchestrator_constants import (
+    ReferentialIntentConfig,
+    REFERENTIAL_INTENT_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +36,16 @@ logger = logging.getLogger(__name__)
 DEFAULT_REFERENTIAL_PATTERNS = [
     re.compile(r"\bdo\s+it\b", re.IGNORECASE),
     re.compile(r"\bdo\s+that\b", re.IGNORECASE),
-    re.compile(r"\bapply\s+(?:the\s+)?(?:changes|recommendations|fixes|updates)\b", re.IGNORECASE),
-    re.compile(r"\bupdate\s+(?:as\s+)?(?:discussed|recommended|suggested|per)\b", re.IGNORECASE),
-    re.compile(r"\bas\s+(?:discussed|recommended|suggested|mentioned)\b", re.IGNORECASE),
+    re.compile(
+        r"\bapply\s+(?:the\s+)?(?:changes|recommendations|fixes|updates)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bupdate\s+(?:as\s+)?(?:discussed|recommended|suggested|per)\b", re.IGNORECASE
+    ),
+    re.compile(
+        r"\bas\s+(?:discussed|recommended|suggested|mentioned)\b", re.IGNORECASE
+    ),
     re.compile(r"\bgo\s+ahead\b", re.IGNORECASE),
     re.compile(r"\bmake\s+(?:the\s+)?(?:changes|updates|fixes)\b", re.IGNORECASE),
     re.compile(r"\bproceed\b", re.IGNORECASE),
@@ -106,6 +116,8 @@ class ReferentialIntentResolver:
         context_block = "\n".join(context_lines)
         # Truncate if over budget
         if len(context_block) > self._config.max_enrichment_chars:
-            context_block = context_block[: self._config.max_enrichment_chars - 3] + "...]"
+            context_block = (
+                context_block[: self._config.max_enrichment_chars - 3] + "...]"
+            )
 
         return f"{message}\n\n{context_block}"

@@ -175,7 +175,9 @@ class HuggingFaceProvider(BaseProvider):
         # If no explicit key and HF_TOKEN is not set, check HUGGINGFACE_API_KEY
         effective_api_key = api_key
         if effective_api_key is None:
-            env_key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY")
+            env_key = os.environ.get("HF_TOKEN") or os.environ.get(
+                "HUGGINGFACE_API_KEY"
+            )
             # Convert empty string to None so resolver knows to check other sources
             effective_api_key = env_key if env_key else None
 
@@ -349,7 +351,11 @@ class HuggingFaceProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(
+                                accumulated_tool_calls
+                                if accumulated_tool_calls
+                                else None
+                            ),
                             stop_reason="stop",
                             is_final=True,
                         )
@@ -357,7 +363,9 @@ class HuggingFaceProvider(BaseProvider):
 
                     try:
                         chunk_data = json.loads(data_str)
-                        yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+                        yield self._parse_stream_chunk(
+                            chunk_data, accumulated_tool_calls
+                        )
                     except json.JSONDecodeError:
                         pass
 

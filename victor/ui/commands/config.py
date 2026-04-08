@@ -8,7 +8,9 @@ from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.config.validation import validate_configuration, format_validation_result
 
-config_app = typer.Typer(name="config", help="Validate configuration files and profiles.")
+config_app = typer.Typer(
+    name="config", help="Validate configuration files and profiles."
+)
 console = Console()
 
 
@@ -149,17 +151,23 @@ def config_validate(
             if profile.provider in available_providers:
                 checks_passed += 1
                 if verbose:
-                    console.print(f"  [green]✓[/] [{name}] Provider '{profile.provider}' is valid")
+                    console.print(
+                        f"  [green]✓[/] [{name}] Provider '{profile.provider}' is valid"
+                    )
             else:
                 errors.append(f"[{name}] Unknown provider: {profile.provider}")
-                console.print(f"  [red]✗[/] [{name}] Unknown provider: {profile.provider}")
+                console.print(
+                    f"  [red]✗[/] [{name}] Unknown provider: {profile.provider}"
+                )
 
             # Check model is specified
             checks_total += 1
             if profile.model:
                 checks_passed += 1
                 if verbose:
-                    console.print(f"  [green]✓[/] [{name}] Model specified: {profile.model}")
+                    console.print(
+                        f"  [green]✓[/] [{name}] Model specified: {profile.model}"
+                    )
             else:
                 errors.append(f"[{name}] No model specified")
                 console.print(f"  [red]✗[/] [{name}] No model specified")
@@ -173,7 +181,9 @@ def config_validate(
                         f"  [green]✓[/] [{name}] Temperature {profile.temperature} is valid"
                     )
             else:
-                errors.append(f"[{name}] Temperature {profile.temperature} out of range [0.0, 2.0]")
+                errors.append(
+                    f"[{name}] Temperature {profile.temperature} out of range [0.0, 2.0]"
+                )
                 console.print(f"  [red]✗[/] [{name}] Temperature out of range")
 
             # Check max_tokens
@@ -218,7 +228,9 @@ def config_validate(
                 console.print(f"  [red]•[/] {err}")
             raise typer.Exit(1)
         elif warnings:
-            console.print(f"[yellow]Validation passed with {len(warnings)} warning(s)[/]")
+            console.print(
+                f"[yellow]Validation passed with {len(warnings)} warning(s)[/]"
+            )
             for warn in warnings:
                 console.print(f"  [yellow]•[/] {warn}")
             console.print(f"\n[green]✓[/] {checks_passed}/{checks_total} checks passed")
@@ -246,12 +258,18 @@ async def _check_connectivity(settings: Any, profiles: dict, verbose: bool) -> N
                 ollama = OllamaProvider(**provider_settings)
                 models = await ollama.list_models()
                 if models:
-                    console.print(f"  [green]✓[/] Ollama: Connected ({len(models)} models)")
+                    console.print(
+                        f"  [green]✓[/] Ollama: Connected ({len(models)} models)"
+                    )
                 else:
-                    console.print("  [yellow]⚠[/] Ollama: Connected but no models installed")
+                    console.print(
+                        "  [yellow]⚠[/] Ollama: Connected but no models installed"
+                    )
                 await ollama.close()
             except Exception as e:
                 console.print(f"  [red]✗[/] Ollama: Cannot connect - {e}")
         else:
             if verbose:
-                console.print(f"  [dim]→[/] {provider}: Connectivity check not implemented")
+                console.print(
+                    f"  [dim]→[/] {provider}: Connectivity check not implemented"
+                )

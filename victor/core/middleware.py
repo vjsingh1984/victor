@@ -312,7 +312,9 @@ class ErrorMiddleware(ABC):
 class _FocusedMiddlewareAdapter(Middleware):
     """Internal adapter that wraps focused protocol middleware into the full interface."""
 
-    def __init__(self, focused: Union[RequestMiddleware, ResponseMiddleware, ErrorMiddleware]):
+    def __init__(
+        self, focused: Union[RequestMiddleware, ResponseMiddleware, ErrorMiddleware]
+    ):
         super().__init__()
         self._focused = focused
 
@@ -390,7 +392,9 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         if self._frozen:
             raise RuntimeError("Cannot add middleware to frozen pipeline")
 
-        if isinstance(middleware, (RequestMiddleware, ResponseMiddleware, ErrorMiddleware)):
+        if isinstance(
+            middleware, (RequestMiddleware, ResponseMiddleware, ErrorMiddleware)
+        ):
             middleware = _FocusedMiddlewareAdapter(middleware)
 
         self._middleware.append(middleware)
@@ -698,7 +702,9 @@ class RetryMiddleware(Middleware):
             except self._retry_on as e:
                 last_error = e
                 if attempt < self._max_retries:
-                    logger.warning(f"Retry {attempt + 1}/{self._max_retries} " f"after error: {e}")
+                    logger.warning(
+                        f"Retry {attempt + 1}/{self._max_retries} " f"after error: {e}"
+                    )
                     await asyncio.sleep(delay)
                     delay *= self._backoff
 
@@ -880,7 +886,9 @@ class MetricsMiddleware(Middleware):
             f"{self._prefix}_errors": self._error_count,
             f"{self._prefix}_total_duration_ms": self._total_duration,
             f"{self._prefix}_avg_duration_ms": (
-                self._total_duration / self._request_count if self._request_count > 0 else 0
+                self._total_duration / self._request_count
+                if self._request_count > 0
+                else 0
             ),
         }
 

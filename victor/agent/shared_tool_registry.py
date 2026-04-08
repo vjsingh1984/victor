@@ -169,7 +169,9 @@ class SharedToolRegistry:
 
         if airgapped_mode:
             return {
-                name: cls for name, cls in self._tool_classes.items() if name not in WEB_TOOL_NAMES
+                name: cls
+                for name, cls in self._tool_classes.items()
+                if name not in WEB_TOOL_NAMES
             }
 
         return self._tool_classes
@@ -340,7 +342,9 @@ class SharedToolRegistry:
         result: List[Any] = []
 
         # Add decorated tools (functions with @tool decorator)
-        for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
+        for name, func in self.get_decorated_tools(
+            airgapped_mode=airgapped_mode
+        ).items():
             result.append(func)
 
         # Add class-based tools (create fresh instances)

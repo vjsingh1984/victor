@@ -175,7 +175,10 @@ def validate_paths(settings: "Settings") -> ValidationResult:
         logger.debug(f"Could not validate config directory: {e}")
 
     # Validate codebase persist directory if specified
-    if hasattr(settings, "codebase_persist_directory") and settings.codebase_persist_directory:
+    if (
+        hasattr(settings, "codebase_persist_directory")
+        and settings.codebase_persist_directory
+    ):
         persist_path = Path(settings.codebase_persist_directory)
         if not persist_path.exists():
             try:
@@ -475,7 +478,9 @@ def format_validation_result(result: ValidationResult) -> str:
     if result.is_valid:
         lines.append("✓ Configuration is valid!")
     else:
-        lines.append(f"✗ Configuration validation failed ({result.error_count} error(s):")
+        lines.append(
+            f"✗ Configuration validation failed ({result.error_count} error(s):"
+        )
         lines.append("")
         for i, error in enumerate(result.errors, 1):
             lines.append(f"\n{i}. {error.message}")

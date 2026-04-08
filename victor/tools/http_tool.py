@@ -54,7 +54,9 @@ async def _make_request(
 
     start_time = time.time()
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects) as client:
+    async with httpx.AsyncClient(
+        timeout=timeout, follow_redirects=follow_redirects
+    ) as client:
         response = await client.request(
             method=method_upper,
             url=url,
@@ -102,7 +104,9 @@ async def _http_request(
         "status_code": response.status_code,
         "status": response.reason_phrase,
         "headers": dict(response.headers),
-        "body": result["response_json"] if result["response_json"] else response.text[:1000],
+        "body": (
+            result["response_json"] if result["response_json"] else response.text[:1000]
+        ),
         "duration_ms": int(result["duration"] * 1000),
         "url": str(response.url),
     }
@@ -223,7 +227,15 @@ async def http(
     try:
         if mode_lower == "request":
             return await _http_request(
-                method, url, headers, params, json, data, auth, follow_redirects, timeout
+                method,
+                url,
+                headers,
+                params,
+                json,
+                data,
+                auth,
+                follow_redirects,
+                timeout,
             )
         elif mode_lower == "test":
             return await _http_test(
@@ -239,7 +251,10 @@ async def http(
                 expected_status,
             )
         else:
-            return {"success": False, "error": f"Unknown mode '{mode}'. Use 'request' or 'test'."}
+            return {
+                "success": False,
+                "error": f"Unknown mode '{mode}'. Use 'request' or 'test'.",
+            }
 
     except httpx.TimeoutException:
         return {"success": False, "error": f"Request timed out after {timeout} seconds"}

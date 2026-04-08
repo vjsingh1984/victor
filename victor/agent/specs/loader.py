@@ -86,7 +86,9 @@ class AgentConfig:
             KeyError: If agent not found
         """
         if name not in self.agents:
-            raise KeyError(f"Agent '{name}' not found. Available: {list(self.agents.keys())}")
+            raise KeyError(
+                f"Agent '{name}' not found. Available: {list(self.agents.keys())}"
+            )
         return self.agents[name]
 
 

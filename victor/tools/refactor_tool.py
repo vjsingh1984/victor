@@ -196,7 +196,16 @@ def _collect_python_files(
         return files
 
     # Directories to skip
-    skip_dirs = {".git", ".venv", "venv", "__pycache__", "node_modules", ".tox", "build", "dist"}
+    skip_dirs = {
+        ".git",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+    }
 
     for item in path.iterdir():
         if item.name in skip_dirs:
@@ -208,7 +217,9 @@ def _collect_python_files(
             # Recurse into subdirectories based on scope
             if scope == "directory" and current_depth == 0:
                 # For "directory" scope, only go one level deep
-                sub_files = _collect_python_files(item, "file", depth, current_depth + 1)
+                sub_files = _collect_python_files(
+                    item, "file", depth, current_depth + 1
+                )
             else:
                 sub_files = _collect_python_files(item, scope, depth, current_depth + 1)
             files.extend(sub_files)
@@ -304,7 +315,11 @@ def _rename_in_file(
         "multi-file",
         "ast",
     ],
-    mandatory_keywords=["rename variable", "rename function", "refactor code"],  # Force inclusion
+    mandatory_keywords=[
+        "rename variable",
+        "rename function",
+        "refactor code",
+    ],  # Force inclusion
     task_types=["refactor", "edit"],  # Classification-aware selection
     stages=["execution"],  # Conversation stages where relevant
 )
@@ -360,7 +375,10 @@ async def rename(
         rename("helper", "util", path="lib/", scope="project", depth=2)
     """
     if not old_name or not new_name:
-        return {"success": False, "error": "Missing required parameters: old_name, new_name"}
+        return {
+            "success": False,
+            "error": "Missing required parameters: old_name, new_name",
+        }
 
     if old_name == new_name:
         return {"success": False, "error": "old_name and new_name must be different"}
@@ -380,9 +398,15 @@ async def rename(
         if not path_obj.exists():
             return {"success": False, "error": f"File not found: {path}"}
         if not path_obj.is_file():
-            return {"success": False, "error": f"Path must be a file for scope='file': {path}"}
+            return {
+                "success": False,
+                "error": f"Path must be a file for scope='file': {path}",
+            }
         if path_obj.suffix != ".py":
-            return {"success": False, "error": f"File must be a Python file (.py): {path}"}
+            return {
+                "success": False,
+                "error": f"File must be a Python file (.py): {path}",
+            }
     else:
         if not path_obj.exists():
             return {"success": False, "error": f"Directory not found: {path}"}
@@ -409,14 +433,19 @@ async def rename(
     require_def = scope == "file"
 
     for file_path in files:
-        result = _rename_in_file(file_path, old_name, new_name, require_definition=require_def)
+        result = _rename_in_file(
+            file_path, old_name, new_name, require_definition=require_def
+        )
         if result:
             all_file_changes.append(result)
             total_changes += len(result["changes"])
 
     if not all_file_changes:
         if scope == "file":
-            return {"success": False, "error": f"Symbol '{old_name}' not found in {path}"}
+            return {
+                "success": False,
+                "error": f"Symbol '{old_name}' not found in {path}",
+            }
         else:
             return {
                 "success": False,
@@ -467,7 +496,9 @@ async def rename(
 
         report.append("")
         if applied_count == len(all_file_changes):
-            report.append(f"{_get_icon('success')} All {applied_count} files updated successfully")
+            report.append(
+                f"{_get_icon('success')} All {applied_count} files updated successfully"
+            )
         else:
             report.append(
                 f"{_get_icon('warning')}  {applied_count}/{len(all_file_changes)} files updated (some failed)"
@@ -482,7 +513,11 @@ async def rename(
         "files_count": len(all_file_changes),
         "total_changes": total_changes,
         "file_changes": [
-            {"file": fc["file_path"], "changes_count": len(fc["changes"]), "changes": fc["changes"]}
+            {
+                "file": fc["file_path"],
+                "changes_count": len(fc["changes"]),
+                "changes": fc["changes"],
+            }
             for fc in all_file_changes
         ],
         "formatted_report": "\n".join(report),
@@ -546,7 +581,10 @@ async def extract(
 
     # Validate line numbers
     if start_line < 1 or end_line > len(lines) or start_line > end_line:
-        return {"success": False, "error": f"Invalid line range: {start_line}-{end_line}"}
+        return {
+            "success": False,
+            "error": f"Invalid line range: {start_line}-{end_line}",
+        }
 
     # Extract code block (0-indexed)
     extracted_lines = lines[start_line - 1 : end_line]
@@ -631,7 +669,9 @@ async def extract(
         report.append(f"{_get_icon('success')} Function extracted successfully")
     else:
         report.append("")
-        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
+        report.append(
+            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
+        )
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -672,7 +712,10 @@ async def inline(
         - error: Error message if failed
     """
     if not file or not variable_name:
-        return {"success": False, "error": "Missing required parameters: file, variable_name"}
+        return {
+            "success": False,
+            "error": "Missing required parameters: file, variable_name",
+        }
 
     file_obj = Path(file)
     if not file_obj.exists():
@@ -691,7 +734,10 @@ async def inline(
     assignment = _find_variable_assignment(tree, variable_name)
 
     if not assignment:
-        return {"success": False, "error": f"Simple assignment for '{variable_name}' not found"}
+        return {
+            "success": False,
+            "error": f"Simple assignment for '{variable_name}' not found",
+        }
 
     lines = content.split("\n")
 
@@ -764,7 +810,9 @@ async def inline(
         report.append(f"{_get_icon('success')} Variable inlined successfully")
     else:
         report.append("")
-        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
+        report.append(
+            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
+        )
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -893,7 +941,9 @@ async def organize_imports(
     # Keep docstring and initial comments
     docstring_end = 0
     for i, line in enumerate(lines):
-        if i == 0 and (line.strip().startswith('"""') or line.strip().startswith("'''")):
+        if i == 0 and (
+            line.strip().startswith('"""') or line.strip().startswith("'''")
+        ):
             # Module docstring
             new_lines.append(line)
             for j in range(i + 1, len(lines)):
@@ -944,7 +994,9 @@ async def organize_imports(
         report.append(f"{_get_icon('success')} Imports organized successfully")
     else:
         report.append("")
-        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
+        report.append(
+            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
+        )
         report.append("   Run with preview=False to apply changes")
 
     return {

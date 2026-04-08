@@ -20,7 +20,9 @@ class DuckDBGraphStore(GraphStoreProtocol):
         try:
             import duckdb  # type: ignore
         except Exception as exc:  # pragma: no cover - import guard
-            raise RuntimeError("duckdb must be installed to use DuckDBGraphStore") from exc
+            raise RuntimeError(
+                "duckdb must be installed to use DuckDBGraphStore"
+            ) from exc
 
         self.duckdb = duckdb
         self.db_path = Path(db_path)
@@ -128,7 +130,10 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 conn.close()
 
     async def get_neighbors(
-        self, node_id: str, edge_types: Optional[Iterable[str]] = None, max_depth: int = 1
+        self,
+        node_id: str,
+        edge_types: Optional[Iterable[str]] = None,
+        max_depth: int = 1,
     ) -> List[GraphEdge]:
         params: list[Any] = [node_id]
         type_clause = ""
@@ -155,7 +160,11 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 conn.close()
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]:
         clauses = []
         params: list[Any] = []

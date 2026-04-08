@@ -194,7 +194,9 @@ class ChainRegistry:
 
             logger.debug(f"Registered chain: {name}@{version} (category={category})")
 
-    def get_chain(self, name: str, version: Optional[str] = None) -> Optional["Runnable"]:
+    def get_chain(
+        self, name: str, version: Optional[str] = None
+    ) -> Optional["Runnable"]:
         """Get a chain by name and optional version.
 
         Args:

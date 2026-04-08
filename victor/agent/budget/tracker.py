@@ -25,7 +25,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from victor.agent.protocols import BudgetConfig, BudgetStatus, BudgetType, IBudgetTracker
+from victor.agent.protocols import (
+    BudgetConfig,
+    BudgetStatus,
+    BudgetType,
+    IBudgetTracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +102,9 @@ class BudgetTracker(IBudgetTracker):
             BudgetType.EXPLORATION: BudgetState(
                 current=0, base_maximum=self._config.base_exploration
             ),
-            BudgetType.ACTION: BudgetState(current=0, base_maximum=self._config.base_action),
+            BudgetType.ACTION: BudgetState(
+                current=0, base_maximum=self._config.base_action
+            ),
         }
 
     def get_status(self, budget_type: BudgetType) -> BudgetStatus:
@@ -123,7 +130,9 @@ class BudgetTracker(IBudgetTracker):
             )
             model_multiplier = self._multiplier_calculator.model_multiplier
             mode_multiplier = self._multiplier_calculator.mode_multiplier
-            productivity_multiplier = self._multiplier_calculator.productivity_multiplier
+            productivity_multiplier = (
+                self._multiplier_calculator.productivity_multiplier
+            )
         else:
             effective_max = state.base_maximum
             model_multiplier = 1.0

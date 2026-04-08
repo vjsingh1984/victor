@@ -425,7 +425,9 @@ class WorkflowRegistry:
             Dictionary representation
         """
         return {
-            "workflows": {name: workflow.to_dict() for name, workflow in self._definitions.items()},
+            "workflows": {
+                name: workflow.to_dict() for name, workflow in self._definitions.items()
+            },
             "factories": list(self._factories.keys()),
             "metadata": {name: meta.to_dict() for name, meta in self._metadata.items()},
         }

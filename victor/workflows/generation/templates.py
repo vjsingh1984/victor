@@ -150,7 +150,9 @@ class WorkflowTemplate:
 
         # Check keyword match (10% weight)
         description_lower = requirements.description.lower()
-        keyword_matches = sum(1 for kw in self.keywords if kw.lower() in description_lower)
+        keyword_matches = sum(
+            1 for kw in self.keywords if kw.lower() in description_lower
+        )
         keyword_score = keyword_matches / max(len(self.keywords), 1)
         score += keyword_score * 0.1
 
@@ -216,7 +218,9 @@ class TemplateLibrary:
                 best_template = template
 
         if best_score >= min_score:
-            logger.info(f"Template '{best_template.name}' matched with score {best_score:.2f}")
+            logger.info(
+                f"Template '{best_template.name}' matched with score {best_score:.2f}"
+            )
             return best_template
 
         logger.warning(f"No template matched minimum score {min_score}")
@@ -253,7 +257,9 @@ class TemplateLibrary:
         return schema
 
     def list_templates(
-        self, vertical: Optional[str] = None, template_type: Optional[TemplateType] = None
+        self,
+        vertical: Optional[str] = None,
+        template_type: Optional[TemplateType] = None,
     ) -> List[WorkflowTemplate]:
         """List available templates.
 
@@ -747,7 +753,9 @@ class TemplateLibrary:
         expected_placeholders = ["{workflow_name}", "{description}", "{topic}"]
         found_placeholders = [p for p in expected_placeholders if p in schema_str]
         if found_placeholders:
-            raise ValueError(f"Schema still contains placeholders: {set(found_placeholders)}")
+            raise ValueError(
+                f"Schema still contains placeholders: {set(found_placeholders)}"
+            )
 
 
 # =============================================================================

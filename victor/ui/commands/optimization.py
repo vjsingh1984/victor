@@ -229,10 +229,16 @@ async def _profile_async(
         click.echo("\nNo bottlenecks detected!")
 
     if workflow_profile.opportunities:
-        click.echo(f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):")
+        click.echo(
+            f"\nOptimization opportunities ({len(workflow_profile.opportunities)}):"
+        )
         for i, opportunity in enumerate(workflow_profile.opportunities[:5], 1):
-            click.echo(f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}")
-            click.echo(f"     Expected improvement: {opportunity.expected_improvement:.1%}")
+            click.echo(
+                f"  {i}. {opportunity.strategy_type.value}: {opportunity.target}"
+            )
+            click.echo(
+                f"     Expected improvement: {opportunity.expected_improvement:.1%}"
+            )
             click.echo(f"     Risk level: {opportunity.risk_level.value}")
             click.echo(f"     Confidence: {opportunity.confidence:.1%}")
     else:
@@ -277,16 +283,22 @@ async def _suggest_async(
 
     click.echo(f"\nFound {len(suggestions)} optimization suggestions:\n")
     for i, suggestion in enumerate(suggestions, 1):
-        click.echo(f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}")
+        click.echo(
+            f"{i}. {suggestion.strategy_type.value.upper()}: {suggestion.target}"
+        )
         click.echo(f"   Description: {suggestion.description}")
         click.echo(f"   Expected improvement: {suggestion.expected_improvement:.1%}")
         click.echo(f"   Risk level: {suggestion.risk_level.value}")
         click.echo(f"   Confidence: {suggestion.confidence:.1%}")
 
         if suggestion.estimated_cost_reduction > 0:
-            click.echo(f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}")
+            click.echo(
+                f"   Estimated cost reduction: ${suggestion.estimated_cost_reduction:.4f}"
+            )
         if suggestion.estimated_duration_reduction > 0:
-            click.echo(f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s")
+            click.echo(
+                f"   Estimated time saved: {suggestion.estimated_duration_reduction:.2f}s"
+            )
         click.echo()
 
     if output:

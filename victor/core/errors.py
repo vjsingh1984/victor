@@ -675,11 +675,16 @@ class ErrorHandler:
             original_exception=type(exception).__name__,
         )
 
-    def _categorize_exception(self, exception: Exception) -> tuple[ErrorCategory, Optional[str]]:
+    def _categorize_exception(
+        self, exception: Exception
+    ) -> tuple[ErrorCategory, Optional[str]]:
         """Categorize a standard exception and provide recovery hint."""
         # File errors
         if isinstance(exception, (FileNotFoundError, builtins_FileNotFoundError)):
-            return ErrorCategory.FILE_NOT_FOUND, "Check if the file exists and path is correct."
+            return (
+                ErrorCategory.FILE_NOT_FOUND,
+                "Check if the file exists and path is correct.",
+            )
 
         if isinstance(exception, PermissionError):
             return ErrorCategory.FILE_PERMISSION, "Check file permissions."
@@ -693,7 +698,10 @@ class ErrorHandler:
             return ErrorCategory.VALIDATION_ERROR, "Check input values and types."
 
         if isinstance(exception, KeyError):
-            return ErrorCategory.CONFIG_MISSING, "Check that required configuration is set."
+            return (
+                ErrorCategory.CONFIG_MISSING,
+                "Check that required configuration is set.",
+            )
 
         # Default
         return ErrorCategory.UNKNOWN, None

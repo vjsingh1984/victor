@@ -215,7 +215,9 @@ class DashboardDataProvider:
 
         return data
 
-    def _aggregate_token_metrics(self, metrics: AgentMetrics, data: DashboardData) -> None:
+    def _aggregate_token_metrics(
+        self, metrics: AgentMetrics, data: DashboardData
+    ) -> None:
         """Aggregate token metrics.
 
         Args:
@@ -257,7 +259,9 @@ class DashboardDataProvider:
             "reasoning": metrics.total_reasoning_tokens,
         }
 
-    def _aggregate_tool_metrics(self, metrics: AgentMetrics, data: DashboardData) -> None:
+    def _aggregate_tool_metrics(
+        self, metrics: AgentMetrics, data: DashboardData
+    ) -> None:
         """Aggregate tool metrics.
 
         Args:
@@ -325,7 +329,9 @@ class DashboardDataProvider:
             "by_tool": per_tool,
         }
 
-    def _aggregate_llm_metrics(self, metrics: AgentMetrics, data: DashboardData) -> None:
+    def _aggregate_llm_metrics(
+        self, metrics: AgentMetrics, data: DashboardData
+    ) -> None:
         """Aggregate LLM metrics.
 
         Args:
@@ -396,7 +402,9 @@ class DashboardDataProvider:
             "by_model": per_model,
         }
 
-    def _aggregate_performance_metrics(self, metrics: AgentMetrics, data: DashboardData) -> None:
+    def _aggregate_performance_metrics(
+        self, metrics: AgentMetrics, data: DashboardData
+    ) -> None:
         """Aggregate performance metrics.
 
         Args:

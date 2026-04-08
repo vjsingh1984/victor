@@ -130,7 +130,9 @@ class MemoryResult:
         """Generate ID if not provided."""
         if not self.id:
             content_str = str(self.content)[:100]
-            self.id = hashlib.md5(f"{self.source.name}:{content_str}".encode()).hexdigest()[:16]
+            self.id = hashlib.md5(
+                f"{self.source.name}:{content_str}".encode()
+            ).hexdigest()[:16]
 
     def __repr__(self) -> str:
         return (
@@ -314,7 +316,9 @@ class RelevanceRankingStrategy:
 
         # Filter by min relevance
         if query.min_relevance > 0:
-            sorted_results = [r for r in sorted_results if r.relevance >= query.min_relevance]
+            sorted_results = [
+                r for r in sorted_results if r.relevance >= query.min_relevance
+            ]
 
         return sorted_results[:limit]
 
@@ -396,7 +400,9 @@ class HybridRankingStrategy:
         scored_results = []
         for r in unique_results:
             recency = self._recency_score(r.timestamp)
-            combined = self.relevance_weight * r.relevance + self.recency_weight * recency
+            combined = (
+                self.relevance_weight * r.relevance + self.recency_weight * recency
+            )
             scored_results.append((combined, r))
 
         # Sort by combined score
@@ -569,7 +575,8 @@ class UnifiedMemoryCoordinator:
 
         # Parallel search
         search_tasks = [
-            self._search_provider(provider, memory_query) for provider in target_providers
+            self._search_provider(provider, memory_query)
+            for provider in target_providers
         ]
 
         results_lists = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -579,7 +586,9 @@ class UnifiedMemoryCoordinator:
         for i, results in enumerate(results_lists):
             if isinstance(results, Exception):
                 self._error_count += 1
-                logger.warning(f"Provider {target_providers[i].memory_type.name} failed: {results}")
+                logger.warning(
+                    f"Provider {target_providers[i].memory_type.name} failed: {results}"
+                )
             else:
                 all_results.extend(results)
 

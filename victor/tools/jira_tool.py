@@ -69,7 +69,12 @@ def is_jira_configured(context: Optional[Dict[str, Any]] = None) -> bool:
     task_types=["action", "search"],
     execution_category="network",
     keywords=["jira", "issue", "ticket", "bug", "task", "sprint", "backlog", "story"],
-    mandatory_keywords=["search issues", "find tickets", "create ticket", "jira search"],
+    mandatory_keywords=[
+        "search issues",
+        "find tickets",
+        "create ticket",
+        "jira search",
+    ],
 )
 async def jira(
     operation: str,
@@ -124,7 +129,9 @@ async def jira(
                     "key": issue.key,
                     "summary": issue.fields.summary,
                     "status": issue.fields.status.name,
-                    "assignee": getattr(issue.fields.assignee, "displayName", "Unassigned"),
+                    "assignee": getattr(
+                        issue.fields.assignee, "displayName", "Unassigned"
+                    ),
                     "priority": getattr(issue.fields.priority, "name", "None"),
                 }
                 for issue in issues
@@ -137,7 +144,9 @@ async def jira(
                     "success": False,
                     "error": "Missing required parameters: project and summary",
                 }
-            logger.info(f"[jira] Creating issue in project '{project}' with summary '{summary}'")
+            logger.info(
+                f"[jira] Creating issue in project '{project}' with summary '{summary}'"
+            )
             issue_dict: Dict[str, Any] = {
                 "project": {"key": project},
                 "summary": summary,
@@ -151,13 +160,18 @@ async def jira(
                 "key": new_issue.key,
                 "summary": new_issue.fields.summary,
                 "url": (
-                    f"{context.get('jira_server', '')}/browse/{new_issue.key}" if context else ""
+                    f"{context.get('jira_server', '')}/browse/{new_issue.key}"
+                    if context
+                    else ""
                 ),
             }
 
         elif operation == "get_issue":
             if not issue_key:
-                return {"success": False, "error": "Missing required parameter: issue_key"}
+                return {
+                    "success": False,
+                    "error": "Missing required parameter: issue_key",
+                }
             logger.info(f"[jira] Getting issue '{issue_key}'")
             issue = jira_client.issue(issue_key)
             comments = []
@@ -168,7 +182,9 @@ async def jira(
                         "body": comment.body,
                         "created": str(comment.created),
                     }
-                    for comment in issue.fields.comment.comments[:5]  # Limit to 5 most recent
+                    for comment in issue.fields.comment.comments[
+                        :5
+                    ]  # Limit to 5 most recent
                 ]
             return {
                 "success": True,
@@ -180,7 +196,11 @@ async def jira(
                 "reporter": getattr(issue.fields.reporter, "displayName", "Unknown"),
                 "priority": getattr(issue.fields.priority, "name", "None"),
                 "comments": comments,
-                "url": f"{context.get('jira_server', '')}/browse/{issue.key}" if context else "",
+                "url": (
+                    f"{context.get('jira_server', '')}/browse/{issue.key}"
+                    if context
+                    else ""
+                ),
             }
 
         elif operation == "add_comment":

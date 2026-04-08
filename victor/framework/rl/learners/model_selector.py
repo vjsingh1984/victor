@@ -70,7 +70,9 @@ class ModelSelectorLearner(BaseLearner):
     """
 
     # Mock/test providers to exclude from Q-table
-    MOCK_PROVIDERS = frozenset({"mock", "mock_provider", "dummy", "dummy-stream", "test"})
+    MOCK_PROVIDERS = frozenset(
+        {"mock", "mock_provider", "dummy", "dummy-stream", "test"}
+    )
 
     # Warm-up threshold: use higher learning rate until this many real selections
     WARMUP_THRESHOLD = 100
@@ -203,7 +205,9 @@ class ModelSelectorLearner(BaseLearner):
                 self._total_selections = int(stats["value"])
 
         if self._q_table:
-            logger.info(f"RL: Loaded {len(self._q_table)} provider Q-values from database")
+            logger.info(
+                f"RL: Loaded {len(self._q_table)} provider Q-values from database"
+            )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record model selection outcome and update Q-values.
@@ -249,7 +253,9 @@ class ModelSelectorLearner(BaseLearner):
                 self._task_selection_counts[provider] = {}
 
             old_task_q = self._q_table_by_task[provider].get(task_type, 0.5)
-            new_task_q = max(0.0, min(1.0, old_task_q + effective_lr * (reward - old_task_q)))
+            new_task_q = max(
+                0.0, min(1.0, old_task_q + effective_lr * (reward - old_task_q))
+            )
 
             self._q_table_by_task[provider][task_type] = new_task_q
             self._task_selection_counts[provider][task_type] = (
@@ -267,7 +273,9 @@ class ModelSelectorLearner(BaseLearner):
             f"(reward={reward:.3f}, count={self._selection_counts[provider]})"
         )
 
-    def _save_to_db(self, provider: str, task_type: Optional[str], timestamp: str) -> None:
+    def _save_to_db(
+        self, provider: str, task_type: Optional[str], timestamp: str
+    ) -> None:
         """Save Q-values and state to database."""
         cursor = self.db.cursor()
 
@@ -357,7 +365,9 @@ class ModelSelectorLearner(BaseLearner):
         """
         # Parse available providers from provider param
         try:
-            available_providers = json.loads(provider) if isinstance(provider, str) else [provider]
+            available_providers = (
+                json.loads(provider) if isinstance(provider, str) else [provider]
+            )
         except (json.JSONDecodeError, TypeError):
             available_providers = [provider]
 
@@ -372,13 +382,17 @@ class ModelSelectorLearner(BaseLearner):
 
         # Select provider using configured strategy
         if self.strategy == SelectionStrategy.EPSILON_GREEDY:
-            selected, reason = self._select_epsilon_greedy(available_providers, task_type)
+            selected, reason = self._select_epsilon_greedy(
+                available_providers, task_type
+            )
         elif self.strategy == SelectionStrategy.UCB:
             selected, reason = self._select_ucb(available_providers, task_type)
         elif self.strategy == SelectionStrategy.EXPLOIT_ONLY:
             selected, reason = self._select_exploit(available_providers, task_type)
         else:
-            selected, reason = self._select_epsilon_greedy(available_providers, task_type)
+            selected, reason = self._select_epsilon_greedy(
+                available_providers, task_type
+            )
 
         q_value = self._get_q_value(selected, task_type)
         count = self._selection_counts.get(selected, 0)
@@ -415,7 +429,9 @@ class ModelSelectorLearner(BaseLearner):
             reason += f" [task={task_type}]"
         return best_provider, reason
 
-    def _select_ucb(self, providers: List[str], task_type: Optional[str] = None) -> Tuple[str, str]:
+    def _select_ucb(
+        self, providers: List[str], task_type: Optional[str] = None
+    ) -> Tuple[str, str]:
         """Select using Upper Confidence Bound (UCB) strategy."""
         if self._total_selections == 0:
             return random.choice(providers), "No history, random selection"
@@ -427,7 +443,9 @@ class ModelSelectorLearner(BaseLearner):
             q_value = self._get_q_value(p, task_type)
             count = self._selection_counts.get(p, 0)
             ucb_scores[p] = (
-                float("inf") if count == 0 else q_value + self.ucb_c * math.sqrt(log_total / count)
+                float("inf")
+                if count == 0
+                else q_value + self.ucb_c * math.sqrt(log_total / count)
             )
 
         best_provider = max(providers, key=lambda p: ucb_scores[p])
@@ -489,7 +507,9 @@ class ModelSelectorLearner(BaseLearner):
             List of provider stats sorted by Q-value descending
         """
         rankings = []
-        log_total = math.log(self._total_selections + 1) if self._total_selections > 0 else 0
+        log_total = (
+            math.log(self._total_selections + 1) if self._total_selections > 0 else 0
+        )
 
         for provider, q_value in self._q_table.items():
             count = self._selection_counts.get(provider, 0)

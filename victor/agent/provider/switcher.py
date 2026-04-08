@@ -176,7 +176,11 @@ class ProviderSwitcher(IProviderSwitcher):
         """
         try:
             # Get provider settings if not provided
-            if not provider_kwargs and settings and hasattr(settings, "get_provider_settings"):
+            if (
+                not provider_kwargs
+                and settings
+                and hasattr(settings, "get_provider_settings")
+            ):
                 provider_kwargs = settings.get_provider_settings(provider_name)
 
             # Create new provider
@@ -186,7 +190,9 @@ class ProviderSwitcher(IProviderSwitcher):
             if self._health_monitor:
                 is_healthy = await self._health_monitor.check_health(new_provider)
                 if not is_healthy:
-                    logger.warning(f"Provider {provider_name} failed health check, aborting switch")
+                    logger.warning(
+                        f"Provider {provider_name} failed health check, aborting switch"
+                    )
                     return False
 
             # Store old state for switch tracking
@@ -211,7 +217,11 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
+                reason=(
+                    SwitchReason.USER_REQUEST
+                    if reason == "manual"
+                    else SwitchReason.FALLBACK
+                ),
                 metadata={
                     "from_provider": old_provider,
                     "from_model": old_model,
@@ -289,7 +299,11 @@ class ProviderSwitcher(IProviderSwitcher):
             self._model_switcher.switch(
                 provider=self._current_state.provider_name,
                 model=model,
-                reason=SwitchReason.USER_REQUEST if reason == "manual" else SwitchReason.FALLBACK,
+                reason=(
+                    SwitchReason.USER_REQUEST
+                    if reason == "manual"
+                    else SwitchReason.FALLBACK
+                ),
                 metadata={"from_model": old_model},
             )
 

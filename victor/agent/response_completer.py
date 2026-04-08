@@ -57,7 +57,8 @@ class CompletionConfig:
     max_recovery_attempts: int = 3
     force_response_on_error: bool = True
     error_response_template: str = (
-        "I encountered an issue: {error}\n\n" "Based on what I found before the error:\n{context}"
+        "I encountered an issue: {error}\n\n"
+        "Based on what I found before the error:\n{context}"
     )
 
 
@@ -140,7 +141,10 @@ class ResponseCompleter:
             CompletionResult with status and content
         """
         # If we already have sufficient content, return it
-        if current_content and len(current_content.strip()) >= self.config.min_response_length:
+        if (
+            current_content
+            and len(current_content.strip()) >= self.config.min_response_length
+        ):
             return CompletionResult(
                 status=CompletionStatus.SUCCESS,
                 content=current_content,
@@ -193,12 +197,16 @@ class ResponseCompleter:
             )
 
         if failure_context.files_examined:
-            context_parts.append(f"Files examined: {', '.join(failure_context.files_examined[:5])}")
+            context_parts.append(
+                f"Files examined: {', '.join(failure_context.files_examined[:5])}"
+            )
 
         if failure_context.partial_results:
             context_parts.append("Partial results were obtained before the failure.")
 
-        context = "\n".join(context_parts) if context_parts else "No prior results available."
+        context = (
+            "\n".join(context_parts) if context_parts else "No prior results available."
+        )
 
         # Build error description
         error_descriptions = []
@@ -218,7 +226,9 @@ class ResponseCompleter:
         )
 
         # Create modified messages with error prompt
-        modified_messages = list(messages) + [Message(role="system", content=error_prompt)]
+        modified_messages = list(messages) + [
+            Message(role="system", content=error_prompt)
+        ]
 
         # Generate response
         try:
@@ -292,7 +302,9 @@ class ResponseCompleter:
                 modified_messages.append(
                     Message(
                         role="system",
-                        content=recovery_prompts[min(attempt - 1, len(recovery_prompts) - 1)],
+                        content=recovery_prompts[
+                            min(attempt - 1, len(recovery_prompts) - 1)
+                        ],
                     )
                 )
 
@@ -355,7 +367,9 @@ class ResponseCompleter:
             )
 
         if failure_context.files_examined:
-            parts.append(f"\nFiles examined: {', '.join(failure_context.files_examined[:5])}")
+            parts.append(
+                f"\nFiles examined: {', '.join(failure_context.files_examined[:5])}"
+            )
 
         return "\n".join(parts)
 
@@ -446,7 +460,10 @@ class AgenticLoop:
             return False, "complete_response"
 
         # Stop if too many failures
-        if len(failure_context.failed_tools) >= self.config.force_response_after_failures:
+        if (
+            len(failure_context.failed_tools)
+            >= self.config.force_response_after_failures
+        ):
             return False, "too_many_failures"
 
         # Continue if there are tool calls to process

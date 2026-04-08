@@ -23,7 +23,9 @@ from victor.config.secure_paths import (
 )
 from victor.config.api_keys import is_keyring_available, get_configured_providers
 
-security_app = typer.Typer(name="security", help="Security status and plugin trust management.")
+security_app = typer.Typer(
+    name="security", help="Security status and plugin trust management."
+)
 console = Console()
 
 
@@ -37,7 +39,9 @@ def security(
     untrust_plugin: Optional[str] = typer.Option(
         None, "--untrust-plugin", help="Remove plugin from trust store"
     ),
-    list_plugins: bool = typer.Option(False, "--list-plugins", "-l", help="List trusted plugins"),
+    list_plugins: bool = typer.Option(
+        False, "--list-plugins", "-l", help="List trusted plugins"
+    ),
     verify_cache: bool = typer.Option(
         False, "--verify-cache", help="Verify embedding cache integrity"
     ),
@@ -96,7 +100,9 @@ def _list_plugins():
     table.add_column("Path")
 
     for plugin in plugins:
-        table.add_row(plugin["name"], plugin.get("hash", "")[:16] + "...", plugin.get("path", ""))
+        table.add_row(
+            plugin["name"], plugin.get("hash", "")[:16] + "...", plugin.get("path", "")
+        )
 
     console.print(table)
 
@@ -144,7 +150,9 @@ def _verify_all():
     if str(secure_home) == env_home:
         console.print("   [green]✓ HOME environment matches passwd database[/]")
     else:
-        console.print(f"   [yellow]⚠ HOME differs: env={env_home}, passwd={secure_home}[/]")
+        console.print(
+            f"   [yellow]⚠ HOME differs: env={env_home}, passwd={secure_home}[/]"
+        )
         issues.append("HOME environment may be manipulated")
 
     # 2. VICTOR_DIR_NAME validation
@@ -170,7 +178,9 @@ def _verify_all():
     if is_keyring_available():
         console.print("   [green]✓ System keyring is available[/]")
     else:
-        console.print("   [yellow]⚠ System keyring not available (install keyring package)[/]")
+        console.print(
+            "   [yellow]⚠ System keyring not available (install keyring package)[/]"
+        )
         issues.append("Keyring not installed - API keys stored in plaintext file")
 
     # 5. Cache integrity
@@ -181,7 +191,9 @@ def _verify_all():
         if is_valid:
             console.print("   [green]✓ Embeddings cache integrity verified[/]")
         else:
-            console.print(f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]")
+            console.print(
+                f"   [red]✗ Cache integrity failed: {len(tampered)} tampered files[/]"
+            )
             all_passed = False
             issues.append(f"Cache tampering detected: {len(tampered)} files modified")
     else:
@@ -245,14 +257,20 @@ def _status():
 
     # Home security
     table.add_row(
-        "Home Validation", "[green]✓ Secure[/]", sec_status["home_security"]["secure_home"]
+        "Home Validation",
+        "[green]✓ Secure[/]",
+        sec_status["home_security"]["secure_home"],
     )
 
     # Keyring
     if sec_status["keyring"]["available"]:
-        table.add_row("System Keyring", "[green]✓ Available[/]", sec_status["keyring"]["backend"])
+        table.add_row(
+            "System Keyring", "[green]✓ Available[/]", sec_status["keyring"]["backend"]
+        )
     else:
-        table.add_row("System Keyring", "[yellow]Not installed[/]", "pip install keyring")
+        table.add_row(
+            "System Keyring", "[yellow]Not installed[/]", "pip install keyring"
+        )
 
     # API keys
     configured = get_configured_providers()
@@ -272,7 +290,9 @@ def _status():
 
     # Cache integrity
     if sec_status["cache_integrity"]["embeddings_verified"]:
-        table.add_row("Cache Integrity", "[green]✓ Verified[/]", "Embeddings cache valid")
+        table.add_row(
+            "Cache Integrity", "[green]✓ Verified[/]", "Embeddings cache valid"
+        )
     else:
         table.add_row("Cache Integrity", "[dim]Not verified[/]", "Run --verify-cache")
 

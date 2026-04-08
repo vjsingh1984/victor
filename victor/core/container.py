@@ -136,7 +136,9 @@ class ServiceScope:
             ScopeDisposedError: If scope has been disposed
         """
         if self._disposed:
-            raise ScopeDisposedError(f"Scope has been disposed, cannot resolve {service_type}")
+            raise ScopeDisposedError(
+                f"Scope has been disposed, cannot resolve {service_type}"
+            )
 
         descriptor = self._parent._get_descriptor(service_type)
 
@@ -147,7 +149,9 @@ class ServiceScope:
         if descriptor.lifetime == ServiceLifetime.SCOPED:
             with self._lock:
                 if service_type not in self._scoped_instances:
-                    self._scoped_instances[service_type] = descriptor.create_instance(self._parent)
+                    self._scoped_instances[service_type] = descriptor.create_instance(
+                        self._parent
+                    )
                 return self._scoped_instances[service_type]
 
         # Transient - always create new
@@ -181,7 +185,11 @@ class ServiceNotFoundError(Exception):
     def __init__(self, service_type: Type):
         self.service_type = service_type
         # Handle both Type objects and string service names
-        name = service_type.__name__ if hasattr(service_type, "__name__") else str(service_type)
+        name = (
+            service_type.__name__
+            if hasattr(service_type, "__name__")
+            else str(service_type)
+        )
         super().__init__(f"Service not registered: {name}")
 
 
@@ -264,11 +272,15 @@ class ServiceContainer:
                 factory=factory,
                 lifetime=lifetime,
             )
-            logger.debug(f"Registered {service_type.__name__} with {lifetime.value} lifetime")
+            logger.debug(
+                f"Registered {service_type.__name__} with {lifetime.value} lifetime"
+            )
 
         return self
 
-    def register_instance(self, service_type: Type[T], instance: T) -> "ServiceContainer":
+    def register_instance(
+        self, service_type: Type[T], instance: T
+    ) -> "ServiceContainer":
         """Register an existing instance as a singleton.
 
         Args:
@@ -315,7 +327,9 @@ class ServiceContainer:
             # Dispose existing singleton if present
             if service_type in self._descriptors:
                 existing = self._descriptors[service_type]
-                if existing.instance is not None and isinstance(existing.instance, Disposable):
+                if existing.instance is not None and isinstance(
+                    existing.instance, Disposable
+                ):
                     try:
                         existing.instance.dispose()
                     except Exception as e:
@@ -326,7 +340,9 @@ class ServiceContainer:
                 factory=factory,
                 lifetime=lifetime,
             )
-            logger.debug(f"Replaced {service_type.__name__} with {lifetime.value} lifetime")
+            logger.debug(
+                f"Replaced {service_type.__name__} with {lifetime.value} lifetime"
+            )
 
         return self
 
@@ -520,7 +536,9 @@ class ServiceContainer:
                 try:
                     return bool(instance.is_healthy())
                 except Exception as e:
-                    logger.warning(f"Health check for {service_type.__name__} failed: {e}")
+                    logger.warning(
+                        f"Health check for {service_type.__name__} failed: {e}"
+                    )
                     return False
 
             # No is_healthy method, consider service healthy if it exists
@@ -558,7 +576,9 @@ class ServiceContainer:
         self._disposed = True
         with self._lock:
             for descriptor in self._descriptors.values():
-                if descriptor.instance is not None and isinstance(descriptor.instance, Disposable):
+                if descriptor.instance is not None and isinstance(
+                    descriptor.instance, Disposable
+                ):
                     try:
                         descriptor.instance.dispose()
                     except Exception as e:
@@ -630,11 +650,15 @@ def reset_container() -> None:
 class MetricsServiceProtocol(Protocol):
     """Protocol for metrics collection services."""
 
-    def record_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def record_metric(
+        self, name: str, value: float, tags: Optional[Dict[str, str]] = None
+    ) -> None:
         """Record a metric value."""
         ...
 
-    def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
+    def increment_counter(
+        self, name: str, tags: Optional[Dict[str, str]] = None
+    ) -> None:
         """Increment a counter metric."""
         ...
 

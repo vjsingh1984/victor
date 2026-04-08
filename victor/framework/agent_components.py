@@ -68,7 +68,9 @@ logger = logging.getLogger(__name__)
 class AgentProtocol(Protocol):
     """Protocol defining the core Agent interface."""
 
-    async def run(self, prompt: str, *, context: Optional[Dict[str, Any]] = None) -> TaskResult:
+    async def run(
+        self, prompt: str, *, context: Optional[Dict[str, Any]] = None
+    ) -> TaskResult:
         """Run a task and return the result."""
         ...
 
@@ -331,7 +333,9 @@ class AgentBuilder:
             Self for chaining
         """
         if not 0.0 <= value <= 2.0:
-            raise ConfigurationError(f"Temperature must be between 0.0 and 2.0, got {value}")
+            raise ConfigurationError(
+                f"Temperature must be between 0.0 and 2.0, got {value}"
+            )
         self._options.temperature = value
         return self
 
@@ -638,7 +642,9 @@ class AgentBuilder:
         self._options.state_hooks["on_exit"] = callback
         return self
 
-    def on_transition(self, callback: Callable[[str, str, Dict], None]) -> "AgentBuilder":
+    def on_transition(
+        self, callback: Callable[[str, str, Dict], None]
+    ) -> "AgentBuilder":
         """Register callback for state transitions.
 
         Args:
@@ -774,14 +780,18 @@ class AgentBuilder:
             # Re-configure tools with filters applied
             if self._options.tools is not None:
                 if isinstance(self._options.tools, ToolSet):
-                    configurator.configure_from_toolset(orchestrator, self._options.tools)
+                    configurator.configure_from_toolset(
+                        orchestrator, self._options.tools
+                    )
                 else:
                     from victor.framework.tool_config import ToolConfigMode
 
                     configurator.configure(
                         orchestrator, set(self._options.tools), ToolConfigMode.REPLACE
                     )
-            logger.debug("Applied %d tool filters via container", len(self._tool_filters))
+            logger.debug(
+                "Applied %d tool filters via container", len(self._tool_filters)
+            )
         else:
             # Fallback: Direct filter application
             from victor.framework.tool_config import get_tool_configurator
@@ -792,14 +802,18 @@ class AgentBuilder:
 
             if self._options.tools is not None:
                 if isinstance(self._options.tools, ToolSet):
-                    configurator.configure_from_toolset(orchestrator, self._options.tools)
+                    configurator.configure_from_toolset(
+                        orchestrator, self._options.tools
+                    )
                 else:
                     from victor.framework.tool_config import ToolConfigMode
 
                     configurator.configure(
                         orchestrator, set(self._options.tools), ToolConfigMode.REPLACE
                     )
-            logger.debug("Applied %d tool filters via fallback", len(self._tool_filters))
+            logger.debug(
+                "Applied %d tool filters via fallback", len(self._tool_filters)
+            )
 
 
 # =============================================================================

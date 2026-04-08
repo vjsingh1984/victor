@@ -23,7 +23,14 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from victor.integrations.api.graph_export import get_execution_state
@@ -65,7 +72,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             for node in workflow_def.nodes.values()
                         ],
                         "tags": workflow_def.metadata.get("tags", []),
-                        "estimated_duration": workflow_def.metadata.get("estimated_duration"),
+                        "estimated_duration": workflow_def.metadata.get(
+                            "estimated_duration"
+                        ),
                     }
                 )
 
@@ -110,7 +119,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             )
 
         except ImportError:
-            return JSONResponse({"error": "Workflows module not available"}, status_code=404)
+            return JSONResponse(
+                {"error": "Workflows module not available"}, status_code=404
+            )
         except Exception:
             logger.exception("Failed to get workflow template")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
@@ -180,7 +191,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
 
                     if execution_id in server._workflow_executions:
                         exec_state = server._workflow_executions[execution_id]
-                        exec_state["status"] = "completed" if result.success else "failed"
+                        exec_state["status"] = (
+                            "completed" if result.success else "failed"
+                        )
                         exec_state["end_time"] = time.time()
                         exec_state["progress"] = 100
                         exec_state["output"] = (
@@ -190,7 +203,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                         for step in exec_state["steps"]:
                             node_result = result.node_results.get(step["id"])
                             if node_result:
-                                step["status"] = "completed" if node_result.success else "failed"
+                                step["status"] = (
+                                    "completed" if node_result.success else "failed"
+                                )
                                 step["duration"] = (
                                     node_result.duration_ms / 1000
                                     if node_result.duration_ms
@@ -201,7 +216,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             {
                                 "type": "agent_event",
                                 "event": (
-                                    "workflow_completed" if result.success else "workflow_failed"
+                                    "workflow_completed"
+                                    if result.success
+                                    else "workflow_failed"
                                 ),
                                 "data": exec_state,
                                 "timestamp": time.time(),
@@ -236,7 +253,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             )
 
         except ImportError:
-            return JSONResponse({"error": "Workflows module not available"}, status_code=500)
+            return JSONResponse(
+                {"error": "Workflows module not available"}, status_code=500
+            )
         except Exception:
             logger.exception("Failed to execute workflow")
             return JSONResponse({"error": "Internal server error"}, status_code=500)
@@ -311,7 +330,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Failed to get graph for workflow {workflow_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to export graph: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to export graph: {str(e)}"
+            )
 
     @router.get("/workflows/{workflow_id}/execution")
     async def get_workflow_execution_status(workflow_id: str) -> JSONResponse:
@@ -341,7 +362,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         await websocket.accept()
 
         if not server._workflow_event_bridge:
-            await websocket.close(code=1011, reason="Workflow event bridge not initialized")
+            await websocket.close(
+                code=1011, reason="Workflow event bridge not initialized"
+            )
             return
 
         try:
@@ -361,7 +384,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
     async def visualize_workflow(workflow_id: str) -> HTMLResponse:
         """Serve HTML page with interactive workflow visualization."""
         try:
-            template_path = Path(__file__).parent.parent / "templates" / "workflow_visualizer.html"
+            template_path = (
+                Path(__file__).parent.parent / "templates" / "workflow_visualizer.html"
+            )
 
             if not template_path.exists():
                 html_content = f"""

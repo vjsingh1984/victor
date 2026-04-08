@@ -185,4 +185,6 @@ def is_legacy_vertical(cls: Type) -> bool:
         >>> is_legacy_vertical(LegacyAssistant)  # No decorator
         True
     """
-    return not hasattr(cls, "_victor_manifest") and not (hasattr(cls, "name") and cls.name)
+    return not hasattr(cls, "_victor_manifest") and not (
+        hasattr(cls, "name") and cls.name
+    )

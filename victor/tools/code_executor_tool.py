@@ -168,7 +168,9 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
         )
         for container in containers:
             try:
-                logger.info(f"Removing orphaned sandbox container: {container.short_id}")
+                logger.info(
+                    f"Removing orphaned sandbox container: {container.short_id}"
+                )
                 container.remove(force=True)
                 cleaned += 1
             except Exception as e:

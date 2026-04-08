@@ -133,7 +133,9 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     think_pattern = r"<think>(.*?)</think>"
     matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
     thinking = "\n".join(matches) if matches else ""
-    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+    content = re.sub(
+        think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE
+    ).strip()
     return (thinking, content)
 
 
@@ -162,7 +164,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     planning_keywords = {"complexity", "steps", "desc", "duration"}
 
     # Pattern 1: JSON code block with tool call
-    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
+    json_block_pattern = (
+        r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
+    )
     matches = re.findall(json_block_pattern, content, re.DOTALL)
     for match in matches:
         try:
@@ -205,7 +209,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
                         }
                     )
                     remaining = re.sub(
-                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
+                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>",
+                        "",
+                        remaining,
                     )
         except json.JSONDecodeError:
             pass
@@ -269,7 +275,11 @@ class VLLMProvider(BaseProvider):
         self._provider_logger = ProviderLogger("vllm", __name__)
 
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.base_url = base_url or DEFAULT_VLLM_URLS[0]
         self.timeout = timeout
@@ -321,10 +331,14 @@ class VLLMProvider(BaseProvider):
                     data = response.json()
                     if data.get("data"):
                         provider._available_model = data["data"][0].get("id")
-                    provider._provider_logger.logger.info(f"Connected to vLLM server at {url}")
+                    provider._provider_logger.logger.info(
+                        f"Connected to vLLM server at {url}"
+                    )
                     return provider
             except Exception as e:
-                provider._provider_logger.logger.debug(f"vLLM not available at {url}: {e}")
+                provider._provider_logger.logger.debug(
+                    f"vLLM not available at {url}: {e}"
+                )
                 continue
 
         raise ProviderConnectionError(
@@ -453,12 +467,17 @@ class VLLMProvider(BaseProvider):
                 if response.status_code != 200:
                     error_data = response.json() if response.content else {}
                     error_msg = (
-                        error_data.get("detail") or error_data.get("message") or response.text
+                        error_data.get("detail")
+                        or error_data.get("message")
+                        or response.text
                     )
                     raise ProviderError(
                         message=f"vLLM API error: {error_msg}",
                         provider="vllm",
-                        details={"status_code": response.status_code, "response": error_data},
+                        details={
+                            "status_code": response.status_code,
+                            "response": error_data,
+                        },
                     )
 
                 result = response.json()
@@ -624,17 +643,21 @@ class VLLMProvider(BaseProvider):
                                         accumulated_tool_calls[idx]["id"] = tc["id"]
                                     func = tc.get("function", {})
                                     if "name" in func:
-                                        accumulated_tool_calls[idx]["name"] = func["name"]
-                                    if "arguments" in func:
-                                        accumulated_tool_calls[idx]["arguments"] += func[
-                                            "arguments"
+                                        accumulated_tool_calls[idx]["name"] = func[
+                                            "name"
                                         ]
+                                    if "arguments" in func:
+                                        accumulated_tool_calls[idx][
+                                            "arguments"
+                                        ] += func["arguments"]
 
                             # Final chunk
                             if finish_reason:
                                 final_content = accumulated_content
                                 if uses_thinking_tags and final_content:
-                                    _, final_content = _extract_thinking_content(final_content)
+                                    _, final_content = _extract_thinking_content(
+                                        final_content
+                                    )
 
                                 # Parse accumulated tool calls
                                 parsed_tool_calls = None
@@ -659,8 +682,8 @@ class VLLMProvider(BaseProvider):
 
                                 # Fallback: Extract tool calls from content
                                 if not parsed_tool_calls and final_content:
-                                    fallback_calls, remaining = _extract_tool_calls_from_content(
-                                        final_content
+                                    fallback_calls, remaining = (
+                                        _extract_tool_calls_from_content(final_content)
                                     )
                                     if fallback_calls:
                                         parsed_tool_calls = fallback_calls
@@ -752,7 +775,9 @@ class VLLMProvider(BaseProvider):
         # Fallback: Extract tool calls from content if server didn't parse them
         # This happens when vLLM wasn't started with --enable-auto-tool-choice
         if not tool_calls and content:
-            fallback_calls, remaining_content = _extract_tool_calls_from_content(content)
+            fallback_calls, remaining_content = _extract_tool_calls_from_content(
+                content
+            )
             if fallback_calls:
                 tool_calls = fallback_calls
                 content = remaining_content

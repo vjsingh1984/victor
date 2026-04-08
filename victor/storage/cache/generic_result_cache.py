@@ -157,7 +157,9 @@ def _create_tool_selection_cache_key(
     if conversation_history and len(conversation_history) > 0:
         # Take last 2 messages max
         recent_history = (
-            conversation_history[-2:] if len(conversation_history) > 2 else conversation_history
+            conversation_history[-2:]
+            if len(conversation_history) > 2
+            else conversation_history
         )
         # Create a normalized string representation
         history_parts = []

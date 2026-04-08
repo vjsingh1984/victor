@@ -82,7 +82,9 @@ class ContextMetricsImpl:
     @property
     def utilization_percent(self) -> float:
         """Context utilization as percentage."""
-        return (self.total_tokens / self._max_tokens * 100) if self._max_tokens > 0 else 0
+        return (
+            (self.total_tokens / self._max_tokens * 100) if self._max_tokens > 0 else 0
+        )
 
 
 class ContextService:
@@ -126,14 +128,25 @@ class ContextService:
         Returns:
             ContextMetrics with current context information
         """
-        total_tokens = sum(self._estimate_tokens(getattr(m, "content", "")) for m in self._messages)
+        total_tokens = sum(
+            self._estimate_tokens(getattr(m, "content", "")) for m in self._messages
+        )
 
         user_count = sum(1 for m in self._messages if getattr(m, "role", "") == "user")
-        assistant_count = sum(1 for m in self._messages if getattr(m, "role", "") == "assistant")
+        assistant_count = sum(
+            1 for m in self._messages if getattr(m, "role", "") == "assistant"
+        )
         tool_count = sum(1 for m in self._messages if getattr(m, "role", "") == "tool")
 
         system_tokens = self._estimate_tokens(
-            next((m.content for m in self._messages if getattr(m, "role", "") == "system"), "")
+            next(
+                (
+                    m.content
+                    for m in self._messages
+                    if getattr(m, "role", "") == "system"
+                ),
+                "",
+            )
         )
 
         return ContextMetricsImpl(
@@ -229,7 +242,9 @@ class ContextService:
             retain_system: If True, retain system prompt
         """
         if retain_system:
-            system_messages = [m for m in self._messages if getattr(m, "role", "") == "system"]
+            system_messages = [
+                m for m in self._messages if getattr(m, "role", "") == "system"
+            ]
             self._messages = system_messages
         else:
             self._messages.clear()

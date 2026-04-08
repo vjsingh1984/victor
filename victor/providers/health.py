@@ -77,7 +77,9 @@ class ProviderHealthResult:
     def __post_init__(self):
         """Set status based on healthy flag."""
         if self.status == HealthStatus.UNKNOWN:
-            self.status = HealthStatus.HEALTHY if self.healthy else HealthStatus.UNHEALTHY
+            self.status = (
+                HealthStatus.HEALTHY if self.healthy else HealthStatus.UNHEALTHY
+            )
 
     @property
     def error_message(self) -> str:
@@ -211,7 +213,9 @@ class ProviderHealthChecker:
             ]
         else:
             info["key_source"] = key_result.source_detail
-            logger.debug(f"Provider '{provider}' API key found: {key_result.source_detail}")
+            logger.debug(
+                f"Provider '{provider}' API key found: {key_result.source_detail}"
+            )
 
         # Check 3: API key format (if key exists)
         if key_result.key and provider in self.KEY_PATTERNS:
@@ -230,7 +234,9 @@ class ProviderHealthChecker:
                 provider, model, key_result.key, timeout, **kwargs
             )
             if not connectivity_result["success"]:
-                issues.append(connectivity_result.get("error", "Connectivity check failed"))
+                issues.append(
+                    connectivity_result.get("error", "Connectivity check failed")
+                )
             else:
                 info["connectivity"] = "OK"
                 logger.debug(f"Provider '{provider}' connectivity check passed")
@@ -352,11 +358,17 @@ class ProviderHealthChecker:
                     )
                 return {"success": True, "response": "Connectivity OK"}
             except asyncio.TimeoutError:
-                return {"success": False, "error": f"Connectivity check timed out after {timeout}s"}
+                return {
+                    "success": False,
+                    "error": f"Connectivity check timed out after {timeout}s",
+                }
             except Exception as e:
                 # Some providers may return auth errors which is also useful info
                 error_str = str(e).lower()
-                if any(term in error_str for term in ["auth", "unauthorized", "invalid key"]):
+                if any(
+                    term in error_str
+                    for term in ["auth", "unauthorized", "invalid key"]
+                ):
                     return {"success": False, "error": f"Authentication failed: {e}"}
                 # Other errors still indicate connectivity (just not a successful call)
                 return {
@@ -396,7 +408,8 @@ class ProviderHealthChecker:
         healthy = [
             name
             for name, result in self._provider_health.items()
-            if result.healthy or result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+            if result.healthy
+            or result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
         ]
         return healthy
 

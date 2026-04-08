@@ -335,7 +335,9 @@ class CapabilityRegistryMixin:
             setter_method=self._set_team_specs,
         )
 
-        logger.info(f"Capability registry initialized with {len(self._capabilities)} capabilities")
+        logger.info(
+            f"Capability registry initialized with {len(self._capabilities)} capabilities"
+        )
 
     # =========================================================================
     # CapabilityRegistryProtocol implementation
@@ -389,7 +391,10 @@ class CapabilityRegistryMixin:
 
         # Check if the underlying component exists
         if cap.attribute:
-            return hasattr(self, cap.attribute) and getattr(self, cap.attribute) is not None
+            return (
+                hasattr(self, cap.attribute)
+                and getattr(self, cap.attribute) is not None
+            )
         if cap.setter:
             method_key = f"{name}:set"
             return method_key in self._capability_methods
@@ -480,7 +485,8 @@ class CapabilityRegistryMixin:
             import warnings
 
             warnings.warn(
-                f"Capability '{name}' (v{cap.version}) is deprecated. " f"{cap.deprecated_message}",
+                f"Capability '{name}' (v{cap.version}) is deprecated. "
+                f"{cap.deprecated_message}",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -683,7 +689,9 @@ class CapabilityRegistryMixin:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to register dynamic capability '{capability.name}': {e}")
+            logger.error(
+                f"Failed to register dynamic capability '{capability.name}': {e}"
+            )
             return False
 
     def unregister_dynamic_capability(self, name: str) -> bool:

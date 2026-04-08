@@ -119,8 +119,12 @@ class ModeTransitionLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action_key -> Q-value}
-        self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action_key -> count}
+        self._q_values: Dict[str, Dict[str, float]] = (
+            {}
+        )  # state_key -> {action_key -> Q-value}
+        self._visit_counts: Dict[str, Dict[str, int]] = (
+            {}
+        )  # state_key -> {action_key -> count}
         self._task_stats: Dict[str, Dict[str, float]] = {}  # task_type -> stats
         self._total_transitions: int = 0
 
@@ -224,7 +228,9 @@ class ModeTransitionLearner(BaseLearner):
             logger.debug(f"RL: Could not load task stats: {e}")
 
         if self._q_values:
-            logger.info(f"RL: Loaded {len(self._q_values)} mode transition states from database")
+            logger.info(
+                f"RL: Loaded {len(self._q_values)} mode transition states from database"
+            )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record mode transition outcome and update Q-values.
@@ -248,7 +254,9 @@ class ModeTransitionLearner(BaseLearner):
         action_key = outcome.metadata.get("action_key")
 
         if not all([from_mode, to_mode, state_key, action_key]):
-            logger.debug("RL: mode_transition outcome missing required fields, skipping")
+            logger.debug(
+                "RL: mode_transition outcome missing required fields, skipping"
+            )
             return
 
         task_type = outcome.task_type or "default"
@@ -286,7 +294,9 @@ class ModeTransitionLearner(BaseLearner):
         self._update_task_stats(outcome)
 
         # Persist to database
-        self._save_to_db(state_key, action_key, from_mode, to_mode, task_type, outcome, reward)
+        self._save_to_db(
+            state_key, action_key, from_mode, to_mode, task_type, outcome, reward
+        )
 
         logger.debug(
             f"RL: Mode transition {from_mode}→{to_mode} Q-value: {old_q:.3f} → {new_q:.3f} "
@@ -367,9 +377,9 @@ class ModeTransitionLearner(BaseLearner):
         stats["avg_quality_score"] = (1 - alpha) * stats[
             "avg_quality_score"
         ] + alpha * outcome.quality_score
-        stats["avg_completion_rate"] = (1 - alpha) * stats["avg_completion_rate"] + alpha * (
-            1.0 if outcome.success else 0.0
-        )
+        stats["avg_completion_rate"] = (1 - alpha) * stats[
+            "avg_completion_rate"
+        ] + alpha * (1.0 if outcome.success else 0.0)
         stats["sample_count"] = count
 
         # Update optimal budget based on outcome
@@ -497,7 +507,11 @@ class ModeTransitionLearner(BaseLearner):
         if rec is None:
             return ("explore:0", 0.0, 0.3)
 
-        return (rec.value, rec.value if isinstance(rec.value, float) else 0.0, rec.confidence)
+        return (
+            rec.value,
+            rec.value if isinstance(rec.value, float) else 0.0,
+            rec.confidence,
+        )
 
     def get_optimal_budget(self, task_type: str) -> int:
         """Get learned optimal tool budget for a task type.
@@ -611,7 +625,9 @@ class ModeTransitionLearner(BaseLearner):
             Dictionary with learner stats
         """
         # Count states and actions
-        total_state_action_pairs = sum(len(actions) for actions in self._q_values.values())
+        total_state_action_pairs = sum(
+            len(actions) for actions in self._q_values.values()
+        )
 
         return {
             "learner": self.name,

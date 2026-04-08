@@ -53,8 +53,23 @@ FALLBACK_CRITICAL_TOOLS: Set[str] = {
 # The registry-based approach dynamically builds categories from @tool(keywords=[...])
 # decorators and is preferred. This static list is only used when registry is None.
 FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
-    "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
-    "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
+    "security": {
+        "security",
+        "vulnerability",
+        "scan",
+        "audit",
+        "cve",
+        "exploit",
+        "owasp",
+    },
+    "metrics": {
+        "metrics",
+        "complexity",
+        "coverage",
+        "analyze",
+        "statistics",
+        "cyclomatic",
+    },
     "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
     "git": {"git", "commit", "branch", "merge", "push", "pull", "rebase"},
     "docker": {"docker", "container", "dockerfile", "compose", "image"},
@@ -240,7 +255,9 @@ def detect_categories_from_message(message: str) -> Set[str]:
         logger.debug(f"Registry module not available for category detection: {e}")
     except Exception as e:
         logger.warning(
-            "Registry category detection failed", exc_info=e, extra={"message_length": len(message)}
+            "Registry category detection failed",
+            exc_info=e,
+            extra={"message_length": len(message)},
         )
 
     # Fallback to static keywords

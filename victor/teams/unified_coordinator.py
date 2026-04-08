@@ -435,7 +435,9 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # Formation Executors
     # =========================================================================
 
-    async def _execute_formation(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_formation(
+        self, task: str, context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Execute using formation strategies.
 
         This replaces the old per-formation methods with a single method
@@ -476,13 +478,21 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         )
 
         # Execute using formation strategy
-        member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
+        member_results_list = await strategy.execute(
+            adapted_members, team_context, agent_task
+        )
 
         # Convert list of MemberResults to dict
-        member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
+        member_results: Dict[str, MemberResult] = {
+            r.member_id: r for r in member_results_list
+        }
 
         # Build final output
-        success = all(r.success for r in member_results_list) if member_results_list else False
+        success = (
+            all(r.success for r in member_results_list)
+            if member_results_list
+            else False
+        )
         final_outputs = [r.output for r in member_results_list if r.success]
         total_tool_calls = sum(r.tool_calls_used for r in member_results_list)
 

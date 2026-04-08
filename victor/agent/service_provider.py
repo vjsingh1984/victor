@@ -292,7 +292,9 @@ class OrchestratorServiceProvider:
             ServiceLifetime.SINGLETON,
         )
 
-    def _create_tool_registrar(self, container: ServiceContainer) -> "ToolRegistrarProtocol":
+    def _create_tool_registrar(
+        self, container: ServiceContainer
+    ) -> "ToolRegistrarProtocol":
         """Create ToolRegistrar instance.
 
         ToolRegistrar manages:
@@ -308,7 +310,10 @@ class OrchestratorServiceProvider:
             ToolRegistrar instance
         """
         from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-        from victor.agent.protocols import ToolRegistryProtocol, ToolDependencyGraphProtocol
+        from victor.agent.protocols import (
+            ToolRegistryProtocol,
+            ToolDependencyGraphProtocol,
+        )
 
         # Get ToolRegistry from container
         tool_registry = container.get(ToolRegistryProtocol)
@@ -486,7 +491,9 @@ class OrchestratorServiceProvider:
 
         return MessageHistory(
             system_prompt="",  # Will be set by orchestrator
-            max_history_messages=getattr(self._settings, "max_conversation_history", 100000),
+            max_history_messages=getattr(
+                self._settings, "max_conversation_history", 100000
+            ),
         )
 
     # =========================================================================
@@ -512,7 +519,9 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
-        def create_memory_coordinator(_: ServiceContainer) -> "UnifiedMemoryCoordinatorProtocol":
+        def create_memory_coordinator(
+            _: ServiceContainer,
+        ) -> "UnifiedMemoryCoordinatorProtocol":
             try:
                 from victor.storage.memory.unified import get_memory_coordinator
 
@@ -619,7 +628,9 @@ class OrchestratorServiceProvider:
         return UsageAnalytics.get_instance(
             AnalyticsConfig(
                 cache_dir=analytics_cache_dir,
-                enable_prometheus_export=getattr(self._settings, "enable_prometheus_export", True),
+                enable_prometheus_export=getattr(
+                    self._settings, "enable_prometheus_export", True
+                ),
             )
         )
 
@@ -685,7 +696,9 @@ class OrchestratorServiceProvider:
         from victor.agent.tool_deduplication import ToolDeduplicationTracker
 
         window_size = getattr(self._settings, "dedup_window_size", 10)
-        similarity_threshold = getattr(self._settings, "dedup_similarity_threshold", 0.7)
+        similarity_threshold = getattr(
+            self._settings, "dedup_similarity_threshold", 0.7
+        )
 
         return ToolDeduplicationTracker(
             window_size=window_size,
@@ -782,8 +795,12 @@ class OrchestratorServiceProvider:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         # Get embedding model from settings
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
-        use_semantic_selection = getattr(self._settings, "use_semantic_tool_selection", True)
+        embedding_model = getattr(
+            self._settings, "embedding_model", "all-MiniLM-L12-v2"
+        )
+        use_semantic_selection = getattr(
+            self._settings, "use_semantic_tool_selection", True
+        )
 
         if not use_semantic_selection:
             # Return a no-op selector that just returns all tools
@@ -797,7 +814,9 @@ class OrchestratorServiceProvider:
                 ) -> list:
                     return available_tools[:max_tools]
 
-                def compute_similarity(self, query: str, tool_description: str) -> float:
+                def compute_similarity(
+                    self, query: str, tool_description: str
+                ) -> float:
                     return 1.0
 
             return NoOpSelector()
@@ -819,13 +838,17 @@ class OrchestratorServiceProvider:
     # Analytics & observability service factory methods
     # =========================================================================
 
-    def _create_conversation_embedding_store(self) -> "ConversationEmbeddingStoreProtocol":
+    def _create_conversation_embedding_store(
+        self,
+    ) -> "ConversationEmbeddingStoreProtocol":
         """Create ConversationEmbeddingStore instance."""
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        embedding_model = getattr(
+            self._settings, "embedding_model", "all-MiniLM-L12-v2"
+        )
         cache_dir = Path(getattr(self._settings, "cache_dir", ".victor/cache"))
 
         # Create embedding service
@@ -841,7 +864,10 @@ class OrchestratorServiceProvider:
 
     def _create_metrics_collector(self) -> "MetricsCollectorProtocol":
         """Create MetricsCollector instance."""
-        from victor.agent.metrics_collector import MetricsCollector, MetricsCollectorConfig
+        from victor.agent.metrics_collector import (
+            MetricsCollector,
+            MetricsCollectorConfig,
+        )
         from victor.analytics.logger import UsageLogger
         from pathlib import Path
 
@@ -857,7 +883,9 @@ class OrchestratorServiceProvider:
         )
 
         # Create usage logger
-        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+        log_file = Path(
+            getattr(self._settings, "usage_log_path", ".victor/logs/usage.log")
+        )
         usage_logger = UsageLogger(log_file=log_file)
 
         return MetricsCollector(
@@ -896,12 +924,16 @@ class OrchestratorServiceProvider:
         from victor.analytics.logger import UsageLogger
         from pathlib import Path
 
-        log_file = Path(getattr(self._settings, "usage_log_path", ".victor/logs/usage.log"))
+        log_file = Path(
+            getattr(self._settings, "usage_log_path", ".victor/logs/usage.log")
+        )
         enabled = getattr(self._settings, "enable_usage_logging", True)
 
         return UsageLogger(log_file=log_file, enabled=enabled)
 
-    def _create_streaming_metrics_collector(self) -> "StreamingMetricsCollectorProtocol":
+    def _create_streaming_metrics_collector(
+        self,
+    ) -> "StreamingMetricsCollectorProtocol":
         """Create StreamingMetricsCollector instance."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
         from pathlib import Path
@@ -912,7 +944,9 @@ class OrchestratorServiceProvider:
         if not enabled:
             # Return a no-op collector
             class NoOpStreamingMetrics:
-                def record_chunk(self, chunk_size: int, timestamp: float, **metadata: Any) -> None:
+                def record_chunk(
+                    self, chunk_size: int, timestamp: float, **metadata: Any
+                ) -> None:
                     pass
 
                 def get_metrics(self) -> dict:
@@ -924,10 +958,13 @@ class OrchestratorServiceProvider:
             return NoOpStreamingMetrics()
 
         export_path = (
-            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "streaming_metrics.json"
+            Path(getattr(self._settings, "cache_dir", ".victor/cache"))
+            / "streaming_metrics.json"
         )
 
-        return StreamingMetricsCollector(max_history=max_history, export_path=export_path)
+        return StreamingMetricsCollector(
+            max_history=max_history, export_path=export_path
+        )
 
     def _create_intent_classifier(self) -> "IntentClassifierProtocol":
         """Create IntentClassifier instance."""
@@ -935,9 +972,12 @@ class OrchestratorServiceProvider:
         from victor.storage.embeddings.service import EmbeddingService
         from pathlib import Path
 
-        embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
+        embedding_model = getattr(
+            self._settings, "embedding_model", "all-MiniLM-L12-v2"
+        )
         cache_dir = (
-            Path(getattr(self._settings, "cache_dir", ".victor/cache")) / "intent_classifier"
+            Path(getattr(self._settings, "cache_dir", ".victor/cache"))
+            / "intent_classifier"
         )
 
         # Create embedding service
@@ -1212,8 +1252,12 @@ class OrchestratorServiceProvider:
         config = ToolCoordinatorConfig(
             default_budget=getattr(self._settings, "tool_budget", 25),
             enable_caching=getattr(self._settings, "enable_tool_cache", True),
-            max_tools_per_selection=getattr(self._settings, "max_tools_per_selection", 15),
-            selection_threshold=getattr(self._settings, "tool_selection_threshold", 0.3),
+            max_tools_per_selection=getattr(
+                self._settings, "max_tools_per_selection", 15
+            ),
+            selection_threshold=getattr(
+                self._settings, "tool_selection_threshold", 0.3
+            ),
         )
 
         # Note: tool_pipeline may be None if not yet registered
@@ -1249,12 +1293,16 @@ class OrchestratorServiceProvider:
         )
 
         # Get dependencies from DI container
-        conversation_controller = self.container.get_optional(ConversationControllerProtocol)
+        conversation_controller = self.container.get_optional(
+            ConversationControllerProtocol
+        )
         state_machine = self.container.get_optional(ConversationStateMachineProtocol)
 
         # Build config from settings
         config = StateCoordinatorConfig(
-            enable_auto_transitions=getattr(self._settings, "enable_auto_stage_transitions", True),
+            enable_auto_transitions=getattr(
+                self._settings, "enable_auto_stage_transitions", True
+            ),
             enable_history_tracking=True,
             max_history_length=100,
             emit_events=getattr(self._settings, "enable_observability", True),

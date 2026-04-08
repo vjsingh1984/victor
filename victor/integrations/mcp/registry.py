@@ -53,12 +53,18 @@ class MCPServerConfig(BaseModel):
     command: List[str] = Field(description="Command to start the server")
     description: str = Field(default="", description="Server description")
     auto_connect: bool = Field(default=True, description="Connect on registry start")
-    health_check_interval: int = Field(default=30, description="Health check interval in seconds")
+    health_check_interval: int = Field(
+        default=30, description="Health check interval in seconds"
+    )
     max_retries: int = Field(default=3, description="Max reconnection attempts")
     retry_delay: int = Field(default=5, description="Delay between retries in seconds")
     enabled: bool = Field(default=True, description="Whether server is enabled")
-    tags: List[str] = Field(default_factory=list, description="Server tags for filtering")
-    env: Dict[str, str] = Field(default_factory=dict, description="Environment variables")
+    tags: List[str] = Field(
+        default_factory=list, description="Server tags for filtering"
+    )
+    env: Dict[str, str] = Field(
+        default_factory=dict, description="Environment variables"
+    )
 
 
 @dataclass
@@ -122,7 +128,9 @@ class MCPRegistry:
             config: Server configuration
         """
         if config.name in self._servers:
-            logger.warning(f"Server '{config.name}' already registered, updating config")
+            logger.warning(
+                f"Server '{config.name}' already registered, updating config"
+            )
 
         self._servers[config.name] = ServerEntry(config=config)
         logger.info(f"Registered MCP server: {config.name}")
@@ -304,7 +312,9 @@ class MCPRegistry:
                     continue
 
                 # Check if health check is due
-                interval = entry.config.health_check_interval or self._default_health_interval
+                interval = (
+                    entry.config.health_check_interval or self._default_health_interval
+                )
                 if time.time() - entry.last_health_check < interval:
                     continue
 
@@ -650,7 +660,9 @@ class MCPRegistry:
         if include_claude_desktop:
             claude_servers = cls._discover_claude_desktop_servers()
             for server in claude_servers:
-                if server.name not in {s.config.name for s in registry._servers.values()}:
+                if server.name not in {
+                    s.config.name for s in registry._servers.values()
+                }:
                     registry.register_server(server)
                     logger.info(f"Discovered Claude Desktop MCP server: {server.name}")
 
@@ -698,16 +710,24 @@ class MCPRegistry:
 
         if system == "Darwin":  # macOS
             config_paths.append(
-                home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+                home
+                / "Library"
+                / "Application Support"
+                / "Claude"
+                / "claude_desktop_config.json"
             )
         elif system == "Windows":
             import os
 
             appdata = os.environ.get("APPDATA", "")
             if appdata:
-                config_paths.append(Path(appdata) / "Claude" / "claude_desktop_config.json")
+                config_paths.append(
+                    Path(appdata) / "Claude" / "claude_desktop_config.json"
+                )
         else:  # Linux and others
-            config_paths.append(home / ".config" / "Claude" / "claude_desktop_config.json")
+            config_paths.append(
+                home / ".config" / "Claude" / "claude_desktop_config.json"
+            )
 
         for config_path in config_paths:
             if not config_path.exists():
@@ -737,7 +757,9 @@ class MCPRegistry:
                         logger.debug(f"Found Claude Desktop MCP server: {name}")
 
             except json.JSONDecodeError as e:
-                logger.warning(f"Invalid JSON in Claude Desktop config {config_path}: {e}")
+                logger.warning(
+                    f"Invalid JSON in Claude Desktop config {config_path}: {e}"
+                )
             except Exception as e:
                 logger.debug(f"Error reading Claude Desktop config {config_path}: {e}")
 
@@ -815,7 +837,9 @@ class MCPRegistry:
                         MCPServerConfig(
                             name=server_name.replace("@", "").replace("/", "_"),
                             command=command_template,
-                            description=config.get("description", f"MCP Server: {server_name}"),
+                            description=config.get(
+                                "description", f"MCP Server: {server_name}"
+                            ),
                             tags=["auto-discovered"] + config.get("tags", []),
                             auto_connect=False,
                         )
@@ -828,7 +852,9 @@ class MCPRegistry:
                         MCPServerConfig(
                             name=server_name.replace("-", "_"),
                             command=[executable_path],
-                            description=config.get("description", f"MCP Server: {server_name}"),
+                            description=config.get(
+                                "description", f"MCP Server: {server_name}"
+                            ),
                             tags=["auto-discovered"] + config.get("tags", []),
                             auto_connect=False,
                         )

@@ -74,7 +74,9 @@ class InfrastructureBuildersMixin:
         logger.debug("Observability integration created")
         return observability
 
-    def create_tracers(self) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
+    def create_tracers(
+        self,
+    ) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
         """Create execution and tool call tracers for debugging.
 
         Returns:
@@ -135,7 +137,10 @@ class InfrastructureBuildersMixin:
         Returns:
             Configured MetricsCollector
         """
-        from victor.agent.metrics_collector import MetricsCollector, MetricsCollectorConfig
+        from victor.agent.metrics_collector import (
+            MetricsCollector,
+            MetricsCollectorConfig,
+        )
 
         return MetricsCollector(
             config=MetricsCollectorConfig(
@@ -172,7 +177,8 @@ class InfrastructureBuildersMixin:
 
         analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
         usage_logger = UsageLogger(
-            analytics_log_file, enabled=getattr(self.settings, "analytics_enabled", True)
+            analytics_log_file,
+            enabled=getattr(self.settings, "analytics_enabled", True),
         )
         logger.debug("Using basic usage logger (enhanced version not available)")
         return usage_logger
@@ -238,13 +244,21 @@ class InfrastructureBuildersMixin:
         from victor.agent.orchestrator_integration import IntegrationConfig
 
         config = IntegrationConfig(
-            enable_resilient_calls=getattr(self.settings, "intelligent_pipeline_enabled", True),
-            enable_quality_scoring=getattr(self.settings, "intelligent_quality_scoring", True),
-            enable_mode_learning=getattr(self.settings, "intelligent_mode_learning", True),
+            enable_resilient_calls=getattr(
+                self.settings, "intelligent_pipeline_enabled", True
+            ),
+            enable_quality_scoring=getattr(
+                self.settings, "intelligent_quality_scoring", True
+            ),
+            enable_mode_learning=getattr(
+                self.settings, "intelligent_mode_learning", True
+            ),
             enable_prompt_optimization=getattr(
                 self.settings, "intelligent_prompt_optimization", True
             ),
-            min_quality_threshold=getattr(self.settings, "intelligent_min_quality_threshold", 0.5),
+            min_quality_threshold=getattr(
+                self.settings, "intelligent_min_quality_threshold", 0.5
+            ),
             grounding_confidence_threshold=getattr(
                 self.settings, "intelligent_grounding_threshold", 0.7
             ),
@@ -337,14 +351,20 @@ class InfrastructureBuildersMixin:
 
         if use_llm:
             try:
-                from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+                from victor.agent.llm_compaction_summarizer import (
+                    LLMCompactionSummarizer,
+                )
 
                 provider = getattr(self, "_provider", None)
                 if provider is None:
                     provider = getattr(self, "provider", None)
                 if provider is not None:
-                    summarizer = LLMCompactionSummarizer(provider=provider, fallback=fallback)
-                    logger.debug("LLMCompactionSummarizer created with LedgerAware fallback")
+                    summarizer = LLMCompactionSummarizer(
+                        provider=provider, fallback=fallback
+                    )
+                    logger.debug(
+                        "LLMCompactionSummarizer created with LedgerAware fallback"
+                    )
                     return summarizer
             except Exception as e:
                 logger.debug(f"LLM summarizer unavailable, using LedgerAware: {e}")
@@ -400,7 +420,12 @@ class InfrastructureBuildersMixin:
         tool_capability_warned = False
 
         logger.debug("Execution state containers initialized")
-        return (observed_files, executed_tools, failed_tool_signatures, tool_capability_warned)
+        return (
+            observed_files,
+            executed_tools,
+            failed_tool_signatures,
+            tool_capability_warned,
+        )
 
     def create_presentation_adapter(self) -> "PresentationProtocol":
         """Create presentation adapter for icon/emoji rendering.

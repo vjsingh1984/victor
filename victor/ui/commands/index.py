@@ -8,7 +8,9 @@ from victor.core.async_utils import run_sync
 from victor.config.settings import load_settings
 from victor.ui.commands.utils import preload_semantic_index
 
-index_app = typer.Typer(name="index", help="Build semantic code search index for the codebase.")
+index_app = typer.Typer(
+    name="index", help="Build semantic code search index for the codebase."
+)
 console = Console()
 
 

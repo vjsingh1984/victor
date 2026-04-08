@@ -324,7 +324,9 @@ class PolicyManager:
             )
 
         except Exception as e:
-            logger.error(f"PolicyManager: Failed to auto-checkpoint {learner_name}: {e}")
+            logger.error(
+                f"PolicyManager: Failed to auto-checkpoint {learner_name}: {e}"
+            )
 
     def _export_learner_state(self, learner: "BaseLearner") -> Dict[str, Any]:
         """Export learner state for checkpointing.
@@ -344,7 +346,8 @@ class PolicyManager:
         # Export weights if available
         if hasattr(learner, "_weights"):
             state["weights"] = {
-                k: dict(v) if isinstance(v, dict) else v for k, v in learner._weights.items()
+                k: dict(v) if isinstance(v, dict) else v
+                for k, v in learner._weights.items()
             }
 
         # Export sample counts
@@ -359,7 +362,9 @@ class PolicyManager:
 
         return state
 
-    def _import_learner_state(self, learner: "BaseLearner", state: Dict[str, Any]) -> None:
+    def _import_learner_state(
+        self, learner: "BaseLearner", state: Dict[str, Any]
+    ) -> None:
         """Import state into a learner.
 
         Args:
@@ -400,7 +405,10 @@ class PolicyManager:
         # Compare to baseline if available
         if state.performance_baseline:
             baseline_success = state.performance_baseline.get("success_rate", 0.5)
-            if state.recent_success_rate < baseline_success - self.DEGRADATION_THRESHOLD:
+            if (
+                state.recent_success_rate
+                < baseline_success - self.DEGRADATION_THRESHOLD
+            ):
                 return True
 
         # Compare recent to earlier outcomes
@@ -436,17 +444,25 @@ class PolicyManager:
 
         # Find target version
         if to_version:
-            target_checkpoint = self._checkpoint_store.get_checkpoint(learner_name, to_version)
+            target_checkpoint = self._checkpoint_store.get_checkpoint(
+                learner_name, to_version
+            )
         else:
             # Get previous version
             checkpoints = self._checkpoint_store.list_checkpoints(learner_name)
             if len(checkpoints) < 2:
-                logger.warning(f"PolicyManager: No previous checkpoint for {learner_name}")
+                logger.warning(
+                    f"PolicyManager: No previous checkpoint for {learner_name}"
+                )
                 return False
 
             # Find current checkpoint index
             current_idx = next(
-                (i for i, cp in enumerate(checkpoints) if cp.version == state.current_version),
+                (
+                    i
+                    for i, cp in enumerate(checkpoints)
+                    if cp.version == state.current_version
+                ),
                 -1,
             )
 
@@ -558,7 +574,8 @@ class PolicyManager:
             "shadow_outcomes": len(shadow_outcomes),
             "main_outcomes": len(main_outcomes),
             "shadow_success_rate": (
-                sum(o.get("success", False) for o in shadow_outcomes) / len(shadow_outcomes)
+                sum(o.get("success", False) for o in shadow_outcomes)
+                / len(shadow_outcomes)
                 if shadow_outcomes
                 else 0.0
             ),
@@ -626,7 +643,9 @@ class PolicyManager:
         state.canary_traffic = max(0, min(100, percentage))
         state.stage = PolicyStage.CANARY if percentage > 0 else PolicyStage.PRODUCTION
 
-        logger.info(f"PolicyManager: Set canary traffic for {learner_name} to {percentage}%")
+        logger.info(
+            f"PolicyManager: Set canary traffic for {learner_name} to {percentage}%"
+        )
 
     def set_performance_baseline(
         self,
@@ -672,7 +691,9 @@ class PolicyManager:
         return {
             "managed_policies": len(self._policy_states),
             "policies_by_stage": {
-                stage.value: sum(1 for s in self._policy_states.values() if s.stage == stage)
+                stage.value: sum(
+                    1 for s in self._policy_states.values() if s.stage == stage
+                )
                 for stage in PolicyStage
             },
             "total_rollbacks": len(self._rollback_history),

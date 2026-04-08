@@ -152,13 +152,19 @@ class FrameworkStrategy(AgentCreationStrategy):
     def supports_verticals(self) -> bool:
         return True
 
-    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
+    def _apply_overrides(
+        self, agent: "AgentOrchestrator", context: AgentCreationContext
+    ) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
         if context.tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
+            agent.unified_tracker.set_tool_budget(
+                context.tool_budget, user_override=True
+            )
 
         if context.max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
+            agent.unified_tracker.set_max_iterations(
+                context.max_iterations, user_override=True
+            )
 
         if context.mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
@@ -203,13 +209,19 @@ class LegacyStrategy(AgentCreationStrategy):
     def supports_verticals(self) -> bool:
         return False
 
-    def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
+    def _apply_overrides(
+        self, agent: "AgentOrchestrator", context: AgentCreationContext
+    ) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
         if context.tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
+            agent.unified_tracker.set_tool_budget(
+                context.tool_budget, user_override=True
+            )
 
         if context.max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
+            agent.unified_tracker.set_max_iterations(
+                context.max_iterations, user_override=True
+            )
 
         if context.mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller

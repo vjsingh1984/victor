@@ -24,7 +24,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-from victor.workflows.executors.factory import NodeExecutorFactory as SharedNodeExecutorFactory
+from victor.workflows.executors.factory import (
+    NodeExecutorFactory as SharedNodeExecutorFactory,
+)
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -43,7 +45,9 @@ class CompilerOrchestratorPool:
         self._orchestrator = orchestrator
         self._orchestrators = orchestrators or {}
 
-    def get_orchestrator(self, profile: Optional[str] = None) -> Optional["AgentOrchestrator"]:
+    def get_orchestrator(
+        self, profile: Optional[str] = None
+    ) -> Optional["AgentOrchestrator"]:
         if profile and profile in self._orchestrators:
             return self._orchestrators[profile]
         return self._orchestrator
@@ -100,7 +104,9 @@ class CompatibilityNodeExecutorFactory:
         *,
         replace: bool = False,
     ) -> None:
-        self._delegate.register_executor_type(node_type, executor_class, replace=replace)
+        self._delegate.register_executor_type(
+            node_type, executor_class, replace=replace
+        )
 
     def create_executor(
         self,

@@ -833,7 +833,8 @@ def secure_embeddings_dir() -> Path:
         is_valid, tampered = verify_cache_integrity(embeddings_dir)
         if not is_valid:
             logger.warning(
-                f"Embedding cache integrity check failed. " f"Tampered files: {tampered[:3]}..."
+                f"Embedding cache integrity check failed. "
+                f"Tampered files: {tampered[:3]}..."
             )
 
     return embeddings_dir
@@ -1027,7 +1028,9 @@ def list_trusted_plugins() -> list[dict]:
         List of trusted plugin info
     """
     trust_store = load_plugin_trust_store()
-    return [{"name": name, **info} for name, info in trust_store["trusted_plugins"].items()]
+    return [
+        {"name": name, **info} for name, info in trust_store["trusted_plugins"].items()
+    ]
 
 
 # =============================================================================

@@ -108,7 +108,9 @@ class ClientConnection:
 
     id: str
     send: Callable[[str], None]  # Async send function
-    subscriptions: Set[str] = field(default_factory=lambda: {"*"})  # Event types subscribed to
+    subscriptions: Set[str] = field(
+        default_factory=lambda: {"*"}
+    )  # Event types subscribed to
     correlation_id: Optional[str] = None
     connected_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
@@ -316,7 +318,9 @@ class EventBroadcaster:
             subscriptions=normalized,
             correlation_id=correlation_id,
         )
-        matched = [event for event in reversed(self._recent_events) if probe.accepts(event)]
+        matched = [
+            event for event in reversed(self._recent_events) if probe.accepts(event)
+        ]
         return matched[: max(1, limit)]
 
     async def _broadcast_loop(self) -> None:
@@ -359,11 +363,17 @@ class EventBroadcaster:
 
     def get_reliability_dashboard(self) -> Dict[str, Any]:
         """Get event-bridge reliability metrics and SLO status."""
-        total_send_attempts = self._client_send_success_count + self._client_send_failure_count
-        delivery_success_rate = (
-            self._client_send_success_count / total_send_attempts if total_send_attempts else 1.0
+        total_send_attempts = (
+            self._client_send_success_count + self._client_send_failure_count
         )
-        dispatch_latency_p95_ms = self._percentile(self._dispatch_latency_ms_window, 95.0)
+        delivery_success_rate = (
+            self._client_send_success_count / total_send_attempts
+            if total_send_attempts
+            else 1.0
+        )
+        dispatch_latency_p95_ms = self._percentile(
+            self._dispatch_latency_ms_window, 95.0
+        )
 
         return {
             "events_dispatched": self._events_dispatched_count,
@@ -377,7 +387,8 @@ class EventBroadcaster:
                 "dispatch_latency_p95_ms_max": self._dispatch_latency_p95_slo_ms,
             },
             "slo_status": {
-                "delivery_success_rate": delivery_success_rate >= self._delivery_success_slo,
+                "delivery_success_rate": delivery_success_rate
+                >= self._delivery_success_slo,
                 "dispatch_latency_p95_ms": dispatch_latency_p95_ms
                 <= self._dispatch_latency_p95_slo_ms,
             },
@@ -479,12 +490,16 @@ class WebSocketEventHandler:
                 self._broadcaster.update_subscriptions(
                     client_id,
                     subscriptions,
-                    correlation_id=correlation_id if isinstance(correlation_id, str) else None,
+                    correlation_id=(
+                        correlation_id if isinstance(correlation_id, str) else None
+                    ),
                 )
 
             elif msg_type == "unsubscribe":
                 # Remove subscriptions
-                self._broadcaster.update_subscriptions(client_id, set(), correlation_id=None)
+                self._broadcaster.update_subscriptions(
+                    client_id, set(), correlation_id=None
+                )
 
             elif msg_type == "ping":
                 # Respond with pong
@@ -556,7 +571,9 @@ class EventBusAdapter:
 
         subscribe = getattr(event_bus, "subscribe", None)
         if not callable(subscribe):
-            logger.warning("EventBusAdapter connect failed: event bus has no subscribe() method")
+            logger.warning(
+                "EventBusAdapter connect failed: event bus has no subscribe() method"
+            )
             raise RuntimeError("EventBus has no subscribe() method")
 
         # Verify subscribe is async (M1 requirement)

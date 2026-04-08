@@ -257,7 +257,9 @@ class IBudgetManager(Protocol):
         """
         ...
 
-    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
+    def record_tool_call(
+        self, tool_name: str, is_write_operation: bool = False
+    ) -> bool:
         """Record a tool call and consume appropriate budget.
 
         Automatically routes to EXPLORATION or ACTION budget based

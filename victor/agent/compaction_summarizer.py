@@ -44,7 +44,9 @@ class KeywordCompactionSummarizer:
     "3 user messages, 5 tool results, topics: yaml, config".
     """
 
-    def summarize(self, removed_messages: List[Message], ledger: Optional[object] = None) -> str:
+    def summarize(
+        self, removed_messages: List[Message], ledger: Optional[object] = None
+    ) -> str:
         if not removed_messages:
             return ""
 
@@ -69,7 +71,9 @@ class KeywordCompactionSummarizer:
     def _extract_key_topics(self, text: str) -> List[str]:
         words = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b", text)  # CamelCase
         words += re.findall(r"\b[a-z]+_[a-z_]+\b", text)  # snake_case
-        words += re.findall(r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower())
+        words += re.findall(
+            r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower()
+        )
 
         seen: set = set()
         topics: List[str] = []
@@ -94,7 +98,9 @@ class LedgerAwareCompactionSummarizer:
     def __init__(self) -> None:
         self._fallback = KeywordCompactionSummarizer()
 
-    def summarize(self, removed_messages: List[Message], ledger: Optional[object] = None) -> str:
+    def summarize(
+        self, removed_messages: List[Message], ledger: Optional[object] = None
+    ) -> str:
         if ledger is None:
             return self._fallback.summarize(removed_messages)
 
@@ -130,7 +136,9 @@ class LedgerAwareCompactionSummarizer:
 
         parts = []
         if files_read:
-            parts.append(f"Read {len(files_read)} files: {', '.join(sorted(files_read)[:5])}")
+            parts.append(
+                f"Read {len(files_read)} files: {', '.join(sorted(files_read)[:5])}"
+            )
         if files_modified:
             parts.append(
                 f"Modified {len(files_modified)} files: {', '.join(sorted(files_modified)[:5])}"

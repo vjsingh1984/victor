@@ -181,7 +181,9 @@ class SystemPromptCoordinator:
         """
         from victor.agent.shell_resolver import resolve_shell_variant
 
-        return resolve_shell_variant(tool_name, self._get_tools(), self._get_mode_controller())
+        return resolve_shell_variant(
+            tool_name, self._get_tools(), self._get_mode_controller()
+        )
 
     def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords in the user message.

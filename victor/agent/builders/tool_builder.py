@@ -175,7 +175,9 @@ class ToolBuilder(FactoryAwareBuilder):
         tool_components["debug_logger"] = debug_logger
 
         # Build tool registrar
-        tool_registrar = self._factory.create_tool_registrar(tools, tool_graph, provider, model)
+        tool_registrar = self._factory.create_tool_registrar(
+            tools, tool_graph, provider, model
+        )
         if background_task_callback:
             tool_registrar.set_background_task_callback(background_task_callback)
         tool_components["tool_registrar"] = tool_registrar
@@ -189,7 +191,9 @@ class ToolBuilder(FactoryAwareBuilder):
         tool_components["argument_normalizer"] = argument_normalizer
 
         # Build middleware chain
-        middleware_chain, code_correction_middleware = self._factory.create_middleware_chain()
+        middleware_chain, code_correction_middleware = (
+            self._factory.create_middleware_chain()
+        )
         tool_components["middleware_chain"] = middleware_chain
         tool_components["code_correction_middleware"] = code_correction_middleware
 
@@ -220,7 +224,9 @@ class ToolBuilder(FactoryAwareBuilder):
         tool_components["response_completer"] = response_completer
 
         # Build semantic selector (optional)
-        use_semantic_selection, embedding_preload_task = self._factory.setup_semantic_selection()
+        use_semantic_selection, embedding_preload_task = (
+            self._factory.setup_semantic_selection()
+        )
         semantic_selector = self._factory.create_semantic_selector()
         tool_components["semantic_selector"] = semantic_selector
         tool_components["use_semantic_selection"] = use_semantic_selection
@@ -263,7 +269,9 @@ class ToolBuilder(FactoryAwareBuilder):
 
         # Build tool output formatter
         if context_compactor:
-            tool_output_formatter = self._factory.create_tool_output_formatter(context_compactor)
+            tool_output_formatter = self._factory.create_tool_output_formatter(
+                context_compactor
+            )
             tool_components["tool_output_formatter"] = tool_output_formatter
 
         # Build workflow registry

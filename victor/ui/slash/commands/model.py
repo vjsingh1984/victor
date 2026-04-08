@@ -149,8 +149,12 @@ class ProfileCommand(BaseSlashCommand):
                 model=profile_config.model,
             ):
                 info = ctx.agent.get_current_provider_info()
-                ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
-                ctx.console.print(f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]")
+                ctx.console.print(
+                    f"[green]Switched to profile:[/] [cyan]{profile_name}[/]"
+                )
+                ctx.console.print(
+                    f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]"
+                )
                 ctx.console.print(
                     f"  [dim]Native tools: {info['native_tool_calls']}, "
                     f"Thinking: {info['thinking_mode']}[/]"
@@ -191,7 +195,9 @@ class ProfileCommand(BaseSlashCommand):
         table.add_column("Status", style="dim")
 
         for name, config in profiles.items():
-            is_current = config.provider == current_provider and config.model == current_model
+            is_current = (
+                config.provider == current_provider and config.model == current_model
+            )
             status = "current" if is_current else ""
 
             provider_lower = config.provider.lower()
@@ -262,7 +268,8 @@ class ProviderCommand(BaseSlashCommand):
                         for r in rankings[:5]:
                             indicator = (
                                 "current"
-                                if r["provider"].lower() == info.get("provider", "").lower()
+                                if r["provider"].lower()
+                                == info.get("provider", "").lower()
                                 else ""
                             )
                             ctx.console.print(
@@ -272,7 +279,9 @@ class ProviderCommand(BaseSlashCommand):
             except Exception:
                 pass
 
-            ctx.console.print(f"\n[dim]Available providers: {', '.join(available_providers)}[/]")
+            ctx.console.print(
+                f"\n[dim]Available providers: {', '.join(available_providers)}[/]"
+            )
             ctx.console.print("[dim]Switch provider: /provider <name>[/]")
             return
 
@@ -293,7 +302,9 @@ class ProviderCommand(BaseSlashCommand):
 
         if await ctx.agent.switch_provider(provider_name=provider_name, model=model):
             info = ctx.agent.get_current_provider_info()
-            ctx.console.print(f"[green]Switched to:[/] {info['provider']}:{info['model']}")
+            ctx.console.print(
+                f"[green]Switched to:[/] {info['provider']}:{info['model']}"
+            )
             ctx.console.print(
                 f"  [dim]Native tools: {info['native_tool_calls']}, "
                 f"Thinking: {info['thinking_mode']}[/]"

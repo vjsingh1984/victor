@@ -63,7 +63,9 @@ class DirectProtocolAdapter(VictorProtocol):
         from victor.agent.orchestrator import AgentOrchestrator
 
         settings = load_settings()
-        orchestrator = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+        orchestrator = await AgentOrchestrator.from_settings(
+            settings, profile, thinking=thinking
+        )
         return cls(orchestrator)
 
     async def chat(self, messages: list[ChatMessage]) -> ChatResponse:
@@ -91,7 +93,9 @@ class DirectProtocolAdapter(VictorProtocol):
             usage=response.usage if hasattr(response, "usage") else {},
         )
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(
+        self, messages: list[ChatMessage]
+    ) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         message = messages[-1].content if messages else ""
 
@@ -106,7 +110,9 @@ class DirectProtocolAdapter(VictorProtocol):
         """Clear conversation history."""
         self._orchestrator.reset_conversation()
 
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
+    async def semantic_search(
+        self, query: str, max_results: int = 10
+    ) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
         from victor.tools.semantic_search import SemanticCodeSearchTool
 
@@ -193,10 +199,14 @@ class DirectProtocolAdapter(VictorProtocol):
             mode=AgentMode(current_mode),
             connected=True,
             tools_available=(
-                len(self._orchestrator.tools) if hasattr(self._orchestrator, "tools") else 0
+                len(self._orchestrator.tools)
+                if hasattr(self._orchestrator, "tools")
+                else 0
             ),
             conversation_length=(
-                len(self._orchestrator.messages) if hasattr(self._orchestrator, "messages") else 0
+                len(self._orchestrator.messages)
+                if hasattr(self._orchestrator, "messages")
+                else 0
             ),
         )
 
@@ -292,7 +302,9 @@ class HTTPProtocolAdapter(VictorProtocol):
         data = response.json()
         return ChatResponse.from_dict(data)
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(
+        self, messages: list[ChatMessage]
+    ) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         async with self._client.stream(
             "POST",
@@ -328,7 +340,9 @@ class HTTPProtocolAdapter(VictorProtocol):
         response = await self._client.post("/conversation/reset")
         response.raise_for_status()
 
-    async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
+    async def semantic_search(
+        self, query: str, max_results: int = 10
+    ) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
         response = await self._client.post(
             "/search/semantic",
@@ -426,7 +440,9 @@ class HTTPProtocolAdapter(VictorProtocol):
         response.raise_for_status()
         return response.json()
 
-    async def get_definition(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
+    async def get_definition(
+        self, file: str, line: int, character: int
+    ) -> list[dict[str, Any]]:
         """Get definition locations for symbol at position."""
         response = await self._client.post(
             "/lsp/definition",
@@ -435,7 +451,9 @@ class HTTPProtocolAdapter(VictorProtocol):
         response.raise_for_status()
         return response.json().get("locations", [])
 
-    async def get_references(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
+    async def get_references(
+        self, file: str, line: int, character: int
+    ) -> list[dict[str, Any]]:
         """Get reference locations for symbol at position."""
         response = await self._client.post(
             "/lsp/references",

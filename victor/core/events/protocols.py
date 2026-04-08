@@ -226,7 +226,9 @@ class MessagingEvent:
             if pattern_parts[-1] == "*" and len(pattern_parts) <= len(topic_parts):
                 return all(
                     p == "*" or p == t
-                    for p, t in zip(pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1])
+                    for p, t in zip(
+                        pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1]
+                    )
                 )
             return False
 

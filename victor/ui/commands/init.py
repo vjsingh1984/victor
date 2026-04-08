@@ -6,12 +6,18 @@ from pathlib import Path
 from typing import Awaitable, Callable, List, Mapping, Optional, cast
 import yaml
 
-from victor.config.settings import get_project_paths, VICTOR_CONTEXT_FILE, VICTOR_DIR_NAME
+from victor.config.settings import (
+    get_project_paths,
+    VICTOR_CONTEXT_FILE,
+    VICTOR_DIR_NAME,
+)
 from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
 from victor.core.utils.coding_support import load_codebase_analyzer_attr
 
-init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
+init_app = typer.Typer(
+    name="init", help="Initialize project context and configuration."
+)
 console = Console()
 
 
@@ -179,7 +185,10 @@ def init(
         False, "--force", "-f", help="Overwrite existing init.md completely"
     ),
     learn: bool = typer.Option(
-        True, "--learn/--no-learn", "-L", help="Include conversation history insights (default: on)"
+        True,
+        "--learn/--no-learn",
+        "-L",
+        help="Include conversation history insights (default: on)",
     ),
     index: bool = typer.Option(
         False, "--index", "-i", help="Use SQLite symbol store only (no LLM)"
@@ -197,14 +206,22 @@ def init(
         False, "--config", "-c", help="Only setup global config, skip project analysis"
     ),
     interactive: bool = typer.Option(
-        True, "--interactive/--no-interactive", "-I", help="Use interactive wizard for scoping"
+        True,
+        "--interactive/--no-interactive",
+        "-I",
+        help="Use interactive wizard for scoping",
     ),
-    local: bool = typer.Option(False, "--local", help="Add a local profile preset (Ollama)"),
+    local: bool = typer.Option(
+        False, "--local", help="Add a local profile preset (Ollama)"
+    ),
     airgapped: bool = typer.Option(
         False, "--airgapped", help="Enable air-gapped mode for this repo"
     ),
     wizard: bool = typer.Option(
-        False, "--wizard", "-w", help="Run interactive setup wizard for first-time users"
+        False,
+        "--wizard",
+        "-w",
+        help="Run interactive setup wizard for first-time users",
     ),
 ) -> None:
     """Initialize project context and configuration."""
@@ -260,7 +277,9 @@ providers:
                 if local_profile_result is True:
                     console.print("[green]✓[/] Added local profile preset")
                     console.print("  [dim]Use with:[/] victor chat --profile local")
-                    console.print("  [dim]Set default:[/] victor profiles set-default local")
+                    console.print(
+                        "  [dim]Set default:[/] victor profiles set-default local"
+                    )
                 elif local_profile_result is False:
                     console.print("[dim]Local profile preset already present[/]")
                 else:
@@ -324,7 +343,9 @@ providers:
                     console.print("[dim]Aborted.[/dim]")
                     return
             elif not force and not update:
-                console.print(f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]")
+                console.print(
+                    f"[yellow]{VICTOR_CONTEXT_FILE} already exists at {target_path}[/]"
+                )
                 console.print("")
                 console.print("[bold]Options:[/]")
                 console.print(
@@ -334,8 +355,12 @@ providers:
                 console.print(
                     "  [cyan]victor init --learn[/]    Enhance with conversation history insights"
                 )
-                console.print("  [cyan]victor init --index[/]    Multi-language symbol indexing")
-                console.print("  [cyan]victor init --deep[/]     LLM-powered deep analysis")
+                console.print(
+                    "  [cyan]victor init --index[/]    Multi-language symbol indexing"
+                )
+                console.print(
+                    "  [cyan]victor init --deep[/]     LLM-powered deep analysis"
+                )
                 return
 
         # Handle --quick flag (overrides everything)
@@ -353,7 +378,9 @@ providers:
             # Get current working directory (cross-platform)
             cwd = Path.cwd()
             all_dirs = [
-                d.name for d in cwd.iterdir() if d.is_dir() and not d.name.startswith(".")
+                d.name
+                for d in cwd.iterdir()
+                if d.is_dir() and not d.name.startswith(".")
             ]  # noqa
             common_src_dirs = ["src", "app", "lib", "victor", "server", "client"]
             suggested_src = [d for d in common_src_dirs if d in all_dirs]
@@ -419,7 +446,9 @@ providers:
 
         # Determine analysis mode and print status
         if deep and learn:
-            console.print("[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]")
+            console.print(
+                "[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]"
+            )
         elif deep:
             console.print("[dim]Analysis: Index → LLM (no conversation insights)...[/]")
         elif learn:
@@ -524,12 +553,16 @@ providers:
                     elif status == "exists":
                         console.print(f"  [dim]○[/] {alias} (already linked)")
                     elif status == "exists_file":
-                        console.print(f"  [yellow]![/] {alias} (file exists, not a symlink)")
+                        console.print(
+                            f"  [yellow]![/] {alias} (file exists, not a symlink)"
+                        )
 
             console.print(f"\n[dim]Review and customize {target_path} as needed.[/]")
 
             if interactive and created_profiles:
-                if Confirm.ask("[cyan]Show a 2-minute first-run guide?[/]", default=True):
+                if Confirm.ask(
+                    "[cyan]Show a 2-minute first-run guide?[/]", default=True
+                ):
                     console.print("\n[bold]First Run Guide[/]")
                     console.print("1) Start chat: [cyan]victor chat[/]")
                     console.print(
@@ -538,11 +571,15 @@ providers:
                     console.print(
                         '3) Try a one-shot: [cyan]victor "write tests for src/utils.py"[/]'
                     )
-                    console.print("4) Switch models in [cyan]~/.victor/profiles.yaml[/]")
+                    console.print(
+                        "4) Switch models in [cyan]~/.victor/profiles.yaml[/]"
+                    )
                     console.print("See [cyan]docs/guides/FIRST_RUN.md[/] for more.")
 
         except Exception as e:
-            console.print(f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}")
+            console.print(
+                f"[red]Failed to create {VICTOR_DIR_NAME}/{VICTOR_CONTEXT_FILE}:[/] {e}"
+            )
             import traceback
 
             traceback.print_exc()

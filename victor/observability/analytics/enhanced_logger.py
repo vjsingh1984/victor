@@ -42,13 +42,21 @@ class PIIScrubber:
     # Patterns for common PII
     PATTERNS: List[tuple[str, Pattern, str]] = [
         # Email addresses
-        ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+        (
+            "email",
+            re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "[EMAIL]",
+        ),
         # API keys (common formats)
         ("api_key", re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(xai-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(AIza[a-zA-Z0-9_-]{35})\b"), "[API_KEY]"),
         # Bearer tokens
-        ("token", re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I), "[BEARER_TOKEN]"),
+        (
+            "token",
+            re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I),
+            "[BEARER_TOKEN]",
+        ),
         # Home directory paths
         ("path", re.compile(r"/Users/[a-zA-Z0-9_-]+"), "/Users/[USER]"),
         ("path", re.compile(r"/home/[a-zA-Z0-9_-]+"), "/home/[USER]"),

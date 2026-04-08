@@ -72,7 +72,14 @@ try:
 except ImportError:
     # Fallback if framework module is not available
     class ContextualError(RuntimeError):  # type: ignore
-        def __init__(self, message, operation=None, suggestion=None, error_code=None, details=None):
+        def __init__(
+            self,
+            message,
+            operation=None,
+            suggestion=None,
+            error_code=None,
+            details=None,
+        ):
             full_message = message
             if operation:
                 full_message = f"[{operation}] {message}"
@@ -244,7 +251,9 @@ class HttpConnectionPool:
             return cls._instance
 
     @classmethod
-    def get_instance_sync(cls, config: Optional[ConnectionPoolConfig] = None) -> HttpConnectionPool:
+    def get_instance_sync(
+        cls, config: Optional[ConnectionPoolConfig] = None
+    ) -> HttpConnectionPool:
         """Get the singleton instance (synchronous version).
 
         Note: This creates an uninitialized instance. You must call
@@ -401,7 +410,9 @@ class HttpConnectionPool:
         """
         return await self.request("POST", url, **kwargs)
 
-    async def _update_request_stats(self, url: str, status: int, request_time: float) -> None:
+    async def _update_request_stats(
+        self, url: str, status: int, request_time: float
+    ) -> None:
         """Update request statistics.
 
         Args:
@@ -423,7 +434,9 @@ class HttpConnectionPool:
             from urllib.parse import urlparse
 
             host = urlparse(url).hostname or "unknown"
-            self._stats.requests_per_host[host] = self._stats.requests_per_host.get(host, 0) + 1
+            self._stats.requests_per_host[host] = (
+                self._stats.requests_per_host.get(host, 0) + 1
+            )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get connection pool statistics.

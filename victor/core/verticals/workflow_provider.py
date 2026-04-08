@@ -70,7 +70,9 @@ class VerticalWorkflowProvider(ABC):
         if not hasattr(cls, "name"):
             return {}
 
-        for module_path in vertical_runtime_module_candidates(str(cls.name), "handlers"):
+        for module_path in vertical_runtime_module_candidates(
+            str(cls.name), "handlers"
+        ):
             try:
                 module = __import__(module_path, fromlist=["HANDLERS"])
                 return getattr(module, "HANDLERS", {})
@@ -116,7 +118,9 @@ class VerticalWorkflowProvider(ABC):
         # Try multiple import patterns
         patterns: List[str] = []
         for module_suffix in ("workflows", "workflows.provider"):
-            patterns.extend(vertical_runtime_module_candidates(str(cls.name), module_suffix))
+            patterns.extend(
+                vertical_runtime_module_candidates(str(cls.name), module_suffix)
+            )
 
         for module_path in patterns:
             try:
@@ -129,7 +133,9 @@ class VerticalWorkflowProvider(ABC):
             except (ImportError, AttributeError):
                 continue
             except Exception as e:
-                logger.debug("Failed loading workflow provider from '%s': %s", module_path, e)
+                logger.debug(
+                    "Failed loading workflow provider from '%s': %s", module_path, e
+                )
                 continue
 
         return None

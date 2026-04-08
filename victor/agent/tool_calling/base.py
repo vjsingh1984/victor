@@ -120,7 +120,9 @@ class ToolCallingCapabilities:
 
     # Model-specific features
     thinking_mode: bool = False  # Model has a thinking/reasoning mode
-    thinking_disable_prefix: Optional[str] = None  # Prefix to disable thinking (e.g., "/no_think")
+    thinking_disable_prefix: Optional[str] = (
+        None  # Prefix to disable thinking (e.g., "/no_think")
+    )
     requires_strict_prompting: bool = False  # Needs strict system prompts
 
     # Format details
@@ -493,10 +495,14 @@ class FallbackParsingMixin:
             for extracted in result.tool_calls:
                 # Validate name if validator provided
                 if validate_name_fn and not validate_name_fn(extracted.name):
-                    result.warnings.append(f"Skipped invalid tool name: {extracted.name}")
+                    result.warnings.append(
+                        f"Skipped invalid tool name: {extracted.name}"
+                    )
                     continue
 
-                tool_calls.append(ToolCall(name=extracted.name, arguments=extracted.arguments))
+                tool_calls.append(
+                    ToolCall(name=extracted.name, arguments=extracted.arguments)
+                )
 
             if not tool_calls:
                 return ToolCallParseResult(
@@ -551,7 +557,9 @@ class FallbackParsingMixin:
             return result
 
         # Try Python-style function call parsing (for open-weight models)
-        result = self.parse_python_call_from_content(content, validate_name_fn, valid_tool_names)
+        result = self.parse_python_call_from_content(
+            content, validate_name_fn, valid_tool_names
+        )
         if result.tool_calls:
             return result
 
@@ -647,7 +655,9 @@ class BaseToolCallingAdapter(ABC):
             hints.append("Do NOT output JSON, XML, or tool syntax in responses.")
         elif capabilities.native_tool_calls and capabilities.parallel_tool_calls:
             # Encourage parallel tool calls for capable models
-            hints.append("Call MULTIPLE tools in parallel when operations are independent.")
+            hints.append(
+                "Call MULTIPLE tools in parallel when operations are independent."
+            )
 
         if capabilities.thinking_mode:
             hints.append("Use /no_think for simple questions.")
@@ -757,7 +767,9 @@ class BaseToolCallingAdapter(ABC):
         "async",
     }
 
-    def normalize_arguments(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+    def normalize_arguments(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
         """Normalize tool arguments with sensible defaults and filter hallucinations.
 
         This method:
@@ -818,7 +830,9 @@ class BaseToolCallingAdapter(ABC):
                 filtered[key] = value
 
         if filtered_out:
-            logger.debug(f"Filtered hallucinated arguments for {tool_name}: {filtered_out}")
+            logger.debug(
+                f"Filtered hallucinated arguments for {tool_name}: {filtered_out}"
+            )
 
         # Step 3: Apply defaults for missing required parameters
         defaults = self.TOOL_ARGUMENT_DEFAULTS.get(tool_name, {})

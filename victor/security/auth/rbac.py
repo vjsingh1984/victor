@@ -134,7 +134,9 @@ class Role:
         if not isinstance(self.permissions, frozenset):
             object.__setattr__(self, "permissions", frozenset(self.permissions))
         if not isinstance(self.allowed_categories, frozenset):
-            object.__setattr__(self, "allowed_categories", frozenset(self.allowed_categories))
+            object.__setattr__(
+                self, "allowed_categories", frozenset(self.allowed_categories)
+            )
         if not isinstance(self.denied_tools, frozenset):
             object.__setattr__(self, "denied_tools", frozenset(self.denied_tools))
 
@@ -220,7 +222,9 @@ class User:
         """
         return any(role.has_permission(permission) for role in self.roles)
 
-    def can_use_tool(self, tool_name: str, category: str, required_permission: Permission) -> bool:
+    def can_use_tool(
+        self, tool_name: str, category: str, required_permission: Permission
+    ) -> bool:
         """Check if user can use a specific tool.
 
         Args:
@@ -232,7 +236,9 @@ class User:
             True if user can use this tool
         """
         for role in self.roles:
-            if role.has_permission(required_permission) and role.can_use_tool(tool_name, category):
+            if role.has_permission(required_permission) and role.can_use_tool(
+                tool_name, category
+            ):
                 return True
         return False
 
@@ -419,12 +425,16 @@ class RBACManager:
         with self._lock:
             user = self.get_user(username)
             if user is None:
-                logger.warning(f"Unknown user '{username}' denied permission '{permission.value}'")
+                logger.warning(
+                    f"Unknown user '{username}' denied permission '{permission.value}'"
+                )
                 return False
 
             result = user.has_permission(permission)
             if not result:
-                logger.debug(f"User '{username}' denied permission '{permission.value}'")
+                logger.debug(
+                    f"User '{username}' denied permission '{permission.value}'"
+                )
             return result
 
     def check_tool_access(
@@ -472,7 +482,9 @@ class RBACManager:
         with self._lock:
             user = self.get_user(username)
             if user is None:
-                logger.warning(f"Unknown user '{username}' denied access to tool '{tool_name}'")
+                logger.warning(
+                    f"Unknown user '{username}' denied access to tool '{tool_name}'"
+                )
                 return False
 
             result = user.can_use_tool(tool_name, category, required_permission)
@@ -567,7 +579,9 @@ class RBACManager:
                 user = User(name=user_name, roles=roles, metadata=metadata)
                 self._users[user_name] = user
 
-            logger.info(f"Loaded RBAC config: {len(self._roles)} roles, {len(self._users)} users")
+            logger.info(
+                f"Loaded RBAC config: {len(self._roles)} roles, {len(self._users)} users"
+            )
 
     def load_from_yaml(self, path: Path) -> None:
         """Load RBAC configuration from a YAML file.

@@ -158,7 +158,10 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
                 technique=self.technique,
                 sub_queries=sub_queries,
                 confidence=0.8 if llm_response else 0.6,
-                metadata={"domain": context.domain, "sub_query_count": len(sub_queries)},
+                metadata={
+                    "domain": context.domain,
+                    "sub_query_count": len(sub_queries),
+                },
             )
 
         # No decomposition possible
@@ -213,7 +216,9 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
 
         return sub_queries
 
-    def _heuristic_decompose(self, query: str, context: EnhancementContext) -> List[str]:
+    def _heuristic_decompose(
+        self, query: str, context: EnhancementContext
+    ) -> List[str]:
         """Heuristic decomposition without LLM.
 
         Uses simple rules to break down queries:

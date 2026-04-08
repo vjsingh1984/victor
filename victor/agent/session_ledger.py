@@ -29,13 +29,18 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
 
-from victor.config.orchestrator_constants import SessionLedgerConfig, SESSION_LEDGER_CONFIG
+from victor.config.orchestrator_constants import (
+    SessionLedgerConfig,
+    SESSION_LEDGER_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 
 # Patterns for extracting decisions from assistant responses
 DECISION_PATTERNS = [
-    re.compile(r"(?:I (?:will|'ll|am going to|decided to))\s+(.+?)(?:\.|$)", re.IGNORECASE),
+    re.compile(
+        r"(?:I (?:will|'ll|am going to|decided to))\s+(.+?)(?:\.|$)", re.IGNORECASE
+    ),
     re.compile(r"(?:conclusion|decision)\s*:\s*(.+?)(?:\.|$)", re.IGNORECASE),
 ]
 
@@ -103,7 +108,9 @@ class SessionLedger:
                 )
             )
 
-    def record_file_modified(self, path: str, change_summary: str, turn_index: int) -> None:
+    def record_file_modified(
+        self, path: str, change_summary: str, turn_index: int
+    ) -> None:
         truncated = change_summary[: self._config.file_summary_max_len]
         self._add_entry(
             LedgerEntry(
@@ -200,7 +207,9 @@ class SessionLedger:
                 matched_path = match.group(2) or ""
                 if matched_tool in ("read", "cat") and matched_path:
                     if matched_path not in self._files_read:
-                        self.record_file_read(matched_path, "read via tool output", turn_index)
+                        self.record_file_read(
+                            matched_path, "read via tool output", turn_index
+                        )
 
     def update_from_assistant_response(self, content: str, turn_index: int) -> None:
         """Extract decisions and recommendations from assistant responses."""
@@ -249,7 +258,9 @@ class SessionLedger:
             parts.append(f"  <{cat}s>  <!-- {label} -->")
             for e in entries:
                 resolved_tag = ' resolved="true"' if e.resolved else ""
-                parts.append(f'    <entry key="{e.key}"{resolved_tag}>{e.summary}</entry>')
+                parts.append(
+                    f'    <entry key="{e.key}"{resolved_tag}>{e.summary}</entry>'
+                )
             parts.append(f"  </{cat}s>")
 
         parts.append("</SESSION_STATE>")
@@ -257,7 +268,9 @@ class SessionLedger:
 
         # Truncate if over budget
         if len(rendered) > max_chars:
-            rendered = rendered[: max_chars - 20] + "\n... (truncated)\n</SESSION_STATE>"
+            rendered = (
+                rendered[: max_chars - 20] + "\n... (truncated)\n</SESSION_STATE>"
+            )
 
         return rendered
 
@@ -313,7 +326,9 @@ class SessionLedger:
     def from_dict(cls, data: Dict[str, Any]) -> "SessionLedger":
         config_data = data.get("config", {})
         config = SessionLedgerConfig(
-            max_entries=config_data.get("max_entries", SESSION_LEDGER_CONFIG.max_entries),
+            max_entries=config_data.get(
+                "max_entries", SESSION_LEDGER_CONFIG.max_entries
+            ),
             max_render_chars=config_data.get(
                 "max_render_chars", SESSION_LEDGER_CONFIG.max_render_chars
             ),

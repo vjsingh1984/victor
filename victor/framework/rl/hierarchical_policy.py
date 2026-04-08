@@ -191,10 +191,14 @@ class HierarchicalPolicy(BaseLearner):
         self.epsilon = epsilon
 
         # Q-table: state_key -> option_name -> Q-value
-        self._q_table: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(lambda: 0.5))
+        self._q_table: Dict[str, Dict[str, float]] = defaultdict(
+            lambda: defaultdict(lambda: 0.5)
+        )
 
         # Visit counts for UCB exploration
-        self._visit_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._visit_counts: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
 
         # Option registry
         self._option_registry = OptionRegistry()
@@ -258,7 +262,9 @@ class HierarchicalPolicy(BaseLearner):
             reason = "Exploration (random)"
         else:
             # Exploit: select best Q-value
-            q_values = {name: self._q_table[state_key][name] for name in available_names}
+            q_values = {
+                name: self._q_table[state_key][name] for name in available_names
+            }
             selected = max(q_values, key=q_values.get)
             reason = f"Exploitation (Q={q_values[selected]:.2f})"
 
@@ -297,7 +303,9 @@ class HierarchicalPolicy(BaseLearner):
 
         return False
 
-    def step_option(self, state: HierarchicalState, reward: float = 0.0) -> Optional[str]:
+    def step_option(
+        self, state: HierarchicalState, reward: float = 0.0
+    ) -> Optional[str]:
         """Step the current option.
 
         Args:
@@ -372,7 +380,9 @@ class HierarchicalPolicy(BaseLearner):
         self._option_completions[option_name] += 1
         self._option_success_rate[option_name].append(success)
         # Keep last 100 outcomes
-        self._option_success_rate[option_name] = self._option_success_rate[option_name][-100:]
+        self._option_success_rate[option_name] = self._option_success_rate[option_name][
+            -100:
+        ]
 
         logger.debug(
             f"HierarchicalPolicy: Recorded outcome for '{option_name}' "
@@ -410,7 +420,9 @@ class HierarchicalPolicy(BaseLearner):
         new_q = current_q + self.learning_rate * (target - current_q)
         self._q_table[state_key][option_name] = new_q
 
-        logger.debug(f"Q-update: {state_key}:{option_name} {current_q:.3f} -> {new_q:.3f}")
+        logger.debug(
+            f"Q-update: {state_key}:{option_name} {current_q:.3f} -> {new_q:.3f}"
+        )
 
     def _to_option_state(self, state: HierarchicalState) -> OptionState:
         """Convert HierarchicalState to OptionState.

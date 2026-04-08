@@ -388,7 +388,9 @@ class DynamicModuleLoader:
                             if on_change:
                                 on_change(file_path, event_type)
                         except Exception as e:
-                            logger.error(f"Error handling {event_type} for '{module_name}': {e}")
+                            logger.error(
+                                f"Error handling {event_type} for '{module_name}': {e}"
+                            )
 
                     loader._debounce_timer.schedule(module_name, do_reload)
 
@@ -859,7 +861,9 @@ class EntryPointCache:
             if isinstance(meta, dict):
                 cached_env_hash = meta.get("env_hash")
                 cached_fingerprint = meta.get("install_fingerprint")
-                if isinstance(cached_env_hash, str) and isinstance(cached_fingerprint, str):
+                if isinstance(cached_env_hash, str) and isinstance(
+                    cached_fingerprint, str
+                ):
                     current_fingerprint = self._compute_installation_fingerprint()
                     if current_fingerprint == cached_fingerprint:
                         self._env_hash = cached_env_hash
@@ -886,7 +890,9 @@ class EntryPointCache:
                         logger.warning(f"Failed to load cache entry for '{group}': {e}")
 
             if self._memory_cache:
-                logger.info(f"Loaded {len(self._memory_cache)} entry point groups from cache")
+                logger.info(
+                    f"Loaded {len(self._memory_cache)} entry point groups from cache"
+                )
 
         except Exception as e:
             logger.warning(f"Failed to load entry point cache from disk: {e}")
@@ -901,7 +907,10 @@ class EntryPointCache:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
 
             with self._cache_lock:
-                data = {group: cached.to_dict() for group, cached in self._memory_cache.items()}
+                data = {
+                    group: cached.to_dict()
+                    for group, cached in self._memory_cache.items()
+                }
                 if self._env_hash is not None:
                     data["_meta"] = {
                         "schema_version": 1,

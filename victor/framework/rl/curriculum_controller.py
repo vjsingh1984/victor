@@ -346,7 +346,9 @@ class CurriculumController:
                 )
 
             if self._context_stages:
-                logger.info(f"CurriculumController: Loaded {len(self._context_stages)} contexts")
+                logger.info(
+                    f"CurriculumController: Loaded {len(self._context_stages)} contexts"
+                )
 
         except Exception as e:
             logger.debug(f"CurriculumController: Could not load state: {e}")

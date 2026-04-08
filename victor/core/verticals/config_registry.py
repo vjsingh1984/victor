@@ -67,7 +67,9 @@ class VerticalBehaviorConfig:
 
         # Validate load_priority is non-negative
         if self.load_priority < 0:
-            raise ValueError(f"load_priority must be non-negative, got {self.load_priority}")
+            raise ValueError(
+                f"load_priority must be non-negative, got {self.load_priority}"
+            )
 
 
 class VerticalConfigRegistry:
@@ -267,7 +269,9 @@ class VerticalBehaviorConfigRegistry:
             raise ValueError("Vertical name cannot be empty")
 
         if not isinstance(config, VerticalBehaviorConfig):
-            raise ValueError(f"Config must be VerticalBehaviorConfig instance, got {type(config)}")
+            raise ValueError(
+                f"Config must be VerticalBehaviorConfig instance, got {type(config)}"
+            )
 
         cls._configs[name] = config
         logger.debug(f"Registered behavior configuration for vertical '{name}'")

@@ -223,7 +223,8 @@ class CapabilityAwareToolStepHandler(BaseStepHandler):
         if tools_result is None or not tools_result.is_success:
             # Tool capability negotiation failed
             logger.warning(
-                "Tool capability negotiation failed or not available, " "applying minimal tool set"
+                "Tool capability negotiation failed or not available, "
+                "applying minimal tool set"
             )
 
             # Apply minimal tool set

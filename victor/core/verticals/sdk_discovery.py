@@ -379,7 +379,9 @@ def enhance_vertical_with_sdk_protocols(
     # Get safety providers for this vertical
     safety_providers = registry.get_safety_providers()
     if safety_providers:
-        logger.debug(f"Found {len(safety_providers)} safety providers for {vertical_name}")
+        logger.debug(
+            f"Found {len(safety_providers)} safety providers for {vertical_name}"
+        )
         if hasattr(vertical_extensions, "add_safety_provider"):
             for provider in safety_providers:
                 vertical_extensions.add_safety_provider(provider)
@@ -387,7 +389,9 @@ def enhance_vertical_with_sdk_protocols(
     # Get workflow providers for this vertical
     workflow_providers = registry.get_workflow_providers()
     if workflow_providers:
-        logger.debug(f"Found {len(workflow_providers)} workflow providers for {vertical_name}")
+        logger.debug(
+            f"Found {len(workflow_providers)} workflow providers for {vertical_name}"
+        )
         if hasattr(vertical_extensions, "add_workflow_provider"):
             for provider in workflow_providers:
                 vertical_extensions.add_workflow_provider(provider)

@@ -167,7 +167,12 @@ def _parse_hunk(lines: List[str], start_idx: int) -> Tuple[Optional[Hunk], int]:
             break
 
         # Accept context (+/-/space) lines
-        if line.startswith("+") or line.startswith("-") or line.startswith(" ") or line == "":
+        if (
+            line.startswith("+")
+            or line.startswith("-")
+            or line.startswith(" ")
+            or line == ""
+        ):
             hunk_lines.append(line)
             i += 1
         # Handle "\ No newline at end of file" marker
@@ -227,7 +232,9 @@ def apply_patch_to_content(
         match_line = _find_matching_location(lines, old_lines, target_line, fuzz)
 
         if match_line is None:
-            warnings.append(f"Could not apply hunk at line {hunk.old_start}: context mismatch")
+            warnings.append(
+                f"Could not apply hunk at line {hunk.old_start}: context mismatch"
+            )
             continue
 
         # Apply the hunk
@@ -327,9 +334,15 @@ async def patch(
     # Route to create diff operation
     if op == "create":
         if not file_path:
-            return {"success": False, "error": "file_path required for 'create' operation"}
+            return {
+                "success": False,
+                "error": "file_path required for 'create' operation",
+            }
         if not new_content:
-            return {"success": False, "error": "new_content required for 'create' operation"}
+            return {
+                "success": False,
+                "error": "new_content required for 'create' operation",
+            }
         return await _create_diff(file_path, new_content, context_lines)
 
     # Apply patch operation (default)
@@ -340,7 +353,10 @@ async def patch(
         }
 
     if not patch_content:
-        return {"success": False, "error": "patch_content required for 'apply' operation"}
+        return {
+            "success": False,
+            "error": "patch_content required for 'apply' operation",
+        }
     from victor.agent.change_tracker import ChangeType, get_change_tracker
 
     # Parse the patch

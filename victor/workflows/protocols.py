@@ -256,7 +256,9 @@ class IWorkflowGraph(Protocol):
         """
         ...
 
-    def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
+    def get_next_nodes(
+        self, node_id: str, state: Dict[str, Any]
+    ) -> List[IWorkflowNode]:
         """Get the next nodes to execute after the given node.
 
         Args:
@@ -307,7 +309,9 @@ class ICheckpointStore(Protocol):
         """
         ...
 
-    async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+    async def load(
+        self, workflow_id: str, checkpoint_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Load a checkpoint.
 
         Args:
@@ -447,7 +451,10 @@ class IStreamingWorkflowExecutor(Protocol):
         """
         # Abstract async generator - yield needed for mypy to recognize as generator
         if False:
-            from victor.workflows.streaming import WorkflowStreamChunk, WorkflowEventType
+            from victor.workflows.streaming import (
+                WorkflowStreamChunk,
+                WorkflowEventType,
+            )
 
             yield WorkflowStreamChunk(
                 event_type=WorkflowEventType.WORKFLOW_START,
@@ -526,7 +533,9 @@ class NodeRunnerResult:
     @property
     def status(self) -> ProtocolNodeStatus:
         """Get status as ProtocolNodeStatus enum."""
-        return ProtocolNodeStatus.COMPLETED if self.success else ProtocolNodeStatus.FAILED
+        return (
+            ProtocolNodeStatus.COMPLETED if self.success else ProtocolNodeStatus.FAILED
+        )
 
 
 @runtime_checkable

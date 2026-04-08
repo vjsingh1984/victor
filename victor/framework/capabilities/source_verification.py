@@ -224,8 +224,12 @@ class URLVerifier(SourceVerifier):
         elif "wikipedia.org" in domain:
             reliability = ReliabilityLevel.MEDIUM
             confidence = 0.7
-            warnings.append("Wikipedia is a tertiary source - verify with primary sources")
-        elif any(re.search(pattern, domain) for pattern in self.LOW_RELIABILITY_PATTERNS):
+            warnings.append(
+                "Wikipedia is a tertiary source - verify with primary sources"
+            )
+        elif any(
+            re.search(pattern, domain) for pattern in self.LOW_RELIABILITY_PATTERNS
+        ):
             reliability = ReliabilityLevel.LOW
             confidence = 0.4
             warnings.append(
@@ -246,7 +250,9 @@ class URLVerifier(SourceVerifier):
 
         # Suggestions
         if not citation.context:
-            suggestions.append("Add context about what information this source provides")
+            suggestions.append(
+                "Add context about what information this source provides"
+            )
 
         is_valid = len(issues) == 0
         confidence = max(0.0, min(1.0, confidence))
@@ -290,7 +296,9 @@ class DOIVerifier(SourceVerifier):
 
         # Suggestions
         if not citation.context:
-            suggestions.append("Add context about which parts of the paper support the claim")
+            suggestions.append(
+                "Add context about which parts of the paper support the claim"
+            )
 
         is_valid = len(issues) == 0
 
@@ -332,7 +340,8 @@ class DocumentationVerifier(SourceVerifier):
 
         # Check if it's official documentation
         is_official = any(
-            re.search(pattern, citation.source.lower()) for pattern in self.OFFICIAL_DOC_PATTERNS
+            re.search(pattern, citation.source.lower())
+            for pattern in self.OFFICIAL_DOC_PATTERNS
         )
 
         if is_official:
@@ -344,8 +353,12 @@ class DocumentationVerifier(SourceVerifier):
             issues.append("Citation claim is empty")
 
         # Check for version information
-        if not any(v in citation.source.lower() for v in ["version", "v.", "/v", "/stable"]):
-            suggestions.append("Consider including version information for documentation")
+        if not any(
+            v in citation.source.lower() for v in ["version", "v.", "/v", "/stable"]
+        ):
+            suggestions.append(
+                "Consider including version information for documentation"
+            )
 
         is_valid = len(issues) == 0
 
@@ -375,7 +388,9 @@ class SourceVerificationCapabilityProvider:
         custom_verifiers: Optional custom verifiers to add
     """
 
-    def __init__(self, custom_verifiers: Optional[Dict[SourceType, SourceVerifier]] = None):
+    def __init__(
+        self, custom_verifiers: Optional[Dict[SourceType, SourceVerifier]] = None
+    ):
         """Initialize the source verification capability provider.
 
         Args:
@@ -469,7 +484,13 @@ class SourceVerificationCapabilityProvider:
             # Check for documentation
             if any(
                 pattern in source_lower
-                for pattern in ["docs.", "developer.", "readthedocs", "/docs", "/documentation"]
+                for pattern in [
+                    "docs.",
+                    "developer.",
+                    "readthedocs",
+                    "/docs",
+                    "/documentation",
+                ]
             ):
                 return SourceType.DOCUMENTATION
 

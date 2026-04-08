@@ -504,7 +504,9 @@ class ContextRequirements:
             "subdomain": self.subdomain,
             "environment": self.environment,
             "user_preferences": self.user_preferences,
-            "project_context": self.project_context.to_dict() if self.project_context else None,
+            "project_context": (
+                self.project_context.to_dict() if self.project_context else None
+            ),
         }
 
 

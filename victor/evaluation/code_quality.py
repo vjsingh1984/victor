@@ -170,7 +170,9 @@ class CodeQualityAnalyzer:
         else:
             # Fallback: estimate complexity from code structure
             metrics.cyclomatic_complexity = self._estimate_complexity(code)
-            metrics.maintainability_index = self._estimate_maintainability(code, metrics)
+            metrics.maintainability_index = self._estimate_maintainability(
+                code, metrics
+            )
 
         # 5. Type coverage (check for type hints)
         metrics.type_coverage = self._analyze_type_coverage(code)
@@ -304,7 +306,9 @@ class CodeQualityAnalyzer:
             if proc.stdout:
                 output = proc.stdout.decode()
                 # Parse average complexity
-                avg_match = re.search(r"Average complexity: [A-F] \((\d+\.\d+)\)", output)
+                avg_match = re.search(
+                    r"Average complexity: [A-F] \((\d+\.\d+)\)", output
+                )
                 if avg_match:
                     result["cyclomatic"] = float(avg_match.group(1))
 
@@ -358,7 +362,9 @@ class CodeQualityAnalyzer:
             elif isinstance(node, ast.BoolOp):
                 # Each and/or adds 1
                 complexity += len(node.values) - 1
-            elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)):
+            elif isinstance(
+                node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
+            ):
                 complexity += 1
 
         # Normalize by number of functions
@@ -413,7 +419,9 @@ class CodeQualityAnalyzer:
 
         count = 0
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
+            if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
+            ):
                 if (
                     ast.get_docstring(node)
                     and len(node.body) > 0
@@ -445,7 +453,9 @@ class CodeQualityAnalyzer:
                     present_annotations += 1
 
                 # Check arguments
-                for arg in node.args.args + node.args.posonlyargs + node.args.kwonlyargs:
+                for arg in (
+                    node.args.args + node.args.posonlyargs + node.args.kwonlyargs
+                ):
                     if arg.arg not in ("self", "cls"):
                         total_annotations += 1
                         if arg.annotation is not None:

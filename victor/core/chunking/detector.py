@@ -96,7 +96,9 @@ HTML_PATTERN = re.compile(
     re.IGNORECASE,
 )
 XML_PATTERN = re.compile(r"<\?xml\s|^<[a-zA-Z][\w-]*[^>]*>", re.MULTILINE)
-MARKDOWN_PATTERN = re.compile(r"^#{1,6}\s+\w+|```|^\*\*\w+\*\*|^\[\w+\]\(", re.MULTILINE)
+MARKDOWN_PATTERN = re.compile(
+    r"^#{1,6}\s+\w+|```|^\*\*\w+\*\*|^\[\w+\]\(", re.MULTILINE
+)
 CODE_PATTERN = re.compile(
     r"^(def |class |function |fn |func |import |from |package |#include |using )",
     re.MULTILINE,

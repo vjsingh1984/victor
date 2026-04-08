@@ -194,7 +194,9 @@ class WorkflowEventBridge:
 
         for pattern in workflow_patterns:
             try:
-                handle = await self._event_bus.subscribe(pattern, self._on_workflow_event)
+                handle = await self._event_bus.subscribe(
+                    pattern, self._on_workflow_event
+                )
                 self._event_subscriptions.append(handle)
             except Exception as e:
                 logger.warning(f"Failed to subscribe to {pattern}: {e}")
@@ -508,7 +510,9 @@ class WorkflowEventBridge:
             Number of subscribers
         """
         if workflow_id:
-            return sum(1 for (wid, _) in self._subscriptions.keys() if wid == workflow_id)
+            return sum(
+                1 for (wid, _) in self._subscriptions.keys() if wid == workflow_id
+            )
         return len(self._subscriptions)
 
     def get_workflow_ids(self) -> List[str]:

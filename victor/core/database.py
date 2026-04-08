@@ -303,7 +303,9 @@ class DatabaseManager:
         Returns:
             List of table names
         """
-        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        rows = self.query(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
         return [row[0] for row in rows]
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
@@ -386,7 +388,9 @@ class DatabaseManager:
                     source_count = conn.execute(
                         f"SELECT COUNT(*) FROM legacy_{source_name}.{table}"
                     ).fetchone()[0]
-                    target_count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                    target_count = conn.execute(
+                        f"SELECT COUNT(*) FROM {table}"
+                    ).fetchone()[0]
 
                     if source_count > 0 and target_count == 0:
                         # Copy data from source to existing target
@@ -509,7 +513,9 @@ class DatabaseManager:
     def _ensure_async_state(self) -> None:
         """Initialize async-related state if not already done."""
         if not hasattr(self, "_write_queue"):
-            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = queue.Queue()
+            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = (
+                queue.Queue()
+            )
             self._write_lock = threading.Lock()
             self._batch_size = 100
             self._flush_interval = 5.0
@@ -879,7 +885,9 @@ class ProjectDatabaseManager:
 
     def get_tables(self) -> List[str]:
         """Get list of all tables."""
-        rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        rows = self.query(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
         return [row[0] for row in rows]
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
@@ -889,7 +897,9 @@ class ProjectDatabaseManager:
                 return
 
             # Check if already migrated
-            cursor = conn.execute("SELECT value FROM _project_metadata WHERE key = 'migrated_at'")
+            cursor = conn.execute(
+                "SELECT value FROM _project_metadata WHERE key = 'migrated_at'"
+            )
             row = cursor.fetchone()
             if row:
                 logger.debug(f"Project database already migrated at {row[0]}")
@@ -922,7 +932,9 @@ class ProjectDatabaseManager:
 
             self._migrated = True
             if migrated_count > 0:
-                logger.info(f"Project database migration complete: {migrated_count} tables")
+                logger.info(
+                    f"Project database migration complete: {migrated_count} tables"
+                )
 
     def _migrate_project_tables(
         self,

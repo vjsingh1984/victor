@@ -153,7 +153,9 @@ class ProviderCircuitBreaker:
         if self._state.state == CircuitState.OPEN:
             # Check if timeout has passed
             if self._state.last_failure_time:
-                elapsed = (datetime.now() - self._state.last_failure_time).total_seconds()
+                elapsed = (
+                    datetime.now() - self._state.last_failure_time
+                ).total_seconds()
                 if elapsed >= self.config.timeout_seconds:
                     return True  # Will transition to half-open
             return False
@@ -258,7 +260,8 @@ class ProviderCircuitBreaker:
             self._state.success_count = 0
 
         logger.info(
-            f"CircuitBreaker '{self.name}' transitioned: " f"{old_state.value} -> {new_state.value}"
+            f"CircuitBreaker '{self.name}' transitioned: "
+            f"{old_state.value} -> {new_state.value}"
         )
 
     def reset(self):
@@ -277,7 +280,9 @@ class ProviderCircuitBreaker:
             "is_available": self.is_available,
             "time_until_retry": self.time_until_retry,
             "last_failure_time": (
-                self._state.last_failure_time.isoformat() if self._state.last_failure_time else None
+                self._state.last_failure_time.isoformat()
+                if self._state.last_failure_time
+                else None
             ),
             "last_state_change": self._state.last_state_change.isoformat(),
         }
@@ -338,7 +343,9 @@ class RetryExhaustedError(Exception):
     def __init__(self, max_retries: int, last_error: Exception):
         self.max_retries = max_retries
         self.last_error = last_error
-        super().__init__(f"Max retries ({max_retries}) exhausted. Last error: {last_error}")
+        super().__init__(
+            f"Max retries ({max_retries}) exhausted. Last error: {last_error}"
+        )
 
 
 class ProviderRetryStrategy:
@@ -418,7 +425,8 @@ class ProviderRetryStrategy:
                 # Check if max retries exceeded
                 if attempt >= self.config.max_retries:
                     logger.error(
-                        f"Max retries ({self.config.max_retries}) exceeded. " f"Last error: {e}"
+                        f"Max retries ({self.config.max_retries}) exceeded. "
+                        f"Last error: {e}"
                     )
                     raise RetryExhaustedError(self.config.max_retries, e)
 
@@ -521,7 +529,11 @@ class ProviderRetryStrategy:
 class ProviderUnavailableError(Exception):
     """Raised when no providers are available."""
 
-    def __init__(self, primary_error: Exception, fallback_errors: Optional[List[Exception]] = None):
+    def __init__(
+        self,
+        primary_error: Exception,
+        fallback_errors: Optional[List[Exception]] = None,
+    ):
         self.primary_error = primary_error
         self.fallback_errors = fallback_errors or []
 
@@ -749,7 +761,9 @@ class ResilientProvider:
             # Build augmented messages for fallback with partial content
             fallback_messages = list(messages)
             if partial_content:
-                collected = "".join(getattr(c, "content", "") or "" for c in partial_content)
+                collected = "".join(
+                    getattr(c, "content", "") or "" for c in partial_content
+                )
                 if collected.strip():
                     fallback_messages.append(
                         {

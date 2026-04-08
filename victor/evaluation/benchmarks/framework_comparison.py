@@ -330,7 +330,9 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
 
     # Quality - calculate from task results
     quality_scores = [
-        r.code_quality.get_overall_score() for r in result.task_results if r.code_quality
+        r.code_quality.get_overall_score()
+        for r in result.task_results
+        if r.code_quality
     ]
     if quality_scores:
         metrics.code_quality_score = sum(quality_scores) / len(quality_scores)

@@ -254,7 +254,9 @@ class TextEntityExtractor(EntityExtractor):
             metadata={"extractor": self.name},
         )
 
-    def _extract_technologies(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_technologies(
+        self, content: str, source: Optional[str]
+    ) -> List[Entity]:
         """Extract technology entities."""
         entities: List[Entity] = []
         content_lower = content.lower()
@@ -280,7 +282,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_organizations(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_organizations(
+        self, content: str, source: Optional[str]
+    ) -> List[Entity]:
         """Extract organization entities."""
         entities: List[Entity] = []
 
@@ -346,7 +350,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_requirements(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_requirements(
+        self, content: str, source: Optional[str]
+    ) -> List[Entity]:
         """Extract requirement and feature entities."""
         entities: List[Entity] = []
 
@@ -390,7 +396,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _infer_relationships(self, content: str, entities: List[Entity]) -> List[EntityRelation]:
+    def _infer_relationships(
+        self, content: str, entities: List[Entity]
+    ) -> List[EntityRelation]:
         """Infer relationships between entities."""
         relations: List[EntityRelation] = []
 

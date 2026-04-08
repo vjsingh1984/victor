@@ -246,8 +246,12 @@ class TaskCoordinator:
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
-                conversation_controller.add_message("system", intent_result.prompt_guard.strip())
-                logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
+                conversation_controller.add_message(
+                    "system", intent_result.prompt_guard.strip()
+                )
+                logger.info(
+                    f"Intent: {intent_result.intent.value}, injected prompt guard"
+                )
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
 
@@ -304,7 +308,9 @@ class TaskCoordinator:
                         f"Analysis task: increased tool_budget from {original_budget} to {self._tool_budget}"
                     )
             else:
-                logger.info(f"Analysis task: respecting user-set tool_budget={self._tool_budget}")
+                logger.info(
+                    f"Analysis task: respecting user-set tool_budget={self._tool_budget}"
+                )
 
             conversation_controller.add_message(
                 "system",

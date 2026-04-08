@@ -48,7 +48,9 @@ class LiveDisplayRenderer:
         self._pending_tool: dict | None = None  # Track tool waiting for result
         self._last_thinking_rendered = ""  # Track last rendered thinking to avoid dupes
         self._thinking_indicator_shown = False  # Track if we've shown the indicator
-        self._in_thinking_mode = False  # Track if we're in thinking mode to avoid content pollution
+        self._in_thinking_mode = (
+            False  # Track if we're in thinking mode to avoid content pollution
+        )
         self._content_shown_before_pause = (
             ""  # Track content shown before pause to avoid re-display
         )
@@ -119,7 +121,9 @@ class LiveDisplayRenderer:
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
         # Single consolidated line: icon + name + args + time
-        self.console.print(f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]")
+        self.console.print(
+            f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]"
+        )
         if success and follow_up_suggestions:
             for suggestion in follow_up_suggestions[:2]:
                 if not isinstance(suggestion, dict):

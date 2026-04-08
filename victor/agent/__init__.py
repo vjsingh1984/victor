@@ -24,7 +24,10 @@ _LIGHT_IMPORT = str(os.getenv("VICTOR_LIGHT_IMPORT", "")).strip().lower() in {
 }
 
 if not _LIGHT_IMPORT:
-    from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+    from victor.agent.argument_normalizer import (
+        ArgumentNormalizer,
+        NormalizationStrategy,
+    )
 
     # OBSOLETE: ConfigLoader moved to victor/agent/archive/obsolete/config_loader.py
     # Configuration is now loaded via Settings objects and composed by OrchestratorFactory
@@ -35,7 +38,12 @@ if not _LIGHT_IMPORT:
     # OBSOLETE: observability moved to victor/agent/archive/obsolete/observability.py
     # Observability is now handled by victor.core.events (get_observability_bus)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.stream_handler import StreamHandler, StreamResult, StreamMetrics, StreamBuffer
+    from victor.agent.stream_handler import (
+        StreamHandler,
+        StreamResult,
+        StreamMetrics,
+        StreamBuffer,
+    )
     from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
 
     # New decomposed components

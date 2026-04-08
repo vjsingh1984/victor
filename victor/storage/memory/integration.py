@@ -35,7 +35,10 @@ from typing import Any, Dict, List, Optional, Set
 
 from victor.storage.memory.entity_memory import EntityMemory, EntityMemoryConfig
 from victor.storage.memory.entity_types import Entity, EntityType
-from victor.storage.memory.extractors.composite import CompositeExtractor, create_default_extractor
+from victor.storage.memory.extractors.composite import (
+    CompositeExtractor,
+    create_default_extractor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +209,9 @@ class EntityMemoryIntegration:
 
             # Get related entities
             if include_related:
-                related = await self._entity_memory.get_related(entity.id, limit=max_related)
+                related = await self._entity_memory.get_related(
+                    entity.id, limit=max_related
+                )
                 for rel_entity, relation in related:
                     context["relationships"].append(
                         {

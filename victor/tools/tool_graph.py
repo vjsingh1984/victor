@@ -507,7 +507,9 @@ class ToolExecutionGraph:
                 # Reduce score for recently used tools
                 if transition.to_tool in recent_set:
                     score *= 0.5
-                candidates[transition.to_tool] = max(candidates.get(transition.to_tool, 0), score)
+                candidates[transition.to_tool] = max(
+                    candidates.get(transition.to_tool, 0), score
+                )
 
         # 2. Add cluster-related tools with lower score
         cluster_tools = self.get_cluster_tools(current_tool)
@@ -675,7 +677,9 @@ class ToolExecutionGraph:
                 # This tool depends on current_tool, so it's a candidate
                 dep_node = self._nodes.get(tool_name)
                 if dep_node:
-                    candidates[tool_name] = max(candidates.get(tool_name, 0), dep_node.weight * 0.9)
+                    candidates[tool_name] = max(
+                        candidates.get(tool_name, 0), dep_node.weight * 0.9
+                    )
 
         # Sort by weight descending
         return sorted(candidates.items(), key=lambda x: x[1], reverse=True)

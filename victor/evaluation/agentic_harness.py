@@ -164,7 +164,9 @@ class AgenticExecutionTrace:
                 {
                     "path": fe.path,
                     "action": fe.action,
-                    "before_content": fe.before_content[:500] if fe.before_content else "",
+                    "before_content": (
+                        fe.before_content[:500] if fe.before_content else ""
+                    ),
                     "after_content": fe.after_content[:500] if fe.after_content else "",
                     "diff": fe.diff,
                 }
@@ -328,7 +330,9 @@ class AgenticMetrics:
                 "successful_corrections": self.successful_corrections,
                 "correction_success_rate": round(self.correction_success_rate, 4),
                 "total_auto_fixes": self.total_auto_fixes,
-                "total_correction_time_seconds": round(self.total_correction_time_seconds, 2),
+                "total_correction_time_seconds": round(
+                    self.total_correction_time_seconds, 2
+                ),
                 "avg_correction_time": round(self.avg_correction_time, 2),
             },
             "tasks": [
@@ -615,7 +619,11 @@ class ToolUsageValidator(AgenticValidator):
         efficiency_score = min(1.0, 10 / max(1, trace.total_tool_calls))
 
         # Combined score
-        score = 0.4 * (1.0 if has_file_edit else 0.3) + 0.3 * success_rate + 0.3 * efficiency_score
+        score = (
+            0.4 * (1.0 if has_file_edit else 0.3)
+            + 0.3 * success_rate
+            + 0.3 * efficiency_score
+        )
 
         if has_file_edit and success_rate >= 0.8:
             return True, "", score
@@ -664,7 +672,9 @@ class SemanticMatchValidator(AgenticValidator):
 
                 self._embedding_service = get_embedding_service()
             except ImportError:
-                logger.warning("EmbeddingService not available, semantic match disabled")
+                logger.warning(
+                    "EmbeddingService not available, semantic match disabled"
+                )
         return self._embedding_service
 
     async def validate(
@@ -717,7 +727,9 @@ class SemanticMatchValidator(AgenticValidator):
             # 4. Compare file edits against expected changes
             if trace.file_edits and task.patch:
                 combined_edits = "\n".join(
-                    fe.after_content[:500] for fe in trace.file_edits if fe.after_content
+                    fe.after_content[:500]
+                    for fe in trace.file_edits
+                    if fe.after_content
                 )
                 if combined_edits:
                     expected_texts.append(self._normalize_code(task.patch))
@@ -746,9 +758,17 @@ class SemanticMatchValidator(AgenticValidator):
 
             # Determine pass/fail and message
             if avg_similarity >= self.HIGH_SIMILARITY_THRESHOLD:
-                return True, f"Excellent semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    True,
+                    f"Excellent semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
             elif avg_similarity >= self._threshold:
-                return True, f"Good semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    True,
+                    f"Good semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
             elif max_similarity >= self._threshold:
                 # At least one comparison passed
                 return (
@@ -757,7 +777,11 @@ class SemanticMatchValidator(AgenticValidator):
                     max_similarity,
                 )
             else:
-                return False, f"Poor semantic match: {avg_similarity:.2%}", avg_similarity
+                return (
+                    False,
+                    f"Poor semantic match: {avg_similarity:.2%}",
+                    avg_similarity,
+                )
 
         except Exception as e:
             logger.warning(f"Semantic match validation error: {e}")
@@ -879,13 +903,17 @@ class TaskCompleteValidator(AgenticValidator):
         combined_final = " ".join(final_messages)
 
         # Check for explicit completion
-        has_completion = any(phrase in combined_final for phrase in self.COMPLETION_PHRASES)
+        has_completion = any(
+            phrase in combined_final for phrase in self.COMPLETION_PHRASES
+        )
 
         # Check for failure indicators
         has_failure = any(phrase in combined_final for phrase in self.FAILURE_PHRASES)
 
         # Check for uncertainty
-        has_uncertainty = any(phrase in combined_final for phrase in self.UNCERTAINTY_PHRASES)
+        has_uncertainty = any(
+            phrase in combined_final for phrase in self.UNCERTAINTY_PHRASES
+        )
 
         # Check for actual work done (file edits or successful tool calls)
         has_edits = len(trace.file_edits) > 0
@@ -968,7 +996,9 @@ class AgenticBenchmarkRunner:
     async def run_task(
         self,
         task: BenchmarkTask,
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
     ) -> AgenticTaskResult:
         """Run a single agentic task.
@@ -1013,23 +1043,35 @@ class AgenticBenchmarkRunner:
             # Run all validators
             scores = {}
             for validator in self._validators:
-                passed, error, score = await validator.validate(task, trace, workspace_dir)
+                passed, error, score = await validator.validate(
+                    task, trace, workspace_dir
+                )
                 trace.validations[validator.validation_type.value] = passed
                 if error:
                     trace.validation_errors[validator.validation_type.value] = error
                 scores[validator.validation_type.value] = score
 
             # Calculate scores
-            result.patch_score = scores.get(AgenticValidationType.PATCH_APPLIES.value, 0.0)
+            result.patch_score = scores.get(
+                AgenticValidationType.PATCH_APPLIES.value, 0.0
+            )
             result.test_score = scores.get(AgenticValidationType.TESTS_PASS.value, 0.0)
-            result.edit_accuracy = scores.get(AgenticValidationType.FILE_EDITS.value, 0.0)
-            result.tool_efficiency = scores.get(AgenticValidationType.TOOL_USAGE.value, 0.0)
+            result.edit_accuracy = scores.get(
+                AgenticValidationType.FILE_EDITS.value, 0.0
+            )
+            result.tool_efficiency = scores.get(
+                AgenticValidationType.TOOL_USAGE.value, 0.0
+            )
             result.calculate_overall_score()
 
             # Determine pass/fail
             # Success = patch applies AND tests pass
-            patch_ok = trace.validations.get(AgenticValidationType.PATCH_APPLIES.value, False)
-            tests_ok = trace.validations.get(AgenticValidationType.TESTS_PASS.value, False)
+            patch_ok = trace.validations.get(
+                AgenticValidationType.PATCH_APPLIES.value, False
+            )
+            tests_ok = trace.validations.get(
+                AgenticValidationType.TESTS_PASS.value, False
+            )
 
             if patch_ok and tests_ok:
                 result.status = TaskStatus.PASSED
@@ -1058,9 +1100,13 @@ class AgenticBenchmarkRunner:
     async def run_benchmark(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
         max_parallel: int = 1,
     ) -> AgenticMetrics:
         """Run complete benchmark with optional parallel execution.
@@ -1080,7 +1126,9 @@ class AgenticBenchmarkRunner:
 
         if max_parallel <= 1:
             # Sequential execution (original behavior)
-            await self._run_sequential(tasks, agent_callback, config, metrics, progress_callback)
+            await self._run_sequential(
+                tasks, agent_callback, config, metrics, progress_callback
+            )
         else:
             # Parallel execution
             await self._run_parallel(
@@ -1090,21 +1138,33 @@ class AgenticBenchmarkRunner:
         # Calculate averages
         n = len(metrics.task_results)
         if n > 0:
-            metrics.avg_patch_score = sum(r.patch_score for r in metrics.task_results) / n
+            metrics.avg_patch_score = (
+                sum(r.patch_score for r in metrics.task_results) / n
+            )
             metrics.avg_test_score = sum(r.test_score for r in metrics.task_results) / n
-            metrics.avg_edit_accuracy = sum(r.edit_accuracy for r in metrics.task_results) / n
-            metrics.avg_tool_efficiency = sum(r.tool_efficiency for r in metrics.task_results) / n
-            metrics.avg_overall_score = sum(r.overall_score for r in metrics.task_results) / n
+            metrics.avg_edit_accuracy = (
+                sum(r.edit_accuracy for r in metrics.task_results) / n
+            )
+            metrics.avg_tool_efficiency = (
+                sum(r.tool_efficiency for r in metrics.task_results) / n
+            )
+            metrics.avg_overall_score = (
+                sum(r.overall_score for r in metrics.task_results) / n
+            )
 
         return metrics
 
     async def _run_sequential(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
         metrics: AgenticMetrics,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
     ) -> None:
         """Run tasks sequentially."""
         for i, task in enumerate(tasks):
@@ -1128,10 +1188,14 @@ class AgenticBenchmarkRunner:
     async def _run_parallel(
         self,
         tasks: list[BenchmarkTask],
-        agent_callback: Callable[[BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]],
+        agent_callback: Callable[
+            [BenchmarkTask, Path], Awaitable[AgenticExecutionTrace]
+        ],
         config: EvaluationConfig,
         metrics: AgenticMetrics,
-        progress_callback: Optional[Callable[[int, int, AgenticTaskResult], None]] = None,
+        progress_callback: Optional[
+            Callable[[int, int, AgenticTaskResult], None]
+        ] = None,
         max_parallel: int = 4,
     ) -> None:
         """Run tasks in parallel with concurrency limit.
@@ -1191,7 +1255,9 @@ class AgenticBenchmarkRunner:
             if i in results_by_index:
                 metrics.task_results.append(results_by_index[i])
 
-    def _update_metrics_counts(self, metrics: AgenticMetrics, result: AgenticTaskResult) -> None:
+    def _update_metrics_counts(
+        self, metrics: AgenticMetrics, result: AgenticTaskResult
+    ) -> None:
         """Update metrics counts based on task result status."""
         if result.status == TaskStatus.PASSED:
             metrics.passed += 1

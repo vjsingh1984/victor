@@ -295,7 +295,9 @@ class OllamaCapabilityDetector:
 _global_detector: Optional[OllamaCapabilityDetector] = None
 
 
-def get_global_detector(base_url: str = "http://localhost:11434") -> OllamaCapabilityDetector:
+def get_global_detector(
+    base_url: str = "http://localhost:11434",
+) -> OllamaCapabilityDetector:
     """Get or create the global detector instance.
 
     Args:

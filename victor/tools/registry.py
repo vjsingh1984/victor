@@ -16,7 +16,17 @@
 
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
@@ -93,7 +103,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._ToolResult = ToolResult
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
-        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
+        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = (
+            []
+        )
         self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
         # Schema cache: version-counter based invalidation for O(1) cache checks.
@@ -156,7 +168,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if isinstance(hook, Hook):
             return hook
         return Hook(
-            callback=hook, name=name or getattr(hook, "__name__", "hook"), critical=critical
+            callback=hook,
+            name=name or getattr(hook, "__name__", "hook"),
+            critical=critical,
         )
 
     def register_before_hook(
@@ -221,7 +235,10 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
             # Check feature flag for strategy-based registration
             try:
-                from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+                from victor.core.feature_flags import (
+                    get_feature_flag_manager,
+                    FeatureFlag,
+                )
 
                 if get_feature_flag_manager().is_enabled(
                     FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
@@ -262,14 +279,18 @@ class ToolRegistry(BaseRegistry[str, Any]):
             tool: Tool to register
             enabled: Whether tool is enabled
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
 
         strategy = self._strategy_registry.get_strategy_for(tool)
         if strategy is None:
-            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
+            raise TypeError(
+                f"No registration strategy found for tool type: {type(tool)}"
+            )
 
         strategy.register(self, tool, enabled)
         self._invalidate_schema_cache()
@@ -317,7 +338,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Args:
             strategy: Strategy to add
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
@@ -359,7 +382,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
             def parameters(self) -> Dict[str, Any]:
                 return parameters
 
-            async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+            async def execute(
+                self, _exec_ctx: Dict[str, Any], **kwargs: Any
+            ) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
                     success=False,
@@ -507,7 +532,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if only_enabled:
             return [
-                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
+                tool
+                for name, tool in self._tools.items()
+                if self._tool_enabled.get(name, False)
             ]
         return list(self._tools.values())
 
@@ -562,7 +589,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
             return tool.cost_tier
         return None
 
-    def get_tools_by_cost(self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True):
+    def get_tools_by_cost(
+        self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True
+    ):
         """Get tools filtered by maximum cost tier.
 
         Args:
@@ -626,7 +655,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
             # Use detailed validation for better error messages
             validation = tool.validate_parameters_detailed(**kwargs)
             if not validation.valid:
-                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(validation.errors)
+                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(
+                    validation.errors
+                )
                 result = ToolResult(
                     success=False,
                     output=None,

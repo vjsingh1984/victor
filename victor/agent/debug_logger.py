@@ -76,7 +76,9 @@ NOISY_LOGGERS = [
 ]
 
 
-def configure_logging_levels(log_level: str = "INFO", file_logging_enabled: bool = True) -> None:
+def configure_logging_levels(
+    log_level: str = "INFO", file_logging_enabled: bool = True
+) -> None:
     """Configure logging levels, silencing noisy third-party loggers.
 
     Args:
@@ -223,7 +225,9 @@ class DebugLogger:
         self.stats.tool_calls_made += 1
 
         # Compact args preview
-        args_str = ", ".join(f"{k}={self._truncate(str(v), 30)}" for k, v in list(args.items())[:3])
+        args_str = ", ".join(
+            f"{k}={self._truncate(str(v), 30)}" for k, v in list(args.items())[:3]
+        )
         if len(args) > 3:
             args_str += f", +{len(args)-3} more"
 
@@ -241,7 +245,9 @@ class DebugLogger:
         if not self.enabled:
             return
 
-        icon = self._presentation.icon("success" if success else "error", with_color=False)
+        icon = self._presentation.icon(
+            "success" if success else "error", with_color=False
+        )
         output_str = str(output) if output else ""
         size = f"{len(output_str):,} chars" if output_str else "empty"
 
@@ -269,7 +275,9 @@ class DebugLogger:
         self.stats.total_messages = len(messages)
         self.stats.total_chars = sum(len(m.content) for m in messages)
         self.stats.user_messages = sum(1 for m in messages if m.role == "user")
-        self.stats.assistant_messages = sum(1 for m in messages if m.role == "assistant")
+        self.stats.assistant_messages = sum(
+            1 for m in messages if m.role == "assistant"
+        )
         self.stats.tool_messages = sum(1 for m in messages if m.role == "tool")
 
     def log_limits(
@@ -285,7 +293,9 @@ class DebugLogger:
             return
 
         budget_pct = (tool_calls_used / tool_budget * 100) if tool_budget > 0 else 0
-        iter_pct = (current_iteration / max_iterations * 100) if max_iterations > 0 else 0
+        iter_pct = (
+            (current_iteration / max_iterations * 100) if max_iterations > 0 else 0
+        )
         mode = "analysis" if is_analysis_task else "standard"
 
         self.logger.debug(

@@ -54,11 +54,15 @@ def call_lifecycle_hook(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
         try:
             return method(**kwargs)
         except Exception as e:
-            logger.warning("Lifecycle hook '%s' failed on plugin '%s': %s", hook, plugin.name, e)
+            logger.warning(
+                "Lifecycle hook '%s' failed on plugin '%s': %s", hook, plugin.name, e
+            )
     return None
 
 
-async def call_lifecycle_hook_async(plugin: VictorPlugin, hook: str, **kwargs: Any) -> Any:
+async def call_lifecycle_hook_async(
+    plugin: VictorPlugin, hook: str, **kwargs: Any
+) -> Any:
     """Async-aware lifecycle hook dispatch.
 
     Prefers ``{hook}_async`` if the plugin implements it, otherwise
@@ -188,7 +192,9 @@ class PluginRegistry:
             ep_entries = aot_entries.get(self.ENTRY_POINT_GROUP, {})
         else:
             cache = get_entry_point_cache()
-            ep_entries = cache.get_entry_points(self.ENTRY_POINT_GROUP, force_refresh=force)
+            ep_entries = cache.get_entry_points(
+                self.ENTRY_POINT_GROUP, force_refresh=force
+            )
 
         for name, value in ep_entries.items():
             try:
@@ -265,7 +271,9 @@ class PluginRegistry:
             for group, entries in manifest.entries.items():
                 group_dict: Dict[str, str] = {}
                 for entry in entries:
-                    value = f"{entry.module}:{entry.attr}" if entry.attr else entry.module
+                    value = (
+                        f"{entry.module}:{entry.attr}" if entry.attr else entry.module
+                    )
                     group_dict[entry.name] = value
                 result[group] = group_dict
 
@@ -319,7 +327,9 @@ class PluginRegistry:
                 plugin.register(self._context)
                 logger.debug(f"Registered plugin: {plugin.name}")
             except Exception as e:
-                logger.error(f"Failed to register plugin {plugin.name}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to register plugin {plugin.name}: {e}", exc_info=True
+                )
 
     @property
     def context(self) -> Optional[HostPluginContext]:

@@ -105,7 +105,11 @@ class ContextMetrics:
 
     @property
     def utilization(self) -> float:
-        return min(1.0, self.char_count / self.max_context_chars) if self.max_context_chars else 0.0
+        return (
+            min(1.0, self.char_count / self.max_context_chars)
+            if self.max_context_chars
+            else 0.0
+        )
 
     @property
     def max_tokens(self) -> int:
@@ -204,7 +208,9 @@ class ConversationController:
         if self._history.messages and self._history.messages[0].role == "system":
             self._system_added = True
             return
-        self._history._messages.insert(0, Message(role="system", content=self._system_prompt))
+        self._history._messages.insert(
+            0, Message(role="system", content=self._system_prompt)
+        )
         self._system_added = True
 
     def add_user_message(self, content: str, **kwargs: Any) -> Message:
@@ -232,7 +238,9 @@ class ConversationController:
         if result.changes:
             logger.debug(f"Normalized prompt: {result.changes}")
         if result.is_duplicate:
-            logger.debug("Detected duplicate message (will still add for conversational flow)")
+            logger.debug(
+                "Detected duplicate message (will still add for conversational flow)"
+            )
 
         message = self._history.add_user_message(normalized_content)
         if self.config.enable_stage_tracking:
@@ -245,7 +253,10 @@ class ConversationController:
         return message
 
     def add_assistant_message(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None, **kwargs: Any
+        self,
+        content: str,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        **kwargs: Any,
     ) -> Message:
         message = self._history.add_assistant_message(content, tool_calls=tool_calls)
         if self.config.enable_stage_tracking:
@@ -439,7 +450,9 @@ class ConversationController:
 
         # Generate summary of removed messages
         removed_indices = {sm.index for sm in scored_messages[target:]}
-        removed_messages = [m for i, m in enumerate(self.messages) if i in removed_indices]
+        removed_messages = [
+            m for i, m in enumerate(self.messages) if i in removed_indices
+        ]
         if removed_messages:
             summary = self._generate_compaction_summary(removed_messages)
             if summary:
@@ -453,7 +466,9 @@ class ConversationController:
                 self.persist_compaction_summary(summary, message_ids)
 
         # Rebuild message list
-        removed_count = len(self.messages) - len(messages_to_keep) - (1 if system_msg else 0)
+        removed_count = (
+            len(self.messages) - len(messages_to_keep) - (1 if system_msg else 0)
+        )
         self._history.clear()
 
         if system_msg:
@@ -468,7 +483,9 @@ class ConversationController:
         )
         return removed_count
 
-    def _score_messages(self, current_query: Optional[str] = None) -> List[MessageImportance]:
+    def _score_messages(
+        self, current_query: Optional[str] = None
+    ) -> List[MessageImportance]:
         """Score messages for importance during compaction.
 
         Scoring factors:
@@ -535,7 +552,9 @@ class ConversationController:
                 and self.config.compaction_strategy
                 in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
             ):
-                similarity = self._compute_semantic_similarity(msg.content, current_query)
+                similarity = self._compute_semantic_similarity(
+                    msg.content, current_query
+                )
                 if similarity > self.config.semantic_relevance_threshold:
                     score += similarity * 3.0
                     reason_parts.append(f"semantic:{similarity:.2f}")
@@ -572,7 +591,9 @@ class ConversationController:
         except ImportError:
             logger.debug("cosine_similarity not available, returning 0.0")
         except (ValueError, TypeError) as e:
-            logger.warning(f"Semantic similarity computation failed (bad embeddings): {e}")
+            logger.warning(
+                f"Semantic similarity computation failed (bad embeddings): {e}"
+            )
 
         return 0.0
 
@@ -631,7 +652,9 @@ class ConversationController:
         # Simple keyword extraction - find capitalized words and technical terms
         words = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b", text)  # CamelCase
         words += re.findall(r"\b[a-z]+_[a-z_]+\b", text)  # snake_case
-        words += re.findall(r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower())
+        words += re.findall(
+            r"\b(?:def|class|function|file|error|test|api)\s+\w+", text.lower()
+        )
 
         # Deduplicate and limit
         seen = set()
@@ -684,7 +707,9 @@ class ConversationController:
 
         # Fallback: direct insertion (backward compat)
         if len(self.messages) > 1:
-            reminder_msg = Message(role="assistant", content=f"[Context reminder: {combined}]")
+            reminder_msg = Message(
+                role="assistant", content=f"[Context reminder: {combined}]"
+            )
             self._history._messages.insert(1, reminder_msg)
             logger.debug(f"Injected compaction context: {combined[:100]}...")
             return True
@@ -754,7 +779,9 @@ class ConversationController:
 
             for msg, score in relevant_msgs:
                 # Format as context reminder
-                role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                role_label = (
+                    msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                )
                 context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
                 relevant_context.append(context)
 

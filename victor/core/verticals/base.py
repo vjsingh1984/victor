@@ -55,7 +55,17 @@ if TYPE_CHECKING:
     from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set, Type, TYPE_CHECKING
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Type,
+    TYPE_CHECKING,
+)
 
 from victor.framework.tools import ToolSet
 from victor_sdk.core.types import Tier
@@ -146,7 +156,8 @@ class VerticalConfig:
             "tools": self.get_tool_names(),
             "system_prompt": self.system_prompt,
             "stages": {
-                k: {"name": v.name, "description": v.description} for k, v in self.stages.items()
+                k: {"name": v.name, "description": v.description}
+                for k, v in self.stages.items()
             },
             "provider_hints": self.provider_hints,
             "evaluation_criteria": self.evaluation_criteria,
@@ -346,7 +357,9 @@ class VerticalBase(
         from victor.core.verticals.composition import CapabilityComposer
 
         # Check if composition mode is enabled
-        if get_feature_flag_manager().is_enabled(FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE):
+        if get_feature_flag_manager().is_enabled(
+            FeatureFlag.USE_COMPOSITION_OVER_INHERITANCE
+        ):
             logger.debug(f"[{cls.__name__}] Using composition mode")
 
         return CapabilityComposer(cls)
@@ -830,7 +843,8 @@ class VerticalRegistry:
                 elif existing_is_contrib and not new_is_contrib:
                     # External overriding contrib — expected upgrade
                     logger.info(
-                        "External vertical '%s' (%s) overrides deprecated " "contrib version (%s).",
+                        "External vertical '%s' (%s) overrides deprecated "
+                        "contrib version (%s).",
                         name,
                         new_module,
                         existing_module,
@@ -946,7 +960,11 @@ class VerticalRegistry:
         registry = get_entry_point_registry()
         group_obj = registry.get_group(cls.ENTRY_POINT_GROUP)
 
-        eps = [(ep, loaded) for ep, loaded in group_obj.entry_points.values()] if group_obj else []
+        eps = (
+            [(ep, loaded) for ep, loaded in group_obj.entry_points.values()]
+            if group_obj
+            else []
+        )
         if eps:
             cls._warn_legacy_entry_point_usage(ep.name for ep, _loaded in eps)
 
@@ -977,7 +995,8 @@ class VerticalRegistry:
                 cls.register(vertical_class)
                 discovered[vertical_class.name] = vertical_class
                 logger.info(
-                    f"Discovered external vertical: {vertical_class.name} " f"(from {ep.value})"
+                    f"Discovered external vertical: {vertical_class.name} "
+                    f"(from {ep.value})"
                 )
 
             except Exception as e:
@@ -1052,7 +1071,12 @@ class VerticalRegistry:
             return False
 
         # Validate the minimal callable contract without executing runtime-heavy hooks.
-        required_methods = ("get_name", "get_description", "get_tools", "get_system_prompt")
+        required_methods = (
+            "get_name",
+            "get_description",
+            "get_tools",
+            "get_system_prompt",
+        )
         for method_name in required_methods:
             method = getattr(vertical_class, method_name, None)
             if method is None or not callable(method):
@@ -1133,7 +1157,9 @@ class VerticalRegistry:
             pass
 
         try:
-            from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+            from victor.framework.entry_point_loader import (
+                clear_entry_point_loader_cache,
+            )
 
             clear_entry_point_loader_cache()
         except Exception:

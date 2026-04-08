@@ -117,7 +117,9 @@ class MCPClient:
         self._sandboxed_process: Optional["SandboxedProcess"] = None
 
         # Connection state
-        self._command: Optional[List[str]] = command  # Store for reconnection and context manager
+        self._command: Optional[List[str]] = (
+            command  # Store for reconnection and context manager
+        )
         self._last_health_check: float = 0.0
         self._consecutive_failures: int = 0
         self._health_task: Optional[asyncio.Task] = None
@@ -155,7 +157,9 @@ class MCPClient:
                         f"timeout={self._sandbox_config.timeout_seconds}s"
                     )
                 except Exception as e:
-                    logger.warning(f"Sandboxed process failed, falling back to regular: {e}")
+                    logger.warning(
+                        f"Sandboxed process failed, falling back to regular: {e}"
+                    )
                     self.process = subprocess.Popen(
                         command,
                         stdin=subprocess.PIPE,
@@ -438,7 +442,10 @@ class MCPClient:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
                 None,
-                lambda: (self.process.stdin.write(request_json + "\n"), self.process.stdin.flush()),
+                lambda: (
+                    self.process.stdin.write(request_json + "\n"),
+                    self.process.stdin.flush(),
+                ),
             )
 
             # Read response with timeout to avoid indefinite blocking
@@ -458,7 +465,9 @@ class MCPClient:
 
             # Verify response ID matches
             if response.get("id") != msg_id:
-                logger.warning(f"Response ID mismatch: {response.get('id')} != {msg_id}")
+                logger.warning(
+                    f"Response ID mismatch: {response.get('id')} != {msg_id}"
+                )
 
             return response
 
@@ -676,7 +685,8 @@ class MCPClient:
 
         if self._consecutive_failures >= self._max_reconnect_attempts:
             logger.error(
-                f"Max reconnect attempts ({self._max_reconnect_attempts}) exceeded, " "giving up"
+                f"Max reconnect attempts ({self._max_reconnect_attempts}) exceeded, "
+                "giving up"
             )
             await self.close("max_retries_exceeded")
             return False
@@ -893,7 +903,9 @@ class MCPClient:
         This is a safety net - prefer using context manager or calling close() explicitly.
         """
         if self.process is not None or self._sandboxed_process is not None:
-            logger.debug("MCPClient being garbage collected with active process - cleaning up")
+            logger.debug(
+                "MCPClient being garbage collected with active process - cleaning up"
+            )
             # Use sync cleanup as we can't await in __del__
             self._cleanup_process_sync()
             if self._sandboxed_process is not None:

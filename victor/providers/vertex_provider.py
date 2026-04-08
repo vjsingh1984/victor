@@ -151,7 +151,9 @@ class VertexAIProvider(BaseProvider):
             )
 
         auth_method = (
-            "API key" if self._api_key else "Google Cloud ADC (Application Default Credentials)"
+            "API key"
+            if self._api_key
+            else "Google Cloud ADC (Application Default Credentials)"
         )
 
         # Build base URL for Vertex AI
@@ -221,7 +223,9 @@ class VertexAIProvider(BaseProvider):
                             "Failed to get access token from gcloud CLI"
                         )
                 except Exception as e:
-                    self._provider_logger.logger.warning(f"Failed to get access token: {e}")
+                    self._provider_logger.logger.warning(
+                        f"Failed to get access token: {e}"
+                    )
 
         return headers
 
@@ -333,7 +337,9 @@ class VertexAIProvider(BaseProvider):
                 f"Vertex AI streaming request: model={model}, msgs={len(messages)}, tools={tools is not None}"
             )
 
-            async with self.client.stream("POST", url, json=payload, headers=headers) as response:
+            async with self.client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as response:
                 response.raise_for_status()
                 accumulated_tool_calls: List[Dict[str, Any]] = []
 
@@ -345,7 +351,11 @@ class VertexAIProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                            tool_calls=(
+                                accumulated_tool_calls
+                                if accumulated_tool_calls
+                                else None
+                            ),
                             stop_reason="stop",
                             is_final=True,
                         )
@@ -353,7 +363,9 @@ class VertexAIProvider(BaseProvider):
 
                     try:
                         chunk_data = json.loads(data_str)
-                        yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+                        yield self._parse_stream_chunk(
+                            chunk_data, accumulated_tool_calls
+                        )
                     except json.JSONDecodeError:
                         self._provider_logger.logger.warning(
                             f"Vertex AI JSON decode error on line: {line[:100]}"

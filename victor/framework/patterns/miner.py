@@ -336,7 +336,8 @@ class PatternMiner:
         """
         # Check for manager/worker naming
         has_manager = any(
-            "manager" in n.lower() or "coordinator" in n.lower() for n in trace.nodes_executed
+            "manager" in n.lower() or "coordinator" in n.lower()
+            for n in trace.nodes_executed
         )
         has_worker = any(
             "worker" in n.lower() or "agent" in n.lower() for n in trace.nodes_executed
@@ -344,7 +345,9 @@ class PatternMiner:
 
         return has_manager and has_worker
 
-    def _extract_participants(self, traces: List[WorkflowExecutionTrace]) -> List[Dict[str, Any]]:
+    def _extract_participants(
+        self, traces: List[WorkflowExecutionTrace]
+    ) -> List[Dict[str, Any]]:
         """Extract participant specs from traces.
 
         Args:

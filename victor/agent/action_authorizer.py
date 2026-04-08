@@ -150,12 +150,20 @@ class IntentClassification:
 DISPLAY_SIGNALS: List[Tuple[str, float, str]] = [
     (r"\bshow\s+me\b", 1.0, "show_me"),
     (r"\bgive\s+me\s+(an?\s+)?(example|code)\b", 0.9, "give_example"),
-    (r"\bcreate\s+(a|an)\s+\w*\s*(function|class|method|script)\b", 0.8, "create_function"),
+    (
+        r"\bcreate\s+(a|an)\s+\w*\s*(function|class|method|script)\b",
+        0.8,
+        "create_function",
+    ),
     (r"\bwrite\s+(a|an)\s+\w*\s*(function|class|method)\b", 0.7, "write_function"),
     (r"\bhow\s+(do|would)\s+(i|you)\s+(write|create|implement)\b", 0.9, "how_to_write"),
     (r"\bwhat\s+(does|would)\s+\w+\s+look\s+like\b", 0.8, "what_looks_like"),
     (r"\bjust\s+(show|display|print)\b", 1.0, "just_show"),
-    (r"\bdon'?t\s+(save|write|create)\s+(any\s+)?(files?|to\s+disk)\b", 1.0, "dont_write"),
+    (
+        r"\bdon'?t\s+(save|write|create)\s+(any\s+)?(files?|to\s+disk)\b",
+        1.0,
+        "dont_write",
+    ),
     (r"\bdisplay\s+(only|it)\b", 1.0, "display_only"),
     (r"\bwithout\s+(saving|writing)\b", 0.9, "without_saving"),
 ]
@@ -170,14 +178,22 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         0.9,
         "add_to_file",
     ),
-    (r"\badd\s+(this|it)\s+(function\s+)?(into|to)\s+\w+\.(py|js|ts)", 0.9, "add_into_file"),
+    (
+        r"\badd\s+(this|it)\s+(function\s+)?(into|to)\s+\w+\.(py|js|ts)",
+        0.9,
+        "add_into_file",
+    ),
     (r"\bupdate\s+(the\s+)?file\b", 0.9, "update_file"),
     (r"\bmodify\s+(the\s+)?\w+\.(py|js|ts|java|cpp)", 0.9, "modify_file"),
     (r"\b(edit|change)\s+(the\s+)?file\b", 0.8, "edit_file"),
     (r"\bsave\s+changes\b", 0.9, "save_changes"),
     (r"\bwrite\s+(this|it)\s+to\s+disk\b", 1.0, "write_to_disk"),
     (r"\badd\s+(this\s+)?to\s+\w+\.(py|js|ts)", 0.8, "add_to_ext"),
-    (r"\bimplement\s+(this\s+)?(in|into)\s+\w+\.(py|js|ts)", 0.8, "implement_into_file"),
+    (
+        r"\bimplement\s+(this\s+)?(in|into)\s+\w+\.(py|js|ts)",
+        0.8,
+        "implement_into_file",
+    ),
 ]
 
 # Signals that indicate read-only intent (no generation)
@@ -200,7 +216,11 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         1.0,
         "analyze_then_fix",
     ),
-    (r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b", 1.0, "find_and_fix"),
+    (
+        r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b",
+        1.0,
+        "find_and_fix",
+    ),
     (
         r"\b(fix|correct|resolve)\s+(any|all|the)?\s*(bugs?|issues?|errors?|problems?)\b",
         0.9,
@@ -209,11 +229,19 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
     # "Fix the bug in X" patterns
     (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\s+(in|with)\b", 0.9, "fix_in"),
     # "Apply the fix/changes" patterns
-    (r"\b(apply|implement)\s+(the\s+)?(fix|changes?|improvements?)\b", 0.9, "apply_fix"),
+    (
+        r"\b(apply|implement)\s+(the\s+)?(fix|changes?|improvements?)\b",
+        0.9,
+        "apply_fix",
+    ),
     # "Make the changes" / "make it work"
     (r"\bmake\s+(the\s+)?(changes?|it\s+work|corrections?)\b", 0.8, "make_changes"),
     # "Refactor and improve"
-    (r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b", 0.8, "refactor_improve"),
+    (
+        r"\b(refactor|clean\s*up)\s+(and\s+)?(improve|optimize)?\b",
+        0.8,
+        "refactor_improve",
+    ),
     # =============================================================================
     # Implementation task patterns - tasks that require creating/modifying artifacts
     # =============================================================================
@@ -264,7 +292,11 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         "add_feature",
     ),
     # "Set up/Configure {tool/system}" - setup tasks
-    (r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+", 0.8, "setup_configure"),
+    (
+        r"\b(set\s*up|configure|initialize|bootstrap)\s+(a\s+)?\w+",
+        0.8,
+        "setup_configure",
+    ),
     # "Build/Deploy {service/app}" - deployment tasks
     (
         r"\b(build|deploy|release)\s+(the\s+)?\w+\s*(service|app|application|container)?",
@@ -288,7 +320,12 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
 
 # Safe actions by intent type
 SAFE_ACTIONS: dict[ActionIntent, Set[str]] = {
-    ActionIntent.READ_ONLY: {"read_file", "list_directory", "code_search", "git_status"},
+    ActionIntent.READ_ONLY: {
+        "read_file",
+        "list_directory",
+        "code_search",
+        "git_status",
+    },
     ActionIntent.DISPLAY_ONLY: {
         "read_file",
         "list_directory",
@@ -362,7 +399,9 @@ class IntentDetector:
         self,
         custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
+        custom_detectors: Optional[
+            List[Callable[[str], Optional[IntentClassification]]]
+        ] = None,
         default_intent: ActionIntent = ActionIntent.DISPLAY_ONLY,
     ):
         """Initialize the intent detector.
@@ -421,9 +460,13 @@ class IntentDetector:
                 return result
 
         # Score each intent type
-        display_score, display_matched = self._score_patterns(message, self._display_patterns)
+        display_score, display_matched = self._score_patterns(
+            message, self._display_patterns
+        )
         write_score, write_matched = self._score_patterns(message, self._write_patterns)
-        read_only_score, read_only_matched = self._score_patterns(message, self._read_only_patterns)
+        read_only_score, read_only_matched = self._score_patterns(
+            message, self._read_only_patterns
+        )
         compound_score, compound_matched = self._score_patterns(
             message, self._compound_write_patterns
         )

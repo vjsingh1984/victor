@@ -148,7 +148,9 @@ class LSPCompletionProvider(BaseCompletionProvider):
                 line=params.position.line,
                 character=params.position.character,
                 trigger_kind=params.context.trigger_kind if params.context else 1,
-                trigger_character=params.context.trigger_character if params.context else None,
+                trigger_character=(
+                    params.context.trigger_character if params.context else None
+                ),
             )
 
             if lsp_result is None:
@@ -259,7 +261,9 @@ class LSPCompletionProvider(BaseCompletionProvider):
         # Handle insert text format
         insert_format = lsp_item.get("insertTextFormat", 1)
         insert_text_format = (
-            InsertTextFormat.SNIPPET if insert_format == 2 else InsertTextFormat.PLAIN_TEXT
+            InsertTextFormat.SNIPPET
+            if insert_format == 2
+            else InsertTextFormat.PLAIN_TEXT
         )
 
         # Handle text edit

@@ -108,13 +108,17 @@ class PersonaTraits:
     def __post_init__(self) -> None:
         """Validate trait values after initialization."""
         if not 0.0 <= self.verbosity <= 1.0:
-            raise ValueError(f"verbosity must be between 0.0 and 1.0, got {self.verbosity}")
+            raise ValueError(
+                f"verbosity must be between 0.0 and 1.0, got {self.verbosity}"
+            )
         if not 0.0 <= self.risk_tolerance <= 1.0:
             raise ValueError(
                 f"risk_tolerance must be between 0.0 and 1.0, got {self.risk_tolerance}"
             )
         if not 0.0 <= self.creativity <= 1.0:
-            raise ValueError(f"creativity must be between 0.0 and 1.0, got {self.creativity}")
+            raise ValueError(
+                f"creativity must be between 0.0 and 1.0, got {self.creativity}"
+            )
 
     def to_system_prompt_fragment(self) -> str:
         """Generate a system prompt fragment for this persona.
@@ -161,7 +165,9 @@ class PersonaTraits:
         """
         data = data.copy()
         if isinstance(data.get("communication_style"), str):
-            data["communication_style"] = CommunicationStyle(data["communication_style"])
+            data["communication_style"] = CommunicationStyle(
+                data["communication_style"]
+            )
         if isinstance(data.get("expertise_level"), str):
             data["expertise_level"] = ExpertiseLevel(data["expertise_level"])
         return cls(**data)

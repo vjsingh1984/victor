@@ -93,8 +93,21 @@ def _get_headers(context: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     stages=["completion", "execution"],  # Same stages as slack
     task_types=["action", "search"],
     execution_category="network",
-    keywords=["teams", "microsoft", "message", "chat", "channel", "notification", "collaboration"],
-    mandatory_keywords=["send teams message", "post to teams", "teams channel", "microsoft teams"],
+    keywords=[
+        "teams",
+        "microsoft",
+        "message",
+        "chat",
+        "channel",
+        "notification",
+        "collaboration",
+    ],
+    mandatory_keywords=[
+        "send teams message",
+        "post to teams",
+        "teams channel",
+        "microsoft teams",
+    ],
     availability_check=is_teams_configured,  # Only available when configured
 )
 async def teams(
@@ -124,7 +137,10 @@ async def teams(
         A dictionary with the result of the operation.
     """
     if not HTTPX_AVAILABLE:
-        return {"success": False, "error": "httpx not installed. Install with: pip install httpx"}
+        return {
+            "success": False,
+            "error": "httpx not installed. Install with: pip install httpx",
+        }
 
     if not _get_teams_access_token(context):
         return {
@@ -147,7 +163,9 @@ async def teams(
                 return await _list_channels(client, team_id)
 
             elif operation == "create_channel":
-                return await _create_channel(client, team_id, channel_name, channel_description)
+                return await _create_channel(
+                    client, team_id, channel_name, channel_description
+                )
 
             else:
                 return {

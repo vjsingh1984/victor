@@ -232,4 +232,6 @@ def __getattr__(name: str):
         module = importlib.import_module(_LAZY_IMPORTS[name])
         return getattr(module, name)
 
-    raise AttributeError(f"module 'victor.framework.extensions' has no attribute {name!r}")
+    raise AttributeError(
+        f"module 'victor.framework.extensions' has no attribute {name!r}"
+    )

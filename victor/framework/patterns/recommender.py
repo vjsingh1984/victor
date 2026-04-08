@@ -390,7 +390,9 @@ class PatternRecommender:
 
         # Usage
         if pattern.metrics.usage_count >= 10:
-            reasons.append(f"Proven pattern with {pattern.metrics.usage_count} prior uses")
+            reasons.append(
+                f"Proven pattern with {pattern.metrics.usage_count} prior uses"
+            )
 
         if not reasons:
             reasons.append("General-purpose pattern with reasonable fit")
@@ -515,9 +517,13 @@ class PatternValidator:
         # Check participants
         num_participants = len(pattern.participants)
         if num_participants < self.min_participants:
-            errors.append(f"Pattern must have at least {self.min_participants} participant(s)")
+            errors.append(
+                f"Pattern must have at least {self.min_participants} participant(s)"
+            )
         if num_participants > self.max_participants:
-            errors.append(f"Pattern cannot have more than {self.max_participants} participants")
+            errors.append(
+                f"Pattern cannot have more than {self.max_participants} participants"
+            )
 
         # Check participant specs
         for i, p in enumerate(pattern.participants):

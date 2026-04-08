@@ -205,11 +205,15 @@ class EventCategoryRegistry:
                         f"Cannot re-register from '{registered_by}'."
                     )
                 # Same registrant - idempotent, return existing
-                logger.debug(f"Category '{name}' already registered by '{registered_by}'")
+                logger.debug(
+                    f"Category '{name}' already registered by '{registered_by}'"
+                )
                 return existing
 
             self._categories[name] = category
-            logger.info(f"Registered custom event category '{name}' by '{registered_by}'")
+            logger.info(
+                f"Registered custom event category '{name}' by '{registered_by}'"
+            )
 
         return category
 

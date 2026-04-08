@@ -125,7 +125,9 @@ class ChunkGenerator:
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit chunk tool start event: {e}")
-        return self.streaming_handler.generate_tool_start_chunk(tool_name, tool_args, status_msg)
+        return self.streaming_handler.generate_tool_start_chunk(
+            tool_name, tool_args, status_msg
+        )
 
     def generate_tool_result_chunks(
         self,
@@ -294,7 +296,9 @@ class ChunkGenerator:
         Returns:
             Formatted metrics line string
         """
-        return self.streaming_handler.format_completion_metrics(stream_ctx, elapsed_time, cost_str)
+        return self.streaming_handler.format_completion_metrics(
+            stream_ctx, elapsed_time, cost_str
+        )
 
     def format_budget_exhausted_metrics(
         self,

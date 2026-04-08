@@ -56,7 +56,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
-from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.agent.tool_calling import (
+    ToolCallingAdapterRegistry,
+    ToolCallingCapabilities,
+)
 from victor.agent.provider import (
     ProviderSwitcher,
     ProviderHealthMonitor,
@@ -345,7 +348,9 @@ class ProviderManager:
 
         return capabilities
 
-    async def _discover_and_cache_capabilities(self) -> Optional[ProviderRuntimeCapabilities]:
+    async def _discover_and_cache_capabilities(
+        self,
+    ) -> Optional[ProviderRuntimeCapabilities]:
         """Discover provider capabilities asynchronously and cache result."""
         if not self._current_state:
             return None
@@ -427,7 +432,9 @@ class ProviderManager:
             # Sync legacy state with switcher state
             switcher_state = self._provider_switcher.get_current_state()
             if switcher_state:
-                _old_switch_count = self._current_state.switch_count if self._current_state else 0
+                _old_switch_count = (
+                    self._current_state.switch_count if self._current_state else 0
+                )
                 self._current_state = ProviderState(
                     provider=switcher_state.provider,
                     provider_name=switcher_state.provider_name,
@@ -445,7 +452,10 @@ class ProviderManager:
                     provider=provider_name,
                     model=new_model,
                     reason=reason,
-                    metadata={"from_provider": self.provider_name, "from_model": self.model},
+                    metadata={
+                        "from_provider": self.provider_name,
+                        "from_model": self.model,
+                    },
                 )
 
             return True
@@ -586,13 +596,17 @@ class ProviderManager:
         return {
             "provider": self.provider_name,
             "model": self.model,
-            "supports_tools": self.provider.supports_tools() if self.provider else False,
+            "supports_tools": (
+                self.provider.supports_tools() if self.provider else False
+            ),
             "native_tool_calls": caps.native_tool_calls if caps else False,
             "streaming_tool_calls": caps.streaming_tool_calls if caps else False,
             "parallel_tool_calls": caps.parallel_tool_calls if caps else False,
             "thinking_mode": caps.thinking_mode if caps else False,
             "context_window": (
-                runtime_caps.context_window if runtime_caps else self.get_context_window()
+                runtime_caps.context_window
+                if runtime_caps
+                else self.get_context_window()
             ),
             "is_cloud": self.is_cloud_provider(),
             "is_local": self.is_local_provider(),
@@ -629,7 +643,9 @@ class ProviderManager:
         # For now, we just log - can be extended to emit to RL tracking, etc.
         logger.debug(f"Switch event emitted: {event}")
 
-    async def _check_provider_health(self, provider: BaseProvider, provider_name: str) -> bool:
+    async def _check_provider_health(
+        self, provider: BaseProvider, provider_name: str
+    ) -> bool:
         """Check health of a provider.
 
         Delegates to ProviderHealthMonitor.
@@ -663,7 +679,9 @@ class ProviderManager:
             if attempt >= self.config.max_fallback_attempts:
                 break
 
-            logger.info(f"Attempting fallback to {provider_name} (attempt {attempt + 1})")
+            logger.info(
+                f"Attempting fallback to {provider_name} (attempt {attempt + 1})"
+            )
 
             try:
                 # Disable auto_fallback to prevent infinite loop

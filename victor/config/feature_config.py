@@ -180,7 +180,9 @@ def save_feature_flags_to_yaml(
 
     # Prepare YAML data
     data = {
-        "features": {key: value for key, value in flags.items() if key in DEFAULT_FEATURE_FLAGS}
+        "features": {
+            key: value for key, value in flags.items() if key in DEFAULT_FEATURE_FLAGS
+        }
     }
 
     try:

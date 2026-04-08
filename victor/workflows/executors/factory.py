@@ -108,7 +108,9 @@ class NodeExecutorFactory:
 
     def _register_extension_executor_types(self) -> None:
         """Register plugin- or application-provided workflow node executors."""
-        from victor.workflows.executors.registry import get_workflow_node_executor_registry
+        from victor.workflows.executors.registry import (
+            get_workflow_node_executor_registry,
+        )
 
         registry = get_workflow_node_executor_registry()
         for registration in registry.get_registrations().values():
@@ -143,13 +145,18 @@ class NodeExecutorFactory:
         """
         if node_type in self._executor_types and not replace:
             raise ValueError(
-                f"Node type '{node_type}' already registered. " f"Use replace=True to override."
+                f"Node type '{node_type}' already registered. "
+                f"Use replace=True to override."
             )
 
         self._executor_types[node_type] = executor_class
-        logger.debug(f"Registered executor type: {node_type} -> {executor_class.__name__}")
+        logger.debug(
+            f"Registered executor type: {node_type} -> {executor_class.__name__}"
+        )
 
-    def create_executor(self, node: "WorkflowNode") -> Callable[["WorkflowState"], "WorkflowState"]:
+    def create_executor(
+        self, node: "WorkflowNode"
+    ) -> Callable[["WorkflowState"], "WorkflowState"]:
         """Create an executor function for a workflow node.
 
         This is the main factory method. It dispatches to the appropriate

@@ -71,7 +71,10 @@ class HostPluginContext(PluginContext):
                     ) and self._container.is_registered(ToolRegistryProtocol):
                         registry = self._container.get(ToolRegistryProtocol)
                 except Exception as e:
-                    logger.debug("Plugin failed to resolve live ToolRegistry from container: %s", e)
+                    logger.debug(
+                        "Plugin failed to resolve live ToolRegistry from container: %s",
+                        e,
+                    )
 
             if registry is None:
                 from victor.tools.registry import ToolRegistry
@@ -82,7 +85,9 @@ class HostPluginContext(PluginContext):
                 registry.register_tool(tool_instance)
             else:
                 registry.register(tool_instance)
-            logger.debug(f"Plugin registered tool: {getattr(tool_instance, 'name', tool_instance)}")
+            logger.debug(
+                f"Plugin registered tool: {getattr(tool_instance, 'name', tool_instance)}"
+            )
         except Exception as e:
             logger.error(f"Plugin failed to register tool: {e}")
 
@@ -134,14 +139,18 @@ class HostPluginContext(PluginContext):
 
         if self._container is not None:
             try:
-                from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
+                from victor.workflows.compiler_protocols import (
+                    NodeExecutorFactoryProtocol,
+                )
 
-                if hasattr(self._container, "is_registered") and self._container.is_registered(
-                    NodeExecutorFactoryProtocol
-                ):
+                if hasattr(
+                    self._container, "is_registered"
+                ) and self._container.is_registered(NodeExecutorFactoryProtocol):
                     factory = self._container.get_optional(NodeExecutorFactoryProtocol)
                     if factory is not None:
-                        existing = getattr(factory, "_executor_types", {}).get(node_type)
+                        existing = getattr(factory, "_executor_types", {}).get(
+                            node_type
+                        )
                         if existing is not executor_factory:
                             factory.register_executor_type(
                                 node_type,
@@ -149,7 +158,9 @@ class HostPluginContext(PluginContext):
                                 replace=replace,
                             )
             except Exception as e:
-                logger.debug(f"Plugin deferred live workflow executor registration: {e}")
+                logger.debug(
+                    f"Plugin deferred live workflow executor registration: {e}"
+                )
 
         logger.debug("Plugin registered workflow node executor: %s", node_type)
 

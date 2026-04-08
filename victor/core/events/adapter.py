@@ -43,7 +43,11 @@ from typing import TYPE_CHECKING, Callable, Optional
 from victor.core.events.protocols import MessagingEvent, DeliveryGuarantee
 
 if TYPE_CHECKING:
-    from victor.core.events import ObservabilityBus as EventBus, VictorEvent, EventCategory
+    from victor.core.events import (
+        ObservabilityBus as EventBus,
+        VictorEvent,
+        EventCategory,
+    )
     from victor.core.events.backends import ObservabilityBus, AgentMessageBus
     from victor.agent.teams.communication import TeamMessageBus
 
@@ -141,7 +145,9 @@ class EventBusAdapter:
 
         if self._forward_to_new:
             # Subscribe to all legacy events
-            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(self._on_legacy_event)
+            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(
+                self._on_legacy_event
+            )
 
         self._enabled = True
         logger.debug("EventBusAdapter forwarding enabled")

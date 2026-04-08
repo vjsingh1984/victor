@@ -85,7 +85,11 @@ class CostCommand(BaseSlashCommand):
         else:
             # Get tool call count via capability or public attribute
             tool_metrics = _get_capability(ctx.agent, "tool_metrics", {})
-            tool_calls = tool_metrics.get("call_count", 0) if isinstance(tool_metrics, dict) else 0
+            tool_calls = (
+                tool_metrics.get("call_count", 0)
+                if isinstance(tool_metrics, dict)
+                else 0
+            )
             if not tool_calls:
                 tool_calls = getattr(ctx.agent, "tool_calls_used", 0)
 
@@ -181,7 +185,9 @@ class MetricsCommand(BaseSlashCommand):
                 for provider, stats in summary["by_provider"].items():
                     content += f"  {provider}: {stats.get('requests', 0)} requests, {stats.get('avg_latency', 0):.0f}ms avg\n"
 
-            ctx.console.print(Panel(content, title="Performance Metrics", border_style="magenta"))
+            ctx.console.print(
+                Panel(content, title="Performance Metrics", border_style="magenta")
+            )
 
         except ImportError:
             ctx.console.print("[yellow]Metrics collector not available[/]")
@@ -276,7 +282,9 @@ class SerializationCommand(BaseSlashCommand):
                     fmt = stat.get("format", "?")
                     usage = stat.get("usage_count", 0)
                     pct = stat.get("avg_savings_percent", 0)
-                    content += f"  [cyan]{fmt}[/]: {usage} uses, {pct:.1f}% avg savings\n"
+                    content += (
+                        f"  [cyan]{fmt}[/]: {usage} uses, {pct:.1f}% avg savings\n"
+                    )
 
             content += "\n[dim]Use /serialization tools for per-tool breakdown[/]"
             content += "\n[dim]Use /serialization formats for format comparison[/]"
@@ -364,13 +372,17 @@ class LearningCommand(BaseSlashCommand):
                 if integration:
                     if hasattr(integration, "reset_session"):
                         integration.reset_session()
-                        ctx.console.print("[green]Intelligent pipeline session reset[/]")
+                        ctx.console.print(
+                            "[green]Intelligent pipeline session reset[/]"
+                        )
                     else:
                         # Fallback to _pipeline attribute
                         pipeline = getattr(integration, "_pipeline", None)
                         if pipeline:
                             pipeline.reset_session()
-                            ctx.console.print("[green]Intelligent pipeline session reset[/]")
+                            ctx.console.print(
+                                "[green]Intelligent pipeline session reset[/]"
+                            )
 
             # Reset model selector
             from victor.framework.rl.coordinator import get_rl_coordinator
@@ -393,7 +405,9 @@ class LearningCommand(BaseSlashCommand):
                 return
 
             task_type = self._get_arg(ctx, 1, "coding")
-            rec = learner.recommend(ctx.agent.provider_name if ctx.agent else "unknown", task_type)
+            rec = learner.recommend(
+                ctx.agent.provider_name if ctx.agent else "unknown", task_type
+            )
 
             if rec:
                 ctx.console.print(
@@ -406,7 +420,9 @@ class LearningCommand(BaseSlashCommand):
                     )
                 )
             else:
-                ctx.console.print("[dim]No recommendation available (need more data)[/]")
+                ctx.console.print(
+                    "[dim]No recommendation available (need more data)[/]"
+                )
             return
 
         # Handle strategy subcommand
@@ -429,7 +445,9 @@ class LearningCommand(BaseSlashCommand):
             try:
                 strategy = SelectionStrategy(strategy_name.lower())
                 learner.set_strategy(strategy)
-                ctx.console.print(f"[green]Selection strategy set to:[/] {strategy.value}")
+                ctx.console.print(
+                    f"[green]Selection strategy set to:[/] {strategy.value}"
+                )
             except ValueError:
                 ctx.console.print(f"[red]Invalid strategy:[/] {strategy_name}")
                 ctx.console.print("[dim]Available: epsilon_greedy, ucb, exploit[/]")
@@ -465,8 +483,12 @@ class LearningCommand(BaseSlashCommand):
                     content += f"  Quality Validations: {stats.quality_validations}\n"
 
                     if stats.avg_quality_score > 0:
-                        content += f"  Avg Quality Score: {stats.avg_quality_score:.2f}\n"
-                        content += f"  Avg Grounding Score: {stats.avg_grounding_score:.2f}\n"
+                        content += (
+                            f"  Avg Quality Score: {stats.avg_quality_score:.2f}\n"
+                        )
+                        content += (
+                            f"  Avg Grounding Score: {stats.avg_grounding_score:.2f}\n"
+                        )
 
                     # Get mode controller via capability registry or attribute
                     if hasattr(integration, "mode_controller"):
@@ -474,7 +496,9 @@ class LearningCommand(BaseSlashCommand):
                     elif hasattr(integration, "_pipeline"):
                         pipeline = getattr(integration, "_pipeline", None)
                         mode_controller = (
-                            getattr(pipeline, "_mode_controller", None) if pipeline else None
+                            getattr(pipeline, "_mode_controller", None)
+                            if pipeline
+                            else None
                         )
                     else:
                         mode_controller = None
@@ -484,16 +508,14 @@ class LearningCommand(BaseSlashCommand):
                         content += "\n[bold cyan]Mode Learning:[/]\n"
                         content += f"  Profile: {session_stats.get('profile_name', 'unknown')}\n"
                         content += f"  Total Reward: {session_stats.get('total_reward', 0):.2f}\n"
-                        content += (
-                            f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
-                        )
-                        content += (
-                            f"  Exploration Rate: {session_stats.get('exploration_rate', 0):.2f}\n"
-                        )
+                        content += f"  Mode Transitions: {session_stats.get('mode_transitions', 0)}\n"
+                        content += f"  Exploration Rate: {session_stats.get('exploration_rate', 0):.2f}\n"
 
                         modes_visited = session_stats.get("modes_visited", [])
                         if modes_visited:
-                            content += f"  Modes Visited: {' -> '.join(modes_visited)}\n"
+                            content += (
+                                f"  Modes Visited: {' -> '.join(modes_visited)}\n"
+                            )
 
                     content += "\n"
 
@@ -512,7 +534,8 @@ class LearningCommand(BaseSlashCommand):
                         current = (
                             " (current)"
                             if ctx.agent
-                            and rank["provider"].lower() == ctx.agent.provider_name.lower()
+                            and rank["provider"].lower()
+                            == ctx.agent.provider_name.lower()
                             else ""
                         )
                         content += f"  {rank['provider']}: Q={rank['q_value']:.2f} (n={rank['sample_count']}){current}\n"
@@ -536,7 +559,9 @@ class LearningCommand(BaseSlashCommand):
         content += "\n[dim]Use /learning recommend to get provider recommendation[/]"
         content += "\n[dim]Use /learning reset to reset Q-values[/]"
 
-        ctx.console.print(Panel(content, title="Q-Learning Stats", border_style="magenta"))
+        ctx.console.print(
+            Panel(content, title="Q-Learning Stats", border_style="magenta")
+        )
 
 
 @register_command
@@ -620,7 +645,9 @@ class MLStatsCommand(BaseSlashCommand):
             content += f"  Total Outcomes: {coord_stats.get('total_outcomes', 0)}\n"
             content += f"  Sessions: {coord_stats.get('sessions', 0)}\n"
 
-            ctx.console.print(Panel(content, title="ML Statistics", border_style="blue"))
+            ctx.console.print(
+                Panel(content, title="ML Statistics", border_style="blue")
+            )
 
         except ImportError:
             ctx.console.print("[yellow]RL coordinator not available[/]")

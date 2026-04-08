@@ -19,7 +19,16 @@ Defines the interface for context and state management operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     Message = Dict[str, Any]

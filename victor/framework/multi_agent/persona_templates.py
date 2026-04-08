@@ -63,7 +63,12 @@ def get_researcher_template() -> PersonaTraits:
         description="Expert at gathering, analyzing, and synthesizing information from diverse sources",
         communication_style=CommunicationStyle.TECHNICAL,
         expertise_level=ExpertiseLevel.EXPERT,
-        strengths=["information_gathering", "source_verification", "synthesis", "analysis"],
+        strengths=[
+            "information_gathering",
+            "source_verification",
+            "synthesis",
+            "analysis",
+        ],
         verbosity=0.7,
         custom_traits={
             "traits": ["thorough", "systematic", "evidence_based", "objective"],
@@ -88,7 +93,12 @@ def get_planner_template() -> PersonaTraits:
         description="Expert at breaking down complex tasks and creating structured plans",
         communication_style=CommunicationStyle.TECHNICAL,
         expertise_level=ExpertiseLevel.EXPERT,
-        strengths=["task_breakdown", "architecture", "sequencing", "dependency_analysis"],
+        strengths=[
+            "task_breakdown",
+            "architecture",
+            "sequencing",
+            "dependency_analysis",
+        ],
         verbosity=0.6,
         custom_traits={
             "traits": ["strategic", "methodical", "forward_thinking", "risk_aware"],
@@ -141,7 +151,12 @@ def get_reviewer_template() -> PersonaTraits:
         strengths=["code_review", "quality_assessment", "best_practices", "security"],
         verbosity=0.6,
         custom_traits={
-            "traits": ["detail_oriented", "critical_thinking", "standards_driven", "helpful"],
+            "traits": [
+                "detail_oriented",
+                "critical_thinking",
+                "standards_driven",
+                "helpful",
+            ],
             "prompt_extensions": {
                 "focus": "Quality and best practices",
                 "approach": "Identify issues and suggest improvements",

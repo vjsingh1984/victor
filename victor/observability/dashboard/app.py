@@ -91,7 +91,9 @@ class EventStats(Static):
             f"[red]Errors:[/] {self.error_events}"
         )
         content.update(display_text)
-        logger.debug(f"[EventStats._update_display] Display updated with: {display_text}")
+        logger.debug(
+            f"[EventStats._update_display] Display updated with: {display_text}"
+        )
 
     def increment(self, category: str) -> None:
         """Increment counters based on event category."""
@@ -106,13 +108,19 @@ class EventStats(Static):
         # category is just the first part of topic (e.g., "state", "tool", "lifecycle")
         if category == "tool":
             self.tool_events += 1
-            logger.debug(f"[EventStats.increment] Incremented tool_events to {self.tool_events}")
+            logger.debug(
+                f"[EventStats.increment] Incremented tool_events to {self.tool_events}"
+            )
         elif category == "state":
             self.state_events += 1
-            logger.debug(f"[EventStats.increment] Incremented state_events to {self.state_events}")
+            logger.debug(
+                f"[EventStats.increment] Incremented state_events to {self.state_events}"
+            )
         elif category == "error":
             self.error_events += 1
-            logger.debug(f"[EventStats.increment] Incremented error_events to {self.error_events}")
+            logger.debug(
+                f"[EventStats.increment] Incremented error_events to {self.error_events}"
+            )
         else:
             logger.debug(
                 f"[EventStats.increment] Category '{category}' not tracked in specific counters"
@@ -128,7 +136,9 @@ class EventLogView(RichLog):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._event_lines: list[str] = []  # Store lines: newest at START (index 0), oldest at END
+        self._event_lines: list[str] = (
+            []
+        )  # Store lines: newest at START (index 0), oldest at END
         self._max_lines = 1000
 
     def add_event(self, event: MessagingEvent) -> None:
@@ -163,7 +173,9 @@ class EventLogView(RichLog):
 
         # Build event header
         lines = []
-        log_message = f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.topic}"
+        log_message = (
+            f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] {event.topic}"
+        )
         lines.append(log_message)
 
         # Display rich event details based on topic and data
@@ -276,7 +288,9 @@ class EventLogView(RichLog):
                 duration = data.get("duration_seconds", 0)
                 success = data.get("success", True)
                 status = "[green]✓[/]" if success else "[red]✗[/]"
-                lines.append(f"         {status} [dim]{tool_calls} tool calls, {duration:.1f}s[/]")
+                lines.append(
+                    f"         {status} [dim]{tool_calls} tool calls, {duration:.1f}s[/]"
+                )
 
         # Error events
         elif topic.startswith("error."):
@@ -299,7 +313,9 @@ class EventLogView(RichLog):
                 stage = data.get("stage", "?")
                 visit_count = data.get("visit_count", 0)
                 sequence = data.get("sequence", [])
-                lines.append(f"         [red]Stage '{stage}' visited {visit_count} times[/]")
+                lines.append(
+                    f"         [red]Stage '{stage}' visited {visit_count} times[/]"
+                )
                 if sequence:
                     lines.append(f"         [dim]Recent: {' → '.join(sequence)}[/]")
 
@@ -426,7 +442,9 @@ class TimeOrderedTableView(DataTable):
                 return (event.timestamp, event.type, event.details)
     """
 
-    def __init__(self, *args, max_rows: int = 500, enable_dedup: bool = False, **kwargs):
+    def __init__(
+        self, *args, max_rows: int = 500, enable_dedup: bool = False, **kwargs
+    ):
         """Initialize the time-ordered table view.
 
         Args:
@@ -469,7 +487,9 @@ class TimeOrderedTableView(DataTable):
         # Prevent duplicates if enabled
         if self._enable_dedup and event.id:
             if event.id in self._seen_event_ids:
-                logger.debug(f"[{self.__class__.__name__}] Skipping duplicate event {event.id}")
+                logger.debug(
+                    f"[{self.__class__.__name__}] Skipping duplicate event {event.id}"
+                )
                 return  # Skip duplicate
             self._seen_event_ids.add(event.id)
 
@@ -503,7 +523,9 @@ class TimeOrderedTableView(DataTable):
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.error(f"[{self.__class__.__name__}] Error formatting event row: {e}")
+                logger.error(
+                    f"[{self.__class__.__name__}] Error formatting event row: {e}"
+                )
 
     def _format_event_row(self, event: MessagingEvent) -> tuple:
         """Format an event as a table row.
@@ -519,7 +541,9 @@ class TimeOrderedTableView(DataTable):
         Raises:
             NotImplementedError: If not implemented by subclass
         """
-        raise NotImplementedError(f"{self.__class__.__name__} must implement _format_event_row()")
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement _format_event_row()"
+        )
 
     def clear_events(self) -> None:
         """Clear all stored events and reset the table."""
@@ -583,7 +607,8 @@ class ToolExecutionView(DataTable):
         """Process a tool event and update statistics."""
         # Handle both tool.* and lifecycle.chunk.tool_start events
         is_tool_event = (
-            event.topic.startswith("tool.") or event.topic == "lifecycle.chunk.tool_start"
+            event.topic.startswith("tool.")
+            or event.topic == "lifecycle.chunk.tool_start"
         )
         if not is_tool_event:
             return
@@ -639,7 +664,9 @@ class ToolExecutionView(DataTable):
                     last_called = last_called_raw.strftime("%H:%M:%S")
                 else:
                     # Assume it's a float timestamp
-                    last_called = datetime.fromtimestamp(last_called_raw).strftime("%H:%M:%S")
+                    last_called = datetime.fromtimestamp(last_called_raw).strftime(
+                        "%H:%M:%S"
+                    )
             else:
                 last_called = "-"
             self.add_row(
@@ -655,7 +682,10 @@ class VerticalTraceView(ScrollableContainer):
     """View showing vertical integration traces."""
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
+        yield Static(
+            "[dim]Vertical integration traces will appear here...[/]",
+            id="trace-content",
+        )
 
     def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event (prepends for newest first)."""
@@ -691,7 +721,10 @@ class JSONLBrowser(ScrollableContainer):
         self._events: List[MessagingEvent] = []
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Load a JSONL file to browse historical events...[/]", id="jsonl-content")
+        yield Static(
+            "[dim]Load a JSONL file to browse historical events...[/]",
+            id="jsonl-content",
+        )
         yield DataTable(id="jsonl-table")
 
     def on_mount(self) -> None:
@@ -735,12 +768,16 @@ class JSONLBrowser(ScrollableContainer):
 
             # Update display
             # TODO: Migrate
-            content.update(f"[green]Loaded {len(self._events)} events from {path.name}[/]")
+            content.update(
+                f"[green]Loaded {len(self._events)} events from {path.name}[/]"
+            )
             table.display = True
             table.clear()
 
             # Iterate in reverse to show newest events first
-            for event in reversed(self._events[-100:]):  # Show last 100 events, newest first
+            for event in reversed(
+                self._events[-100:]
+            ):  # Show last 100 events, newest first
                 # TODO: Migrate
                 timestamp = event.datetime.strftime("%Y-%m-%d %H:%M:%S")
                 category = event.category
@@ -911,7 +948,14 @@ class ToolCallHistoryView(TimeOrderedTableView):
             )
 
         # Default fallback for other tool events
-        return (timestamp, data.get("tool_name", "unknown"), event_name, "N/A", "N/A", "")
+        return (
+            timestamp,
+            data.get("tool_name", "unknown"),
+            event_name,
+            "N/A",
+            "N/A",
+            "",
+        )
 
 
 class StateTransitionView(TimeOrderedTableView):
@@ -1045,7 +1089,9 @@ class PerformanceMetricsView(Static):
                 # Update rolling average
                 current_avg = self.avg_tool_duration
                 count = self.total_tool_calls
-                self.avg_tool_duration = ((current_avg * (count - 1)) + duration) / count
+                self.avg_tool_duration = (
+                    (current_avg * (count - 1)) + duration
+                ) / count
             elif event.topic == "tool_call_failed":
                 self.total_tool_calls += 1
                 self.failed_tool_calls += 1
@@ -1197,7 +1243,9 @@ class ObservabilityDashboard(App):
         self._paused = False
         self._unsubscribe: Optional[Callable[[], None]] = None
         self._event_buffer: List[MessagingEvent] = []
-        self._subscription_handles: List[Any] = []  # For canonical event system subscriptions
+        self._subscription_handles: List[Any] = (
+            []
+        )  # For canonical event system subscriptions
 
         # Widget references
         self._stats: Optional[EventStats] = None
@@ -1250,7 +1298,9 @@ class ObservabilityDashboard(App):
 
         # Get ObservabilityBus
         self._event_bus = get_observability_bus()
-        logger.info(f"[Dashboard] ObservabilityBus acquired: {type(self._event_bus).__name__}")
+        logger.info(
+            f"[Dashboard] ObservabilityBus acquired: {type(self._event_bus).__name__}"
+        )
 
         # Subscribe to EventBus
         # TODO: Migrate
@@ -1267,11 +1317,15 @@ class ObservabilityDashboard(App):
         self._jsonl_browser = self.query_one("#jsonl-browser", JSONLBrowser)
         # New debugging views
         # TODO: Migrate
-        self._execution_trace_view = self.query_one("#execution-trace-view", ExecutionTraceView)
+        self._execution_trace_view = self.query_one(
+            "#execution-trace-view", ExecutionTraceView
+        )
         self._tool_call_history_view = self.query_one(
             "#tool-call-history-view", ToolCallHistoryView
         )
-        self._state_transition_view = self.query_one("#state-transition-view", StateTransitionView)
+        self._state_transition_view = self.query_one(
+            "#state-transition-view", StateTransitionView
+        )
         self._performance_metrics_view = self.query_one(
             "#performance-metrics-view", PerformanceMetricsView
         )
@@ -1320,21 +1374,35 @@ class ObservabilityDashboard(App):
             """
             event_counter[0] += 1
             # Use INFO level to ensure it's always visible
-            logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: RECEIVED [{event.topic}]")
+            logger.info(
+                f"[Dashboard.handle_event] #{event_counter[0]}: RECEIVED [{event.topic}]"
+            )
 
             if self._paused:
-                logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: PAUSED, buffering")
+                logger.info(
+                    f"[Dashboard.handle_event] #{event_counter[0]}: PAUSED, buffering"
+                )
                 self._event_buffer.append(event)
                 return
 
             # Schedule UI update on Textual's event loop
             # We're in an async callback, can call UI methods directly
-            logger.info(f"[Dashboard.handle_event] #{event_counter[0]}: Processing event")
+            logger.info(
+                f"[Dashboard.handle_event] #{event_counter[0]}: Processing event"
+            )
             self._process_event(event)
 
         # Subscribe to all event patterns using canonical event system
         # The canonical system uses pattern-based subscriptions (e.g., "tool.*")
-        patterns = ["tool.*", "state.*", "model.*", "error.*", "lifecycle.*", "metric.*", "trace.*"]
+        patterns = [
+            "tool.*",
+            "state.*",
+            "model.*",
+            "error.*",
+            "lifecycle.*",
+            "metric.*",
+            "trace.*",
+        ]
 
         async def do_subscribe():
             """Perform async subscription to ObservabilityBus."""
@@ -1349,7 +1417,9 @@ class ObservabilityDashboard(App):
 
             # Store handles for cleanup
             self._subscription_handles = handles
-            logger.info(f"[Dashboard] Successfully subscribed to {len(handles)} event patterns")
+            logger.info(
+                f"[Dashboard] Successfully subscribed to {len(handles)} event patterns"
+            )
 
         # Run subscription in background since on_mount is sync
         try:
@@ -1401,7 +1471,9 @@ class ObservabilityDashboard(App):
 
         # Load historical events from JSONL file (for both memory and jsonl backends)
         if self._jsonl_path.exists():
-            logger.info(f"[Dashboard] Loading historical events from {self._jsonl_path}")
+            logger.info(
+                f"[Dashboard] Loading historical events from {self._jsonl_path}"
+            )
             self._setup_jsonl_source()
         else:
             logger.info(f"[Dashboard] JSONL file not found: {self._jsonl_path}")
@@ -1537,7 +1609,9 @@ class ObservabilityDashboard(App):
                 # Convert ISO format string to unix timestamp
                 try:
                     if "T" in data["timestamp"]:
-                        dt = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
+                        dt = datetime.fromisoformat(
+                            data["timestamp"].replace("Z", "+00:00")
+                        )
                     else:
                         dt = datetime.fromisoformat(data["timestamp"])
                     data["timestamp"] = dt.timestamp()
@@ -1563,7 +1637,9 @@ class ObservabilityDashboard(App):
         import traceback
 
         logger = logging.getLogger(__name__)
-        logger.info(f"[Dashboard._process_event] PROCESSING [{event.category}/{event.topic}]")
+        logger.info(
+            f"[Dashboard._process_event] PROCESSING [{event.category}/{event.topic}]"
+        )
 
         try:
             # Update stats

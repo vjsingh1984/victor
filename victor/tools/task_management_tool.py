@@ -256,7 +256,9 @@ class TaskStore:
             text = self._persist_path.read_text(encoding="utf-8")
             data = json.loads(text)
         except (OSError, json.JSONDecodeError) as exc:
-            logger.error("Failed to load task store from %s: %s", self._persist_path, exc)
+            logger.error(
+                "Failed to load task store from %s: %s", self._persist_path, exc
+            )
             return
 
         self._next_id = data.get("next_id", 1)

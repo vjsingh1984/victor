@@ -212,7 +212,9 @@ class WorkflowGenerationPipeline:
             vertical=vertical,
             strategy=strategy,
         )
-        self._refiner = WorkflowRefiner(conservative=True) if enable_refinement else None
+        self._refiner = (
+            WorkflowRefiner(conservative=True) if enable_refinement else None
+        )
 
     async def generate_workflow(
         self,
@@ -264,7 +266,9 @@ class WorkflowGenerationPipeline:
 
             requirements = await self._extractor.extract(description, context)
             result.requirements = requirements
-            logger.info(f"Requirements extracted: {len(requirements.functional.tasks)} tasks")
+            logger.info(
+                f"Requirements extracted: {len(requirements.functional.tasks)} tasks"
+            )
 
             # Interactive mode: show requirements and ask for approval
             if mode == "interactive":
@@ -313,7 +317,9 @@ class WorkflowGenerationPipeline:
                     f"Validation failed, attempting refinement ({len(validation.all_errors)} errors)"
                 )
 
-                refined_schema, refinement_result = await self._refine_schema(schema, validation)
+                refined_schema, refinement_result = await self._refine_schema(
+                    schema, validation
+                )
 
                 if refinement_result.success:
                     schema = refined_schema
@@ -412,7 +418,9 @@ class WorkflowGenerationPipeline:
     # Private Methods
     # =============================================================================
 
-    async def _validate_schema(self, schema: Dict[str, Any]) -> WorkflowGenerationValidationResult:
+    async def _validate_schema(
+        self, schema: Dict[str, Any]
+    ) -> WorkflowGenerationValidationResult:
         """Validate workflow schema.
 
         Performs multi-layer validation:

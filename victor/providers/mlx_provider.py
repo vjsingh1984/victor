@@ -131,7 +131,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     remaining = content
 
     # Pattern: JSON code block with tool call
-    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
+    json_block_pattern = (
+        r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
+    )
     import json
 
     matches = re.findall(json_block_pattern, content, re.DOTALL)
@@ -219,7 +221,9 @@ class MLXProvider(BaseProvider):
                 return
 
             try:
-                self._provider_logger.logger.info(f"Loading MLX model: {self.model_path}")
+                self._provider_logger.logger.info(
+                    f"Loading MLX model: {self.model_path}"
+                )
                 if _mlx_load is None:
                     raise RuntimeError("mlx-lm loader unavailable")
 
@@ -236,12 +240,17 @@ class MLXProvider(BaseProvider):
                 except TypeError as e:
                     # If load() doesn't accept some kwargs (like trust_remote_code),
                     # try without the problematic ones
-                    if "trust_remote_code" in str(e) and "trust_remote_code" in load_kwargs:
+                    if (
+                        "trust_remote_code" in str(e)
+                        and "trust_remote_code" in load_kwargs
+                    ):
                         self._provider_logger.logger.debug(
                             "MLX load() doesn't accept trust_remote_code, retrying without it"
                         )
                         load_kwargs = {
-                            k: v for k, v in load_kwargs.items() if k != "trust_remote_code"
+                            k: v
+                            for k, v in load_kwargs.items()
+                            if k != "trust_remote_code"
                         }
                         self._model, self._tokenizer = await loop.run_in_executor(
                             None,
@@ -250,12 +259,16 @@ class MLXProvider(BaseProvider):
                     else:
                         raise
 
-                self._provider_logger.logger.info(f"MLX model loaded: {self.model_path}")
+                self._provider_logger.logger.info(
+                    f"MLX model loaded: {self.model_path}"
+                )
             except Exception as e:
                 # Convert specific exception types to provider errors
                 if isinstance(e, ProviderError):
                     raise
-                raise ProviderConnectionError(f"Failed to load MLX model {self.model_path}: {e}")
+                raise ProviderConnectionError(
+                    f"Failed to load MLX model {self.model_path}: {e}"
+                )
 
     def supports_streaming(self) -> bool:
         """Check if provider supports streaming.
@@ -502,7 +515,9 @@ class MLXProvider(BaseProvider):
         async def stream_producer():
             """Run sync generator in thread pool and feed queue."""
             try:
-                for chunk in await loop.run_in_executor(None, lambda: list(generate_sync())):
+                for chunk in await loop.run_in_executor(
+                    None, lambda: list(generate_sync())
+                ):
                     await stream_queue.put(chunk)
                 await stream_queue.put(None)  # Sentinel
             except ProviderError:

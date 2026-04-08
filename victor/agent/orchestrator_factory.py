@@ -53,7 +53,10 @@ from victor.agent.factory.coordination_builders import CoordinationBuildersMixin
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.agent.context_project import ProjectContext
@@ -409,7 +412,8 @@ class OrchestratorFactory(
             logger.debug(f"Could not load vertical prompt contributors: {e}")
 
         return SystemPromptBuilder(
-            provider_name=self.provider_name or self.provider.__class__.__name__.lower(),
+            provider_name=self.provider_name
+            or self.provider.__class__.__name__.lower(),
             model=self.model,
             tool_adapter=tool_adapter,
             capabilities=capabilities,
@@ -587,10 +591,16 @@ class OrchestratorFactory(
                 if mode == "foreground":
                     merged_kwargs["tool_budget"] = config.tool_budget
                     merged_kwargs["max_iterations"] = config.max_iterations
-                    merged_kwargs["enable_parallel_tools"] = config.enable_parallel_tools
+                    merged_kwargs["enable_parallel_tools"] = (
+                        config.enable_parallel_tools
+                    )
                     merged_kwargs["max_concurrent_tools"] = config.max_concurrent_tools
-                    merged_kwargs["enable_context_compaction"] = config.enable_context_compaction
-                    merged_kwargs["enable_semantic_search"] = config.enable_semantic_search
+                    merged_kwargs["enable_context_compaction"] = (
+                        config.enable_context_compaction
+                    )
+                    merged_kwargs["enable_semantic_search"] = (
+                        config.enable_semantic_search
+                    )
                     merged_kwargs["enable_analytics"] = config.enable_analytics
 
                 # Background-specific
@@ -649,7 +659,9 @@ class OrchestratorFactory(
             if tools:
                 from victor.framework._internal import configure_tools
 
-                configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
+                configure_tools(
+                    orchestrator, tools, airgapped=kwargs.get("airgapped", False)
+                )
 
             vertical = kwargs.get("vertical")
             if vertical:

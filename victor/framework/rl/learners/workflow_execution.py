@@ -323,8 +323,12 @@ class WorkflowExecutionLearner(BaseLearner):
         # Update aggregates
         new_execution_count = execution_count + 1
         new_success_count = success_count + (1 if success else 0)
-        new_avg_duration = (avg_duration * execution_count + duration_seconds) / new_execution_count
-        new_avg_quality = (avg_quality * execution_count + quality_score) / new_execution_count
+        new_avg_duration = (
+            avg_duration * execution_count + duration_seconds
+        ) / new_execution_count
+        new_avg_quality = (
+            avg_quality * execution_count + quality_score
+        ) / new_execution_count
 
         # Upsert Q-value
         cursor.execute(
@@ -511,7 +515,9 @@ class WorkflowExecutionLearner(BaseLearner):
             stats[wf_name]["task_types"][task_type] = {
                 "q_value": row[2],
                 "execution_count": execution_count,
-                "success_rate": success_count / execution_count if execution_count > 0 else 0.0,
+                "success_rate": (
+                    success_count / execution_count if execution_count > 0 else 0.0
+                ),
                 "avg_duration": row[5],
                 "avg_quality": row[6],
             }

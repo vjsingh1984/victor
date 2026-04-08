@@ -388,7 +388,9 @@ def generate_profile_yaml(
         "settings": {
             "default_provider": provider,
             "fallback_max_tools": profile.settings.get("fallback_max_tools", 10),
-            "framework_preload_enabled": profile.settings.get("framework_preload_enabled", True),
+            "framework_preload_enabled": profile.settings.get(
+                "framework_preload_enabled", True
+            ),
             "http_connection_pool_enabled": profile.settings.get(
                 "http_connection_pool_enabled", True
             ),

@@ -101,7 +101,9 @@ class ProviderBuilder(FactoryAwareBuilder):
         )
 
         # Build tool calling matrix
-        tool_calling_models, tool_capabilities = self._factory.create_tool_calling_matrix()
+        tool_calling_models, tool_capabilities = (
+            self._factory.create_tool_calling_matrix()
+        )
         provider_components["tool_calling_models"] = tool_calling_models
         provider_components["tool_capabilities"] = tool_capabilities
 

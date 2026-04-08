@@ -748,18 +748,26 @@ class GroundingVerificationResult:
             IssueSeverity.MEDIUM: 2,
             IssueSeverity.LOW: 3,
         }
-        sorted_issues = sorted(self.issues, key=lambda i: severity_order.get(i.severity, 4))[
-            :max_issues
-        ]
+        sorted_issues = sorted(
+            self.issues, key=lambda i: severity_order.get(i.severity, 4)
+        )[:max_issues]
 
         # Build feedback sections by issue type for clarity
         feedback_parts = []
 
         # Group corrections by type
-        file_issues = [i for i in sorted_issues if i.issue_type == IssueType.FILE_NOT_FOUND]
-        symbol_issues = [i for i in sorted_issues if i.issue_type == IssueType.SYMBOL_NOT_FOUND]
-        code_issues = [i for i in sorted_issues if i.issue_type == IssueType.CODE_MISMATCH]
-        fabricated = [i for i in sorted_issues if i.issue_type == IssueType.FABRICATED_CONTENT]
+        file_issues = [
+            i for i in sorted_issues if i.issue_type == IssueType.FILE_NOT_FOUND
+        ]
+        symbol_issues = [
+            i for i in sorted_issues if i.issue_type == IssueType.SYMBOL_NOT_FOUND
+        ]
+        code_issues = [
+            i for i in sorted_issues if i.issue_type == IssueType.CODE_MISMATCH
+        ]
+        fabricated = [
+            i for i in sorted_issues if i.issue_type == IssueType.FABRICATED_CONTENT
+        ]
         other_issues = [
             i
             for i in sorted_issues
@@ -947,7 +955,9 @@ class GroundingVerifier:
         if grounding_threshold_learner:
             logger.info("RL: GroundingVerifier using unified GroundingThresholdLearner")
 
-        logger.debug(f"GroundingVerifier initialized with project_root={self.project_root}")
+        logger.debug(
+            f"GroundingVerifier initialized with project_root={self.project_root}"
+        )
 
     def _get_rl_threshold(self, provider: str, response_type: str) -> Optional[float]:
         """Get RL-recommended threshold for given context.
@@ -1035,11 +1045,14 @@ class GroundingVerifier:
                     dirs[:] = [
                         d
                         for d in dirs
-                        if d not in self.config.ignore_patterns and not d.startswith(".")
+                        if d not in self.config.ignore_patterns
+                        and not d.startswith(".")
                     ]
 
                     for file in files:
-                        rel_path = os.path.relpath(os.path.join(root, file), self.project_root)
+                        rel_path = os.path.relpath(
+                            os.path.join(root, file), self.project_root
+                        )
                         self._existing_files.add(rel_path)
                 logger.debug(
                     f"GroundingVerifier scanned {len(self._existing_files)} files "
@@ -1131,7 +1144,9 @@ class GroundingVerifier:
         matches = self.SYMBOL_PATTERN.findall(response)
         return list(set(matches))
 
-    async def verify_file_paths(self, paths: List[str], result: VerificationResult) -> None:
+    async def verify_file_paths(
+        self, paths: List[str], result: VerificationResult
+    ) -> None:
         """Verify file path references exist.
 
         Args:
@@ -1158,7 +1173,8 @@ class GroundingVerifier:
             partial_matches = [
                 f
                 for f in existing_files
-                if f.endswith(filename) and (f == filename or f.endswith("/" + filename))
+                if f.endswith(filename)
+                and (f == filename or f.endswith("/" + filename))
             ]
 
             if partial_matches:
@@ -1170,7 +1186,9 @@ class GroundingVerifier:
                 elif len(partial_matches) == 1 and partial_matches[0] == clean_path:
                     # Single match and path is correct - count as verified
                     result.verified_references.append(path)
-                elif len(partial_matches) == 1 and partial_matches[0].endswith("/" + clean_path):
+                elif len(partial_matches) == 1 and partial_matches[0].endswith(
+                    "/" + clean_path
+                ):
                     # Single match and given path is a valid suffix of actual path
                     # (model used relative path from subdirectory which is fine)
                     result.verified_references.append(path)
@@ -1344,7 +1362,9 @@ class GroundingVerifier:
 
             # Skip verification for code generation tasks if configured
             if self.config.skip_generated_code and is_code_generation:
-                logger.debug("[GroundingVerifier] Skipping verification for generated code snippet")
+                logger.debug(
+                    "[GroundingVerifier] Skipping verification for generated code snippet"
+                )
                 result.metadata["skipped_generated_snippets"] = (
                     result.metadata.get("skipped_generated_snippets", 0) + 1
                 )
@@ -1604,7 +1624,9 @@ class GroundingVerifier:
         if not is_code_generation:
             is_code_generation = self._has_creation_intent_in_response(response)
             if is_code_generation:
-                logger.debug("[GroundingVerifier] Creation intent detected in response content")
+                logger.debug(
+                    "[GroundingVerifier] Creation intent detected in response content"
+                )
                 result.metadata["creation_intent_source"] = "response"
 
         result.metadata["is_code_generation"] = is_code_generation
@@ -1634,7 +1656,9 @@ class GroundingVerifier:
             original_count = len(file_paths)
             file_paths = [p for p in file_paths if not self._is_generated_code_path(p)]
             if len(file_paths) < original_count:
-                result.metadata["skipped_generated_paths"] = original_count - len(file_paths)
+                result.metadata["skipped_generated_paths"] = original_count - len(
+                    file_paths
+                )
 
         # Run verifications
         if self.config.verify_file_paths and file_paths:
@@ -1659,7 +1683,9 @@ class GroundingVerifier:
         provider = context.get("provider", "unknown")
         model = context.get("model", "unknown")
         response_type = (
-            "code_generation" if is_code_generation else context.get("task_type", "general")
+            "code_generation"
+            if is_code_generation
+            else context.get("task_type", "general")
         )
 
         # Try RL-learned threshold, fall back to config

@@ -24,7 +24,10 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from victor.config.orchestrator_constants import DeduplicationConfig, DEDUPLICATION_CONFIG
+from victor.config.orchestrator_constants import (
+    DeduplicationConfig,
+    DEDUPLICATION_CONFIG,
+)
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)

@@ -110,7 +110,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         plan = _plans[plan_id]
         if plan.get("status") != "draft":
             return JSONResponse(
-                {"error": f"Plan is not in draft status (status: {plan.get('status')})"},
+                {
+                    "error": f"Plan is not in draft status (status: {plan.get('status')})"
+                },
                 status_code=400,
             )
 
@@ -134,7 +136,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         plan = _plans[plan_id]
         if plan.get("status") != "approved":
             return JSONResponse(
-                {"error": f"Plan must be approved before execution (status: {plan.get('status')})"},
+                {
+                    "error": f"Plan must be approved before execution (status: {plan.get('status')})"
+                },
                 status_code=400,
             )
 
@@ -148,7 +152,11 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     if plan_id not in _plans:
                         break
                     plan["current_step"] = i
-                    step_desc = step.get("description", step) if isinstance(step, dict) else step
+                    step_desc = (
+                        step.get("description", step)
+                        if isinstance(step, dict)
+                        else step
+                    )
                     plan["output"] += f"\n## Step {i+1}: {step_desc}\n"
                     if isinstance(step, dict):
                         step["status"] = "completed"

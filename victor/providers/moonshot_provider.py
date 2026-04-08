@@ -265,7 +265,9 @@ class MoonshotProvider(BaseProvider):
                 **kwargs,
             )
 
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
+            async with self.client.stream(
+                "POST", "/chat/completions", json=payload
+            ) as response:
                 response.raise_for_status()
 
                 accumulated_content = ""
@@ -285,7 +287,9 @@ class MoonshotProvider(BaseProvider):
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(
-                                    accumulated_tool_calls if accumulated_tool_calls else None
+                                    accumulated_tool_calls
+                                    if accumulated_tool_calls
+                                    else None
                                 ),
                                 stop_reason="stop",
                                 is_final=True,
@@ -300,13 +304,17 @@ class MoonshotProvider(BaseProvider):
                         try:
                             chunk_data = json.loads(data_str)
                             chunk = self._parse_stream_chunk(
-                                chunk_data, accumulated_tool_calls, accumulated_reasoning
+                                chunk_data,
+                                accumulated_tool_calls,
+                                accumulated_reasoning,
                             )
                             if chunk.content:
                                 accumulated_content += chunk.content
                             # Track reasoning content
                             if chunk.metadata and "reasoning_content" in chunk.metadata:
-                                accumulated_reasoning = chunk.metadata["reasoning_content"]
+                                accumulated_reasoning = chunk.metadata[
+                                    "reasoning_content"
+                                ]
                             yield chunk
 
                         except json.JSONDecodeError:
@@ -537,16 +545,22 @@ class MoonshotProvider(BaseProvider):
 
         # Finalize tool calls on stream end
         final_tool_calls = None
-        if finish_reason == "tool_calls" or (finish_reason == "stop" and accumulated_tool_calls):
+        if finish_reason == "tool_calls" or (
+            finish_reason == "stop" and accumulated_tool_calls
+        ):
             final_tool_calls = []
             for tc in accumulated_tool_calls:
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args) if isinstance(args, str) else args
+                        parsed_args = (
+                            json.loads(args) if isinstance(args, str) else args
+                        )
                     except json.JSONDecodeError:
                         parsed_args = {}
-                    final_tool_calls.append({"name": tc["name"], "arguments": parsed_args})
+                    final_tool_calls.append(
+                        {"name": tc["name"], "arguments": parsed_args}
+                    )
 
         return StreamChunk(
             content=content,

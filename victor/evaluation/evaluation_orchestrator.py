@@ -131,7 +131,9 @@ class TaskProgress:
             "instance_id": self.instance_id,
             "stage": self.stage.value,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "duration_seconds": self.duration_seconds,
             "error_message": self.error_message,
             "is_success": self.is_success,
@@ -231,7 +233,9 @@ class EvaluationSummary:
             "failed_tasks": self.failed_tasks,
             "skipped_tasks": self.skipped_tasks,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "duration_seconds": self.duration_seconds,
             "avg_score": self.avg_score,
             "pass_rate": self.pass_rate,
@@ -342,7 +346,9 @@ class EvaluationOrchestrator:
         self._loader = SWEBenchLoader(swe_config)
 
         # Workspace manager
-        cache_dir = self.config.workspace_cache_dir or (self.config.output_dir / "workspace_cache")
+        cache_dir = self.config.workspace_cache_dir or (
+            self.config.output_dir / "workspace_cache"
+        )
         self._workspace_manager = SWEBenchWorkspaceManager(cache_dir=cache_dir)
 
         # Environment setup
@@ -413,13 +419,19 @@ class EvaluationOrchestrator:
         logger.info("Loading SWE-bench tasks...")
 
         if self.config.dataset_path:
-            self._tasks = self._loader.load_instances_from_file(self.config.dataset_path)
+            self._tasks = self._loader.load_instances_from_file(
+                self.config.dataset_path
+            )
         else:
-            self._tasks = await self._loader.load_from_huggingface(self.config.dataset_name)
+            self._tasks = await self._loader.load_from_huggingface(
+                self.config.dataset_name
+            )
 
         # Filter by instance IDs if specified
         if self.config.instance_ids:
-            self._tasks = [t for t in self._tasks if t.instance_id in self.config.instance_ids]
+            self._tasks = [
+                t for t in self._tasks if t.instance_id in self.config.instance_ids
+            ]
 
         # Filter by repos if specified
         if self.config.repos:
@@ -433,7 +445,9 @@ class EvaluationOrchestrator:
 
         # Initialize progress tracking
         for task in self._tasks:
-            self._progress[task.instance_id] = TaskProgress(instance_id=task.instance_id)
+            self._progress[task.instance_id] = TaskProgress(
+                instance_id=task.instance_id
+            )
 
         logger.info(f"Loaded {len(self._tasks)} tasks")
 
@@ -498,7 +512,9 @@ class EvaluationOrchestrator:
             progress.env_setup_result = env_result
 
             if not env_result.success:
-                raise RuntimeError(f"Environment setup failed: {env_result.error_message}")
+                raise RuntimeError(
+                    f"Environment setup failed: {env_result.error_message}"
+                )
 
             # Stage 2: Establish baseline
             progress.stage = EvaluationStage.BASELINE_ESTABLISHMENT
@@ -686,7 +702,9 @@ class EvaluationOrchestrator:
 
         if self._summary.completed_tasks > 0:
             self._summary.avg_turns = total_turns / self._summary.completed_tasks
-            self._summary.avg_tool_calls = total_tool_calls / self._summary.completed_tasks
+            self._summary.avg_tool_calls = (
+                total_tool_calls / self._summary.completed_tasks
+            )
 
         # Aggregate correction metrics from per-task results
         total_corrections = 0
@@ -697,7 +715,9 @@ class EvaluationOrchestrator:
                 # Extract from summary section if available
                 if "summary" in metrics:
                     total_corrections += metrics["summary"].get("total_corrections", 0)
-                    successful_corrections += metrics["summary"].get("successful_corrections", 0)
+                    successful_corrections += metrics["summary"].get(
+                        "successful_corrections", 0
+                    )
                 else:
                     # Direct access for flattened dict
                     total_corrections += metrics.get("total_corrections", 0)
@@ -706,7 +726,9 @@ class EvaluationOrchestrator:
         self._summary.total_corrections = total_corrections
         self._summary.successful_corrections = successful_corrections
         if total_corrections > 0:
-            self._summary.correction_success_rate = successful_corrections / total_corrections
+            self._summary.correction_success_rate = (
+                successful_corrections / total_corrections
+            )
         if self._summary.completed_tasks > 0:
             self._summary.avg_corrections_per_task = (
                 total_corrections / self._summary.completed_tasks

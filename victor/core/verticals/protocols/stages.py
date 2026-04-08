@@ -186,7 +186,9 @@ class StageValidator:
         # Treat warnings as errors in strict mode
         if self._strict_mode and result.warnings:
             for warning in result.warnings:
-                result.add_error(ValidationError.INVALID_TRANSITION, f"[STRICT] {warning}")
+                result.add_error(
+                    ValidationError.INVALID_TRANSITION, f"[STRICT] {warning}"
+                )
             result.warnings.clear()
 
         return result
@@ -207,7 +209,9 @@ class StageValidator:
                 f"Missing required stages: {sorted(missing)}",
             )
 
-    def _validate_stage_names(self, stages: Dict[str, Any], result: StageValidationResult) -> None:
+    def _validate_stage_names(
+        self, stages: Dict[str, Any], result: StageValidationResult
+    ) -> None:
         """Validate stage name format.
 
         Args:
@@ -216,7 +220,10 @@ class StageValidator:
         """
         for stage_name in stages.keys():
             # Check for reserved prefixes
-            if any(stage_name.startswith(prefix) for prefix in StageContract.RESERVED_PREFIXES):
+            if any(
+                stage_name.startswith(prefix)
+                for prefix in StageContract.RESERVED_PREFIXES
+            ):
                 result.add_error(
                     ValidationError.INVALID_STAGE_NAME,
                     f"Stage '{stage_name}' uses reserved prefix",
@@ -224,7 +231,9 @@ class StageValidator:
 
             # Check naming convention (uppercase with underscores allowed but not required for single-word names)
             if not stage_name.isupper():
-                result.add_warning(f"Stage '{stage_name}' should use UPPERCASE naming convention")
+                result.add_warning(
+                    f"Stage '{stage_name}' should use UPPERCASE naming convention"
+                )
 
     def _validate_stage_attributes(
         self, stage_name: str, stage_def: Any, result: StageValidationResult
@@ -292,7 +301,9 @@ class StageValidator:
                 f"Terminal stage '{stage_name}' should not have next_stages",
             )
 
-    def _validate_transitions(self, stages: Dict[str, Any], result: StageValidationResult) -> None:
+    def _validate_transitions(
+        self, stages: Dict[str, Any], result: StageValidationResult
+    ) -> None:
         """Validate stage transitions.
 
         Args:
@@ -390,7 +401,9 @@ class StageContractMixin:
         """
         return self._stage_validator.validate(stages, stage_name)
 
-    def ensure_stage_contract(self, stages: Dict[str, Any], stage_name: str = "default") -> None:
+    def ensure_stage_contract(
+        self, stages: Dict[str, Any], stage_name: str = "default"
+    ) -> None:
         """Ensure stage definitions satisfy contract, raise if not.
 
         Args:

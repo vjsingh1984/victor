@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def detect_step_type(step_name: str, commands: str | list[str] | None = None) -> StepType:
+def detect_step_type(
+    step_name: str, commands: str | list[str] | None = None
+) -> StepType:
     """Detect the type of a pipeline step from its name and commands.
 
     Args:
@@ -65,23 +67,38 @@ def detect_step_type(step_name: str, commands: str | list[str] | None = None) ->
     combined = f"{name_lower} {cmd_str}"
 
     # Build patterns
-    if any(kw in combined for kw in ["build", "compile", "make", "cargo build", "go build"]):
+    if any(
+        kw in combined for kw in ["build", "compile", "make", "cargo build", "go build"]
+    ):
         return StepType.BUILD
 
     # Test patterns
-    if any(kw in combined for kw in ["test", "pytest", "jest", "mocha", "rspec", "cargo test"]):
+    if any(
+        kw in combined
+        for kw in ["test", "pytest", "jest", "mocha", "rspec", "cargo test"]
+    ):
         return StepType.TEST
 
     # Lint patterns
     if any(
-        kw in combined for kw in ["lint", "eslint", "flake8", "ruff", "black", "mypy", "clippy"]
+        kw in combined
+        for kw in ["lint", "eslint", "flake8", "ruff", "black", "mypy", "clippy"]
     ):
         return StepType.LINT
 
     # Security patterns
     if any(
         kw in combined
-        for kw in ["security", "scan", "trivy", "snyk", "bandit", "safety", "audit", "cve"]
+        for kw in [
+            "security",
+            "scan",
+            "trivy",
+            "snyk",
+            "bandit",
+            "safety",
+            "audit",
+            "cve",
+        ]
     ):
         return StepType.SECURITY
 
@@ -173,7 +190,9 @@ class GitHubActionsAnalyzer(PipelineAnalyzerProtocol):
                 if not isinstance(step, dict):
                     continue
 
-                step_name = step.get("name", step.get("run", step.get("uses", "unnamed")))
+                step_name = step.get(
+                    "name", step.get("run", step.get("uses", "unnamed"))
+                )
                 command = step.get("run")
                 image = job_config.get("runs-on")
 
@@ -266,7 +285,8 @@ class GitHubActionsAnalyzer(PipelineAnalyzerProtocol):
 
         # Check for missing cache
         has_cache = any(
-            "cache" in s.name.lower() or s.step_type == StepType.CACHE for s in config.steps
+            "cache" in s.name.lower() or s.step_type == StepType.CACHE
+            for s in config.steps
         )
         if not has_cache and len(config.steps) > 3:
             issues.append(
@@ -493,7 +513,9 @@ class CoberturaAnalyzer(CoverageAnalyzerProtocol):
             root = tree.getroot()
         except ET.ParseError as e:
             logger.warning(f"Failed to parse Cobertura report {report_path}: {e}")
-            return CoverageMetrics(report_path=report_path, report_format=self.format_name)
+            return CoverageMetrics(
+                report_path=report_path, report_format=self.format_name
+            )
 
         # Extract metrics from coverage tag
         line_rate = float(root.get("line-rate", 0))
@@ -618,7 +640,9 @@ class LCOVAnalyzer(CoverageAnalyzerProtocol):
                         uncovered_files.append(current_file)
 
         line_coverage = (covered_lines / total_lines * 100) if total_lines > 0 else 0
-        branch_coverage = (covered_branches / total_branches * 100) if total_branches > 0 else 0
+        branch_coverage = (
+            (covered_branches / total_branches * 100) if total_branches > 0 else 0
+        )
         function_coverage = (
             (covered_functions / total_functions * 100) if total_functions > 0 else 0
         )
@@ -667,7 +691,9 @@ class JaCoCoAnalyzer(CoverageAnalyzerProtocol):
             root = tree.getroot()
         except ET.ParseError as e:
             logger.warning(f"Failed to parse JaCoCo report {report_path}: {e}")
-            return CoverageMetrics(report_path=report_path, report_format=self.format_name)
+            return CoverageMetrics(
+                report_path=report_path, report_format=self.format_name
+            )
 
         total_lines = 0
         covered_lines = 0
@@ -709,8 +735,12 @@ class JaCoCoAnalyzer(CoverageAnalyzerProtocol):
                         uncovered_files.append(filename)
 
         line_coverage = (covered_lines / total_lines * 100) if total_lines > 0 else 0
-        branch_coverage = (covered_branches / total_branches * 100) if total_branches > 0 else 0
-        function_coverage = (covered_methods / total_methods * 100) if total_methods > 0 else 0
+        branch_coverage = (
+            (covered_branches / total_branches * 100) if total_branches > 0 else 0
+        )
+        function_coverage = (
+            (covered_methods / total_methods * 100) if total_methods > 0 else 0
+        )
 
         return CoverageMetrics(
             total_lines=total_lines,
@@ -747,7 +777,9 @@ COVERAGE_ANALYZERS: dict[str, CoverageAnalyzerProtocol] = {
 }
 
 
-def get_pipeline_analyzer(platform: PipelinePlatform) -> PipelineAnalyzerProtocol | None:
+def get_pipeline_analyzer(
+    platform: PipelinePlatform,
+) -> PipelineAnalyzerProtocol | None:
     """Get an analyzer for a specific CI/CD platform.
 
     Args:

@@ -249,7 +249,9 @@ class PersonaRegistry:
             self._factories[key] = factory
             logger.debug(f"Registered persona factory: {key}")
 
-    def create(self, name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
+    def create(
+        self, name: str, vertical: Optional[str] = None
+    ) -> Optional[PersonaSpec]:
         """Create a persona from a registered factory.
 
         Invokes the factory function and returns the created persona.
@@ -290,7 +292,9 @@ class PersonaRegistry:
             return persona_obj
         except Exception as e:
             logger.error(f"Failed to create persona '{key}': {e}")
-            raise RuntimeError(f"Persona factory execution failed for '{key}': {e}") from e
+            raise RuntimeError(
+                f"Persona factory execution failed for '{key}': {e}"
+            ) from e
 
     def has(self, name: str, vertical: Optional[str] = None) -> bool:
         """Check if a persona or factory is registered.
@@ -428,7 +432,9 @@ class PersonaRegistry:
         with self._lock:
             return [p for p in self._personas.values() if tag in p.tags]
 
-    def find_by_tags(self, tags: List[str], match_all: bool = False) -> List[PersonaSpec]:
+    def find_by_tags(
+        self, tags: List[str], match_all: bool = False
+    ) -> List[PersonaSpec]:
         """Find personas matching multiple tags.
 
         Args:
@@ -560,7 +566,9 @@ def register_persona_spec(
     )
 
 
-def get_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
+def get_persona_spec(
+    name: str, vertical: Optional[str] = None
+) -> Optional[PersonaSpec]:
     """Get a persona from the global registry.
 
     Args:
@@ -573,7 +581,9 @@ def get_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[Pers
     return get_persona_registry().get(name, vertical=vertical)
 
 
-def create_persona_spec(name: str, vertical: Optional[str] = None) -> Optional[PersonaSpec]:
+def create_persona_spec(
+    name: str, vertical: Optional[str] = None
+) -> Optional[PersonaSpec]:
     """Create a persona from a registered factory.
 
     Convenience function for creating personas from factories.

@@ -196,7 +196,9 @@ class SQLiteSessionPersistence:
                 else execution_state
             ),
             "session_ledger": (
-                session_ledger.to_dict() if hasattr(session_ledger, "to_dict") else session_ledger
+                session_ledger.to_dict()
+                if hasattr(session_ledger, "to_dict")
+                else session_ledger
             ),
             "compaction_hierarchy": compaction_hierarchy,
         }
@@ -237,7 +239,9 @@ class SQLiteSessionPersistence:
                     (session_id, role, content, tool_calls_json),
                 )
 
-            logger.info(f"Saved session {session_id} to SQLite ({message_count} messages)")
+            logger.info(
+                f"Saved session {session_id} to SQLite ({message_count} messages)"
+            )
             return session_id
 
         except Exception as e:
@@ -459,7 +463,9 @@ class SQLiteSessionPersistence:
         return "Untitled Session"
 
 
-def get_sqlite_session_persistence(db_path: Optional[Path] = None) -> SQLiteSessionPersistence:
+def get_sqlite_session_persistence(
+    db_path: Optional[Path] = None,
+) -> SQLiteSessionPersistence:
     """Get the SQLite session persistence instance.
 
     Args:

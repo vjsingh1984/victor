@@ -330,7 +330,9 @@ def _is_transient_error(exc: Exception) -> bool:
     while cause is not None:
         if isinstance(cause, ssl.SSLError):
             return True
-        if isinstance(cause, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        if isinstance(
+            cause, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+        ):
             return True
         cause = getattr(cause, "__cause__", None)
     return False
@@ -571,7 +573,10 @@ class CerebrasProvider(BaseProvider):
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,
                     ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
+                elif any(
+                    term in error_str
+                    for term in ["rate limit", "429", "too many requests"]
+                ):
                     raise ProviderRateLimitError(
                         message=f"Rate limit exceeded: {str(e)}",
                         provider=self.name,
@@ -644,7 +649,9 @@ class CerebrasProvider(BaseProvider):
         thinking_filter = StreamingThinkingFilter(model=model)
         accumulated_reasoning: str = ""
 
-        async with self.client.stream("POST", "/chat/completions", json=payload) as response:
+        async with self.client.stream(
+            "POST", "/chat/completions", json=payload
+        ) as response:
             response.raise_for_status()
             accumulated_tool_calls: List[Dict[str, Any]] = []
 
@@ -662,7 +669,9 @@ class CerebrasProvider(BaseProvider):
                     # Emit final chunk with remaining content and metadata
                     yield StreamChunk(
                         content=remaining_content,
-                        tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                        tool_calls=(
+                            accumulated_tool_calls if accumulated_tool_calls else None
+                        ),
                         stop_reason="stop",
                         is_final=True,
                         metadata=(
@@ -675,12 +684,14 @@ class CerebrasProvider(BaseProvider):
 
                 try:
                     chunk_data = json.loads(data_str)
-                    raw_chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+                    raw_chunk = self._parse_stream_chunk(
+                        chunk_data, accumulated_tool_calls
+                    )
 
                     # Filter thinking content
                     if raw_chunk.content:
-                        filtered_content, filter_metadata = thinking_filter.process_chunk(
-                            raw_chunk.content
+                        filtered_content, filter_metadata = (
+                            thinking_filter.process_chunk(raw_chunk.content)
                         )
                         if filter_metadata and "reasoning_content" in filter_metadata:
                             accumulated_reasoning = filter_metadata["reasoning_content"]

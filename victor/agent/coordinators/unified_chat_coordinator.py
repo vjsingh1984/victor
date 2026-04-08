@@ -44,7 +44,9 @@ from victor.agent.coordinators.protocols import ExecutionMode
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
-    from victor.agent.coordinators.streaming_chat_coordinator import StreamingChatCoordinator
+    from victor.agent.coordinators.streaming_chat_coordinator import (
+        StreamingChatCoordinator,
+    )
 
 logger = logging.getLogger(__name__)
 

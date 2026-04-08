@@ -313,7 +313,9 @@ class LearningBasedTeamSelector:
             recommendation = self._learner.get_recommendation(task_type)
             if recommendation and not recommendation.is_baseline:
                 # Map formation to team name
-                return self._find_team_for_recommendation(recommendation, available_teams)
+                return self._find_team_for_recommendation(
+                    recommendation, available_teams
+                )
         except Exception as e:
             logger.debug(f"Learner selection failed: {e}")
 
@@ -342,7 +344,9 @@ class LearningBasedTeamSelector:
                         confidence=recommendation.confidence,
                         reason=recommendation.reason,
                         formation=(
-                            recommendation.formation.value if recommendation.formation else None
+                            recommendation.formation.value
+                            if recommendation.formation
+                            else None
                         ),
                         suggested_budget=recommendation.suggested_budget,
                         role_distribution=recommendation.role_distribution,
@@ -427,7 +431,9 @@ class HybridTeamSelector:
     ) -> Optional[str]:
         """Select team using hybrid approach."""
         # Try learning first (if learner has data)
-        learning_pick = self._learning_selector.select(task_type, complexity, available_teams)
+        learning_pick = self._learning_selector.select(
+            task_type, complexity, available_teams
+        )
         if learning_pick:
             return learning_pick
 
@@ -443,7 +449,9 @@ class HybridTeamSelector:
     ) -> List[TeamRecommendation]:
         """Recommend teams using hybrid approach."""
         # Get recommendations from both
-        rule_recs = self._rule_selector.recommend(task_type, complexity, available_teams, top_k)
+        rule_recs = self._rule_selector.recommend(
+            task_type, complexity, available_teams, top_k
+        )
         learning_recs = self._learning_selector.recommend(
             task_type, complexity, available_teams, top_k
         )
@@ -466,7 +474,9 @@ class HybridTeamSelector:
                 existing = combined[rec.team_name]
                 combined[rec.team_name] = TeamRecommendation(
                     team_name=rec.team_name,
-                    confidence=(existing.confidence + rec.confidence * self._learning_weight),
+                    confidence=(
+                        existing.confidence + rec.confidence * self._learning_weight
+                    ),
                     reason=f"{existing.reason}; {rec.reason}",
                     formation=rec.formation or existing.formation,
                     suggested_budget=rec.suggested_budget,

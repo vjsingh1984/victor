@@ -451,8 +451,12 @@ class PromptTemplateLearner(BaseLearner):
             template = self._recent_selections[session_id]
         else:
             # No template tracking, use default
-            default_key = task_type if task_type in self.DEFAULT_TEMPLATES else "default"
-            template = self.DEFAULT_TEMPLATES.get(default_key, self.DEFAULT_TEMPLATES["default"])
+            default_key = (
+                task_type if task_type in self.DEFAULT_TEMPLATES else "default"
+            )
+            template = self.DEFAULT_TEMPLATES.get(
+                default_key, self.DEFAULT_TEMPLATES["default"]
+            )
 
         # Compute success signal
         success_score = self._compute_success_score(outcome)
@@ -464,7 +468,9 @@ class PromptTemplateLearner(BaseLearner):
 
         # Update element posteriors
         for element in template.elements:
-            element_posterior = self._get_element_posterior(task_type, provider, element)
+            element_posterior = self._get_element_posterior(
+                task_type, provider, element
+            )
             element_posterior.update(success)
 
         # Update sample count
@@ -534,7 +540,9 @@ class PromptTemplateLearner(BaseLearner):
 
         # Save element posteriors
         for element in template.elements:
-            element_posterior = self._get_element_posterior(task_type, provider, element)
+            element_posterior = self._get_element_posterior(
+                task_type, provider, element
+            )
             cursor.execute(
                 f"""
                 INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_ELEMENT}
@@ -622,9 +630,9 @@ class PromptTemplateLearner(BaseLearner):
                     e: self._get_element_posterior(task_type, provider, e).sample()
                     for e in selected_elements
                 }
-                selected_elements = sorted(element_samples, key=element_samples.get, reverse=True)[
-                    :4
-                ]
+                selected_elements = sorted(
+                    element_samples, key=element_samples.get, reverse=True
+                )[:4]
 
             template = PromptTemplate(
                 style=best_style,
@@ -660,7 +668,9 @@ class PromptTemplateLearner(BaseLearner):
         elements = random.sample(self.ALL_ELEMENTS, k=num_elements)
         return PromptTemplate(style=style, elements=elements)
 
-    def _compute_confidence(self, posterior: BetaDistribution, sample_count: int) -> float:
+    def _compute_confidence(
+        self, posterior: BetaDistribution, sample_count: int
+    ) -> float:
         """Compute confidence from posterior and samples.
 
         Args:
@@ -693,7 +703,9 @@ class PromptTemplateLearner(BaseLearner):
         # Limit tracked selections
         if len(self._recent_selections) > self._max_tracked_selections:
             # Remove oldest entries
-            oldest = list(self._recent_selections.keys())[: self._max_tracked_selections // 2]
+            oldest = list(self._recent_selections.keys())[
+                : self._max_tracked_selections // 2
+            ]
             for key in oldest:
                 del self._recent_selections[key]
 
@@ -715,7 +727,9 @@ class PromptTemplateLearner(BaseLearner):
             return PromptTemplate.from_dict(rec.value)
         return self.DEFAULT_TEMPLATES.get(task_type, self.DEFAULT_TEMPLATES["default"])
 
-    def get_style_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
+    def get_style_probabilities(
+        self, task_type: str, provider: str
+    ) -> Dict[str, float]:
         """Get posterior mean probabilities for each style.
 
         Args:
@@ -730,7 +744,9 @@ class PromptTemplateLearner(BaseLearner):
             for style in self.ALL_STYLES
         }
 
-    def get_element_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
+    def get_element_probabilities(
+        self, task_type: str, provider: str
+    ) -> Dict[str, float]:
         """Get posterior mean probabilities for each element.
 
         Args:
@@ -741,7 +757,9 @@ class PromptTemplateLearner(BaseLearner):
             Dictionary of element -> probability
         """
         return {
-            element.value: self._get_element_posterior(task_type, provider, element).mean()
+            element.value: self._get_element_posterior(
+                task_type, provider, element
+            ).mean()
             for element in self.ALL_ELEMENTS
         }
 
@@ -906,7 +924,9 @@ class PromptTemplateLearner(BaseLearner):
 
         self.db.commit()
 
-    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> Dict[str, float]:
+    def get_enrichment_probabilities(
+        self, vertical: str, task_type: str = ""
+    ) -> Dict[str, float]:
         """Get posterior mean probabilities for each enrichment type.
 
         Args:
@@ -924,7 +944,9 @@ class PromptTemplateLearner(BaseLearner):
                     probabilities[etype] = posterior.mean()
         return probabilities
 
-    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> Dict[str, bool]:
+    def get_enrichment_recommendation(
+        self, vertical: str, task_type: str = ""
+    ) -> Dict[str, bool]:
         """Get recommendation on which enrichment types to use.
 
         Uses Thompson Sampling to decide which enrichments are worth applying.
@@ -1013,7 +1035,9 @@ class PromptTemplateLearner(BaseLearner):
             if context not in enrichment_stats:
                 enrichment_stats[context] = {
                     "probability": posterior.mean(),
-                    "sample_count": self._enrichment_sample_counts.get((vertical, etype), 0),
+                    "sample_count": self._enrichment_sample_counts.get(
+                        (vertical, etype), 0
+                    ),
                 }
 
         return {
@@ -1025,7 +1049,9 @@ class PromptTemplateLearner(BaseLearner):
             "element_posteriors_count": len(self._element_posteriors),
             "tracked_selections": len(self._recent_selections),
             "top_styles_by_context": top_styles,
-            "samples_per_context": {f"{k[0]}:{k[1]}": v for k, v in self._sample_counts.items()},
+            "samples_per_context": {
+                f"{k[0]}:{k[1]}": v for k, v in self._sample_counts.items()
+            },
             # Enrichment stats
             "enrichment_posteriors_count": len(self._enrichment_posteriors),
             "enrichment_samples_total": sum(self._enrichment_sample_counts.values()),

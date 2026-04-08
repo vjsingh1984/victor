@@ -251,7 +251,9 @@ class ToolSequenceTracker:
         if len(self._history) > self.config.max_history:
             self._history = self._history[-self.config.max_history :]
 
-        logger.debug(f"Recorded tool execution: {tool_name} (history: {len(self._history)})")
+        logger.debug(
+            f"Recorded tool execution: {tool_name} (history: {len(self._history)})"
+        )
 
     def get_next_suggestions(
         self,
@@ -279,7 +281,9 @@ class ToolSequenceTracker:
             for next_tool, stats in self._transitions[last_tool].items():
                 if next_tool not in exclude:
                     # Calculate confidence based on count and success rate
-                    total_from_last = sum(s.count for s in self._transitions[last_tool].values())
+                    total_from_last = sum(
+                        s.count for s in self._transitions[last_tool].values()
+                    )
                     if total_from_last > 0:
                         base_prob = stats.count / total_from_last
                         confidence = base_prob * stats.success_rate
@@ -295,7 +299,9 @@ class ToolSequenceTracker:
                     suggestions[suggested] = max(current, weight)
 
         # Sort by confidence and return top_k
-        sorted_suggestions = sorted(suggestions.items(), key=lambda x: x[1], reverse=True)
+        sorted_suggestions = sorted(
+            suggestions.items(), key=lambda x: x[1], reverse=True
+        )
 
         return sorted_suggestions[:top_k]
 
@@ -389,7 +395,8 @@ class ToolSequenceTracker:
             Dictionary with tracker stats
         """
         total_transitions = sum(
-            sum(s.count for s in targets.values()) for targets in self._transitions.values()
+            sum(s.count for s in targets.values())
+            for targets in self._transitions.values()
         )
 
         return {

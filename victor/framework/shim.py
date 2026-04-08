@@ -229,7 +229,9 @@ class FrameworkShim:
         if self._enable_observability:
             self._wire_observability()
 
-        logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
+        logger.debug(
+            f"FrameworkShim created orchestrator: session_id={self._session_id}"
+        )
 
         return self._orchestrator
 
@@ -254,7 +256,9 @@ class FrameworkShim:
         logger.debug(f"Applying vertical via pipeline: {vertical.name}")
 
         # Use shared framework service for vertical application
-        result = apply_vertical_configuration(self._orchestrator, vertical, source="cli")
+        result = apply_vertical_configuration(
+            self._orchestrator, vertical, source="cli"
+        )
 
         # Store result for access
         self._vertical_config = result.context.config if result.context else None

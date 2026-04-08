@@ -130,7 +130,9 @@ class ParallelToolExecutor:
             return False
         return True
 
-    def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
+    def _extract_file_dependencies(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> Dict[int, Set[int]]:
         dependencies = {i: set() for i in range(len(tool_calls))}
         path_writers = {}
 
@@ -168,7 +170,9 @@ class ParallelToolExecutor:
             or len(tool_calls) <= 1
             or self._has_write_tools(tool_calls)
         ):
-            return await self._execute_sequential(tool_calls, context, result, start_time)
+            return await self._execute_sequential(
+                tool_calls, context, result, start_time
+            )
 
         # Parallel execution with dependency handling
         dependencies = self._extract_file_dependencies(tool_calls)
@@ -260,7 +264,9 @@ class ParallelToolExecutor:
 
         try:
             result = await asyncio.wait_for(
-                self.executor.execute(tool_name=tool_name, arguments=arguments, context=context),
+                self.executor.execute(
+                    tool_name=tool_name, arguments=arguments, context=context
+                ),
                 timeout=self.config.timeout_per_tool,
             )
 
@@ -270,7 +276,9 @@ class ParallelToolExecutor:
             return result
 
         except asyncio.TimeoutError:
-            error_msg = f"Tool '{tool_name}' timed out after {self.config.timeout_per_tool}s"
+            error_msg = (
+                f"Tool '{tool_name}' timed out after {self.config.timeout_per_tool}s"
+            )
             if self.progress_callback:
                 self.progress_callback(tool_name, "timeout", False)
             return self._create_error_result(tool_name, error_msg)
@@ -287,5 +295,7 @@ def create_parallel_executor(
     enable: bool = True,
     progress_callback: Optional[Callable[[str, str, bool], None]] = None,
 ) -> ParallelToolExecutor:
-    config = ParallelExecutionConfig(max_concurrent=max_concurrent, enable_parallel=enable)
+    config = ParallelExecutionConfig(
+        max_concurrent=max_concurrent, enable_parallel=enable
+    )
     return ParallelToolExecutor(tool_executor, config, progress_callback)

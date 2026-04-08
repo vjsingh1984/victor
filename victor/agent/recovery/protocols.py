@@ -141,8 +141,12 @@ class RecoveryContext:
         Discretizes continuous values for state space manageability.
         """
         # Discretize continuous values
-        budget_ratio = self._discretize_ratio(self.tool_calls_made / max(self.tool_budget, 1))
-        iter_ratio = self._discretize_ratio(self.iteration_count / max(self.max_iterations, 1))
+        budget_ratio = self._discretize_ratio(
+            self.tool_calls_made / max(self.tool_budget, 1)
+        )
+        iter_ratio = self._discretize_ratio(
+            self.iteration_count / max(self.max_iterations, 1)
+        )
         time_ratio = self._discretize_ratio(
             self.elapsed_time_seconds / max(self.session_idle_timeout, 1)
         )
@@ -356,7 +360,9 @@ class TelemetryCollector(Protocol):
         """Record a failure occurrence."""
         ...
 
-    def record_recovery_attempt(self, context: RecoveryContext, result: RecoveryResult) -> None:
+    def record_recovery_attempt(
+        self, context: RecoveryContext, result: RecoveryResult
+    ) -> None:
         """Record a recovery attempt."""
         ...
 

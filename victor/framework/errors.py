@@ -160,7 +160,9 @@ class ConfigurationError(CoreConfigurationError, AgentError):
         **kwargs: Any,
     ) -> None:
         # Initialize core ConfigurationError
-        CoreConfigurationError.__init__(self, message=message, config_key=config_key, **kwargs)
+        CoreConfigurationError.__init__(
+            self, message=message, config_key=config_key, **kwargs
+        )
         # Set framework-specific attributes
         self.invalid_fields = invalid_fields or []
         self.recoverable = False  # Configuration errors are not recoverable

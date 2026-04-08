@@ -98,7 +98,11 @@ class Persona:
 
         if style == "formal":
             # Capitalize first letter and ensure punctuation
-            result = content[0].upper() + content[1:] if len(content) > 1 else content.upper()
+            result = (
+                content[0].upper() + content[1:]
+                if len(content) > 1
+                else content.upper()
+            )
             if not result.endswith((".", "!", "?")):
                 result = result + "."
             return result

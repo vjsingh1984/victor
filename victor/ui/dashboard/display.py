@@ -75,7 +75,8 @@ class MetricsDashboard:
         """
         if not RICH_AVAILABLE:
             raise ImportError(
-                "Rich library is required for the dashboard. " "Install it with: pip install rich"
+                "Rich library is required for the dashboard. "
+                "Install it with: pip install rich"
             )
 
         self._provider = provider or get_dashboard_provider()

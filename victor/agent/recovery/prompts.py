@@ -284,7 +284,9 @@ class ModelSpecificPromptRegistry:
 
             # Provider match
             if template.provider_patterns:
-                if any(fnmatch.fnmatch(provider, p) for p in template.provider_patterns):
+                if any(
+                    fnmatch.fnmatch(provider, p) for p in template.provider_patterns
+                ):
                     score += 0.3
                 else:
                     continue  # Provider-specific but doesn't match
@@ -341,7 +343,9 @@ class ModelSpecificPromptRegistry:
             or "force" in c[0].name.lower()
             or "final" in c[0].name.lower()
         ]
-        _other = [c for c in candidates if c not in gentle + specific + assertive]  # noqa: F841
+        _other = [
+            c for c in candidates if c not in gentle + specific + assertive
+        ]  # noqa: F841
 
         # Select based on escalation level
         if escalation_level == 0 and gentle:
@@ -378,7 +382,9 @@ class ModelSpecificPromptRegistry:
 
         # Progress summary
         if context.tool_calls_made > 0:
-            kwargs["progress_summary"] = f"You made {context.tool_calls_made} tool calls."
+            kwargs["progress_summary"] = (
+                f"You made {context.tool_calls_made} tool calls."
+            )
         else:
             kwargs["progress_summary"] = "No tool calls were made."
 
@@ -444,7 +450,10 @@ class ModelSpecificPromptRegistry:
         return {
             tid: {
                 "name": self._templates.get(
-                    tid, PromptTemplate(id=tid, name="Unknown", template="", failure_types=[])
+                    tid,
+                    PromptTemplate(
+                        id=tid, name="Unknown", template="", failure_types=[]
+                    ),
                 ).name,
                 "usage_count": stats.usage_count,
                 "success_rate": stats.success_rate,

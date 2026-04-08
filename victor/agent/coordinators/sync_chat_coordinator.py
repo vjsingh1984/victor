@@ -165,7 +165,9 @@ class SyncChatCoordinator:
             True if planning should be used
         """
         # Check orchestrator settings
-        planning_enabled = getattr(self._chat_context.settings, "enable_planning", False)
+        planning_enabled = getattr(
+            self._chat_context.settings, "enable_planning", False
+        )
         if not planning_enabled:
             return False
 
@@ -193,7 +195,9 @@ class SyncChatCoordinator:
             return True
 
         # Check task complexity
-        task_classification = self._provider_context.task_classifier.classify(user_message)
+        task_classification = self._provider_context.task_classifier.classify(
+            user_message
+        )
         return task_classification.complexity in (
             TaskComplexity.MEDIUM,
             TaskComplexity.COMPLEX,

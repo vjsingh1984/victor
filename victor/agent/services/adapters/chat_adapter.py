@@ -52,7 +52,9 @@ class ChatServiceAdapter:
         use_planning: bool | None = None,
     ) -> "CompletionResponse":
         """Process a chat message with planning via the coordinator."""
-        return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
+        return await self._chat_coordinator.chat_with_planning(
+            user_message, use_planning
+        )
 
     def reset_conversation(self) -> None:
         """Reset conversation state."""

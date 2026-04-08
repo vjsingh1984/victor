@@ -58,7 +58,9 @@ class ObservabilityProtocol(Protocol):
     Provides event emission for monitoring and tracing.
     """
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], tool_id: str) -> None:
+    def on_tool_start(
+        self, tool_name: str, arguments: Dict[str, Any], tool_id: str
+    ) -> None:
         """Called when tool execution starts."""
         ...
 
@@ -86,7 +88,9 @@ class ObservabilityProtocol(Protocol):
 class MetricsCollectorProtocol(Protocol):
     """Protocol for metrics collection."""
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int) -> None:
+    def on_tool_start(
+        self, tool_name: str, arguments: Dict[str, Any], iteration: int
+    ) -> None:
         """Record tool start metrics."""
         ...
 
@@ -701,7 +705,9 @@ class TaskTrackerProtocol(Protocol):
 class CompactionSummarizerProtocol(Protocol):
     """Protocol for compaction summarization strategies."""
 
-    def summarize(self, removed_messages: List[Any], ledger: Optional[object] = None) -> str:
+    def summarize(
+        self, removed_messages: List[Any], ledger: Optional[object] = None
+    ) -> str:
         """Summarize removed messages into a compact context string."""
         ...
 

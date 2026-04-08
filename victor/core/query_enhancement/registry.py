@@ -44,7 +44,9 @@ class QueryEnhancementRegistry:
 
     def __init__(self):
         """Initialize empty registry."""
-        self._strategies: Dict[EnhancementTechnique, Type[IQueryEnhancementStrategy]] = {}
+        self._strategies: Dict[
+            EnhancementTechnique, Type[IQueryEnhancementStrategy]
+        ] = {}
         self._instances: Dict[EnhancementTechnique, IQueryEnhancementStrategy] = {}
 
     def register(
@@ -137,8 +139,12 @@ def _register_default_strategies(registry: QueryEnhancementRegistry) -> None:
         registry: Registry to populate
     """
     from victor.core.query_enhancement.strategies.rewrite import RewriteStrategy
-    from victor.core.query_enhancement.strategies.decomposition import DecompositionStrategy
-    from victor.core.query_enhancement.strategies.entity_expand import EntityExpandStrategy
+    from victor.core.query_enhancement.strategies.decomposition import (
+        DecompositionStrategy,
+    )
+    from victor.core.query_enhancement.strategies.entity_expand import (
+        EntityExpandStrategy,
+    )
 
     registry.register(EnhancementTechnique.REWRITE, RewriteStrategy)
     registry.register(EnhancementTechnique.DECOMPOSITION, DecompositionStrategy)

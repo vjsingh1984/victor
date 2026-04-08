@@ -141,7 +141,9 @@ class BaseRecoveryStrategy:
             reward = 1.0 if success else -0.5
             # Convert enum to string name for Q-learning store
             action_key = (
-                result.action.name if hasattr(result.action, "name") else str(result.action)
+                result.action.name
+                if hasattr(result.action, "name")
+                else str(result.action)
             )
             self._q_store.update_q_value(state_key, action_key, reward)
 
@@ -191,7 +193,10 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         return [FailureType.EMPTY_RESPONSE]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
-        return action in (RecoveryAction.PROMPT_TOOL_CALL, RecoveryAction.ADJUST_TEMPERATURE)
+        return action in (
+            RecoveryAction.PROMPT_TOOL_CALL,
+            RecoveryAction.ADJUST_TEMPERATURE,
+        )
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from empty response."""
@@ -348,7 +353,9 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from hallucinated tool call."""
-        mentioned = ", ".join(context.mentioned_tools) if context.mentioned_tools else "tools"
+        mentioned = (
+            ", ".join(context.mentioned_tools) if context.mentioned_tools else "tools"
+        )
 
         if context.consecutive_failures >= self._max_hallucinations:
             # Give up on tool calls, force text response
@@ -484,7 +491,9 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
         applicable = [s for s in self._strategies if s.can_handle(context)]
 
         if not applicable:
-            logger.warning(f"No strategy found for failure type: {context.failure_type}")
+            logger.warning(
+                f"No strategy found for failure type: {context.failure_type}"
+            )
             return RecoveryResult(
                 action=RecoveryAction.CONTINUE,
                 success=False,

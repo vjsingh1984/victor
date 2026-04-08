@@ -162,14 +162,20 @@ class SandboxedExecutor:
                     command, isolation, working_dir, env, input_data
                 )
             else:
-                logger.warning("Docker not available, falling back to process isolation")
+                logger.warning(
+                    "Docker not available, falling back to process isolation"
+                )
                 result = await self._execute_process(
                     command, isolation, working_dir, env, input_data
                 )
         elif isolation.sandbox_type == "process":
-            result = await self._execute_process(command, isolation, working_dir, env, input_data)
+            result = await self._execute_process(
+                command, isolation, working_dir, env, input_data
+            )
         else:
-            result = await self._execute_inline(command, isolation, working_dir, env, input_data)
+            result = await self._execute_inline(
+                command, isolation, working_dir, env, input_data
+            )
 
         result.duration_seconds = time.time() - start_time
         return result
@@ -205,7 +211,9 @@ class SandboxedExecutor:
             )
 
             timeout = (
-                isolation.resource_limits.timeout_seconds if isolation.resource_limits else 60.0
+                isolation.resource_limits.timeout_seconds
+                if isolation.resource_limits
+                else 60.0
             )
 
             stdout, stderr = await asyncio.wait_for(
@@ -216,7 +224,11 @@ class SandboxedExecutor:
             return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
-                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                error=(
+                    stderr.decode("utf-8", errors="replace")
+                    if process.returncode != 0
+                    else ""
+                ),
                 exit_code=process.returncode or 0,
                 sandbox_type="none",
             )
@@ -356,7 +368,9 @@ class SandboxedExecutor:
         docker_cmd = ["docker", "run", "--rm", "--name", container_name]
 
         # Add label for identification during cleanup
-        docker_cmd.extend(["--label", f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"])
+        docker_cmd.extend(
+            ["--label", f"{SANDBOX_CONTAINER_LABEL}={SANDBOX_CONTAINER_VALUE}"]
+        )
 
         # Resource limits
         docker_cmd.extend(
@@ -416,14 +430,20 @@ class SandboxedExecutor:
             return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
-                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                error=(
+                    stderr.decode("utf-8", errors="replace")
+                    if process.returncode != 0
+                    else ""
+                ),
                 exit_code=process.returncode or 0,
                 sandbox_type="docker",
             )
 
         except asyncio.TimeoutError:
             # On timeout, we need to force-kill the container
-            logger.warning(f"Docker execution timed out, killing container {container_name}")
+            logger.warning(
+                f"Docker execution timed out, killing container {container_name}"
+            )
             await self._force_kill_container(container_name)
             return SandboxExecutionResult(
                 success=False,

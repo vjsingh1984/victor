@@ -67,7 +67,9 @@ class PipelineManager:
         self._settings = load_settings()
         self._paths = get_project_paths(self.root_path)
         self._history_file = self._paths.project_victor_dir / "pipeline_history.json"
-        self._coverage_history_file = self._paths.project_victor_dir / "coverage_history.json"
+        self._coverage_history_file = (
+            self._paths.project_victor_dir / "coverage_history.json"
+        )
 
     async def detect_platforms(self) -> list[PipelinePlatform]:
         """Detect which CI/CD platforms are configured in the project.
@@ -80,7 +82,9 @@ class PipelineManager:
             configs = await analyzer.detect_config_files(self.root_path)
             if configs:
                 detected.append(analyzer.platform)
-                logger.debug(f"Detected {analyzer.platform.value}: {len(configs)} config(s)")
+                logger.debug(
+                    f"Detected {analyzer.platform.value}: {len(configs)} config(s)"
+                )
 
         return detected
 
@@ -142,7 +146,9 @@ class PipelineManager:
             coverage_trend = await self._analyze_coverage()
 
         # Generate recommendations
-        recommendations = self._generate_recommendations(configs, issues, coverage_trend)
+        recommendations = self._generate_recommendations(
+            configs, issues, coverage_trend
+        )
 
         # Load historical runs
         recent_runs = await self._load_run_history()
@@ -192,7 +198,9 @@ class PipelineManager:
 
         return metrics
 
-    async def get_coverage(self, format_hint: str | None = None) -> CoverageMetrics | None:
+    async def get_coverage(
+        self, format_hint: str | None = None
+    ) -> CoverageMetrics | None:
         """Get current coverage metrics.
 
         Args:
@@ -215,7 +223,9 @@ class PipelineManager:
             return max(all_coverage, key=lambda c: c.total_lines)
         return None
 
-    async def compare_coverage(self, baseline_path: str | Path | None = None) -> dict[str, Any]:
+    async def compare_coverage(
+        self, baseline_path: str | Path | None = None
+    ) -> dict[str, Any]:
         """Compare current coverage against baseline.
 
         Args:
@@ -255,7 +265,8 @@ class PipelineManager:
             "baseline": baseline.to_dict(),
             "line_coverage_delta": current.line_coverage - baseline.line_coverage,
             "branch_coverage_delta": current.branch_coverage - baseline.branch_coverage,
-            "function_coverage_delta": current.function_coverage - baseline.function_coverage,
+            "function_coverage_delta": current.function_coverage
+            - baseline.function_coverage,
             "improved": current.line_coverage > baseline.line_coverage,
             "new_uncovered_files": [
                 f for f in current.uncovered_files if f not in baseline.uncovered_files
@@ -437,7 +448,9 @@ class PipelineManager:
             for c in coverage:
                 all_uncovered.update(c.uncovered_files)
             if all_uncovered:
-                recommendations.append(f"📝 {len(all_uncovered)} file(s) have no test coverage")
+                recommendations.append(
+                    f"📝 {len(all_uncovered)} file(s) have no test coverage"
+                )
 
         # Config-based recommendations
         has_matrix = any(c.matrix for c in configs)
@@ -447,7 +460,9 @@ class PipelineManager:
             )
 
         # Check for test parallelization
-        test_steps = sum(1 for c in configs for s in c.steps if s.step_type.value == "test")
+        test_steps = sum(
+            1 for c in configs for s in c.steps if s.step_type.value == "test"
+        )
         if test_steps > 3:
             recommendations.append(
                 "⚡ Multiple test jobs detected - ensure parallel execution is configured"
@@ -455,10 +470,13 @@ class PipelineManager:
 
         # Check for caching
         has_cache = any(
-            any(s.cache_paths for s in c.steps) or "cache" in c.raw_content.lower() for c in configs
+            any(s.cache_paths for s in c.steps) or "cache" in c.raw_content.lower()
+            for c in configs
         )
         if not has_cache and len(configs) > 0:
-            recommendations.append("💨 Add dependency caching to speed up pipeline execution")
+            recommendations.append(
+                "💨 Add dependency caching to speed up pipeline execution"
+            )
 
         return recommendations
 
@@ -474,7 +492,9 @@ class PipelineManager:
             "platforms_detected": len({c.platform for c in result.configs}),
             "pipeline_configs": len(result.configs),
             "total_issues": len(result.issues),
-            "critical_issues": sum(1 for i in result.issues if i.severity == "critical"),
+            "critical_issues": sum(
+                1 for i in result.issues if i.severity == "critical"
+            ),
             "warning_issues": sum(1 for i in result.issues if i.severity == "warning"),
             "success_rate": result.success_rate,
             "avg_duration_seconds": (

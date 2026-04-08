@@ -155,7 +155,9 @@ class VerticalLoader:
             # Error with available names
             if vertical is None:
                 available = self._get_available_names()
-                raise ValueError(f"Vertical '{name}' not found. Available: {', '.join(available)}")
+                raise ValueError(
+                    f"Vertical '{name}' not found. Available: {', '.join(available)}"
+                )
 
             runtime_vertical = vertical
             runtime_metadata = get_vertical_runtime_metadata(runtime_vertical)
@@ -184,7 +186,11 @@ class VerticalLoader:
             vertical = VerticalRegistry.get(name)
             ep_vertical = self._import_from_entrypoint(name)
 
-            if vertical is not None and ep_vertical is not None and vertical is not ep_vertical:
+            if (
+                vertical is not None
+                and ep_vertical is not None
+                and vertical is not ep_vertical
+            ):
                 reg_module = getattr(vertical, "__module__", "")
                 ep_module = getattr(ep_vertical, "__module__", "")
                 is_expected_override = ("verticals.contrib" in reg_module) != (
@@ -199,7 +205,10 @@ class VerticalLoader:
                         f"{vertical.__module__}.{vertical.__qualname__}",
                         f"{ep_vertical.__module__}.{ep_vertical.__qualname__}",
                     )
-                elif "verticals.contrib" in reg_module and "verticals.contrib" not in ep_module:
+                elif (
+                    "verticals.contrib" in reg_module
+                    and "verticals.contrib" not in ep_module
+                ):
                     vertical = ep_vertical
 
             if vertical is None:
@@ -224,14 +233,18 @@ class VerticalLoader:
         ep_entries = self._get_vertical_entry_points()
         entry_name = name if name in ep_entries else None
         if entry_name is None:
-            entry_name = next((key for key in ep_entries if key.lower() == name.lower()), None)
+            entry_name = next(
+                (key for key in ep_entries if key.lower() == name.lower()), None
+            )
         if entry_name is None:
             return None
 
         value = ep_entries[entry_name]
         candidate = self._load_entry_point(entry_name, value)
         try:
-            discovered_verticals = self._collect_validated_verticals(candidate, entry_name)
+            discovered_verticals = self._collect_validated_verticals(
+                candidate, entry_name
+            )
         except TypeError:
             return None
         if discovered_verticals:
@@ -262,14 +275,18 @@ class VerticalLoader:
                 return self._discovered_vertical_entry_points
 
             cache = get_entry_point_cache()
-            entries = dict(cache.get_entry_points("victor.plugins", force_refresh=force_refresh))
+            entries = dict(
+                cache.get_entry_points("victor.plugins", force_refresh=force_refresh)
+            )
             self._discovered_vertical_entry_points = entries
             return entries
 
     def discover_vertical_names(self, force_refresh: bool = False) -> List[str]:
         """Discover installed vertical names without importing their modules."""
 
-        return sorted(self._get_vertical_entry_points(force_refresh=force_refresh).keys())
+        return sorted(
+            self._get_vertical_entry_points(force_refresh=force_refresh).keys()
+        )
 
     def _emit_observability_event(self, topic: str, data: Dict[str, Any]) -> None:
         """Emit loader observability event from sync contexts."""
@@ -288,7 +305,9 @@ class VerticalLoader:
         except Exception as e:
             logger.debug("Failed to emit %s event: %s", topic, e)
 
-    async def _emit_observability_event_async(self, topic: str, data: Dict[str, Any]) -> None:
+    async def _emit_observability_event_async(
+        self, topic: str, data: Dict[str, Any]
+    ) -> None:
         """Emit loader observability event from async contexts."""
         try:
             from victor.core.events import get_observability_bus
@@ -425,7 +444,9 @@ class VerticalLoader:
             verticals = loader.discover_verticals()
             # {'coding': <class 'victor_coding.CodingVertical'>}
         """
-        discovered, cache_hit, duration_ms = self._discover_verticals_internal(force_refresh)
+        discovered, cache_hit, duration_ms = self._discover_verticals_internal(
+            force_refresh
+        )
         payload = self._build_discovery_event_payload(
             kind="vertical",
             count=len(discovered),
@@ -438,7 +459,9 @@ class VerticalLoader:
                 topic="vertical.plugins.discovered",
                 data=payload,
             )
-        self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
+        self._log_discovery_telemetry(
+            event="VERTICAL_DISCOVERY", kind="vertical", payload=payload
+        )
         return discovered
 
     def _discover_verticals_internal(
@@ -463,7 +486,9 @@ class VerticalLoader:
 
             try:
                 # Discover verticals via entry point scan
-                ep_entries = self._get_vertical_entry_points(force_refresh=force_refresh)
+                ep_entries = self._get_vertical_entry_points(
+                    force_refresh=force_refresh
+                )
                 self._load_vertical_entries(ep_entries)
             except Exception as e:
                 logger.warning("Failed to discover vertical entry points: %s", e)
@@ -508,7 +533,9 @@ class VerticalLoader:
             topic="vertical.plugins.discovered",
             data=payload,
         )
-        self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
+        self._log_discovery_telemetry(
+            event="VERTICAL_DISCOVERY", kind="vertical", payload=payload
+        )
         return discovered
 
     def _load_vertical_entries(self, ep_entries: Dict[str, str]) -> None:
@@ -520,9 +547,13 @@ class VerticalLoader:
         for name, value in ep_entries.items():
             try:
                 candidate = self._load_entry_point(name, value)
-                discovered_verticals = self._collect_validated_verticals(candidate, name)
+                discovered_verticals = self._collect_validated_verticals(
+                    candidate, name
+                )
                 if not discovered_verticals:
-                    logger.warning("Entry point '%s' did not register any valid verticals", name)
+                    logger.warning(
+                        "Entry point '%s' did not register any valid verticals", name
+                    )
                     continue
 
                 for vertical_name, vertical_cls in discovered_verticals.items():
@@ -549,7 +580,9 @@ class VerticalLoader:
                         # External overriding contrib — let register() handle it
                     self._discovered_verticals[vertical_name] = vertical_cls
                     VerticalRegistry.register(vertical_cls)
-                    logger.debug("Discovered vertical plugin: %s -> %s", name, vertical_name)
+                    logger.debug(
+                        "Discovered vertical plugin: %s -> %s", name, vertical_name
+                    )
             except Exception as e:
                 logger.warning("Failed to load vertical entry point '%s': %s", name, e)
 
@@ -562,7 +595,9 @@ class VerticalLoader:
 
         discovered: Dict[str, Type[VerticalBase]] = {}
         for vertical_cls in collect_verticals_from_candidate(candidate).values():
-            if VerticalRegistry._validate_external_vertical(vertical_cls, entry_point_name):
+            if VerticalRegistry._validate_external_vertical(
+                vertical_cls, entry_point_name
+            ):
                 discovered[vertical_cls.name] = vertical_cls
         return discovered
 
@@ -613,7 +648,9 @@ class VerticalLoader:
             tools = loader.discover_tools()
             # {'code_search': <class 'victor_coding.tools.CodeSearchTool'>}
         """
-        discovered, cache_hit, duration_ms = self._discover_tools_internal(force_refresh)
+        discovered, cache_hit, duration_ms = self._discover_tools_internal(
+            force_refresh
+        )
         payload = self._build_discovery_event_payload(
             kind="tools",
             count=len(discovered),
@@ -626,7 +663,9 @@ class VerticalLoader:
                 topic="vertical.plugins.discovered",
                 data=payload,
             )
-        self._log_discovery_telemetry(event="TOOL_DISCOVERY", kind="tools", payload=payload)
+        self._log_discovery_telemetry(
+            event="TOOL_DISCOVERY", kind="tools", payload=payload
+        )
         return discovered
 
     def _discover_tools_internal(
@@ -694,7 +733,9 @@ class VerticalLoader:
             topic="vertical.plugins.discovered",
             data=payload,
         )
-        self._log_discovery_telemetry(event="TOOL_DISCOVERY", kind="tools", payload=payload)
+        self._log_discovery_telemetry(
+            event="TOOL_DISCOVERY", kind="tools", payload=payload
+        )
         return discovered
 
     def _load_tool_entries(self, ep_entries: Dict[str, str]) -> None:
@@ -747,14 +788,20 @@ class VerticalLoader:
 
                 clear_vertical_integration_pipeline_cache()
             except Exception as e:
-                logger.debug("Failed clearing framework vertical integration cache: %s", e)
+                logger.debug(
+                    "Failed clearing framework vertical integration cache: %s", e
+                )
 
             try:
-                from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+                from victor.framework.entry_point_loader import (
+                    clear_entry_point_loader_cache,
+                )
 
                 clear_entry_point_loader_cache()
             except Exception as e:
-                logger.debug("Failed clearing framework entry-point loader cache: %s", e)
+                logger.debug(
+                    "Failed clearing framework entry-point loader cache: %s", e
+                )
 
             try:
                 from victor.core.tool_dependency_loader import (
@@ -916,7 +963,9 @@ class VerticalLoader:
             result: NegotiationResult = negotiator.negotiate(manifest)
 
             for warning in result.warnings:
-                logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
+                logger.warning(
+                    "Manifest negotiation warning for '%s': %s", manifest.name, warning
+                )
 
             if not result.compatible:
                 errors = "; ".join(result.errors)
@@ -1045,7 +1094,9 @@ class VerticalLoader:
             from victor.core.verticals.dependency_graph import DependencyCycleError
 
             if isinstance(exc, DependencyCycleError):
-                raise ValueError(f"Vertical '{manifest.name}' has circular dependencies: {exc}")
+                raise ValueError(
+                    f"Vertical '{manifest.name}' has circular dependencies: {exc}"
+                )
             else:
                 raise
 
@@ -1215,7 +1266,9 @@ class VerticalLoader:
         framework_entry_point_stats: Dict[str, Any] = {}
         entry_point_cache_stats: Dict[str, Any] = {}
         try:
-            from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
+            from victor.core.tool_dependency_loader import (
+                get_tool_dependency_resolution_stats,
+            )
 
             tool_dependency_stats = get_tool_dependency_resolution_stats()
         except Exception as e:

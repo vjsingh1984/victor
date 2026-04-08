@@ -93,7 +93,9 @@ def _save_profiles_yaml(profiles_file: Path, data: Dict[str, Any]) -> None:
 
 @profiles_app.command("list")
 def profile_list(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed profile settings"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed profile settings"
+    ),
 ) -> None:
     """List all available configuration profiles."""
     all_profiles = list_profiles()
@@ -126,7 +128,9 @@ def profile_list(
         console.print("─" * 60)
 
         for profile in sorted(all_profiles, key=lambda p: p.level.value):
-            console.print(f"\n[cyan bold]{profile.display_name} ([dim]{profile.name}[/])[/]")
+            console.print(
+                f"\n[cyan bold]{profile.display_name} ([dim]{profile.name}[/])[/]"
+            )
             console.print(f"[dim]{profile.description}[/]")
 
             settings_table = Table(show_header=False, box=None)
@@ -200,10 +204,16 @@ def profile_show(
 @profiles_app.command("apply")
 def profile_apply(
     name: str = typer.Argument(..., help="Profile name to apply"),
-    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Override provider"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", "-p", help="Override provider"
+    ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without applying"),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", "-d", help="Config directory"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show changes without applying"
+    ),
 ) -> None:
     """Apply a profile to your configuration.
 
@@ -220,7 +230,9 @@ def profile_apply(
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
 
     # Generate YAML content
-    yaml_content = generate_profile_yaml(profile, provider_override=provider, model_override=model)
+    yaml_content = generate_profile_yaml(
+        profile, provider_override=provider, model_override=model
+    )
 
     if dry_run:
         console.print(f"\n[bold]Dry Run: {profile.display_name} Profile[/]")
@@ -234,10 +246,15 @@ def profile_apply(
     # Apply the profile
     try:
         profiles_path = install_profile(
-            profile, config_dir=config_path, provider_override=provider, model_override=model
+            profile,
+            config_dir=config_path,
+            provider_override=provider,
+            model_override=model,
         )
 
-        console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")
+        console.print(
+            f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile"
+        )
         console.print(f"[dim]Config written to: {profiles_path}[/]")
 
         # Show summary
@@ -248,7 +265,9 @@ def profile_apply(
 
         # Show key settings
         table.add_row("Profile Level", profile.level.value.upper())
-        table.add_row("Provider", provider or profile.settings.get("default_provider", "ollama"))
+        table.add_row(
+            "Provider", provider or profile.settings.get("default_provider", "ollama")
+        )
         table.add_row("Model", model or profile.settings.get("default_model", "auto"))
         table.add_row("Max Tools", str(profile.settings.get("fallback_max_tools", 10)))
 
@@ -276,7 +295,9 @@ def profile_apply(
 
 @profiles_app.command("current")
 def profile_current(
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", "-d", help="Config directory"),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", "-d", help="Config directory"
+    ),
 ) -> None:
     """Show the current active profile."""
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
@@ -293,12 +314,16 @@ def profile_current(
     profile = get_profile(profile_name)
     if profile:
         console.print(f"\n[bold]Current Profile:[/]")
-        console.print(f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])")
+        console.print(
+            f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])"
+        )
         console.print(f"  Level: [yellow]{profile.level.value.upper()}[/]")
         console.print(f"  Description: {profile.description}")
         console.print(f"\n[dim]Config directory: {config_path}[/]")
     else:
-        console.print(f"\n[dim]Current profile: {profile_name}[/] (custom configuration)")
+        console.print(
+            f"\n[dim]Current profile: {profile_name}[/] (custom configuration)"
+        )
 
 
 @profiles_app.command("create")
@@ -306,10 +331,16 @@ def profile_create(
     name: str = typer.Argument(..., help="Profile name to create"),
     provider: str = typer.Option("ollama", "--provider", "-p", help="LLM provider"),
     model: str = typer.Option("llama2", "--model", "-m", help="Model name"),
-    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    temperature: Optional[float] = typer.Option(
+        None, "--temperature", "-t", help="Temperature"
+    ),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Description"
+    ),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", help="Config directory"
+    ),
 ) -> None:
     """Create a new custom profile."""
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
@@ -341,12 +372,20 @@ def profile_create(
 @profiles_app.command("edit")
 def profile_edit(
     name: str = typer.Argument(..., help="Profile name to edit"),
-    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="LLM provider"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", "-p", help="LLM provider"
+    ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Model name"),
-    temperature: Optional[float] = typer.Option(None, "--temperature", "-t", help="Temperature"),
+    temperature: Optional[float] = typer.Option(
+        None, "--temperature", "-t", help="Temperature"
+    ),
     max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max tokens"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description"),
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Description"
+    ),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", help="Config directory"
+    ),
 ) -> None:
     """Edit an existing custom profile."""
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
@@ -386,7 +425,9 @@ def profile_edit(
 def profile_delete(
     name: str = typer.Argument(..., help="Profile name to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", help="Config directory"
+    ),
 ) -> None:
     """Delete a custom profile."""
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"
@@ -415,7 +456,9 @@ def profile_delete(
 @profiles_app.command("set-default")
 def profile_set_default(
     name: str = typer.Argument(..., help="Profile name to set as default"),
-    config_dir: Optional[str] = typer.Option(None, "--config-dir", help="Config directory"),
+    config_dir: Optional[str] = typer.Option(
+        None, "--config-dir", help="Config directory"
+    ),
 ) -> None:
     """Set a profile as the default."""
     config_path = Path(config_dir) if config_dir else Path.home() / ".victor"

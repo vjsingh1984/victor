@@ -861,7 +861,9 @@ class DockerDeploymentHandler(DeploymentHandler):
 
                 self._client = docker.from_env()
             except ImportError:
-                raise RuntimeError("docker package not installed. Install with: pip install docker")
+                raise RuntimeError(
+                    "docker package not installed. Install with: pip install docker"
+                )
         return self._client
 
     async def prepare(
@@ -991,7 +993,8 @@ class KubernetesDeploymentHandler(DeploymentHandler):
                 self._core_v1 = client.CoreV1Api()
             except ImportError:
                 raise RuntimeError(
-                    "kubernetes package not installed. " "Install with: pip install kubernetes"
+                    "kubernetes package not installed. "
+                    "Install with: pip install kubernetes"
                 )
         return self._core_v1
 
@@ -1029,7 +1032,9 @@ class KubernetesDeploymentHandler(DeploymentHandler):
             containers=[container],
             service_account_name=self.config.service_account,
             restart_policy="Never",
-            node_selector=self.config.node_selector if self.config.node_selector else None,
+            node_selector=(
+                self.config.node_selector if self.config.node_selector else None
+            ),
         )
 
         # Build pod metadata
@@ -1166,7 +1171,9 @@ class ECSDeploymentHandler(DeploymentHandler):
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:
-                raise RuntimeError("boto3 package not installed. Install with: pip install boto3")
+                raise RuntimeError(
+                    "boto3 package not installed. Install with: pip install boto3"
+                )
         return self._ecs_client
 
     async def prepare(
@@ -1189,7 +1196,9 @@ class ECSDeploymentHandler(DeploymentHandler):
                 "awsvpcConfiguration": {
                     "subnets": self.config.subnets,
                     "securityGroups": self.config.security_groups,
-                    "assignPublicIp": "ENABLED" if self.config.assign_public_ip else "DISABLED",
+                    "assignPublicIp": (
+                        "ENABLED" if self.config.assign_public_ip else "DISABLED"
+                    ),
                 }
             }
 
@@ -1291,7 +1300,9 @@ class ECSDeploymentHandler(DeploymentHandler):
 
             # ECS Exec returns a session - would need SSM to get output
             # For now, return state (full implementation requires SSM integration)
-            logger.debug(f"ECS exec session: {response.get('session', {}).get('sessionId')}")
+            logger.debug(
+                f"ECS exec session: {response.get('session', {}).get('sessionId')}"
+            )
             return state
 
         except Exception as e:

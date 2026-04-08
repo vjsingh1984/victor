@@ -446,7 +446,9 @@ class WorkflowScheduler:
         with self._lock:
             if schedule_id in self._schedules:
                 workflow = self._schedules.pop(schedule_id)
-                logger.info(f"Unregistered scheduled workflow: {workflow.workflow_name}")
+                logger.info(
+                    f"Unregistered scheduled workflow: {workflow.workflow_name}"
+                )
                 return True
             return False
 
@@ -551,7 +553,9 @@ class WorkflowScheduler:
             schedule: The scheduled workflow to execute
         """
         schedule.mark_started()
-        execution_id = f"{schedule.schedule_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        execution_id = (
+            f"{schedule.schedule_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
 
         logger.info(
             f"Executing scheduled workflow: {schedule.workflow_name} "
@@ -629,7 +633,8 @@ class WorkflowScheduler:
 
         if not schedule.workflow_path:
             raise ValueError(
-                f"No workflow_path specified for scheduled workflow: " f"{schedule.workflow_name}"
+                f"No workflow_path specified for scheduled workflow: "
+                f"{schedule.workflow_name}"
             )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)

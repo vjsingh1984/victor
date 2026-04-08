@@ -51,7 +51,9 @@ class StreamMetrics:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
-    has_actual_usage: bool = False  # True when counts came from API, False when estimated
+    has_actual_usage: bool = (
+        False  # True when counts came from API, False when estimated
+    )
 
     # Cache tokens (Anthropic-specific)
     cache_read_tokens: int = 0

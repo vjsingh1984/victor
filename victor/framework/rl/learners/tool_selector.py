@@ -189,7 +189,9 @@ class ToolSelectorLearner(BaseLearner):
             logger.debug(f"RL: Could not load task Q-values: {e}")
 
         if self._tool_q_values:
-            logger.info(f"RL: Loaded {len(self._tool_q_values)} tool Q-values from database")
+            logger.info(
+                f"RL: Loaded {len(self._tool_q_values)} tool Q-values from database"
+            )
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record tool execution outcome and update Q-values.
@@ -219,22 +221,30 @@ class ToolSelectorLearner(BaseLearner):
 
         if tool_name not in self._tool_task_q_values:
             self._tool_task_q_values[tool_name] = {}
-        old_task_q = self._tool_task_q_values[tool_name].get(task_type, self.DEFAULT_Q_VALUE)
+        old_task_q = self._tool_task_q_values[tool_name].get(
+            task_type, self.DEFAULT_Q_VALUE
+        )
 
         # Update Q-values: Q(s,a) <- Q(s,a) + alpha * (reward - Q(s,a))
         new_global_q = self._clamp_q_value(
             old_global_q + self.learning_rate * (reward - old_global_q)
         )
-        new_task_q = self._clamp_q_value(old_task_q + self.learning_rate * (reward - old_task_q))
+        new_task_q = self._clamp_q_value(
+            old_task_q + self.learning_rate * (reward - old_task_q)
+        )
 
         # Update caches
         self._tool_q_values[tool_name] = new_global_q
         self._tool_task_q_values[tool_name][task_type] = new_task_q
-        self._tool_selection_counts[tool_name] = self._tool_selection_counts.get(tool_name, 0) + 1
+        self._tool_selection_counts[tool_name] = (
+            self._tool_selection_counts.get(tool_name, 0) + 1
+        )
         self._total_selections += 1
 
         if outcome.success:
-            self._tool_success_counts[tool_name] = self._tool_success_counts.get(tool_name, 0) + 1
+            self._tool_success_counts[tool_name] = (
+                self._tool_success_counts.get(tool_name, 0) + 1
+            )
 
         # Persist to database
         self._save_to_db(tool_name, task_type, outcome, reward)
@@ -497,5 +507,7 @@ class ToolSelectorLearner(BaseLearner):
             "total_selections": self._total_selections,
             "epsilon": self.epsilon,
             "learning_rate": self.learning_rate,
-            "top_tools": self.get_tool_rankings(list(self._tool_q_values.keys())[:10], "default"),
+            "top_tools": self.get_tool_rankings(
+                list(self._tool_q_values.keys())[:10], "default"
+            ),
         }

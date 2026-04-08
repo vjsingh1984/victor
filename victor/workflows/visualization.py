@@ -266,7 +266,9 @@ class WorkflowVisualizer:
 
             if isinstance(node, AgentNode):
                 description = (
-                    node.goal[:50] + "..." if node.goal and len(node.goal) > 50 else node.goal
+                    node.goal[:50] + "..."
+                    if node.goal and len(node.goal) > 50
+                    else node.goal
                 )
                 metadata["role"] = node.role
             elif isinstance(node, ComputeNode):
@@ -281,11 +283,20 @@ class WorkflowVisualizer:
                 if hasattr(node, "constraints") and node.constraints:
                     constraints = node.constraints
                     blocked = []
-                    if hasattr(constraints, "llm_allowed") and not constraints.llm_allowed:
+                    if (
+                        hasattr(constraints, "llm_allowed")
+                        and not constraints.llm_allowed
+                    ):
                         blocked.append("llm")
-                    if hasattr(constraints, "network_allowed") and not constraints.network_allowed:
+                    if (
+                        hasattr(constraints, "network_allowed")
+                        and not constraints.network_allowed
+                    ):
                         blocked.append("network")
-                    if hasattr(constraints, "write_allowed") and not constraints.write_allowed:
+                    if (
+                        hasattr(constraints, "write_allowed")
+                        and not constraints.write_allowed
+                    ):
                         blocked.append("write")
                     if blocked:
                         metadata["blocked"] = blocked
@@ -895,7 +906,9 @@ class WorkflowVisualizer:
             return svg_content
 
         except URLError as e:
-            raise RuntimeError(f"Kroki API error: {e}. Check network or use local backend.")
+            raise RuntimeError(
+                f"Kroki API error: {e}. Check network or use local backend."
+            )
 
     def _to_svg_matplotlib(self, output_path: Optional[str] = None) -> str:
         """Render SVG using matplotlib and networkx."""
@@ -912,7 +925,9 @@ class WorkflowVisualizer:
 
         for node in self._nodes:
             style = NODE_STYLES.get(node.node_type, DEFAULT_STYLE)
-            G.add_node(node.id, label=node.name, color=style.color, node_type=node.node_type)
+            G.add_node(
+                node.id, label=node.name, color=style.color, node_type=node.node_type
+            )
 
         for edge in self._edges:
             G.add_edge(edge.source, edge.target, label=edge.label or "")

@@ -327,7 +327,9 @@ class EnumRule(ValidationRule):
 
         if self._case_insensitive and isinstance(value, str):
             check_value = value.lower()
-            check_allowed = {v.lower() if isinstance(v, str) else v for v in self._allowed}
+            check_allowed = {
+                v.lower() if isinstance(v, str) else v for v in self._allowed
+            }
 
         if check_value not in check_allowed:
             allowed_str = ", ".join(str(v) for v in self._allowed)
@@ -413,7 +415,10 @@ class DependencyRule(ValidationRule):
         for field_name, expected in self._required_if.items():
             if context.get(field_name) == expected:
                 if value is None:
-                    msg = self._message or f"Field is required when {field_name}={expected}"
+                    msg = (
+                        self._message
+                        or f"Field is required when {field_name}={expected}"
+                    )
                     result.add_error("", msg)
                     break
 
@@ -469,8 +474,12 @@ class ModelConfigSchema(BaseModel):
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(4096, ge=1, le=200000, description="Maximum tokens")
     top_p: float = Field(1.0, ge=0.0, le=1.0, description="Nucleus sampling")
-    presence_penalty: float = Field(0.0, ge=-2.0, le=2.0, description="Presence penalty")
-    frequency_penalty: float = Field(0.0, ge=-2.0, le=2.0, description="Frequency penalty")
+    presence_penalty: float = Field(
+        0.0, ge=-2.0, le=2.0, description="Presence penalty"
+    )
+    frequency_penalty: float = Field(
+        0.0, ge=-2.0, le=2.0, description="Frequency penalty"
+    )
 
     @field_validator("model")
     @classmethod
@@ -509,7 +518,9 @@ class CacheConfigSchema(BaseModel):
 
     enabled: bool = Field(True, description="Whether caching is enabled")
     ttl_seconds: int = Field(3600, ge=0, le=86400, description="Cache TTL in seconds")
-    max_size_mb: int = Field(100, ge=1, le=10000, description="Maximum cache size in MB")
+    max_size_mb: int = Field(
+        100, ge=1, le=10000, description="Maximum cache size in MB"
+    )
     strategy: str = Field("lru", description="Eviction strategy")
 
     @field_validator("strategy")
@@ -526,13 +537,21 @@ class ResilienceConfigSchema(BaseModel):
     """Schema for resilience configuration."""
 
     circuit_breaker_enabled: bool = Field(True, description="Enable circuit breaker")
-    failure_threshold: int = Field(5, ge=1, le=100, description="Failures before opening")
-    recovery_timeout: float = Field(30.0, ge=1.0, le=300.0, description="Recovery timeout")
+    failure_threshold: int = Field(
+        5, ge=1, le=100, description="Failures before opening"
+    )
+    recovery_timeout: float = Field(
+        30.0, ge=1.0, le=300.0, description="Recovery timeout"
+    )
     retry_enabled: bool = Field(True, description="Enable retry")
     max_retries: int = Field(3, ge=0, le=10, description="Maximum retries")
-    base_delay: float = Field(1.0, ge=0.1, le=60.0, description="Base delay between retries")
+    base_delay: float = Field(
+        1.0, ge=0.1, le=60.0, description="Base delay between retries"
+    )
     rate_limit_enabled: bool = Field(False, description="Enable rate limiting")
-    requests_per_second: float = Field(10.0, ge=0.1, le=1000.0, description="Rate limit")
+    requests_per_second: float = Field(
+        10.0, ge=0.1, le=1000.0, description="Rate limit"
+    )
 
 
 class ObservabilityConfigSchema(BaseModel):
@@ -672,7 +691,9 @@ class ModeDefinitionSchema(BaseModel):
         if self.allowed_tools and self.disallowed_tools:
             overlap = self.allowed_tools & self.disallowed_tools
             if overlap:
-                raise ValueError(f"Tools cannot be both allowed and disallowed: {overlap}")
+                raise ValueError(
+                    f"Tools cannot be both allowed and disallowed: {overlap}"
+                )
         return self
 
     @field_validator("allowed_tools", "disallowed_tools", mode="before")
@@ -1001,7 +1022,9 @@ def validate_mode_definition_dict(definition: Dict[str, Any]) -> ModeDefinitionS
     return ModeDefinitionSchema.model_validate(definition)
 
 
-def validate_vertical_mode_config_dict(config: Dict[str, Any]) -> VerticalModeConfigSchema:
+def validate_vertical_mode_config_dict(
+    config: Dict[str, Any],
+) -> VerticalModeConfigSchema:
     """Validate and create VerticalModeConfigSchema from dict.
 
     Args:

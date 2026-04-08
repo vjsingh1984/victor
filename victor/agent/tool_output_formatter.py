@@ -207,13 +207,18 @@ class ToolOutputFormatter:
         if tool_name in ("read_file", "read"):
             if original_len > self.config.file_structure_threshold:
                 # Skip truncation - use file structure mode instead
-                return self._format_large_file_structure(args, output, output_str, original_len)
+                return self._format_large_file_structure(
+                    args, output, output_str, original_len
+                )
 
         # Use smart truncation if truncator available
         if self._truncator:
             try:
                 truncation_result = self._truncator.truncate_tool_result(output_str)
-                if hasattr(truncation_result, "truncated") and truncation_result.truncated:
+                if (
+                    hasattr(truncation_result, "truncated")
+                    and truncation_result.truncated
+                ):
                     truncated = True
                     output_str = truncation_result.content
                     logger.debug(
@@ -232,7 +237,9 @@ class ToolOutputFormatter:
 
         # Tool-specific formatting
         if tool_name in ("read_file", "read"):
-            return self._format_read_file(args, output, output_str, original_len, truncated)
+            return self._format_read_file(
+                args, output, output_str, original_len, truncated
+            )
 
         if tool_name == "list_directory":
             return self._format_list_directory(args, output_str)
@@ -461,7 +468,9 @@ These are the actual search results. Reference only the files and matches shown 
             # Extract tool operation from arguments
             tool_operation = None
             if tool_args:
-                tool_operation = tool_args.get("operation") or tool_args.get("subcommand")
+                tool_operation = tool_args.get("operation") or tool_args.get(
+                    "subcommand"
+                )
 
             # Create serialization context
             ser_context = SerializationContext(
@@ -527,7 +536,9 @@ These are the actual search results. Reference only the files and matches shown 
 
         return "\n".join(summary_parts)
 
-    def _extract_python_structure(self, lines: List[str], summary_parts: List[str]) -> None:
+    def _extract_python_structure(
+        self, lines: List[str], summary_parts: List[str]
+    ) -> None:
         """Extract Python class and function definitions."""
         classes = []
         functions = []

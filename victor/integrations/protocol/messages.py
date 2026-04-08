@@ -322,7 +322,9 @@ class UnifiedMessage:
         content_dicts = []
         for block in self.content:
             if hasattr(block, "__dict__"):
-                content_dicts.append({k: v for k, v in block.__dict__.items() if v is not None})
+                content_dicts.append(
+                    {k: v for k, v in block.__dict__.items() if v is not None}
+                )
             else:
                 content_dicts.append({"type": "text", "text": str(block)})
 

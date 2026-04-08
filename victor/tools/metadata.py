@@ -70,15 +70,25 @@ class ToolMetadata:
     access_mode: Optional["AccessMode"] = None  # Default: READONLY when None
     danger_level: Optional["DangerLevel"] = None  # Default: SAFE when None
     # Stage affinity for conversation state machine
-    stages: List[str] = field(default_factory=list)  # e.g., ["initial", "reading", "execution"]
+    stages: List[str] = field(
+        default_factory=list
+    )  # e.g., ["initial", "reading", "execution"]
     # NEW: Mandatory keyword triggers that force tool inclusion
-    mandatory_keywords: List[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
+    mandatory_keywords: List[str] = field(
+        default_factory=list
+    )  # e.g., ["show diff", "compare"]
     # NEW: Task types for classification-aware selection
-    task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
+    task_types: List[str] = field(
+        default_factory=list
+    )  # e.g., ["analysis", "search", "default"]
     # NEW: Progress parameters for loop detection
-    progress_params: List[str] = field(default_factory=list)  # e.g., ["path", "offset", "limit"]
+    progress_params: List[str] = field(
+        default_factory=list
+    )  # e.g., ["path", "offset", "limit"]
     # NEW: Execution category for parallel execution
-    execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
+    execution_category: Optional["ExecutionCategory"] = (
+        None  # Default: READ_ONLY when None
+    )
 
     def __post_init__(self):
         """Apply defaults for None values to support backward compatibility."""
@@ -99,7 +109,10 @@ class ToolMetadata:
     @property
     def requires_approval(self) -> bool:
         """Check if this tool requires user approval."""
-        return self.access_mode.requires_approval or self.danger_level.requires_confirmation
+        return (
+            self.access_mode.requires_approval
+            or self.danger_level.requires_confirmation
+        )
 
     @property
     def is_safe(self) -> bool:
@@ -122,7 +135,9 @@ class ToolMetadata:
             "task_types": self.task_types,
             "progress_params": self.progress_params,
             "execution_category": (
-                self.execution_category.value if self.execution_category else "read_only"
+                self.execution_category.value
+                if self.execution_category
+                else "read_only"
             ),
         }
 
@@ -450,7 +465,9 @@ class ToolMetadataRegistry:
         self._metadata_cache: Dict[str, ToolMetadata] = {}
         self._category_index: Dict[str, List[str]] = {}  # category -> tool names
         self._keyword_index: Dict[str, List[str]] = {}  # keyword -> tool names
-        self._tools_hash: Optional[str] = None  # Hash of registered tools for change detection
+        self._tools_hash: Optional[str] = (
+            None  # Hash of registered tools for change detection
+        )
         self._last_refresh_count: int = 0  # Number of tools at last refresh
 
     @classmethod
@@ -693,7 +710,9 @@ class ToolMetadataRegistry:
         Returns:
             Dictionary mapping tool names to metadata dicts
         """
-        return {name: metadata.to_dict() for name, metadata in self._metadata_cache.items()}
+        return {
+            name: metadata.to_dict() for name, metadata in self._metadata_cache.items()
+        }
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get statistics about registered tools and metadata.
@@ -727,7 +746,9 @@ class ToolMetadataRegistry:
         Returns:
             Dictionary mapping category names to lists of tool names
         """
-        return {category: list(tools) for category, tools in self._category_index.items()}
+        return {
+            category: list(tools) for category, tools in self._category_index.items()
+        }
 
     def get_tools_for_task_type(self, task_type: str) -> List[str]:
         """Get relevant tools for a task type.

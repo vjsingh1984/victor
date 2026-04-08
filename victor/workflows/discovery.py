@@ -136,7 +136,9 @@ def discover_workflows(
                             workflows.append(instance)
                             logger.debug(f"Discovered workflow: {instance.name}")
                         except Exception as e:
-                            logger.warning(f"Failed to instantiate workflow {name}: {e}")
+                            logger.warning(
+                                f"Failed to instantiate workflow {name}: {e}"
+                            )
 
             except Exception as e:
                 logger.debug(f"Failed to import workflow module {module_name}: {e}")

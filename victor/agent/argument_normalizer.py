@@ -82,7 +82,9 @@ class ArgumentNormalizer:
         )
     """
 
-    def __init__(self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize argument normalizer.
 
@@ -93,7 +95,9 @@ class ArgumentNormalizer:
         """
         self.provider_name = provider_name
         self.config = config or {}
-        self.parameter_aliases: Dict[str, Dict[str, str]] = self.config.get("parameter_aliases", {})
+        self.parameter_aliases: Dict[str, Dict[str, str]] = self.config.get(
+            "parameter_aliases", {}
+        )
         self.stats: NormalizationStats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
@@ -185,7 +189,8 @@ class ArgumentNormalizer:
         # AGGRESSIVE APPROACH: Check if any values look like JSON and try normalization FIRST
         # This ensures we catch malformed JSON even if basic validation passes
         has_json_like_strings = any(
-            isinstance(v, str) and v.strip().startswith(("[", "{")) for v in arguments.values()
+            isinstance(v, str) and v.strip().startswith(("[", "{"))
+            for v in arguments.values()
         )
         logger.debug(
             f"[{self.provider_name}] {tool_name}: has_json_like_strings={has_json_like_strings}"
@@ -209,7 +214,9 @@ class ArgumentNormalizer:
                         f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}"
                     )
                     if is_valid:
-                        self.stats["normalizations"][NormalizationStrategy.PYTHON_AST.value] += 1
+                        self.stats["normalizations"][
+                            NormalizationStrategy.PYTHON_AST.value
+                        ] += 1
                         self.stats["by_tool"][tool_name]["normalizations"] += 1
                         logger.info(
                             f"[{self.provider_name}] Preemptively normalized {tool_name} arguments via AST"
@@ -217,14 +224,19 @@ class ArgumentNormalizer:
                         return normalized, NormalizationStrategy.PYTHON_AST
             except Exception as e:
                 logger.debug(
-                    f"Preemptive AST normalization failed for {tool_name}: {e}", exc_info=True
+                    f"Preemptive AST normalization failed for {tool_name}: {e}",
+                    exc_info=True,
                 )
 
         # Layer 1: Check if already valid (fast path - most cases after preemptive normalization)
-        logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid")
+        logger.debug(
+            f"[{self.provider_name}] {tool_name}: Layer 1 - Checking if already valid"
+        )
         try:
             is_valid = self._is_valid_json_dict(arguments)
-            logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}")
+            logger.debug(
+                f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}"
+            )
             if is_valid:
                 self.stats["normalizations"][NormalizationStrategy.DIRECT.value] += 1
                 return arguments, NormalizationStrategy.DIRECT
@@ -242,7 +254,9 @@ class ArgumentNormalizer:
             try:
                 normalized = self._normalize_via_ast(arguments)
                 if self._is_valid_json_dict(normalized):
-                    self.stats["normalizations"][NormalizationStrategy.PYTHON_AST.value] += 1
+                    self.stats["normalizations"][
+                        NormalizationStrategy.PYTHON_AST.value
+                    ] += 1
                     logger.info(
                         f"[{self.provider_name}] Normalized {tool_name} arguments via AST conversion"
                     )
@@ -254,8 +268,12 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_regex(arguments)
             if self._is_valid_json_dict(normalized):
-                self.stats["normalizations"][NormalizationStrategy.REGEX_QUOTES.value] += 1
-                logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
+                self.stats["normalizations"][
+                    NormalizationStrategy.REGEX_QUOTES.value
+                ] += 1
+                logger.info(
+                    f"[{self.provider_name}] Normalized {tool_name} arguments via regex"
+                )
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
             logger.debug(f"Regex normalization failed for {tool_name}: {e}")
@@ -264,7 +282,9 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_manual_repair(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
-                self.stats["normalizations"][NormalizationStrategy.MANUAL_REPAIR.value] += 1
+                self.stats["normalizations"][
+                    NormalizationStrategy.MANUAL_REPAIR.value
+                ] += 1
                 logger.info(
                     f"[{self.provider_name}] Normalized {tool_name} arguments via manual repair"
                 )
@@ -488,7 +508,9 @@ class ArgumentNormalizer:
                     pass
         return arguments
 
-    def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+    def _coerce_primitive_types(
+        self, arguments: Dict[str, Any], tool_name: str
+    ) -> Dict[str, Any]:
         """
         Coerce string values to primitive types (int, float, bool) when appropriate.
 
@@ -612,7 +634,8 @@ class ArgumentNormalizer:
             Dictionary with normalization metrics
         """
         success_rate = (
-            (self.stats["total_calls"] - self.stats["failures"]) / max(self.stats["total_calls"], 1)
+            (self.stats["total_calls"] - self.stats["failures"])
+            / max(self.stats["total_calls"], 1)
         ) * 100
 
         return {

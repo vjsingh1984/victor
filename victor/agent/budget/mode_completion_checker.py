@@ -130,7 +130,9 @@ class ModeCompletionChecker(IModeCompletionChecker):
         ),
     }
 
-    def __init__(self, custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None):
+    def __init__(
+        self, custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None
+    ):
         """Initialize with optional custom criteria.
 
         Args:
@@ -187,7 +189,9 @@ class ModeCompletionChecker(IModeCompletionChecker):
 
         # Check maximum iterations exceeded
         if iterations >= criteria.max_iterations:
-            logger.info(f"Mode {mode}: max iterations ({criteria.max_iterations}) reached")
+            logger.info(
+                f"Mode {mode}: max iterations ({criteria.max_iterations}) reached"
+            )
             return True, f"Maximum iterations ({criteria.max_iterations}) reached"
 
         # Check minimum requirements by mode
@@ -203,7 +207,10 @@ class ModeCompletionChecker(IModeCompletionChecker):
         else:
             # EXPLORE and PLAN require files to be read
             if files_read < criteria.min_files_read:
-                return False, f"Need {criteria.min_files_read - files_read} more file(s) read"
+                return (
+                    False,
+                    f"Need {criteria.min_files_read - files_read} more file(s) read",
+                )
 
         # Check for completion signals in response
         response_lower = response_text.lower()

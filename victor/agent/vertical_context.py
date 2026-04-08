@@ -764,7 +764,9 @@ class VerticalContext:
         child.team_specs = dict(self.team_specs)
 
         # Per-agent mutable state (fresh or overridden)
-        child.enabled_tools = set(enabled_tools) if enabled_tools else set(self.enabled_tools)
+        child.enabled_tools = (
+            set(enabled_tools) if enabled_tools else set(self.enabled_tools)
+        )
         child.prompt_sections = []  # Fresh — child builds its own
         child.capability_configs = {}  # Fresh — child gets own capabilities
 

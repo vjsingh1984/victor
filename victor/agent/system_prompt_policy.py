@@ -63,7 +63,9 @@ class SystemPromptPolicy:
     def __init__(self, config: Optional[SystemPromptPolicyConfig] = None) -> None:
         self._config = config or SystemPromptPolicyConfig()
 
-    def enforce(self, builder: PromptBuilder, context: Optional["TaskContext"] = None) -> None:
+    def enforce(
+        self, builder: PromptBuilder, context: Optional["TaskContext"] = None
+    ) -> None:
         """Ensure required sections exist and trim oversized prompts."""
 
         if self._config.enforce_identity:
@@ -101,7 +103,9 @@ class SystemPromptPolicy:
 
     def build_fallback_prompt(self, context: Optional["TaskContext"] = None) -> str:
         """Return a safe fallback prompt when assembly fails."""
-        task_type = (context.task_type if context and context.task_type else "general").strip()
+        task_type = (
+            context.task_type if context and context.task_type else "general"
+        ).strip()
         message = (context.message if context and context.message else "").strip()
         if not message:
             message = "No user message captured."
@@ -151,25 +155,36 @@ def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
         value = getattr(settings, attr, default)
         return default if value is None else value
 
-    protected_sections_override = getattr(settings, "prompt_policy_protected_sections", None)
+    protected_sections_override = getattr(
+        settings, "prompt_policy_protected_sections", None
+    )
     if protected_sections_override is None:
         protected_sections = base_config.protected_sections
     else:
         protected_sections = tuple(protected_sections_override)
 
     config = SystemPromptPolicyConfig(
-        enforce_identity=_get("prompt_policy_enforce_identity", base_config.enforce_identity),
-        enforce_guidelines=_get("prompt_policy_enforce_guidelines", base_config.enforce_guidelines),
+        enforce_identity=_get(
+            "prompt_policy_enforce_identity", base_config.enforce_identity
+        ),
+        enforce_guidelines=_get(
+            "prompt_policy_enforce_guidelines", base_config.enforce_guidelines
+        ),
         enforce_operating_preamble=_get(
-            "prompt_policy_enforce_operating_preamble", base_config.enforce_operating_preamble
+            "prompt_policy_enforce_operating_preamble",
+            base_config.enforce_operating_preamble,
         ),
         enforce_unique_sections=_get(
             "prompt_policy_enforce_unique_sections", base_config.enforce_unique_sections
         ),
         protected_sections=protected_sections,
-        max_section_chars=_get("prompt_policy_max_section_chars", base_config.max_section_chars),
+        max_section_chars=_get(
+            "prompt_policy_max_section_chars", base_config.max_section_chars
+        ),
         fallback_identity=_get("prompt_policy_identity", base_config.fallback_identity),
-        fallback_guidelines=_get("prompt_policy_guidelines", base_config.fallback_guidelines),
+        fallback_guidelines=_get(
+            "prompt_policy_guidelines", base_config.fallback_guidelines
+        ),
         fallback_operating_template=_get(
             "prompt_policy_operating_template", base_config.fallback_operating_template
         ),

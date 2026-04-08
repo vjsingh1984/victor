@@ -53,7 +53,9 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
     ]
 
 
-def convert_tools_to_anthropic_format(tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+def convert_tools_to_anthropic_format(
+    tools: List[ToolDefinition],
+) -> List[Dict[str, Any]]:
     """Convert standard tools to Anthropic format.
 
     Args:

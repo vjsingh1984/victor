@@ -126,7 +126,9 @@ class RateLimiter:
         self._endpoint_buckets: Dict[str, TokenBucket] = {}
 
         # Request counters for analytics
-        self._request_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._request_counts: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         self._lock = asyncio.Lock()
 
     @lru_cache(maxsize=1024)
@@ -145,7 +147,9 @@ class RateLimiter:
         """
         forwarded = request.headers.get("X-Forwarded-For")
         peername = request.transport.get_extra_info("peername")
-        return self._get_client_id_cached(forwarded, tuple(peername) if peername else None)
+        return self._get_client_id_cached(
+            forwarded, tuple(peername) if peername else None
+        )
 
     def _get_bucket(self, key: str, is_endpoint: bool = False) -> TokenBucket:
         """Get or create token bucket for key."""
@@ -157,7 +161,9 @@ class RateLimiter:
 
         return buckets[key]
 
-    async def is_allowed(self, request: Request) -> tuple[bool, Optional[Dict[str, Any]]]:
+    async def is_allowed(
+        self, request: Request
+    ) -> tuple[bool, Optional[Dict[str, Any]]]:
         """Check if request is allowed by rate limits.
 
         Args:
@@ -374,14 +380,17 @@ def create_request_logging_middleware() -> Callable:
             elapsed = (time.monotonic() - start_time) * 1000
 
             logger.info(
-                f"{request.method} {request.path} -> {response.status} " f"({elapsed:.1f}ms)"
+                f"{request.method} {request.path} -> {response.status} "
+                f"({elapsed:.1f}ms)"
             )
 
             return response
 
         except Exception as e:
             elapsed = (time.monotonic() - start_time) * 1000
-            logger.error(f"{request.method} {request.path} -> ERROR ({elapsed:.1f}ms): {e}")
+            logger.error(
+                f"{request.method} {request.path} -> ERROR ({elapsed:.1f}ms): {e}"
+            )
             raise
 
     return logging_middleware

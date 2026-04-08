@@ -55,7 +55,16 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Protocol,
+    runtime_checkable,
+)
 
 from victor.core.async_utils import run_sync
 
@@ -262,8 +271,12 @@ class ProviderSwitchCoordinator:
                 # Perform health check if enabled
                 if verify_health and self._health_monitor:
                     try:
-                        new_provider = self._create_provider(provider_name, **provider_kwargs)
-                        is_healthy = await self._health_monitor.check_health(new_provider)
+                        new_provider = self._create_provider(
+                            provider_name, **provider_kwargs
+                        )
+                        is_healthy = await self._health_monitor.check_health(
+                            new_provider
+                        )
                         if not is_healthy:
                             logger.warning(
                                 f"Provider {provider_name} failed health check (attempt {attempt + 1})"
@@ -302,12 +315,16 @@ class ProviderSwitchCoordinator:
                     # Execute hooks
                     await self._execute_hooks(context)
 
-                    logger.info(f"Successfully switched to {provider_name}:{model} ({reason})")
+                    logger.info(
+                        f"Successfully switched to {provider_name}:{model} ({reason})"
+                    )
                     return True
                 else:
                     # Switch returned False
                     if attempt < max_retries:
-                        logger.info(f"Switch failed, retrying... (attempt {attempt + 1})")
+                        logger.info(
+                            f"Switch failed, retrying... (attempt {attempt + 1})"
+                        )
                         continue
                     else:
                         logger.error(f"Switch failed after {max_retries + 1} attempts")
@@ -475,7 +492,9 @@ class ProviderSwitchCoordinator:
             True if hook was found and removed
         """
         original_len = len(self._registered_hooks)
-        self._registered_hooks = [h for h in self._registered_hooks if h.hook.name != name]
+        self._registered_hooks = [
+            h for h in self._registered_hooks if h.hook.name != name
+        ]
         removed = len(self._registered_hooks) < original_len
         if removed:
             logger.debug(f"Unregistered hook '{name}'")

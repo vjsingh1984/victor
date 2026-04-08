@@ -86,7 +86,9 @@ class CodeValidatorRegistry:
         """
         for lang in validator.supported_languages:
             self._validators[lang] = validator
-            logger.debug(f"Registered validator for {lang.name}: {type(validator).__name__}")
+            logger.debug(
+                f"Registered validator for {lang.name}: {type(validator).__name__}"
+            )
 
     def unregister(self, language: "Language") -> None:
         """Remove a validator for a language.
@@ -179,7 +181,9 @@ class CodeValidatorRegistry:
                                 f"for {[lang.name for lang in validator.supported_languages]}"
                             )
                         except Exception as e:
-                            logger.warning(f"Failed to instantiate {attr.__name__}: {e}")
+                            logger.warning(
+                                f"Failed to instantiate {attr.__name__}: {e}"
+                            )
 
             except Exception as e:
                 logger.warning(f"Failed to import validator module {module_name}: {e}")

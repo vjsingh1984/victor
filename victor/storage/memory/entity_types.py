@@ -228,7 +228,11 @@ class Entity:
         """
         # Use higher confidence description
         description = (
-            (other.description if other.confidence > self.confidence else self.description)
+            (
+                other.description
+                if other.confidence > self.confidence
+                else self.description
+            )
             or self.description
             or other.description
         )

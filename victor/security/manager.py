@@ -174,7 +174,12 @@ class SecurityManager:
             lines.append("")
 
         # Vulnerabilities by severity
-        for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+        for severity in [
+            Severity.CRITICAL,
+            Severity.HIGH,
+            Severity.MEDIUM,
+            Severity.LOW,
+        ]:
             vulns = result.get_by_severity(severity)
             if vulns:
                 lines.append(f"{severity.value.upper()} VULNERABILITIES")
@@ -239,7 +244,12 @@ class SecurityManager:
             lines.append("## Vulnerabilities")
             lines.append("")
 
-            for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+            for severity in [
+                Severity.CRITICAL,
+                Severity.HIGH,
+                Severity.MEDIUM,
+                Severity.LOW,
+            ]:
                 vulns = result.get_by_severity(severity)
                 if vulns:
                     lines.append(f"### {severity.value.capitalize()}")
@@ -255,7 +265,9 @@ class SecurityManager:
                         lines.append(vuln.cve.description)
                         lines.append("")
                         if vuln.fixed_version:
-                            lines.append(f"**Fix:** Upgrade to version {vuln.fixed_version}")
+                            lines.append(
+                                f"**Fix:** Upgrade to version {vuln.fixed_version}"
+                            )
                             lines.append("")
                         if vuln.cve.references:
                             lines.append("**References:**")
@@ -348,13 +360,19 @@ class SecurityManager:
                 commands[eco] = []
 
             if eco == "pypi":
-                commands[eco].append(f"pip install {vuln.dependency.name}=={vuln.fixed_version}")
+                commands[eco].append(
+                    f"pip install {vuln.dependency.name}=={vuln.fixed_version}"
+                )
             elif eco == "npm":
-                commands[eco].append(f"npm install {vuln.dependency.name}@{vuln.fixed_version}")
+                commands[eco].append(
+                    f"npm install {vuln.dependency.name}@{vuln.fixed_version}"
+                )
             elif eco == "cargo":
                 commands[eco].append(f"cargo update -p {vuln.dependency.name}")
             elif eco == "go":
-                commands[eco].append(f"go get {vuln.dependency.name}@v{vuln.fixed_version}")
+                commands[eco].append(
+                    f"go get {vuln.dependency.name}@v{vuln.fixed_version}"
+                )
 
         return commands
 

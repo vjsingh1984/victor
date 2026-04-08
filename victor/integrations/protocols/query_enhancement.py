@@ -166,7 +166,8 @@ class QueryEnhancementConfig:
         """Ensure techniques is a list of EnhancementTechnique."""
         if self.techniques:
             self.techniques = [
-                EnhancementTechnique(t) if isinstance(t, str) else t for t in self.techniques
+                EnhancementTechnique(t) if isinstance(t, str) else t
+                for t in self.techniques
             ]
 
 

@@ -41,27 +41,39 @@ def export_prometheus_metrics() -> str:
     lines = []
 
     # HELP and TYPE metadata
-    lines.append("# HELP victor_eventbridge_events_total Total number of events dispatched")
+    lines.append(
+        "# HELP victor_eventbridge_events_total Total number of events dispatched"
+    )
     lines.append("# TYPE victor_eventbridge_events_total counter")
     lines.append(f"victor_eventbridge_events_total {metrics['events_dispatched']}")
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_send_successes_total Total successful sends to clients")
+    lines.append(
+        "# HELP victor_eventbridge_send_successes_total Total successful sends to clients"
+    )
     lines.append("# TYPE victor_eventbridge_send_successes_total counter")
     lines.append(f"victor_eventbridge_send_successes_total {metrics['send_successes']}")
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_send_failures_total Total failed sends to clients")
+    lines.append(
+        "# HELP victor_eventbridge_send_failures_total Total failed sends to clients"
+    )
     lines.append("# TYPE victor_eventbridge_send_failures_total counter")
     lines.append(f"victor_eventbridge_send_failures_total {metrics['send_failures']}")
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_delivery_success_rate Delivery success rate (0-1)")
+    lines.append(
+        "# HELP victor_eventbridge_delivery_success_rate Delivery success rate (0-1)"
+    )
     lines.append("# TYPE victor_eventbridge_delivery_success_rate gauge")
-    lines.append(f"victor_eventbridge_delivery_success_rate {metrics['delivery_success_rate']:.6f}")
+    lines.append(
+        f"victor_eventbridge_delivery_success_rate {metrics['delivery_success_rate']:.6f}"
+    )
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_dispatch_latency_ms Dispatch latency in milliseconds")
+    lines.append(
+        "# HELP victor_eventbridge_dispatch_latency_ms Dispatch latency in milliseconds"
+    )
     lines.append("# TYPE victor_eventbridge_dispatch_latency_ms gauge")
     lines.append(
         f"victor_eventbridge_dispatch_latency_p95_ms {metrics['dispatch_latency_p95_ms']:.3f}"
@@ -77,7 +89,9 @@ def export_prometheus_metrics() -> str:
     lines.append(f"victor_eventbridge_slo_delivery_success_rate {slo_status}")
 
     lines.append("")
-    lines.append("# HELP victor_eventbridge_slo_dispatch_latency Dispatch latency SLO status")
+    lines.append(
+        "# HELP victor_eventbridge_slo_dispatch_latency Dispatch latency SLO status"
+    )
     lines.append("# TYPE victor_eventbridge_slo_dispatch_latency gauge")
     slo_status = 1 if metrics["slo_status"]["dispatch_latency_p95_ms"] else 0
     lines.append(f"victor_eventbridge_slo_dispatch_latency {slo_status}")
@@ -146,7 +160,9 @@ def print_metrics_table() -> None:
     print(f"p95 Dispatch Latency:  {metrics['dispatch_latency_p95_ms']:.1f}ms")
     print()
     print("SLO Thresholds:")
-    print(f"  Delivery Rate:       {metrics['slo_thresholds']['delivery_success_rate_min']:.1%}")
+    print(
+        f"  Delivery Rate:       {metrics['slo_thresholds']['delivery_success_rate_min']:.1%}"
+    )
     print(
         f"  p95 Latency:         {metrics['slo_thresholds']['dispatch_latency_p95_ms_max']:.0f}ms"
     )

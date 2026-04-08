@@ -167,7 +167,9 @@ class ServiceBuilder(FactoryAwareBuilder):
         services["search_router"] = self._factory.create_search_router()
 
         # Build conversation-related services
-        services["conversation_state"] = self._factory.create_conversation_state_machine()
+        services["conversation_state"] = (
+            self._factory.create_conversation_state_machine()
+        )
         services["intent_classifier"] = self._factory.create_intent_classifier()
 
         # Build memory components if needed
@@ -192,7 +194,9 @@ class ServiceBuilder(FactoryAwareBuilder):
             services["memory_session_id"] = None
 
         # Build metrics and analytics
-        services["streaming_metrics_collector"] = self._factory.create_streaming_metrics_collector()
+        services["streaming_metrics_collector"] = (
+            self._factory.create_streaming_metrics_collector()
+        )
         services["usage_analytics"] = self._factory.create_usage_analytics()
         services["sequence_tracker"] = self._factory.create_sequence_tracker()
 
@@ -241,7 +245,8 @@ class ServiceBuilder(FactoryAwareBuilder):
         self._register_components(services)
 
         self._logger.info(
-            f"ServiceBuilder built {len(services)} core services: " f"{', '.join(services.keys())}"
+            f"ServiceBuilder built {len(services)} core services: "
+            f"{', '.join(services.keys())}"
         )
 
         return services
@@ -310,7 +315,9 @@ class ServiceBuilder(FactoryAwareBuilder):
         Returns:
             StreamingChatHandler instance
         """
-        handler = self._factory.create_streaming_chat_handler(message_adder=message_adder)
+        handler = self._factory.create_streaming_chat_handler(
+            message_adder=message_adder
+        )
         self.register_component("streaming_handler", handler)
         return handler
 

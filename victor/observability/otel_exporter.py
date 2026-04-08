@@ -69,7 +69,9 @@ try:
     )
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME
     from opentelemetry.trace import Status, StatusCode, Span
-    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
 
     _OTEL_AVAILABLE = True
 except ImportError:
@@ -321,7 +323,9 @@ class AsyncBatchingExporter(BaseExporter):
         batch_size: int = 100,
         flush_interval: float = 5.0,
         max_queue_size: int = 10000,
-        on_export_error: Optional[Callable[[Exception, List[MessagingEvent]], None]] = None,
+        on_export_error: Optional[
+            Callable[[Exception, List[MessagingEvent]], None]
+        ] = None,
     ) -> None:
         """Initialize async batching exporter.
 

@@ -120,7 +120,9 @@ class PIIMatch:
         # Redact matched text for safety in logs
         if len(self.matched_text) > 8:
             visible = min(4, len(self.matched_text) // 4)
-            self.matched_text = self.matched_text[:visible] + "***" + self.matched_text[-visible:]
+            self.matched_text = (
+                self.matched_text[:visible] + "***" + self.matched_text[-visible:]
+            )
 
 
 # =============================================================================

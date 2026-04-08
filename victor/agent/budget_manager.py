@@ -257,7 +257,9 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         """
         return self._tracker.get_prompt_budget_info()
 
-    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
+    def record_tool_call(
+        self, tool_name: str, is_write_operation: bool = False
+    ) -> bool:
         """Record a tool call and consume appropriate budget.
 
         Uses ToolCallClassifier for classification (SRP/OCP).
@@ -371,7 +373,11 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
 
         Deprecated: Multiplier is now managed by MultiplierCalculator.
         """
-        return self._multiplier_calc.productivity_multiplier if self._multiplier_calc else 1.0
+        return (
+            self._multiplier_calc.productivity_multiplier
+            if self._multiplier_calc
+            else 1.0
+        )
 
     @property
     def _on_exhausted(self):
@@ -455,7 +461,9 @@ class ExtendedBudgetManager(BudgetManager):
         """Record a file write operation."""
         self._files_written += 1
 
-    def record_tool_call(self, tool_name: str, is_write_operation: bool = False) -> bool:
+    def record_tool_call(
+        self, tool_name: str, is_write_operation: bool = False
+    ) -> bool:
         """Record tool call with file tracking.
 
         Extends parent to track file read/write operations.

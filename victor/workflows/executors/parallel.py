@@ -52,7 +52,9 @@ class ParallelNodeExecutor:
         """
         self._context = context
 
-    async def execute(self, node: "ParallelNode", state: "WorkflowState") -> "WorkflowState":
+    async def execute(
+        self, node: "ParallelNode", state: "WorkflowState"
+    ) -> "WorkflowState":
         """Execute a parallel node.
 
         Args:
@@ -129,7 +131,9 @@ class ParallelNodeExecutor:
                 duration_seconds=time.time() - start_time,
             )
 
-            logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
+            logger.info(
+                f"Parallel node {node.id} completed with strategy: {join_strategy}"
+            )
             return state
 
         except Exception as e:

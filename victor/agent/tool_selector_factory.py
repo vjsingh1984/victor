@@ -277,7 +277,10 @@ def _create_hybrid_selector(
             "Either provide embedding_service or use 'keyword' strategy."
         )
 
-    from victor.tools.hybrid_tool_selector import HybridSelectorConfig, HybridToolSelector
+    from victor.tools.hybrid_tool_selector import (
+        HybridSelectorConfig,
+        HybridToolSelector,
+    )
 
     # Create both semantic and keyword selectors
     semantic_selector = _create_semantic_selector(

@@ -98,7 +98,9 @@ def configure_logging_from_config(
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Build file format with session context
-            file_format = config.file_format.replace("%(session)s", f"{repo_path}-{session_id}")
+            file_format = config.file_format.replace(
+                "%(session)s", f"{repo_path}-{session_id}"
+            )
             file_formatter = logging.Formatter(file_format)
 
             file_handler = logging.handlers.RotatingFileHandler(
@@ -130,7 +132,9 @@ def configure_logging_from_config(
             get_observability_bus()
             # Note: The canonical event system doesn't have exporters
             # This is a no-op for now, but kept for compatibility
-            logger.debug("EventBus → Logging integration enabled (no-op for canonical system)")
+            logger.debug(
+                "EventBus → Logging integration enabled (no-op for canonical system)"
+            )
         except Exception as e:
             logger.debug(f"Could not enable event logging: {e}")
 
@@ -141,6 +145,7 @@ def setup_logging(
     stream: Optional[Any] = None,
     session_id: Optional[str] = None,
     repo_path: Optional[str] = None,
+    cli_debug_modules: Optional[str] = None,
 ) -> "LoggingConfig":
     """Convenience function to load config and configure logging in one call.
 
@@ -167,6 +172,8 @@ def setup_logging(
     config = get_logging_config(
         command=command,
         cli_console_level=cli_log_level,
+        cli_file_level=cli_log_level,  # CLI flag controls both console and file
+        cli_debug_modules=cli_debug_modules,
     )
     configure_logging_from_config(
         config,
@@ -231,7 +238,9 @@ def configure_logging(
     console_handler = logging.StreamHandler(stream or sys.stderr)
     effective_console_level = getattr(logging, log_level.upper(), None)
     if effective_console_level is None:
-        effective_console_level = getattr(logging, console_level.upper(), logging.WARNING)
+        effective_console_level = getattr(
+            logging, console_level.upper(), logging.WARNING
+        )
     console_handler.setLevel(effective_console_level)
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
@@ -269,7 +278,9 @@ def configure_logging(
             get_observability_bus()
             # Note: The canonical event system doesn't have exporters
             # This is a no-op for now, but kept for compatibility
-            logger.debug("EventBus → Logging integration enabled (no-op for canonical system)")
+            logger.debug(
+                "EventBus → Logging integration enabled (no-op for canonical system)"
+            )
         except Exception as e:
             # Don't fail if event logging can't be set up
             logger.debug(f"Could not enable event logging: {e}")
@@ -391,21 +402,29 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
         signal.signal(signal.SIGTERM, signal_handler)
 
 
-async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = False) -> None:
+async def check_codebase_index(
+    cwd: str, console_obj: Console, silent: bool = False
+) -> None:
     """Check codebase index status at startup and reindex if needed."""
     if CodebaseIndexFactoryProtocol is None:
         if not silent:
-            logger.debug("Codebase indexing not available - victor-coding package not installed")
+            logger.debug(
+                "Codebase indexing not available - victor-coding package not installed"
+            )
         return
 
     _container = get_container()
     _factory = _container.get_optional(CodebaseIndexFactoryProtocol)
     if _factory is None:
         if not silent:
-            logger.debug("Codebase indexing not available - victor-coding package not installed")
+            logger.debug(
+                "Codebase indexing not available - victor-coding package not installed"
+            )
         return
     try:
-        index = _factory.create(root_path=cwd, use_embeddings=False, enable_watcher=False)
+        index = _factory.create(
+            root_path=cwd, use_embeddings=False, enable_watcher=False
+        )
         is_stale, modified, deleted = index.check_staleness_by_mtime()
         if not is_stale:
             if not silent:
@@ -419,11 +438,15 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
         if total_changes <= 10:
             await index.incremental_reindex()
             if not silent:
-                console_obj.print(f"[green]Incrementally reindexed {total_changes} files[/]")
+                console_obj.print(
+                    f"[green]Incrementally reindexed {total_changes} files[/]"
+                )
         else:
             await index.reindex()
             if not silent:
-                console_obj.print(f"[green]Full reindex completed ({len(index.files)} files)[/]")
+                console_obj.print(
+                    f"[green]Full reindex completed ({len(index.files)} files)[/]"
+                )
     except ImportError:
         logger.debug("Codebase indexer not available")
     except Exception as e:
@@ -442,7 +465,9 @@ async def preload_semantic_index(
             return True
         console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
         start_time = time.time()
-        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+        index, rebuilt = await _get_or_build_index(
+            root_path, settings, force_reindex=force
+        )
         elapsed = time.time() - start_time
 
         # Get graph stats if available
@@ -461,9 +486,13 @@ async def preload_semantic_index(
                 pass
 
         if rebuilt:
-            console_obj.print(f"[green]✓ Semantic index built in {elapsed:.1f}s{graph_stats}[/]")
+            console_obj.print(
+                f"[green]✓ Semantic index built in {elapsed:.1f}s{graph_stats}[/]"
+            )
         else:
-            console_obj.print(f"[green]✓ Semantic index loaded in {elapsed:.1f}s{graph_stats}[/]")
+            console_obj.print(
+                f"[green]✓ Semantic index loaded in {elapsed:.1f}s{graph_stats}[/]"
+            )
         if empty_graph_warning:
             console_obj.print(
                 "[yellow]⚠ No symbols were added to the project graph. "
@@ -547,7 +576,9 @@ def get_rl_profile_suggestion(
 
         # Find matching profile for recommended provider
         matching_profiles = [
-            name for name, cfg in profiles.items() if cfg.provider.lower() == rec.value.lower()
+            name
+            for name, cfg in profiles.items()
+            if cfg.provider.lower() == rec.value.lower()
         ]
         if matching_profiles:
             return (matching_profiles[0], rec.value, rec.confidence)

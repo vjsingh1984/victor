@@ -116,7 +116,9 @@ class ErrorReporter:
         json_str = reporter.json_report(result)
     """
 
-    def aggregate_errors(self, result: WorkflowGenerationValidationResult) -> ErrorReport:
+    def aggregate_errors(
+        self, result: WorkflowGenerationValidationResult
+    ) -> ErrorReport:
         """Aggregate errors by category, severity, and node.
 
         Args:
@@ -186,7 +188,9 @@ class ErrorReporter:
 
         # If valid, just show summary
         if result.is_valid:
-            warnings = [e for e in result.all_errors if e.severity == ErrorSeverity.WARNING]
+            warnings = [
+                e for e in result.all_errors if e.severity == ErrorSeverity.WARNING
+            ]
             if warnings:
                 lines.append(f"Validation passed with {len(warnings)} warnings:")
                 lines.append("-" * 80)
@@ -280,7 +284,9 @@ class ErrorReporter:
         """
         # If valid, return simple message
         if result.is_valid:
-            warnings = [e for e in result.all_errors if e.severity == ErrorSeverity.WARNING]
+            warnings = [
+                e for e in result.all_errors if e.severity == ErrorSeverity.WARNING
+            ]
             if warnings:
                 return f"Validation passed with {len(warnings)} warnings. No changes required."
             return "Validation passed. No changes required."
@@ -310,8 +316,12 @@ class ErrorReporter:
 
         # Structure errors
         if report.errors_by_category["structure"]:
-            lines.append(f"STRUCTURE ERRORS ({len(report.errors_by_category['structure'])}):")
-            for error in report.errors_by_category["structure"][:max_errors_per_category]:
+            lines.append(
+                f"STRUCTURE ERRORS ({len(report.errors_by_category['structure'])}):"
+            )
+            for error in report.errors_by_category["structure"][
+                :max_errors_per_category
+            ]:
                 lines.append(f"  - Location: {error.location}")
                 lines.append(f"    Error: {error.message}")
                 if include_fixes and error.suggestion:
@@ -326,8 +336,12 @@ class ErrorReporter:
 
         # Semantic errors
         if report.errors_by_category["semantic"]:
-            lines.append(f"SEMANTIC ERRORS ({len(report.errors_by_category['semantic'])}):")
-            for error in report.errors_by_category["semantic"][:max_errors_per_category]:
+            lines.append(
+                f"SEMANTIC ERRORS ({len(report.errors_by_category['semantic'])}):"
+            )
+            for error in report.errors_by_category["semantic"][
+                :max_errors_per_category
+            ]:
                 lines.append(f"  - Location: {error.location}")
                 lines.append(f"    Error: {error.message}")
                 if include_fixes and error.suggestion:
@@ -342,8 +356,12 @@ class ErrorReporter:
 
         # Security errors
         if report.errors_by_category["security"]:
-            lines.append(f"SECURITY ERRORS ({len(report.errors_by_category['security'])}):")
-            for error in report.errors_by_category["security"][:max_errors_per_category]:
+            lines.append(
+                f"SECURITY ERRORS ({len(report.errors_by_category['security'])}):"
+            )
+            for error in report.errors_by_category["security"][
+                :max_errors_per_category
+            ]:
                 lines.append(f"  - Location: {error.location}")
                 lines.append(f"    Error: {error.message}")
                 if include_fixes and error.suggestion:
@@ -367,7 +385,9 @@ class ErrorReporter:
 
         return "\n".join(lines)
 
-    def json_report(self, result: WorkflowGenerationValidationResult, indent: int = 2) -> str:
+    def json_report(
+        self, result: WorkflowGenerationValidationResult, indent: int = 2
+    ) -> str:
         """Generate JSON report for programmatic consumption.
 
         Args:
@@ -380,7 +400,9 @@ class ErrorReporter:
         return json.dumps(result.to_dict(), indent=indent)
 
     def markdown_report(
-        self, result: WorkflowGenerationValidationResult, include_suggestions: bool = True
+        self,
+        result: WorkflowGenerationValidationResult,
+        include_suggestions: bool = True,
     ) -> str:
         """Generate Markdown report for documentation.
 
@@ -479,7 +501,9 @@ class ErrorReporter:
             f"{report.warning_count} warnings"
         )
 
-    def node_report(self, result: WorkflowGenerationValidationResult, node_id: str) -> str:
+    def node_report(
+        self, result: WorkflowGenerationValidationResult, node_id: str
+    ) -> str:
         """Generate report for a specific node.
 
         Useful for focused debugging of problematic nodes.
@@ -502,11 +526,16 @@ class ErrorReporter:
         lines.append("-" * 40)
 
         for error in node_errors:
-            severity_emoji = {"critical": "🚨", "error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(
-                error.severity.value, ""
-            )
+            severity_emoji = {
+                "critical": "🚨",
+                "error": "❌",
+                "warning": "⚠️",
+                "info": "ℹ️",
+            }.get(error.severity.value, "")
 
-            lines.append(f"{severity_emoji} [{error.severity.value.upper()}] {error.message}")
+            lines.append(
+                f"{severity_emoji} [{error.severity.value.upper()}] {error.message}"
+            )
             if error.suggestion:
                 lines.append(f"   💡 {error.suggestion}")
 

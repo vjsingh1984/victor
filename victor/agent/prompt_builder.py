@@ -42,7 +42,15 @@ logger = logging.getLogger(__name__)
 
 
 # Provider classifications
-CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+CLOUD_PROVIDERS: Set[str] = {
+    "anthropic",
+    "openai",
+    "google",
+    "xai",
+    "moonshot",
+    "kimi",
+    "deepseek",
+}
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
@@ -143,7 +151,9 @@ DO NOT assume content is missing - use offset/search to access additional sectio
 # Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
 
-def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
+def get_task_type_hint(
+    task_type: str, prompt_contributors: Optional[list] = None
+) -> str:
     """Get prompt hint for a specific task type.
 
     Hints come from vertical prompt contributors (the canonical source).
@@ -300,7 +310,9 @@ class SystemPromptBuilder:
         merged: dict = {}  # Populated by vertical contributors below
 
         # Override with vertical contributors (sorted by priority)
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             hints = contributor.get_task_type_hints()
             for task_type, task_hint in hints.items():
                 # Extract hint string from TaskTypeHint objects
@@ -326,7 +338,9 @@ class SystemPromptBuilder:
 
         # Collect grounding rules from all contributors
         rules = []
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             grounding = contributor.get_grounding_rules()
             if grounding:
                 rules.append(grounding)
@@ -352,7 +366,9 @@ class SystemPromptBuilder:
 
         # Collect sections from all contributors
         sections = []
-        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
+        for contributor in sorted(
+            self.prompt_contributors, key=lambda c: c.get_priority()
+        ):
             section = contributor.get_system_prompt_section()
             if section:
                 sections.append(section)
@@ -629,7 +645,9 @@ class SystemPromptBuilder:
             if selected:
                 # Always include completion guidance (required for detection)
                 result = set(selected) | {"completion"}
-                logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
+                logger.debug(
+                    f"Edge prompt focus: {len(result)}/{len(all_sections)} sections"
+                )
                 return result
 
         except Exception:
@@ -650,7 +668,9 @@ class SystemPromptBuilder:
         )
 
         # Get adapter-specific hints
-        hints = self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
+        hints = (
+            self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
+        )
 
         if hints:
             return f"{base_prompt}\n\n{hints}\n\n{GROUNDING_RULES}"

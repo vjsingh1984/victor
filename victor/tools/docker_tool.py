@@ -47,7 +47,9 @@ SAFE_OPERATIONS = frozenset(
 DANGEROUS_OPERATIONS = frozenset({"exec", "rm", "rmi", "pull", "run"})
 
 
-async def _run_docker_command_async(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
+async def _run_docker_command_async(
+    args: List[str], timeout: int = 30
+) -> Tuple[bool, str, str]:
     """Run Docker command asynchronously.
 
     Args:
@@ -143,7 +145,10 @@ async def docker(
         docker("volumes")
     """
     if not check_docker_available():
-        return {"success": False, "error": "Docker CLI not found. Please install Docker."}
+        return {
+            "success": False,
+            "error": "Docker CLI not found. Please install Docker.",
+        }
 
     if options is None:
         options = {}
@@ -156,7 +161,9 @@ async def docker(
             from victor.config.settings import get_settings
 
             settings = get_settings()
-            allow_dangerous = getattr(settings, "docker_allow_dangerous_operations", False)
+            allow_dangerous = getattr(
+                settings, "docker_allow_dangerous_operations", False
+            )
         except Exception:
             allow_dangerous = False
         if not allow_dangerous:
@@ -194,7 +201,10 @@ async def docker(
 
     elif operation in ["start", "stop", "restart", "rm"]:
         if not resource_id:
-            return {"success": False, "error": f"resource_id required for {operation} operation"}
+            return {
+                "success": False,
+                "error": f"resource_id required for {operation} operation",
+            }
 
         args = [operation, resource_id]
         if operation == "rm" and options.get("force"):
@@ -212,7 +222,10 @@ async def docker(
 
     elif operation == "logs":
         if not resource_id:
-            return {"success": False, "error": "resource_id required for logs operation"}
+            return {
+                "success": False,
+                "error": "resource_id required for logs operation",
+            }
 
         args = ["logs", resource_id]
         if "tail" in options:
@@ -257,7 +270,10 @@ async def docker(
 
     elif operation == "exec":
         if not resource_id:
-            return {"success": False, "error": "resource_id required for exec operation"}
+            return {
+                "success": False,
+                "error": "resource_id required for exec operation",
+            }
         if "command" not in options:
             return {"success": False, "error": "command required in options for exec"}
 
@@ -273,13 +289,18 @@ async def docker(
             "success": success,
             "result": {"stdout": stdout, "stderr": stderr},
             "message": (
-                f"Executed command in {resource_id}" if success else f"Exec failed: {stderr}"
+                f"Executed command in {resource_id}"
+                if success
+                else f"Exec failed: {stderr}"
             ),
         }
 
     elif operation == "inspect":
         if not resource_id:
-            return {"success": False, "error": "resource_id required for inspect operation"}
+            return {
+                "success": False,
+                "error": "resource_id required for inspect operation",
+            }
 
         args = ["inspect", resource_id]
         success, stdout, stderr = await _run_docker_command_async(args)

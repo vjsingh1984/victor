@@ -150,7 +150,9 @@ class NullPresentationAdapter:
             KeyError: If icon name is not found.
         """
         if name not in _TEXT_ICONS:
-            raise KeyError(f"Unknown icon: {name}. Available: {list(_TEXT_ICONS.keys())}")
+            raise KeyError(
+                f"Unknown icon: {name}. Available: {list(_TEXT_ICONS.keys())}"
+            )
         return _TEXT_ICONS[name]
 
     def format_status(self, message: str, icon_name: str) -> str:

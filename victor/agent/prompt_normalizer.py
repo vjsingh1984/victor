@@ -218,7 +218,9 @@ class PromptNormalizer:
                 logger.debug(f"Removed duplicate section (hash: {section_hash[:8]})")
 
         if len(unique) < len(sections):
-            logger.info(f"Deduplicated prompt sections: {len(sections)} → {len(unique)}")
+            logger.info(
+                f"Deduplicated prompt sections: {len(sections)} → {len(unique)}"
+            )
 
         return unique
 
@@ -241,7 +243,9 @@ class PromptNormalizer:
 
         for recent in self._recent_messages:
             recent_normalized = " ".join(recent.lower().split())
-            similarity = self._calculate_similarity(content_normalized, recent_normalized)
+            similarity = self._calculate_similarity(
+                content_normalized, recent_normalized
+            )
             if similarity >= threshold:
                 logger.debug(f"Similar message detected (similarity: {similarity:.2f})")
                 return True

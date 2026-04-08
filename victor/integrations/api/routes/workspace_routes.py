@@ -87,7 +87,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                             result["children"].append(scan_dir(entry, d + 1))
                         else:
                             ext = entry.suffix.lower()
-                            overview["file_counts"][ext] = overview["file_counts"].get(ext, 0) + 1
+                            overview["file_counts"][ext] = (
+                                overview["file_counts"].get(ext, 0) + 1
+                            )
                             overview["total_files"] += 1
                             try:
                                 overview["total_size"] += entry.stat().st_size
@@ -123,7 +125,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
             orchestrator = await server._get_orchestrator()
 
             try:
-                tool_result = await orchestrator.execute_tool("metrics", path=server.workspace_root)
+                tool_result = await orchestrator.execute_tool(
+                    "metrics", path=server.workspace_root
+                )
                 if tool_result.success:
                     return JSONResponse(tool_result.data)
             except Exception:
@@ -158,7 +162,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     ext = path.suffix.lower()
                     if ext in code_extensions:
                         try:
-                            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            with open(
+                                path, "r", encoding="utf-8", errors="ignore"
+                            ) as f:
                                 lines = len(f.readlines())
                                 metrics["lines_of_code"] += lines
                                 metrics["files_by_type"][ext] = (
@@ -196,7 +202,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     scan_type="secrets",
                 )
                 if tool_result.success:
-                    return JSONResponse({"scan_completed": True, "results": tool_result.data})
+                    return JSONResponse(
+                        {"scan_completed": True, "results": tool_result.data}
+                    )
             except Exception:
                 pass
 
@@ -288,7 +296,9 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                         for line in req_path.read_text().splitlines():
                             line = line.strip()
                             if line and not line.startswith("#"):
-                                deps.append(line.split("==")[0].split(">=")[0].split("<")[0])
+                                deps.append(
+                                    line.split("==")[0].split(">=")[0].split("<")[0]
+                                )
                         dependencies["python"] = {
                             "file": req_file,
                             "count": len(deps),

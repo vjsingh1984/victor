@@ -235,7 +235,9 @@ class AutoCommitter:
 
         return "\n".join(parts)
 
-    def _detect_change_type(self, description: str, files: Optional[List[str]] = None) -> str:
+    def _detect_change_type(
+        self, description: str, files: Optional[List[str]] = None
+    ) -> str:
         """Auto-detect change type from description and files.
 
         Args:
@@ -248,12 +250,18 @@ class AutoCommitter:
         description_lower = description.lower()
 
         # Check description keywords
-        if any(word in description_lower for word in ["fix", "bug", "error", "issue", "crash"]):
+        if any(
+            word in description_lower
+            for word in ["fix", "bug", "error", "issue", "crash"]
+        ):
             return ChangeType.FIX.value
-        if any(word in description_lower for word in ["add", "new", "feature", "implement"]):
+        if any(
+            word in description_lower for word in ["add", "new", "feature", "implement"]
+        ):
             return ChangeType.FEAT.value
         if any(
-            word in description_lower for word in ["refactor", "restructure", "reorganize", "clean"]
+            word in description_lower
+            for word in ["refactor", "restructure", "reorganize", "clean"]
         ):
             return ChangeType.REFACTOR.value
         if any(word in description_lower for word in ["test", "spec", "coverage"]):
@@ -262,7 +270,9 @@ class AutoCommitter:
             return ChangeType.DOCS.value
         if any(word in description_lower for word in ["style", "format", "lint"]):
             return ChangeType.STYLE.value
-        if any(word in description_lower for word in ["perf", "optim", "speed", "fast"]):
+        if any(
+            word in description_lower for word in ["perf", "optim", "speed", "fast"]
+        ):
             return ChangeType.PERF.value
 
         # Check file patterns
@@ -388,13 +398,17 @@ class AutoCommitter:
         """
         try:
             # Get basic commit info
-            result = self._run_git("log", "-1", "--format=%H|%s|%an|%ae|%ci", check=False)
+            result = self._run_git(
+                "log", "-1", "--format=%H|%s|%an|%ae|%ci", check=False
+            )
             if result.returncode == 0 and result.stdout.strip():
                 parts = result.stdout.strip().split("|")
                 if len(parts) >= 5:
                     # Also get full commit message to check for signature
                     body_result = self._run_git("log", "-1", "--format=%B", check=False)
-                    full_message = body_result.stdout if body_result.returncode == 0 else ""
+                    full_message = (
+                        body_result.stdout if body_result.returncode == 0 else ""
+                    )
 
                     return {
                         "hash": parts[0],

@@ -302,7 +302,9 @@ class ThinkingPatternDetector:
         words = re.findall(r"\b[a-z]+\b", text_lower)
 
         # Filter stopwords and short words
-        keywords = {w for w in words if len(w) >= self.MIN_KEYWORD_LENGTH and w not in STOPWORDS}
+        keywords = {
+            w for w in words if len(w) >= self.MIN_KEYWORD_LENGTH and w not in STOPWORDS
+        }
 
         return keywords
 
@@ -442,7 +444,9 @@ class ThinkingPatternDetector:
             self._consecutive_stalls = 0
 
         # Check for exact repetition
-        self._pattern_counts[content_hash] = self._pattern_counts.get(content_hash, 0) + 1
+        self._pattern_counts[content_hash] = (
+            self._pattern_counts.get(content_hash, 0) + 1
+        )
 
         if self._pattern_counts[content_hash] >= self._repetition_threshold:
             self._loops_detected += 1
@@ -492,7 +496,9 @@ class ThinkingPatternDetector:
         if self._detect_circular_phrases(content) and len(self._history) > 3:
             # Only warn if we've been going for a while
             recent_circular = sum(
-                1 for p in list(self._history)[-3:] if self._detect_circular_phrases(content)
+                1
+                for p in list(self._history)[-3:]
+                if self._detect_circular_phrases(content)
             )
             if recent_circular >= 2:
                 logger.debug("Circular phrases detected but not yet a loop")
@@ -625,7 +631,9 @@ class ThinkingPatternDetector:
             "stalling_detected": self._stalling_detected,
             "consecutive_stalls": self._consecutive_stalls,
             "detection_rate": (
-                self._loops_detected / self._total_analyzed if self._total_analyzed > 0 else 0.0
+                self._loops_detected / self._total_analyzed
+                if self._total_analyzed > 0
+                else 0.0
             ),
             "history_size": len(self._history),
             "unique_patterns": len(self._pattern_counts),

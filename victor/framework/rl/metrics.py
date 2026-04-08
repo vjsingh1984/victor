@@ -196,9 +196,15 @@ class RLMetricsExporter:
         # Get exploration metrics from hooks
         if self._hooks is not None:
             try:
-                metrics.exploration_rate = self._hooks.get_exploration_rate(learner_name)
-                metrics.exploration_count = self._hooks._exploration_counts.get(learner_name, 0)
-                metrics.exploitation_count = self._hooks._exploitation_counts.get(learner_name, 0)
+                metrics.exploration_rate = self._hooks.get_exploration_rate(
+                    learner_name
+                )
+                metrics.exploration_count = self._hooks._exploration_counts.get(
+                    learner_name, 0
+                )
+                metrics.exploitation_count = self._hooks._exploitation_counts.get(
+                    learner_name, 0
+                )
 
                 # Get current epsilon from history
                 history = self._hooks.get_epsilon_trend(learner_name, limit=1)
@@ -232,7 +238,9 @@ class RLMetricsExporter:
                 if row and row[0]:
                     metrics.total_outcomes = row[0]
                     success_count = row[1] or 0
-                    metrics.overall_success_rate = success_count / metrics.total_outcomes
+                    metrics.overall_success_rate = (
+                        success_count / metrics.total_outcomes
+                    )
                     metrics.overall_quality = row[2] or 0.5
 
                 # Get active learners (those with outcomes)
@@ -243,7 +251,9 @@ class RLMetricsExporter:
                 active = {row[0] for row in cursor.fetchall()}
                 metrics.active_learners = list(active)
                 metrics.inactive_learners = [
-                    learner for learner in self.EXPECTED_LEARNERS if learner not in active
+                    learner
+                    for learner in self.EXPECTED_LEARNERS
+                    if learner not in active
                 ]
                 metrics.total_learners = len(active)
 

@@ -451,10 +451,16 @@ async def scaffold(
     # Create operation
     if operation == "create":
         if not template:
-            return {"success": False, "error": "Create operation requires 'template' parameter"}
+            return {
+                "success": False,
+                "error": "Create operation requires 'template' parameter",
+            }
 
         if not name:
-            return {"success": False, "error": "Create operation requires 'name' parameter"}
+            return {
+                "success": False,
+                "error": "Create operation requires 'name' parameter",
+            }
 
         if template not in TEMPLATES:
             available = ", ".join(TEMPLATES.keys())
@@ -523,7 +529,10 @@ async def scaffold(
 
         if template in ["fastapi", "flask", "microservice"]:
             next_steps.extend(
-                ["pip install -r requirements.txt", "# Edit .env.example and save as .env"]
+                [
+                    "pip install -r requirements.txt",
+                    "# Edit .env.example and save as .env",
+                ]
             )
         elif template == "react-app":
             next_steps.extend(["npm install", "npm start"])
@@ -585,7 +594,9 @@ async def scaffold(
             report.append("")
 
         report.append("Usage:")
-        report.append("  scaffold(operation='create', template='fastapi', name='my-project')")
+        report.append(
+            "  scaffold(operation='create', template='fastapi', name='my-project')"
+        )
 
         return {
             "success": True,
@@ -598,7 +609,10 @@ async def scaffold(
     # Add operation
     elif operation == "add":
         if not path:
-            return {"success": False, "error": "Add operation requires 'path' parameter"}
+            return {
+                "success": False,
+                "error": "Add operation requires 'path' parameter",
+            }
 
         file_path = Path(path)
 
@@ -637,9 +651,15 @@ async def scaffold(
             }
 
         except subprocess.CalledProcessError as e:
-            return {"success": False, "error": f"Git initialization failed: {e.stderr.decode()}"}
+            return {
+                "success": False,
+                "error": f"Git initialization failed: {e.stderr.decode()}",
+            }
         except FileNotFoundError:
-            return {"success": False, "error": "Git not found. Please install git first."}
+            return {
+                "success": False,
+                "error": "Git not found. Please install git first.",
+            }
 
     # From-template operation (variable interpolation for templates)
     elif operation == "from-template":

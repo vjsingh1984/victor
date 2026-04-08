@@ -78,7 +78,9 @@ def _load_workflow_file(workflow_path: Path) -> dict:
         raise typer.Exit(1)
 
     if workflow_path.suffix not in {".yaml", ".yml"}:
-        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
+        console.print(
+            f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}"
+        )
         raise typer.Exit(1)
 
     try:
@@ -130,7 +132,14 @@ def _detect_vertical_from_path(workflow_path: Path) -> Optional[str]:
     - victor/coding/workflows/feature.yaml -> coding
     - victor/research/workflows/paper.yaml -> research
     """
-    known_verticals = {"coding", "devops", "rag", "dataanalysis", "research", "benchmark"}
+    known_verticals = {
+        "coding",
+        "devops",
+        "rag",
+        "dataanalysis",
+        "research",
+        "benchmark",
+    }
     parts = workflow_path.parts
 
     for part in parts:
@@ -292,7 +301,9 @@ def _validate_escape_hatches_and_handlers(
         # Check parallel nodes
         if isinstance(node, ParallelNode):
             if not node.parallel_nodes:
-                warnings.append(f"Parallel node '{node_id}' has no parallel_nodes defined")
+                warnings.append(
+                    f"Parallel node '{node_id}' has no parallel_nodes defined"
+                )
 
         # Check HITL nodes
         if isinstance(node, HITLNode):
@@ -463,7 +474,9 @@ def validate_workflow(
     if verbose and detected_vertical:
         conditions, transforms = _load_escape_hatches(detected_vertical)
         if conditions or transforms:
-            console.print(f"\n[dim]Available escape hatches for '{detected_vertical}':[/]")
+            console.print(
+                f"\n[dim]Available escape hatches for '{detected_vertical}':[/]"
+            )
             if conditions:
                 console.print(f"  CONDITIONS: {', '.join(sorted(conditions))}")
             if transforms:
@@ -560,8 +573,12 @@ def render_workflow(
     else:
         workflow = next(iter(workflows.values()))
         if len(workflows) > 1:
-            console.print(f"[dim]Multiple workflows found, rendering '{workflow.name}'[/]")
-            console.print(f"[dim]Use --name to specify: {', '.join(workflows.keys())}[/]")
+            console.print(
+                f"[dim]Multiple workflows found, rendering '{workflow.name}'[/]"
+            )
+            console.print(
+                f"[dim]Use --name to specify: {', '.join(workflows.keys())}[/]"
+            )
 
     # Show summary if requested
     if summary:
@@ -593,7 +610,11 @@ def render_workflow(
                 extra = f"role={node.role}"
             elif node_type == "ComputeNode":
                 icon = "#"
-                extra = f"handler={node.handler}" if node.handler else f"tools={len(node.tools)}"
+                extra = (
+                    f"handler={node.handler}"
+                    if node.handler
+                    else f"tools={len(node.tools)}"
+                )
             elif node_type == "ConditionNode":
                 icon = "?"
                 extra = f"branches={list(node.branches.keys())}"
@@ -691,7 +712,9 @@ def list_workflows(
 
     # Find YAML files
     pattern = "**/*.yaml" if recursive else "*.yaml"
-    yaml_files = list(path.glob(pattern)) + list(path.glob(pattern.replace(".yaml", ".yml")))
+    yaml_files = list(path.glob(pattern)) + list(
+        path.glob(pattern.replace(".yaml", ".yml"))
+    )
 
     if not yaml_files:
         console.print(f"[dim]No workflow files found in {directory}[/]")
@@ -721,7 +744,9 @@ def list_workflows(
                     node_type = type(node).__name__.replace("Node", "")
                     node_types[node_type] = node_types.get(node_type, 0) + 1
 
-                types_str = ", ".join(f"{v}{k[0]}" for k, v in sorted(node_types.items()))
+                types_str = ", ".join(
+                    f"{v}{k[0]}" for k, v in sorted(node_types.items())
+                )
 
                 table.add_row(
                     yaml_file.name,
@@ -738,7 +763,9 @@ def list_workflows(
             table.add_row(yaml_file.name, "[red]Error[/]", str(e)[:40], "-", "-")
 
     console.print(table)
-    console.print(f"\n[dim]Total: {total_workflows} workflow(s) in {len(yaml_files)} file(s)[/]")
+    console.print(
+        f"\n[dim]Total: {total_workflows} workflow(s) in {len(yaml_files)} file(s)[/]"
+    )
 
 
 async def _execute_workflow_async(
@@ -758,14 +785,20 @@ async def _execute_workflow_async(
     settings = load_settings()
 
     orchestrators = {}
-    has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
+    has_agent_nodes = any(
+        isinstance(node, AgentNode) for node in workflow.nodes.values()
+    )
 
     if has_agent_nodes:
         node_profiles = set()
         profile_to_nodes = {}
 
         for node in workflow.nodes.values():
-            if isinstance(node, AgentNode) and hasattr(node, "profile") and node.profile:
+            if (
+                isinstance(node, AgentNode)
+                and hasattr(node, "profile")
+                and node.profile
+            ):
                 node_profiles.add(node.profile)
                 profile_to_nodes.setdefault(node.profile, []).append(node.id)
             elif isinstance(node, AgentNode):
@@ -790,7 +823,9 @@ async def _execute_workflow_async(
                 )
                 orchestrator = await shim.create_orchestrator()
                 orchestrators[profile_name] = orchestrator
-                logger.debug(f"Successfully created orchestrator for profile: {profile_name}")
+                logger.debug(
+                    f"Successfully created orchestrator for profile: {profile_name}"
+                )
                 console.print(f"  [dim]✓ Profile '{profile_name}' initialized[/]")
             except Exception as e:
                 logger.error(
@@ -843,7 +878,9 @@ async def _execute_workflow_async(
         if result.success:
             console.print("[bold green]✓[/] Workflow completed successfully")
             console.print(f"  [dim]Duration: {result.duration_seconds:.2f}s[/]")
-            console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
+            console.print(
+                f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]"
+            )
 
             if result.state:
                 console.print("\n[bold]Final State:[/]")
@@ -982,7 +1019,9 @@ def run_workflow(
     _display_workflow_info(workflow, workflow.name)
 
     if initial_context:
-        console.print(f"\n[dim]Context: {json.dumps(initial_context, default=str)[:100]}...[/]")
+        console.print(
+            f"\n[dim]Context: {json.dumps(initial_context, default=str)[:100]}...[/]"
+        )
 
     if dry_run:
         console.print("\n[bold yellow]Dry run mode[/] - showing execution plan:")
@@ -1133,9 +1172,13 @@ async def _generate_workflow_async(
         req_pipeline = RequirementPipeline(orchestrator, vertical=vertical)
         requirements = await req_pipeline.extract_and_validate(description)
 
-        console.print(f"  [green]✓[/] Extracted {len(requirements.functional.tasks)} tasks")
+        console.print(
+            f"  [green]✓[/] Extracted {len(requirements.functional.tasks)} tasks"
+        )
         console.print(f"  [dim]Tools: {list(requirements.functional.tools.keys())}[/]")
-        console.print(f"  [dim]Execution order: {requirements.structural.execution_order}[/]")
+        console.print(
+            f"  [dim]Execution order: {requirements.structural.execution_order}[/]"
+        )
 
         if requirements.metadata.ambiguities:
             console.print(
@@ -1159,7 +1202,9 @@ async def _generate_workflow_async(
             )
             return
 
-        console.print(f"\n[bold]Step 2:[/] Generating workflow (strategy: {strategy})...")
+        console.print(
+            f"\n[bold]Step 2:[/] Generating workflow (strategy: {strategy})..."
+        )
 
         pipeline = WorkflowGenerationPipeline(
             orchestrator=orchestrator,
@@ -1193,7 +1238,9 @@ async def _generate_workflow_async(
         yaml_data = {
             "workflows": {
                 workflow_schema.get("workflow_name", "generated_workflow"): {
-                    "description": workflow_schema.get("description", description[:100]),
+                    "description": workflow_schema.get(
+                        "description", description[:100]
+                    ),
                     "metadata": {
                         "vertical": vertical,
                         "generated_by": "victor workflow generate",
@@ -1219,7 +1266,9 @@ async def _generate_workflow_async(
             if val_result.is_valid:
                 console.print("  [green]✓[/] Validation passed")
             else:
-                console.print(f"  [yellow]⚠[/] Validation warnings: {len(val_result.all_errors)}")
+                console.print(
+                    f"  [yellow]⚠[/] Validation warnings: {len(val_result.all_errors)}"
+                )
                 for err in val_result.all_errors[:3]:
                     console.print(f"    - {err.message}")
 
@@ -1333,7 +1382,14 @@ def generate_workflow(
         raise typer.Exit(1)
 
     # Validate vertical
-    valid_verticals = {"coding", "devops", "research", "rag", "dataanalysis", "benchmark"}
+    valid_verticals = {
+        "coding",
+        "devops",
+        "research",
+        "rag",
+        "dataanalysis",
+        "benchmark",
+    }
     if vertical.lower() not in valid_verticals:
         console.print(f"[bold red]Error:[/] Unknown vertical: {vertical}")
         console.print(f"Valid options: {', '.join(valid_verticals)}")

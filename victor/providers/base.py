@@ -16,7 +16,16 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +175,9 @@ class Message(BaseModel):
 
     role: str = Field(..., description="Message role: system, user, or assistant")
     content: str = Field(..., description="Message content")
-    name: Optional[str] = Field(default=None, description="Optional name for the message sender")
+    name: Optional[str] = Field(
+        default=None, description="Optional name for the message sender"
+    )
     tool_calls: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Tool calls requested by the assistant"
     )
@@ -184,7 +195,9 @@ class ToolDefinition(BaseModel):
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
-    parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
+    parameters: Dict[str, Any] = Field(
+        ..., description="JSON Schema for tool parameters"
+    )
 
 
 class CompletionResponse(BaseModel):
@@ -192,11 +205,15 @@ class CompletionResponse(BaseModel):
 
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
+    tool_calls: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Tool calls requested"
+    )
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
     usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
     model: Optional[str] = Field(None, description="Model used")
-    raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
+    raw_response: Optional[Dict[str, Any]] = Field(
+        None, description="Raw provider response"
+    )
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata (e.g., reasoning_content)"
     )
@@ -375,7 +392,14 @@ class BaseProvider(ABC):
         # proper exception types or HTTP status codes instead)
         if any(
             t in error_str
-            for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
+            for t in (
+                "auth",
+                "unauthorized",
+                "invalid key",
+                "invalid api",
+                "api_key",
+                "401",
+            )
         ):
             logger.warning(
                 "String-based error classification triggered for auth error "

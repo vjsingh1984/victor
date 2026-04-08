@@ -64,7 +64,10 @@ import yaml
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 
-from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
+from victor.core.tool_dependency_base import (
+    BaseToolDependencyProvider,
+    ToolDependencyConfig,
+)
 from victor.core.tool_dependency_schema import ToolDependencySpec
 from victor.core.tool_types import ToolDependency
 from victor.core.verticals.config_registry import (
@@ -77,21 +80,27 @@ logger = logging.getLogger(__name__)
 
 def import_module_with_fallback(module_path: str):
     """Lazy proxy to avoid importing vertical package graph at module import time."""
-    from victor.core.verticals.import_resolver import import_module_with_fallback as _resolver
+    from victor.core.verticals.import_resolver import (
+        import_module_with_fallback as _resolver,
+    )
 
     return _resolver(module_path)
 
 
 def module_import_candidates(module_path: str):
     """Lazy proxy for compatibility candidate expansion."""
-    from victor.core.verticals.import_resolver import module_import_candidates as _resolver
+    from victor.core.verticals.import_resolver import (
+        module_import_candidates as _resolver,
+    )
 
     return _resolver(module_path)
 
 
 def normalize_vertical_name(vertical_name: str) -> str:
     """Lazy proxy for shared vertical-name normalization."""
-    from victor.core.verticals.import_resolver import normalize_vertical_name as _resolver
+    from victor.core.verticals.import_resolver import (
+        normalize_vertical_name as _resolver,
+    )
 
     return _resolver(vertical_name)
 
@@ -181,7 +190,9 @@ class ToolDependencyLoader:
         # Cache result
         self._cache[yaml_path] = config
 
-        logger.info(f"Loaded tool dependency config for '{spec.vertical}' from {yaml_path}")
+        logger.info(
+            f"Loaded tool dependency config for '{spec.vertical}' from {yaml_path}"
+        )
         return config
 
     def load_from_string(self, yaml_content: str) -> ToolDependencyConfig:
@@ -343,7 +354,9 @@ class ToolDependencyLoader:
         result: Dict[str, List[Tuple[str, float]]] = {}
         for source, targets in transitions.items():
             source_name = self._canonicalize_name(source)
-            result[source_name] = [(self._canonicalize_name(t.tool), t.weight) for t in targets]
+            result[source_name] = [
+                (self._canonicalize_name(t.tool), t.weight) for t in targets
+            ]
         return result
 
     def _convert_clusters(
@@ -372,7 +385,9 @@ class ToolDependencyLoader:
         Returns:
             Dict mapping sequence_name -> list of tools.
         """
-        return {name: self._convert_tool_list(tools) for name, tools in sequences.items()}
+        return {
+            name: self._convert_tool_list(tools) for name, tools in sequences.items()
+        }
 
     def _convert_tool_set(self, tools: List[str]) -> Set[str]:
         """Convert tool list to set, optionally canonicalizing names.
@@ -418,7 +433,9 @@ class ToolDependencyLoader:
             return get_canonical_name(name)
         except ImportError:
             # If tool_naming not available, return as-is
-            logger.warning("Tool naming module not available, skipping canonicalization")
+            logger.warning(
+                "Tool naming module not available, skipping canonicalization"
+            )
             return name
 
 
@@ -566,7 +583,9 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
 # Format: {path_str: (mtime_ns, provider_instance)}
 _provider_cache: Dict[str, Tuple[int, BaseToolDependencyProvider]] = {}
 # Vertical provider resolution cache
-_vertical_provider_cache: Dict[Tuple[str, Optional[bool]], BaseToolDependencyProvider] = {}
+_vertical_provider_cache: Dict[
+    Tuple[str, Optional[bool]], BaseToolDependencyProvider
+] = {}
 _vertical_provider_cache_lock = threading.Lock()
 
 
@@ -688,7 +707,9 @@ _TOOL_DEPENDENCY_STATS_LOCK = threading.Lock()
 def _increment_resolution_stat(name: str) -> None:
     """Increment a tool-dependency resolution telemetry counter."""
     with _TOOL_DEPENDENCY_STATS_LOCK:
-        _TOOL_DEPENDENCY_RESOLUTION_STATS[name] = _TOOL_DEPENDENCY_RESOLUTION_STATS.get(name, 0) + 1
+        _TOOL_DEPENDENCY_RESOLUTION_STATS[name] = (
+            _TOOL_DEPENDENCY_RESOLUTION_STATS.get(name, 0) + 1
+        )
 
 
 def get_tool_dependency_resolution_stats() -> Dict[str, int]:
@@ -711,7 +732,9 @@ def get_tool_dependency_resolution_stats() -> Dict[str, int]:
     return stats
 
 
-def reset_tool_dependency_resolution_stats(clear_entry_point_cache: bool = False) -> None:
+def reset_tool_dependency_resolution_stats(
+    clear_entry_point_cache: bool = False,
+) -> None:
     """Reset resolution telemetry counters and optionally clear EP cache."""
     with _TOOL_DEPENDENCY_STATS_LOCK:
         for key in _TOOL_DEPENDENCY_RESOLUTION_STATS:
@@ -800,7 +823,9 @@ def create_vertical_tool_dependency_provider(
     _increment_resolution_stat("total_requests")
     vertical_name = normalize_vertical_name(vertical)
     effective_canonicalize = (
-        canonicalize if canonicalize is not None else get_canonicalization_setting(vertical_name)
+        canonicalize
+        if canonicalize is not None
+        else get_canonicalization_setting(vertical_name)
     )
     cache_key = (vertical_name, effective_canonicalize)
 
@@ -821,7 +846,10 @@ def create_vertical_tool_dependency_provider(
             _increment_resolution_stat("entry_point_resolutions")
             with _vertical_provider_cache_lock:
                 _vertical_provider_cache[cache_key] = provider
-            logger.debug("Loaded tool dependency provider for '%s' from entry point", vertical_name)
+            logger.debug(
+                "Loaded tool dependency provider for '%s' from entry point",
+                vertical_name,
+            )
             return provider
         except Exception as e:
             _increment_resolution_stat("entry_point_load_failures")
@@ -862,7 +890,9 @@ def create_vertical_tool_dependency_provider(
     # The registry will provide defaults for unknown verticals
     if not VerticalBehaviorConfigRegistry.has_config(vertical_name):
         # This is now informational, not an error - unknown verticals get defaults
-        logger.debug(f"Vertical '{vertical_name}' has no explicit configuration, using defaults")
+        logger.debug(
+            f"Vertical '{vertical_name}' has no explicit configuration, using defaults"
+        )
 
     # Fallback 2: package resource YAML (works for wheel/pip installs).
     checked_packages: List[str] = []
@@ -881,9 +911,9 @@ def create_vertical_tool_dependency_provider(
             yaml_resource = files(package).joinpath("tool_dependencies.yaml")
             if yaml_resource.is_file():
                 yaml_content = yaml_resource.read_text(encoding="utf-8")
-                config = ToolDependencyLoader(canonicalize=effective_canonicalize).load_from_string(
-                    yaml_content
-                )
+                config = ToolDependencyLoader(
+                    canonicalize=effective_canonicalize
+                ).load_from_string(yaml_content)
                 _increment_resolution_stat("package_resource_resolutions")
                 logger.debug(
                     "Loaded tool dependency provider for '%s' from package resource '%s:tool_dependencies.yaml'",

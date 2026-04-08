@@ -28,12 +28,20 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
+from victor.tools.base import (
+    AccessMode,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+    ToolConfig,
+)
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 
 
-def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
+def _get_provider_and_model(
+    context: Optional[Dict[str, Any]] = None,
+) -> Tuple[Any, Optional[str]]:
     """Get provider and model from ToolConfig in execution context.
 
     Args:
@@ -100,7 +108,11 @@ async def _run_git_async(
     ],
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
-    progress_params=["operation", "files", "branch"],  # Params indicating different operations
+    progress_params=[
+        "operation",
+        "files",
+        "branch",
+    ],  # Params indicating different operations
     keywords=[
         "git",
         "commit",
@@ -261,7 +273,10 @@ async def git(
 
         # Commit with message and optional author override
         success, stdout, stderr = await _run_git_async(
-            "commit", "-m", message, env_overrides=env_overrides if env_overrides else None
+            "commit",
+            "-m",
+            message,
+            env_overrides=env_overrides if env_overrides else None,
         )
 
         if not success:
@@ -269,7 +284,9 @@ async def git(
 
         author_info = ""
         if author_name or author_email:
-            author_info = f" (as {author_name or 'default'} <{author_email or 'default'}>)"
+            author_info = (
+                f" (as {author_name or 'default'} <{author_email or 'default'}>)"
+            )
 
         return {
             "success": True,
@@ -405,7 +422,11 @@ Generate ONLY the commit message, nothing else."""
         return {"success": True, "output": message, "error": ""}
 
     except Exception as e:
-        return {"success": False, "output": "", "error": f"AI generation failed: {str(e)}"}
+        return {
+            "success": False,
+            "output": "",
+            "error": f"AI generation failed: {str(e)}",
+        }
 
 
 @tool(
@@ -473,7 +494,9 @@ async def pr(
 
         if success and diff:
             # Get commit log
-            _, log, _ = await _run_git_async("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
+            _, log, _ = await _run_git_async(
+                "log", f"{base_branch}..HEAD", "--pretty=format:- %s"
+            )
 
             # Generate PR content
             prompt = f"""Generate a pull request title and description for these changes.
@@ -540,7 +563,11 @@ DESCRIPTION:
     )
 
     if not success:
-        return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Failed to push branch: {stderr}",
+        }
 
     # Create PR with gh CLI
     pr_command = (
@@ -580,7 +607,11 @@ DESCRIPTION:
     access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
-    use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
+    use_cases=[
+        "analyzing merge conflicts",
+        "resolving git conflicts",
+        "conflict resolution help",
+    ],
     examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
 )
 async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -612,7 +643,9 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {"success": False, "output": "", "error": stderr}
 
     # Find conflicted files (marked with UU)
-    conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
+    conflicted = [
+        line.split()[-1] for line in status.split("\n") if line.startswith("UU")
+    ]
 
     if not conflicted:
         return {"success": True, "output": "No merge conflicts detected", "error": ""}
@@ -639,7 +672,9 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 end = content.find(">>>>>>> ", start)
                 if end != -1:
                     conflict_section = content[start : end + 50]
-                    analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
+                    analysis.append(
+                        f"   First conflict preview:\n   {conflict_section[:200]}..."
+                    )
 
         except Exception as e:
             analysis.append(f"   Error reading file: {e}")
@@ -677,7 +712,9 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                             f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
                         )
                 except Exception as e:
-                    logger.debug("Failed to read merge conflict details for %s: %s", file, e)
+                    logger.debug(
+                        "Failed to read merge conflict details for %s: %s", file, e
+                    )
 
             if conflict_details:
                 prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
@@ -705,7 +742,9 @@ Be concise and practical."""
                 for line in suggestions.split("\n"):
                     analysis.append(f"   {line}")
             else:
-                analysis.append("   Could not extract conflict details for AI analysis.")
+                analysis.append(
+                    "   Could not extract conflict details for AI analysis."
+                )
         except Exception as e:
             analysis.append(f"   AI analysis failed: {e}")
 

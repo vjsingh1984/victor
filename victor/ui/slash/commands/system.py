@@ -85,7 +85,9 @@ class HelpCommand(BaseSlashCommand):
             command = registry.get(cmd_name)
             if command:
                 meta = command.metadata
-                aliases = ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
+                aliases = (
+                    ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
+                )
                 ctx.console.print(
                     Panel(
                         f"[bold]/{meta.name}[/]\n\n"
@@ -199,7 +201,9 @@ class StatusCommand(BaseSlashCommand):
             if learner:
                 rec = learner.recommend(agent.provider_name, "coding")
                 if rec and rec.confidence > 0:
-                    content += f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
+                    content += (
+                        f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
+                    )
         except Exception:
             pass
 

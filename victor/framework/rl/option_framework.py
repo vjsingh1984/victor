@@ -235,7 +235,9 @@ class Option(ABC):
             metadata={
                 "name": self.name,
                 "duration": (
-                    (datetime.now() - self._start_time).total_seconds() if self._start_time else 0
+                    (datetime.now() - self._start_time).total_seconds()
+                    if self._start_time
+                    else 0
                 ),
             },
         )
@@ -318,7 +320,13 @@ class ImplementOption(Option):
             name="implement_feature",
             description="Implement code changes for the task",
         )
-        self._implement_tools = {"write_file", "edit_file", "execute_code", "run_tests", "bash"}
+        self._implement_tools = {
+            "write_file",
+            "edit_file",
+            "execute_code",
+            "run_tests",
+            "bash",
+        }
 
     def can_initiate(self, state: OptionState) -> bool:
         """Can initiate when we have enough context."""
@@ -374,7 +382,9 @@ class DebugOption(Option):
 
     def should_terminate(self, state: OptionState) -> bool:
         """Terminate when fixed or max attempts."""
-        return self._steps >= self.MAX_DEBUG_STEPS or (state.last_tool_success and self._steps >= 2)
+        return self._steps >= self.MAX_DEBUG_STEPS or (
+            state.last_tool_success and self._steps >= 2
+        )
 
     def get_action(self, state: OptionState) -> str:
         """Get debug action based on state."""
@@ -498,7 +508,9 @@ class OptionRegistry:
             return True
         return False
 
-    def step_active_option(self, state: OptionState, reward: float = 0.0) -> Optional[str]:
+    def step_active_option(
+        self, state: OptionState, reward: float = 0.0
+    ) -> Optional[str]:
         """Step the active option.
 
         Args:

@@ -237,9 +237,13 @@ class WorkflowGenerator:
 
                 # Generate using preferred strategy
                 if self._strategy == GenerationStrategy.LLM_MULTI_STAGE:
-                    schema, metadata = await self._generate_multi_stage(requirements, attempt)
+                    schema, metadata = await self._generate_multi_stage(
+                        requirements, attempt
+                    )
                 elif self._strategy == GenerationStrategy.LLM_SINGLE_STAGE:
-                    schema, metadata = await self._generate_single_stage(requirements, attempt)
+                    schema, metadata = await self._generate_single_stage(
+                        requirements, attempt
+                    )
                 else:
                     schema, metadata = await self._generate_from_template(requirements)
 
@@ -272,7 +276,10 @@ class WorkflowGenerator:
                     await asyncio.sleep(2**attempt)
 
         # All retries failed - try template fallback
-        if self._enable_templates and self._strategy != GenerationStrategy.TEMPLATE_BASED:
+        if (
+            self._enable_templates
+            and self._strategy != GenerationStrategy.TEMPLATE_BASED
+        ):
             logger.info("LLM generation failed, trying template fallback")
             try:
                 schema, metadata = await self._generate_from_template(requirements)
@@ -313,7 +320,9 @@ class WorkflowGenerator:
 
         # Call LLM
         try:
-            response = await self._orchestrator.chat(prompt, context={"response_format": "json"})
+            response = await self._orchestrator.chat(
+                prompt, context={"response_format": "json"}
+            )
             refined_schema = self._parse_json_response(response)
 
             # Basic validation
@@ -367,7 +376,9 @@ class WorkflowGenerator:
 
         return schema, metadata
 
-    async def _stage1_understand(self, requirements: WorkflowRequirements) -> Dict[str, Any]:
+    async def _stage1_understand(
+        self, requirements: WorkflowRequirements
+    ) -> Dict[str, Any]:
         """Stage 1: Understand and confirm requirements.
 
         Returns a summary of what the LLM understood.
@@ -436,7 +447,9 @@ Respond with a JSON structure:
 }}
 """
 
-        response = await self._orchestrator.chat(prompt, context={"response_format": "json"})
+        response = await self._orchestrator.chat(
+            prompt, context={"response_format": "json"}
+        )
         return self._parse_json_response(response)
 
     async def _stage3_generate(
@@ -470,7 +483,9 @@ You are a workflow generator. Generate a complete StateGraph JSON schema.
 Generate the complete workflow schema as JSON only.
 """
 
-        response = await self._orchestrator.chat(prompt, context={"response_format": "json"})
+        response = await self._orchestrator.chat(
+            prompt, context={"response_format": "json"}
+        )
         schema = self._parse_json_response(response)
 
         return schema
@@ -516,7 +531,9 @@ You are a workflow generator. Generate a StateGraph JSON schema from requirement
 Generate the workflow schema as JSON only.
 """
 
-        response = await self._orchestrator.chat(prompt, context={"response_format": "json"})
+        response = await self._orchestrator.chat(
+            prompt, context={"response_format": "json"}
+        )
         schema = self._parse_json_response(response)
 
         # Basic validation
@@ -626,7 +643,9 @@ Generate the workflow schema as JSON only.
 
         # Validate entry point
         if schema["entry_point"] not in node_ids:
-            raise ValueError(f"Entry point '{schema['entry_point']}' not found in nodes")
+            raise ValueError(
+                f"Entry point '{schema['entry_point']}' not found in nodes"
+            )
 
         # Validate edges
         for edge in schema["edges"]:
@@ -643,7 +662,9 @@ Generate the workflow schema as JSON only.
             elif isinstance(target, dict):
                 for branch_target in target.values():
                     if branch_target != "__end__" and branch_target not in node_ids:
-                        raise ValueError(f"Edge branch target '{branch_target}' not found in nodes")
+                        raise ValueError(
+                            f"Edge branch target '{branch_target}' not found in nodes"
+                        )
 
     def _build_refinement_prompt(
         self,
@@ -653,7 +674,9 @@ Generate the workflow schema as JSON only.
     ) -> str:
         """Build prompt for schema refinement."""
         feedback_text = (
-            "\n".join(f"- {f}" for f in feedback) if isinstance(feedback, list) else feedback
+            "\n".join(f"- {f}" for f in feedback)
+            if isinstance(feedback, list)
+            else feedback
         )
 
         prompt = f"""
@@ -686,7 +709,9 @@ Fixed schema:
 """
         return prompt
 
-    def _parse_json_response(self, response: Union[str, Dict[str, Any], Any]) -> Dict[str, Any]:
+    def _parse_json_response(
+        self, response: Union[str, Dict[str, Any], Any]
+    ) -> Dict[str, Any]:
         """Parse JSON from LLM response using unified parser.
 
         This method uses the unified response parser from victor.processing.response_parser

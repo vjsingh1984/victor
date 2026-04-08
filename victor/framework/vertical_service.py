@@ -68,7 +68,9 @@ def get_vertical_integration_pipeline(
             _PIPELINE = None
 
         if _PIPELINE is None:
-            from victor.framework.vertical_integration import create_integration_pipeline
+            from victor.framework.vertical_integration import (
+                create_integration_pipeline,
+            )
 
             _PIPELINE = create_integration_pipeline(
                 strict=strict,
@@ -134,7 +136,9 @@ def clear_vertical_integration_pipeline_cache() -> None:
     if callable(clear_fn):
         clear_fn()
     else:
-        logger.debug("Shared pipeline does not expose clear_cache(); skipping cache clear")
+        logger.debug(
+            "Shared pipeline does not expose clear_cache(); skipping cache clear"
+        )
 
 
 __all__ = [

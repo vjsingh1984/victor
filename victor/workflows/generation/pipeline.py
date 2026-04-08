@@ -173,7 +173,9 @@ class RequirementPipeline:
                 validation_result = validator.validate(requirements)
 
                 if not validation_result.is_valid:
-                    logger.error(f"Validation failed with {len(validation_result.errors)} errors")
+                    logger.error(
+                        f"Validation failed with {len(validation_result.errors)} errors"
+                    )
                     for error in validation_result.errors:
                         logger.error(f"  - {error.severity}: {error.message}")
 
@@ -201,7 +203,9 @@ class RequirementPipeline:
                     validation_result = validator.validate(requirements)
                     if not validation_result.is_valid:
                         logger.error("Re-validation failed after ambiguity resolution")
-                        raise ValueError(f"Requirements still invalid: {validation_result.errors}")
+                        raise ValueError(
+                            f"Requirements still invalid: {validation_result.errors}"
+                        )
 
             # Update metadata
             extraction_time = time.time() - start_time
@@ -294,7 +298,9 @@ class RequirementPipeline:
                 logger.warning(f"LLM extraction failed: {e}")
 
                 if not self._enable_rules:
-                    raise RuntimeError(f"LLM extraction failed and rule fallback disabled: {e}")
+                    raise RuntimeError(
+                        f"LLM extraction failed and rule fallback disabled: {e}"
+                    )
 
         # Fall back to rule-based extraction
         if self._enable_rules:
@@ -390,7 +396,9 @@ class HybridExtractor:
             validation_errors = self._validate_with_rules(requirements)
 
             if validation_errors:
-                logger.warning(f"LLM output has {len(validation_errors)} validation errors")
+                logger.warning(
+                    f"LLM output has {len(validation_errors)} validation errors"
+                )
                 # Use rules to correct errors
                 requirements = self._correct_with_rules(requirements, validation_errors)
 

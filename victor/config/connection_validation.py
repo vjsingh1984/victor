@@ -241,7 +241,9 @@ class ConnectionValidator:
                             )
                         )
                     else:
-                        result.error = f"{account.provider} returned status {response.status}"
+                        result.error = (
+                            f"{account.provider} returned status {response.status}"
+                        )
         except asyncio.TimeoutError:
             result.error = f"Connection to {account.provider} timed out"
         except Exception as e:
@@ -518,7 +520,9 @@ def ping_provider(provider: str, endpoint: Optional[str] = None) -> ValidationRe
         name="ping-test",
         provider=provider,
         model="default",
-        auth=AuthConfig(method="none" if provider in {"ollama", "lmstudio", "vllm"} else "api_key"),
+        auth=AuthConfig(
+            method="none" if provider in {"ollama", "lmstudio", "vllm"} else "api_key"
+        ),
         endpoint=endpoint,
     )
 

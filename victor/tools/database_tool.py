@@ -201,7 +201,10 @@ async def _connect_sqlserver(
             "message": "Connected to SQL Server database",
         }
     except ImportError:
-        return {"success": False, "error": "SQL Server support requires: pip install pyodbc"}
+        return {
+            "success": False,
+            "error": "SQL Server support requires: pip install pyodbc",
+        }
     except Exception as e:
         return {"success": False, "error": f"SQL Server connection failed: {str(e)}"}
 
@@ -242,7 +245,12 @@ async def _do_connect(
         )
     elif db_type == "sqlserver":
         return await _connect_sqlserver(
-            {"database": database, "host": host, "username": username, "password": password},
+            {
+                "database": database,
+                "host": host,
+                "username": username,
+                "password": password,
+            },
             connection_pool,
         )
     else:
@@ -269,7 +277,9 @@ async def _do_query(
 
     # Check for dangerous patterns
     allow_writes = (
-        _DEFAULT_ALLOW_MODIFICATIONS if allow_modifications is None else allow_modifications
+        _DEFAULT_ALLOW_MODIFICATIONS
+        if allow_modifications is None
+        else allow_modifications
     )
     if not allow_writes:
         sql_upper = sql.upper()
@@ -391,7 +401,8 @@ async def _do_describe(
                 """)
             rows = cursor.fetchall()
             columns = [
-                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"} for row in rows
+                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
+                for row in rows
             ]
 
         elif connection_id.startswith("mysql"):
@@ -408,9 +419,17 @@ async def _do_describe(
             ]
 
         else:
-            return {"success": False, "error": "Describe not implemented for this database type"}
+            return {
+                "success": False,
+                "error": "Describe not implemented for this database type",
+            }
 
-        return {"success": True, "table": table, "columns": columns, "count": len(columns)}
+        return {
+            "success": True,
+            "table": table,
+            "columns": columns,
+            "count": len(columns),
+        }
 
     except Exception as e:
         return {"success": False, "error": f"Failed to describe table: {str(e)}"}
@@ -436,7 +455,9 @@ async def _do_schema(
         for table in tables_result["tables"]:
             describe_result = await _do_describe(connection_id, table, pool)
             if describe_result["success"]:
-                schema_info["tables"].append({"name": table, "columns": describe_result["columns"]})
+                schema_info["tables"].append(
+                    {"name": table, "columns": describe_result["columns"]}
+                )
 
         return {"success": True, "tables": schema_info["tables"]}
 
@@ -457,7 +478,10 @@ async def _do_disconnect(
         conn.close()
         del pool[connection_id]
 
-        return {"success": True, "message": f"Disconnected from database: {connection_id}"}
+        return {
+            "success": True,
+            "message": f"Disconnected from database: {connection_id}",
+        }
 
     except Exception as e:
         return {"success": False, "error": f"Disconnect failed: {str(e)}"}
@@ -543,35 +567,52 @@ async def database(
     if action_lower == "connect":
         if not database:
             return {"success": False, "error": "Missing required parameter: database"}
-        return await _do_connect(database, db_type, host, port, username, password, pool)
+        return await _do_connect(
+            database, db_type, host, port, username, password, pool
+        )
 
     elif action_lower == "query":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         if not sql:
             return {"success": False, "error": "Missing required parameter: sql"}
         return await _do_query(connection_id, sql, limit, allow_modifications, pool)
 
     elif action_lower == "tables":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_tables(connection_id, pool)
 
     elif action_lower == "describe":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         if not table:
             return {"success": False, "error": "Missing required parameter: table"}
         return await _do_describe(connection_id, table, pool)
 
     elif action_lower == "schema":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_schema(connection_id, pool)
 
     elif action_lower == "disconnect":
         if not connection_id:
-            return {"success": False, "error": "Missing required parameter: connection_id"}
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection_id",
+            }
         return await _do_disconnect(connection_id, pool)
 
     else:

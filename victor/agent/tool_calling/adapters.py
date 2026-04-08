@@ -74,7 +74,9 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
     def get_capabilities(self) -> ToolCallingCapabilities:
         # Load from YAML config, use format hint for Anthropic
         loader = _get_capability_loader()
-        caps = loader.get_capabilities("anthropic", self.model, ToolCallFormat.ANTHROPIC)
+        caps = loader.get_capabilities(
+            "anthropic", self.model, ToolCallFormat.ANTHROPIC
+        )
 
         # Anthropic always has native tool calls, override if YAML is missing
         if not caps.native_tool_calls:
@@ -452,7 +454,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         )
 
         try:
-            from victor.providers.ollama_capability_detector import OllamaCapabilityDetector
+            from victor.providers.ollama_capability_detector import (
+                OllamaCapabilityDetector,
+            )
 
             detector = OllamaCapabilityDetector(base_url, timeout=5)
             support = detector.get_tool_support(self.model)
@@ -464,15 +468,23 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                     f"supports_tools={support.supports_tools}, "
                     f"format={support.tool_response_format}"
                 )
-                OllamaToolCallingAdapter._tool_support_cache[self.model] = support.supports_tools
+                OllamaToolCallingAdapter._tool_support_cache[self.model] = (
+                    support.supports_tools
+                )
                 return support.supports_tools
             else:
-                logger.debug(f"Dynamic detection failed for {self.model}: {support.error}")
+                logger.debug(
+                    f"Dynamic detection failed for {self.model}: {support.error}"
+                )
         except Exception as e:
-            logger.debug(f"Failed to dynamically detect tool support for {self.model}: {e}")
+            logger.debug(
+                f"Failed to dynamically detect tool support for {self.model}: {e}"
+            )
 
         # Fallback to static list
-        has_static_support = any(pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS)
+        has_static_support = any(
+            pattern in self.model_lower for pattern in self.NATIVE_TOOL_MODELS
+        )
         OllamaToolCallingAdapter._tool_support_cache[self.model] = has_static_support
         return has_static_support
 
@@ -492,7 +504,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """
         # Determine format based on model detection (uses dynamic detection first)
         has_native = self._has_native_support()
-        format_hint = ToolCallFormat.OLLAMA_NATIVE if has_native else ToolCallFormat.OLLAMA_JSON
+        format_hint = (
+            ToolCallFormat.OLLAMA_NATIVE if has_native else ToolCallFormat.OLLAMA_JSON
+        )
 
         # Load from YAML config with model pattern matching
         loader = _get_capability_loader()
@@ -517,7 +531,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 tool_call_format=format_hint,
                 argument_format=caps.argument_format,
                 recommended_max_tools=caps.recommended_max_tools if has_native else 10,
-                recommended_tool_budget=caps.recommended_tool_budget if has_native else 5,
+                recommended_tool_budget=(
+                    caps.recommended_tool_budget if has_native else 5
+                ),
             )
 
         # Apply model-specific overrides that YAML can't detect
@@ -628,7 +644,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """
         # Try native tool calls first (using mixin method)
         if raw_tool_calls:
-            result = self.parse_native_tool_calls(raw_tool_calls, self.is_valid_tool_name)
+            result = self.parse_native_tool_calls(
+                raw_tool_calls, self.is_valid_tool_name
+            )
             if result.tool_calls:
                 # Preserve original content for reference
                 return ToolCallParseResult(
@@ -647,7 +665,9 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
             # Ollama-specific: Try hybrid XML pattern recovery
             # This handles <function=X>...</tool_call> malformed patterns
-            hybrid_result = self._parse_hybrid_xml_format(content, self.is_valid_tool_name)
+            hybrid_result = self._parse_hybrid_xml_format(
+                content, self.is_valid_tool_name
+            )
             if hybrid_result.tool_calls:
                 return hybrid_result
 
@@ -720,7 +740,9 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     """
 
     # Patterns for text-based tool calls from Gemini
-    EXECUTE_BASH_PATTERN = re.compile(r"<execute_bash>\s*(.*?)\s*</execute_bash>", re.DOTALL)
+    EXECUTE_BASH_PATTERN = re.compile(
+        r"<execute_bash>\s*(.*?)\s*</execute_bash>", re.DOTALL
+    )
     TOOL_CODE_PATTERN = re.compile(r"<tool_code>\s*(.*?)\s*</tool_code>", re.DOTALL)
     CODE_BLOCK_PATTERN = re.compile(r"```tool_code\s*(.*?)\s*```", re.DOTALL)
     # Pattern for <ctrl42>call: `tool_name` followed by ```json {...}```
@@ -880,7 +902,9 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed ctrl42 call: {tool_name}({args})")
                 except json.JSONDecodeError:
-                    warnings.append(f"Failed to parse JSON for {tool_name}: {json_str[:50]}")
+                    warnings.append(
+                        f"Failed to parse JSON for {tool_name}: {json_str[:50]}"
+                    )
 
         # Parse simpler call: patterns
         for match in self.SIMPLE_CALL_PATTERN.finditer(content):
@@ -936,7 +960,9 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             code = match.group(1).strip()
             if code:
                 # Try to extract read_file calls
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(
+                    r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code
+                )
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
@@ -954,7 +980,9 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         for match in self.CODE_BLOCK_PATTERN.finditer(content):
             code = match.group(1).strip()
             if code:
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(
+                    r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code
+                )
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
@@ -1047,7 +1075,9 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """Get capabilities for LMStudio models."""
         has_native = self._has_native_support()
         format_hint = (
-            ToolCallFormat.LMSTUDIO_NATIVE if has_native else ToolCallFormat.LMSTUDIO_DEFAULT
+            ToolCallFormat.LMSTUDIO_NATIVE
+            if has_native
+            else ToolCallFormat.LMSTUDIO_DEFAULT
         )
 
         # Load from YAML config with model pattern matching
@@ -1102,7 +1132,9 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         # 1. Try native tool calls first (using mixin method)
         if raw_tool_calls:
-            result = self.parse_native_tool_calls(raw_tool_calls, self.is_valid_tool_name)
+            result = self.parse_native_tool_calls(
+                raw_tool_calls, self.is_valid_tool_name
+            )
             if result.tool_calls:
                 return ToolCallParseResult(
                     tool_calls=result.tool_calls,
@@ -1262,7 +1294,9 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
 
     def _has_native_support(self) -> bool:
         """Check if model has native tool support."""
-        return any(pattern in self.model_lower for pattern in self.LMSTUDIO_NATIVE_MODELS)
+        return any(
+            pattern in self.model_lower for pattern in self.LMSTUDIO_NATIVE_MODELS
+        )
 
     def get_capabilities(self) -> ToolCallingCapabilities:
         has_native = self._has_native_support()
@@ -1292,7 +1326,9 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
         else:
             # LMStudio: Load from YAML with model pattern matching
             format_hint = (
-                ToolCallFormat.LMSTUDIO_NATIVE if has_native else ToolCallFormat.LMSTUDIO_DEFAULT
+                ToolCallFormat.LMSTUDIO_NATIVE
+                if has_native
+                else ToolCallFormat.LMSTUDIO_DEFAULT
             )
             loader = _get_capability_loader()
             caps = loader.get_capabilities("lmstudio", self.model, format_hint)

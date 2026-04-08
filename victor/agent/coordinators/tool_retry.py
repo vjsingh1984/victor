@@ -111,7 +111,9 @@ class ToolRetryExecutor:
                 return cached, True, None
 
         if retry_config:
-            retry_enabled = retry_config.get("retry_enabled", self._config.retry_enabled)
+            retry_enabled = retry_config.get(
+                "retry_enabled", self._config.retry_enabled
+            )
             max_attempts = (
                 retry_config.get("max_attempts", self._config.max_retry_attempts)
                 if retry_enabled
@@ -151,7 +153,9 @@ class ToolRetryExecutor:
                             touched_paths = []
                             if "path" in tool_args:
                                 touched_paths.append(tool_args["path"])
-                            if "paths" in tool_args and isinstance(tool_args["paths"], list):
+                            if "paths" in tool_args and isinstance(
+                                tool_args["paths"], list
+                            ):
                                 touched_paths.extend(tool_args["paths"])
                             if touched_paths:
                                 effective_cache.invalidate_paths(touched_paths)
@@ -210,7 +214,9 @@ class ToolRetryExecutor:
                 # Check for non-retryable errors
                 from victor.core.errors import ToolNotFoundError, ToolValidationError
 
-                if isinstance(e, (ToolNotFoundError, ToolValidationError, PermissionError)):
+                if isinstance(
+                    e, (ToolNotFoundError, ToolValidationError, PermissionError)
+                ):
                     logger.error(f"Tool '{tool_name}' permanent failure: {e}")
                     return None, False, str(e)
 
@@ -225,7 +231,9 @@ class ToolRetryExecutor:
                     )
                     await asyncio.sleep(delay)
                 else:
-                    logger.error(f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}")
+                    logger.error(
+                        f"Tool '{tool_name}' failed after {max_attempts} attempts: {e}"
+                    )
                     return None, False, last_error
 
         # Should not reach here, but handle it anyway

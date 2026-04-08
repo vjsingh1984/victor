@@ -161,7 +161,9 @@ class PythonCodeValidator(BaseCodeValidator):
         # Check for external packages
         for pkg in imports_used:
             if pkg in self.EXTERNAL_PACKAGES:
-                warnings.append(f"Uses external package '{pkg}' - consider stdlib alternative")
+                warnings.append(
+                    f"Uses external package '{pkg}' - consider stdlib alternative"
+                )
 
         # Check for missing imports
         for module in modules_referenced:
@@ -182,7 +184,9 @@ class PythonCodeValidator(BaseCodeValidator):
 
             if missing_types and not has_typing_import:
                 missing_imports.append("typing")
-                errors.append(f"Uses type hints {missing_types} without importing from typing")
+                errors.append(
+                    f"Uses type hints {missing_types} without importing from typing"
+                )
 
         # Build result
         imports_valid = len(missing_imports) == 0
@@ -213,7 +217,9 @@ class PythonCodeValidator(BaseCodeValidator):
 
         # Add missing imports
         if validation.missing_imports:
-            fixed_code = self._add_missing_imports(fixed_code, list(validation.missing_imports))
+            fixed_code = self._add_missing_imports(
+                fixed_code, list(validation.missing_imports)
+            )
 
         return fixed_code
 
@@ -287,7 +293,9 @@ class PythonCodeValidator(BaseCodeValidator):
                 # Add specific typing imports
                 types_used = self._find_type_hint_usage(code)
                 if types_used:
-                    imports_to_add.append(f"from typing import {', '.join(sorted(types_used))}")
+                    imports_to_add.append(
+                        f"from typing import {', '.join(sorted(types_used))}"
+                    )
             else:
                 imports_to_add.append(f"import {module}")
 

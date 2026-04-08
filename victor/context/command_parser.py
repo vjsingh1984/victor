@@ -137,7 +137,9 @@ class URLResolver(ContextResolver):
             async with aiohttp.ClientSession() as session:
                 headers = {"User-Agent": self.user_agent}
                 async with session.get(
-                    url, timeout=aiohttp.ClientTimeout(total=self.timeout), headers=headers
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                    headers=headers,
                 ) as response:
                     if response.status != 200:
                         return ContextItem(
@@ -154,9 +156,7 @@ class URLResolver(ContextResolver):
                     # Truncate if too long
                     if len(content) > self.max_content_length:
                         content = content[: self.max_content_length]
-                        content += (
-                            f"\n\n[Content truncated at {self.max_content_length} characters]"
-                        )
+                        content += f"\n\n[Content truncated at {self.max_content_length} characters]"
 
                     return ContextItem(
                         source_type="url",
@@ -339,7 +339,9 @@ class FolderResolver(ContextResolver):
         lines = []
 
         try:
-            entries = sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+            entries = sorted(
+                path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
+            )
         except PermissionError:
             return f"{prefix}[Permission denied]\n"
 
@@ -357,7 +359,9 @@ class FolderResolver(ContextResolver):
 
             if entry.is_dir():
                 lines.append(f"{prefix}{connector}{entry.name}/\n")
-                subtree = self._build_tree(entry, prefix + extension, depth + 1, file_count)
+                subtree = self._build_tree(
+                    entry, prefix + extension, depth + 1, file_count
+                )
                 lines.append(subtree)
             else:
                 file_count[0] += 1
@@ -403,16 +407,25 @@ class FolderResolver(ContextResolver):
             # Add key file previews if enabled
             previews = ""
             if self.include_file_previews:
-                key_files = ["README.md", "README.rst", "pyproject.toml", "package.json"]
+                key_files = [
+                    "README.md",
+                    "README.rst",
+                    "pyproject.toml",
+                    "package.json",
+                ]
                 for key_file in key_files:
                     key_path = folder_path / key_file
                     if key_path.exists() and key_path.is_file():
                         try:
-                            content = key_path.read_text(encoding="utf-8", errors="replace")
+                            content = key_path.read_text(
+                                encoding="utf-8", errors="replace"
+                            )
                             lines = content.split("\n")[: self.preview_lines]
                             preview = "\n".join(lines)
                             if len(content.split("\n")) > self.preview_lines:
-                                preview += f"\n... ({len(content.split(chr(10)))} total lines)"
+                                preview += (
+                                    f"\n... ({len(content.split(chr(10)))} total lines)"
+                                )
                             previews += f"\n\n--- {key_file} ---\n{preview}"
                         except Exception:
                             pass

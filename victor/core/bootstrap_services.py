@@ -126,7 +126,9 @@ def bootstrap_new_services(
         provider_service = _create_provider_service(container)
         services_created["provider"] = provider_service
         container.register(
-            ProviderServiceProtocol, lambda c: provider_service, ServiceLifetime.SINGLETON
+            ProviderServiceProtocol,
+            lambda c: provider_service,
+            ServiceLifetime.SINGLETON,
         )
         logger.info("Bootstrapped ProviderService")
 
@@ -135,7 +137,9 @@ def bootstrap_new_services(
         recovery_service = _create_recovery_service(container)
         services_created["recovery"] = recovery_service
         container.register(
-            RecoveryServiceProtocol, lambda c: recovery_service, ServiceLifetime.SINGLETON
+            RecoveryServiceProtocol,
+            lambda c: recovery_service,
+            ServiceLifetime.SINGLETON,
         )
         logger.info("Bootstrapped RecoveryService")
 
@@ -147,7 +151,9 @@ def bootstrap_new_services(
             tool_executor=tool_executor,
         )
         services_created["tool"] = tool_service
-        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+        container.register(
+            ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped ToolService")
 
     # Bootstrap SessionService if enabled
@@ -167,7 +173,9 @@ def bootstrap_new_services(
         if decision_service is not None:
             logger.info("Bootstrapped LLMDecisionService with edge model")
 
-    if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+    if decision_service is None and feature_flags.is_enabled(
+        FeatureFlag.USE_LLM_DECISION_SERVICE
+    ):
         decision_service = _create_llm_decision_service(container)
         if decision_service is not None:
             logger.info("Bootstrapped LLMDecisionService with cloud provider")
@@ -195,7 +203,9 @@ def bootstrap_new_services(
             context_service=services_created.get("context"),
             recovery_service=services_created.get("recovery"),
         )
-        container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
+        container.register(
+            ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON
+        )
         logger.info("Bootstrapped ChatService")
 
 
@@ -208,7 +218,10 @@ def _create_context_service(container: ServiceContainer) -> "ContextService":
     Returns:
         Configured ContextService instance
     """
-    from victor.agent.services.context_service import ContextService, ContextServiceConfig
+    from victor.agent.services.context_service import (
+        ContextService,
+        ContextServiceConfig,
+    )
 
     config = ContextServiceConfig(
         max_tokens=100000,  # Default, can be overridden
@@ -375,7 +388,10 @@ def _create_edge_decision_service() -> Optional[Any]:
     Returns None if Ollama is unavailable.
     """
     try:
-        from victor.agent.edge_model import EdgeModelConfig, create_edge_decision_service
+        from victor.agent.edge_model import (
+            EdgeModelConfig,
+            create_edge_decision_service,
+        )
 
         config = EdgeModelConfig()
         return create_edge_decision_service(config)
@@ -416,7 +432,11 @@ def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
             return None
 
         # Get model name from provider if available
-        model = getattr(provider, "model", None) or getattr(provider, "model_name", None) or ""
+        model = (
+            getattr(provider, "model", None)
+            or getattr(provider, "model_name", None)
+            or ""
+        )
 
         config = LLMDecisionServiceConfig(
             confidence_threshold=0.7,

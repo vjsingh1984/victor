@@ -379,7 +379,9 @@ class SafetyRulesCapabilityProvider:
                 self._rule_cache[rule.category] = []
             self._rule_cache[rule.category].append(rule)
 
-    def check_operation(self, tool_name: str, args: List[str]) -> Tuple[bool, List[SafetyRule]]:
+    def check_operation(
+        self, tool_name: str, args: List[str]
+    ) -> Tuple[bool, List[SafetyRule]]:
         """Check if an operation is safe.
 
         Args:
@@ -427,7 +429,10 @@ class SafetyRulesCapabilityProvider:
         confirmations = []
 
         for rule in matching_rules:
-            if rule.action == SafetyAction.REQUIRE_CONFIRMATION and rule.confirmation_prompt:
+            if (
+                rule.action == SafetyAction.REQUIRE_CONFIRMATION
+                and rule.confirmation_prompt
+            ):
                 confirmations.append(rule.confirmation_prompt)
 
         return confirmations

@@ -149,7 +149,9 @@ class LocalProcessProvider(BaseServiceProvider):
                 logger.info(f"Process PID={handle.process_id} terminated gracefully")
             except asyncio.TimeoutError:
                 # Force kill
-                logger.warning(f"Process PID={handle.process_id} didn't exit, sending SIGKILL")
+                logger.warning(
+                    f"Process PID={handle.process_id} didn't exit, sending SIGKILL"
+                )
                 if sys.platform != "win32":
                     os.killpg(os.getpgid(process.pid), signal.SIGKILL)
                 else:
@@ -255,7 +257,9 @@ class PostgresLocalProvider(LocalProcessProvider):
 
             if process.returncode != 0:
                 stderr = await process.stderr.read()
-                raise ServiceStartError(config.name, f"pg_ctl failed: {stderr.decode()}")
+                raise ServiceStartError(
+                    config.name, f"pg_ctl failed: {stderr.decode()}"
+                )
 
             handle.state = ServiceState.STARTING
             handle.ports[5432] = port
@@ -265,7 +269,8 @@ class PostgresLocalProvider(LocalProcessProvider):
 
         except FileNotFoundError:
             raise ServiceStartError(
-                config.name, "PostgreSQL not found. Install with: brew install postgresql"
+                config.name,
+                "PostgreSQL not found. Install with: brew install postgresql",
             )
 
     async def _init_db(self) -> None:
@@ -307,7 +312,9 @@ class PostgresLocalProvider(LocalProcessProvider):
     async def _do_cleanup(self, handle: ServiceHandle) -> None:
         """Force stop PostgreSQL."""
         data_dir = handle.metadata.get("data_dir", str(self._pg_data_dir))
-        await asyncio.create_subprocess_exec("pg_ctl", "stop", "-D", data_dir, "-m", "immediate")
+        await asyncio.create_subprocess_exec(
+            "pg_ctl", "stop", "-D", data_dir, "-m", "immediate"
+        )
 
     async def get_logs(self, handle: ServiceHandle, tail: int = 100) -> str:
         """Get PostgreSQL server logs."""

@@ -311,7 +311,9 @@ class FeatureFlagManager:
                 data = yaml_safe_load(f)
 
             if not data or not isinstance(data, dict):
-                logger.warning(f"Invalid feature flag config: {self._config.config_path}")
+                logger.warning(
+                    f"Invalid feature flag config: {self._config.config_path}"
+                )
                 return
 
             features = data.get("features", {})

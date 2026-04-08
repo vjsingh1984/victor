@@ -202,7 +202,9 @@ class ToolExecutionError(ContextualError):
         elif "network" in error_str or "connection" in error_str:
             return "Check network connectivity. Try: ping example.com"
         elif "timeout" in error_str:
-            return "Operation timed out. Try again with a longer timeout or smaller input"
+            return (
+                "Operation timed out. Try again with a longer timeout or smaller input"
+            )
 
         return f"Check tool configuration and input parameters for '{operation}'"
 
@@ -248,7 +250,9 @@ class FileOperationError(ContextualError):
             elif "no space" in error_str:
                 return "Check disk space: df -h"
 
-        return f"Check path and permissions: ls -la '{os.path.dirname(self.path) or '.'}'"
+        return (
+            f"Check path and permissions: ls -la '{os.path.dirname(self.path) or '.'}'"
+        )
 
 
 class ConfigurationError(ContextualError):
@@ -478,12 +482,18 @@ def format_exception_for_user(error: Exception) -> str:
     # Permission errors
     if "permission" in str(error).lower():
         return (
-            f"{error}\n\n" "💡 Suggestion: Check file/directory permissions.\n" "Try: ls -la <path>"
+            f"{error}\n\n"
+            "💡 Suggestion: Check file/directory permissions.\n"
+            "Try: ls -la <path>"
         )
 
     # File not found
     if "not found" in str(error).lower():
-        return f"{error}\n\n" "💡 Suggestion: Verify the file/path exists.\n" "Try: ls <path>"
+        return (
+            f"{error}\n\n"
+            "💡 Suggestion: Verify the file/path exists.\n"
+            "Try: ls <path>"
+        )
 
     # Generic error with system info
     return (

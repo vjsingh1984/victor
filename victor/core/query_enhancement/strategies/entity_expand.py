@@ -135,7 +135,9 @@ class EntityExpandStrategy(BaseQueryEnhancementStrategy):
             metadata={"domain": context.domain, "no_expansion": True},
         )
 
-    def _get_expansion_terms(self, query: str, context: EnhancementContext) -> list[str]:
+    def _get_expansion_terms(
+        self, query: str, context: EnhancementContext
+    ) -> list[str]:
         """Extract expansion terms from context.
 
         Args:
