@@ -434,15 +434,11 @@ class VictorAgentAdapter:
         # A minimal set forces decisive tool use at each stage.
         BENCHMARK_TOOLS = {"read", "edit", "write", "grep", "ls", "shell"}
         try:
-            if hasattr(self.orchestrator, "tools"):
-                all_tools = set(self.orchestrator.tools.list_tools())
-                disable = all_tools - BENCHMARK_TOOLS
-                for tool_name in disable:
-                    self.orchestrator.tools.disable_tool(tool_name)
-                logger.info(
-                    f"Benchmark tool restriction: {len(BENCHMARK_TOOLS)} tools enabled "
-                    f"({', '.join(sorted(BENCHMARK_TOOLS))})"
-                )
+            self.orchestrator.set_enabled_tools(BENCHMARK_TOOLS)
+            logger.info(
+                f"Benchmark tool restriction: {len(BENCHMARK_TOOLS)} tools enabled "
+                f"({', '.join(sorted(BENCHMARK_TOOLS))})"
+            )
         except Exception as e:
             logger.debug(f"Could not restrict tools for benchmark: {e}")
 
