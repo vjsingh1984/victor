@@ -284,6 +284,14 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             if task.repo:
                 # Extract project name from repo URL (e.g., "astropy" from "astropy/astropy")
                 repo_name = task.repo.rstrip("/").split("/")[-1].replace(".git", "")
+
+                # Use framework's workspace dependency installer
+                from victor.context.workspace_setup import (
+                    ensure_project_importable,
+                )
+
+                await ensure_project_importable(repo_name, cached_repo)
+
                 try:
                     spec = __import__(repo_name)
                     site_pkg_dir = Path(spec.__file__).parent
