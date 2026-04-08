@@ -210,7 +210,16 @@ from victor.tools.filesystem import enforce_sandbox_path
     stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
-    keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+    keywords=[
+        "edit",
+        "modify",
+        "replace",
+        "create",
+        "delete",
+        "rename",
+        "file",
+        "text",
+    ],
     # Examples help LLMs understand correct parameter format
     examples=[
         'edit(ops=[{"type": "replace", "path": "config.py", "old_str": "DEBUG = True", "new_str": "DEBUG = False"}])',
@@ -400,7 +409,10 @@ async def edit(
 
         op_type = op.get("type")
         if not op_type:
-            return {"success": False, "error": f"Operation {i} missing required field: type"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: type",
+            }
 
         if op_type not in ["create", "modify", "delete", "rename", "replace"]:
             return {
@@ -409,7 +421,10 @@ async def edit(
             }
 
         if "path" not in op:
-            return {"success": False, "error": f"Operation {i} missing required field: path"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: path",
+            }
 
         # Validate type-specific requirements
         if op_type == "rename" and "new_path" not in op:
@@ -540,20 +555,49 @@ async def edit(
                 # Read current content
                 original_content = file_path.read_text(encoding="utf-8")
 
+                # Reject no-op edits (old_str == new_str)
+                if old_str == new_str:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"No-op edit rejected: old_str and new_str are identical "
+                            f"for {path}. Provide a different new_str to make an "
+                            f"actual change."
+                        ),
+                    }
+
                 # Check if old_str exists in file
                 occurrences = original_content.count(old_str)
                 if occurrences == 0:
                     # Build helpful error message
-                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
+                    old_str_preview = (
+                        old_str[:80] + "..." if len(old_str) > 80 else old_str
+                    )
                     old_str_first_line = old_str.split("\n")[0][:60]
 
                     # Try to find similar content to help debug
                     hint = ""
+                    context_str = ""
                     if old_str_first_line in original_content:
                         hint = (
                             f" The first line '{old_str_first_line}' exists in file but "
                             f"subsequent lines don't match. Check line endings and indentation."
                         )
+                        # Show surrounding file content to help model retry
+                        file_lines = original_content.splitlines()
+                        for i, line in enumerate(file_lines):
+                            if old_str_first_line in line:
+                                start = max(0, i - 3)
+                                end = min(len(file_lines), i + 8)
+                                numbered = [
+                                    f"{start + j + 1}: {file_lines[start + j]}"
+                                    for j in range(end - start)
+                                ]
+                                context_str = (
+                                    "\n\nActual file content around match:\n"
+                                    + "\n".join(numbered)
+                                )
+                                break
                     elif old_str.rstrip() in original_content:
                         hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
                     elif old_str.lstrip() in original_content:
@@ -564,7 +608,7 @@ async def edit(
                         "error": (
                             f"Replace operation failed: old_str not found in {path}.{hint} "
                             f"Make sure the string matches exactly including whitespace. "
-                            f"Searched for: {repr(old_str_preview)}"
+                            f"Searched for: {repr(old_str_preview)}{context_str}"
                         ),
                     }
                 if occurrences > 1:
@@ -590,7 +634,11 @@ async def edit(
                     original_content=original_content,
                     new_content=new_content,
                     tool_name="edit_files",
-                    tool_args={"type": "replace", "path": path, "old_str": old_str[:50]},
+                    tool_args={
+                        "type": "replace",
+                        "path": path,
+                        "old_str": old_str[:50],
+                    },
                 )
 
     except Exception as e:
@@ -660,7 +708,10 @@ async def edit(
         else:
             # Clear change group on failure
             tracker._current_group = None
-            return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
+            return {
+                "success": False,
+                "error": "Failed to commit changes. Transaction rolled back.",
+            }
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing

@@ -17,9 +17,14 @@ from __future__ import annotations
 """Bash command execution tool with readonly mode support."""
 
 import asyncio
+import logging
 import platform
+import re
 import shlex
+import shutil
 from typing import Any, Dict, List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
@@ -274,6 +279,68 @@ def get_allowed_readonly_commands() -> List[str]:
     return commands
 
 
+# =========================================================================
+# Command Optimizer Pipeline
+# =========================================================================
+# Pluggable chain of command optimizers applied before execution.
+# Each optimizer is a callable (str) -> str that may rewrite the command
+# for better performance. Optimizers are applied in registration order.
+# =========================================================================
+
+_command_optimizers: List[Any] = []
+
+
+def register_command_optimizer(optimizer: Any) -> Any:
+    """Register a command optimizer. Can be used as a decorator."""
+    _command_optimizers.append(optimizer)
+    return optimizer
+
+
+def optimize_command(cmd: str) -> str:
+    """Apply all registered command optimizers to a shell command."""
+    for opt in _command_optimizers:
+        cmd = opt(cmd)
+    return cmd
+
+
+@register_command_optimizer
+def _optimize_grep_to_rg(cmd: str) -> str:
+    """Replace slow recursive grep with ripgrep (rg) when available.
+
+    grep -r/-R on large repos can hang for minutes. ripgrep is 10-100x faster
+    because it respects .gitignore, uses memory-mapped I/O, and parallelizes.
+    Basic grep flags (-n, -i, -l, -c, -w, -e) are compatible with rg.
+    """
+    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(
+        r"^grep\s+-[a-zA-Z]*[rR]", cmd
+    ):
+        return cmd
+
+    if not shutil.which("rg"):
+        return cmd
+
+    # Replace 'grep' with 'rg' and remove -r/-R (rg is recursive by default)
+    optimized = re.sub(r"^grep\b", "rg", cmd)
+    optimized = re.sub(
+        r"\s-([a-zA-Z]*)r([a-zA-Z]*)",
+        lambda m: (f" -{m.group(1)}{m.group(2)}" if m.group(1) or m.group(2) else ""),
+        optimized,
+    )
+    optimized = re.sub(
+        r"\s-([a-zA-Z]*)R([a-zA-Z]*)",
+        lambda m: (f" -{m.group(1)}{m.group(2)}" if m.group(1) or m.group(2) else ""),
+        optimized,
+    )
+    # Clean up empty flag groups and extra whitespace
+    optimized = re.sub(r"\s-\s", " ", optimized)
+    optimized = re.sub(r"\s+", " ", optimized).strip()
+
+    if optimized != cmd:
+        logger.info(f"Shell optimizer: grep→rg rewrite: {cmd!r} → {optimized!r}")
+
+    return optimized
+
+
 def _is_dangerous(command: str) -> bool:
     """Check if command is potentially dangerous.
 
@@ -345,6 +412,9 @@ async def shell(
     if timeout is None:
         timeout = ProcessTimeouts.BASH_DEFAULT
 
+    # Apply command optimizer pipeline (grep→rg, etc.)
+    cmd = optimize_command(cmd)
+
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):
         return {
@@ -414,13 +484,17 @@ async def shell(
                 # Truncate stderr if too long, keeping first and last parts
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    stderr_preview = (
+                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    )
                 error_parts.append(f"stderr: {stderr_preview}")
             elif stdout_str.strip():
                 # Some commands output errors to stdout
                 stdout_preview = stdout_str.strip()
                 if len(stdout_preview) > 300:
-                    stdout_preview = stdout_preview[:150] + "..." + stdout_preview[-150:]
+                    stdout_preview = (
+                        stdout_preview[:150] + "..." + stdout_preview[-150:]
+                    )
                 error_parts.append(f"output: {stdout_preview}")
             result["error"] = "\n".join(error_parts)
 
@@ -572,6 +646,9 @@ async def shell_readonly(
     if timeout is None:
         timeout = ProcessTimeouts.BASH_DEFAULT
 
+    # Apply command optimizer pipeline (grep→rg, etc.)
+    cmd = optimize_command(cmd)
+
     # Validate working directory exists before execution
     effective_cwd = cwd or os.getcwd()
     if not os.path.isdir(effective_cwd):
@@ -638,7 +715,9 @@ async def shell_readonly(
             if stderr_str.strip():
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    stderr_preview = (
+                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
+                    )
                 error_parts.append(f"stderr: {stderr_preview}")
             result["error"] = "\n".join(error_parts)
 

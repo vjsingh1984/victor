@@ -68,10 +68,14 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
         from victor.tools.metadata_registry import register_tool_metadata
 
         register_tool_metadata(tool_instance)
-        logger.debug(f"Auto-registered tool '{tool_instance.name}' with metadata registry")
+        logger.debug(
+            f"Auto-registered tool '{tool_instance.name}' with metadata registry"
+        )
     except ImportError:
         # metadata_registry not available (e.g., during early import stages)
-        logger.debug(f"Could not auto-register tool '{tool_instance.name}': registry not available")
+        logger.debug(
+            f"Could not auto-register tool '{tool_instance.name}': registry not available"
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -247,6 +251,9 @@ def tool(
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
     availability_check: Optional[Callable[[], bool]] = None,
+    # Per-tool timeout override (seconds). Overrides pipeline's per_tool_timeout_seconds.
+    # None = use pipeline default (30s). Set higher for slow tools (code_search, web_search).
+    timeout: Optional[float] = None,
 ) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
@@ -354,6 +361,7 @@ def tool(
         "progress_params": progress_params,
         "execution_category": execution_category,
         "availability_check": availability_check,
+        "timeout": timeout,
     }
 
     # Capture selection/approval metadata parameters
@@ -375,6 +383,7 @@ def tool(
 
         # Mark as tool for dynamic discovery
         wrapper._is_tool = True  # type: ignore[attr-defined]
+        wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
         # We will attach a class to the wrapper that is the actual tool
         wrapper.Tool = _create_tool_class(
             fn,
@@ -570,7 +579,9 @@ def _create_tool_class(
             self._mandatory_keywords = _mandatory_keywords
             self._task_types = _task_types
             self._progress_params = _progress_params
-            self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
+            self._execution_category = (
+                _execution_category or ExecutionCategory.READ_ONLY
+            )
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
 
@@ -697,7 +708,10 @@ def _create_tool_class(
         @property
         def requires_approval(self) -> bool:
             """Check if this tool requires user approval before execution."""
-            return self._access_mode.requires_approval or self._danger_level.requires_confirmation
+            return (
+                self._access_mode.requires_approval
+                or self._danger_level.requires_confirmation
+            )
 
         @property
         def is_safe(self) -> bool:
@@ -730,7 +744,9 @@ def _create_tool_class(
             try:
                 return self._availability_check()
             except Exception as e:
-                logger.warning(f"Availability check for tool '{self._name}' raised exception: {e}")
+                logger.warning(
+                    f"Availability check for tool '{self._name}' raised exception: {e}"
+                )
                 return False
 
         def get_warning_message(self) -> str:
@@ -796,7 +812,11 @@ def _create_tool_class(
                             metadata=result.get("metadata"),
                         )
                     # Some tools return {"error": "..."} without success field
-                    if "error" in result and "success" not in result and len(result) <= 2:
+                    if (
+                        "error" in result
+                        and "success" not in result
+                        and len(result) <= 2
+                    ):
                         return ToolResult(
                             success=False,
                             output=None,
