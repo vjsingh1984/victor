@@ -1976,21 +1976,12 @@ class ToolSelector(ModeAwareMixin):
     def _should_use_edge_for_tools(self) -> bool:
         """Check if edge model should be used for tool filtering.
 
-        Returns False when stage_detection_order starts with "heuristic"
-        (default) — the semantic+keyword pipeline is sufficient.
-        Returns True when "llm" is first in the order (LLM-primary mode).
+        Uses the unified decision chain config. Only uses edge model
+        when "llm" is primary for tool_selection decisions.
         """
-        try:
-            from victor.config.settings import load_settings
+        from victor.agent.decisions.chain import is_llm_primary
 
-            settings = load_settings()
-            pipeline = getattr(settings, "pipeline", None)
-            if pipeline and hasattr(pipeline, "stage_detection_order"):
-                order = pipeline.stage_detection_order
-                return len(order) > 0 and order[0] == "llm"
-        except Exception:
-            pass
-        return False  # Default: don't use edge for tools
+        return is_llm_primary("tool_selection")
 
     def _apply_edge_model_filter(
         self,

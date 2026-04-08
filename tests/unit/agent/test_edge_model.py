@@ -35,7 +35,7 @@ class TestEdgeModelConfig:
         config = EdgeModelConfig()
         assert config.enabled is True
         assert config.provider == "ollama"
-        assert config.model == "qwen2.5-coder:1.5b"
+        assert config.model == "qwen3.5:2b"
         assert config.timeout_ms == 2000
         assert config.max_tokens == 50
         assert config.max_tools == 6

@@ -779,13 +779,39 @@ class UISettings(_BaseModel):
 class PipelineSettings(_BaseModel):
     """Intelligent agent pipeline, quality scoring, and recovery."""
 
-    # Stage detection strategy order — configurable fallback chain.
-    # "heuristic": Fast keyword matching (default first — proven at 60% SWE-bench)
-    # "llm": LLM decision service via edge/main model (tiebreaker)
-    # Examples: ["heuristic", "llm"], ["llm", "heuristic"], ["heuristic"]
-    stage_detection_order: List[str] = Field(
+    # =================================================================
+    # Decision Chain Configuration
+    # =================================================================
+    # Unified fallback chain for ALL decision points in the agentic loop.
+    # Each decision type maps to an ordered list of strategies:
+    #   "heuristic" — fast keyword/pattern/rule-based (default first)
+    #   "llm"       — LLM decision service via edge or main model
+    #
+    # The chain tries strategies in order. If a strategy returns a result
+    # with confidence >= its threshold, it's used. Otherwise, next in chain.
+    #
+    # Default: heuristic-first for all decisions (proven at 60% SWE-bench).
+    # Override per decision type or globally via decision_chain_default.
+    #
+    # Example ~/.victor/config.yaml:
+    #   pipeline:
+    #     decision_chain_default: ["heuristic", "llm"]
+    #     decision_chain:
+    #       stage_detection: ["heuristic", "llm"]
+    #       tool_selection: ["heuristic"]        # no LLM for tools
+    #       task_completion: ["llm", "heuristic"] # LLM-first for completion
+    # =================================================================
+
+    # Global default chain — applied to any decision type not in decision_chain
+    decision_chain_default: List[str] = Field(
         default=["heuristic", "llm"]
     )
+
+    # Per-decision-type overrides (keys match DecisionType enum values)
+    decision_chain: Dict[str, List[str]] = Field(default_factory=dict)
+
+    # Heuristic confidence threshold — below this, fallback to next in chain
+    heuristic_confidence_threshold: float = 0.7
 
     intelligent_pipeline_enabled: bool = True
     intelligent_quality_scoring: bool = True

@@ -275,10 +275,9 @@ class ConversationStateMachine:
     # while still preventing thrashing
     TRANSITION_COOLDOWN_SECONDS: float = 2.0
 
-    # Stage detection strategy order — loaded from settings.pipeline.stage_detection_order.
-    # Default: ["heuristic", "llm"] — heuristics first, LLM as tiebreaker.
-    # Override per-instance or via ~/.victor/config.yaml
-    STAGE_DETECTION_ORDER: List[str] = ["heuristic", "llm"]
+    # Stage detection order is now managed by unified decision chain config.
+    # See: victor.agent.decisions.chain.get_decision_chain("stage_detection")
+    # Configure via settings.pipeline.decision_chain or decision_chain_default
 
     # Thrashing detection: if >MAX transitions in WINDOW seconds, apply longer cooldown.
     # Tuned conservatively — natural EXECUTION↔READING cycling (read-edit-read) is
@@ -323,16 +322,7 @@ class ConversationStateMachine:
         self._max_history_size = max_history_size
         self._transition_history: List[Dict[str, Any]] = []
 
-        # Load stage detection order from settings
-        try:
-            from victor.config.settings import load_settings
-
-            settings = load_settings()
-            pipeline = getattr(settings, "pipeline", None)
-            if pipeline and hasattr(pipeline, "stage_detection_order"):
-                self.STAGE_DETECTION_ORDER = pipeline.stage_detection_order
-        except Exception:
-            pass  # Use class default
+        # Stage detection order managed by decisions.chain module
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
 
@@ -503,7 +493,9 @@ class ConversationStateMachine:
         Returns:
             Detected stage or None
         """
-        for strategy in self.STAGE_DETECTION_ORDER:
+        from victor.agent.decisions.chain import get_decision_chain
+
+        for strategy in get_decision_chain("stage_detection"):
             result = None
             if strategy == "heuristic":
                 result = self._detect_stage_heuristic(content)
