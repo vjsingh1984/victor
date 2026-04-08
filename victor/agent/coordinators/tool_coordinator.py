@@ -14,37 +14,8 @@
 
 """Tool Coordinator - Coordinates tool selection, budgeting, and execution.
 
-This module extracts tool-related coordination logic from AgentOrchestrator,
-providing a focused interface for:
-- Tool selection (semantic + keyword-based)
-- Tool budget management and enforcement
-- Tool access control and enable/disable
-- Tool execution coordination via ToolPipeline
-- Tool alias resolution and shell variant handling
-- Tool call parsing and validation
-
-Design Philosophy:
-- Single Responsibility: Coordinates all tool-related operations
-- Composable: Works with existing ToolPipeline, ToolSelector, etc.
-- Observable: Provides budget/execution metrics
-- Backward Compatible: Maintains API compatibility with orchestrator
-
-Usage:
-    coordinator = ToolCoordinator(
-        tool_pipeline=pipeline,
-        tool_selector=selector,
-        tool_registry=registry,
-        budget_manager=budget_mgr,
-    )
-
-    # Select tools for current context
-    tools = await coordinator.select_tools(context)
-
-    # Check budget
-    remaining = coordinator.get_remaining_budget()
-
-    # Execute tool calls
-    result = await coordinator.execute_tool_calls(tool_calls)
+Extracts tool-related coordination from AgentOrchestrator: selection,
+budget management, access control, execution, alias resolution, and parsing.
 """
 
 from __future__ import annotations
@@ -81,7 +52,10 @@ if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutionResult
     from victor.storage.cache.tool_cache import ToolCache
     from victor.tools.base import BaseTool, ToolRegistry
-    from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+    from victor.agent.argument_normalizer import (
+        ArgumentNormalizer,
+        NormalizationStrategy,
+    )
     from victor.agent.tool_calling import ToolCallingAdapter, ToolCallParseResult
     from victor.agent.protocols import ToolAccessContext
 
@@ -215,8 +189,12 @@ class ToolCoordinator:
         tool_adapter: Optional["ToolCallingAdapter"] = None,
         tool_access_controller: Optional[Any] = None,
         config: Optional[ToolCoordinatorConfig] = None,
-        on_selection_complete: Optional[Callable[[str, int], None]] = None,  # method, count
-        on_budget_warning: Optional[Callable[[int, int], None]] = None,  # remaining, total
+        on_selection_complete: Optional[
+            Callable[[str, int], None]
+        ] = None,  # method, count
+        on_budget_warning: Optional[
+            Callable[[int, int], None]
+        ] = None,  # remaining, total
         on_tool_complete: Optional[Callable[[ToolExecutionResult], None]] = None,
     ) -> None:
         """Initialize the ToolCoordinator.
@@ -264,7 +242,9 @@ class ToolCoordinator:
         self._tool_call_parser = ToolCallParser()
         self._tool_call_validator = ToolCallValidator()
         self._observability = ToolObservabilityHandler(self)
-        self._retry_executor = ToolRetryExecutor(self._config, self._pipeline, self._cache)
+        self._retry_executor = ToolRetryExecutor(
+            self._config, self._pipeline, self._cache
+        )
 
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
@@ -363,7 +343,9 @@ class ToolCoordinator:
         effective_budget = int(self._config.default_budget * multiplier)
         self._total_budget = effective_budget
 
-        logger.debug(f"Budget multiplier set to {multiplier}, effective budget: {effective_budget}")
+        logger.debug(
+            f"Budget multiplier set to {multiplier}, effective budget: {effective_budget}"
+        )
 
     def is_budget_exhausted(self) -> bool:
         """Check if tool budget is exhausted.
@@ -439,10 +421,6 @@ class ToolCoordinator:
             logger.warning(f"Tool selection failed: {e}, returning empty list")
             return []
 
-    def get_selection_stats(self) -> Dict[str, Any]:
-        """Get tool selection statistics."""
-        return self._observability.get_selection_stats()
-
     # =====================================================================
     # Tool Access Control
     # =====================================================================
@@ -476,14 +454,6 @@ class ToolCoordinator:
         # Return framework-set tools
         if self._enabled_tools:
             return self._enabled_tools
-
-        # Fall back to orchestrator's enabled tools (if set before coordinator was initialized)
-        if hasattr(self, "_orchestrator") and self._orchestrator:
-            orch_tools = getattr(self._orchestrator, "_enabled_tools", None)
-            if orch_tools:
-                # Sync to coordinator's state for future access
-                self._enabled_tools = orch_tools
-                return orch_tools
 
         # Fall back to all available tools
         return self.get_available_tools()
@@ -557,7 +527,9 @@ class ToolCoordinator:
 
         return ToolAccessContext(
             session_enabled_tools=self._enabled_tools,
-            current_mode=(self._mode_controller.config.name if self._mode_controller else None),
+            current_mode=(
+                self._mode_controller.config.name if self._mode_controller else None
+            ),
         )
 
     # =====================================================================
@@ -598,7 +570,10 @@ class ToolCoordinator:
         # Check mode controller for BUILD mode (allows all tools including shell)
         if self._mode_controller:
             config = self._mode_controller.config
-            if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
+            if (
+                config.allow_all_tools
+                and ToolNames.SHELL not in config.disallowed_tools
+            ):
                 logger.debug(
                     f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)"
                 )
@@ -606,16 +581,22 @@ class ToolCoordinator:
 
         # Check if full shell is enabled first
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
+            logger.debug(
+                f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)"
+            )
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
+            logger.debug(
+                f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)"
+            )
             return ToolNames.SHELL_READONLY
 
         # Neither enabled - return canonical name (will fail validation)
-        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+        logger.debug(
+            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
+        )
         return canonical
 
     # =====================================================================
@@ -706,7 +687,9 @@ class ToolCoordinator:
         call_count = len(tool_calls)
 
         if remaining < call_count:
-            logger.warning(f"Insufficient budget: {remaining} remaining, {call_count} requested")
+            logger.warning(
+                f"Insufficient budget: {remaining} remaining, {call_count} requested"
+            )
 
         # Build execution context
         execution_context = {}
@@ -725,7 +708,9 @@ class ToolCoordinator:
         )
 
         # Update tracking
-        successful = result.successful_calls if hasattr(result, "successful_calls") else 0
+        successful = (
+            result.successful_calls if hasattr(result, "successful_calls") else 0
+        )
         self._execution_count += successful
         self.consume_budget(successful)
 
@@ -766,21 +751,7 @@ class ToolCoordinator:
         content: str,
         raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> "ToolCallParseResult":
-        """Parse tool calls using the tool calling adapter.
-
-        Handles:
-        1. Native tool calls from provider
-        2. JSON fallback parsing
-        3. XML fallback parsing
-        4. Tool name validation
-
-        Args:
-            content: Response content text
-            raw_tool_calls: Native tool_calls from provider (if any)
-
-        Returns:
-            ToolCallParseResult with parsed tool calls and metadata
-        """
+        """Parse tool calls via adapter with native/JSON/XML fallbacks."""
         if not self._tool_adapter:
             from victor.agent.tool_calling import ToolCallParseResult
 
@@ -812,22 +783,7 @@ class ToolCoordinator:
         full_content: str,
         tool_adapter: Any,
     ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-        """Parse, validate, and normalize tool calls from provider response.
-
-        Handles:
-        1. Fallback parsing from content if no native tool calls
-        2. Normalization to ensure tool_calls are dicts
-        3. Filtering out disabled/invalid tool names
-        4. Coercing arguments to dicts (some providers send JSON strings)
-
-        Args:
-            tool_calls: Native tool calls from provider (may be None)
-            full_content: Full response content for fallback parsing
-            tool_adapter: ToolCallingAdapter for fallback parsing
-
-        Returns:
-            Tuple of (validated_tool_calls, remaining_content)
-        """
+        """Parse, validate, normalize, and filter tool calls from provider response."""
         # Use unified adapter-based tool call parsing with fallbacks
         if not tool_calls and full_content:
             logger.debug(
@@ -854,7 +810,9 @@ class ToolCoordinator:
             if len(normalized_tool_calls) != len(tool_calls):
                 logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
             tool_calls = normalized_tool_calls or None
-            logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
+            logger.debug(
+                f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls"
+            )
 
         # Filter out invalid/hallucinated tool names early
         if tool_calls:
@@ -927,6 +885,36 @@ class ToolCoordinator:
     # Tool Completion Tracking
     # =====================================================================
 
+    # =====================================================================
+    # Dependency Injection
+    # =====================================================================
+
+    def set_mode_controller(self, mode_controller: Any) -> None:
+        """Set the mode controller for tool access control."""
+        self._mode_controller = mode_controller
+
+    def set_tool_planner(self, tool_planner: Any) -> None:
+        """Set the tool planner for goal-based tool selection."""
+        self._tool_planner = tool_planner
+
+    def set_orchestrator_reference(self, orchestrator: Any) -> None:
+        """Set orchestrator reference for callback context.
+
+        Deprecated: Use set_enabled_tools() directly instead of passing
+        the full orchestrator. Kept for backward compatibility.
+        """
+        orch_tools = getattr(orchestrator, "_enabled_tools", None)
+        if orch_tools:
+            self.set_enabled_tools(orch_tools)
+
+    def get_tool_usage_stats(self) -> Dict[str, Any]:
+        """Get comprehensive tool usage statistics."""
+        return self._observability.get_tool_usage_stats()
+
+    # =====================================================================
+    # Tool Completion Tracking
+    # =====================================================================
+
     def on_tool_complete(
         self,
         result: Any,
@@ -953,54 +941,6 @@ class ToolCoordinator:
         )
 
     # =====================================================================
-    # Statistics and Tracking
-    # =====================================================================
-
-    def get_execution_stats(self) -> Dict[str, Any]:
-        """Get tool execution statistics."""
-        return self._observability.get_execution_stats()
-
-    def get_tool_usage_stats(self) -> Dict[str, Any]:
-        """Get comprehensive tool usage statistics."""
-        return self._observability.get_tool_usage_stats()
-
-    def clear_selection_history(self) -> None:
-        """Clear the selection history."""
-        self._observability.clear_selection_history()
-
-    def clear_failed_signatures(self) -> None:
-        """Clear the failed tool signatures cache."""
-        self._observability.clear_failed_signatures()
-
-    # =====================================================================
-    # Dependency Injection
-    # =====================================================================
-
-    def set_mode_controller(self, mode_controller: Any) -> None:
-        """Set the mode controller for tool access control.
-
-        Args:
-            mode_controller: ModeController instance
-        """
-        self._mode_controller = mode_controller
-
-    def set_tool_planner(self, tool_planner: Any) -> None:
-        """Set the tool planner for goal-based tool selection.
-
-        Args:
-            tool_planner: ToolPlanner instance
-        """
-        self._tool_planner = tool_planner
-
-    def set_orchestrator_reference(self, orchestrator: Any) -> None:
-        """Set orchestrator reference for callback context.
-
-        Args:
-            orchestrator: AgentOrchestrator instance
-        """
-        self._orchestrator = orchestrator
-
-    # =====================================================================
     # Tool Call Validation & Normalization
     # =====================================================================
 
@@ -1010,20 +950,7 @@ class ToolCoordinator:
         sanitizer: Any,
         is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
     ) -> "ToolCallValidation":
-        """Validate a single tool call structure, name, and enabled status.
-
-        Encapsulates structure checks, name format validation, alias resolution,
-        and enabled-tool checking.
-
-        Args:
-            tool_call: Raw tool call dict from the model
-            sanitizer: ResponseSanitizer with is_valid_tool_name()
-            is_tool_enabled_fn: Optional callback to check if tool is enabled.
-                Defaults to self.is_tool_enabled.
-
-        Returns:
-            ToolCallValidation with validation result
-        """
+        """Validate a tool call's structure, name, and enabled status."""
         _is_enabled = is_tool_enabled_fn or self.is_tool_enabled
         # Structure check
         if not isinstance(tool_call, dict):
@@ -1109,7 +1036,9 @@ class ToolCoordinator:
                 canonical, tool_call.get("arguments", {})
             )
             if not schema_result.valid:
-                logger.warning(f"Schema validation: {canonical}: {schema_result.errors}")
+                logger.warning(
+                    f"Schema validation: {canonical}: {schema_result.errors}"
+                )
 
         return ToolCallValidation(
             valid=True,
@@ -1126,25 +1055,11 @@ class ToolCoordinator:
         tool_adapter: Any,
         failed_signatures: Optional[Set[Tuple[str, str]]] = None,
     ) -> "NormalizedArgs":
-        """Normalize tool arguments through all stages.
-
-        Encapsulates: JSON string parsing, ArgumentNormalizer, ToolCallingAdapter,
-        git operation inference, and dedup signature computation.
-
-        Args:
-            tool_name: Canonical tool name
-            original_name: Original (alias) tool name from the model
-            raw_args: Raw arguments from tool call
-            argument_normalizer: ArgumentNormalizer instance
-            tool_adapter: ToolCallingAdapter instance
-            failed_signatures: Set of previously failed (name, args_json) tuples.
-                Defaults to self._failed_tool_signatures.
-
-        Returns:
-            NormalizedArgs with normalized arguments and metadata
-        """
+        """Normalize tool arguments through all stages (JSON parsing, normalization, dedup)."""
         _failed = (
-            failed_signatures if failed_signatures is not None else self._failed_tool_signatures
+            failed_signatures
+            if failed_signatures is not None
+            else self._failed_tool_signatures
         )
         import ast as _ast
 
@@ -1165,7 +1080,9 @@ class ToolCoordinator:
             tool_args = {}
 
         # Stage 2: ArgumentNormalizer (handles malformed JSON syntax)
-        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
+        normalized_args, strategy = argument_normalizer.normalize_arguments(
+            tool_args, tool_name
+        )
 
         # Stage 3: ToolCallingAdapter (handles missing required params)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
@@ -1175,7 +1092,10 @@ class ToolCoordinator:
 
         # Stage 5: Compute dedup signature
         try:
-            signature = (tool_name, json.dumps(normalized_args, sort_keys=True, default=str))
+            signature = (
+                tool_name,
+                json.dumps(normalized_args, sort_keys=True, default=str),
+            )
         except Exception:
             signature = (tool_name, str(normalized_args))
 

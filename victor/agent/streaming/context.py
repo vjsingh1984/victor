@@ -70,7 +70,9 @@ class StreamingChatContext:
     complexity_tool_budget: Optional[int] = None
     is_analysis_task: bool = False
     is_action_task: bool = False
-    is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
+    is_complex_task: bool = (
+        False  # GAP-16: Track COMPLEX complexity for lenient progress checking
+    )
     needs_execution: bool = False
     coarse_task_type: str = "default"
 
@@ -210,7 +212,10 @@ class StreamingChatContext:
 
     def is_approaching_budget_limit(self, warning_threshold: int = 250) -> bool:
         """Check if approaching budget limit."""
-        return self.tool_calls_used >= warning_threshold and self.get_remaining_budget() > 0
+        return (
+            self.tool_calls_used >= warning_threshold
+            and self.get_remaining_budget() > 0
+        )
 
     def record_tool_execution(self, count: int = 1) -> None:
         """Record tool calls used."""
@@ -243,8 +248,12 @@ class StreamingChatContext:
 
         # Check unique resources accessed
         # GAP-16: Include is_complex_task for lenient threshold calculation
-        requires_lenient = self.is_analysis_task or self.is_action_task or self.is_complex_task
-        threshold = self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
+        requires_lenient = (
+            self.is_analysis_task or self.is_action_task or self.is_complex_task
+        )
+        threshold = (
+            self.tool_calls_used // 4 if requires_lenient else self.tool_calls_used // 2
+        )
         return len(self.unique_resources) >= threshold
 
     def update_quality_score(self, score: float) -> None:

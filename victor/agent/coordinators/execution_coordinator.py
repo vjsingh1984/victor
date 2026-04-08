@@ -132,11 +132,15 @@ class ExecutionCoordinator:
         # Initialize tracking for this conversation turn
         self._tool_context.tool_calls_used = 0
         failure_context = ToolFailureContext()
-        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
+        max_iterations_setting = getattr(
+            self._chat_context.settings, "chat_max_iterations", 10
+        )
         iteration = 0
 
         # Classify task complexity for appropriate budgeting
-        task_classification = self._provider_context.task_classifier.classify(user_message)
+        task_classification = self._provider_context.task_classifier.classify(
+            user_message
+        )
         # Ensure at least 1 iteration is always allowed
         task_iteration_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(
@@ -147,6 +151,8 @@ class ExecutionCoordinator:
 
         # Agentic loop: continue until no tool calls or budget exhausted
         final_response: Optional[CompletionResponse] = None
+        consecutive_zero_tool_turns = 0
+        MAX_ZERO_TOOL_TURNS = 3  # Nudge after 2, break after 3
 
         while iteration < iteration_budget:
             iteration += 1
@@ -185,8 +191,11 @@ class ExecutionCoordinator:
 
             # Check if model wants to use tools
             if response.tool_calls:
+                consecutive_zero_tool_turns = 0
                 # Handle tool calls and track results
-                tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
+                tool_results = await self._tool_context._handle_tool_calls(
+                    response.tool_calls
+                )
 
                 # Update failure context
                 for result in tool_results:
@@ -199,12 +208,55 @@ class ExecutionCoordinator:
                 # Continue loop to get follow-up response
                 continue
 
-            # No tool calls - this is the final response
-            final_response = response
-            break
+            # No tool calls — check if agent is stuck or truly done
+            consecutive_zero_tool_turns += 1
+
+            if consecutive_zero_tool_turns >= MAX_ZERO_TOOL_TURNS:
+                # Agent has been chatting without tools for too many turns
+                logger.warning(
+                    "Agent stuck: %d turns without tool calls, breaking loop",
+                    consecutive_zero_tool_turns,
+                )
+                final_response = response
+                break
+
+            if consecutive_zero_tool_turns >= 2 and tools:
+                # Nudge: inject tool-usage prompt and continue
+                logger.info(
+                    "Zero-tool nudge: %d turns without tools, prompting",
+                    consecutive_zero_tool_turns,
+                )
+                nudge = (
+                    "You have not called any tools in the last "
+                    f"{consecutive_zero_tool_turns} turns. You MUST use a tool now "
+                    "(read, edit, write, shell) to make progress on the task. "
+                    "Do not respond with text only."
+                )
+                self._chat_context.add_message("user", nudge)
+
+                # Budget awareness: warn when past halfway with no tool calls
+                if iteration > iteration_budget // 2:
+                    remaining = iteration_budget - iteration
+                    self._chat_context.add_message(
+                        "system",
+                        f"WARNING: {remaining} turns remaining out of {iteration_budget}. "
+                        "Make your edits NOW.",
+                    )
+                continue
+
+            # First turn with no tool calls — allow it (model may be
+            # providing a final answer after successfully using tools)
+            if self._tool_context.tool_calls_used > 0:
+                final_response = response
+                break
+
+            # No tools ever called — continue to give the model another chance
+            continue
 
         # Ensure we have a complete response
-        final_response = await self._ensure_complete_response(final_response, failure_context)
+        final_response = await self._ensure_complete_response(
+            final_response, failure_context
+        )
 
         return final_response
 
@@ -265,7 +317,9 @@ class ExecutionCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
+        tools = self._tool_context.tool_selector.prioritize_by_stage(
+            user_message, tools
+        )
 
         return tools
 
@@ -306,15 +360,15 @@ class ExecutionCoordinator:
             if self._token_tracker is not None:
                 self._token_tracker.accumulate(response.usage)
             else:
-                self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
-                    "prompt_tokens", 0
-                )
+                self._chat_context._cumulative_token_usage[
+                    "prompt_tokens"
+                ] += response.usage.get("prompt_tokens", 0)
                 self._chat_context._cumulative_token_usage[
                     "completion_tokens"
                 ] += response.usage.get("completion_tokens", 0)
-                self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
-                    "total_tokens", 0
-                )
+                self._chat_context._cumulative_token_usage[
+                    "total_tokens"
+                ] += response.usage.get("total_tokens", 0)
 
     async def _check_context_compaction(
         self,
@@ -361,12 +415,16 @@ class ExecutionCoordinator:
             return final_response
 
         # Use response completer to generate a response
-        completion_result = await self._provider_context.response_completer.ensure_response(
-            messages=self._chat_context.messages,
-            model=self._provider_context.model,
-            temperature=self._provider_context.temperature,
-            max_tokens=self._provider_context.max_tokens,
-            failure_context=failure_context if failure_context.failed_tools else None,
+        completion_result = (
+            await self._provider_context.response_completer.ensure_response(
+                messages=self._chat_context.messages,
+                model=self._provider_context.model,
+                temperature=self._provider_context.temperature,
+                max_tokens=self._provider_context.max_tokens,
+                failure_context=(
+                    failure_context if failure_context.failed_tools else None
+                ),
+            )
         )
 
         if completion_result.content:
@@ -379,7 +437,8 @@ class ExecutionCoordinator:
 
         # Last resort fallback
         fallback_content = (
-            "I was unable to generate a complete response. " "Please try rephrasing your request."
+            "I was unable to generate a complete response. "
+            "Please try rephrasing your request."
         )
         if failure_context.failed_tools:
             fallback_content = (

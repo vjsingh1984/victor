@@ -142,115 +142,68 @@ def chat_coordinator(mock_orchestrator):
 
 
 class TestExtractRequiredFilesFromPrompt:
-    """Tests for _extract_required_files_from_prompt."""
+    """Tests for _extract_required_files_from_prompt (moved to streaming.pipeline)."""
 
-    def test_extract_absolute_paths(self, chat_coordinator):
+    def test_extract_absolute_paths(self):
         """Extract absolute file paths from message."""
-        result = chat_coordinator._extract_required_files_from_prompt(
+        from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
+
+        result = _extract_required_files_from_prompt(
             "Please fix /home/user/project/main.py and /home/user/project/utils.py"
         )
-        assert set(result) == {"/home/user/project/main.py", "/home/user/project/utils.py"}
+        assert set(result) == {
+            "/home/user/project/main.py",
+            "/home/user/project/utils.py",
+        }
 
-    def test_extract_relative_paths(self, chat_coordinator):
+    def test_extract_relative_paths(self):
         """Extract relative file paths from message."""
-        result = chat_coordinator._extract_required_files_from_prompt(
+        from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
+
+        result = _extract_required_files_from_prompt(
             "Check ./src/main.py and ../utils/helper.py"
         )
         assert set(result) == {"./src/main.py", "../utils/helper.py"}
 
-    def test_extract_mixed_paths(self, chat_coordinator):
+    def test_extract_mixed_paths(self):
         """Extract mixed path types."""
-        result = chat_coordinator._extract_required_files_from_prompt(
+        from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
+
+        result = _extract_required_files_from_prompt(
             "Review /absolute/path.py and ./relative/path.py"
         )
         assert set(result) == {"/absolute/path.py", "./relative/path.py"}
 
-    def test_deduplicate_paths(self, chat_coordinator):
+    def test_deduplicate_paths(self):
         """Remove duplicate paths."""
-        result = chat_coordinator._extract_required_files_from_prompt(
+        from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
+
+        result = _extract_required_files_from_prompt(
             "Fix ./file.py and also fix ./file.py and /abs/file.py"
         )
         assert len(result) == 2  # Deduplicated: ./file.py and /abs/file.py
 
-    def test_no_paths_returns_empty(self, chat_coordinator):
+    def test_no_paths_returns_empty(self):
         """Return empty list when no paths found."""
-        result = chat_coordinator._extract_required_files_from_prompt("Hello, how are you today?")
+        from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
+
+        result = _extract_required_files_from_prompt("Hello, how are you today?")
         assert result == []
 
 
 class TestExtractRequiredOutputsFromPrompt:
-    """Tests for _extract_required_outputs_from_prompt."""
+    """Tests for _extract_required_outputs_from_prompt (moved to streaming.pipeline)."""
 
-    def test_returns_empty_list(self, chat_coordinator):
+    def test_returns_empty_list(self):
         """Always returns empty list as outputs are advisory."""
-        result = chat_coordinator._extract_required_outputs_from_prompt(
+        from victor.agent.streaming.pipeline import (
+            _extract_required_outputs_from_prompt,
+        )
+
+        result = _extract_required_outputs_from_prompt(
             "Create output.txt and results.json"
         )
         assert result == []
-
-
-class TestGetMaxContextChars:
-    """Tests for _get_max_context_chars."""
-
-    def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
-        """Delegates to orchestrator's _get_max_context_chars."""
-        mock_orchestrator._get_max_context_chars.return_value = 150000
-        result = chat_coordinator._get_max_context_chars()
-        assert result == 150000
-        mock_orchestrator._get_max_context_chars.assert_called_once()
-
-
-class TestClassifyTaskKeywords:
-    """Tests for _classify_task_keywords."""
-
-    def test_delegates_to_task_analyzer(self, chat_coordinator, mock_orchestrator):
-        """Delegates to orchestrator's task analyzer."""
-        mock_orchestrator._task_analyzer.classify_task_keywords.return_value = {
-            "is_analysis_task": True,
-            "is_action_task": False,
-            "needs_execution": False,
-            "coarse_task_type": "analysis",
-        }
-        result = chat_coordinator._classify_task_keywords("Explain this code")
-        assert result["is_analysis_task"] is True
-        assert result["coarse_task_type"] == "analysis"
-        mock_orchestrator._task_analyzer.classify_task_keywords.assert_called_once_with(
-            "Explain this code"
-        )
-
-
-class TestApplyIntentGuard:
-    """Tests for _apply_intent_guard."""
-
-    def test_applies_intent_guard(self, chat_coordinator, mock_orchestrator):
-        """Apply intent guard through task coordinator."""
-        chat_coordinator._apply_intent_guard("What files exist?")
-        mock_orchestrator.task_coordinator.apply_intent_guard.assert_called_once()
-        assert (
-            mock_orchestrator._current_intent == mock_orchestrator.task_coordinator.current_intent
-        )
-
-
-class TestApplyTaskGuidance:
-    """Tests for _apply_task_guidance."""
-
-    def test_applies_task_guidance(self, chat_coordinator, mock_orchestrator):
-        """Apply task guidance through task coordinator."""
-        from victor.agent.unified_task_tracker import TrackerTaskType
-
-        chat_coordinator._apply_task_guidance(
-            user_message="Fix the bug",
-            unified_task_type=TrackerTaskType.EDIT,
-            is_analysis_task=False,
-            is_action_task=True,
-            needs_execution=True,
-            max_exploration_iterations=3,
-        )
-
-        # Verify temperature and tool_budget are set
-        assert mock_orchestrator.task_coordinator.temperature == 0.7
-        assert mock_orchestrator.task_coordinator.tool_budget == 15
-        mock_orchestrator.task_coordinator.apply_task_guidance.assert_called_once()
 
 
 class TestPrepareTask:
@@ -260,7 +213,9 @@ class TestPrepareTask:
         """Prepare task through task coordinator."""
         from victor.agent.unified_task_tracker import TrackerTaskType
 
-        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(task_type="edit")
+        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(
+            task_type="edit"
+        )
         result = chat_coordinator._prepare_task(
             "Write a function",
             TrackerTaskType.EDIT,
@@ -271,9 +226,13 @@ class TestPrepareTask:
 class TestGetRateLimitWaitTime:
     """Tests for _get_rate_limit_wait_time."""
 
-    def test_calculates_wait_time_with_backoff(self, chat_coordinator, mock_orchestrator):
+    def test_calculates_wait_time_with_backoff(
+        self, chat_coordinator, mock_orchestrator
+    ):
         """Calculate wait time with exponential backoff."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 2.0
+        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = (
+            2.0
+        )
         exc = Exception("Rate limited")
 
         # First attempt
@@ -290,95 +249,28 @@ class TestGetRateLimitWaitTime:
 
     def test_caps_wait_at_max(self, chat_coordinator, mock_orchestrator):
         """Cap wait time at 300 seconds."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 100.0
+        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = (
+            100.0
+        )
         exc = Exception("Rate limited")
 
         # Would be 100 * 2^4 = 1600, but capped at 300
         wait = chat_coordinator._get_rate_limit_wait_time(exc, 4)
         assert wait == 300.0
 
-
-class TestSelectToolsForTurn:
-    """Tests for _select_tools_for_turn."""
-
-    @pytest.mark.asyncio
-    async def test_select_tools_with_intent_filtering(self, chat_coordinator, mock_orchestrator):
-        """Select tools with intent-based filtering."""
-        mock_orchestrator._tool_planner.filter_tools_by_intent.return_value = [
-            MagicMock(name="read_file"),
-            MagicMock(name="write_file"),
-        ]
-
-        result = await chat_coordinator._select_tools_for_turn(
-            "Read the file", MagicMock(goals=["analysis"])
-        )
-
-        mock_orchestrator._tool_planner.filter_tools_by_intent.assert_called()
-
-
-class TestParseAndValidateToolCalls:
-    """Tests for _parse_and_validate_tool_calls."""
-
-    def test_delegates_to_tool_coordinator(self, chat_coordinator, mock_orchestrator):
-        """Delegate parsing to tool coordinator."""
-        mock_orchestrator._tool_coordinator.parse_and_validate_tool_calls.return_value = (
-            [{"id": "1"}],
-            "content",
-        )
-
-        result = chat_coordinator._parse_and_validate_tool_calls([], "test")
-
-        mock_orchestrator._tool_coordinator.parse_and_validate_tool_calls.assert_called_once()
-
-
-class TestCreateRecoveryContext:
-    """Tests for _create_recovery_context."""
-
-    def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
-        """Delegate recovery context creation to orchestrator."""
-        mock_ctx = MagicMock()
-        mock_orchestrator._create_recovery_context.return_value = MagicMock()
-
-        result = chat_coordinator._create_recovery_context(mock_ctx)
-
-        mock_orchestrator._create_recovery_context.assert_called_once_with(mock_ctx)
-
-
-class TestHandleRecoveryWithIntegration:
-    """Tests for _handle_recovery_with_integration."""
-
-    @pytest.mark.asyncio
-    async def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
-        """Delegate recovery handling to orchestrator."""
-        mock_ctx = MagicMock()
-        mock_orchestrator._handle_recovery_with_integration = AsyncMock(return_value=MagicMock())
-
-        result = await chat_coordinator._handle_recovery_with_integration(
-            mock_ctx, "content", [], None
-        )
-
-        mock_orchestrator._handle_recovery_with_integration.assert_called_once()
-
-
-class TestApplyRecoveryAction:
-    """Tests for _apply_recovery_action."""
-
-    def test_delegates_to_orchestrator(self, chat_coordinator, mock_orchestrator):
-        """Delegate recovery action to orchestrator."""
-        mock_ctx = MagicMock()
-        mock_action = MagicMock()
-        mock_orchestrator._apply_recovery_action = MagicMock(return_value=None)
-
-        result = chat_coordinator._apply_recovery_action(mock_action, mock_ctx)
-
-        mock_orchestrator._apply_recovery_action.assert_called_once()
+    # NOTE: TestSelectToolsForTurn, TestParseAndValidateToolCalls, TestCreateRecoveryContext,
+    # TestHandleRecoveryWithIntegration, and TestApplyRecoveryAction delegation tests removed.
+    # These methods were moved to the streaming pipeline (direct orch calls).
+    # The real logic is tested in test_orchestrator_core.py.
 
 
 class TestHandleEmptyResponseRecovery:
     """Tests for _handle_empty_response_recovery."""
 
     @pytest.mark.asyncio
-    async def test_empty_response_recovery_logic(self, chat_coordinator, mock_orchestrator):
+    async def test_empty_response_recovery_logic(
+        self, chat_coordinator, mock_orchestrator
+    ):
         """Test empty response recovery handles provider stream."""
         from victor.providers.base import StreamChunk
 
@@ -388,13 +280,15 @@ class TestHandleEmptyResponseRecovery:
 
         mock_orchestrator.provider.stream = mock_stream
         mock_orchestrator.add_message = MagicMock()
-        mock_orchestrator.sanitizer.sanitize = MagicMock(return_value="sanitized content")
+        mock_orchestrator.sanitizer.sanitize = MagicMock(
+            return_value="sanitized content"
+        )
         mock_orchestrator._chunk_generator.generate_content_chunk = MagicMock(
             return_value=MagicMock()
         )
 
-        success, tool_calls, chunk = await chat_coordinator._handle_empty_response_recovery(
-            MagicMock(), []
+        success, tool_calls, chunk = (
+            await chat_coordinator._handle_empty_response_recovery(MagicMock(), [])
         )
 
         # Should recover content
@@ -402,24 +296,9 @@ class TestHandleEmptyResponseRecovery:
         assert tool_calls is None
         assert chunk is not None
 
-
-class TestValidateIntelligentResponse:
-    """Tests for _validate_intelligent_response."""
-
-    @pytest.mark.asyncio
-    async def test_delegates_to_orchestrator_with_correct_args(
-        self, chat_coordinator, mock_orchestrator
-    ):
-        """Delegate validation to orchestrator with correct arguments."""
-        mock_orchestrator._validate_intelligent_response = AsyncMock(return_value=None)
-
-        result = await chat_coordinator._validate_intelligent_response(
-            "response", "query", 0, "edit"
-        )
-
-        mock_orchestrator._validate_intelligent_response.assert_called_once_with(
-            response="response", query="query", tool_calls=0, task_type="edit"
-        )
+    # NOTE: TestValidateIntelligentResponse delegation test removed.
+    # This method was moved to the streaming pipeline (direct orch call).
+    # The real logic is tested in test_orchestrator_core.py.
 
 
 class StubStreamingPipeline:

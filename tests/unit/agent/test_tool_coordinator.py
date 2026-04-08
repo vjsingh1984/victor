@@ -234,8 +234,8 @@ class TestToolCoordinator:
         assert coordinator.execution_count == 2
 
     def test_get_selection_stats(self, coordinator):
-        """Test selection statistics."""
-        stats = coordinator.get_selection_stats()
+        """Test selection statistics via observability handler."""
+        stats = coordinator._observability.get_selection_stats()
 
         assert "total_selections" in stats
         assert "total_tools_selected" in stats
@@ -243,10 +243,10 @@ class TestToolCoordinator:
         assert stats["total_selections"] == 0
 
     def test_get_execution_stats(self, coordinator):
-        """Test execution statistics."""
+        """Test execution statistics via observability handler."""
         coordinator.consume_budget(5)
 
-        stats = coordinator.get_execution_stats()
+        stats = coordinator._observability.get_execution_stats()
 
         assert stats["total_executions"] == 0
         assert stats["budget_used"] == 5
@@ -289,7 +289,9 @@ class TestToolCoordinator:
 
         assert coordinator.get_available_tools() == {"read", "write"}
 
-    def test_is_tool_enabled_with_registry_tool_instances(self, mock_pipeline, mock_selector):
+    def test_is_tool_enabled_with_registry_tool_instances(
+        self, mock_pipeline, mock_selector
+    ):
         """Enabled-tool fallback should work when registry.list_tools returns tool instances."""
         read_tool = MagicMock()
         read_tool.name = "read"

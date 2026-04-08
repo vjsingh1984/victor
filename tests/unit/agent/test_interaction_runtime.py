@@ -5,7 +5,9 @@
 
 from unittest.mock import MagicMock, patch
 
-from victor.agent.runtime.interaction_runtime import create_interaction_runtime_components
+from victor.agent.runtime.interaction_runtime import (
+    create_interaction_runtime_components,
+)
 
 
 def test_create_interaction_runtime_components_lazy_materialization():
@@ -24,8 +26,12 @@ def test_create_interaction_runtime_components_lazy_materialization():
     pipeline = MagicMock()
     factory.create_streaming_chat_pipeline.return_value = pipeline
 
-    with patch("victor.agent.coordinators.chat_coordinator.ChatCoordinator") as chat_cls:
-        with patch("victor.agent.coordinators.tool_coordinator.ToolCoordinator") as tool_cls:
+    with patch(
+        "victor.agent.coordinators.chat_coordinator.ChatCoordinator"
+    ) as chat_cls:
+        with patch(
+            "victor.agent.coordinators.tool_coordinator.ToolCoordinator"
+        ) as tool_cls:
             with patch(
                 "victor.agent.coordinators.session_coordinator.create_session_coordinator"
             ) as session_factory:
@@ -71,7 +77,8 @@ def test_create_interaction_runtime_components_lazy_materialization():
         tool_access_controller=tool_access_controller,
     )
     tool_coordinator.set_mode_controller.assert_called_once_with(mode_controller)
-    tool_coordinator.set_orchestrator_reference.assert_called_once_with(orchestrator)
+    # set_orchestrator_reference replaced with direct set_enabled_tools
+    # (protocol-based injection — no orchestrator reference passed)
     session_factory.assert_called_once_with(
         session_state_manager=session_state_manager,
         lifecycle_manager=lifecycle_manager,

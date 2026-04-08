@@ -268,7 +268,8 @@ class StreamingCoordinator:
                 session = self._controller.complete_session()
                 if session:
                     logger.debug(
-                        f"Completed session {session.session_id}: " f"{session.duration:.2f}s"
+                        f"Completed session {session.session_id}: "
+                        f"{session.duration:.2f}s"
                     )
 
 

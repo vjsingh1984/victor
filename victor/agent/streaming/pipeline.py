@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import AsyncIterator, List, TYPE_CHECKING
 
 from victor.providers.base import StreamChunk
@@ -11,6 +12,37 @@ if TYPE_CHECKING:
     from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_required_files_from_prompt(user_message: str) -> List[str]:
+    """Extract required file paths from the user message."""
+    pattern = r'(?:^|[\s"\'`])(/[\w./\-]+\.\w+|\.{1,2}/[\w./\-]+\.\w+)'
+    matches = re.findall(pattern, user_message)
+    return list(set(matches))
+
+
+def _extract_required_outputs_from_prompt(user_message: str) -> List[str]:
+    """Extract required outputs from the user message."""
+    return []
+
+
+def _get_decision_service(orchestrator: object) -> object | None:
+    """Get the LLM decision service from the container if available."""
+    try:
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+            return None
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
+
+        container = getattr(orchestrator, "_container", None)
+        if container is not None:
+            return container.get(LLMDecisionServiceProtocol)
+    except Exception as e:
+        logger.debug("Failed to resolve LLM decision service: %s", e)
+    return None
 
 
 class StreamingChatPipeline:
@@ -31,8 +63,8 @@ class StreamingChatPipeline:
         orch._current_stream_context = stream_ctx
 
         # Extract required files and outputs from user prompt for task completion tracking
-        orch._required_files = coord._extract_required_files_from_prompt(user_message)
-        orch._required_outputs = coord._extract_required_outputs_from_prompt(user_message)
+        orch._required_files = _extract_required_files_from_prompt(user_message)
+        orch._required_outputs = _extract_required_outputs_from_prompt(user_message)
         orch._read_files_session.clear()
         orch._all_files_read_nudge_sent = False
         logger.debug(
@@ -61,10 +93,13 @@ class StreamingChatPipeline:
         max_exploration_iterations = stream_ctx.max_exploration_iterations
 
         # Detect intent and inject prompt guard for non-write tasks
-        coord._apply_intent_guard(user_message)
+        orch._apply_intent_guard(user_message)
 
         # For compound analysis+edit tasks, unified_tracker handles exploration limits
-        if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in ("edit", "create"):
+        if stream_ctx.is_analysis_task and stream_ctx.unified_task_type.value in (
+            "edit",
+            "create",
+        ):
             logger.info(
                 f"Compound task detected (analysis+{stream_ctx.unified_task_type.value}): "
                 f"unified_tracker will use appropriate exploration limits"
@@ -77,7 +112,7 @@ class StreamingChatPipeline:
         )
 
         # Apply guidance for analysis/action tasks
-        coord._apply_task_guidance(
+        orch._apply_task_guidance(
             user_message,
             stream_ctx.unified_task_type,
             stream_ctx.is_analysis_task,
@@ -126,14 +161,16 @@ class StreamingChatPipeline:
         orch.debug_logger.reset()
 
         # Reset LLM decision service budget for this turn (if available)
-        decision_service = coord._get_decision_service()
+        decision_service = _get_decision_service(orch)
         if decision_service is not None:
             decision_service.reset_budget()
 
         while True:
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
             cancelled = False
-            async for pre_chunk in coord._run_iteration_pre_checks(stream_ctx, user_message):
+            async for pre_chunk in coord._run_iteration_pre_checks(
+                stream_ctx, user_message
+            ):
                 yield pre_chunk
                 if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
                     cancelled = True
@@ -141,11 +178,29 @@ class StreamingChatPipeline:
                 return
 
             # Log iteration debug info
-            coord._log_iteration_debug(stream_ctx, max_total_iterations)
+            unique_resources = orch.unified_tracker.unique_resources
+            logger.debug(
+                f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
+                f"tool_calls_used={orch.tool_calls_used}/{orch.tool_budget}, "
+                f"unique_resources={len(unique_resources)}, "
+                f"force_completion={stream_ctx.force_completion}"
+            )
+            orch.debug_logger.log_iteration_start(
+                stream_ctx.total_iterations,
+                tool_calls=orch.tool_calls_used,
+                files_read=len(unique_resources),
+            )
+            orch.debug_logger.log_limits(
+                tool_budget=orch.tool_budget,
+                tool_calls_used=orch.tool_calls_used,
+                max_iterations=max_total_iterations,
+                current_iteration=stream_ctx.total_iterations,
+                is_analysis_task=stream_ctx.is_analysis_task,
+            )
 
             # === CONTEXT AND ITERATION LIMIT CHECKS ===
-            max_context = coord._get_max_context_chars()
-            handled, iter_chunk = await coord._handle_context_and_iteration_limits(
+            max_context = orch._get_max_context_chars()
+            handled, iter_chunk = await orch._handle_context_and_iteration_limits(
                 user_message,
                 max_total_iterations,
                 max_context,
@@ -157,17 +212,22 @@ class StreamingChatPipeline:
             if handled:
                 break
 
-            tools = await coord._select_tools_for_turn(stream_ctx.context_msg, goals)
+            tools = await orch._select_tools_for_turn(stream_ctx.context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it
             provider_kwargs = {}
             if orch.thinking:
-                provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
+                provider_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": 10000,
+                }
 
-            full_content, tool_calls, _, garbage_detected = await coord._stream_provider_response(
-                tools=tools,
-                provider_kwargs=provider_kwargs,
-                stream_ctx=stream_ctx,
+            full_content, tool_calls, _, garbage_detected = (
+                await coord._stream_provider_response(
+                    tools=tools,
+                    provider_kwargs=provider_kwargs,
+                    stream_ctx=stream_ctx,
+                )
             )
 
             # Debug: Log response details
@@ -184,7 +244,7 @@ class StreamingChatPipeline:
                 logger.info("Setting force_completion due to garbage detection")
 
             # Parse, validate, and normalize tool calls
-            tool_calls, full_content = coord._parse_and_validate_tool_calls(
+            tool_calls, full_content = orch._parse_and_validate_tool_calls(
                 tool_calls, full_content
             )
 
@@ -220,7 +280,7 @@ class StreamingChatPipeline:
                 )
 
             # Use recovery integration to detect and handle failures
-            recovery_action = await coord._handle_recovery_with_integration(
+            recovery_action = await orch._handle_recovery_with_integration(
                 stream_ctx=stream_ctx,
                 full_content=full_content,
                 tool_calls=tool_calls,
@@ -229,7 +289,9 @@ class StreamingChatPipeline:
 
             # Apply recovery action if not just "continue"
             if recovery_action.action != "continue":
-                recovery_chunk = coord._apply_recovery_action(recovery_action, stream_ctx)
+                recovery_chunk = orch._apply_recovery_action(
+                    recovery_action, stream_ctx
+                )
                 if recovery_chunk:
                     yield recovery_chunk
                     if recovery_chunk.is_final:
@@ -257,7 +319,7 @@ class StreamingChatPipeline:
                     )
             elif not tool_calls:
                 # No content and no tool calls - check for natural completion
-                recovery_ctx = coord._create_recovery_context(stream_ctx)
+                recovery_ctx = orch._create_recovery_context(stream_ctx)
                 final_chunk = orch._recovery_coordinator.check_natural_completion(
                     recovery_ctx, has_tool_calls=False, content_length=0
                 )
@@ -266,11 +328,13 @@ class StreamingChatPipeline:
                     return
 
                 # No substantial content yet - attempt aggressive recovery
-                logger.warning("Model returned empty response - attempting aggressive recovery")
+                logger.warning(
+                    "Model returned empty response - attempting aggressive recovery"
+                )
 
-                recovery_ctx = coord._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
-                    recovery_ctx
+                recovery_ctx = orch._create_recovery_context(stream_ctx)
+                recovery_chunk, should_force = (
+                    orch._recovery_coordinator.handle_empty_response(recovery_ctx)
                 )
                 if recovery_chunk:
                     yield recovery_chunk
@@ -291,9 +355,11 @@ class StreamingChatPipeline:
                             f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                         )
                 else:
-                    recovery_ctx = coord._create_recovery_context(stream_ctx)
-                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
-                        recovery_ctx
+                    recovery_ctx = orch._create_recovery_context(stream_ctx)
+                    fallback_msg = (
+                        orch._recovery_coordinator.get_recovery_fallback_message(
+                            recovery_ctx
+                        )
                     )
                     orch._record_intelligent_outcome(
                         success=False,
@@ -301,7 +367,9 @@ class StreamingChatPipeline:
                         user_satisfied=False,
                         completed=False,
                     )
-                    yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
+                    yield orch._chunk_generator.generate_content_chunk(
+                        fallback_msg, is_final=True
+                    )
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -317,7 +385,7 @@ class StreamingChatPipeline:
 
             # Intelligent pipeline post-iteration hook: validate response quality
             if full_content and len(full_content.strip()) > 50:
-                quality_result = await coord._validate_intelligent_response(
+                quality_result = await orch._validate_intelligent_response(
                     response=full_content,
                     query=user_message,
                     tool_calls=orch.tool_calls_used,
@@ -331,7 +399,9 @@ class StreamingChatPipeline:
                             issues[:3],
                         )
                     if quality_result.get("should_retry"):
-                        grounding_feedback = quality_result.get("grounding_feedback", "")
+                        grounding_feedback = quality_result.get(
+                            "grounding_feedback", ""
+                        )
                         if grounding_feedback:
                             logger.info(
                                 f"Injecting grounding feedback for retry: {len(grounding_feedback)} chars"
@@ -339,7 +409,9 @@ class StreamingChatPipeline:
                             stream_ctx.pending_grounding_feedback = grounding_feedback
 
                 if quality_result:
-                    new_score = quality_result.get("quality_score", stream_ctx.last_quality_score)
+                    new_score = quality_result.get(
+                        "quality_score", stream_ctx.last_quality_score
+                    )
                     stream_ctx.update_quality_score(new_score)
 
                 if quality_result and quality_result.get("should_finalize"):
@@ -359,12 +431,16 @@ class StreamingChatPipeline:
                 stream_ctx, unified_loop_warning
             )
             if loop_warning_chunk:
-                logger.warning(f"UnifiedTaskTracker loop warning: {unified_loop_warning}")
+                logger.warning(
+                    f"UnifiedTaskTracker loop warning: {unified_loop_warning}"
+                )
                 yield loop_warning_chunk
             else:
                 # Check UnifiedTaskTracker for stop decision via recovery coordinator
-                recovery_ctx = coord._create_recovery_context(stream_ctx)
-                was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)
+                recovery_ctx = orch._create_recovery_context(stream_ctx)
+                was_triggered, hint = orch._recovery_coordinator.check_force_action(
+                    recovery_ctx
+                )
                 if was_triggered:
                     logger.info(
                         f"UnifiedTaskTracker forcing action: {hint}, "
@@ -376,10 +452,12 @@ class StreamingChatPipeline:
                 if not tool_calls:
                     # === INTENT CLASSIFICATION (P0 SRP refactor) ===
                     if not coord._intent_classification_handler:
-                        from victor.agent.streaming import create_intent_classification_handler
+                        from victor.agent.streaming import (
+                            create_intent_classification_handler,
+                        )
 
-                        coord._intent_classification_handler = create_intent_classification_handler(
-                            orch
+                        coord._intent_classification_handler = (
+                            create_intent_classification_handler(orch)
                         )
 
                     # Ensure tracking variables are initialized
@@ -396,14 +474,12 @@ class StreamingChatPipeline:
 
                     tracking_state = create_tracking_state(orch)
 
-                    intent_result = (
-                        coord._intent_classification_handler.classify_and_determine_action(
-                            stream_ctx=stream_ctx,
-                            full_content=full_content,
-                            content_length=content_length,
-                            mentioned_tools=mentioned_tools_detected,
-                            tracking_state=tracking_state,
-                        )
+                    intent_result = coord._intent_classification_handler.classify_and_determine_action(
+                        stream_ctx=stream_ctx,
+                        full_content=full_content,
+                        content_length=content_length,
+                        mentioned_tools=mentioned_tools_detected,
+                        tracking_state=tracking_state,
                     )
 
                     for chunk in intent_result.chunks:
@@ -413,7 +489,8 @@ class StreamingChatPipeline:
                         full_content = ""
 
                     force_finalize_used = (
-                        tracking_state.force_finalize and intent_result.action == "finish"
+                        tracking_state.force_finalize
+                        and intent_result.action == "finish"
                     )
                     from victor.agent.streaming import apply_tracking_state_updates
 
@@ -436,19 +513,26 @@ class StreamingChatPipeline:
 
                     action_result["action"] = action
 
-                    continuation_result = await coord._continuation_handler.handle_action(
-                        action_result=action_result,
-                        stream_ctx=stream_ctx,
-                        full_content=full_content,
+                    continuation_result = (
+                        await coord._continuation_handler.handle_action(
+                            action_result=action_result,
+                            stream_ctx=stream_ctx,
+                            full_content=full_content,
+                        )
                     )
 
                     for chunk in continuation_result.chunks:
                         yield chunk
 
-                    if "cumulative_prompt_interventions" in continuation_result.state_updates:
-                        orch._cumulative_prompt_interventions = continuation_result.state_updates[
-                            "cumulative_prompt_interventions"
-                        ]
+                    if (
+                        "cumulative_prompt_interventions"
+                        in continuation_result.state_updates
+                    ):
+                        orch._cumulative_prompt_interventions = (
+                            continuation_result.state_updates[
+                                "cumulative_prompt_interventions"
+                            ]
+                        )
 
                     if continuation_result.should_return:
                         return
@@ -481,6 +565,8 @@ class StreamingChatPipeline:
                     return
 
 
-def create_streaming_chat_pipeline(coordinator: "ChatCoordinator") -> StreamingChatPipeline:
+def create_streaming_chat_pipeline(
+    coordinator: "ChatCoordinator",
+) -> StreamingChatPipeline:
     """Factory helper for creating a streaming pipeline bound to a coordinator."""
     return StreamingChatPipeline(coordinator)

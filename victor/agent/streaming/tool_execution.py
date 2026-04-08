@@ -110,7 +110,9 @@ class ChunkGeneratorProtocol(Protocol):
         self, tool_name: str, tool_args: Dict, status_msg: str
     ) -> StreamChunk: ...
 
-    def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[StreamChunk]: ...
+    def generate_tool_result_chunks(
+        self, result: Dict[str, Any]
+    ) -> List[StreamChunk]: ...
 
     def generate_thinking_status_chunk(self) -> StreamChunk: ...
 
@@ -215,8 +217,12 @@ class ToolExecutionHandler:
         handle_force_completion_with_handler: Callable[
             [StreamingChatContext], Optional[StreamChunk]
         ],
-        handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
-        handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
+        handle_budget_exhausted: Callable[
+            [StreamingChatContext], AsyncIterator[StreamChunk]
+        ],
+        handle_force_final_response: Callable[
+            [StreamingChatContext], AsyncIterator[StreamChunk]
+        ],
         handle_tool_calls: Callable[[List[Dict]], Any],
         get_tool_status_message: Callable[[str, Dict], str],
         observed_files: Optional[Set[str]] = None,
@@ -247,7 +253,9 @@ class ToolExecutionHandler:
         self._settings = settings
         self._create_recovery_context = create_recovery_context
         self._check_progress_with_handler = check_progress_with_handler
-        self._handle_force_completion_with_handler = handle_force_completion_with_handler
+        self._handle_force_completion_with_handler = (
+            handle_force_completion_with_handler
+        )
         self._handle_budget_exhausted = handle_budget_exhausted
         self._handle_force_final_response = handle_force_final_response
         self._handle_tool_calls = handle_tool_calls
@@ -321,7 +329,9 @@ class ToolExecutionHandler:
                 return result
 
         # Filter and truncate tool calls
-        tool_calls = await self._filter_and_truncate_tools(stream_ctx, tool_calls, result)
+        tool_calls = await self._filter_and_truncate_tools(
+            stream_ctx, tool_calls, result
+        )
 
         # Execute tools if any remain
         if tool_calls:
@@ -337,8 +347,12 @@ class ToolExecutionHandler:
     ) -> Optional[StreamChunk]:
         """Check if budget warning should be shown."""
         recovery_ctx = self._create_recovery_context(stream_ctx)
-        warning_threshold = getattr(self._settings, "tool_call_budget_warning_threshold", 250)
-        return self._recovery_coordinator.check_tool_budget(recovery_ctx, warning_threshold)
+        warning_threshold = getattr(
+            self._settings, "tool_call_budget_warning_threshold", 250
+        )
+        return self._recovery_coordinator.check_tool_budget(
+            recovery_ctx, warning_threshold
+        )
 
     async def _handle_budget_exhausted_phase(
         self, stream_ctx: StreamingChatContext
@@ -381,7 +395,9 @@ class ToolExecutionHandler:
 
         # Filter blocked tool calls
         filtered_calls, blocked_chunks, blocked_count = (
-            self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
+            self._recovery_coordinator.filter_blocked_tool_calls(
+                recovery_ctx, tool_calls
+            )
         )
         result.add_chunks(blocked_chunks)
 
@@ -414,7 +430,9 @@ class ToolExecutionHandler:
             tool_args = tool_call.get("arguments", {})
             status_msg = self._get_tool_status_message(tool_name, tool_args)
             result.add_chunk(
-                self._chunk_generator.generate_tool_start_chunk(tool_name, tool_args, status_msg)
+                self._chunk_generator.generate_tool_start_chunk(
+                    tool_name, tool_args, status_msg
+                )
             )
             last_tool_name = tool_name
 
@@ -492,7 +510,9 @@ def create_tool_execution_handler(
             orchestrator, "_check_progress_with_handler", _noop_check_progress
         ),
         handle_force_completion_with_handler=getattr(
-            orchestrator, "_handle_force_completion_with_handler", _noop_force_completion
+            orchestrator,
+            "_handle_force_completion_with_handler",
+            _noop_force_completion,
         ),
         handle_budget_exhausted=getattr(
             orchestrator, "_handle_budget_exhausted", _noop_async_generator
@@ -502,5 +522,7 @@ def create_tool_execution_handler(
         ),
         handle_tool_calls=orchestrator._handle_tool_calls,
         get_tool_status_message=get_tool_status_message,
-        observed_files=set(orchestrator.observed_files) if orchestrator.observed_files else set(),
+        observed_files=(
+            set(orchestrator.observed_files) if orchestrator.observed_files else set()
+        ),
     )

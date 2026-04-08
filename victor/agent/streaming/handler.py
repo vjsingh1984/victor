@@ -63,7 +63,9 @@ class MessageAdder(Protocol):
 class ToolExecutor(Protocol):
     """Protocol for executing tools."""
 
-    async def execute_tools(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def execute_tools(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Execute tool calls and return results."""
         ...
 
@@ -134,7 +136,9 @@ class StreamingChatHandler:
             return result
         return None
 
-    def check_iteration_limit(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
+    def check_iteration_limit(
+        self, ctx: StreamingChatContext
+    ) -> Optional[IterationResult]:
         """Check if iteration limit has been exceeded.
 
         Args:
@@ -152,7 +156,9 @@ class StreamingChatHandler:
             )
         return None
 
-    def check_force_completion(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
+    def check_force_completion(
+        self, ctx: StreamingChatContext
+    ) -> Optional[IterationResult]:
         """Check if force completion conditions are met.
 
         Args:
@@ -163,10 +169,14 @@ class StreamingChatHandler:
         """
         if ctx.should_force_completion():
             logger.info("Force completion triggered")
-            return create_force_completion_result("Forcing completion due to constraints.")
+            return create_force_completion_result(
+                "Forcing completion due to constraints."
+            )
         return None
 
-    def handle_blocked_attempts(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
+    def handle_blocked_attempts(
+        self, ctx: StreamingChatContext
+    ) -> Optional[IterationResult]:
         """Handle consecutive blocked tool attempts.
 
         Args:
@@ -275,7 +285,9 @@ class StreamingChatHandler:
 
         # Add thinking status
         thinking_icon = self._presentation.icon("thinking", with_color=False)
-        chunks.append(StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."}))
+        chunks.append(
+            StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."})
+        )
         return chunks
 
     def generate_tool_start_chunk(
@@ -302,7 +314,9 @@ class StreamingChatHandler:
             },
         )
 
-    def should_continue_loop(self, result: IterationResult, ctx: StreamingChatContext) -> bool:
+    def should_continue_loop(
+        self, result: IterationResult, ctx: StreamingChatContext
+    ) -> bool:
         """Determine if the streaming loop should continue.
 
         Args:
@@ -342,7 +356,9 @@ class StreamingChatHandler:
         # completion detection based on explicit signals (_DONE_, _TASK_DONE_, _SUMMARY_)
         return None
 
-    def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
+    def handle_empty_response(
+        self, ctx: StreamingChatContext
+    ) -> Optional[IterationResult]:
         """Handle an empty response from the model.
 
         Tracks consecutive empty responses and forces summary if threshold exceeded.
@@ -361,7 +377,9 @@ class StreamingChatHandler:
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
             result.add_chunk(
-                StreamChunk(content="\n[recovery] Forcing summary after repeated empty responses\n")
+                StreamChunk(
+                    content="\n[recovery] Forcing summary after repeated empty responses\n"
+                )
             )
             # Add strong instruction to summarize
             self.message_adder.add_message(
@@ -444,7 +462,9 @@ class StreamingChatHandler:
 
             if block_reason:
                 # Use existing handler method to process blocked tool
-                chunk = self.handle_blocked_tool_call(ctx, tc_name, tc_args, block_reason)
+                chunk = self.handle_blocked_tool_call(
+                    ctx, tc_name, tc_args, block_reason
+                )
                 blocked_chunks.append(chunk)
                 blocked_count += 1
             else:
@@ -518,7 +538,9 @@ class StreamingChatHandler:
 
         return None
 
-    def _create_blocked_force_result(self, ctx: StreamingChatContext) -> IterationResult:
+    def _create_blocked_force_result(
+        self, ctx: StreamingChatContext
+    ) -> IterationResult:
         """Create a force completion result due to blocked attempts.
 
         Args:
@@ -646,7 +668,9 @@ class StreamingChatHandler:
             return True
         return False
 
-    def get_budget_exhausted_chunks(self, ctx: StreamingChatContext) -> List[StreamChunk]:
+    def get_budget_exhausted_chunks(
+        self, ctx: StreamingChatContext
+    ) -> List[StreamChunk]:
         """Generate chunks for budget exhausted state.
 
         Args:
@@ -749,7 +773,9 @@ class StreamingChatHandler:
         ctx.force_completion_warning_shown = True
 
         is_research = self.is_research_loop(stop_reason_value, stop_hint)
-        warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
+        warning_chunk, system_message = self.get_force_completion_chunks(
+            ctx, is_research
+        )
 
         # Add system message to force summary
         self.message_adder.add_message("system", system_message)
@@ -781,7 +807,9 @@ class StreamingChatHandler:
         """
         # Check if we should continue the task vs summarize
         has_budget_remaining = ctx.tool_calls_used < ctx.tool_budget * 0.8
-        should_continue_task = (ctx.is_analysis_task or ctx.is_action_task) and has_budget_remaining
+        should_continue_task = (
+            ctx.is_analysis_task or ctx.is_action_task
+        ) and has_budget_remaining
 
         def maybe_prefix(prompt: str) -> str:
             """Add thinking disable prefix if available."""
@@ -859,7 +887,9 @@ class StreamingChatHandler:
                     min(base_temperature + 0.2, 0.8),
                 ),
                 (
-                    maybe_prefix("One sentence answer: What is the main thing you learned?"),
+                    maybe_prefix(
+                        "One sentence answer: What is the main thing you learned?"
+                    ),
                     min(base_temperature + 0.3, 0.9),
                 ),
             ]
@@ -881,7 +911,9 @@ class StreamingChatHandler:
                 ),
             ]
 
-    def should_use_tools_for_recovery(self, ctx: StreamingChatContext, attempt: int) -> bool:
+    def should_use_tools_for_recovery(
+        self, ctx: StreamingChatContext, attempt: int
+    ) -> bool:
         """Determine if tools should be enabled for a recovery attempt.
 
         Args:
@@ -893,7 +925,9 @@ class StreamingChatHandler:
         """
         # For task-continuation mode, enable tools on first 2 attempts
         has_budget_remaining = ctx.tool_calls_used < ctx.tool_budget * 0.8
-        should_continue_task = (ctx.is_analysis_task or ctx.is_action_task) and has_budget_remaining
+        should_continue_task = (
+            ctx.is_analysis_task or ctx.is_action_task
+        ) and has_budget_remaining
         return should_continue_task and attempt <= 2
 
     def get_recovery_fallback_message(
@@ -971,7 +1005,9 @@ class StreamingChatHandler:
             return " ".join(metrics_parts)
         else:
             # Fallback to estimate
-            tokens_per_second = ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+            tokens_per_second = (
+                ctx.total_tokens / elapsed_time if elapsed_time > 0 else 0
+            )
             base = (
                 f"{self._presentation.icon('chart', with_color=False)} ~{ctx.total_tokens:.0f} tokens (est.) | "
                 f"{elapsed_time:.1f}s | {tokens_per_second:.1f} tok/s"
@@ -1167,7 +1203,9 @@ class StreamingChatHandler:
                     for edit in edits[:max_edits_per_file]:
                         old_str = edit.get("old_string", "")
                         new_str = edit.get("new_string", "")
-                        edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
+                        edit_chunk = self.generate_edit_preview_chunk(
+                            old_str, new_str, path
+                        )
                         if edit_chunk:
                             chunks.append(edit_chunk)
 
@@ -1227,7 +1265,9 @@ class StreamingChatHandler:
             StreamChunk with thinking status metadata
         """
         thinking_icon = self._presentation.icon("thinking", with_color=False)
-        return StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."})
+        return StreamChunk(
+            content="", metadata={"status": f"{thinking_icon} Thinking..."}
+        )
 
     def generate_budget_error_chunk(self) -> StreamChunk:
         """Generate a chunk for budget limit summary error.
@@ -1243,7 +1283,9 @@ class StreamingChatHandler:
         Returns:
             StreamChunk with force response error message
         """
-        return StreamChunk(content="Unable to generate final summary. Please try a simpler query.")
+        return StreamChunk(
+            content="Unable to generate final summary. Please try a simpler query."
+        )
 
     def handle_iteration_start(
         self,
@@ -1298,7 +1340,9 @@ class StreamingChatHandler:
         """
         # Handle force completion with warning
         if ctx.force_completion:
-            force_result = self.handle_force_completion(ctx, stop_reason_value, stop_hint)
+            force_result = self.handle_force_completion(
+                ctx, stop_reason_value, stop_hint
+            )
             if force_result is not None:
                 return force_result
 
@@ -1339,7 +1383,9 @@ class StreamingChatHandler:
 
         # Check for natural completion
         if has_content and ctx.has_substantial_content():
-            return self.check_natural_completion(ctx, has_tool_calls, len(ctx.context_msg))
+            return self.check_natural_completion(
+                ctx, has_tool_calls, len(ctx.context_msg)
+            )
 
         # Handle empty response
         if not has_content:

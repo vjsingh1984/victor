@@ -101,12 +101,17 @@ async def test_pipeline_executes_tool_calls():
 async def test_pipeline_records_pending_grounding_feedback():
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("analysis output " * 5, None, None, False)
-    coordinator._validate_result = {
+    validate_result = {
         "should_retry": True,
         "grounding_feedback": "cite sources",
         "quality_score": 0.4,
         "is_grounded": False,
     }
+
+    async def mock_validate(*args, **kwargs):
+        return validate_result
+
+    coordinator._orchestrator._validate_intelligent_response = mock_validate
     intent_result = IntentClassificationResult(
         chunks=[],
         action_result={"reason": "finish"},
@@ -128,7 +133,6 @@ async def test_pipeline_records_pending_grounding_feedback():
 async def test_pipeline_yields_recovery_fallback_when_empty():
     coordinator = DummyCoordinator(limit_result=(False, None))
     coordinator._provider_response = ("", None, None, False)
-    coordinator._recovery_action = SimpleNamespace(action="continue")
     coordinator._empty_recovery = (False, None, None)
 
     pipeline = StreamingChatPipeline(coordinator)

@@ -196,7 +196,9 @@ class ContinuationHandler:
         unified_tracker: Optional[Any] = None,
         finalize_metrics: Optional[Callable[[Dict], Any]] = None,
         record_outcome: Optional[Callable[..., None]] = None,
-        execute_extracted_tool: Optional[Callable[..., AsyncIterator[StreamChunk]]] = None,
+        execute_extracted_tool: Optional[
+            Callable[..., AsyncIterator[StreamChunk]]
+        ] = None,
     ):
         """Initialize the continuation handler.
 
@@ -287,7 +289,9 @@ class ContinuationHandler:
 
         if "cumulative_prompt_interventions" in updates:
             # Note: This is tracked internally but also returned for orchestrator sync
-            applied["cumulative_prompt_interventions"] = updates["cumulative_prompt_interventions"]
+            applied["cumulative_prompt_interventions"] = updates[
+                "cumulative_prompt_interventions"
+            ]
 
         if action_result.get("set_final_summary_requested"):
             applied["final_summary_requested"] = True
@@ -329,7 +333,9 @@ class ContinuationHandler:
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
             if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+                result.add_chunk(
+                    self._chunk_generator.generate_content_chunk(sanitized)
+                )
 
         # Add final marker
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
@@ -381,7 +387,9 @@ class ContinuationHandler:
         updates = action_result.get("updates", {})
         if "synthesis_nudge_count" in updates and self._unified_tracker:
             if hasattr(self._unified_tracker, "synthesis_nudge_count"):
-                self._unified_tracker.synthesis_nudge_count = updates["synthesis_nudge_count"]
+                self._unified_tracker.synthesis_nudge_count = updates[
+                    "synthesis_nudge_count"
+                ]
 
         return result
 
@@ -451,7 +459,9 @@ class ContinuationHandler:
                 sanitized = self._sanitizer.sanitize(response.content)
                 if sanitized:
                     self._message_adder.add_message("assistant", sanitized)
-                    result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+                    result.add_chunk(
+                        self._chunk_generator.generate_content_chunk(sanitized)
+                    )
 
             # Finalize metrics
             if self._finalize_metrics:
@@ -467,7 +477,9 @@ class ContinuationHandler:
                 metrics_line = self._chunk_generator.format_completion_metrics(
                     stream_ctx, elapsed_time, cost_str
                 )
-                result.add_chunk(self._chunk_generator.generate_metrics_chunk(metrics_line))
+                result.add_chunk(
+                    self._chunk_generator.generate_metrics_chunk(metrics_line)
+                )
 
             result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
 
@@ -579,7 +591,9 @@ class ContinuationHandler:
         if full_content:
             sanitized = self._sanitizer.sanitize(full_content)
             if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+                result.add_chunk(
+                    self._chunk_generator.generate_content_chunk(sanitized)
+                )
 
         # Finalize and display metrics
         if self._finalize_metrics:
@@ -639,5 +653,7 @@ def create_continuation_handler(
         unified_tracker=orchestrator.unified_tracker,
         finalize_metrics=orchestrator._finalize_stream_metrics,
         record_outcome=orchestrator._record_intelligent_outcome,
-        execute_extracted_tool=getattr(orchestrator, "_execute_extracted_tool_call", None),
+        execute_extracted_tool=getattr(
+            orchestrator, "_execute_extracted_tool_call", None
+        ),
     )
