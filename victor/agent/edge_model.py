@@ -61,8 +61,8 @@ class EdgeModelConfig:
 
     enabled: bool = True
     provider: str = "ollama"
-    model: str = "qwen2.5-coder:1.5b"
-    timeout_ms: int = 2000
+    model: str = "gpt-oss:20b"
+    timeout_ms: int = 5000  # Larger model needs more time
     max_tokens: int = 50
     cache_ttl: int = 120
     confidence_threshold: float = 0.6
