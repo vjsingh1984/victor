@@ -55,7 +55,11 @@ benchmark_app = typer.Typer(
 console = Console()
 
 
-def _configure_log_level(log_level: Optional[str], command: str = "benchmark") -> None:
+def _configure_log_level(
+    log_level: Optional[str],
+    command: str = "benchmark",
+    debug_modules: Optional[str] = None,
+) -> None:
     """Configure logging for benchmark commands using centralized config.
 
     Uses the centralized logging config system with proper priority chain:
@@ -85,7 +89,12 @@ def _configure_log_level(log_level: Optional[str], command: str = "benchmark") -
             log_level = "WARNING"
 
     # Use centralized logging config
-    setup_logging(command=command, cli_log_level=log_level, stream=sys.stderr)
+    setup_logging(
+        command=command,
+        cli_log_level=log_level,
+        stream=sys.stderr,
+        cli_debug_modules=debug_modules,
+    )
 
 
 @benchmark_app.command("list")
@@ -116,7 +125,9 @@ def list_benchmarks() -> None:
 
 @benchmark_app.command("setup")
 def setup_benchmark(
-    benchmark: str = typer.Argument(..., help="Benchmark to setup: swe-bench, swe-bench-lite"),
+    benchmark: str = typer.Argument(
+        ..., help="Benchmark to setup: swe-bench, swe-bench-lite"
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of repos to setup"
     ),
@@ -156,22 +167,33 @@ def setup_benchmark(
 
 @benchmark_app.command("run")
 def run_benchmark(
-    benchmark: str = typer.Argument(..., help="Benchmark to run: swe-bench, humaneval, mbpp"),
+    benchmark: str = typer.Argument(
+        ..., help="Benchmark to run: swe-bench, humaneval, mbpp"
+    ),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
-    profile: str = typer.Option("default", "--profile", "-p", help="Victor profile to use"),
+    profile: str = typer.Option(
+        "default", "--profile", "-p", help="Victor profile to use"
+    ),
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
     ),
-    timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout per task in seconds"),
-    max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
+    timeout: int = typer.Option(
+        300, "--timeout", "-t", help="Timeout per task in seconds"
+    ),
+    max_turns: int = typer.Option(
+        10, "--max-turns", help="Maximum conversation turns per task"
+    ),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
-        False, "--resume", "-r", help="Resume from checkpoint if previous run was interrupted"
+        False,
+        "--resume",
+        "-r",
+        help="Resume from checkpoint if previous run was interrupted",
     ),
     provider: Optional[str] = typer.Option(
         None, "--provider", help="Override provider (e.g., deepseek, openai, xai)"
@@ -179,9 +201,25 @@ def run_benchmark(
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
+    debug_modules: Optional[str] = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules for DEBUG logging (e.g. code_search,agent_adapter)",
+    ),
+    no_edge_model: bool = typer.Option(
+        False,
+        "--no-edge-model",
+        help="Disable edge model micro-decisions during benchmark",
+    ),
 ) -> None:
     """Run a benchmark evaluation."""
-    _configure_log_level(log_level)
+    _configure_log_level(log_level, debug_modules=debug_modules)
+
+    # Disable edge model if requested
+    if no_edge_model:
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        get_feature_flag_manager().disable(FeatureFlag.USE_EDGE_MODEL)
 
     from victor.config.settings import Settings
     from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
@@ -194,7 +232,10 @@ def run_benchmark(
     # Map benchmark name to type and runner
     benchmark_map = {
         "swe-bench": (BenchmarkType.SWE_BENCH, SWEBenchRunner),
-        "swe-bench-lite": (BenchmarkType.SWE_BENCH, lambda: SWEBenchRunner(split="lite")),
+        "swe-bench-lite": (
+            BenchmarkType.SWE_BENCH,
+            lambda: SWEBenchRunner(split="lite"),
+        ),
         "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
         "mbpp": (BenchmarkType.MBPP, MBPPRunner),
         "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
@@ -314,7 +355,9 @@ async def _setup_benchmark_async(
     from victor.evaluation.swe_bench_loader import SWEBenchWorkspaceManager
 
     runner = (
-        SWEBenchRunner(split="lite") if benchmark_lower == "swe-bench-lite" else SWEBenchRunner()
+        SWEBenchRunner(split="lite")
+        if benchmark_lower == "swe-bench-lite"
+        else SWEBenchRunner()
     )
     config = EvaluationConfig(
         benchmark=BenchmarkType.SWE_BENCH,
@@ -344,8 +387,14 @@ async def _setup_benchmark_async(
         setup_task = progress.add_task("Setting up repos...", total=len(unique_tasks))
 
         for i, task in enumerate(unique_tasks):
-            repo_name = task.repo.split("/")[-1].replace(".git", "") if task.repo else task.task_id
-            progress.update(setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}")
+            repo_name = (
+                task.repo.split("/")[-1].replace(".git", "")
+                if task.repo
+                else task.task_id
+            )
+            progress.update(
+                setup_task, description=f"[{i+1}/{len(unique_tasks)}] {repo_name}"
+            )
 
             try:
                 if not force_reindex and workspace_manager.is_repo_indexed(task):
@@ -410,28 +459,36 @@ async def _run_benchmark_async(
             )
             # Bootstrap edge model decision service into the container
             # so tool selection, prompt focus, and stage detection can use it.
-            try:
-                from victor.agent.edge_model import (
-                    EdgeModelConfig,
-                    create_edge_decision_service,
-                )
-                from victor.core import get_container
-                from victor.agent.services.protocols.decision_service import (
-                    LLMDecisionServiceProtocol,
-                )
-                from victor.core.container import ServiceLifetime
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
-                edge_service = create_edge_decision_service(EdgeModelConfig())
-                if edge_service:
-                    container = get_container()
-                    container.register(
-                        LLMDecisionServiceProtocol,
-                        lambda c: edge_service,
-                        ServiceLifetime.SINGLETON,
+            _edge_enabled = get_feature_flag_manager().is_enabled(
+                FeatureFlag.USE_EDGE_MODEL
+            )
+            if _edge_enabled:
+                try:
+                    from victor.agent.edge_model import (
+                        EdgeModelConfig,
+                        create_edge_decision_service,
                     )
-                    console.print("[dim]Edge model enabled for micro-decisions[/]")
-            except Exception as e:
-                console.print(f"[dim]Edge model unavailable: {e}[/]")
+                    from victor.core import get_container
+                    from victor.agent.services.protocols.decision_service import (
+                        LLMDecisionServiceProtocol,
+                    )
+                    from victor.core.container import ServiceLifetime
+
+                    edge_service = create_edge_decision_service(EdgeModelConfig())
+                    if edge_service:
+                        container = get_container()
+                        container.register(
+                            LLMDecisionServiceProtocol,
+                            lambda c: edge_service,
+                            ServiceLifetime.SINGLETON,
+                        )
+                        console.print("[dim]Edge model enabled for micro-decisions[/]")
+                except Exception as e:
+                    console.print(f"[dim]Edge model unavailable: {e}[/]")
+            else:
+                console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
             if provider_override:
                 # Direct provider creation bypassing profile's provider
@@ -443,20 +500,44 @@ async def _run_benchmark_async(
                 settings = load_settings()
                 profiles = settings.load_profiles()
                 profile_config = profiles.get(profile, profiles.get("default"))
-                effective_model = model or (
-                    profile_config.model if profile_config else "deepseek-chat"
-                )
+                # Use explicit --model, else provider's default model
+                _PROVIDER_DEFAULT_MODELS = {
+                    "deepseek": "deepseek-chat",
+                    "anthropic": "claude-sonnet-4-20250514",
+                    "openai": "gpt-4o",
+                    "google": "gemini-2.0-flash",
+                    "xai": "grok-3",
+                    "ollama": "gemma4:31b",
+                }
+                if model:
+                    effective_model = model
+                else:
+                    effective_model = _PROVIDER_DEFAULT_MODELS.get(provider_override)
+                    if not effective_model and profile_config:
+                        effective_model = profile_config.model
+                    if not effective_model:
+                        effective_model = "deepseek-chat"
 
                 api_key = get_api_key(provider_override)
                 provider = ProviderRegistry.create(
-                    provider_override, api_key=api_key, settings=settings, timeout=timeout
+                    provider_override,
+                    api_key=api_key,
+                    settings=settings,
+                    timeout=timeout,
                 )
+
+                # Only enable thinking for providers that support it
+                use_thinking = (
+                    hasattr(provider, "supports_thinking")
+                    and provider.supports_thinking()
+                )
+
                 orchestrator = AgentOrchestrator(
                     settings=settings,
                     provider=provider,
                     model=effective_model,
                     provider_name=provider_override,
-                    thinking=True,
+                    thinking=use_thinking,
                 )
                 adapter = VictorAgentAdapter(orchestrator, adapter_config)
             else:
@@ -485,9 +566,16 @@ async def _run_benchmark_async(
                     # Reset workspace to base_commit with clean working tree.
                     # Fetch the specific commit first (may be outside shallow depth).
                     for git_cmd in [
-                        ["git", "fetch", "--depth", "1", "origin", benchmark_task.base_commit],
+                        [
+                            "git",
+                            "fetch",
+                            "--depth",
+                            "1",
+                            "origin",
+                            benchmark_task.base_commit,
+                        ],
                         ["git", "checkout", "--force", benchmark_task.base_commit],
-                        ["git", "clean", "-fd"],
+                        ["git", "clean", "-fd", "-e", ".victor"],
                     ]:
                         proc = await asyncio.create_subprocess_exec(
                             *git_cmd,
@@ -496,6 +584,21 @@ async def _run_benchmark_async(
                             stderr=asyncio.subprocess.PIPE,
                         )
                         await proc.communicate()
+
+                # Pre-warm code_search index BEFORE task timer starts.
+                # This ensures the first code_search call is a cache hit (~0ms)
+                # instead of a full re-index (~20s that eats into timeout).
+                try:
+                    from victor.tools.code_search_tool import _get_or_build_index
+                    from victor.config.settings import load_settings
+
+                    _prewarm_settings = load_settings()
+                    await _get_or_build_index(
+                        work_dir, _prewarm_settings, force_reindex=False
+                    )
+                    console.print("  [dim]Code search index pre-warmed[/]")
+                except Exception as e:
+                    logger.debug(f"Index pre-warm skipped: {e}")
 
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
@@ -568,7 +671,8 @@ async def _run_benchmark_async(
             )
 
         progress.update(
-            task, description="Resuming evaluation..." if resume else "Running evaluation..."
+            task,
+            description="Resuming evaluation..." if resume else "Running evaluation...",
         )
         return await harness.run_evaluation(
             config=config,
@@ -669,7 +773,9 @@ def compare_frameworks(
 
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
-    benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),
+    benchmark: str = typer.Option(
+        "swe-bench", "--benchmark", "-b", help="Benchmark to show"
+    ),
 ) -> None:
     """Show the leaderboard for a benchmark."""
     from victor.evaluation.benchmarks import PUBLISHED_RESULTS
@@ -695,7 +801,9 @@ def show_leaderboard(
         raise typer.Exit(0)
 
     results = PUBLISHED_RESULTS[bench_type]
-    sorted_results = sorted(results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True)
+    sorted_results = sorted(
+        results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True
+    )
 
     table = Table()
     table.add_column("Rank", style="bold")
@@ -732,7 +840,12 @@ def show_capabilities() -> None:
     table.add_column("Capability", style="cyan")
 
     # Add framework columns
-    frameworks = [Framework.VICTOR, Framework.AIDER, Framework.CLAUDE_CODE, Framework.CURSOR]
+    frameworks = [
+        Framework.VICTOR,
+        Framework.AIDER,
+        Framework.CLAUDE_CODE,
+        Framework.CURSOR,
+    ]
     for f in frameworks:
         table.add_column(f.value, justify="center")
 

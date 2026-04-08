@@ -76,7 +76,9 @@ class SWEBenchConfig:
     seed: int = 42  # Random seed for reproducibility
 
     # Workspace settings
-    workspace_base: Path = field(default_factory=lambda: Path("/tmp/swe_bench_workspaces"))
+    workspace_base: Path = field(
+        default_factory=lambda: Path("/tmp/swe_bench_workspaces")
+    )
     clone_timeout: int = 300  # Timeout for git clone in seconds
     shallow_clone: bool = True  # Use shallow clones for speed
 
@@ -464,7 +466,9 @@ class SWEBenchWorkspaceManager:
             Path to the prepared workspace
         """
         # Create unique workspace directory
-        workspace_id = hashlib.md5(f"{task.task_id}_{task.base_commit}".encode()).hexdigest()[:12]
+        workspace_id = hashlib.md5(
+            f"{task.task_id}_{task.base_commit}".encode()
+        ).hexdigest()[:12]
         workspace_dir = self.workspace_base / f"task_{workspace_id}"
 
         if workspace_dir.exists():
@@ -647,9 +651,24 @@ class SWEBenchWorkspaceManager:
         # Check if already indexed
         victor_dir = cache_path / ".victor"
         index_marker = victor_dir / "indexed_at"
+        embeddings_dir = victor_dir / "embeddings"
 
         if not force_reindex and index_marker.exists():
             logger.info(f"Repo already indexed: {cache_path}")
+            return cache_path
+
+        # Check if embeddings exist on disk even without marker
+        # (e.g., marker was deleted but embeddings persist)
+        if (
+            not force_reindex
+            and embeddings_dir.exists()
+            and any(embeddings_dir.iterdir())
+        ):
+            logger.info(f"Embeddings exist at {embeddings_dir}, restoring index marker")
+            victor_dir.mkdir(parents=True, exist_ok=True)
+            from datetime import datetime, timezone
+
+            index_marker.write_text(datetime.now(timezone.utc).isoformat())
             return cache_path
 
         # Build indexes
@@ -661,11 +680,20 @@ class SWEBenchWorkspaceManager:
             from victor.core.capability_registry import CapabilityRegistry
             from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
-            factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
+            factory = CapabilityRegistry.get_instance().get(
+                CodebaseIndexFactoryProtocol
+            )
             if factory is None:
                 raise ImportError("Codebase indexing not available")
             indexer = factory.create(root_path=str(cache_path), use_embeddings=True)
             await indexer.index_codebase()
+
+            # Auto-generate init.md for project context
+            from victor.context.project_context import ProjectContext
+
+            init_path = ProjectContext.auto_generate(str(cache_path))
+            if init_path:
+                logger.info(f"Auto-generated project context: {init_path}")
 
             # Mark as indexed
             from datetime import datetime, timezone
