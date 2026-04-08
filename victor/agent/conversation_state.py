@@ -96,6 +96,7 @@ from victor.tools.metadata_registry import (
     get_tools_by_stage as registry_get_tools_by_stage,
 )
 from victor.core.events import ObservabilityBus
+from victor.core import get_container
 
 if TYPE_CHECKING:
     from victor.observability.hooks import StateHookManager
@@ -548,18 +549,7 @@ class ConversationStateMachine:
         Returns:
             Tuple of (detected stage, confidence) or (None, 0.0)
         """
-        # Check cache first — avoid redundant edge model calls
-        import time as _time
-
-        cache_key = f"{self.state.stage.value}:{content[:50] if content else ''}"
-        if cache_key in self._edge_stage_cache:
-            cached_stage, cached_conf, cached_ts = self._edge_stage_cache[cache_key]
-            if _time.time() - cached_ts < 30:  # 30s TTL
-                return cached_stage, cached_conf
-
         try:
-            from victor.core import get_container
-
             container = get_container()
 
             from victor.agent.services.protocols.decision_service import (
@@ -572,19 +562,28 @@ class ConversationStateMachine:
 
             from victor.agent.decisions.schemas import DecisionType
 
+            # Always provide full state to edge model — prevents cold-calling
+            # that disagrees with framework's richer context.
             context: Dict[str, Any] = {
                 "message_excerpt": content[:200] if content else "",
                 "current_stage": (
-                    tool_context.get("current_stage", "") if tool_context else ""
+                    tool_context.get("current_stage", "")
+                    if tool_context
+                    else self.state.stage.value
                 ),
                 "last_tools": (
-                    tool_context.get("last_tools", "") if tool_context else ""
+                    tool_context.get("last_tools", "")
+                    if tool_context
+                    else ",".join(self.state.last_tools[-5:])
                 ),
                 "detected_stage_heuristic": (
                     tool_context.get("detected_stage_heuristic", "")
                     if tool_context
                     else ""
                 ),
+                "files_observed": len(self.state.observed_files),
+                "files_modified": len(self.state.modified_files),
+                "tool_call_count": len(self.state.last_tools),
             }
 
             decision = service.decide_sync(
@@ -619,12 +618,6 @@ class ConversationStateMachine:
             if result:
                 logger.info(
                     f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
-                )
-                # Cache the result
-                self._edge_stage_cache[cache_key] = (
-                    result,
-                    confidence,
-                    _time.time(),
                 )
             return result, confidence
 

@@ -180,9 +180,12 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
             "What stage is this conversation in?\n\n"
             "Current stage: {current_stage}\n"
             "Recent tools: {last_tools}\n"
+            "Files read: {files_observed}, Files modified: {files_modified}\n"
+            "Tool calls so far: {tool_call_count}\n"
             "Heuristic guess: {detected_stage_heuristic}\n"
             "Request: {message_excerpt}\n\n"
-            "Stages: initial, planning, reading, analysis, execution, verification\n\n"
+            "Stages: initial, planning, reading, analysis, execution, verification\n"
+            "Rule: Stay in execution if files are being read/edited actively.\n\n"
             'JSON: {{"stage": "...", "confidence": 0.0-1.0}}'
         ),
         schema=StageDetectionDecision,
