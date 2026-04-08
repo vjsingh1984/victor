@@ -85,7 +85,10 @@ class TestSentenceTransformersEmbedding:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         # Model should not be loaded initially (EmbeddingService is lazy)
-        assert EmbeddingService._instance is None or not EmbeddingService._instance.is_loaded
+        assert (
+            EmbeddingService._instance is None
+            or not EmbeddingService._instance.is_loaded
+        )
 
         # Mock the EmbeddingService's embed_text method
         mock_embedding = np.random.randn(384).astype(np.float32)
@@ -134,7 +137,9 @@ class TestSentenceTransformersEmbedding:
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         # Mock ImportError when loading sentence-transformers
-        with patch("sentence_transformers.SentenceTransformer", side_effect=ImportError):
+        with patch(
+            "sentence_transformers.SentenceTransformer", side_effect=ImportError
+        ):
             # Should fall back to random embedding (better than crashing)
             embedding = await selector._get_sentence_transformer_embedding("test text")
             # Verify it's a valid embedding (384-dim)
@@ -163,7 +168,9 @@ class TestEmbeddingIndexAcceleration:
         fake_index_class = MagicMock(side_effect=FakeEmbeddingIndex)
 
         with (
-            patch.object(selector, "_get_embedding", AsyncMock(return_value=fake_embedding)),
+            patch.object(
+                selector, "_get_embedding", AsyncMock(return_value=fake_embedding)
+            ),
             patch.dict(
                 sys.modules,
                 {"victor_native": SimpleNamespace(EmbeddingIndex=fake_index_class)},
@@ -178,8 +185,12 @@ class TestEmbeddingIndexAcceleration:
     async def test_select_relevant_tools_prefers_native_embedding_index(
         self, temp_cache_dir, mock_tool_registry
     ):
-        selector = SemanticToolSelector(cache_dir=temp_cache_dir, cache_embeddings=False)
-        selector._tool_embedding_cache = {"mock_tool": np.array([1.0, 0.0, 0.0], dtype=np.float32)}
+        selector = SemanticToolSelector(
+            cache_dir=temp_cache_dir, cache_embeddings=False
+        )
+        selector._tool_embedding_cache = {
+            "mock_tool": np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        }
         selector._embedding_index = FakeEmbeddingIndex(
             [selector._tool_embedding_cache["mock_tool"].tolist()],
             ["mock_tool"],
@@ -191,8 +202,12 @@ class TestEmbeddingIndexAcceleration:
                 "_get_embedding",
                 AsyncMock(return_value=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
             ),
-            patch.object(selector, "_batch_cosine_similarity", side_effect=AssertionError),
-            patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]),
+            patch.object(
+                selector, "_batch_cosine_similarity", side_effect=AssertionError
+            ),
+            patch.object(
+                selector, "_get_relevant_categories", return_value=["mock_tool"]
+            ),
             patch.object(selector, "_get_mandatory_tools", return_value=[]),
         ):
             selected = await selector.select_relevant_tools(
@@ -250,9 +265,13 @@ class TestOllamaAPIEmbedding:
 
         # Mock httpx response
         mock_response = MagicMock()
-        mock_response.json.return_value = {"embedding": [0.1] * 768}  # nomic-embed-text is 768-dim
+        mock_response.json.return_value = {
+            "embedding": [0.1] * 768
+        }  # nomic-embed-text is 768-dim
 
-        with patch.object(selector._client, "post", return_value=mock_response) as mock_post:
+        with patch.object(
+            selector._client, "post", return_value=mock_response
+        ) as mock_post:
             mock_post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_post.return_value.__aexit__ = AsyncMock()
 
@@ -309,7 +328,9 @@ class TestProviderFallback:
     @pytest.mark.asyncio
     async def test_unsupported_provider_raises_error(self):
         """Test that unsupported provider raises NotImplementedError."""
-        selector = SemanticToolSelector(embedding_provider="openai")  # Not yet implemented
+        selector = SemanticToolSelector(
+            embedding_provider="openai"
+        )  # Not yet implemented
 
         with pytest.raises(NotImplementedError, match="openai not yet supported"):
             await selector._get_embedding("test text")
@@ -362,10 +383,15 @@ class TestToolSelectionWithEmbeddings:
             assert "mock_tool" in selector._tool_embedding_cache
 
             # Mock the category filtering to include our mock_tool
-            with patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]):
+            with patch.object(
+                selector, "_get_relevant_categories", return_value=["mock_tool"]
+            ):
                 # Select tools
                 selected_tools = await selector.select_relevant_tools(
-                    "use the mock tool", mock_tool_registry, max_tools=5, similarity_threshold=0.3
+                    "use the mock tool",
+                    mock_tool_registry,
+                    max_tools=5,
+                    similarity_threshold=0.3,
                 )
 
                 # Should select mock_tool since we mocked the category filter
@@ -488,7 +514,9 @@ class TestCacheOperations:
     async def test_save_to_cache_success(self, temp_cache_dir):
         """Test _save_to_cache saves embeddings (covers lines 303-314)."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
-        selector._tool_embedding_cache = {"test_tool": np.array([0.1, 0.2], dtype=np.float32)}
+        selector._tool_embedding_cache = {
+            "test_tool": np.array([0.1, 0.2], dtype=np.float32)
+        }
 
         selector._save_to_cache("test_hash")
 
@@ -603,7 +631,9 @@ class TestCostAwareSelection:
     @pytest.mark.asyncio
     async def test_cost_aware_selection_disabled(self, temp_cache_dir):
         """Test cost-aware selection can be disabled."""
-        selector = SemanticToolSelector(cache_dir=temp_cache_dir, cost_aware_selection=False)
+        selector = SemanticToolSelector(
+            cache_dir=temp_cache_dir, cost_aware_selection=False
+        )
         assert selector.cost_aware_selection is False
 
 
@@ -611,13 +641,17 @@ class TestConceptualQueryRouting:
     """Tests for conceptual query detection and semantic search routing (GAP-003 fix)."""
 
     @pytest.mark.asyncio
-    async def test_is_conceptual_query_detects_inheritance_patterns(self, temp_cache_dir):
+    async def test_is_conceptual_query_detects_inheritance_patterns(
+        self, temp_cache_dir
+    ):
         """Test _is_conceptual_query detects inheritance-related queries."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
         # Should detect inheritance queries
         assert selector._is_conceptual_query("What classes inherit from BaseTool?")
-        assert selector._is_conceptual_query("Find all subclasses that inherit from Provider")
+        assert selector._is_conceptual_query(
+            "Find all subclasses that inherit from Provider"
+        )
         assert selector._is_conceptual_query("Show me classes that extend BaseClass")
 
     @pytest.mark.asyncio
@@ -778,6 +812,87 @@ class TestConceptualQueryRouting:
         assert "caching" in patterns
         assert "similar to" in patterns
         assert "related to" in patterns
+
+
+class TestSemanticMatchEventMetadata:
+    """Tests for RL event metadata emitted by _emit_semantic_match_event."""
+
+    def test_event_includes_embedding_model_and_results_count(self):
+        """Verify _emit_semantic_match_event sends correct metadata keys.
+
+        The SemanticThresholdLearner reads 'results_count', 'embedding_model',
+        and 'threshold_used' from event metadata. Missing keys caused 100%
+        zero_rate and embedding_model=unknown in RL stats.
+        """
+        selector = SemanticToolSelector(
+            embedding_model="test-model-v1",
+            embedding_provider="sentence-transformers",
+            cache_embeddings=False,
+        )
+
+        # Create mock tools for the event
+        mock_tool = MagicMock()
+        mock_tool.name = "read"
+        selected_tools = [(mock_tool, 0.85), (MagicMock(name="edit"), 0.72)]
+        selected_tools[1][0].name = "edit"
+
+        captured_events = []
+
+        with patch("victor.tools.semantic_selector._get_rl_hooks") as mock_hooks_fn:
+            mock_hooks = MagicMock()
+            mock_hooks.emit = lambda evt: captured_events.append(evt)
+            mock_hooks_fn.return_value = mock_hooks
+
+            selector._emit_semantic_match_event(
+                selected_tools=selected_tools,
+                threshold=0.15,
+                task_type="bug_fix",
+                classification_aware=True,
+                excluded_count=2,
+            )
+
+        assert len(captured_events) == 1
+        event = captured_events[0]
+        meta = event.metadata
+
+        # These keys were missing and caused RL stats corruption
+        assert meta["results_count"] == 2
+        assert meta["embedding_model"] == "test-model-v1"
+        assert meta["embedding_provider"] == "sentence-transformers"
+        assert meta["threshold_used"] == 0.15
+
+        # Existing keys still present
+        assert meta["tools_selected"] == 2
+        assert meta["classification_aware"] is True
+        assert meta["excluded_count"] == 2
+
+    def test_event_with_zero_results_sets_results_count_zero(self):
+        """Verify results_count=0 when no tools selected."""
+        selector = SemanticToolSelector(
+            embedding_model="test-model",
+            cache_embeddings=False,
+        )
+
+        captured_events = []
+
+        with patch("victor.tools.semantic_selector._get_rl_hooks") as mock_hooks_fn:
+            mock_hooks = MagicMock()
+            mock_hooks.emit = lambda evt: captured_events.append(evt)
+            mock_hooks_fn.return_value = mock_hooks
+
+            selector._emit_semantic_match_event(
+                selected_tools=[],
+                threshold=0.15,
+                task_type="default",
+                classification_aware=False,
+                excluded_count=0,
+            )
+
+        assert len(captured_events) == 1
+        meta = captured_events[0].metadata
+        assert meta["results_count"] == 0
+        assert meta["embedding_model"] == "test-model"
+        assert captured_events[0].success is False
 
 
 if __name__ == "__main__":

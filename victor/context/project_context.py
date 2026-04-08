@@ -139,7 +139,9 @@ class ProjectContext:
                 if not force_reload and cache_key in _context_cache:
                     self._content, self._parsed_sections = _context_cache[cache_key]
                     _last_cache_check[root_key] = now
-                    logger.debug(f"Using cached project context for {self._context_file}")
+                    logger.debug(
+                        f"Using cached project context for {self._context_file}"
+                    )
                     return True
 
                 # Load from file
@@ -181,7 +183,9 @@ class ProjectContext:
             if line.startswith("## "):
                 # Save previous section
                 if current_content:
-                    self._parsed_sections[current_section] = "\n".join(current_content).strip()
+                    self._parsed_sections[current_section] = "\n".join(
+                        current_content
+                    ).strip()
                 # Start new section
                 current_section = line[3:].strip().lower().replace(" ", "_")
                 current_content = []
@@ -224,7 +228,9 @@ class ProjectContext:
             return ""
 
         # Use actual file name or default to configured name
-        file_name = self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
+        file_name = (
+            self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
+        )
 
         return f"""
 <project-context>
@@ -233,6 +239,103 @@ The following is project-specific context from {file_name}:
 {self._content}
 </project-context>
 """
+
+    @classmethod
+    def auto_generate(cls, root_path: str) -> Optional[Path]:
+        """Auto-generate a compact init.md for a project if not present.
+
+        Creates a lightweight (~500 token) context file from:
+        - README.md first 1500 chars
+        - Top-level directory listing (max 20)
+        - Detected build system
+
+        Idempotent: skips if init.md already exists.
+
+        Args:
+            root_path: Project root directory
+
+        Returns:
+            Path to created init.md, or None if already exists or failed
+        """
+        root = Path(root_path)
+        victor_dir = root / VICTOR_DIR_NAME
+        init_file = victor_dir / VICTOR_CONTEXT_FILE
+
+        if init_file.exists():
+            logger.debug(f"init.md already exists at {init_file}")
+            return None
+
+        sections = []
+        project_name = root.name
+
+        # 1. Extract README summary (first 1500 chars of first text paragraph)
+        readme_summary = ""
+        for readme_name in ["README.md", "README.rst", "README.txt", "readme.md"]:
+            readme_path = root / readme_name
+            if readme_path.exists():
+                try:
+                    raw = readme_path.read_text(encoding="utf-8")[:3000]
+                    for para in raw.split("\n\n"):
+                        stripped = para.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith(("#", "![", "<", "[!", "---", "```")):
+                            continue
+                        if stripped.startswith("[") and stripped.endswith(")"):
+                            continue
+                        readme_summary = stripped[:1500]
+                        break
+                except Exception:
+                    pass
+                break
+
+        sections.append(f"# {project_name}\n")
+        if readme_summary:
+            sections.append(readme_summary + "\n")
+
+        # 2. Top-level directory listing
+        try:
+            dirs = sorted(
+                d.name
+                for d in root.iterdir()
+                if d.is_dir()
+                and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
+            )[:20]
+            if dirs:
+                sections.append("## Structure\n")
+                sections.append("```")
+                sections.append("\n".join(f"{d}/" for d in dirs))
+                sections.append("```\n")
+        except OSError:
+            pass
+
+        # 3. Detect build system
+        build_hints = []
+        if (root / "pyproject.toml").exists():
+            build_hints.append("Python (pyproject.toml)")
+        elif (root / "setup.py").exists():
+            build_hints.append("Python (setup.py)")
+        if (root / "package.json").exists():
+            build_hints.append("Node.js")
+        if (root / "Cargo.toml").exists():
+            build_hints.append("Rust")
+        if (root / "go.mod").exists():
+            build_hints.append("Go")
+
+        if build_hints:
+            sections.append(f"**Build**: {', '.join(build_hints)}\n")
+
+        content = "\n".join(sections)
+
+        # Write file
+        try:
+            victor_dir.mkdir(parents=True, exist_ok=True)
+            init_file.write_text(content, encoding="utf-8")
+            logger.info(f"Auto-generated init.md at {init_file} ({len(content)} chars)")
+            return init_file
+        except Exception as e:
+            logger.warning(f"Failed to auto-generate init.md: {e}")
+            return None
 
     def get_package_layout_hint(self) -> str:
         """Extract package layout hints from context.
@@ -333,9 +436,13 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
             layout_hints.append("- **Legacy/Deprecated**: `src/` (DO NOT USE)")
     elif has_src:
         # Only src/ exists, check if it has nested packages
-        src_packages = [d.name for d in (root / "src").iterdir() if is_python_package(d)]
+        src_packages = [
+            d.name for d in (root / "src").iterdir() if is_python_package(d)
+        ]
         if src_packages:
-            layout_hints.append(f"- **Source code**: `src/{src_packages[0]}/` (src layout)")
+            layout_hints.append(
+                f"- **Source code**: `src/{src_packages[0]}/` (src layout)"
+            )
         else:
             layout_hints.append("- **Source code**: `src/` (src layout)")
     elif (root / expected_pkg).is_dir():
@@ -409,7 +516,9 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
-def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Optional[Path]:
+def init_victor_md(
+    root_path: Optional[str] = None, force: bool = False
+) -> Optional[Path]:
     """Initialize project context file in .victor/init.md.
 
     Creates the file at the configured location (default: .victor/init.md).

@@ -103,7 +103,10 @@ if TYPE_CHECKING:
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker
     from victor.agent.auto_commit import AutoCommitter
-    from victor.agent.conversation_manager import ConversationManager, create_conversation_manager
+    from victor.agent.conversation_manager import (
+        ConversationManager,
+        create_conversation_manager,
+    )
 
 # Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
@@ -171,7 +174,10 @@ from victor.framework.rl.coordinator import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
 from victor.agent.session_state_accessor import SessionStateAccessor
-from victor.agent.session_state_manager import SessionStateManager, create_session_state_manager
+from victor.agent.session_state_manager import (
+    SessionStateManager,
+    create_session_state_manager,
+)
 
 # Recovery - enums and functions used at runtime
 from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
@@ -190,7 +196,10 @@ from victor.agent.tool_output_formatter import (
 
 # Pipeline - configs and results used at runtime
 from victor.agent.tool_pipeline import ToolPipelineConfig, ToolCallResult
-from victor.agent.streaming_controller import StreamingControllerConfig, StreamingSession
+from victor.agent.streaming_controller import (
+    StreamingControllerConfig,
+    StreamingSession,
+)
 from victor.agent.task_analyzer import get_task_analyzer
 from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 from victor.agent.tool_registrar import ToolRegistrarConfig
@@ -212,7 +221,10 @@ from victor.agent.orchestrator_utils import (
 )
 from victor.agent.orchestrator_factory import OrchestratorFactory
 from victor.agent.parallel_executor import create_parallel_executor
-from victor.agent.response_completer import ToolFailureContext, create_response_completer
+from victor.agent.response_completer import (
+    ToolFailureContext,
+    create_response_completer,
+)
 from victor.observability.analytics.logger import UsageLogger
 from victor.observability.analytics.streaming_metrics import StreamingMetricsCollector
 from victor.storage.cache.tool_cache import ToolCache
@@ -454,7 +466,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     def _initialize_provider_runtime(self) -> None:
         """Initialize provider runtime boundaries with lazy coordinator loading."""
-        from victor.agent.runtime.provider_runtime import create_provider_runtime_components
+        from victor.agent.runtime.provider_runtime import (
+            create_provider_runtime_components,
+        )
 
         self._provider_runtime = create_provider_runtime_components(
             factory=self._factory,
@@ -463,7 +477,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         # Keep legacy attributes for compatibility while deferring heavy coordinator init.
         self._provider_coordinator = self._provider_runtime.provider_coordinator
-        self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
+        self._provider_switch_coordinator = (
+            self._provider_runtime.provider_switch_coordinator
+        )
 
     def _initialize_memory_runtime(self) -> None:
         """Initialize memory/session runtime boundaries."""
@@ -478,11 +494,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._memory_session_id = self._memory_runtime.memory_session_id
 
         # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled.
-        if self.memory_manager and getattr(self.settings, "conversation_embeddings_enabled", True):
+        if self.memory_manager and getattr(
+            self.settings, "conversation_embeddings_enabled", True
+        ):
             try:
                 self._init_conversation_embedding_store()
             except ImportError as embed_err:
-                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
+                logger.debug(
+                    f"ConversationEmbeddingStore dependencies not available: {embed_err}"
+                )
             except (OSError, IOError) as embed_err:
                 logger.warning(
                     f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
@@ -494,7 +514,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     def _initialize_metrics_runtime(self) -> None:
         """Initialize metrics/analytics runtime boundaries."""
-        from victor.agent.runtime.metrics_runtime import create_metrics_runtime_components
+        from victor.agent.runtime.metrics_runtime import (
+            create_metrics_runtime_components,
+        )
 
         self._metrics_runtime = create_metrics_runtime_components(
             factory=self._factory,
@@ -503,26 +525,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             debug_logger=self.debug_logger,
             cumulative_token_usage=self._cumulative_token_usage,
             tool_cost_lookup=lambda name: (
-                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
+                self.tools.get_tool_cost(name)
+                if hasattr(self, "tools")
+                else CostTier.FREE
             ),
         )
         self.usage_logger = self._metrics_runtime.usage_logger
-        self.streaming_metrics_collector = self._metrics_runtime.streaming_metrics_collector
+        self.streaming_metrics_collector = (
+            self._metrics_runtime.streaming_metrics_collector
+        )
         self._metrics_collector = self._metrics_runtime.metrics_collector
         self._session_cost_tracker = self._metrics_runtime.session_cost_tracker
         self._metrics_coordinator = self._metrics_runtime.metrics_coordinator
 
         self.usage_logger.log_event(
-            "session_start", {"model": self.model, "provider": self.provider.__class__.__name__}
+            "session_start",
+            {"model": self.model, "provider": self.provider.__class__.__name__},
         )
         if self.streaming_metrics_collector:
             logger.info("StreamingMetricsCollector initialized via runtime boundary")
 
     def _initialize_workflow_runtime(self) -> None:
         """Initialize workflow runtime boundaries with lazy registry loading."""
-        from victor.agent.runtime.workflow_runtime import create_workflow_runtime_components
+        from victor.agent.runtime.workflow_runtime import (
+            create_workflow_runtime_components,
+        )
 
-        self._workflow_runtime = create_workflow_runtime_components(factory=self._factory)
+        self._workflow_runtime = create_workflow_runtime_components(
+            factory=self._factory
+        )
         self._workflow_registry = self._workflow_runtime.workflow_registry
 
     def _initialize_coordination_runtime(self) -> None:
@@ -531,7 +562,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             create_coordination_runtime_components,
         )
 
-        self._coordination_runtime = create_coordination_runtime_components(factory=self._factory)
+        self._coordination_runtime = create_coordination_runtime_components(
+            factory=self._factory
+        )
         self._recovery_coordinator = self._coordination_runtime.recovery_coordinator
         self._chunk_generator = self._coordination_runtime.chunk_generator
         self._tool_planner = self._coordination_runtime.tool_planner
@@ -561,9 +594,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
-            tool_selector=self.tool_selector if hasattr(self, "tool_selector") else None,
+            tool_selector=(
+                self.tool_selector if hasattr(self, "tool_selector") else None
+            ),
             tool_access_controller=getattr(self, "_tool_access_controller", None),
-            mode_controller=self.mode_controller if hasattr(self, "mode_controller") else None,
+            mode_controller=(
+                self.mode_controller if hasattr(self, "mode_controller") else None
+            ),
             session_state_manager=self._session_state,
             lifecycle_manager=self._lifecycle_manager,
             memory_manager=self.memory_manager,
@@ -684,7 +721,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.provider_name,
             self.tool_adapter,
             self.tool_calling_caps,
-        ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
+        ) = self._factory.create_provider_manager_with_adapter(
+            provider, model, provider_name
+        )
 
         # Provider runtime boundary: coordinator services are created lazily on first use.
         self._initialize_provider_runtime()
@@ -709,9 +748,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Inject project context if available
         if self.project_context.content:
             self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+                base_system_prompt
+                + "\n\n"
+                + self.project_context.get_system_prompt_addition()
             )
-            logger.info(f"Loaded project context from {self.project_context.context_file}")
+            logger.info(
+                f"Loaded project context from {self.project_context.context_file}"
+            )
         else:
             self._system_prompt = base_system_prompt
 
@@ -800,7 +843,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Provides RL-based mode learning, quality scoring, prompt optimization
         self._intelligent_integration: Optional["OrchestratorIntegration"] = None
         self._intelligent_integration_config = self._factory.create_integration_config()
-        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
+        self._intelligent_pipeline_enabled = getattr(
+            settings, "intelligent_pipeline_enabled", True
+        )
 
         # Sub-agent orchestration (via factory) - lazy initialization for parallel task delegation
         self._subagent_orchestrator, self._subagent_orchestration_enabled = (
@@ -827,7 +872,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.tools.register_before_hook(self._log_tool_call)
 
         # Plugin system for extensible tools (via factory, delegates to ToolRegistrar)
-        self.plugin_manager = self._factory.initialize_plugin_system(self.tool_registrar)
+        self.plugin_manager = self._factory.initialize_plugin_system(
+            self.tool_registrar
+        )
 
         # Argument normalizer for handling malformed tool arguments (via factory, DI with fallback)
         self.argument_normalizer = self._factory.create_argument_normalizer(provider)
@@ -856,7 +903,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         # Parallel tool executor for concurrent independent tool calls (via factory)
-        self.parallel_executor = self._factory.create_parallel_executor(self.tool_executor)
+        self.parallel_executor = self._factory.create_parallel_executor(
+            self.tool_executor
+        )
 
         # Response completer for ensuring complete responses after tool calls (via factory)
         self.response_completer = self._factory.create_response_completer()
@@ -870,7 +919,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Initialize UnifiedTaskTracker (via factory, DI with fallback)
         # This is the single source of truth for task progress, milestones, and loop detection
-        self.unified_tracker = self._factory.create_unified_tracker(self.tool_calling_caps)
+        self.unified_tracker = self._factory.create_unified_tracker(
+            self.tool_calling_caps
+        )
 
         # Initialize unified ToolSelector (via factory) - semantic + keyword selection
         self.tool_selector = self._factory.create_tool_selector(
@@ -930,9 +981,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             context_compactor=(
                 self._context_compactor if hasattr(self, "_context_compactor") else None
             ),
-            sequence_tracker=self._sequence_tracker if hasattr(self, "_sequence_tracker") else None,
-            usage_analytics=self._usage_analytics if hasattr(self, "_usage_analytics") else None,
-            reminder_manager=self._reminder_manager if hasattr(self, "_reminder_manager") else None,
+            sequence_tracker=(
+                self._sequence_tracker if hasattr(self, "_sequence_tracker") else None
+            ),
+            usage_analytics=(
+                self._usage_analytics if hasattr(self, "_usage_analytics") else None
+            ),
+            reminder_manager=(
+                self._reminder_manager if hasattr(self, "_reminder_manager") else None
+            ),
         )
 
         # Tool deduplication tracker for preventing redundant calls (via factory)
@@ -954,7 +1011,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
-        if hasattr(self, "_pending_semantic_cache") and self._pending_semantic_cache is not None:
+        if (
+            hasattr(self, "_pending_semantic_cache")
+            and self._pending_semantic_cache is not None
+        ):
             self._tool_pipeline.set_semantic_cache(self._pending_semantic_cache)
             logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
             self._pending_semantic_cache = None  # Clear reference
@@ -971,7 +1031,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         # StreamingChatHandler: Testable extraction of streaming loop logic (via factory)
-        self._streaming_handler = self._factory.create_streaming_chat_handler(message_adder=self)
+        self._streaming_handler = self._factory.create_streaming_chat_handler(
+            message_adder=self
+        )
 
         # IterationCoordinator: Loop control for streaming chat (using handler)
         self._iteration_coordinator: Optional[IterationCoordinator] = None
@@ -1060,8 +1122,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # =================================================================
 
         # Initialize workflow optimization components (via factory)
-        self._workflow_optimization = self._factory.create_workflow_optimization_components(
-            timeout_seconds=getattr(settings, "execution_timeout", None)
+        self._workflow_optimization = (
+            self._factory.create_workflow_optimization_components(
+                timeout_seconds=getattr(settings, "execution_timeout", None)
+            )
         )
 
         # Wire component dependencies (via factory)
@@ -1272,7 +1336,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._lifecycle_manager.set_background_tasks(list(self._background_tasks))
         # Set callbacks for orchestrator-specific shutdown logic
         self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
-        self._lifecycle_manager.set_stop_health_monitoring_callback(self.stop_health_monitoring)
+        self._lifecycle_manager.set_stop_health_monitoring_callback(
+            self.stop_health_monitoring
+        )
 
         # Initialize session context for tracing/propagation
         set_session_id(self.active_session_id or "")
@@ -1280,10 +1346,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Debug-mode conformance assertion for ChatOrchestratorProtocol
         # Placed at end of __init__ so all attributes are initialized
         if __debug__:
-            from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+            from victor.agent.coordinators.chat_protocols import (
+                ChatOrchestratorProtocol,
+            )
             from victor.framework.protocols import verify_protocol_conformance
 
-            _conforms, _missing = verify_protocol_conformance(self, ChatOrchestratorProtocol)
+            _conforms, _missing = verify_protocol_conformance(
+                self, ChatOrchestratorProtocol
+            )
             assert (
                 _conforms
             ), f"AgentOrchestrator missing ChatOrchestratorProtocol members: {_missing}"
@@ -1321,7 +1391,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             get_vertical_context=lambda: self._vertical_context,
         )
 
-    def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _on_tool_start_callback(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
         self._callback_coordinator.on_tool_start(tool_name, arguments)
 
@@ -1501,7 +1573,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync coordinator with new vertical context (if already initialized)
         if self._mode_workflow_team_coordinator is not None:
             self._mode_workflow_team_coordinator.set_vertical_context(context)
-            logger.debug(f"Coordinator synced with vertical context: {context.vertical_name}")
+            logger.debug(
+                f"Coordinator synced with vertical context: {context.vertical_name}"
+            )
 
         # Sync tool selector with vertical context for vertical-specific tool selection (DIP)
         if hasattr(self, "tool_selector") and self.tool_selector is not None:
@@ -1515,7 +1589,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync middleware chain with vertical context for vertical-aware middleware (DIP)
         if hasattr(self, "_middleware_chain") and self._middleware_chain is not None:
             self._middleware_chain.set_vertical_context(context)
-            logger.debug(f"Middleware chain synced with vertical context: {context.vertical_name}")
+            logger.debug(
+                f"Middleware chain synced with vertical context: {context.vertical_name}"
+            )
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
@@ -1561,13 +1637,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.project_context = ProjectContext(root_path=str(workspace_dir))
         self.project_context.load()
 
+        # Set RL repo context for per-repo isolation
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            coordinator.set_repo_context(workspace_dir.name)
+        except Exception:
+            pass
+
         # Update system prompt if new context has content
         if self.project_context.content:
             base_prompt = self._build_system_prompt_with_adapter()
             self._system_prompt = (
                 base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
             )
-            logger.info(f"Loaded project context from {self.project_context.context_file}")
+            logger.info(
+                f"Loaded project context from {self.project_context.context_file}"
+            )
 
     def _apply_vertical_tools(self, tools: Set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
@@ -1706,7 +1793,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Get orchestrator state to pass to integration
         stream_context = getattr(self, "_current_stream_context", None)
         continuation_prompts = getattr(self, "_continuation_prompts", 0)
-        max_continuation_prompts_used = getattr(self, "_max_continuation_prompts_used", 6)
+        max_continuation_prompts_used = getattr(
+            self, "_max_continuation_prompts_used", 6
+        )
         stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
 
         try:
@@ -1997,7 +2086,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize embedding store. Delegates to SessionCoordinator."""
-        from victor.agent.runtime.memory_runtime import initialize_conversation_embedding_store
+        from victor.agent.runtime.memory_runtime import (
+            initialize_conversation_embedding_store,
+        )
 
         store, cache = initialize_conversation_embedding_store(
             memory_manager=self.memory_manager,
@@ -2156,7 +2247,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         preload_manager = PreloadManager(
-            enable_parallel=bool(getattr(self.settings, "framework_preload_parallel", True))
+            enable_parallel=bool(
+                getattr(self.settings, "framework_preload_parallel", True)
+            )
         )
         preload_manager.add_task(
             "configuration",
@@ -2181,18 +2274,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 await get_http_pool(
                     ConnectionPoolConfig(
                         max_connections=int(
-                            getattr(self.settings, "http_connection_pool_max_connections", 100)
+                            getattr(
+                                self.settings,
+                                "http_connection_pool_max_connections",
+                                100,
+                            )
                         ),
                         max_connections_per_host=int(
                             getattr(
-                                self.settings, "http_connection_pool_max_connections_per_host", 10
+                                self.settings,
+                                "http_connection_pool_max_connections_per_host",
+                                10,
                             )
                         ),
                         connection_timeout=int(
-                            getattr(self.settings, "http_connection_pool_connection_timeout", 30)
+                            getattr(
+                                self.settings,
+                                "http_connection_pool_connection_timeout",
+                                30,
+                            )
                         ),
                         total_timeout=int(
-                            getattr(self.settings, "http_connection_pool_total_timeout", 60)
+                            getattr(
+                                self.settings, "http_connection_pool_total_timeout", 60
+                            )
                         ),
                     )
                 )
@@ -2232,7 +2337,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if getattr(self.settings, "framework_preload_enabled", False):
             if self._runtime_preload_task is not None:
                 return
-            task = self._create_background_task(self._run_runtime_preload(), name="runtime_preload")
+            task = self._create_background_task(
+                self._run_runtime_preload(), name="runtime_preload"
+            )
             if task:
                 self._runtime_preload_task = task
                 logger.info("Started runtime preload task")
@@ -2245,7 +2352,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not self.use_semantic_selection or self._embedding_preload_task:
             return
 
-        task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")
+        task = self._create_background_task(
+            self._preload_embeddings(), name="embedding_preload"
+        )
         if task:
             self._embedding_preload_task = task
             logger.info("Started background task for embedding preload")
@@ -2293,7 +2402,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             SearchType.HYBRID: "both",
         }
 
-        recommended_tool = route.tool_name or tool_map.get(route.search_type, "code_search")
+        recommended_tool = route.tool_name or tool_map.get(
+            route.search_type, "code_search"
+        )
 
         return {
             "recommended_tool": recommended_tool,
@@ -2559,7 +2670,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         base_system_prompt = self._build_system_prompt_with_adapter()
         if self.project_context and self.project_context.content:
             self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
+                base_system_prompt
+                + "\n\n"
+                + self.project_context.get_system_prompt_addition()
             )
         else:
             self._system_prompt = base_system_prompt
@@ -2666,9 +2779,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with classification results
         """
-        return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
+        return self._system_prompt_coordinator.classify_task_with_context(
+            user_message, history
+        )
 
-    def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
+    def _format_tool_output(
+        self, tool_name: str, args: Dict[str, Any], output: Any
+    ) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
         Delegates to ToolOutputFormatter for:
@@ -2692,7 +2809,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             model=getattr(self.settings, "model", None),
             remaining_tokens=context_metrics.remaining_tokens,
             max_tokens=context_metrics.max_tokens,
-            response_token_reserve=getattr(self.settings, "response_token_reserve", 4096),
+            response_token_reserve=getattr(
+                self.settings, "response_token_reserve", 4096
+            ),
         )
 
         # Delegate to the extracted formatter
@@ -2728,7 +2847,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Delegate to ToolRegistrar for dynamic tool registration
         registered_count = self.tool_registrar._register_dynamic_tools()
-        logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
+        logger.debug(
+            f"Dynamically registered {registered_count} tools via ToolRegistrar"
+        )
 
         # MCP integration - delegate to ToolRegistrar
         if getattr(self.settings, "use_mcp_tools", False):
@@ -2762,9 +2883,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not provider_key:
             return True
 
-        supported = self.tool_capabilities.is_tool_call_supported(provider_key, self.model)
+        supported = self.tool_capabilities.is_tool_call_supported(
+            provider_key, self.model
+        )
         if not supported and not self._tool_capability_warned:
-            known = ", ".join(self.tool_capabilities.get_supported_models(provider_key)) or "none"
+            known = (
+                ", ".join(self.tool_capabilities.get_supported_models(provider_key))
+                or "none"
+            )
             logger.warning(
                 f"Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
                 f"Known tool-capable models: {known}"
@@ -2838,7 +2964,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         if self._use_service_layer and self._chat_service:
             return await self._chat_service.chat(user_message)
-        return await self._chat_coordinator.chat(user_message, use_planning=use_planning)
+        return await self._chat_coordinator.chat(
+            user_message, use_planning=use_planning
+        )
 
     async def chat_with_planning(
         self,
@@ -2882,8 +3010,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
         """
         if self._use_service_layer and self._chat_service:
-            return await self._chat_service.chat_with_planning(user_message, use_planning)
-        return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
+            return await self._chat_service.chat_with_planning(
+                user_message, use_planning
+            )
+        return await self._chat_coordinator.chat_with_planning(
+            user_message, use_planning
+        )
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -2931,7 +3063,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Extracted from CRITICAL-001 Phase 2D.
         """
         # Delegate to TaskCoordinator
-        self.task_coordinator.apply_intent_guard(user_message, self.conversation_controller)
+        self.task_coordinator.apply_intent_guard(
+            user_message, self.conversation_controller
+        )
 
         # Sync current_intent back to orchestrator
         self._current_intent = self.task_coordinator.current_intent
@@ -3029,7 +3163,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Get elapsed time from streaming controller
         elapsed_time = 0.0
         if self._streaming_controller.current_session:
-            elapsed_time = time.time() - self._streaming_controller.current_session.start_time
+            elapsed_time = (
+                time.time() - self._streaming_controller.current_session.start_time
+            )
 
         return StreamingRecoveryContext(
             iteration=stream_ctx.total_iterations,
@@ -3166,9 +3302,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             Tuple of (result, success, error_message or None)
         """
         if self._use_service_layer and self._tool_service:
-            return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
+            return await self._tool_service.execute_tool_with_retry(
+                tool_name, tool_args, context
+            )
 
-        async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
+        async def _executor(
+            name: str, args: Dict[str, Any], ctx: Dict[str, Any]
+        ) -> Any:
             return await self.tools.execute(name, context=ctx, **args)
 
         def _on_success(name: str, args: Dict[str, Any], result: Any) -> None:
@@ -3195,7 +3335,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             },
         )
 
-    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _handle_tool_calls(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
         Thin facade that delegates validation and normalization to
@@ -3217,7 +3359,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             if not validation.valid:
                 if validation.skip_reason:
-                    self.console.print(f"[yellow]{warn_icon} {validation.skip_reason}[/]")
+                    self.console.print(
+                        f"[yellow]{warn_icon} {validation.skip_reason}[/]"
+                    )
                 if validation.error_result:
                     results.append(validation.error_result)
                 continue
@@ -3279,7 +3423,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             error_msg = exec_result.error
 
             # Reset activity timer
-            if hasattr(self, "_current_stream_context") and self._current_stream_context:
+            if (
+                hasattr(self, "_current_stream_context")
+                and self._current_stream_context
+            ):
                 self._current_stream_context.reset_activity_timer()
 
             # --- State updates (orchestrator-local) ---
@@ -3289,14 +3436,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset continuation/input prompts on successful tool call
-            if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
+            if (
+                hasattr(self, "_continuation_prompts")
+                and self._continuation_prompts > 0
+            ):
                 logger.debug(
                     f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
                 )
                 self._continuation_prompts = 0
                 if hasattr(self, "_tool_calls_at_continuation_start"):
                     self._tool_calls_at_continuation_start = self.tool_calls_used
-            if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
+            if (
+                hasattr(self, "_asking_input_prompts")
+                and self._asking_input_prompts > 0
+            ):
                 logger.debug(
                     f"Resetting asking input prompts counter (was {self._asking_input_prompts}) after successful tool call"
                 )
@@ -3305,15 +3458,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             elapsed_ms = (time.monotonic() - start) * 1000
 
             error_type = (
-                type(exec_result.error).__name__ if exec_result.error and not success else None
+                type(exec_result.error).__name__
+                if exec_result.error and not success
+                else None
             )
-            self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
+            self._record_tool_execution(
+                tool_name, success, elapsed_ms, error_type=error_type
+            )
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+            self.unified_tracker.update_from_tool_call(
+                tool_name, normalized_args, result_dict
+            )
 
             # --- Result formatting + conversation injection ---
             output = exec_result.result if success else None
@@ -3344,8 +3503,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
             if semantic_success:
-                logger.debug(f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)")
-                formatted_output = self._format_tool_output(tool_name, normalized_args, output)
+                logger.debug(
+                    f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)"
+                )
+                formatted_output = self._format_tool_output(
+                    tool_name, normalized_args, output
+                )
                 output_preview = str(output)[:500] if output else "<empty>"
                 if len(str(output)) > 500:
                     output_preview += f"... [truncated, total {len(str(output))} chars]"
@@ -3375,10 +3538,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                     )
 
-                error_output = output if isinstance(output, dict) else {"error": error_display}
-                formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)
+                error_output = (
+                    output if isinstance(output, dict) else {"error": error_display}
+                )
+                formatted_error = self._format_tool_output(
+                    tool_name, normalized_args, error_output
+                )
                 self.add_message("user", formatted_error)
-                logger.debug(f"Sent error feedback to model for {tool_name}: {error_display}")
+                logger.debug(
+                    f"Sent error feedback to model for {tool_name}: {error_display}"
+                )
 
                 results.append(
                     {
@@ -3512,7 +3681,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._memory_session_id = session_id
         return success
 
-    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_memory_context(
+        self, max_tokens: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
         Delegates to SessionCoordinator.
@@ -3851,7 +4022,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of message dictionaries
         """
-        return [{"role": m.role, "content": m.content} for m in self.conversation.messages]
+        return [
+            {"role": m.role, "content": m.content} for m in self.conversation.messages
+        ]
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).
@@ -3897,7 +4070,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
 # Install extracted property descriptors onto the class.
 # This runs once at import time and keeps full mock.patch.object compatibility.
-from victor.agent.orchestrator_properties import install_properties as _install_properties
+from victor.agent.orchestrator_properties import (
+    install_properties as _install_properties,
+)
 
 _install_properties(AgentOrchestrator)
 del _install_properties

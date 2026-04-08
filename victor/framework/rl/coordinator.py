@@ -246,8 +246,8 @@ class AsyncWriterQueue:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -255,6 +255,7 @@ class AsyncWriterQueue:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -394,8 +395,8 @@ class BatchedOutcomeWriter:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -403,6 +404,7 @@ class BatchedOutcomeWriter:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -457,7 +459,9 @@ class RLCoordinator:
         rec = coordinator.get_recommendation("continuation_patience", ...)
     """
 
-    def __init__(self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None):
+    def __init__(
+        self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None
+    ):
         """Initialize RL coordinator.
 
         Args:
@@ -488,8 +492,24 @@ class RLCoordinator:
         # Lifecycle state tracking
         self._is_closed = False
 
+        # Per-repo isolation: outcomes are tagged with repo_id
+        self._repo_id: Optional[str] = None
+
+        # Tool name prefixes to exclude from RL recording (test fixtures)
+        self._excluded_tool_prefixes = (
+            "dummy_",
+            "test_",
+            "flaky_",
+            "error_",
+            "always_",
+            "mock_",
+        )
+
         # Ensure core tables exist
         self._ensure_core_tables()
+
+        # Migrate schema: add repo_id column if missing
+        self._migrate_add_repo_id()
 
         # Auto-register default learners
         self._register_default_learners()
@@ -497,7 +517,9 @@ class RLCoordinator:
         # Connect to RL hooks and metrics for event-driven updates
         self._connect_hooks_and_metrics()
 
-        logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
+        logger.info(
+            f"RL: Coordinator initialized with unified database at {self.db_path}"
+        )
 
     def _ensure_core_tables(self) -> None:
         """Create core tables for telemetry and cross-learner analysis."""
@@ -514,6 +536,43 @@ class RLCoordinator:
 
         self.db.commit()
         logger.debug("RL: Core tables ensured")
+
+    def _migrate_add_repo_id(self) -> None:
+        """Add repo_id column to rl_outcome if missing (backward-compatible)."""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"PRAGMA table_info({Tables.RL_OUTCOME})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "repo_id" not in columns:
+                cursor.execute(
+                    f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN repo_id TEXT DEFAULT NULL"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo "
+                    f"ON {Tables.RL_OUTCOME}(repo_id)"
+                )
+                self.db.commit()
+                logger.info("RL: Migrated rl_outcome — added repo_id column")
+        except Exception as e:
+            logger.debug(f"RL: repo_id migration skipped: {e}")
+
+    def set_repo_context(self, repo_id: Optional[str]) -> None:
+        """Set current repo context for outcome isolation.
+
+        When set, all recorded outcomes are tagged with this repo_id,
+        and queries prefer repo-specific data over global data.
+
+        Args:
+            repo_id: Repository identifier (e.g., directory name), or None for global
+        """
+        self._repo_id = repo_id
+        logger.debug(f"RL: Repo context set to {repo_id!r}")
+
+    def _should_record_tool(self, tool_name: str) -> bool:
+        """Check if a tool outcome should be recorded (filters test fixtures)."""
+        if not tool_name:
+            return True
+        return not any(tool_name.startswith(p) for p in self._excluded_tool_prefixes)
 
     def _register_default_learners(self) -> None:
         """Register default learners.
@@ -634,15 +693,25 @@ class RLCoordinator:
                     SemanticThresholdLearner,
                 )
 
-                return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return SemanticThresholdLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "model_selector":
-                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+                from victor.framework.rl.learners.model_selector import (
+                    ModelSelectorLearner,
+                )
 
-                return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return ModelSelectorLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "cache_eviction":
-                from victor.framework.rl.learners.cache_eviction import CacheEvictionLearner
+                from victor.framework.rl.learners.cache_eviction import (
+                    CacheEvictionLearner,
+                )
 
-                return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return CacheEvictionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "grounding_threshold":
                 from victor.framework.rl.learners.grounding_threshold import (
                     GroundingThresholdLearner,
@@ -652,38 +721,66 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "quality_weights":
-                from victor.framework.rl.learners.quality_weights import QualityWeightLearner
+                from victor.framework.rl.learners.quality_weights import (
+                    QualityWeightLearner,
+                )
 
-                return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
+                return QualityWeightLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
+                )
             elif name == "tool_selector":
-                from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
+                from victor.framework.rl.learners.tool_selector import (
+                    ToolSelectorLearner,
+                )
 
-                return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
+                return ToolSelectorLearner(
+                    name=name, db_connection=self.db, learning_rate=0.05
+                )
             elif name == "mode_transition":
-                from victor.framework.rl.learners.mode_transition import ModeTransitionLearner
+                from victor.framework.rl.learners.mode_transition import (
+                    ModeTransitionLearner,
+                )
 
-                return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return ModeTransitionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "prompt_template":
-                from victor.framework.rl.learners.prompt_template import PromptTemplateLearner
+                from victor.framework.rl.learners.prompt_template import (
+                    PromptTemplateLearner,
+                )
 
-                return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return PromptTemplateLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "team_composition":
                 from victor.agent.teams.learner import TeamCompositionLearner
 
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
                 return TeamCompositionLearner(learning_rate=0.1)
             elif name == "cross_vertical":
-                from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
+                from victor.framework.rl.learners.cross_vertical import (
+                    CrossVerticalLearner,
+                )
 
-                return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return CrossVerticalLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "workflow_execution":
-                from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
+                from victor.framework.rl.learners.workflow_execution import (
+                    WorkflowExecutionLearner,
+                )
 
-                return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
+                return WorkflowExecutionLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             elif name == "context_pruning":
-                from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+                from victor.framework.rl.learners.context_pruning import (
+                    ContextPruningLearner,
+                )
 
-                return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
+                return ContextPruningLearner(
+                    name=name, db_connection=self.db, learning_rate=0.15
+                )
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
@@ -708,6 +805,12 @@ class RLCoordinator:
         """
         outcome.vertical = vertical
 
+        # Filter test fixture tools from RL recording
+        tool_name = outcome.metadata.get("tool_name", "") if outcome.metadata else ""
+        if not self._should_record_tool(tool_name):
+            logger.debug(f"RL: Skipping test fixture tool '{tool_name}'")
+            return
+
         learner = self.get_learner(learner_name)
         if not learner:
             logger.warning(f"RL: Unknown learner '{learner_name}', skipping outcome")
@@ -717,14 +820,14 @@ class RLCoordinator:
             # Record in learner-specific tables
             learner.record_outcome(outcome)
 
-            # Record in shared outcomes table
+            # Record in shared outcomes table with repo_id
             cursor = self.db.cursor()
             cursor.execute(
                 f"""
                 INSERT INTO {Tables.RL_OUTCOME} (
                     learner_id, provider, model, task_type, vertical,
-                    success, quality_score, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    repo_id, success, quality_score, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     learner_name,  # Maps to learner_id column
@@ -732,6 +835,7 @@ class RLCoordinator:
                     outcome.model,
                     outcome.task_type,
                     outcome.vertical or "general",  # Default to "general" if None
+                    self._repo_id,  # Per-repo isolation
                     1 if outcome.success else 0,
                     outcome.quality_score,
                     outcome.to_dict()["metadata"],  # JSON string
@@ -865,14 +969,18 @@ class RLCoordinator:
                        False=force immediate)
         """
         # Determine whether to use writer queue
-        should_queue = use_queue if use_queue is not None else self._writer_queue_enabled
+        should_queue = (
+            use_queue if use_queue is not None else self._writer_queue_enabled
+        )
 
         if should_queue and self._writer_queue:
             # Queue for batched writing (non-blocking)
             await self._writer_queue.queue_async(learner_name, outcome, vertical)
         else:
             # Direct write (offloaded to thread pool)
-            await asyncio.to_thread(self.record_outcome, learner_name, outcome, vertical)
+            await asyncio.to_thread(
+                self.record_outcome, learner_name, outcome, vertical
+            )
 
     async def get_recommendation_async(
         self,
@@ -911,7 +1019,9 @@ class RLCoordinator:
         Returns:
             Dictionary mapping learner name to recommendation
         """
-        return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
+        return await asyncio.to_thread(
+            self.get_all_recommendations, provider, model, task_type
+        )
 
     async def export_metrics_async(self) -> Dict[str, Any]:
         """Async version of export_metrics.
@@ -968,7 +1078,11 @@ class RLCoordinator:
         """
         recommendations = {}
 
-        for name in ["continuation_patience", "continuation_prompts", "semantic_threshold"]:
+        for name in [
+            "continuation_patience",
+            "continuation_prompts",
+            "semantic_threshold",
+        ]:
             rec = self.get_recommendation(name, provider, model, task_type)
             if rec:
                 recommendations[name] = rec

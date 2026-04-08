@@ -47,7 +47,9 @@ except ImportError:
         return str(e)
 
 
-chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
+chat_app = typer.Typer(
+    name="chat", help="Start interactive chat or send a one-shot message."
+)
 console = Console()
 
 
@@ -81,6 +83,11 @@ def chat(
         "-l",
         help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
         case_sensitive=False,
+    ),
+    debug_modules: str = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules to set to DEBUG level (e.g., code_search,agent_adapter).",
     ),
     thinking: bool = typer.Option(
         False,
@@ -265,7 +272,9 @@ def chat(
         if mode:
             mode = mode.lower()
             if mode not in {"build", "plan", "explore"}:
-                console.print("[bold red]Error:[/] Invalid mode. Choose from build, plan, explore.")
+                console.print(
+                    "[bold red]Error:[/] Invalid mode. Choose from build, plan, explore."
+                )
                 raise typer.Exit(1)
 
         # Handle workflow mode (--workflow and --validate/--render)
@@ -292,7 +301,9 @@ def chat(
         automation_mode = json_output or plain or code_only
 
         # Smart TUI detection: disable if non-interactive terminal or automation mode
-        use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
+        use_tui = (
+            tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
+        )
 
         # Use ERROR level for automation modes (cleaner output)
         if log_level is None and automation_mode:
@@ -320,13 +331,16 @@ def chat(
         setup_logging(
             command="chat",
             cli_log_level=log_level,
+            cli_debug_modules=debug_modules,
             stream=sys.stderr,
             session_id=session_id,  # Use --sessionid flag value for logging
         )
 
         # Handle --sessions flag (list sessions and exit)
         if list_sessions:
-            from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+            from victor.agent.sqlite_session_persistence import (
+                get_sqlite_session_persistence,
+            )
 
             persistence = get_sqlite_session_persistence()
             sessions = persistence.list_sessions(limit=20)
@@ -368,7 +382,9 @@ def chat(
 
             console.print(table)
             console.print(f"\n[dim]Total: {len(sessions)} session(s)[/]")
-            console.print("[dim]Use 'victor chat --sessionid <id>' to resume a session[/]")
+            console.print(
+                "[dim]Use 'victor chat --sessionid <id>' to resume a session[/]"
+            )
             raise typer.Exit(0)
 
         from victor.agent.debug_logger import configure_logging_levels
@@ -398,7 +414,10 @@ def chat(
 
         # Early configuration validation (P0: catch errors at startup, not runtime)
         try:
-            from victor.config.validation import validate_configuration, format_validation_result
+            from victor.config.validation import (
+                validate_configuration,
+                format_validation_result,
+            )
 
             validation_result = validate_configuration(settings)
             if not validation_result.is_valid:
@@ -406,7 +425,9 @@ def chat(
                 console.print("[bold red]Configuration Validation Failed:[/]")
                 console.print(format_validation_result(validation_result))
                 console.print("")
-                console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
+                console.print(
+                    "[yellow]Run 'victor config validate' for detailed diagnostics[/]"
+                )
                 raise typer.Exit(1)
         except Exception as e:
             # If validation itself fails, log it but don't block startup
@@ -585,7 +606,9 @@ async def run_oneshot(
 
         if legacy_mode:
             # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+            agent = await AgentOrchestrator.from_settings(
+                settings, profile, thinking=thinking
+            )
         else:
             # Framework path: use FrameworkShim with observability and verticals
             vertical_class = get_vertical(vertical) if vertical else None
@@ -635,7 +658,9 @@ async def run_oneshot(
         agent.start_embedding_preload()
 
         # Planning mode requires non-streaming (plan generation → step execution → summary)
-        use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
+        use_streaming = (
+            stream and agent.provider.supports_streaming() and not enable_planning
+        )
 
         if use_streaming:
             from victor.ui.rendering import (
@@ -648,9 +673,13 @@ async def run_oneshot(
             if renderer_choice in {"rich-text", "text"}:
                 use_live = False
             renderer = (
-                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+                LiveDisplayRenderer(console)
+                if use_live
+                else FormatterRenderer(formatter, console)
             )
-            await stream_response(agent, message, renderer, suppress_thinking=not show_reasoning)
+            await stream_response(
+                agent, message, renderer, suppress_thinking=not show_reasoning
+            )
         else:
             # Use streaming pipeline with BufferedRenderer to capture
             # tool calls and reasoning that agent.chat() would swallow
@@ -663,7 +692,9 @@ async def run_oneshot(
                 show_reasoning=show_reasoning,
                 plain=formatter._plain if hasattr(formatter, "_plain") else False,
             )
-            await stream_response(agent, message, buffered, suppress_thinking=not show_reasoning)
+            await stream_response(
+                agent, message, buffered, suppress_thinking=not show_reasoning
+            )
             buffered.flush(console)
 
         success = True
@@ -735,7 +766,9 @@ async def run_interactive(
 
         if legacy_mode:
             # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
+            agent = await AgentOrchestrator.from_settings(
+                settings, profile, thinking=thinking
+            )
         else:
             # Framework path: use FrameworkShim with observability and verticals
             vertical_class = get_vertical(vertical) if vertical else None
@@ -756,7 +789,9 @@ async def run_interactive(
 
             # Resume session if requested
             if resume_session_id:
-                from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+                from victor.agent.sqlite_session_persistence import (
+                    get_sqlite_session_persistence,
+                )
                 from victor.agent.message_history import MessageHistory
                 from victor.agent.conversation_state import ConversationStateMachine
 
@@ -764,7 +799,9 @@ async def run_interactive(
                 session_data = persistence.load_session(resume_session_id)
 
                 if not session_data:
-                    console.print(f"[bold red]Error:[/ ] Session not found: {resume_session_id}")
+                    console.print(
+                        f"[bold red]Error:[/ ] Session not found: {resume_session_id}"
+                    )
                     raise typer.Exit(1)
 
                 # Restore conversation
@@ -942,7 +979,9 @@ async def _run_cli_repl(
     show_reasoning: bool = False,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
-    vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
+    vertical_display = (
+        f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
+    )
     panel_content = (
         f"[bold blue]Victor[/] - Open-source agentic AI framework\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
@@ -1069,7 +1108,9 @@ async def run_workflow_mode(
         raise typer.Exit(1)
 
     if workflow_file.suffix not in {".yaml", ".yml"}:
-        console.print(f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}")
+        console.print(
+            f"[bold red]Error:[/] File must be .yaml or .yml: {workflow_path}"
+        )
         raise typer.Exit(1)
 
     console.print(f"\n[bold blue]Workflow:[/] {workflow_file.name}")
@@ -1161,7 +1202,9 @@ async def run_workflow_mode(
             # SVG/PNG require output path
             if fmt in {VizFormat.SVG, VizFormat.PNG} and not render_output:
                 # Generate default output path
-                render_output = str(workflow_file.with_suffix(f".{render_format.lower()}"))
+                render_output = str(
+                    workflow_file.with_suffix(f".{render_format.lower()}")
+                )
                 console.print(f"[dim]Output: {render_output}[/]")
 
             console.print(f"\n[bold]Rendering as {render_format.upper()}...[/]")
@@ -1202,7 +1245,9 @@ async def run_workflow_mode(
         orchestrator = None
         from victor.workflows.definition import AgentNode
 
-        has_agent_nodes = any(isinstance(node, AgentNode) for node in workflow.nodes.values())
+        has_agent_nodes = any(
+            isinstance(node, AgentNode) for node in workflow.nodes.values()
+        )
 
         if has_agent_nodes:
             shim = FrameworkShim(
@@ -1229,7 +1274,9 @@ async def run_workflow_mode(
         if result.success:
             console.print("[bold green]✓[/] Workflow completed successfully")
             console.print(f"  [dim]Duration: {result.duration_seconds:.2f}s[/]")
-            console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
+            console.print(
+                f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]"
+            )
             console.print(f"  [dim]Iterations: {result.iterations}[/]")
 
             if result.state:
