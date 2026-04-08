@@ -20,6 +20,7 @@ from victor.agent.conversation_state import (
     ConversationStateMachine,
     STAGE_KEYWORDS,
     WEAK_EXECUTION_KEYWORDS,
+    NATURAL_BACKWARD_TRANSITIONS,
 )
 from victor.tools.metadata_registry import get_tools_by_stage
 
@@ -834,3 +835,87 @@ class TestNaturalStageProgression:
             sm.state.observed_files.add(f"file_{i}.py")
 
         assert sm._should_force_execution_transition() is True
+
+
+class TestStageRegressionPrevention:
+    """Tests for explicit backward transition allowlist.
+
+    READING→INITIAL regression trapped the agent in read-only mode
+    for 240s during SWE-bench task 3 (astropy-14365).
+    """
+
+    @staticmethod
+    def _make_sm():
+        """Create state machine with cooldown disabled for testing."""
+        sm = ConversationStateMachine()
+        sm.TRANSITION_COOLDOWN_SECONDS = 0.0
+        return sm
+
+    def test_reading_to_initial_blocked(self):
+        """READING→INITIAL at confidence 0.70 must be blocked."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.READING, confidence=0.8)
+
+        # Attempt backward transition
+        sm._transition_to(ConversationStage.INITIAL, confidence=0.70)
+
+        # Should stay in READING — not a natural backward transition
+        assert sm.state.stage == ConversationStage.READING
+
+    def test_execution_to_reading_allowed(self):
+        """EXECUTION→READING at confidence 0.50 allowed (natural cycle)."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+        sm._transition_to(ConversationStage.READING, confidence=0.50)
+        assert sm.state.stage == ConversationStage.READING
+
+    def test_execution_to_analysis_allowed(self):
+        """EXECUTION→ANALYSIS at confidence 0.55 allowed (natural cycle)."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+        sm._transition_to(ConversationStage.ANALYSIS, confidence=0.55)
+        assert sm.state.stage == ConversationStage.ANALYSIS
+
+    def test_reading_to_planning_blocked(self):
+        """READING→PLANNING not in natural transitions — needs high confidence."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.READING, confidence=0.8)
+        sm._transition_to(ConversationStage.PLANNING, confidence=0.70)
+        # Blocked — requires BACKWARD_TRANSITION_THRESHOLD (0.85)
+        assert sm.state.stage == ConversationStage.READING
+
+    def test_forward_transitions_always_allowed(self):
+        """Forward transitions always succeed regardless of confidence."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.READING, confidence=0.3)
+        assert sm.state.stage == ConversationStage.READING
+        sm._transition_to(ConversationStage.EXECUTION, confidence=0.3)
+        assert sm.state.stage == ConversationStage.EXECUTION
+
+    def test_natural_transitions_allowlist_complete(self):
+        """Verify NATURAL_BACKWARD_TRANSITIONS covers expected pairs."""
+        assert (
+            ConversationStage.EXECUTION,
+            ConversationStage.READING,
+        ) in NATURAL_BACKWARD_TRANSITIONS
+        assert (
+            ConversationStage.EXECUTION,
+            ConversationStage.ANALYSIS,
+        ) in NATURAL_BACKWARD_TRANSITIONS
+        assert (
+            ConversationStage.ANALYSIS,
+            ConversationStage.READING,
+        ) in NATURAL_BACKWARD_TRANSITIONS
+        assert (
+            ConversationStage.VERIFICATION,
+            ConversationStage.EXECUTION,
+        ) in NATURAL_BACKWARD_TRANSITIONS
+        # These should NOT be in the allowlist
+        assert (
+            ConversationStage.READING,
+            ConversationStage.INITIAL,
+        ) not in NATURAL_BACKWARD_TRANSITIONS
+        assert (
+            ConversationStage.EXECUTION,
+            ConversationStage.INITIAL,
+        ) not in NATURAL_BACKWARD_TRANSITIONS

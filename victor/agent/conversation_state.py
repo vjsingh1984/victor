@@ -121,6 +121,24 @@ STAGE_ORDER: Dict[ConversationStage, int] = {
 # Scored at 0.5 instead of 1.0 to prevent premature EXECUTION stage detection.
 WEAK_EXECUTION_KEYWORDS = {"fix", "add", "change", "update"}
 
+# Explicit allowlist of natural backward stage transitions.
+# These get the lower threshold (0.50) instead of BACKWARD_TRANSITION_THRESHOLD (0.85).
+# All other backward transitions require high confidence to prevent regressions.
+NATURAL_BACKWARD_TRANSITIONS = {
+    (ConversationStage.EXECUTION, ConversationStage.READING),  # verify-after-edit
+    (ConversationStage.EXECUTION, ConversationStage.ANALYSIS),  # re-analyze after edit
+    (ConversationStage.ANALYSIS, ConversationStage.READING),  # need more file context
+    (
+        ConversationStage.VERIFICATION,
+        ConversationStage.EXECUTION,
+    ),  # fix after failed test
+    (
+        ConversationStage.VERIFICATION,
+        ConversationStage.ANALYSIS,
+    ),  # re-analyze after test
+    (ConversationStage.COMPLETION, ConversationStage.VERIFICATION),  # re-verify
+}
+
 STAGE_KEYWORDS: Dict[ConversationStage, List[str]] = {
     ConversationStage.INITIAL: ["what", "how", "where", "explain", "help", "can you"],
     ConversationStage.PLANNING: ["plan", "approach", "strategy", "design", "architect"],
@@ -755,15 +773,10 @@ class ConversationStateMachine:
         old_stage = self.state.stage
 
         # Don't transition backwards unless confidence is sufficient.
-        # Allow EXECUTION→READING/ANALYSIS with a lower threshold since
-        # execute→verify→re-execute is a core agentic pattern (SWE-bench, bug fixes).
+        # Natural backward transitions (explicit allowlist) use lower threshold (0.50).
+        # All other backward transitions require BACKWARD_TRANSITION_THRESHOLD (0.85).
         if STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]:
-            # Allow natural backward transitions with lower threshold:
-            # - EXECUTION→READING/ANALYSIS (verify-after-edit cycle)
-            # - ANALYSIS→READING (need more file context during analysis)
-            # - VERIFICATION→EXECUTION (fix after failed test)
-            step_back = STAGE_ORDER[old_stage] - STAGE_ORDER[new_stage]
-            is_natural_backward = step_back <= 2  # At most 2 stages back
+            is_natural_backward = (old_stage, new_stage) in NATURAL_BACKWARD_TRANSITIONS
             threshold = (
                 0.50 if is_natural_backward else self.BACKWARD_TRANSITION_THRESHOLD
             )
