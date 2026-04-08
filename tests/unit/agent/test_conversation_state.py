@@ -19,6 +19,7 @@ from victor.agent.conversation_state import (
     ConversationState,
     ConversationStateMachine,
     STAGE_KEYWORDS,
+    WEAK_EXECUTION_KEYWORDS,
 )
 from victor.tools.metadata_registry import get_tools_by_stage
 
@@ -218,13 +219,20 @@ class TestConversationStateMachine:
         assert summary["files_observed"] == 1
 
     def test_detect_stage_from_content_execution(self):
-        """Test detecting execution stage from message content."""
+        """Test detecting execution stage from message content.
+
+        EXECUTION is only returned after the agent has observed files.
+        On the first message with no files read, it returns READING instead.
+        """
         sm = ConversationStateMachine()
+        # Simulate having observed files (post-exploration)
+        sm.state.message_count = 2
+        sm.state.observed_files = {"some_file.py"}
 
         # Message with execution keywords
         stage = sm._detect_stage_from_content("Please fix and implement this change")
 
-        # Should detect execution stage (multiple keywords)
+        # Should detect execution stage (files already observed)
         assert stage == ConversationStage.EXECUTION
 
     def test_detect_stage_from_content_no_match(self):
@@ -279,7 +287,9 @@ class TestConversationStateMachineTransitions:
         sm = ConversationStateMachine()
 
         # Send message with strong execution keywords
-        sm.record_message("Please fix and change and implement this update", is_user=True)
+        sm.record_message(
+            "Please fix and change and implement this update", is_user=True
+        )
 
         # Confidence should be updated
         assert sm.state._stage_confidence >= 0
@@ -528,3 +538,299 @@ class TestConversationStateMachineRegistryIntegration:
             # Custom tool from registry should get high boost
             boost = sm.get_tool_priority_boost("custom_exec_tool")
             assert boost == 0.15  # High boost for stage-relevant tools
+
+
+class TestEdgeModelStageTransitionFallback:
+    """Tests for edge model fallback in stage transitions (FEP)."""
+
+    def _make_decision_result(self, stage: str, confidence: float, source: str = "llm"):
+        """Create a mock DecisionResult."""
+        from unittest.mock import MagicMock
+
+        result = MagicMock()
+        result.result.stage = stage
+        result.confidence = confidence
+        result.source = source
+        return result
+
+    def _make_sm_at_execution(self):
+        """Create a state machine at EXECUTION stage with recent read tools."""
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.EXECUTION
+        sm.state.last_tools = ["read", "code_search", "read", "read", "code_search"]
+        return sm
+
+    def _stage_tools_side_effect(self, stage):
+        """Return stage-specific tool sets so detection works properly."""
+        mapping = {
+            ConversationStage.READING: {"read", "code_search", "ls"},
+            ConversationStage.ANALYSIS: {"code_search", "overview", "refs"},
+            ConversationStage.EXECUTION: {"edit", "write", "shell"},
+            ConversationStage.INITIAL: {"read", "ls"},
+            ConversationStage.PLANNING: {"read", "overview"},
+            ConversationStage.VERIFICATION: {"test", "shell"},
+            ConversationStage.COMPLETION: set(),
+        }
+        return mapping.get(stage, set())
+
+    def test_edge_model_called_when_heuristic_low_confidence(self):
+        """Edge model should be consulted when tool overlap is below threshold."""
+        from unittest.mock import patch, MagicMock
+
+        sm = self._make_sm_at_execution()
+
+        decision = self._make_decision_result("analysis", 0.90)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with patch.object(
+            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
+        ), patch("victor.core.get_container") as mock_container, patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Edge model should have been called (read/code_search overlap
+            # with READING=2 but < MIN_TOOLS_FOR_TRANSITION=3)
+            mock_service.decide_sync.assert_called_once()
+
+    def test_edge_model_not_called_when_heuristic_high_confidence(self):
+        """Edge model should NOT be called when tool overlap meets threshold."""
+        from unittest.mock import patch, MagicMock
+
+        sm = ConversationStateMachine()
+        sm.state.stage = ConversationStage.INITIAL
+        sm.state.last_tools = ["edit", "write", "shell", "edit", "write"]
+
+        mock_service = MagicMock()
+
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"edit", "write", "shell"},
+        ), patch("victor.core.get_container") as mock_container:
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Edge model should NOT have been called (high overlap = 3+)
+            mock_service.decide_sync.assert_not_called()
+
+    def test_graceful_fallback_when_edge_model_unavailable(self):
+        """When edge model returns None, heuristic behavior is preserved."""
+        from unittest.mock import patch
+
+        sm = self._make_sm_at_execution()
+
+        with patch(
+            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            return_value={"read", "code_search"},
+        ), patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm, patch(
+            "victor.core.get_container"
+        ) as mock_container:
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = None  # No service
+
+            sm._maybe_transition()
+
+            # Should stay at EXECUTION (no transition)
+            assert sm.state.stage == ConversationStage.EXECUTION
+
+    def test_edge_model_overrides_heuristic_on_higher_confidence(self):
+        """Edge model with higher confidence should override heuristic."""
+        from unittest.mock import patch, MagicMock
+
+        sm = self._make_sm_at_execution()
+
+        decision = self._make_decision_result("analysis", 0.90)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with patch.object(
+            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
+        ), patch("victor.core.get_container") as mock_container, patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Should transition to ANALYSIS (edge model overrode heuristic)
+            assert sm.state.stage == ConversationStage.ANALYSIS
+
+    def test_feature_flag_off_skips_edge_model(self):
+        """When USE_EDGE_MODEL is disabled, edge model is never called."""
+        from unittest.mock import patch, MagicMock
+
+        sm = self._make_sm_at_execution()
+
+        mock_service = MagicMock()
+
+        with patch.object(
+            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
+        ), patch("victor.core.get_container") as mock_container, patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = False
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Edge model should NOT have been called
+            mock_service.decide_sync.assert_not_called()
+            # Should stay at EXECUTION
+            assert sm.state.stage == ConversationStage.EXECUTION
+
+    def test_execution_to_analysis_backward_transition(self):
+        """EXECUTION→ANALYSIS should succeed when edge model has sufficient confidence."""
+        from unittest.mock import patch, MagicMock
+
+        sm = self._make_sm_at_execution()
+
+        decision = self._make_decision_result("analysis", 0.85)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with patch.object(
+            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
+        ), patch("victor.core.get_container") as mock_container, patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Backward transition should succeed (verify cycle threshold = 0.50)
+            assert sm.state.stage == ConversationStage.ANALYSIS
+
+    def test_edge_model_context_includes_tools_and_stage(self):
+        """Edge model context should include last_tools, current_stage, and heuristic."""
+        from unittest.mock import patch, MagicMock
+
+        sm = self._make_sm_at_execution()
+
+        decision = self._make_decision_result("analysis", 0.90)
+        mock_service = MagicMock()
+        mock_service.decide_sync.return_value = decision
+
+        with patch.object(
+            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
+        ), patch("victor.core.get_container") as mock_container, patch(
+            "victor.core.feature_flags.get_feature_flag_manager"
+        ) as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = True
+            mock_container.return_value.get.return_value = mock_service
+
+            sm._maybe_transition()
+
+            # Verify context passed to edge model
+            call_args = mock_service.decide_sync.call_args
+            context = call_args[1].get("context") or call_args[0][1]
+            assert "last_tools" in context
+            assert "current_stage" in context
+            assert "detected_stage_heuristic" in context
+
+
+class TestNaturalStageProgression:
+    """Tests for decision pipeline reordering — natural stage progression.
+
+    The agent should explore (READING) before editing (EXECUTION).
+    Bug-fix tasks match EXECUTION keywords but the agent hasn't seen any code yet.
+    """
+
+    def test_first_message_execution_intent_maps_to_reading(self):
+        """First message with strong edit intent → READING, not EXECUTION.
+
+        The agent must read files before editing. EXECUTION keywords on
+        the first message should be suppressed when no files are observed.
+        """
+        sm = ConversationStateMachine()
+        # Simulate first message — no files observed
+        assert sm.state.message_count == 0
+        assert len(sm.state.observed_files) == 0
+
+        # "create" + "implement" = 2.0 (both strong), would normally → EXECUTION
+        result = sm._detect_stage_from_content(
+            "Create and implement a fix for the separability_matrix bug"
+        )
+        assert result == ConversationStage.READING
+
+    def test_execution_after_files_observed(self):
+        """After reading files, EXECUTION keywords should work normally."""
+        sm = ConversationStateMachine()
+        # Simulate having observed files
+        sm.state.message_count = 3
+        sm.state.observed_files = {"astropy/modeling/separable.py", "tests/test.py"}
+
+        result = sm._detect_stage_from_content(
+            "Fix the bug by modifying the separability_matrix function"
+        )
+        # "fix" (0.5) + "modify" (1.0) = 1.5 < 2, but "modify" alone is strong
+        # With files observed, the first-message guard doesn't apply
+        assert result == ConversationStage.EXECUTION
+
+    def test_weak_keywords_dont_shortcircuit(self):
+        """Weak EXECUTION keywords ('fix', 'add') score 0.5, not 1.0.
+
+        'fix the add' = 0.5 + 0.5 = 1.0, below threshold 2.
+        Should fall through to edge model or lower-confidence path.
+        """
+        sm = ConversationStateMachine()
+        sm.state.message_count = 5  # Not first message
+        sm.state.observed_files = {"some_file.py"}
+
+        # Count weak keywords manually
+        content = "fix the add"
+        score = 0.0
+        for kw in STAGE_KEYWORDS[ConversationStage.EXECUTION]:
+            if kw in content.lower():
+                if kw in WEAK_EXECUTION_KEYWORDS:
+                    score += 0.5
+                else:
+                    score += 1.0
+        assert score < 2.0, f"Weak keywords scored {score}, should be < 2"
+
+    def test_strong_keywords_still_shortcircuit(self):
+        """Strong EXECUTION keywords ('create', 'implement') still score 1.0.
+
+        'create and implement a new feature' = 1.0 + 1.0 = 2.0, hits threshold.
+        """
+        sm = ConversationStateMachine()
+        sm.state.message_count = 5
+        sm.state.observed_files = {"some_file.py"}
+
+        result = sm._detect_stage_from_content(
+            "create and implement a new feature for the module"
+        )
+        assert result == ConversationStage.EXECUTION
+
+    def test_benchmark_adapter_starts_reading(self):
+        """Benchmark adapter should set READING, not lock EXECUTION."""
+        from unittest.mock import MagicMock
+
+        sm = ConversationStateMachine()
+        default_min_tools = sm.MIN_TOOLS_FOR_TRANSITION
+
+        # Simulate what the new benchmark adapter does
+        sm._transition_to(ConversationStage.READING, confidence=0.8)
+
+        assert sm.state.stage == ConversationStage.READING
+        # MIN_TOOLS_FOR_TRANSITION should NOT be locked to 999
+        assert sm.MIN_TOOLS_FOR_TRANSITION == default_min_tools
+
+    def test_force_execution_after_5_reads(self):
+        """After MAX_READS_WITHOUT_EDIT reads, force READING→EXECUTION."""
+        sm = ConversationStateMachine()
+        sm._transition_to(ConversationStage.READING, confidence=0.8)
+
+        # Simulate reading files
+        for i in range(sm.MAX_READS_WITHOUT_EDIT):
+            sm.state.observed_files.add(f"file_{i}.py")
+
+        assert sm._should_force_execution_transition() is True

@@ -90,9 +90,11 @@ Migration Example:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
-from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
+from victor.tools.metadata_registry import (
+    get_tools_by_stage as registry_get_tools_by_stage,
+)
 from victor.core.events import ObservabilityBus
 
 if TYPE_CHECKING:
@@ -115,6 +117,10 @@ STAGE_ORDER: Dict[ConversationStage, int] = {
 # Use registry_get_tools_by_stage() to get tools for a stage.
 
 # Keywords that suggest specific stages
+# Weak EXECUTION keywords — common in bug descriptions but don't imply edit intent.
+# Scored at 0.5 instead of 1.0 to prevent premature EXECUTION stage detection.
+WEAK_EXECUTION_KEYWORDS = {"fix", "add", "change", "update"}
+
 STAGE_KEYWORDS: Dict[ConversationStage, List[str]] = {
     ConversationStage.INITIAL: ["what", "how", "where", "explain", "help", "can you"],
     ConversationStage.PLANNING: ["plan", "approach", "strategy", "design", "architect"],
@@ -258,7 +264,7 @@ class ConversationStateMachine:
 
     # Maximum reads without edit before forcing READING → EXECUTION transition
     # Prevents infinite exploration in SWE-bench style bug fix tasks
-    MAX_READS_WITHOUT_EDIT: int = 7
+    MAX_READS_WITHOUT_EDIT: int = 5
 
     def __init__(
         self,
@@ -423,7 +429,9 @@ class ConversationStateMachine:
     def _detect_stage_from_content(self, content: str) -> Optional[ConversationStage]:
         """Detect stage from message content.
 
-        Uses keyword matching first, then edge model for ambiguous cases.
+        Priority: LLM decision service → keyword heuristics (fallback).
+        The LLM considers full context (message, stage, files observed).
+        Heuristics are fast fallback when LLM is unavailable or budget exhausted.
 
         Args:
             content: Message content to analyze
@@ -431,40 +439,67 @@ class ConversationStateMachine:
         Returns:
             Detected stage or None
         """
-        content_lower = content.lower()
+        # 1. Try LLM decision service FIRST (considers full context)
+        edge_stage, edge_conf = self._detect_stage_with_edge_model(content)
+        if edge_stage is not None:
+            # Guard: suppress EXECUTION before any files are read
+            if (
+                edge_stage == ConversationStage.EXECUTION
+                and self.state.message_count <= 1
+                and not self.state.observed_files
+            ):
+                logger.info(
+                    "LLM detected EXECUTION but no files read yet — using READING"
+                )
+                return ConversationStage.READING
+            return edge_stage
 
-        # Score each stage based on keyword matches
-        scores: Dict[ConversationStage, int] = {}
+        # 2. Fallback: keyword heuristics with weighted scoring
+        content_lower = content.lower()
+        scores: Dict[ConversationStage, float] = {}
 
         for stage, keywords in STAGE_KEYWORDS.items():
-            score = sum(1 for kw in keywords if kw in content_lower)
-            if score > 0:
-                scores[stage] = score
+            for kw in keywords:
+                if kw in content_lower:
+                    weight = 1.0
+                    if (
+                        stage == ConversationStage.EXECUTION
+                        and kw in WEAK_EXECUTION_KEYWORDS
+                    ):
+                        weight = 0.5
+                    scores[stage] = scores.get(stage, 0) + weight
 
         if scores:
             best_stage = max(scores, key=scores.get)  # type: ignore
-            if scores[best_stage] >= 2:  # High confidence — use keyword result
-                return best_stage
-
-        # Low confidence or no keyword match — try edge model
-        edge_stage = self._detect_stage_with_edge_model(content)
-        if edge_stage is not None:
-            return edge_stage
-
-        # Fall through to best keyword match even with score < 2
-        if scores:
-            return max(scores, key=scores.get)  # type: ignore
+            # Guard: suppress EXECUTION before any files are read
+            if (
+                best_stage == ConversationStage.EXECUTION
+                and self.state.message_count <= 1
+                and not self.state.observed_files
+            ):
+                return ConversationStage.READING
+            return best_stage
 
         return None
 
-    def _detect_stage_with_edge_model(self, content: str) -> Optional[ConversationStage]:
-        """Use edge model for stage detection when keywords are ambiguous.
+    def _detect_stage_with_edge_model(
+        self,
+        content: str,
+        tool_context: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[ConversationStage], float]:
+        """Use edge model for stage detection when heuristics are ambiguous.
+
+        Called from two paths:
+        1. Content-based detection (keywords ambiguous) — tool_context is None
+        2. Tool-based transition fallback (overlap too low) — tool_context has
+           last_tools, current_stage, detected_stage_heuristic
 
         Args:
-            content: Message content to analyze
+            content: Message content to analyze (may be empty for tool path)
+            tool_context: Optional dict with tool-based context for richer prompt
 
         Returns:
-            Detected ConversationStage or None
+            Tuple of (detected stage, confidence) or (None, 0.0)
         """
         try:
             from victor.core import get_container
@@ -477,27 +512,42 @@ class ConversationStateMachine:
 
             service = container.get(LLMDecisionServiceProtocol)
             if service is None:
-                return None
+                return None, 0.0
 
             from victor.agent.decisions.schemas import DecisionType
 
+            context: Dict[str, Any] = {
+                "message_excerpt": content[:200] if content else "",
+                "current_stage": (
+                    tool_context.get("current_stage", "") if tool_context else ""
+                ),
+                "last_tools": (
+                    tool_context.get("last_tools", "") if tool_context else ""
+                ),
+                "detected_stage_heuristic": (
+                    tool_context.get("detected_stage_heuristic", "")
+                    if tool_context
+                    else ""
+                ),
+            }
+
             decision = service.decide_sync(
                 DecisionType.STAGE_DETECTION,
-                context={"message_excerpt": content[:200]},
+                context=context,
                 heuristic_confidence=0.0,
             )
 
             if decision.source in ("heuristic", "budget_exhausted", "timeout_fallback"):
-                return None
+                return None, 0.0
 
             if not hasattr(decision.result, "stage"):
-                return None
+                return None, 0.0
 
             stage_name = decision.result.stage
             confidence = decision.confidence
 
             if confidence < 0.6:
-                return None
+                return None, 0.0
 
             # Map string to ConversationStage enum
             stage_map = {
@@ -511,12 +561,14 @@ class ConversationStateMachine:
             }
             result = stage_map.get(stage_name)
             if result:
-                logger.info(f"Edge stage detection: {stage_name} (confidence={confidence:.2f})")
-            return result
+                logger.info(
+                    f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
+                )
+            return result, confidence
 
         except Exception as e:
             logger.debug(f"Edge stage detection unavailable: {e}")
-            return None
+            return None, 0.0
 
     def _detect_stage_from_tools(self) -> Optional[ConversationStage]:
         """Detect stage from recent tool execution patterns.
@@ -549,7 +601,9 @@ class ConversationStateMachine:
             elif self.state.stage in tied_stages:
                 # Current stage is tied - stay to avoid oscillation
                 detected = self.state.stage
-                logger.debug("_detect_stage_from_tools: Tie resolved by staying at current stage")
+                logger.debug(
+                    "_detect_stage_from_tools: Tie resolved by staying at current stage"
+                )
             else:
                 # Pick the most advanced (highest in workflow order)
                 detected = max(tied_stages, key=lambda s: STAGE_ORDER[s])
@@ -597,9 +651,52 @@ class ConversationStateMachine:
             if recent_overlap >= self.MIN_TOOLS_FOR_TRANSITION:
                 self._transition_to(detected, confidence=0.6 + (recent_overlap * 0.1))
             else:
-                logger.debug(
-                    f"_maybe_transition: Transition blocked - overlap {recent_overlap} < threshold {self.MIN_TOOLS_FOR_TRANSITION}"
+                # Heuristic uncertain — consult edge model as tiebreaker
+                heuristic_confidence = 0.6 + (recent_overlap * 0.1)
+                edge_stage, edge_confidence = self._try_edge_model_transition(
+                    detected, heuristic_confidence
                 )
+                if edge_stage is not None and edge_confidence > heuristic_confidence:
+                    logger.info(
+                        f"Edge model override: {detected.name}→{edge_stage.name} "
+                        f"(edge={edge_confidence:.2f} > heuristic={heuristic_confidence:.2f})"
+                    )
+                    self._transition_to(edge_stage, confidence=edge_confidence)
+                else:
+                    logger.debug(
+                        f"_maybe_transition: Transition blocked - overlap {recent_overlap} "
+                        f"< threshold {self.MIN_TOOLS_FOR_TRANSITION}, edge model did not override"
+                    )
+
+    def _try_edge_model_transition(
+        self,
+        heuristic_stage: ConversationStage,
+        heuristic_confidence: float,
+    ) -> Tuple[Optional[ConversationStage], float]:
+        """Try edge model as fallback when heuristic confidence is low.
+
+        Only called when USE_EDGE_MODEL feature flag is enabled.
+        Returns (None, 0.0) if edge model is unavailable or disabled.
+        """
+        try:
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+            if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL):
+                return None, 0.0
+        except Exception:
+            return None, 0.0
+
+        return self._detect_stage_with_edge_model(
+            content="",
+            tool_context={
+                "last_tools": (
+                    ",".join(self.state.last_tools) if self.state.last_tools else ""
+                ),
+                "current_stage": self.state.stage.name.lower(),
+                "detected_stage_heuristic": heuristic_stage.name.lower(),
+                "message_excerpt": "",
+            },
+        )
 
     def _should_force_execution_transition(self) -> bool:
         """Check if we should force transition from READING to EXECUTION.
@@ -616,7 +713,10 @@ class ConversationStateMachine:
             True if we should force transition to EXECUTION
         """
         # Only force from READING or ANALYSIS stages
-        if self.state.stage not in {ConversationStage.READING, ConversationStage.ANALYSIS}:
+        if self.state.stage not in {
+            ConversationStage.READING,
+            ConversationStage.ANALYSIS,
+        }:
             return False
 
         # Only force if we've read many files but haven't edited any
@@ -632,7 +732,9 @@ class ConversationStateMachine:
 
         return False
 
-    def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:
+    def _transition_to(
+        self, new_stage: ConversationStage, confidence: float = 0.5
+    ) -> None:
         """Transition to a new stage.
 
         Args:
@@ -652,18 +754,25 @@ class ConversationStateMachine:
 
         old_stage = self.state.stage
 
-        # Don't transition backwards unless confidence is high
-        # Use class constant for threshold
-        # Compare stage order (not string values) to determine backward transition
-        if (
-            STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]
-            and confidence < self.BACKWARD_TRANSITION_THRESHOLD
-        ):
-            logger.debug(
-                f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
-                f"confidence={confidence:.2f} < threshold={self.BACKWARD_TRANSITION_THRESHOLD}"
+        # Don't transition backwards unless confidence is sufficient.
+        # Allow EXECUTION→READING/ANALYSIS with a lower threshold since
+        # execute→verify→re-execute is a core agentic pattern (SWE-bench, bug fixes).
+        if STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]:
+            # Allow natural backward transitions with lower threshold:
+            # - EXECUTION→READING/ANALYSIS (verify-after-edit cycle)
+            # - ANALYSIS→READING (need more file context during analysis)
+            # - VERIFICATION→EXECUTION (fix after failed test)
+            step_back = STAGE_ORDER[old_stage] - STAGE_ORDER[new_stage]
+            is_natural_backward = step_back <= 2  # At most 2 stages back
+            threshold = (
+                0.50 if is_natural_backward else self.BACKWARD_TRANSITION_THRESHOLD
             )
-            return
+            if confidence < threshold:
+                logger.debug(
+                    f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
+                    f"confidence={confidence:.2f} < threshold={threshold}"
+                )
+                return
 
         if new_stage != old_stage:
             # Enforce cooldown to prevent stage thrashing
@@ -828,7 +937,9 @@ class ConversationStateMachine:
         for record in self._transition_history:
             path = f"{record['from_stage']}->{record['to_stage']}"
             path_counts[path] = path_counts.get(path, 0) + 1
-            stage_entries[record["to_stage"]] = stage_entries.get(record["to_stage"], 0) + 1
+            stage_entries[record["to_stage"]] = (
+                stage_entries.get(record["to_stage"], 0) + 1
+            )
             total_confidence += record["confidence"]
 
         return {

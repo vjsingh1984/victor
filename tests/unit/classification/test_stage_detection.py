@@ -143,11 +143,17 @@ class TestConversationStateMachine:
         ]
 
     def test_detect_stage_from_execution_keywords(self):
-        """Test stage detection from execution keywords."""
+        """Test stage detection from execution keywords.
+
+        EXECUTION requires files to be observed first (natural progression).
+        """
         machine = ConversationStateMachine()
+        # Simulate files already explored
+        machine.state.message_count = 2
+        machine.state.observed_files = {"module.py"}
         machine.record_message("Please implement the changes and fix the bug")
 
-        # Should detect EXECUTION stage
+        # Should detect EXECUTION stage (files observed)
         assert machine.get_stage() == ConversationStage.EXECUTION
 
     def test_detect_stage_from_tool_execution(self):
