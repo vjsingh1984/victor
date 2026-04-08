@@ -160,6 +160,8 @@ class LSPWriteEnhancer:
         self._language_registry: Optional["LanguageRegistryProtocol"] = (
             language_registry
         )
+        # Use in-process black library by default (faster, no subprocess overhead)
+        self._use_thread_formatter = True
 
     async def _get_lsp_pool(self) -> "LSPPoolProtocol":
         """Get or create LSP connection pool.
@@ -283,7 +285,16 @@ class LSPWriteEnhancer:
         if not formatter:
             return content, None
 
-        # Write content to temp file for formatting
+        # Try in-process formatting first (faster, no subprocess overhead)
+        if formatter.name == "black" and self._use_thread_formatter:
+            try:
+                formatted = self._format_with_black_library(content, file_path)
+                if formatted is not None:
+                    return formatted, "black (in-process)"
+            except Exception as e:
+                logger.debug(f"In-process black failed, falling to subprocess: {e}")
+
+        # Fallback: subprocess-based formatting
         import tempfile
 
         with tempfile.NamedTemporaryFile(
@@ -293,7 +304,6 @@ class LSPWriteEnhancer:
             tmp.write(content)
 
         try:
-            # Run formatter
             cmd = formatter.command.copy()
             cmd.append(tmp_path)
 
@@ -302,11 +312,10 @@ class LSPWriteEnhancer:
                 capture_output=True,
                 text=True,
                 cwd=self._workspace_root,
-                timeout=30,
+                timeout=10,
             )
 
             if result.returncode == 0:
-                # Read formatted content
                 with open(tmp_path, "r") as f:
                     formatted = f.read()
                 return formatted, formatter.name
@@ -330,6 +339,28 @@ class LSPWriteEnhancer:
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+    def _format_with_black_library(
+        self, content: str, file_path: Path
+    ) -> Optional[str]:
+        """Format Python code using black as a library (no subprocess).
+
+        Much faster than subprocess — avoids process spawn overhead.
+        Returns formatted content or None if black unavailable/fails.
+        """
+        if file_path.suffix != ".py":
+            return None
+        try:
+            import black
+
+            mode = black.Mode(line_length=100, target_versions={black.TargetVersion.PY310})
+            return black.format_str(content, mode=mode)
+        except ImportError:
+            return None
+        except black.NothingChanged:
+            return content
+        except Exception:
+            return None
 
     async def write_with_lsp(
         self,

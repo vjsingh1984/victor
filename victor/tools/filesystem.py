@@ -1210,16 +1210,50 @@ async def read(
                 except ValueError:
                     path = str(result.resolved_path)
         except FileNotFoundError:
-            # PathResolver couldn't find the file - provide helpful suggestions
-            suggestions = resolver.suggest_similar(path, limit=5)
-            if suggestions:
-                suggestion_list = "\n  - ".join(suggestions[:5])
-                raise FileNotFoundError(
-                    f"File not found: {path}\n"
-                    f"Did you mean one of these?\n  - {suggestion_list}"
-                )
+            # Try fuzzy resolve — search for bare filename in project tree
+            basename = Path(path).name
+            if basename and basename != path:
+                # Already has directory prefix, don't fuzzy search
+                pass
             else:
-                raise FileNotFoundError(f"File not found: {path}")
+                try:
+                    cwd = Path.cwd()
+                    matches = [
+                        m
+                        for m in cwd.rglob(basename)
+                        if m.is_file()
+                        and ".victor" not in str(m)
+                        and ".git" not in str(m)
+                    ]
+                    if len(matches) == 1:
+                        file_path = matches[0]
+                        logger.info(f"Fuzzy resolved {path} → {file_path}")
+                        try:
+                            path = str(file_path.relative_to(cwd))
+                        except ValueError:
+                            path = str(file_path)
+                        # Skip to reading — file_path is now valid
+                        if file_path.exists():
+                            # Continue to the reading logic below
+                            pass
+                        else:
+                            raise FileNotFoundError(f"File not found: {path}")
+                    else:
+                        raise FileNotFoundError("multiple or none")
+                except (FileNotFoundError, OSError):
+                    pass  # Fall through to suggestions
+
+            # PathResolver couldn't find the file - provide helpful suggestions
+            if not file_path.exists():
+                suggestions = resolver.suggest_similar(path, limit=5)
+                if suggestions:
+                    suggestion_list = "\n  - ".join(suggestions[:5])
+                    raise FileNotFoundError(
+                        f"File not found: {path}\n"
+                        f"Did you mean one of these?\n  - {suggestion_list}"
+                    )
+                else:
+                    raise FileNotFoundError(f"File not found: {path}")
         except IsADirectoryError:
             raise IsADirectoryError(
                 f"Cannot read directory as file: {path}\n"

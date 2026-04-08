@@ -636,6 +636,8 @@ class SearchSettings(_BaseModel):
     hybrid_search_keyword_weight: float = 0.4
     enable_semantic_threshold_rl_learning: bool = False
     semantic_threshold_overrides: dict = Field(default_factory=dict)
+    # RL mode: "full" (write all), "selective" (skip unchanged), "none" (read-only)
+    rl_mode: str = "selective"
 
 
 class ResilienceSettings(_BaseModel):

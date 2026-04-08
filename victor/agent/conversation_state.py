@@ -319,6 +319,10 @@ class ConversationStateMachine:
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
 
+        # Edge model decision cache — avoid repeated calls with same input
+        # Key: stage_value:message_prefix → (result_stage, confidence, timestamp)
+        self._edge_stage_cache: Dict[str, tuple] = {}
+
         # Sync initial state to manager if provided
         if self._state_manager:
             self._sync_state_to_manager()
@@ -544,6 +548,15 @@ class ConversationStateMachine:
         Returns:
             Tuple of (detected stage, confidence) or (None, 0.0)
         """
+        # Check cache first — avoid redundant edge model calls
+        import time as _time
+
+        cache_key = f"{self.state.stage.value}:{content[:50] if content else ''}"
+        if cache_key in self._edge_stage_cache:
+            cached_stage, cached_conf, cached_ts = self._edge_stage_cache[cache_key]
+            if _time.time() - cached_ts < 30:  # 30s TTL
+                return cached_stage, cached_conf
+
         try:
             from victor.core import get_container
 
@@ -606,6 +619,12 @@ class ConversationStateMachine:
             if result:
                 logger.info(
                     f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
+                )
+                # Cache the result
+                self._edge_stage_cache[cache_key] = (
+                    result,
+                    confidence,
+                    _time.time(),
                 )
             return result, confidence
 
