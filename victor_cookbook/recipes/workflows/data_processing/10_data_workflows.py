@@ -10,9 +10,7 @@ RECIPE_TIME = "25 minutes"
 
 
 async def data_pipeline_workflow(
-    source_path: str,
-    destination_path: str,
-    transformations: list[str]
+    source_path: str, destination_path: str, transformations: list[str]
 ):
     """End-to-end data processing pipeline."""
     import tempfile
@@ -169,7 +167,7 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
@@ -177,20 +175,14 @@ edges:
         agent = Agent.create(vertical="dataanalysis")
         result = await agent.run_workflow(
             workflow_path,
-            input={
-                "source_path": source_path,
-                "destination_path": destination_path
-            }
+            input={"source_path": source_path, "destination_path": destination_path},
         )
         return result.content
     finally:
         os.unlink(workflow_path)
 
 
-async def data_validation_workflow(
-    data_path: str,
-    validation_rules: list[str]
-):
+async def data_validation_workflow(data_path: str, validation_rules: list[str]):
     """Data validation with custom rules workflow."""
     import tempfile
     import os
@@ -285,25 +277,19 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create(vertical="dataanalysis")
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"data_path": data_path}
-        )
+        result = await agent.run_workflow(workflow_path, input={"data_path": data_path})
         return result.content
     finally:
         os.unlink(workflow_path)
 
 
-async def data_enrichment_workflow(
-    base_data_path: str,
-    enrichment_sources: list[str]
-):
+async def data_enrichment_workflow(base_data_path: str, enrichment_sources: list[str]):
     """Enrich data with external sources."""
     import tempfile
     import os
@@ -401,15 +387,14 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create(vertical="dataanalysis")
         result = await agent.run_workflow(
-            workflow_path,
-            input={"base_data_path": base_data_path}
+            workflow_path, input={"base_data_path": base_data_path}
         )
         return result.content
     finally:
@@ -417,9 +402,7 @@ edges:
 
 
 async def data_aggregation_workflow(
-    data_path: str,
-    group_by_columns: list[str],
-    aggregations: list[str]
+    data_path: str, group_by_columns: list[str], aggregations: list[str]
 ):
     """Data aggregation and summarization workflow."""
     import tempfile
@@ -515,25 +498,20 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         agent = Agent.create(vertical="dataanalysis")
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"data_path": data_path}
-        )
+        result = await agent.run_workflow(workflow_path, input={"data_path": data_path})
         return result.content
     finally:
         os.unlink(workflow_path)
 
 
 async def data_merging_workflow(
-    primary_path: str,
-    secondary_paths: list[str],
-    merge_strategy: str
+    primary_path: str, secondary_paths: list[str], merge_strategy: str
 ):
     """Merge multiple datasets together."""
     import tempfile
@@ -647,7 +625,7 @@ edges:
     to: "complete"
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
@@ -655,10 +633,7 @@ edges:
         agent = Agent.create(vertical="dataanalysis")
         result = await agent.run_workflow(
             workflow_path,
-            input={
-                "primary_path": primary_path,
-                "merge_strategy": merge_strategy
-            }
+            input={"primary_path": primary_path, "merge_strategy": merge_strategy},
         )
         return result.content
     finally:
@@ -673,11 +648,12 @@ async def demo_data_workflows():
     result = await data_pipeline_workflow(
         "data/input.csv",
         "data/output.csv",
-        ["Normalize text columns", "Convert dates", "Calculate derived fields"]
+        ["Normalize text columns", "Convert dates", "Calculate derived fields"],
     )
     print(result[:400] + "...\n")
 
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_data_workflows())

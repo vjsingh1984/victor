@@ -155,7 +155,9 @@ class ImportValidator:
                     self._check_import(file_path, rel_path_str, node.lineno, alias.name)
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
-                    self._check_import(file_path, rel_path_str, node.lineno, node.module)
+                    self._check_import(
+                        file_path, rel_path_str, node.lineno, node.module
+                    )
 
     def _check_import(
         self, file_path: Path, rel_path: str, line_number: int, module_name: str
@@ -176,7 +178,9 @@ class ImportValidator:
             return  # Allowed exception
 
         # Rule 1: Tools should not import from agent/
-        if rel_path.startswith("victor/tools/") and module_name.startswith("victor.agent"):
+        if rel_path.startswith("victor/tools/") and module_name.startswith(
+            "victor.agent"
+        ):
             # Exception for tools importing from agent/protocols (which is being moved to core/protocols)
             if module_name.startswith("victor.agent.protocols"):
                 # Warning: this should be migrated to victor.core.protocols
@@ -199,7 +203,9 @@ class ImportValidator:
                 self.violations.append(violation)
 
         # Rule 2: Providers should not import from agent/
-        if rel_path.startswith("victor/providers/") and module_name.startswith("victor.agent"):
+        if rel_path.startswith("victor/providers/") and module_name.startswith(
+            "victor.agent"
+        ):
             violation = ImportViolation(
                 file_path=file_path,
                 line_number=line_number,

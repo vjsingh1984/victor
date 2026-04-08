@@ -32,7 +32,8 @@ async def wait_for_ollama(max_retries=30, delay=2):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags", timeout=5.0
+                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/tags",
+                    timeout=5.0,
                 )
                 if response.status_code == 200:
                     console.print("[green]✓ Ollama is ready![/green]")
@@ -50,7 +51,9 @@ async def wait_for_ollama(max_retries=30, delay=2):
 async def demo_simple_chat():
     """Demo 1: Simple chat completion."""
     console.print(
-        Panel.fit("[bold cyan]Demo 1: Simple Chat Completion[/bold cyan]", border_style="cyan")
+        Panel.fit(
+            "[bold cyan]Demo 1: Simple Chat Completion[/bold cyan]", border_style="cyan"
+        )
     )
 
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
@@ -75,7 +78,9 @@ async def demo_simple_chat():
 
 async def demo_code_generation():
     """Demo 2: Code generation."""
-    console.print(Panel.fit("[bold cyan]Demo 2: Code Generation[/bold cyan]", border_style="cyan"))
+    console.print(
+        Panel.fit("[bold cyan]Demo 2: Code Generation[/bold cyan]", border_style="cyan")
+    )
 
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
@@ -106,13 +111,18 @@ async def demo_code_generation():
 async def demo_streaming():
     """Demo 3: Streaming responses."""
     console.print(
-        Panel.fit("[bold cyan]Demo 3: Streaming Responses[/bold cyan]", border_style="cyan")
+        Panel.fit(
+            "[bold cyan]Demo 3: Streaming Responses[/bold cyan]", border_style="cyan"
+        )
     )
 
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
     messages = [
-        Message(role="user", content="List 5 benefits of using AI coding assistants. Be concise.")
+        Message(
+            role="user",
+            content="List 5 benefits of using AI coding assistants. Be concise.",
+        )
     ]
 
     console.print("\n[bold]Prompt:[/bold]", messages[0].content)
@@ -136,7 +146,10 @@ async def demo_streaming():
 async def demo_multi_turn():
     """Demo 4: Multi-turn conversation."""
     console.print(
-        Panel.fit("[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]", border_style="cyan")
+        Panel.fit(
+            "[bold cyan]Demo 4: Multi-Turn Conversation[/bold cyan]",
+            border_style="cyan",
+        )
     )
 
     provider = OllamaProvider(base_url=os.getenv("OLLAMA_HOST", "http://ollama:11434"))
@@ -176,7 +189,9 @@ async def demo_multi_turn():
 
 async def demo_tool_calling():
     """Demo 5: Tool calling."""
-    console.print(Panel.fit("[bold cyan]Demo 5: Tool Calling[/bold cyan]", border_style="cyan"))
+    console.print(
+        Panel.fit("[bold cyan]Demo 5: Tool Calling[/bold cyan]", border_style="cyan")
+    )
 
     from victor.providers.base import ToolDefinition
 
@@ -226,7 +241,9 @@ async def save_demo_report():
     output_dir = Path(os.getenv("DEMO_OUTPUT_DIR", "/output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    report_file = output_dir / f"demo_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    report_file = (
+        output_dir / f"demo_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    )
 
     report = f"""# Victor Docker Demo Report
 

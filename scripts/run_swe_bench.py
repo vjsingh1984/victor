@@ -170,7 +170,9 @@ async def run_swe_bench(
     # Create callback that sets up workspace
     async def workspace_callback(task: BenchmarkTask, workspace_dir: Path):
         # Set up workspace with repo clone
-        actual_workspace = await workspace_manager.setup_workspace(task, use_cache=cache_repos)
+        actual_workspace = await workspace_manager.setup_workspace(
+            task, use_cache=cache_repos
+        )
 
         # Execute task in workspace
         result = await adapter.execute_task(task, actual_workspace / "repo")
@@ -209,7 +211,9 @@ async def run_swe_bench(
                 )
             else:
                 metrics.failed += 1
-                logger.warning(f"  FAILED - {result.error_message or 'validation failed'}")
+                logger.warning(
+                    f"  FAILED - {result.error_message or 'validation failed'}"
+                )
 
             metrics.total_turns += result.trace.turns
             metrics.total_tool_calls += len(result.trace.tool_calls)

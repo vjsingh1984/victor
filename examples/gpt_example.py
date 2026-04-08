@@ -80,7 +80,9 @@ def calculate_total(items):
     )
 
     print("\nGPT-4o mini: ", end="", flush=True)
-    async for event in agent2.stream("List 5 Python best practices in one sentence each."):
+    async for event in agent2.stream(
+        "List 5 Python best practices in one sentence each."
+    ):
         if event.type == EventType.CONTENT:
             print(event.content, end="", flush=True)
     print()

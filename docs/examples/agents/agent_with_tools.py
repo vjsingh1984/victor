@@ -11,9 +11,7 @@ from victor import Agent
 async def main():
     """Create an agent with filesystem tools."""
     # Create an agent with filesystem tools
-    agent = Agent.create(
-        tools=["read", "write", "ls", "grep"]
-    )
+    agent = Agent.create(tools=["read", "write", "ls", "grep"])
 
     # Ask the agent to analyze the current directory
     result = await agent.run(

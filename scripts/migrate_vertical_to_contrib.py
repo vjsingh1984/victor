@@ -110,9 +110,13 @@ class VerticalMigrator:
     def __init__(self, vertical_path: str, dry_run: bool = False):
         self.vertical_path = Path(vertical_path)
         self.dry_run = dry_run
-        self.backup_dir = self.vertical_path / f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.backup_dir = (
+            self.vertical_path / f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
 
-    def migrate(self, report: MigrationReport, analyzer: VerticalAnalyzer) -> MigrationReport:
+    def migrate(
+        self, report: MigrationReport, analyzer: VerticalAnalyzer
+    ) -> MigrationReport:
         """Perform the migration.
 
         Args:
@@ -346,14 +350,23 @@ __all__ = [
 
             new_lines = len(content.splitlines())
             lines_saved = original_lines - new_lines
-            percent_reduced = (lines_saved / original_lines) * 100 if original_lines > 0 else 0
+            percent_reduced = (
+                (lines_saved / original_lines) * 100 if original_lines > 0 else 0
+            )
 
-            print(f"✓ Migrated safety.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)")
+            print(
+                f"✓ Migrated safety.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)"
+            )
             return (lines_saved, percent_reduced)
         else:
-            print(f"[DRY RUN] Would migrate safety.py: ~{original_lines} lines → ~{len(content.splitlines())} lines")
+            print(
+                f"[DRY RUN] Would migrate safety.py: ~{original_lines} lines → ~{len(content.splitlines())} lines"
+            )
             estimated_lines = original_lines - len(content.splitlines())
-            return (estimated_lines, (estimated_lines / original_lines * 100) if original_lines > 0 else 0)
+            return (
+                estimated_lines,
+                (estimated_lines / original_lines * 100) if original_lines > 0 else 0,
+            )
 
     def _migrate_mode_config(self) -> Optional[Tuple[int, float]]:
         """Migrate mode_config.py to use BaseModeConfigProvider.
@@ -524,14 +537,23 @@ __all__ = [
 
             new_lines = len(content.splitlines())
             lines_saved = original_lines - new_lines
-            percent_reduced = (lines_saved / original_lines) * 100 if original_lines > 0 else 0
+            percent_reduced = (
+                (lines_saved / original_lines) * 100 if original_lines > 0 else 0
+            )
 
-            print(f"✓ Migrated mode_config.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)")
+            print(
+                f"✓ Migrated mode_config.py: saved {lines_saved} lines ({percent_reduced:.1f}% reduction)"
+            )
             return (lines_saved, percent_reduced)
         else:
-            print(f"[DRY RUN] Would migrate mode_config.py: ~{original_lines} lines → ~{len(content.splitlines())} lines")
+            print(
+                f"[DRY RUN] Would migrate mode_config.py: ~{original_lines} lines → ~{len(content.splitlines())} lines"
+            )
             estimated_lines = original_lines - len(content.splitlines())
-            return (estimated_lines, (estimated_lines / original_lines * 100) if original_lines > 0 else 0)
+            return (
+                estimated_lines,
+                (estimated_lines / original_lines * 100) if original_lines > 0 else 0,
+            )
 
 
 def print_report(report: MigrationReport):
@@ -562,7 +584,9 @@ def print_report(report: MigrationReport):
         print(f"  ✓ {report.conversation_migration}")
     print()
 
-    print(f"Estimated Code Reduction: {report.code_reduction_lines} lines ({report.code_reduction_percent:.1f}%)")
+    print(
+        f"Estimated Code Reduction: {report.code_reduction_lines} lines ({report.code_reduction_percent:.1f}%)"
+    )
     print()
 
     if report.warnings:

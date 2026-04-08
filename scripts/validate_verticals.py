@@ -51,8 +51,13 @@ class VerticalValidator:
 
         # Find all Python files
         python_files = list(self.vertical_path.rglob("*.py"))
-        python_files = [f for f in python_files if "__pycache__" not in str(f)
-                       and ".venv" not in str(f) and "tests" not in f.parts]
+        python_files = [
+            f
+            for f in python_files
+            if "__pycache__" not in str(f)
+            and ".venv" not in str(f)
+            and "tests" not in f.parts
+        ]
 
         if not python_files:
             print("  ⚠ No Python files found")
@@ -82,9 +87,9 @@ class VerticalValidator:
             file_path: Path to Python file
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-                lines = content.split('\n')
+                lines = content.split("\n")
 
             # Parse AST
             tree = ast.parse(content, filename=str(file_path))
@@ -100,13 +105,25 @@ class VerticalValidator:
                     self._check_decorator(file_path, node, lines)
 
         except SyntaxError as e:
-            self.issues.append((str(file_path.relative_to(self.vertical_path)),
-                               f"Syntax error: {e}", e.lineno or 0))
+            self.issues.append(
+                (
+                    str(file_path.relative_to(self.vertical_path)),
+                    f"Syntax error: {e}",
+                    e.lineno or 0,
+                )
+            )
         except Exception as e:
-            self.warnings.append((str(file_path.relative_to(self.vertical_path)),
-                                f"Could not parse: {e}", 0))
+            self.warnings.append(
+                (
+                    str(file_path.relative_to(self.vertical_path)),
+                    f"Could not parse: {e}",
+                    0,
+                )
+            )
 
-    def _check_import(self, file_path: Path, module: str, lineno: int, lines: List[str]) -> None:
+    def _check_import(
+        self, file_path: Path, module: str, lineno: int, lines: List[str]
+    ) -> None:
         """Check if import is allowed.
 
         Args:
@@ -122,22 +139,28 @@ class VerticalValidator:
             if import_stmt.startswith(forbidden):
                 # Check if it's an allowed exception with documentation
                 if lineno > 1:
-                    prev_lines = '\n'.join(lines[max(0, lineno-3):lineno])
+                    prev_lines = "\n".join(lines[max(0, lineno - 3) : lineno])
                     if "INTERNAL API" in prev_lines or "TODO: Refactor" in prev_lines:
-                        self.warnings.append((
-                            str(file_path.relative_to(self.vertical_path)),
-                            f"Using internal module: {module} (documented)",
-                            lineno
-                        ))
+                        self.warnings.append(
+                            (
+                                str(file_path.relative_to(self.vertical_path)),
+                                f"Using internal module: {module} (documented)",
+                                lineno,
+                            )
+                        )
                         return
 
-                self.issues.append((
-                    str(file_path.relative_to(self.vertical_path)),
-                    f"Forbidden import from internal module: {module}",
-                    lineno
-                ))
+                self.issues.append(
+                    (
+                        str(file_path.relative_to(self.vertical_path)),
+                        f"Forbidden import from internal module: {module}",
+                        lineno,
+                    )
+                )
 
-    def _check_decorator(self, file_path: Path, node: ast.ClassDef, lines: List[str]) -> None:
+    def _check_decorator(
+        self, file_path: Path, node: ast.ClassDef, lines: List[str]
+    ) -> None:
         """Check if class has @register_vertical decorator.
 
         Args:
@@ -162,7 +185,10 @@ class VerticalValidator:
         has_decorator = False
         for decorator in node.decorator_list:
             if isinstance(decorator, ast.Call):
-                if isinstance(decorator.func, ast.Name) and decorator.func.id == "register_vertical":
+                if (
+                    isinstance(decorator.func, ast.Name)
+                    and decorator.func.id == "register_vertical"
+                ):
                     has_decorator = True
                     break
 
@@ -172,11 +198,13 @@ class VerticalValidator:
             return
 
         if not has_decorator:
-            self.warnings.append((
-                str(file_path.relative_to(self.vertical_path)),
-                f"Class '{node.name}' missing @register_vertical decorator",
-                node.lineno
-            ))
+            self.warnings.append(
+                (
+                    str(file_path.relative_to(self.vertical_path)),
+                    f"Class '{node.name}' missing @register_vertical decorator",
+                    node.lineno,
+                )
+            )
 
 
 def main() -> int:

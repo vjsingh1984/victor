@@ -30,7 +30,9 @@ from victor.evaluation.protocol import (
     TaskStatus,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -123,7 +125,9 @@ async def mock_agent_callback(
     if task.task_id == "sample-001":
         # Off-by-one bug
         buggy_code = "def sum_range(start, end):\n    return sum(range(start, end))\n"
-        fixed_code = "def sum_range(start, end):\n    return sum(range(start, end + 1))\n"
+        fixed_code = (
+            "def sum_range(start, end):\n    return sum(range(start, end + 1))\n"
+        )
         main_py.write_text(buggy_code)
     elif task.task_id == "sample-002":
         # Missing validation

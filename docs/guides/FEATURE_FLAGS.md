@@ -1,0 +1,472 @@
+# Feature Flags Guide
+
+**Feature flags enable gradual rollout and experimentation in Victor.**
+
+## Overview
+
+Victor uses feature flags to control the availability of experimental features, phased rollouts, and architectural transitions. Feature flags allow:
+
+- **Gradual rollout** — Enable features incrementally for users
+- **A/B testing** — Compare different implementations
+- **Quick rollback** — Disable features without deploying
+- **Architecture migrations** — Transition between implementations safely
+
+## Using Feature Flags
+
+### Checking Feature Flags
+
+```python
+from victor.core.feature_flags import feature_flags, FeatureFlag
+
+# Check if a feature is enabled
+if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
+    # Use edge model for micro-decisions
+    service = create_edge_decision_service()
+else:
+    # Use fallback
+    service = create_heuristic_service()
+
+# Check with default value
+enabled = feature_flags.is_enabled(
+    FeatureFlag.EXPERIMENTAL_FEATURE,
+    default=False
+)
+```
+
+### Setting Feature Flags
+
+Feature flags can be set via:
+
+1. **Environment variables** (highest priority)
+2. **Configuration file** (`~/.victor/settings.yaml`)
+3. **Default values** (in code)
+
+```bash
+# Via environment variable
+export VICTOR_USE_EDGE_MODEL=true
+export VICTOR_USE_PROVIDER_POOLING=false
+```
+
+```yaml
+# Via settings.yaml
+feature_flags:
+  use_edge_model: true
+  use_provider_pooling: false
+```
+
+## Available Feature Flags
+
+### AI/ML Features
+
+#### `use_edge_model`
+
+**Purpose**: Enable fast edge model for micro-decisions instead of cloud LLM
+
+**Default**: `false`
+
+**Configuration**:
+```yaml
+edge_model:
+  enabled: true  # Master toggle for edge model
+```
+
+**Environment Variable**: `VICTOR_USE_EDGE_MODEL=true`
+
+**See Also**: [Edge Model Guide](./EDGE_MODEL.md), [FEP-0001](../feps/fep-0001-edge-model.md)
+
+**Impact**:
+- Reduces token usage by ~500M tokens/year
+- Improves latency for micro-decisions (<2s vs 2-5s)
+- Requires Ollama with small model (1.1-3GB)
+
+**Migration**: See [Edge Model Guide](./EDGE_MODEL.md) for setup instructions
+
+---
+
+#### `use_semantic_tool_selection`
+
+**Purpose**: Use embeddings instead of keywords for tool selection
+
+**Default**: `true`
+
+**Configuration**:
+```yaml
+tool_settings:
+  use_semantic_tool_selection: true
+```
+
+**Environment Variable**: `VICTOR_USE_SEMANTIC_TOOL_SELECTION=true`
+
+**Impact**:
+- Better tool matching for vague requests
+- Requires sentence-transformers embeddings
+- Adds ~100ms latency per tool selection
+
+**Migration**: Disable via environment variable if embeddings unavailable
+
+---
+
+### Architecture & Refactoring
+
+#### `use_provider_pooling`
+
+**Purpose**: Enable connection pooling for LLM provider requests
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_PROVIDER_POOLING=true`
+
+**Impact**:
+- Reduces connection overhead for repeated requests
+- Better resource utilization under high load
+- Experimental — may have stability issues
+
+**Migration**: Safe to enable for testing; report any connection issues
+
+---
+
+#### `use_composition_over_inheritance`
+
+**Purpose**: Phase 4 — Use composition-based verticals instead of inheritance
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_COMPOSITION_OVER_INHERITANCE=true`
+
+**Status**: 🔄 In Development
+
+**Impact**:
+- Changes vertical integration architecture
+- Required for external vertical packages
+- Breaking change for custom verticals
+
+**Migration**: See [Vertical Migration Guide](../development/testing/vertical-migration-summary-2026-03-04.md)
+
+---
+
+#### `use_strategy_based_tool_registration`
+
+**Purpose**: Phase 5 — Use strategy pattern for tool registration
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_STRATEGY_BASED_TOOL_REGISTRATION=true`
+
+**Status**: ⏳ Planned
+
+**Impact**:
+- More flexible tool registration system
+- Enables dynamic tool discovery
+- Breaking change for tool providers
+
+**Migration**: Not yet ready for production use
+
+---
+
+### Service Layer Flags
+
+#### `use_new_chat_service`
+
+**Purpose**: Use ChatService instead of orchestrator methods for chat operations
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_CHAT_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Cleaner separation of concerns
+- Easier testing and mocking
+- Required for future service layer work
+
+**Migration**: Safe to enable; report any chat issues
+
+---
+
+#### `use_new_tool_service`
+
+**Purpose**: Use ToolService instead of orchestrator methods for tool operations
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_TOOL_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Centralized tool execution logic
+- Better error handling and retries
+- Required for tool orchestration features
+
+**Migration**: Safe to enable; report any tool execution issues
+
+---
+
+#### `use_new_context_service`
+
+**Purpose**: Use ContextService for context management
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_CONTEXT_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Unified context management across sessions
+- Better context window utilization
+- Required for context optimization features
+
+**Migration**: Safe to enable; report any context issues
+
+---
+
+#### `use_new_provider_service`
+
+**Purpose**: Use ProviderService for provider management
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_PROVIDER_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Centralized provider configuration
+- Easier provider switching
+- Required for multi-provider features
+
+**Migration**: Safe to enable; report any provider issues
+
+---
+
+#### `use_new_recovery_service`
+
+**Purpose**: Use RecoveryService for error recovery
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_RECOVERY_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Consistent error recovery patterns
+- Better error classification
+- Required for resilience features
+
+**Migration**: Safe to enable; report any error handling issues
+
+---
+
+#### `use_new_session_service`
+
+**Purpose**: Use SessionService for session management
+
+**Default**: `false`
+
+**Environment Variable**: `VICTOR_USE_NEW_SESSION_SERVICE=true`
+
+**Status**: 🔄 Phase 3 — Service Implementation
+
+**Impact**:
+- Centralized session state management
+- Better session persistence
+- Required for multi-session features
+
+**Migration**: Safe to enable; report any session issues
+
+---
+
+### UI & Output
+
+#### `use_emojis`
+
+**Purpose**: Enable emoji indicators in output (✓, ✗, etc.)
+
+**Default**: `true` (auto-disabled in CI)
+
+**Configuration**:
+```yaml
+ui:
+  use_emojis: true
+```
+
+**Environment Variable**: `VICTOR_USE_EMOJIS=false` (or set `CI=true`)
+
+**Impact**:
+- Visual indicators in CLI output
+- Automatically disabled in CI environments
+- No functional impact
+
+**Migration**: Disable for plain text output
+
+---
+
+### Integration
+
+#### `use_mcp_tools`
+
+**Purpose**: Enable MCP (Model Context Protocol) tool support
+
+**Default**: `false`
+
+**Configuration**:
+```yaml
+mcp:
+  enabled: true
+  command: "python mcp_server.py"
+  prefix: "mcp"
+```
+
+**Environment Variable**: `VICTOR_USE_MCP_TOOLS=true`
+
+**Status**: 🔄 Experimental
+
+**Impact**:
+- Enables external tool servers via MCP
+- Adds complexity to tool execution
+- Requires MCP server configuration
+
+**Migration**: See [MCP Integration Guide](./MCP_INTEGRATION.md)
+
+---
+
+## Feature Flag Lifecycle
+
+### Phase 1: Development
+
+```python
+# Add new feature flag to enum
+class FeatureFlag(str, Enum):
+    MY_NEW_FEATURE = "use_my_new_feature"
+```
+
+### Phase 2: Testing
+
+```yaml
+# Enable for testing
+feature_flags:
+  use_my_new_feature: true
+```
+
+### Phase 3: Gradual Rollout
+
+```bash
+# Enable for specific users/groups
+export VICTOR_USE_MY_NEW_FEATURE=true
+```
+
+### Phase 4: Default Enable
+
+```python
+# Change default in code
+DEFAULT_FLAGS = {
+    FeatureFlag.MY_NEW_FEATURE: True,  # Was False
+}
+```
+
+### Phase 5: Removal
+
+```python
+# Remove flag after full rollout
+# Delete old code path
+# Remove flag from enum
+```
+
+## Best Practices
+
+### 1. Default to Disabled
+
+New features should default to `false` to avoid disrupting existing users:
+
+```python
+DEFAULT_FLAGS = {
+    FeatureFlag.EXPERIMENTAL_FEATURE: False,  # Safe default
+}
+```
+
+### 2. Document Dependencies
+
+If a feature flag depends on other flags or configuration:
+
+```python
+"""
+FeatureFlag.MY_FEATURE requires:
+- FeatureFlag.DEPENDENCY_FEATURE enabled
+- external_package installed
+- API_KEY configured
+"""
+```
+
+### 3. Provide Migration Path
+
+Users need a clear path when flags are removed:
+
+```python
+# Deprecated: Remove in v1.0
+if feature_flags.is_enabled(FeatureFlag.OLD_FEATURE):
+    warnings.warn(
+        "OLD_FEATURE is deprecated and will be removed in v1.0. "
+        "Use NEW_FEATURE instead."
+    )
+```
+
+### 4. Monitor Usage
+
+Track feature flag usage to guide rollout decisions:
+
+```python
+if feature_flags.is_enabled(FeatureFlag.EXPERIMENTAL):
+    analytics.track("experimental_feature_used")
+    # ... feature code
+```
+
+### 5. Safe Fallback
+
+Always provide a fallback when features are disabled:
+
+```python
+if feature_flags.is_enabled(FeatureFlag.NEW_FEATURE):
+    result = new_implementation()
+else:
+    result = old_implementation()  # Fallback
+```
+
+## Troubleshooting
+
+### Feature Flag Not Working
+
+**Symptom**: Feature flag change has no effect
+
+**Solutions**:
+1. Check environment variable spelling: `VICTOR_USE_FEATURE_NAME`
+2. Verify configuration file location: `~/.victor/settings.yaml`
+3. Check for conflicting settings (env var > config file > default)
+4. Enable debug logging: `victor chat --log-level debug`
+
+### Multiple Flags Interacting
+
+**Symptom**: Unexpected behavior when multiple flags enabled
+
+**Solutions**:
+1. Check flag dependencies in documentation
+2. Test flags individually before combining
+3. Review flag interaction matrix in docs
+
+### Performance Issues
+
+**Symptom**: Enabling a flag causes slowdown
+
+**Solutions**:
+1. Profile with and without flag: `victor chat --profile`
+2. Check flag documentation for known performance impacts
+3. Report issue if not documented
+
+## References
+
+- [Feature Flag Implementation](../architecture/adr/008-feature-flags.md)
+- [Edge Model Guide](./EDGE_MODEL.md)
+- [Configuration Guide](../config.md)
+- [Architecture Decision Records](../architecture/adr/)

@@ -66,17 +66,14 @@ edges:
 """
 
     # Save workflow
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
     try:
         # Run workflow
         agent = Agent.create()
-        result = await agent.run_workflow(
-            workflow_path,
-            input={"content": content}
-        )
+        result = await agent.run_workflow(workflow_path, input={"content": content})
         return result.content
     finally:
         os.unlink(workflow_path)
@@ -171,7 +168,7 @@ edges:
 """
 
     # Save and run workflow
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 
@@ -271,7 +268,7 @@ edges:
 """
 
     # Save and run
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(workflow_yaml)
         workflow_path = f.name
 

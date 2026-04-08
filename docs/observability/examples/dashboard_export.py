@@ -37,7 +37,7 @@ def export_to_prometheus_format():
         for metric in snapshot.metrics:
             # Format: metric_name{labels} value
             labels_str = ""
-            if hasattr(metric, 'labels') and metric.labels:
+            if hasattr(metric, "labels") and metric.labels:
                 labels = ",".join(
                     f'{label.key}="{label.value}"' for label in metric.labels
                 )

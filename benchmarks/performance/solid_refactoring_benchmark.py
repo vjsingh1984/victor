@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, List, Optional
 # Optional imports for benchmarking
 try:
     import memory_profiler
+
     HAS_MEMORY_PROFILER = True
 except ImportError:
     HAS_MEMORY_PROFILER = False
@@ -65,7 +66,7 @@ class BenchmarkResult:
     def ops_per_second(self) -> float:
         """Operations per second."""
         if self.duration_ms == 0:
-            return float('inf')
+            return float("inf")
         return (self.operations / self.duration_ms) * 1000
 
     @property
@@ -237,6 +238,7 @@ async def benchmark_tool_registration() -> BenchmarkSuite:
 
             async def execute(self, _exec_ctx, **kwargs):
                 from victor.tools.base import ToolResult
+
                 return ToolResult(success=True, output="test")
 
         for i in range(10):
@@ -269,6 +271,7 @@ async def benchmark_tool_registration() -> BenchmarkSuite:
 
             async def execute(self, _exec_ctx, **kwargs):
                 from victor.tools.base import ToolResult
+
                 return ToolResult(success=True, output="test")
 
         for i in range(10):
@@ -302,7 +305,10 @@ async def benchmark_service_creation() -> BenchmarkSuite:
 
     # Direct creation
     def create_direct():
-        from victor.agent.services.context_service import ContextService, ContextServiceConfig
+        from victor.agent.services.context_service import (
+            ContextService,
+            ContextServiceConfig,
+        )
 
         for _ in range(10):
             service = ContextService(config=ContextServiceConfig())
@@ -311,8 +317,13 @@ async def benchmark_service_creation() -> BenchmarkSuite:
     # DI container creation
     def create_via_container():
         from victor.core.container import ServiceContainer
-        from victor.agent.services.protocols.context_service import ContextServiceProtocol
-        from victor.agent.services.context_service import ContextService, ContextServiceConfig
+        from victor.agent.services.protocols.context_service import (
+            ContextServiceProtocol,
+        )
+        from victor.agent.services.context_service import (
+            ContextService,
+            ContextServiceConfig,
+        )
 
         container = ServiceContainer()
         container.register(
@@ -354,6 +365,7 @@ async def benchmark_vertical_creation() -> BenchmarkSuite:
         from victor.core.verticals.base import VerticalBase
 
         for _ in range(10):
+
             class InheritanceVertical(VerticalBase):
                 @classmethod
                 def get_tools(cls):
@@ -372,8 +384,7 @@ async def benchmark_vertical_creation() -> BenchmarkSuite:
 
         for _ in range(10):
             ComposedVertical = (
-                VerticalBase
-                .compose()
+                VerticalBase.compose()
                 .with_metadata("test", "Test", "1.0.0")
                 .with_tools(["read", "write"])
                 .with_system_prompt("You are an assistant")
@@ -401,7 +412,9 @@ async def benchmark_vertical_creation() -> BenchmarkSuite:
 
 async def run_all_benchmarks() -> None:
     """Run all performance benchmarks."""
-    console.print("\n[bold cyan]Running SOLID Refactoring Performance Benchmarks[/bold cyan]\n")
+    console.print(
+        "\n[bold cyan]Running SOLID Refactoring Performance Benchmarks[/bold cyan]\n"
+    )
 
     # Tool Registration
     console.print("[yellow]Tool Registration Benchmarks[/yellow]")
@@ -442,7 +455,11 @@ def print_comparison(
         new_ops = tool_suite.results[1].ops_per_second
         old_ops = tool_suite.results[0].ops_per_second
         improvement = ((new_ops / old_ops) - 1) * 100
-        status = "✅ Improved" if improvement > 0 else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        status = (
+            "✅ Improved"
+            if improvement > 0
+            else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        )
         improvements.append(("Tool Registration", improvement, status))
 
     # Service creation
@@ -450,7 +467,11 @@ def print_comparison(
         new_ops = service_suite.results[1].ops_per_second
         old_ops = service_suite.results[0].ops_per_second
         improvement = ((new_ops / old_ops) - 1) * 100
-        status = "✅ Improved" if improvement > 0 else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        status = (
+            "✅ Improved"
+            if improvement > 0
+            else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        )
         improvements.append(("Service Creation", improvement, status))
 
     # Vertical creation
@@ -458,7 +479,11 @@ def print_comparison(
         new_ops = vertical_suite.results[1].ops_per_second
         old_ops = vertical_suite.results[0].ops_per_second
         improvement = ((new_ops / old_ops) - 1) * 100
-        status = "✅ Improved" if improvement > 0 else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        status = (
+            "✅ Improved"
+            if improvement > 0
+            else "⚠️  Regressed" if improvement < -5 else "➡️  Neutral"
+        )
         improvements.append(("Vertical Creation", improvement, status))
 
     for name, improvement, status in improvements:
@@ -476,7 +501,9 @@ def print_comparison(
     if avg_improvement > 5:
         console.print("[green]✓ New architecture shows performance improvement[/green]")
     elif avg_improvement < -5:
-        console.print("[red]✗ New architecture shows performance regression - investigation needed[/red]")
+        console.print(
+            "[red]✗ New architecture shows performance regression - investigation needed[/red]"
+        )
     else:
         console.print("[yellow]→ Performance is comparable (±5%)[/yellow]")
 

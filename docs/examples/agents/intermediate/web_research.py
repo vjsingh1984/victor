@@ -11,9 +11,7 @@ from victor import Agent
 async def research_topic(topic: str, depth: str = "quick"):
     """Research a topic using web search."""
     agent = Agent.create(
-        vertical="research",
-        tools=["web_search", "web_fetch"],
-        temperature=0.4
+        vertical="research", tools=["web_search", "web_fetch"], temperature=0.4
     )
 
     if depth == "quick":
@@ -42,14 +40,11 @@ async def research_topic(topic: str, depth: str = "quick"):
 async def compare_options(options: list[str]):
     """Compare multiple options using web research."""
     agent = Agent.create(
-        vertical="research",
-        tools=["web_search", "web_fetch"],
-        temperature=0.3
+        vertical="research", tools=["web_search", "web_fetch"], temperature=0.3
     )
 
     options_str = ", ".join(options)
-    result = await agent.run(
-        f"""Research and compare these options: {options_str}
+    result = await agent.run(f"""Research and compare these options: {options_str}
 
         For each option, provide:
         1. Description
@@ -58,22 +53,16 @@ async def compare_options(options: list[str]):
         4. Best use cases
         5. Comparison to others
 
-        End with a recommendation table."""
-    )
+        End with a recommendation table.""")
 
     return result.content
 
 
 async def fact_check(statement: str):
     """Fact-check a statement using web search."""
-    agent = Agent.create(
-        vertical="research",
-        tools=["web_search"],
-        temperature=0.2
-    )
+    agent = Agent.create(vertical="research", tools=["web_search"], temperature=0.2)
 
-    result = await agent.run(
-        f"""Fact-check this statement: "{statement}"
+    result = await agent.run(f"""Fact-check this statement: "{statement}"
 
         Search for:
         1. Supporting evidence
@@ -84,28 +73,22 @@ async def fact_check(statement: str):
         - Verdict (True/False/Mixed/Unverifiable)
         - Evidence summary
         - Confidence level
-        - Sources"""
-    )
+        - Sources""")
 
     return result.content
 
 
 async def summarize_article(url: str):
     """Fetch and summarize an article."""
-    agent = Agent.create(
-        tools=["web_fetch"],
-        temperature=0.4
-    )
+    agent = Agent.create(tools=["web_fetch"], temperature=0.4)
 
-    result = await agent.run(
-        f"""Fetch and summarize the article at: {url}
+    result = await agent.run(f"""Fetch and summarize the article at: {url}
 
         Provide:
         1. Main points (3-5 bullets)
         2. Key takeaways
         3. Target audience
-        4. Verdict (worth reading or not)"""
-    )
+        4. Verdict (worth reading or not)""")
 
     return result.content
 
@@ -119,15 +102,11 @@ async def main():
     research = await research_topic("quantum computing applications")
     print(research)
 
-    print("\n" + "="*60 + "\n")
+    print("\n" + "=" * 60 + "\n")
 
     # Compare options
     print("Comparing Python frameworks...")
-    comparison = await compare_options([
-        "Django",
-        "Flask",
-        "FastAPI"
-    ])
+    comparison = await compare_options(["Django", "Flask", "FastAPI"])
     print(comparison)
 
 

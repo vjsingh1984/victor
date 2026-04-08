@@ -1,0 +1,1 @@
+Python is a high‑level, interpreted programming language known for its readability, dynamic typing, and extensive standard library.

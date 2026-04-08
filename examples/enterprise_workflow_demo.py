@@ -83,14 +83,18 @@ def calculate_total(items: list) -> float:
     print()
 
     print("Running code review...")
-    review_result = await code_review(path=str(temp_file), aspects=["all"], include_metrics=True)
+    review_result = await code_review(
+        path=str(temp_file), aspects=["all"], include_metrics=True
+    )
 
     if review_result.get("success"):
         print("✅ Code review complete!")
         print(f"Issues found: {review_result.get('total_issues', 0)}")
         metrics = review_result.get("results", {}).get("complexity", {})
         if metrics:
-            print(f"Complexity: {metrics.get('summary', {}).get('avg_complexity', 'N/A')}")
+            print(
+                f"Complexity: {metrics.get('summary', {}).get('avg_complexity', 'N/A')}"
+            )
     else:
         print(f"❌ Code review failed: {review_result.get('error')}")
     print()
@@ -103,14 +107,12 @@ def calculate_total(items: list) -> float:
 
     test_module = temp_file.stem
     test_file = temp_file.with_name(f"test_{test_module}.py")
-    test_file.write_text(
-        f"""import {test_module}
+    test_file.write_text(f"""import {test_module}
 
 def test_calculate_total():
     items = [{{"price": 10, "quantity": 2}}, {{"price": 5, "quantity": 1}}]
     assert {test_module}.calculate_total(items) == 25
-"""
-    )
+""")
 
     print("Running pytest...")
     test_result = await test(path=str(temp_file.parent))
@@ -165,7 +167,9 @@ jobs:
     workflow_file = temp_file.with_suffix(".yml")
     workflow_file.write_text(sample_workflow.strip() + "\n")
 
-    cicd_result = await cicd(operation="validate", platform="github", file=str(workflow_file))
+    cicd_result = await cicd(
+        operation="validate", platform="github", file=str(workflow_file)
+    )
 
     if cicd_result.get("success"):
         print("✅ CI/CD workflow validated!")

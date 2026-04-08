@@ -61,8 +61,16 @@ def build_self_cls_usage_counts() -> Counter:
                 prev_prev = None
                 for tok in tokenize.tokenize(handle.readline):
                     if tok.type == tokenize.NAME:
-                        if prev_prev and prev and prev.type == tokenize.OP and prev.string == ".":
-                            if prev_prev.type == tokenize.NAME and prev_prev.string in {"self", "cls"}:
+                        if (
+                            prev_prev
+                            and prev
+                            and prev.type == tokenize.OP
+                            and prev.string == "."
+                        ):
+                            if (
+                                prev_prev.type == tokenize.NAME
+                                and prev_prev.string in {"self", "cls"}
+                            ):
                                 counts[tok.string] += 1
                         prev_prev = prev
                         prev = tok
@@ -87,14 +95,18 @@ def nested_function_lines(path: Path) -> set[int]:
             self.stack: list[ast.AST] = []
 
         def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            if self.stack and isinstance(self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if self.stack and isinstance(
+                self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)
+            ):
                 nested.add(node.lineno)
             self.stack.append(node)
             self.generic_visit(node)
             self.stack.pop()
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            if self.stack and isinstance(self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if self.stack and isinstance(
+                self.stack[-1], (ast.FunctionDef, ast.AsyncFunctionDef)
+            ):
                 nested.add(node.lineno)
             self.stack.append(node)
             self.generic_visit(node)
@@ -162,21 +174,29 @@ def main() -> int:
 
         reasons: list[str] = []
         if is_false_positive(entry, reasons, nested_lines):
-            false_positives.append({
-                **entry,
-                "reasons": reasons,
-            })
+            false_positives.append(
+                {
+                    **entry,
+                    "reasons": reasons,
+                }
+            )
             continue
 
-        if entry.get("severity") == "low" and entry.get("is_private") and not entry.get("is_dunder"):
+        if (
+            entry.get("severity") == "low"
+            and entry.get("is_private")
+            and not entry.get("is_dunder")
+        ):
             if not (entry.get("file") or "").endswith(".py"):
                 continue
             confidence = confidence_score(entry, self_cls_counts)
             if confidence >= 0.6:
-                prune_shortlist.append({
-                    **entry,
-                    "confidence": confidence,
-                })
+                prune_shortlist.append(
+                    {
+                        **entry,
+                        "confidence": confidence,
+                    }
+                )
 
     false_positives.sort(key=lambda x: (x.get("module", ""), x.get("name", "")))
     prune_shortlist.sort(key=lambda x: x["confidence"], reverse=True)

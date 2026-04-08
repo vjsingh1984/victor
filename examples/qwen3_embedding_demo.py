@@ -65,7 +65,9 @@ async def main():
 
     print("📋 Configuration:")
     print(f"   Vector Store: {config.vector_store}")
-    print(f"   Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})")
+    print(
+        f"   Embedding Model: {config.embedding_model_name} ({config.embedding_model_type})"
+    )
     print(f"   Dimension: {config.extra_config['dimension']}")
     print(f"   Persist Directory: {config.persist_directory}")
     print()

@@ -18,7 +18,7 @@ class ProductionAgent:
         model: str = "gpt-4",
         max_retries: int = 3,
         timeout: int = 30,
-        enable_metrics: bool = True
+        enable_metrics: bool = True,
     ):
         """Initialize production agent.
 
@@ -40,7 +40,7 @@ class ProductionAgent:
             "total_calls": 0,
             "successful_calls": 0,
             "failed_calls": 0,
-            "total_duration_ms": 0
+            "total_duration_ms": 0,
         }
         self._agent = None
 
@@ -51,7 +51,7 @@ class ProductionAgent:
         self._agent = Agent.create(
             provider=self.provider,
             model=self.model,
-            enable_observability=self.enable_metrics
+            enable_observability=self.enable_metrics,
         )
 
     async def run_with_retry(self, prompt: str, **kwargs) -> str:
@@ -81,8 +81,7 @@ class ProductionAgent:
                 start_time = time.time()
 
                 result = await asyncio.wait_for(
-                    self._agent.run(prompt, **kwargs),
-                    timeout=self.timeout
+                    self._agent.run(prompt, **kwargs), timeout=self.timeout
                 )
 
                 duration_ms = (time.time() - start_time) * 1000
@@ -98,7 +97,7 @@ class ProductionAgent:
 
             if attempt < self.max_retries - 1:
                 # Exponential backoff
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
         self.metrics["failed_calls"] += 1
         raise Exception(f"Agent failed after {self.max_retries} attempts: {last_error}")
@@ -138,8 +137,7 @@ async def main():
 
     try:
         result = await agent.run_with_retry(
-            "What is async/await in Python?",
-            temperature=0.3
+            "What is async/await in Python?", temperature=0.3
         )
         print(f"Result: {result}")
 
@@ -229,6 +227,7 @@ async def error_handling_wrapper(agent_func, *args, fallback_value=None):
         return await agent_func(*args)
     except Exception as e:
         import logging
+
         logging.error(f"Agent call failed: {e}")
         return fallback_value
 
@@ -319,6 +318,7 @@ class CircuitBreaker:
         if self.last_failure_time is None:
             return True
         import time
+
         return (time.time() - self.last_failure_time) > self.timeout
 
 
@@ -402,4 +402,5 @@ async def demo_production_agent():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_production_agent())

@@ -31,7 +31,11 @@ def demo_planning_detection():
         ("Simple question", "What is the weather today?", False),
         ("Code question", "How do I use argparse?", False),
         ("Architecture analysis", "Analyze the codebase architecture", True),
-        ("Multi-step with keywords", "Analyze architecture and design improvements", True),
+        (
+            "Multi-step with keywords",
+            "Analyze architecture and design improvements",
+            True,
+        ),
         ("Step indicators", "First analyze, then design, finally implement", True),
         ("SOLID evaluation", "Evaluate SOLID principles and identify violations", True),
         ("Complex design", "Design and implement user auth system with analysis", True),
@@ -91,7 +95,9 @@ def demo_config_options():
         ("Aggressive", TaskComplexity.SIMPLE, 2, False),
     ]
 
-    print(f"\n{'Profile':<15} {'Min Complexity':<15} {'Min Keywords':<15} {'Show Plan'}")
+    print(
+        f"\n{'Profile':<15} {'Min Complexity':<15} {'Min Keywords':<15} {'Show Plan'}"
+    )
     print("-" * 70)
 
     for profile, complexity, keywords, show_plan in configs:
@@ -100,9 +106,7 @@ def demo_config_options():
             min_steps_threshold=keywords,
             show_plan_before_execution=show_plan,
         )
-        print(
-            f"{profile:<15} {complexity.value:<15} {keywords:<15} {show_plan!s:<5}"
-        )
+        print(f"{profile:<15} {complexity.value:<15} {keywords:<15} {show_plan!s:<5}")
 
     print("\n" + "=" * 70)
 

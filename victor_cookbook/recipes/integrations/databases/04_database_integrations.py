@@ -13,10 +13,7 @@ async def postgres_query_execution():
     """Execute PostgreSQL queries with natural language."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["shell"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["shell"], temperature=0.3)
 
     # Generate SQL from natural language
     result = await agent.run(
@@ -42,21 +39,17 @@ async def sqlite_schema_analysis(db_path: str):
     from victor import Agent
 
     agent = Agent.create(
-        tools=["read", "python"],
-        vertical="dataanalysis",
-        temperature=0.3
+        tools=["read", "python"], vertical="dataanalysis", temperature=0.3
     )
 
-    result = await agent.run(
-        f"""Analyze the SQLite database at {db_path}.
+    result = await agent.run(f"""Analyze the SQLite database at {db_path}.
 
         Provide:
         1. List all tables
         2. Schema for each table
         3. Relationships between tables
         4. Row counts per table
-        5. Index information"""
-    )
+        5. Index information""")
 
     return result.content
 
@@ -82,8 +75,7 @@ async def redis_cache_strategy():
 
     agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        """Design a Redis caching strategy for a REST API.
+    result = await agent.run("""Design a Redis caching strategy for a REST API.
 
         API endpoints:
         - GET /users/{id} - Get user by ID
@@ -102,8 +94,7 @@ async def redis_cache_strategy():
         1. Key naming conventions
         2. TTL values for different operations
         3. Cache invalidation strategy
-        4. Example Redis commands"""
-    )
+        4. Example Redis commands""")
 
     return result.content
 
@@ -112,10 +103,7 @@ async def etl_pipeline():
     """Design ETL pipeline for data migration."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["python", "read", "write"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["python", "read", "write"], temperature=0.3)
 
     result = await agent.run(
         """Design an ETL pipeline to migrate data from PostgreSQL to MongoDB.
@@ -207,13 +195,9 @@ async def full_text_search_setup():
     """Setup full-text search with PostgreSQL."""
     from victor import Agent
 
-    agent = Agent.create(
-        tools=["python"],
-        temperature=0.3
-    )
+    agent = Agent.create(tools=["python"], temperature=0.3)
 
-    result = await agent.run(
-        """Set up full-text search in PostgreSQL for documents.
+    result = await agent.run("""Set up full-text search in PostgreSQL for documents.
 
         Table: documents(id, title, content, created_at, author_id)
 
@@ -230,8 +214,7 @@ async def full_text_search_setup():
         2. Index creation
         3. Query examples
         4. Optimization tips
-        """
-    )
+        """)
 
     return result.content
 
@@ -253,4 +236,5 @@ async def demo_database_integrations():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_database_integrations())

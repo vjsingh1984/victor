@@ -43,7 +43,9 @@ class SecurityAssistant(VerticalBase):
     @classmethod
     def get_tool_requirements(cls) -> list[ToolRequirement]:
         return [
-            ToolRequirement(ToolNames.READ, purpose="inspect source and configuration files"),
+            ToolRequirement(
+                ToolNames.READ, purpose="inspect source and configuration files"
+            ),
             ToolRequirement(ToolNames.LS, purpose="map project structure"),
             ToolRequirement(
                 ToolNames.CODE_SEARCH,
@@ -200,7 +202,11 @@ Priorities:
                         "backstory": (
                             "You specialize in application security reviews and threat discovery."
                         ),
-                        "expertise": ["static analysis", "dependency risk", "secret detection"],
+                        "expertise": [
+                            "static analysis",
+                            "dependency risk",
+                            "secret detection",
+                        ],
                         "personality": "methodical and evidence-driven",
                         "memory": True,
                     },
