@@ -1854,6 +1854,9 @@ class ToolSelector(ModeAwareMixin):
                 except Exception as e:
                     logger.warning(f"Failed to cache tool selection: {e}")
 
+        # Final gate: enforce enabled_tools restriction (framework-wide)
+        tools = self._filter_by_enabled(tools)
+
         return tools
 
     def select_keywords(
@@ -1971,6 +1974,10 @@ class ToolSelector(ModeAwareMixin):
 
         if _record:
             self._record_selection("keyword", len(selected_tools))
+
+        # Final gate: enforce enabled_tools restriction (framework-wide)
+        selected_tools = self._filter_by_enabled(selected_tools)
+
         return selected_tools
 
     def _should_use_edge_for_tools(self) -> bool:
