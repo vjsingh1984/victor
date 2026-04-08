@@ -1688,7 +1688,7 @@ async def read(
     ],
 )
 async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
-    """Write file. Creates parent dirs. Use edit_files for partial edits.
+    """Write file. Creates parent dirs. Use edit tool for partial edits.
 
     Automatically uses LSP (Language Server Protocol) enhancement when available:
     - Validates code syntax before writing

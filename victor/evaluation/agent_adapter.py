@@ -432,7 +432,7 @@ class VictorAgentAdapter:
         # The default semantic selector broadcasts 15+ tools which causes model
         # decision fatigue — models default to text responses instead of tool use.
         # A minimal set forces decisive tool use at each stage.
-        BENCHMARK_TOOLS = {"read", "edit", "write", "grep", "ls", "shell"}
+        BENCHMARK_TOOLS = {"read", "edit", "write", "code_search", "ls", "shell"}
         try:
             self.orchestrator.set_enabled_tools(BENCHMARK_TOOLS)
             logger.info(
