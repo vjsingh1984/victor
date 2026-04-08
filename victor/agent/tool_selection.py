@@ -1803,9 +1803,10 @@ class ToolSelector(ModeAwareMixin):
             tools = self._get_fallback_tools(user_message)
             is_fallback = True
 
-        # Edge model tool filter — runs BEFORE the cap so it can reduce
-        # 15+ tools down to 5-6 targeted tools, saving token broadcast cost.
-        if len(tools) > 8:
+        # Edge model tool filter — only when edge model is the primary decision maker.
+        # With heuristic-first (default), the semantic+keyword+stage pipeline is
+        # sufficient and the cap below handles excess tools without edge model overhead.
+        if len(tools) > 8 and self._should_use_edge_for_tools():
             tools = self._apply_edge_model_filter(tools, user_message, stage)
 
         # Cap to fallback_max_tools to avoid broadcasting too many tools
@@ -1971,6 +1972,25 @@ class ToolSelector(ModeAwareMixin):
         if _record:
             self._record_selection("keyword", len(selected_tools))
         return selected_tools
+
+    def _should_use_edge_for_tools(self) -> bool:
+        """Check if edge model should be used for tool filtering.
+
+        Returns False when stage_detection_order starts with "heuristic"
+        (default) — the semantic+keyword pipeline is sufficient.
+        Returns True when "llm" is first in the order (LLM-primary mode).
+        """
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            pipeline = getattr(settings, "pipeline", None)
+            if pipeline and hasattr(pipeline, "stage_detection_order"):
+                order = pipeline.stage_detection_order
+                return len(order) > 0 and order[0] == "llm"
+        except Exception:
+            pass
+        return False  # Default: don't use edge for tools
 
     def _apply_edge_model_filter(
         self,
