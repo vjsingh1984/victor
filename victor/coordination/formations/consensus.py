@@ -65,7 +65,8 @@ class ConsensusFormation(BaseFormationStrategy):
 
             # Execute all agents in parallel for this round
             round_tasks = [
-                self._execute_agent(agent, current_task, context, round_num) for agent in agents
+                self._execute_agent(agent, current_task, context, round_num)
+                for agent in agents
             ]
 
             round_results = await asyncio.gather(*round_tasks, return_exceptions=True)
@@ -92,7 +93,9 @@ class ConsensusFormation(BaseFormationStrategy):
             consensus = self._check_consensus(processed_results)
 
             if consensus:
-                logger.info(f"ConsensusFormation: consensus reached in round {round_num + 1}")
+                logger.info(
+                    f"ConsensusFormation: consensus reached in round {round_num + 1}"
+                )
                 # Mark results with consensus metadata
                 for r in processed_results:
                     r.metadata["consensus_achieved"] = True
@@ -123,7 +126,9 @@ class ConsensusFormation(BaseFormationStrategy):
             )
 
         # Max rounds reached without consensus
-        logger.warning(f"ConsensusFormation: no consensus after {self.max_rounds} rounds")
+        logger.warning(
+            f"ConsensusFormation: no consensus after {self.max_rounds} rounds"
+        )
         # Return final round results (last round executed)
         final_round_num = self.max_rounds - 1
         final_round_results = [

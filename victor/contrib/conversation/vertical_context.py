@@ -148,7 +148,8 @@ class VerticalConversationContext:
             self.tasks[task_id].status = status
             self.tasks[task_id].updated_at = datetime.now()
             logger.debug(
-                f"Updated task '{task_id}' status to '{status}' " f"for '{self.vertical_name}'"
+                f"Updated task '{task_id}' status to '{status}' "
+                f"for '{self.vertical_name}'"
             )
             return True
         return False
@@ -161,7 +162,8 @@ class VerticalConversationContext:
         """
         self.knowledge.append(knowledge)
         logger.debug(
-            f"Added knowledge about '{knowledge.topic}' to " f"'{self.vertical_name}' context"
+            f"Added knowledge about '{knowledge.topic}' to "
+            f"'{self.vertical_name}' context"
         )
 
     def get_knowledge_by_topic(self, topic: str) -> List[DomainKnowledge]:
@@ -203,7 +205,8 @@ class VerticalConversationContext:
             del self.tasks[task_id]
 
         logger.debug(
-            f"Cleared {len(completed_ids)} completed tasks from " f"'{self.vertical_name}' context"
+            f"Cleared {len(completed_ids)} completed tasks from "
+            f"'{self.vertical_name}' context"
         )
         return len(completed_ids)
 

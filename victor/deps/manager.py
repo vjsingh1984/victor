@@ -102,7 +102,9 @@ class DepsManager:
         analysis.dependencies = self._dedupe_dependencies(all_runtime)
         analysis.dev_dependencies = self._dedupe_dependencies(all_dev)
 
-        analysis.total_packages = len(analysis.dependencies) + len(analysis.dev_dependencies)
+        analysis.total_packages = len(analysis.dependencies) + len(
+            analysis.dev_dependencies
+        )
         analysis.direct_packages = analysis.total_packages
 
         # Get installed versions
@@ -423,7 +425,8 @@ class DepsManager:
             )
             if result.returncode == 0:
                 installed = {
-                    pkg["name"].lower(): pkg["version"] for pkg in json.loads(result.stdout)
+                    pkg["name"].lower(): pkg["version"]
+                    for pkg in json.loads(result.stdout)
                 }
                 for dep in deps:
                     dep.installed_version = installed.get(dep.name.lower())
@@ -513,7 +516,11 @@ class DepsManager:
 
         if pkg_manager in (PackageManager.PIP, PackageManager.POETRY):
             version = self._get_pypi_version(package)
-        elif pkg_manager in (PackageManager.NPM, PackageManager.YARN, PackageManager.PNPM):
+        elif pkg_manager in (
+            PackageManager.NPM,
+            PackageManager.YARN,
+            PackageManager.PNPM,
+        ):
             version = self._get_npm_version(package)
 
         if version:
@@ -609,7 +616,9 @@ def get_deps_manager(
         DepsManager instance
     """
     global _deps_manager
-    if _deps_manager is None or (project_root and _deps_manager.project_root != project_root):
+    if _deps_manager is None or (
+        project_root and _deps_manager.project_root != project_root
+    ):
         _deps_manager = DepsManager(project_root=project_root, config=config)
     return _deps_manager
 

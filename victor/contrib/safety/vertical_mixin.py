@@ -213,7 +213,9 @@ class VerticalSafetyMixin:
             system_paths = ["/etc", "/usr", "/bin", "/sbin"]
 
         # Create pattern that matches any of the system paths
-        path_pattern = "|".join(system_paths.replace("/", r"/") for system_paths in system_paths)
+        path_pattern = "|".join(
+            system_paths.replace("/", r"/") for system_paths in system_paths
+        )
         pattern = rf"write.*({path_pattern})/"
 
         return SafetyRule(

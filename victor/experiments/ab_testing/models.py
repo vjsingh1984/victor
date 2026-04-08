@@ -206,7 +206,9 @@ class ExperimentStatus:
 
     # Variant status
     variant_samples: Dict[str, int] = field(default_factory=dict)
-    variant_status: Dict[str, Literal["running", "paused", "failed"]] = field(default_factory=dict)
+    variant_status: Dict[str, Literal["running", "paused", "failed"]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass
@@ -278,7 +280,9 @@ class ExperimentResult:
     variant_results: Dict[str, VariantResult] = field(default_factory=dict)
 
     # Recommendations
-    recommendation: Literal["deploy_winner", "continue", "inconclusive"] = "inconclusive"
+    recommendation: Literal["deploy_winner", "continue", "inconclusive"] = (
+        "inconclusive"
+    )
     reasoning: str = ""
 
     # Metadata

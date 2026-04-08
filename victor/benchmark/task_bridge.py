@@ -56,7 +56,9 @@ def benchmark_task_to_framework_task(
     context: Dict[str, Any] = {
         "task_id": benchmark_task.task_id,
         "benchmark_type": (
-            benchmark_task.benchmark_type.value if benchmark_task.benchmark_type else None
+            benchmark_task.benchmark_type.value
+            if benchmark_task.benchmark_type
+            else None
         ),
     }
 
@@ -114,7 +116,9 @@ def framework_result_to_benchmark_result(
         status = TaskStatus.ERROR
     elif framework_result.success:
         if tests_passed is not None and tests_total is not None:
-            status = TaskStatus.PASSED if tests_passed == tests_total else TaskStatus.FAILED
+            status = (
+                TaskStatus.PASSED if tests_passed == tests_total else TaskStatus.FAILED
+            )
         else:
             status = TaskStatus.PASSED
     else:
@@ -129,11 +133,15 @@ def framework_result_to_benchmark_result(
         generated_code=framework_result.content,
         tests_passed=tests_passed,
         tests_total=tests_total,
-        tests_failed=(tests_total - tests_passed) if tests_passed and tests_total else None,
+        tests_failed=(
+            (tests_total - tests_passed) if tests_passed and tests_total else None
+        ),
         tokens_used=metadata.get("tokens_used", 0),
         tokens_input=metadata.get("tokens_input", 0),
         tokens_output=metadata.get("tokens_output", 0),
-        tool_calls=len(framework_result.tool_calls) if framework_result.tool_calls else 0,
+        tool_calls=(
+            len(framework_result.tool_calls) if framework_result.tool_calls else 0
+        ),
         turns=metadata.get("turns", 0),
         error_message=framework_result.error,
     )
@@ -233,6 +241,8 @@ def build_benchmark_prompt(
 
     # Add test info if available
     if benchmark_task.test_code:
-        sections.append("## Tests\n\nTest code is available. Run tests to verify your solution.")
+        sections.append(
+            "## Tests\n\nTest code is available. Run tests to verify your solution."
+        )
 
     return "\n\n".join(sections)

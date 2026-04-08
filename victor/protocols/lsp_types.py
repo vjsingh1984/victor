@@ -337,7 +337,9 @@ class Diagnostic:
     code: Optional[Union[str, int]] = None
     code_description: Optional[str] = None
     tags: List[DiagnosticTag] = field(default_factory=list)
-    related_information: List[DiagnosticRelatedInformation] = field(default_factory=list)
+    related_information: List[DiagnosticRelatedInformation] = field(
+        default_factory=list
+    )
     data: Optional[Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -356,7 +358,9 @@ class Diagnostic:
         if self.tags:
             result["tags"] = [t.value for t in self.tags]
         if self.related_information:
-            result["relatedInformation"] = [ri.to_dict() for ri in self.related_information]
+            result["relatedInformation"] = [
+                ri.to_dict() for ri in self.related_information
+            ]
         if self.data is not None:
             result["data"] = self.data
         return result
@@ -367,7 +371,8 @@ class Diagnostic:
         code_desc = data.get("codeDescription", {})
         tags = [DiagnosticTag(t) for t in data.get("tags", [])]
         related = [
-            DiagnosticRelatedInformation.from_dict(ri) for ri in data.get("relatedInformation", [])
+            DiagnosticRelatedInformation.from_dict(ri)
+            for ri in data.get("relatedInformation", [])
         ]
         return cls(
             range=Range.from_dict(data["range"]),
@@ -487,7 +492,9 @@ class Hover:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {"contents": {"kind": "markdown", "value": self.contents}}
+        result: Dict[str, Any] = {
+            "contents": {"kind": "markdown", "value": self.contents}
+        }
         if self.range:
             result["range"] = self.range.to_dict()
         return result
@@ -499,7 +506,9 @@ class Hover:
         if isinstance(contents, dict):
             contents = contents.get("value", "")
         elif isinstance(contents, list):
-            contents = "\n".join(c.get("value", c) if isinstance(c, dict) else c for c in contents)
+            contents = "\n".join(
+                c.get("value", c) if isinstance(c, dict) else c for c in contents
+            )
 
         range_data = data.get("range")
         return cls(
@@ -709,7 +718,9 @@ class TextDocumentEdit:
     def from_dict(cls, data: Dict[str, Any]) -> "TextDocumentEdit":
         """Create from LSP dictionary."""
         return cls(
-            text_document=VersionedTextDocumentIdentifier.from_dict(data["textDocument"]),
+            text_document=VersionedTextDocumentIdentifier.from_dict(
+                data["textDocument"]
+            ),
             edits=[TextEdit.from_dict(e) for e in data["edits"]],
         )
 

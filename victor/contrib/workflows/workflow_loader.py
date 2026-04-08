@@ -40,7 +40,9 @@ class WorkflowLoaderMixin:
     """
 
     @staticmethod
-    def validate_workflow_structure(workflow_def: Dict[str, Any]) -> tuple[bool, List[str]]:
+    def validate_workflow_structure(
+        workflow_def: Dict[str, Any],
+    ) -> tuple[bool, List[str]]:
         """Validate the structure of a workflow definition.
 
         Args:

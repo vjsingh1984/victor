@@ -334,7 +334,9 @@ class AdaptiveFormation(BaseFormationStrategy):
             logger.warning(f"Unknown formation {formation_name}, using sequential")
             return SequentialFormation()
 
-    def _evaluate_performance(self, results: List[MemberResult], duration: float) -> float:
+    def _evaluate_performance(
+        self, results: List[MemberResult], duration: float
+    ) -> float:
         """Evaluate performance of execution.
 
         Args:

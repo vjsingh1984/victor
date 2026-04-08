@@ -180,7 +180,9 @@ class DynamicRouterFormation(BaseFormationStrategy):
 
         # Execute task with selected agent
         try:
-            result = await selected_agent.execute(task.content, context=context.shared_state)
+            result = await selected_agent.execute(
+                task.content, context=context.shared_state
+            )
 
             return [
                 MemberResult(
@@ -258,11 +260,17 @@ class DynamicRouterFormation(BaseFormationStrategy):
             for kw in ["code", "function", "class", "implement", "refactor", "debug"]
         ):
             return "coding"
-        elif any(kw in task_lower for kw in ["search", "find", "look up", "investigate"]):
+        elif any(
+            kw in task_lower for kw in ["search", "find", "look up", "investigate"]
+        ):
             return "research"
-        elif any(kw in task_lower for kw in ["analyze", "review", "compare", "evaluate"]):
+        elif any(
+            kw in task_lower for kw in ["analyze", "review", "compare", "evaluate"]
+        ):
             return "analysis"
-        elif any(kw in task_lower for kw in ["write", "document", "explain", "describe"]):
+        elif any(
+            kw in task_lower for kw in ["write", "document", "explain", "describe"]
+        ):
             return "writing"
 
         return None

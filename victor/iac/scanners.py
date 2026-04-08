@@ -125,7 +125,9 @@ class TerraformScanner(IaCScannerProtocol):
             raw_content=content,
         )
 
-    async def scan(self, config: IaCConfig, policy: ScanPolicy | None = None) -> list[IaCFinding]:
+    async def scan(
+        self, config: IaCConfig, policy: ScanPolicy | None = None
+    ) -> list[IaCFinding]:
         """Scan Terraform configuration for security issues."""
         findings: list[IaCFinding] = []
         content = config.raw_content
@@ -273,7 +275,9 @@ class DockerScanner(IaCScannerProtocol):
             raw_content=content,
         )
 
-    async def scan(self, config: IaCConfig, policy: ScanPolicy | None = None) -> list[IaCFinding]:
+    async def scan(
+        self, config: IaCConfig, policy: ScanPolicy | None = None
+    ) -> list[IaCFinding]:
         """Scan Dockerfile for security issues."""
         findings: list[IaCFinding] = []
         content = config.raw_content
@@ -359,7 +363,10 @@ class DockerScanner(IaCScannerProtocol):
                 )
 
         # Apt-get without cleanup
-        if re.search(r"apt-get\s+install", content) and "rm -rf /var/lib/apt" not in content:
+        if (
+            re.search(r"apt-get\s+install", content)
+            and "rm -rf /var/lib/apt" not in content
+        ):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-006",
@@ -439,7 +446,9 @@ class KubernetesScanner(IaCScannerProtocol):
             raw_content=content,
         )
 
-    async def scan(self, config: IaCConfig, policy: ScanPolicy | None = None) -> list[IaCFinding]:
+    async def scan(
+        self, config: IaCConfig, policy: ScanPolicy | None = None
+    ) -> list[IaCFinding]:
         """Scan Kubernetes manifests for security issues."""
         findings: list[IaCFinding] = []
 
@@ -451,7 +460,12 @@ class KubernetesScanner(IaCScannerProtocol):
 
             # Pod Security
             spec = props.get("spec", {})
-            if resource.resource_type in ["Deployment", "Pod", "DaemonSet", "StatefulSet"]:
+            if resource.resource_type in [
+                "Deployment",
+                "Pod",
+                "DaemonSet",
+                "StatefulSet",
+            ]:
                 pod_spec = spec
                 if "template" in spec:
                     pod_spec = spec.get("template", {}).get("spec", {})
@@ -658,7 +672,9 @@ class DockerComposeScanner(IaCScannerProtocol):
             raw_content=content,
         )
 
-    async def scan(self, config: IaCConfig, policy: ScanPolicy | None = None) -> list[IaCFinding]:
+    async def scan(
+        self, config: IaCConfig, policy: ScanPolicy | None = None
+    ) -> list[IaCFinding]:
         """Scan Docker Compose for security issues."""
         findings: list[IaCFinding] = []
 
@@ -717,7 +733,9 @@ class DockerComposeScanner(IaCScannerProtocol):
 
             for key, value in env_items:
                 key_upper = key.upper()
-                if any(kw in key_upper for kw in ["PASSWORD", "SECRET", "KEY", "TOKEN"]):
+                if any(
+                    kw in key_upper for kw in ["PASSWORD", "SECRET", "KEY", "TOKEN"]
+                ):
                     if value and not value.startswith("${"):
                         findings.append(
                             IaCFinding(

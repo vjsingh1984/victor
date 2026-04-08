@@ -245,7 +245,9 @@ class FEPValidator:
         try:
             metadata = parse_fep_metadata(content)
         except ValueError as e:
-            errors.append(FEPValidationError(severity="error", section="metadata", message=str(e)))
+            errors.append(
+                FEPValidationError(severity="error", section="metadata", message=str(e))
+            )
             return FEPValidationResult(
                 is_valid=False,
                 metadata=None,
@@ -303,7 +305,9 @@ class FEPValidator:
         if metadata.fep < 0:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="FEP number must be >= 0"
+                    severity="error",
+                    section="metadata",
+                    message="FEP number must be >= 0",
                 )
             )
 
@@ -311,7 +315,9 @@ class FEPValidator:
         if not metadata.title or len(metadata.title.strip()) == 0:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="Title cannot be empty"
+                    severity="error",
+                    section="metadata",
+                    message="Title cannot be empty",
                 )
             )
 
@@ -359,7 +365,9 @@ class FEPValidator:
         if not metadata.authors:
             errors.append(
                 FEPValidationError(
-                    severity="error", section="metadata", message="At least one author required"
+                    severity="error",
+                    section="metadata",
+                    message="At least one author required",
                 )
             )
 
@@ -602,7 +610,9 @@ def parse_fep_metadata(content: str) -> FEPMetadata:
         raise ValueError(f"Missing required field in frontmatter: {e}")
 
 
-def validate_fep(fep_path: Path, feps_dir: Optional[Path] = None) -> FEPValidationResult:
+def validate_fep(
+    fep_path: Path, feps_dir: Optional[Path] = None
+) -> FEPValidationResult:
     """Validate a FEP file.
 
     Convenience function that creates a validator and validates.

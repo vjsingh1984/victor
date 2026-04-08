@@ -42,7 +42,15 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Tuple, List, Optional, Any, runtime_checkable, TYPE_CHECKING
+from typing import (
+    Protocol,
+    Tuple,
+    List,
+    Optional,
+    Any,
+    runtime_checkable,
+    TYPE_CHECKING,
+)
 from enum import Enum
 
 if TYPE_CHECKING:
@@ -646,7 +654,9 @@ class LMStudioAdapter(BaseProviderAdapter):
         matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
 
         thinking = "\n".join(matches) if matches else ""
-        content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
+        content = re.sub(
+            think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE
+        ).strip()
 
         return (thinking, content)
 
@@ -1242,7 +1252,9 @@ def get_provider_adapter(provider_name: str) -> BaseProviderAdapter:
     return adapter_class()
 
 
-def register_provider_adapter(name: str, adapter_class: type[BaseProviderAdapter]) -> None:
+def register_provider_adapter(
+    name: str, adapter_class: type[BaseProviderAdapter]
+) -> None:
     """Register a custom provider adapter.
 
     Args:

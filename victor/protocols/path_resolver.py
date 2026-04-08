@@ -47,7 +47,16 @@ import os
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import (
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +96,7 @@ class PathResolution:
     def __str__(self) -> str:
         """Human-readable representation."""
         if self.was_normalized:
-            return (
-                f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
-            )
+            return f"'{self.original_path}' -> '{self.resolved_path}' ({self.normalization_applied})"
         return str(self.resolved_path)
 
 
@@ -510,7 +517,9 @@ class PathResolver(IPathResolver):
                         # Build combined description
                         full_description = description
                         if root != self.cwd:
-                            full_description = f"{description}, resolved_from:{root.name}"
+                            full_description = (
+                                f"{description}, resolved_from:{root.name}"
+                            )
 
                         result = PathResolution(
                             original_path=path,

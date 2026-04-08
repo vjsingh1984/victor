@@ -114,7 +114,9 @@ class BaseWorkflowProvider:
         """
         return {}
 
-    def validate_workflow(self, workflow_name: str, workflow_def: Dict[str, Any]) -> bool:
+    def validate_workflow(
+        self, workflow_name: str, workflow_def: Dict[str, Any]
+    ) -> bool:
         """Validate a workflow definition.
 
         Args:
@@ -166,7 +168,9 @@ class BaseWorkflowProvider:
                     workflows = self._load_workflow_file(workflow_file)
                     loaded.update(workflows)
                 except Exception as e:
-                    logger.warning(f"Failed to load workflows from {workflow_file}: {e}")
+                    logger.warning(
+                        f"Failed to load workflows from {workflow_file}: {e}"
+                    )
 
         self._workflows = loaded
         logger.info(
@@ -261,7 +265,9 @@ class BaseWorkflowProvider:
                     workflows[name] = full_def
                     self._workflow_paths[name] = path
                 else:
-                    logger.warning(f"Workflow '{name}' failed validation in {file_path}")
+                    logger.warning(
+                        f"Workflow '{name}' failed validation in {file_path}"
+                    )
 
         except yaml.YAMLError as e:
             logger.error(f"YAML parsing error in {file_path}: {e}")

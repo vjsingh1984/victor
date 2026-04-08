@@ -179,7 +179,9 @@ class WorkflowVariantGenerator:
             )
 
         if not success:
-            logger.warning(f"Failed to apply optimization: {opportunity.strategy_type.value}")
+            logger.warning(
+                f"Failed to apply optimization: {opportunity.strategy_type.value}"
+            )
             return None
 
         # Create variant
@@ -248,7 +250,8 @@ class WorkflowVariantGenerator:
                     config["edges"] = [
                         edge
                         for edge in config["edges"]
-                        if edge.get("source") != node_id and edge.get("target") != node_id
+                        if edge.get("source") != node_id
+                        and edge.get("target") != node_id
                     ]
 
                 changes.append(
@@ -350,7 +353,9 @@ class WorkflowVariantGenerator:
                 metadata={
                     "parallel_node_id": parallel_node_id,
                     "node_ids": target_nodes,
-                    "estimated_speedup": opportunity.metadata.get("estimated_speedup", 2.0),
+                    "estimated_speedup": opportunity.metadata.get(
+                        "estimated_speedup", 2.0
+                    ),
                 },
             )
         )
@@ -409,7 +414,9 @@ class WorkflowVariantGenerator:
                             )
                         )
 
-                        logger.info(f"Substituted tool in node {node_id}: {old_tool} -> {new_tool}")
+                        logger.info(
+                            f"Substituted tool in node {node_id}: {old_tool} -> {new_tool}"
+                        )
 
         return len(changes) > 0, changes
 
@@ -461,7 +468,8 @@ class WorkflowVariantGenerator:
         if has_cycle:
             # Check if max_iterations is set to handle cycles
             has_max_iter = any(
-                node.get("max_iterations", 0) > 0 for node in config.get("nodes", {}).values()
+                node.get("max_iterations", 0) > 0
+                for node in config.get("nodes", {}).values()
             )
 
             if not has_max_iter:

@@ -521,7 +521,13 @@ class ABTestManager:
                 experiment_id, user_id, variant_id, allocated_at, context_json
             ) VALUES (?, ?, ?, ?, ?)
         """,
-            (experiment_id, user_id, variant_id, time.time(), json.dumps(context or {})),
+            (
+                experiment_id,
+                user_id,
+                variant_id,
+                time.time(),
+                json.dumps(context or {}),
+            ),
         )
 
         conn.commit()
@@ -686,7 +692,9 @@ class ABTestManager:
             statistical_significance=bool(row[2]),
             p_value=row[3],
             confidence_interval=json.loads(row[4]) if row[4] else None,
-            variant_results={k: VariantResult(**v) for k, v in json.loads(row[5]).items()},
+            variant_results={
+                k: VariantResult(**v) for k, v in json.loads(row[5]).items()
+            },
             recommendation=row[6],
             reasoning=row[7],
             analyzed_at=row[8],

@@ -112,7 +112,9 @@ _PERFORMANCE_DEFAULTS: Dict[str, Any] = {
 }
 
 
-def _load_config(orchestrator: Any, name: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+def _load_config(
+    orchestrator: Any, name: str, defaults: Dict[str, Any]
+) -> Dict[str, Any]:
     """Load config from framework service when available, else fallback to orchestrator attr."""
     return load_capability_config(orchestrator, name, defaults)
 
@@ -122,7 +124,9 @@ def _store_config(orchestrator: Any, name: str, config: Dict[str, Any]) -> None:
     store_capability_config(orchestrator, name, config)
 
 
-def _store_benchmark_section(orchestrator: Any, section: str, config: Dict[str, Any]) -> None:
+def _store_benchmark_section(
+    orchestrator: Any, section: str, config: Dict[str, Any]
+) -> None:
     """Store/update benchmark_config section with service-first behavior."""
     update_capability_config_section(
         orchestrator,
@@ -413,7 +417,9 @@ def configure_performance_benchmarking(
         },
     )
 
-    logger.info(f"Configured performance benchmarking: iterations={benchmark_iterations}")
+    logger.info(
+        f"Configured performance benchmarking: iterations={benchmark_iterations}"
+    )
 
 
 # =============================================================================

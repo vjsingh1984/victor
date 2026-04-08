@@ -1022,7 +1022,9 @@ def _register_patterns():
     PATTERNS = {p.name: p for p in patterns_list}
 
 
-def get_patterns_by_complexity(complexity: TaskComplexity) -> List[ClassificationPattern]:
+def get_patterns_by_complexity(
+    complexity: TaskComplexity,
+) -> List[ClassificationPattern]:
     """Get all patterns that map to a complexity level.
 
     Args:

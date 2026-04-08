@@ -329,7 +329,9 @@ class ModeAwareMixin:
             exploration_multiplier=getattr(config, "exploration_multiplier", 1.0),
             sandbox_dir=getattr(config, "sandbox_dir", None),
             allowed_tools=set(config.allowed_tools) if config.allowed_tools else set(),
-            disallowed_tools=set(config.disallowed_tools) if config.disallowed_tools else set(),
+            disallowed_tools=(
+                set(config.disallowed_tools) if config.disallowed_tools else set()
+            ),
         )
         return self._mode_info_cache
 

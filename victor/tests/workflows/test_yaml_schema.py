@@ -296,7 +296,9 @@ workflows:
 
         node1 = wf.nodes["step1"]
         # $ctx. prefix is stripped during parsing
-        assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(node1.input_mapping)
+        assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(
+            node1.input_mapping
+        )
 
     def test_parse_nested_context_references(self):
         """Test parsing nested context references like $ctx.data.field."""
@@ -422,7 +424,9 @@ workflows:
         assert (
             "empty_workflow" not in workflows
             or len(
-                workflows.get("empty_workflow", {}).nodes if "empty_workflow" in workflows else {}
+                workflows.get("empty_workflow", {}).nodes
+                if "empty_workflow" in workflows
+                else {}
             )
             == 0
         )
@@ -438,7 +442,10 @@ workflows:
         type: invalid_type
         goal: "This should fail"
 """
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowError
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowError,
+        )
 
         with pytest.raises((ValueError, KeyError, YAMLWorkflowError)):
             load_workflow_from_yaml(yaml_content)
@@ -458,7 +465,10 @@ workflows:
         role: analyst
         # Missing: goal, tool_budget
 """
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowError
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowError,
+        )
 
         try:
             workflows = load_workflow_from_yaml(yaml_content)

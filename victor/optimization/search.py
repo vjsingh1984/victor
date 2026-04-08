@@ -65,7 +65,9 @@ class OptimizationResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
-            "best_variant_id": self.best_variant.variant_id if self.best_variant else None,
+            "best_variant_id": (
+                self.best_variant.variant_id if self.best_variant else None
+            ),
             "best_score": self.best_score,
             "iterations": self.iterations,
             "converged": self.converged,
@@ -229,7 +231,8 @@ class HillClimbingOptimizer:
                 variant_id=f"{profile.workflow_id}_optimized",
                 base_workflow_id=profile.workflow_id,
                 changes=[],
-                expected_improvement=(best_score - score_history[0]) / max(score_history[0], 1e-6),
+                expected_improvement=(best_score - score_history[0])
+                / max(score_history[0], 1e-6),
                 risk_level="medium",
                 config=best_config,
             )
@@ -494,7 +497,8 @@ class SimulatedAnnealingOptimizer:
             variant_id=f"{profile.workflow_id}_annealed",
             base_workflow_id=profile.workflow_id,
             changes=[],
-            expected_improvement=(best_score - score_history[0]) / max(score_history[0], 1e-6),
+            expected_improvement=(best_score - score_history[0])
+            / max(score_history[0], 1e-6),
             risk_level="medium",
             config=best_config,
         )

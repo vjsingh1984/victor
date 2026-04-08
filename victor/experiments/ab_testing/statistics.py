@@ -107,11 +107,13 @@ class StatisticalAnalyzer:
         ci = (
             float(
                 diff
-                - stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff
+                - stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2)
+                * se_diff
             ),
             float(
                 diff
-                + stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2) * se_diff
+                + stats.t.ppf(1 - alpha / 2, len(control_arr) + len(treatment_arr) - 2)
+                * se_diff
             ),
         )
 
@@ -483,7 +485,9 @@ class StatisticalAnalyzer:
         # Check if best is significantly better than control
         if best_id == control_id:
             # Control is best - check if significantly better than all treatments
-            all_not_significant = all(not self.is_significant(p, alpha) for p in p_values.values())
+            all_not_significant = all(
+                not self.is_significant(p, alpha) for p in p_values.values()
+            )
             significant = all_not_significant
         else:
             # Treatment is best - check if significantly better than control

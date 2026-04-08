@@ -151,7 +151,9 @@ class WorkflowOptimizer:
                 variant_generator=self.variant_generator,
             )
         else:
-            raise ValueError(f"Unsupported search algorithm: {self.config.search_algorithm}")
+            raise ValueError(
+                f"Unsupported search algorithm: {self.config.search_algorithm}"
+            )
 
     async def analyze_workflow(
         self,
@@ -279,7 +281,9 @@ class WorkflowOptimizer:
             )
 
             if not opportunities:
-                logger.warning(f"No optimization opportunities found for: {workflow_id}")
+                logger.warning(
+                    f"No optimization opportunities found for: {workflow_id}"
+                )
                 return None
 
         logger.info(f"Using {len(opportunities)} opportunities for optimization")
@@ -359,7 +363,10 @@ class WorkflowOptimizer:
         Returns:
             WorkflowVariant if successful, None otherwise
         """
-        logger.info(f"Applying optimization {opportunity.strategy_type.value} " f"to {workflow_id}")
+        logger.info(
+            f"Applying optimization {opportunity.strategy_type.value} "
+            f"to {workflow_id}"
+        )
 
         # Get profile for validation
         profile = await self.analyze_workflow(
@@ -368,7 +375,9 @@ class WorkflowOptimizer:
         )
 
         if not profile:
-            logger.warning(f"Cannot apply optimization without profile for: {workflow_id}")
+            logger.warning(
+                f"Cannot apply optimization without profile for: {workflow_id}"
+            )
             return None
 
         # Generate variant
@@ -379,7 +388,9 @@ class WorkflowOptimizer:
         )
 
         if not variant:
-            logger.warning(f"Failed to generate variant for opportunity: {opportunity.target}")
+            logger.warning(
+                f"Failed to generate variant for opportunity: {opportunity.target}"
+            )
             return None
 
         # Validate if requested

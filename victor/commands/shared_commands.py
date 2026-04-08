@@ -550,7 +550,9 @@ class CommandRegistry:
     def to_dict(self) -> Dict[str, Any]:
         """Export all commands as a dictionary."""
         return {
-            "commands": [cmd.to_dict() for cmd in self.list_commands(include_hidden=True)],
+            "commands": [
+                cmd.to_dict() for cmd in self.list_commands(include_hidden=True)
+            ],
             "aliases": dict(self._aliases),
         }
 

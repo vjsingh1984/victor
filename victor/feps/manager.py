@@ -141,7 +141,9 @@ class FEPManager:
 
         # Extract sections
         sections: Dict[str, FEPSection] = {}
-        self.validator._extract_and_validate_sections(content_without_frontmatter, sections)
+        self.validator._extract_and_validate_sections(
+            content_without_frontmatter, sections
+        )
 
         return sections
 
@@ -164,7 +166,9 @@ class FEPManager:
 
         return self.validator.validate_file(matches[0])
 
-    def update_fep_status(self, fep_number: int, new_status: FEPStatus) -> Tuple[bool, str]:
+    def update_fep_status(
+        self, fep_number: int, new_status: FEPStatus
+    ) -> Tuple[bool, str]:
         """Update FEP status.
 
         Args:
@@ -202,7 +206,11 @@ class FEPManager:
             modified_pattern = r"^modified:\s*\d{4}-\d{2}-\d{2}"
             new_modified_line = f"modified: {today}"
             new_content = re.sub(
-                modified_pattern, new_modified_line, new_content, count=1, flags=re.MULTILINE
+                modified_pattern,
+                new_modified_line,
+                new_content,
+                count=1,
+                flags=re.MULTILINE,
             )
 
             # Write back

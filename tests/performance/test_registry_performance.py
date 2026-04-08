@@ -42,9 +42,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
-from victor.framework.chain_registry import ChainRegistry, ChainMetadata, reset_chain_registry
-from victor.framework.persona_registry import PersonaRegistry, PersonaSpec, reset_persona_registry
+from victor.framework.capabilities.base import (
+    BaseCapabilityProvider,
+    CapabilityMetadata,
+)
+from victor.framework.chain_registry import (
+    ChainRegistry,
+    ChainMetadata,
+    reset_chain_registry,
+)
+from victor.framework.persona_registry import (
+    PersonaRegistry,
+    PersonaSpec,
+    reset_persona_registry,
+)
 from victor.framework.middleware import (
     GitSafetyMiddleware,
     LoggingMiddleware,
@@ -81,7 +92,9 @@ def create_mock_chain(n: int) -> Any:
     return mock
 
 
-def create_persona_spec(n: int, expertise_areas: List[str] | None = None) -> PersonaSpec:
+def create_persona_spec(
+    n: int, expertise_areas: List[str] | None = None
+) -> PersonaSpec:
     """Create a test persona spec.
 
     Args:
@@ -118,7 +131,8 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
 
     def __init__(self, num_capabilities: int = 10):
         self._capabilities = {
-            f"capability_{i}": MockCapability(f"capability_{i}") for i in range(num_capabilities)
+            f"capability_{i}": MockCapability(f"capability_{i}")
+            for i in range(num_capabilities)
         }
         self._metadata = {
             f"capability_{i}": CapabilityMetadata(
@@ -677,7 +691,9 @@ class TestMiddlewarePerformance:
         middleware = SecretMaskingMiddleware(replacement="[REDACTED]")
 
         async def run_middleware():
-            return await middleware.before_tool_call("test_tool", {"secret": "hidden_value"})
+            return await middleware.before_tool_call(
+                "test_tool", {"secret": "hidden_value"}
+            )
 
         def run_sync():
             return asyncio.run(run_middleware())
@@ -743,7 +759,9 @@ class TestMiddlewarePerformance:
         ]
 
         def sort_by_priority():
-            return sorted(middleware_list, key=lambda m: m.get_priority().value, reverse=True)
+            return sorted(
+                middleware_list, key=lambda m: m.get_priority().value, reverse=True
+            )
 
         result = benchmark(sort_by_priority)
         assert len(result) == 10
@@ -885,7 +903,9 @@ class TestIntegrationPerformance:
         chains = {f"chain_{i}": create_mock_chain(i) for i in range(100)}
 
         def bulk_register():
-            return registry.register_from_vertical("test_vertical", chains, replace=True)
+            return registry.register_from_vertical(
+                "test_vertical", chains, replace=True
+            )
 
         result = benchmark(bulk_register)
         assert result == 100
@@ -960,7 +980,9 @@ class TestPerformanceAssertions:
         elapsed = time.perf_counter() - start
 
         avg_time_ms = (elapsed / 1000) * 1000
-        assert avg_time_ms < 0.1, f"Chain lookup too slow: {avg_time_ms:.3f}ms (target: < 0.1ms)"
+        assert (
+            avg_time_ms < 0.1
+        ), f"Chain lookup too slow: {avg_time_ms:.3f}ms (target: < 0.1ms)"
 
     def test_persona_registration_meets_target(self):
         """Assert persona registration is < 1ms per item."""

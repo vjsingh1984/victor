@@ -81,7 +81,9 @@ class ParallelFormation(BaseFormationStrategy):
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"ParallelFormation: agent {agents[i].id} failed: {result}")
+                logger.error(
+                    f"ParallelFormation: agent {agents[i].id} failed: {result}"
+                )
                 processed_results.append(
                     MemberResult(
                         member_id=agents[i].id,

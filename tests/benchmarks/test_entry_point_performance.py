@@ -51,7 +51,9 @@ class TestEntryPointScanPerformance:
         duration_ms = (end - start) * 1000
 
         # Assert: scan should complete in < 50ms
-        assert duration_ms < 50, f"Entry point scan took {duration_ms:.2f}ms, target < 50ms"
+        assert (
+            duration_ms < 50
+        ), f"Entry point scan took {duration_ms:.2f}ms, target < 50ms"
 
         # Also verify we found some groups (via metrics)
         assert metrics.total_groups > 0, "Should find at least some entry point groups"
@@ -96,10 +98,16 @@ class TestEntryPointScanPerformance:
         multiple_scan_duration = time.perf_counter() - start
 
         # Single-pass should be faster
-        speedup = multiple_scan_duration / single_pass_duration if single_pass_duration > 0 else 1
+        speedup = (
+            multiple_scan_duration / single_pass_duration
+            if single_pass_duration > 0
+            else 1
+        )
 
         # Assert: single-pass should be at least 2x faster
-        assert speedup >= 1.5, f"Single-pass scan is only {speedup:.2f}x faster, target >= 1.5x"
+        assert (
+            speedup >= 1.5
+        ), f"Single-pass scan is only {speedup:.2f}x faster, target >= 1.5x"
 
         print(f"\nSingle-pass: {single_pass_duration*1000:.2f}ms")
         print(f"Multiple scans: {multiple_scan_duration*1000:.2f}ms")
@@ -132,11 +140,15 @@ class TestEntryPointScanPerformance:
         duration_ms = (end - start) * 1000
 
         # Assert: 300 lazy gets should be very fast (< 30ms total)
-        assert duration_ms < 30, f"300 lazy get operations took {duration_ms:.2f}ms, target < 30ms"
+        assert (
+            duration_ms < 30
+        ), f"300 lazy get operations took {duration_ms:.2f}ms, target < 30ms"
 
         # Average per get (300 operations)
         avg_per_get = duration_ms / 300
-        assert avg_per_get < 0.2, f"Average lazy get took {avg_per_get:.3f}ms, target < 0.2ms"
+        assert (
+            avg_per_get < 0.2
+        ), f"Average lazy get took {avg_per_get:.3f}ms, target < 0.2ms"
 
     def test_caching_efficiency(self):
         """Test that repeated scans use cached results efficiently."""

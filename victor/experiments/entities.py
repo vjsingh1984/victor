@@ -178,7 +178,9 @@ class Experiment:
             "workflow_name": self.workflow_name,
             "vertical": self.vertical,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
         }
 
     @classmethod
@@ -201,10 +203,14 @@ class Experiment:
             workflow_name=data.get("workflow_name"),
             vertical=data.get("vertical", "coding"),
             started_at=(
-                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+                datetime.fromisoformat(data["started_at"])
+                if data.get("started_at")
+                else None
             ),
             completed_at=(
-                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+                datetime.fromisoformat(data["completed_at"])
+                if data.get("completed_at")
+                else None
             ),
         )
 
@@ -268,7 +274,9 @@ class Run:
             "name": self.name,
             "status": self.status.value,
             "started_at": self.started_at.isoformat(),
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "metrics_summary": self.metrics_summary,
             "parameters": self.parameters,
             "error_message": self.error_message,
@@ -293,7 +301,9 @@ class Run:
             status=RunStatus(data["status"]),
             started_at=datetime.fromisoformat(data["started_at"]),
             completed_at=(
-                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+                datetime.fromisoformat(data["completed_at"])
+                if data.get("completed_at")
+                else None
             ),
             metrics_summary=data.get("metrics_summary", {}),
             parameters=data.get("parameters", {}),

@@ -217,7 +217,9 @@ class MetricsCollector:
         # Append to aggregation arrays
         self._aggregation_cache[key]["execution_times"].append(metrics.execution_time)
         self._aggregation_cache[key]["token_counts"].append(metrics.total_tokens)
-        self._aggregation_cache[key]["tool_call_counts"].append(metrics.tool_calls_count)
+        self._aggregation_cache[key]["tool_call_counts"].append(
+            metrics.tool_calls_count
+        )
         self._aggregation_cache[key]["successes"].append(1 if metrics.success else 0)
         self._aggregation_cache[key]["costs"].append(metrics.estimated_cost)
 
@@ -238,7 +240,9 @@ class MetricsCollector:
         # Check cache first
         key = f"{experiment_id}:{variant_id}"
         if key in self._aggregation_cache:
-            return self._compute_aggregated_metrics(self._aggregation_cache[key], variant_id)
+            return self._compute_aggregated_metrics(
+                self._aggregation_cache[key], variant_id
+            )
 
         # Load from database
         conn = sqlite3.connect(str(self.storage_path))
