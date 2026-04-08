@@ -507,6 +507,25 @@ class VictorAgentAdapter:
         )
 
         try:
+            # Start heartbeat for silent hang detection
+            import time as _time
+
+            _heartbeat_start = _time.time()
+
+            async def _heartbeat():
+                while True:
+                    await asyncio.sleep(30)
+                    logger.info(
+                        "[AgentAdapter] Heartbeat: turn=%d, tool_calls=%d, "
+                        "files_modified=%s, elapsed=%.0fs",
+                        self._turns,
+                        len(self._tool_calls),
+                        bool(self._file_edits),
+                        _time.time() - _heartbeat_start,
+                    )
+
+            _heartbeat_task = asyncio.create_task(_heartbeat())
+
             # Execute agent loop
             complete = False
             while not complete and self._turns < self.config.max_turns:
@@ -617,6 +636,13 @@ class VictorAgentAdapter:
         except Exception as e:
             logger.error(f"Task execution error: {e}")
             trace.validation_errors["execution"] = str(e)
+        finally:
+            # Cancel heartbeat
+            _heartbeat_task.cancel()
+            try:
+                await _heartbeat_task
+            except asyncio.CancelledError:
+                pass
 
         # Populate trace
         trace.end_time = time.time()
