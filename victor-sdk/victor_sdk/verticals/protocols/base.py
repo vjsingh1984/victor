@@ -213,7 +213,9 @@ class VerticalBase(ABC):
 
         def _create() -> Any:
             module = importlib.import_module(import_path)
-            target_name = attribute_name or cls._auto_extension_class_name(extension_key)
+            target_name = attribute_name or cls._auto_extension_class_name(
+                extension_key
+            )
             extension_cls = getattr(module, target_name)
             return extension_cls()
 
@@ -234,7 +236,9 @@ class VerticalBase(ABC):
                 return
 
             prefix = f"{cls._cache_namespace()}:"
-            stale_config_keys = [key for key in cls._config_cache if key.startswith(prefix)]
+            stale_config_keys = [
+                key for key in cls._config_cache if key.startswith(prefix)
+            ]
             for key in stale_config_keys:
                 cls._config_cache.pop(key, None)
             stale_keys = [key for key in cls._extension_cache if key.startswith(prefix)]
@@ -390,6 +394,57 @@ class VerticalBase(ABC):
 
         return None
 
+    # -----------------------------------------------------------------
+    # Runtime integration hooks (no-op defaults for external verticals)
+    # -----------------------------------------------------------------
+    # The victor-ai framework calls these on verticals during runtime.
+    # External verticals inherit safe no-op defaults; the framework's
+    # own VerticalBase overrides them with full implementations.
+
+    @classmethod
+    def get_handlers(cls) -> Dict[str, Any]:
+        """Return workflow step handlers for this vertical."""
+        return {}
+
+    @classmethod
+    def get_capability_provider(cls) -> Optional[Any]:
+        """Return the capability provider for this vertical, if any."""
+        return None
+
+    @classmethod
+    def get_team_specs(cls) -> Dict[str, Any]:
+        """Return team specifications for this vertical."""
+        return {}
+
+    @classmethod
+    def get_tool_graph(cls) -> Optional[Any]:
+        """Return the tool dependency graph for this vertical, if any."""
+        return None
+
+    @classmethod
+    def register_tools(cls, registry: Any) -> None:
+        """Register vertical-specific tools with the framework registry."""
+        pass
+
+    @classmethod
+    def clear_extension_cache(cls, *, clear_all: bool = False) -> None:
+        """Clear cached extension instances. Delegates to clear_config_cache."""
+        cls.clear_config_cache(clear_all=clear_all)
+
+    @classmethod
+    def get_capability_configs(cls) -> Dict[str, Any]:
+        """Return capability configurations for this vertical."""
+        return {}
+
+    @classmethod
+    def get_mode_config(cls) -> Dict[str, Any]:
+        """Return mode configurations for this vertical."""
+        return {}
+
+    # -----------------------------------------------------------------
+    # Extension container
+    # -----------------------------------------------------------------
+
     @classmethod
     def get_extensions(
         cls,
@@ -411,8 +466,12 @@ class VerticalBase(ABC):
             prompt_contributor = cls.get_prompt_contributor()
             return VerticalExtensions(
                 middleware=lambda: list(cls.get_middleware() or []),
-                safety_extensions=lambda: [safety_extension] if safety_extension else [],
-                prompt_contributors=lambda: [prompt_contributor] if prompt_contributor else [],
+                safety_extensions=lambda: (
+                    [safety_extension] if safety_extension else []
+                ),
+                prompt_contributors=lambda: (
+                    [prompt_contributor] if prompt_contributor else []
+                ),
                 mode_config_provider=cls.get_mode_config_provider,
                 tool_dependency_provider=cls.get_tool_dependency_provider,
                 workflow_provider=cls.get_workflow_provider,

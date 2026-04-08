@@ -38,7 +38,6 @@ import os
 from pathlib import Path
 from typing import Any, List, Optional, Set, Tuple, Type
 
-
 # Default forbidden import prefixes for external verticals
 _DEFAULT_FORBIDDEN_PREFIXES = (
     "victor.agent.",
@@ -78,12 +77,12 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
     required_methods = ["get_name", "get_description", "get_tools", "get_system_prompt"]
     for method_name in required_methods:
         method = getattr(vertical_cls, method_name, None)
-        assert method is not None, (
-            f"Vertical {vertical_cls.__name__} missing required method: {method_name}"
-        )
-        assert callable(method), (
-            f"Vertical {vertical_cls.__name__}.{method_name} is not callable"
-        )
+        assert (
+            method is not None
+        ), f"Vertical {vertical_cls.__name__} missing required method: {method_name}"
+        assert callable(
+            method
+        ), f"Vertical {vertical_cls.__name__}.{method_name} is not callable"
 
     # Validate get_tools returns list of strings
     tools = vertical_cls.get_tools()
@@ -91,9 +90,9 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
         f"Vertical {vertical_cls.__name__}.get_tools() must return list, "
         f"got {type(tools).__name__}"
     )
-    assert len(tools) > 0, (
-        f"Vertical {vertical_cls.__name__}.get_tools() returned empty list"
-    )
+    assert (
+        len(tools) > 0
+    ), f"Vertical {vertical_cls.__name__}.get_tools() returned empty list"
     for tool in tools:
         assert isinstance(tool, str), (
             f"Vertical {vertical_cls.__name__}.get_tools() items must be str, "
@@ -106,9 +105,9 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
         f"Vertical {vertical_cls.__name__}.get_system_prompt() must return str, "
         f"got {type(prompt).__name__}"
     )
-    assert len(prompt.strip()) > 0, (
-        f"Vertical {vertical_cls.__name__}.get_system_prompt() returned empty string"
-    )
+    assert (
+        len(prompt.strip()) > 0
+    ), f"Vertical {vertical_cls.__name__}.get_system_prompt() returned empty string"
 
     # Validate manifest if present
     manifest = getattr(vertical_cls, "_victor_manifest", None)
@@ -116,9 +115,9 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
         assert hasattr(manifest, "name"), "Manifest missing 'name' field"
         assert hasattr(manifest, "version"), "Manifest missing 'version' field"
         assert hasattr(manifest, "provides"), "Manifest missing 'provides' field"
-        assert isinstance(manifest.name, str) and manifest.name, (
-            "Manifest.name must be a non-empty string"
-        )
+        assert (
+            isinstance(manifest.name, str) and manifest.name
+        ), "Manifest.name must be a non-empty string"
 
 
 def assert_import_boundaries(

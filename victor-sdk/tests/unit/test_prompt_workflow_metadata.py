@@ -55,9 +55,7 @@ def test_prompt_and_workflow_metadata_normalize_and_serialize() -> None:
 
     prompt_metadata = normalize_prompt_metadata(
         {
-            "templates": {
-                "analysis": "Analyze the request."
-            },
+            "templates": {"analysis": "Analyze the request."},
             "task_type_hints": {
                 "analysis": {
                     "hint": "Prefer read-first workflows.",

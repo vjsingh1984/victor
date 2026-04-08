@@ -43,9 +43,7 @@ class ConversationManagerProtocol(Protocol):
     this protocol and can be wrapped by vertical-specific managers.
     """
 
-    def add_message(
-        self, role: str, content: str, **metadata: Any
-    ) -> str:
+    def add_message(self, role: str, content: str, **metadata: Any) -> str:
         """Record a message in the conversation history.
 
         Args:
@@ -58,9 +56,7 @@ class ConversationManagerProtocol(Protocol):
         """
         ...
 
-    def get_history(
-        self, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Retrieve conversation history.
 
         Args:

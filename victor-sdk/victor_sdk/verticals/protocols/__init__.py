@@ -40,7 +40,9 @@ from victor_sdk.verticals.protocols.modes import ModeConfigProvider
 from victor_sdk.verticals.protocols.rl import RLProvider
 from victor_sdk.verticals.protocols.enrichment import EnrichmentProvider
 from victor_sdk.verticals.protocols.services import ServiceProvider
-from victor_sdk.verticals.protocols.handlers import HandlerProvider as InputHandlerProvider
+from victor_sdk.verticals.protocols.handlers import (
+    HandlerProvider as InputHandlerProvider,
+)
 from victor_sdk.verticals.protocols.capabilities import CapabilityProvider
 
 # Promoted protocols from victor.core.verticals.protocols

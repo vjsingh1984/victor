@@ -174,9 +174,10 @@ class ProtocolRegistry:
             for ep in importlib.metadata.entry_points(group=self.VERTICALS_GROUP):
                 try:
                     candidate = ep.load()
-                    for vertical_name, vertical_class in collect_verticals_from_candidate(
-                        candidate
-                    ).items():
+                    for (
+                        vertical_name,
+                        vertical_class,
+                    ) in collect_verticals_from_candidate(candidate).items():
                         self._verticals[vertical_name] = vertical_class
                         self._discovery_stats.total_verticals += 1
                         self._track_metadata(
@@ -318,7 +319,9 @@ class ProtocolRegistry:
         except Exception as e:
             logger.debug(f"Failed to track metadata for {name}: {e}")
 
-    def _handle_load_error(self, name: str, protocol_type: str, error: Exception) -> None:
+    def _handle_load_error(
+        self, name: str, protocol_type: str, error: Exception
+    ) -> None:
         """Handle a load error.
 
         Args:
@@ -338,7 +341,9 @@ class ProtocolRegistry:
         )
 
         if self._strict:
-            raise RuntimeError(f"Failed to load {protocol_type} '{name}': {error}") from error
+            raise RuntimeError(
+                f"Failed to load {protocol_type} '{name}': {error}"
+            ) from error
         else:
             logger.warning(f"Failed to load {protocol_type} '{name}': {error}")
 
@@ -420,7 +425,9 @@ class ProtocolRegistry:
         """Get all registered verticals."""
         return self._verticals.copy()
 
-    def get_protocol_metadata(self, name: Optional[str] = None) -> Dict[str, ProtocolMetadata]:
+    def get_protocol_metadata(
+        self, name: Optional[str] = None
+    ) -> Dict[str, ProtocolMetadata]:
         """Get metadata about discovered protocols.
 
         Args:
@@ -432,7 +439,9 @@ class ProtocolRegistry:
         """
         if name:
             return (
-                {name: self._protocol_metadata.get(name)} if name in self._protocol_metadata else {}
+                {name: self._protocol_metadata.get(name)}
+                if name in self._protocol_metadata
+                else {}
             )
         return self._protocol_metadata.copy()
 
@@ -477,7 +486,9 @@ class ProtocolRegistry:
         Returns:
             List of protocol names that had load errors.
         """
-        return [name for name, meta in self._protocol_metadata.items() if not meta.is_loaded]
+        return [
+            name for name, meta in self._protocol_metadata.items() if not meta.is_loaded
+        ]
 
 
 # Global registry instance
@@ -543,7 +554,9 @@ class _CollectingPluginContext:
         return None
 
 
-def collect_verticals_from_candidate(candidate: Any) -> Dict[str, Type[SdkVerticalBase]]:
+def collect_verticals_from_candidate(
+    candidate: Any,
+) -> Dict[str, Type[SdkVerticalBase]]:
     """Collect SDK vertical classes from a direct vertical or VictorPlugin candidate.
 
     This helper is the definition-layer contract parser shared by SDK discovery,
@@ -571,7 +584,9 @@ def collect_verticals_from_candidate(candidate: Any) -> Dict[str, Type[SdkVertic
             for vertical_class in context.verticals
         }
 
-    raise TypeError("Entry point must resolve to a VictorPlugin or an SDK VerticalBase subclass")
+    raise TypeError(
+        "Entry point must resolve to a VictorPlugin or an SDK VerticalBase subclass"
+    )
 
 
 # Convenience functions for common operations
@@ -603,7 +618,9 @@ def discover_protocols(
     elif protocol_type == "safety_provider":
         return {f"safety_{i}": p for i, p in enumerate(registry.get_safety_providers())}
     elif protocol_type == "workflow_provider":
-        return {f"workflow_{i}": p for i, p in enumerate(registry.get_workflow_providers())}
+        return {
+            f"workflow_{i}": p for i, p in enumerate(registry.get_workflow_providers())
+        }
     elif protocol_type == "prompt_provider":
         return {f"prompt_{i}": p for i, p in enumerate(registry.get_prompt_providers())}
     elif protocol_type == "team_provider":

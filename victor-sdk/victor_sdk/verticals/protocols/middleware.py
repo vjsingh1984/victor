@@ -15,7 +15,9 @@ class MiddlewareProvider(Protocol):
     Middleware can intercept and modify execution flow at various points.
     """
 
-    def get_pre_execution_middleware(self) -> List[Callable[[Dict[str, Any]], Awaitable[None]]]:
+    def get_pre_execution_middleware(
+        self,
+    ) -> List[Callable[[Dict[str, Any]], Awaitable[None]]]:
         """Return middleware to run before execution.
 
         Returns:
@@ -23,7 +25,9 @@ class MiddlewareProvider(Protocol):
         """
         ...
 
-    def get_post_execution_middleware(self) -> List[Callable[[Dict[str, Any]], Awaitable[None]]]:
+    def get_post_execution_middleware(
+        self,
+    ) -> List[Callable[[Dict[str, Any]], Awaitable[None]]]:
         """Return middleware to run after execution.
 
         Returns:
@@ -31,7 +35,9 @@ class MiddlewareProvider(Protocol):
         """
         ...
 
-    def get_error_handling_middleware(self) -> List[Callable[[Exception, Dict[str, Any]], Awaitable[None]]]:
+    def get_error_handling_middleware(
+        self,
+    ) -> List[Callable[[Exception, Dict[str, Any]], Awaitable[None]]]:
         """Return middleware for error handling.
 
         Returns:

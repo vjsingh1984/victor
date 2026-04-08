@@ -331,7 +331,10 @@ def run_all_e2e_tests():
 
     tests = [
         ("Zero-Dependency Import", test_zero_dependency_import),
-        ("Zero-Dependency Vertical Definition", test_zero_dependency_vertical_definition),
+        (
+            "Zero-Dependency Vertical Definition",
+            test_zero_dependency_vertical_definition,
+        ),
         ("Protocol Implementation", test_protocol_implementation),
         ("Discovery System", test_discovery_system),
         ("Core Types", test_core_types),

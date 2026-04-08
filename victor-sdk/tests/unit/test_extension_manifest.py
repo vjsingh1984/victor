@@ -37,7 +37,11 @@ class TestExtensionManifest:
 
     def test_unmet_requirements_all_met(self):
         m = ExtensionManifest(requires={ExtensionType.SAFETY, ExtensionType.TOOLS})
-        available = {ExtensionType.SAFETY, ExtensionType.TOOLS, ExtensionType.MIDDLEWARE}
+        available = {
+            ExtensionType.SAFETY,
+            ExtensionType.TOOLS,
+            ExtensionType.MIDDLEWARE,
+        }
         assert m.unmet_requirements(available) == set()
 
     def test_unmet_requirements_some_missing(self):

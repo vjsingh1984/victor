@@ -33,7 +33,6 @@ from victor_sdk.verticals.protocols.promoted_types import (
     ValidationError,
 )
 
-
 # =============================================================================
 # Tool Selection Strategy Protocol
 # =============================================================================
@@ -465,7 +464,9 @@ class StageValidator:
         self._validate_transitions(stages, result)
         if self._strict_mode and result.warnings:
             for warning in result.warnings:
-                result.add_error(ValidationError.INVALID_TRANSITION, f"[STRICT] {warning}")
+                result.add_error(
+                    ValidationError.INVALID_TRANSITION, f"[STRICT] {warning}"
+                )
             result.warnings.clear()
         return result
 
@@ -483,7 +484,9 @@ class StageValidator:
         self, stages: Dict[str, Any], result: StageValidationResult
     ) -> None:
         for sname in stages.keys():
-            if any(sname.startswith(prefix) for prefix in StageContract.RESERVED_PREFIXES):
+            if any(
+                sname.startswith(prefix) for prefix in StageContract.RESERVED_PREFIXES
+            ):
                 result.add_error(
                     ValidationError.INVALID_STAGE_NAME,
                     f"Stage '{sname}' uses reserved prefix",
