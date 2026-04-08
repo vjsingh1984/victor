@@ -586,6 +586,16 @@ class ConversationStateMachine:
                 "tool_call_count": len(self.state.last_tools),
             }
 
+            logger.debug(
+                "Edge model input: stage=%s, tools=%s, files_read=%d, "
+                "files_modified=%d, tool_calls=%d",
+                context.get("current_stage"),
+                context.get("last_tools"),
+                context.get("files_observed", 0),
+                context.get("files_modified", 0),
+                context.get("tool_call_count", 0),
+            )
+
             decision = service.decide_sync(
                 DecisionType.STAGE_DETECTION,
                 context=context,
@@ -600,6 +610,13 @@ class ConversationStateMachine:
 
             stage_name = decision.result.stage
             confidence = decision.confidence
+
+            logger.debug(
+                "Edge model output: stage=%s, confidence=%.2f, source=%s",
+                stage_name,
+                confidence,
+                decision.source,
+            )
 
             if confidence < 0.6:
                 return None, 0.0
