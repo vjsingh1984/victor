@@ -309,6 +309,8 @@ class VictorAgentAdapter:
             "tokens_used": token_usage["total_tokens"],
             "tool_calls": len(self._tool_calls),
             "turns": self._turns,
+            "file_edits": len(self._file_edits),
+            "files_modified": [e.get("path", "") for e in self._file_edits[:10]],
         }
 
     def reset(self) -> None:
@@ -348,6 +350,31 @@ class VictorAgentAdapter:
             get_rl_coordinator().set_repo_context(None)
         except Exception:
             pass
+
+        # Reset conversation state machine (clear transition history)
+        state_mgr = getattr(
+            self.orchestrator,
+            "_conversation_state",
+            getattr(self.orchestrator, "conversation_state", None),
+        )
+        if state_mgr and hasattr(state_mgr, "reset"):
+            state_mgr.reset()
+
+        # Reset embedding service to prevent stale connections
+        try:
+            from victor.storage.embeddings.service import EmbeddingService
+
+            if EmbeddingService._instance is not None and hasattr(
+                EmbeddingService._instance, "_shutdown"
+            ):
+                EmbeddingService._instance._shutdown = False
+        except Exception:
+            pass
+
+        # Force GC to release held resources
+        import gc
+
+        gc.collect()
 
     async def execute_task(
         self,

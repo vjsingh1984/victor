@@ -274,6 +274,11 @@ class ConversationStateMachine:
     # while still preventing thrashing
     TRANSITION_COOLDOWN_SECONDS: float = 2.0
 
+    # Thrashing detection: if >MAX transitions in WINDOW seconds, apply longer cooldown
+    MAX_TRANSITIONS_PER_WINDOW: int = 6
+    THRASHING_WINDOW_SECONDS: float = 120.0  # 2 min window
+    THRASHING_COOLDOWN_SECONDS: float = 30.0  # Lock stage for 30s on thrashing
+
     # Minimum tools required to trigger stage transition
     MIN_TOOLS_FOR_TRANSITION: int = 3
 
@@ -326,6 +331,24 @@ class ConversationStateMachine:
         # Reset manager state if provided
         if self._state_manager:
             self._sync_state_to_manager()
+
+    def _is_thrashing(self) -> bool:
+        """Detect stage thrashing — rapid oscillation between stages.
+
+        Returns True if more than MAX_TRANSITIONS_PER_WINDOW transitions
+        occurred in the last THRASHING_WINDOW_SECONDS.
+        """
+        import time
+
+        if len(self._transition_history) < self.MAX_TRANSITIONS_PER_WINDOW:
+            return False
+        now = time.time()
+        recent = [
+            t
+            for t in self._transition_history
+            if now - t.get("timestamp", 0) < self.THRASHING_WINDOW_SECONDS
+        ]
+        return len(recent) >= self.MAX_TRANSITIONS_PER_WINDOW
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -788,10 +811,21 @@ class ConversationStateMachine:
                 return
 
         if new_stage != old_stage:
-            # Enforce cooldown to prevent stage thrashing
             current_time = time.time()
             time_since_last = current_time - self._last_transition_time
 
+            # Check for thrashing (rapid oscillation)
+            if self._is_thrashing():
+                if time_since_last < self.THRASHING_COOLDOWN_SECONDS:
+                    logger.warning(
+                        "Stage thrashing detected, blocking %s->%s for %ds",
+                        old_stage.name,
+                        new_stage.name,
+                        int(self.THRASHING_COOLDOWN_SECONDS),
+                    )
+                    return
+
+            # Enforce normal cooldown
             if time_since_last < self.TRANSITION_COOLDOWN_SECONDS:
                 logger.debug(
                     f"Stage transition blocked by cooldown: {old_stage.name} -> {new_stage.name} "

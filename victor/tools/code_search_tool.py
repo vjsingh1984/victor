@@ -24,6 +24,28 @@ def clear_index_cache() -> None:
     _INDEX_CACHE.clear()
 
 
+async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
+    """Validate persistent index integrity with a test query.
+
+    Returns True if index was corrupt and rebuilt, False if healthy.
+    """
+    try:
+        await asyncio.wait_for(
+            index.semantic_search(query="test", max_results=1),
+            timeout=timeout,
+        )
+        return False  # Healthy — no rebuild needed
+    except Exception as e:
+        logger.warning("Persistent index corrupt (%s), forcing rebuild", e)
+        if hasattr(index, "_is_indexed"):
+            index._is_indexed = False
+        try:
+            await index.index_codebase()
+        except Exception as rebuild_err:
+            logger.warning("Index rebuild failed: %s", rebuild_err)
+        return True  # Rebuilt (or attempted)
+
+
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Get the index cache, preferring DI-injected cache if available.
 
@@ -478,7 +500,8 @@ async def _get_or_build_index(
         logger.info(
             "Using persistent embeddings from %s (skip full rebuild)", persist_path
         )
-        rebuilt = False
+        # Validate integrity — corrupt LanceDB data will fail silently
+        rebuilt = await _probe_index_integrity(index)
 
     index_cache[str(root)] = {
         "index": index,

@@ -919,3 +919,50 @@ class TestStageRegressionPrevention:
             ConversationStage.EXECUTION,
             ConversationStage.INITIAL,
         ) not in NATURAL_BACKWARD_TRANSITIONS
+
+
+class TestStageThrashingDampener:
+    """Tests for stage thrashing detection and dampening."""
+
+    @staticmethod
+    def _make_sm():
+        sm = ConversationStateMachine()
+        sm.TRANSITION_COOLDOWN_SECONDS = 0.0
+        sm.THRASHING_COOLDOWN_SECONDS = 30.0
+        sm.THRASHING_WINDOW_SECONDS = 120.0
+        sm.MAX_TRANSITIONS_PER_WINDOW = 6
+        return sm
+
+    def test_thrashing_detected_on_oscillation(self):
+        """Rapid READING↔EXECUTION cycling triggers thrashing detection."""
+        import time
+
+        sm = self._make_sm()
+        # Simulate 8 rapid transitions (above MAX_TRANSITIONS_PER_WINDOW=6)
+        for i in range(4):
+            sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+            sm._transition_to(ConversationStage.READING, confidence=0.7)
+
+        assert sm._is_thrashing() is True
+
+    def test_thrashing_dampener_blocks(self):
+        """After thrashing detected, transitions are blocked for cooldown."""
+        sm = self._make_sm()
+        # Trigger thrashing
+        for i in range(4):
+            sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+            sm._transition_to(ConversationStage.READING, confidence=0.7)
+
+        current_stage = sm.state.stage
+        # Next transition should be blocked by thrashing cooldown
+        sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+        assert sm.state.stage == current_stage  # Stayed in same stage
+
+    def test_normal_transitions_not_flagged(self):
+        """Normal progression (< MAX transitions) is not flagged."""
+        sm = self._make_sm()
+        sm._transition_to(ConversationStage.READING, confidence=0.8)
+        sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
+        sm._transition_to(ConversationStage.VERIFICATION, confidence=0.8)
+
+        assert sm._is_thrashing() is False

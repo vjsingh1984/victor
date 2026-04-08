@@ -165,6 +165,28 @@ def setup_benchmark(
     )
 
 
+async def _run_git_with_timeout(cmd, cwd, timeout=60):
+    """Run a git command with timeout protection.
+
+    Kills the process if it doesn't complete within timeout seconds.
+    Prevents silent hangs from blocking the benchmark pipeline.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return proc.returncode, stdout, stderr
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        logger.warning("Git command timed out after %ds: %s", timeout, " ".join(cmd))
+        raise
+
+
 @benchmark_app.command("run")
 def run_benchmark(
     benchmark: str = typer.Argument(
@@ -577,26 +599,29 @@ async def _run_benchmark_async(
                         ["git", "checkout", "--force", benchmark_task.base_commit],
                         ["git", "clean", "-fd", "-e", ".victor"],
                     ]:
-                        proc = await asyncio.create_subprocess_exec(
-                            *git_cmd,
-                            cwd=work_dir,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        await proc.communicate()
+                        try:
+                            await _run_git_with_timeout(git_cmd, work_dir, timeout=60)
+                        except asyncio.TimeoutError:
+                            console.print(
+                                f"  [yellow]Git command timed out: {git_cmd[1]}[/]"
+                            )
 
                 # Pre-warm code_search index BEFORE task timer starts.
-                # This ensures the first code_search call is a cache hit (~0ms)
-                # instead of a full re-index (~20s that eats into timeout).
+                # Timeout protected — if pre-warm hangs, skip and continue.
                 try:
                     from victor.tools.code_search_tool import _get_or_build_index
                     from victor.config.settings import load_settings
 
                     _prewarm_settings = load_settings()
-                    await _get_or_build_index(
-                        work_dir, _prewarm_settings, force_reindex=False
+                    await asyncio.wait_for(
+                        _get_or_build_index(
+                            work_dir, _prewarm_settings, force_reindex=False
+                        ),
+                        timeout=120,
                     )
                     console.print("  [dim]Code search index pre-warmed[/]")
+                except asyncio.TimeoutError:
+                    logger.warning("Index pre-warm timed out after 120s, skipping")
                 except Exception as e:
                     logger.debug(f"Index pre-warm skipped: {e}")
 
