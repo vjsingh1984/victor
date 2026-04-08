@@ -186,7 +186,7 @@ class SemanticThresholdLearner(BaseLearner):
                 stats["zero_result_count"] == prev_stats.get("zero_result_count")
                 and stats["low_quality_count"] == prev_stats.get("low_quality_count")
                 and abs(stats["avg_threshold"] - (prev_stats.get("avg_threshold") or 0))
-                < 0.001
+                < 0.05  # Wider tolerance — decay causes small drift each call
             )
             if unchanged:
                 logger.debug(
